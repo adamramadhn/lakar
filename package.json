@@ -9,7 +9,9 @@
   "scripts": {
     "build": "node scripts/assert-node.mjs && tsc -b",
     "test": "node scripts/assert-node.mjs && tsc -p tsconfig.test.json && vitest run",
-    "clean": "tsc -b --clean"
+    "clean": "tsc -b --clean",
+    "lakard": "node packages/daemon/dist/main.js",
+    "install-browser": "bash scripts/install-browser.sh"
   },
   "devDependencies": {
     "@types/node": "26.6.6",

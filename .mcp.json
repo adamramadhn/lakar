@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "lakar": {
+      "command": "/opt/node-26/bin/node",
+      "args": ["/root/lakar/packages/mcp/dist/main.js"],
+      "env": {
+        "LAKAR_URL": "http://127.0.0.1:7466"
+      }
+    }
+  }
+}

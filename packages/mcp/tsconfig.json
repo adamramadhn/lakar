@@ -10,5 +10,10 @@
     {
       "path": "../schema"
     }
-  ]
+  ],
+  "compilerOptions": {
+    "types": [
+      "node"
+    ]
+  }
 }

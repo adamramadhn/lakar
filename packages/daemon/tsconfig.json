@@ -24,6 +24,17 @@
     },
     {
       "path": "../skills"
+    },
+    {
+      "path": "../schema"
+    },
+    {
+      "path": "../ports"
     }
-  ]
+  ],
+  "compilerOptions": {
+    "types": [
+      "node"
+    ]
+  }
 }

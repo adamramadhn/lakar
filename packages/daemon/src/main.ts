@@ -1,0 +1,44 @@
+#!/usr/bin/env node
+// Entry `lakard`. Jalankan: /opt/node-26/bin/pnpm lakard  (atau /opt/node-26/bin/node packages/daemon/dist/main.js)
+import { loadConfig } from './config.js';
+import { startDaemon } from './start.js';
+
+let config;
+try {
+  config = loadConfig();
+} catch (e) {
+  console.error(`lakard: ${(e as Error).message}`);
+  process.exit(1);
+}
+
+try {
+  const daemon = await startDaemon(config);
+  let closing = false;
+  const shutdown = (signal: string) => {
+    if (closing) return;
+    closing = true;
+    console.log(`lakard: ${signal}, berhenti...`);
+    const force = setTimeout(() => process.exit(1), 5000);
+    force.unref();
+    daemon.close().then(
+      () => process.exit(0),
+      () => process.exit(1),
+    );
+  };
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+  process.on('SIGINT', () => shutdown('SIGINT'));
+  // Baris kesiapan dicetak SETELAH handler sinyal terpasang: pengawas (tes, tracer-e2e) boleh
+  // langsung mengirim SIGTERM begitu membaca baris ini tanpa membunuh proses lewat aksi default.
+  console.log(`lakard: mendengarkan ${daemon.url} (data: ${config.dataDir})`);
+} catch (e) {
+  const err = e as NodeJS.ErrnoException;
+  if (err.code === 'EADDRINUSE') {
+    console.error(
+      `lakard: port ${config.port} di ${config.host} sudah dipakai proses lain. ` +
+        `Hentikan proses itu atau set LAKAR_PORT ke port lain (mis. LAKAR_PORT=7467). Daemon tidak mencoba port lain.`,
+    );
+  } else {
+    console.error(`lakard: gagal start: ${err.message}`);
+  }
+  process.exit(1);
+}

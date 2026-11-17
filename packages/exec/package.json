@@ -18,6 +18,8 @@
   ],
   "dependencies": {
     "@lakar/core": "workspace:*",
-    "@lakar/ports": "workspace:*"
+    "@lakar/ports": "workspace:*",
+    "@lakar/schema": "workspace:*",
+    "quickjs-emscripten": "0.32.0"
   }
 }

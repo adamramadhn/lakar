@@ -17,11 +17,19 @@
     "dist"
   ],
   "dependencies": {
+    "@lakar/check": "workspace:*",
     "@lakar/core": "workspace:*",
     "@lakar/exec": "workspace:*",
-    "@lakar/render": "workspace:*",
-    "@lakar/check": "workspace:*",
     "@lakar/icons": "workspace:*",
-    "@lakar/skills": "workspace:*"
+    "@lakar/ports": "workspace:*",
+    "@lakar/render": "workspace:*",
+    "@lakar/schema": "workspace:*",
+    "@lakar/skills": "workspace:*",
+    "fastify": "5.12.8",
+    "playwright-core": "1.65.1",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "26.6.6"
   }
 }
