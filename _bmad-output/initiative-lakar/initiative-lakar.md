@@ -49,6 +49,7 @@ Adam bisa meminta desain UI dari Claude Code dan mendapat hasil setara atau lebi
 - C6 (golden-set §Provenance): frame target golden set dari pen.dev hanya arsip internal. Frame itu tidak dipakai sebagai jangkar juri, data, atau bahan skill.
 - C7 (DESIGN.md Lampiran B; golden-set): rubrik dan kriteria golden set tidak pernah dibaca agen.
 - C8 (golden-set §Prosedur; DESIGN.md Lampiran B, Gerbang): waktu dan biaya kedua alat diukur dengan cara yang sama. Biaya hanya dilaporkan, bukan ambang. Satu putaran mencakup semua prompt dan tidak memilih run terbaik.
+- C9 (keputusan Adam 2026-11-17): setiap langkah yang menyentuh mesin bersama tidak boleh berdampak ke aplikasi lain di VPS. Yang termasuk: runtime, paket global, service, port, Docker, dan file `.pen`. Pilih cara yang terisolasi, dan buktikan aplikasi lain tetap berjalan.
 
 ## Done when
 
@@ -85,5 +86,5 @@ Adam bisa meminta desain UI dari Claude Code dan mendapat hasil setara atau lebi
 - Decision: 2026-11-17 — ukuran board yang salah membuat hasil gagal otomatis di bench (Lampiran B, Gerbang), meskipun LC-12 berlevel warning.
 - Decision: 2026-11-17 — putaran G0 hanya berisi A dan B, dan gerbang G0 tidak menghitung R3/R7 (aturan sumbernya milik G1). Detail ada di epic G0.
 - Decision: 2026-11-17 — epic dibagi per gerbang: G0, lalu G1, lalu B (arahan Adam).
-- Decision: 2026-11-17 — story pertama G0 adalah upgrade Node 22 → 26 LTS (arahan Adam).
+- Decision: 2026-11-17 — story pertama G0 menyiapkan Node 26 LTS (arahan Adam). Node 26 dipasang berdampingan khusus Lakar, sementara `/usr/bin/node` tetap v22 karena dipakai pen, n8n-mcp, dan aplikasi lain. Docker tidak dipakai: menambah latensi MCP stdio dan bertentangan dengan spine (systemd).
 - Decision: 2026-11-17 — tidak ada epic platform-baseline terpisah. Upgrade Node dan scaffold menjadi story pertama epic G0.

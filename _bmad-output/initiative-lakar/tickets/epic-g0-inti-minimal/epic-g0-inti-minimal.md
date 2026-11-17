@@ -33,17 +33,18 @@ Adam tahu apakah arah editor sendiri layak: prompt A dan B setara atau lebih bai
 - R6 (parent R6, bagian G0): `read_skill` menyajikan `core.md`, `landing.md`, `mobile.md`, `icons.md`, dan `api.md` (dihasilkan dari `api.ts`). Contoh di skill dites terhadap API. `webapp.md` menyusul di G1 (AD-12).
 - R7 (parent R7, bagian G0): harness bench menjalankan prompt A dan B di Lakar dan pen.dev sesuai golden-set §Prosedur. Isinya baseline pen.dev median 3 run, PNG skala 1, strip mobile, juri 3× buta, dan laporan putaran (AD-13).
 - R8 (parent R8): keputusan G0 tercatat di `bench/round-<n>.md` dan sudah dikonfirmasi Adam.
-- R9 (architecture §Stack, §Deployment): `lakard` berjalan di Node 26 LTS sebagai systemd user service yang bind ke 127.0.0.1. Rilis memakai `pnpm build` dan instal chromium-headless-shell.
+- R9 (architecture §Stack, §Deployment; C9): `lakard` berjalan di Node 26 LTS yang terpasang berdampingan dengan Node sistem, sebagai systemd user service yang bind ke 127.0.0.1. Rilis memakai `pnpm build` dan instal chromium-headless-shell.
 
 ## Constraints
 
-- C1, C2, C3, C5, C6, C7, dan C8 dari inisiatif berlaku penuh.
+- C1, C2, C3, C5, C6, C7, C8, dan C9 dari inisiatif berlaku penuh.
+- Lakar selalu memanggil Node 26 lewat path absolut (`/opt/node-26/bin`), dan `/usr/bin/node` tidak diubah.
 - C4: kalau G0 gagal, epic G1 tidak dimulai sampai arah dievaluasi.
 - Stack mengikuti architecture §Stack (versi terpin). TypeScript 7 dipakai tanpa alat yang butuh API TS programatik.
 
 ## Done when
 
-- Node 26 LTS aktif di mesin, dan `pnpm build` + `vitest` lulus untuk semua paket.
+- Node 26 LTS tersedia untuk Lakar sementara Node sistem tetap v22, dan `pnpm build` + `vitest` lulus untuk semua paket.
 - Dari sesi Claude Code baru, prompt A dan B menghasilkan board di Lakar dengan PNG, dan `layout_check` G0 menghasilkan 0 error gerbang.
 - `lakard` berjalan sebagai systemd user service dan `status` melaporkan versi, pool, dan font hilang.
 - `bench/round-1.md` berisi baseline pen.dev (median 3 run), hasil Lakar, skor juri, dan keputusan A dan B, sudah dikonfirmasi Adam.

@@ -3,20 +3,20 @@
 [[entry]]
 id = 1
 type = "story"
-title = "Mesin memakai Node 26 LTS"
-description = "Upgrade Node 22 ke Node 26 LTS (aarch64) di VPS dan pasang pnpm 12.21.0 lewat npm i -g, tanpa merusak tool global yang sudah ada (Claude Code, pen-vps-kit)."
-verify = "node -v menunjukkan v26.x, pnpm -v menunjukkan 12.21.0, dan claude --version serta MCP pencil masih berjalan."
+title = "Lakar memakai Node 26 LTS berdampingan, Node sistem tetap 22"
+description = "Pasang Node 26 LTS linux-arm64 di /opt/node-26 (tarball resmi, checksum dicek) dengan pnpm 12.21.0 di prefix itu; /usr/bin/node, paket global npm, dan PATH sistem tidak diubah (C9)."
+verify = "/opt/node-26/bin/node -v menunjukkan v26.x dan /opt/node-26/bin/pnpm -v 12.21.0; /usr/bin/node -v tetap v22.23.5; claude --version, pen, MCP pencil, n8n-mcp, dan t3code masih berjalan."
 covers = ["R9"]
 after = []
 hitl = true
 risk = "medium"
-notes = ["Arahan Adam: upgrade Node jadi story pertama G0."]
+notes = ["Arahan Adam: Node 26 jadi story pertama G0, tanpa mengubah Node sistem yang dipakai aplikasi lain."]
 
 [[entry]]
 id = 2
 type = "story"
 title = "Monorepo Lakar terbangun dan teruji kosong"
-description = "Membuat workspace pnpm dengan paket per Structural Seed (schema, ports, core, render, check, exec, icons, skills, daemon, mcp, bench), TypeScript 7 tsc -b, vitest, field packageManager, dan tes arah dependensi spine."
+description = "Membuat workspace pnpm dengan paket per Structural Seed (schema, ports, core, render, check, exec, icons, skills, daemon, mcp, bench), TypeScript 7 tsc -b, vitest, field packageManager, .node-version dan engines node >=26 (build gagal di Node 22), dan tes arah dependensi spine."
 verify = "pnpm install, pnpm build, dan pnpm test lulus; tes arah dependensi gagal bila core mengimpor modul IO atau mcp mengimpor core."
 covers = ["R9"]
 after = [1]
@@ -28,7 +28,7 @@ references = ["_bmad-output/initiative-lakar/architecture-lakar-core/architectur
 id = 3
 type = "story"
 title = "Tracer: Claude Code membuat board lewat execute dan menerima PNG"
-description = "Jalur paling tipis lewat semua lapisan: skema minimal (board, frame, text), core add dalam transaksi, exec QuickJS, daemon HTTP + sesi, render Chromium satu halaman (diganti pool di story 12), tool MCP open_doc minimal (membuat atau membuka dokumen aktif sesi), execute, dan screenshot; menyiapkan instal chromium-headless-shell dan registrasi lakar-mcp di Claude Code."
+description = "Jalur paling tipis lewat semua lapisan: skema minimal (board, frame, text), core add dalam transaksi, exec QuickJS, daemon HTTP + sesi, render Chromium satu halaman (diganti pool di story 12), tool MCP open_doc minimal (membuat atau membuka dokumen aktif sesi), execute, dan screenshot; menyiapkan instal chromium-headless-shell dan registrasi lakar-mcp di Claude Code dengan path absolut Node 26 (tanpa mengubah MCP lain)."
 verify = "Dari sesi Claude Code baru, open_doc lalu satu panggilan execute menambah board 390x844 berisi teks dan screenshot mengembalikan PNG yang menampilkan teks itu; dokumen tersimpan sebagai <slug>.lakar.json."
 covers = ["R1", "R2", "R3"]
 after = [2]
@@ -127,7 +127,7 @@ risk = "high"
 id = 12
 type = "story"
 title = "Pool render hangat, tool MCP v1 lengkap, dan lakard sebagai service"
-description = "Pool Chromium minimal 2 halaman dengan sewa eksklusif, batas waktu host, dan pembuatan ulang halaman crash (AD-18); tool status, read_skill, open_doc, list_boards, inspect, screenshot, export, dan VERSION_MISMATCH saat sesi MCP mulai; unit systemd user service bind 127.0.0.1 dengan Restart=on-failure; skrip rilis (tag git, pnpm build, instal chromium-headless-shell, restart service); pool menggantikan halaman tunggal dari story 3."
+description = "Pool Chromium minimal 2 halaman dengan sewa eksklusif, batas waktu host, dan pembuatan ulang halaman crash (AD-18); tool status, read_skill, open_doc, list_boards, inspect, screenshot, export, dan VERSION_MISMATCH saat sesi MCP mulai; unit systemd user service bind 127.0.0.1 (port yang belum dipakai aplikasi lain) dengan ExecStart ke /opt/node-26/bin/node dan Restart=on-failure; skrip rilis (tag git, pnpm build, instal chromium-headless-shell, restart service); pool menggantikan halaman tunggal dari story 3."
 verify = "systemctl --user status lakard aktif; dua screenshot paralel atas dokumen berbeda keduanya benar; halaman yang dimatikan paksa menghasilkan RENDER_FAILED retryable lalu pool pulih; status melaporkan versi, pool, dan font hilang."
 covers = ["R3", "R9"]
 after = [11]
