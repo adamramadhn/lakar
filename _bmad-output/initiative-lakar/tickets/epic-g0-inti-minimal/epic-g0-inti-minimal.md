@@ -74,3 +74,4 @@ Adam tahu apakah arah editor sendiri layak: prompt A dan B setara atau lebih bai
 - Decision: 2026-11-17 — gerbang G0 tidak menghitung R3/R7, karena aturan sumbernya (LC-03/06/07/11/13/14/17/18/21) milik G1. G0 memakai error gerbang, ukuran board, dan waktu.
 - Decision: 2026-11-17 — waktu diukur sesuai AD-13 (lihat Notes inisiatif). Story 4 tidak lagi tertahan.
 - Decision: 2026-11-17 — epic G0 tetap satu dengan 16 story, tidak dipecah menjadi inti dan bench. Keduanya baru bernilai bersama untuk memutuskan gerbang. Keputusan diserahkan Adam ke Sofia.
+- Decision: 2026-11-17 — G0 dibangun tanpa pendamping oleh `bmad-build-auto`, berurutan di branch `g0`. Plan direview dulu (plan_checkpoint) untuk story berisiko tinggi: 3, 4, 7, 11, 16. Eksekusi berhenti setelah selesai (done_checkpoint) di story 1 (mesin), 4 (baseline pen.dev), 12 (service), dan 16 (gerbang). Story hitl berhenti saat butuh Adam. Keputusan diserahkan Adam ke Sofia.

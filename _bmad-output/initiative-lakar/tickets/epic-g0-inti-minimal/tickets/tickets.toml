@@ -11,6 +11,7 @@ after = []
 hitl = true
 risk = "medium"
 notes = ["Arahan Adam: Node 26 jadi story pertama G0, tanpa mengubah Node sistem yang dipakai aplikasi lain."]
+done_checkpoint = true
 
 [[entry]]
 id = 2
@@ -34,6 +35,7 @@ covers = ["R1", "R2", "R3"]
 after = [2]
 hitl = true
 risk = "high"
+plan_checkpoint = true
 
 [[entry]]
 id = 4
@@ -45,6 +47,8 @@ covers = ["R7"]
 after = [2]
 hitl = true
 risk = "high"
+plan_checkpoint = true
+done_checkpoint = true
 
 [[entry]]
 id = 5
@@ -78,6 +82,7 @@ covers = ["R2", "R3"]
 after = [5]
 hitl = false
 risk = "high"
+plan_checkpoint = true
 
 [[entry]]
 id = 8
@@ -122,6 +127,7 @@ covers = ["R5"]
 after = [9, 10]
 hitl = false
 risk = "high"
+plan_checkpoint = true
 
 [[entry]]
 id = 12
@@ -133,6 +139,7 @@ covers = ["R3", "R9"]
 after = [11]
 hitl = true
 risk = "medium"
+done_checkpoint = true
 
 [[entry]]
 id = 13
@@ -177,3 +184,5 @@ covers = ["R7", "R8"]
 after = [13, 14, 15]
 hitl = true
 risk = "high"
+plan_checkpoint = true
+done_checkpoint = true
