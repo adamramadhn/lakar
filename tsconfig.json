@@ -1,0 +1,38 @@
+{
+  "files": [],
+  "references": [
+    {
+      "path": "./packages/schema"
+    },
+    {
+      "path": "./packages/ports"
+    },
+    {
+      "path": "./packages/skills"
+    },
+    {
+      "path": "./packages/core"
+    },
+    {
+      "path": "./packages/render"
+    },
+    {
+      "path": "./packages/check"
+    },
+    {
+      "path": "./packages/exec"
+    },
+    {
+      "path": "./packages/icons"
+    },
+    {
+      "path": "./packages/daemon"
+    },
+    {
+      "path": "./packages/mcp"
+    },
+    {
+      "path": "./bench"
+    }
+  ]
+}

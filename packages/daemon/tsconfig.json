@@ -1,0 +1,29 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "include": [
+    "src"
+  ],
+  "exclude": [
+    "src/**/*.test.ts"
+  ],
+  "references": [
+    {
+      "path": "../core"
+    },
+    {
+      "path": "../exec"
+    },
+    {
+      "path": "../render"
+    },
+    {
+      "path": "../check"
+    },
+    {
+      "path": "../icons"
+    },
+    {
+      "path": "../skills"
+    }
+  ]
+}

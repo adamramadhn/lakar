@@ -1,0 +1,27 @@
+{
+  "name": "@lakar/daemon",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=26"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "dependencies": {
+    "@lakar/core": "workspace:*",
+    "@lakar/exec": "workspace:*",
+    "@lakar/render": "workspace:*",
+    "@lakar/check": "workspace:*",
+    "@lakar/icons": "workspace:*",
+    "@lakar/skills": "workspace:*"
+  }
+}
