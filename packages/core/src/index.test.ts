@@ -97,4 +97,78 @@ describe('@lakar/core', () => {
       expect((e as LakarError).code).toBe(code);
     }
   });
+
+  it('createDocument berisi tokens kosong', () => {
+    expect(createDocument().tokens).toEqual({});
+  });
+
+  it.each([
+    ['text', { type: 'text', name: 'T', content: 'a', size: 12 }],
+    ['rect', { type: 'rect', name: 'R', width: 10, height: 10 }],
+    ['ellipse', { type: 'ellipse', name: 'E', width: 10, height: 10, inner: 0.5 }],
+    ['path', { type: 'path', name: 'P', d: 'M0 0L1 1', viewBox: [0, 0, 1, 1] }],
+    ['icon', { type: 'icon', name: 'Icon / lucide / house', icon: 'house', lib: 'lucide', size: 16 }],
+  ])('add daun %s: tanpa children, valid, dan tidak bisa menjadi parent', (type, node) => {
+    const tx = beginTransaction(createDocument(), { sessionId: 's' });
+    const b = tx.add(null, boardIn);
+    const f = tx.add(b, { type: 'frame', name: 'F' });
+    const leaf = tx.add(f, node);
+    try {
+      tx.add(leaf, { type: 'rect', name: 'Anak' });
+      expect.unreachable();
+    } catch (e) {
+      expect((e as LakarError).code).toBe('SCHEMA_INVALID');
+      expect((e as LakarError).message).toContain(type);
+    }
+    const r = tx.commit('daun');
+    const stored = (r.doc.pages[0]!.children[0]!.children[0] as { children: Record<string, unknown>[] }).children[0]!;
+    expect(stored).toEqual({ ...node, id: leaf });
+    expect('children' in stored).toBe(false);
+    expect(parseDocument(r.doc)).toEqual(r.doc);
+  });
+
+  it('commit dengan token tak dikenal → TOKEN_UNKNOWN, transaksi tertutup, dokumen asli utuh', () => {
+    const doc = createDocument();
+    const before = structuredClone(doc);
+    const tx = beginTransaction(doc, { sessionId: 's' });
+    const b = tx.add(null, boardIn);
+    tx.add(b, { type: 'text', name: 'T', content: 'a', size: 12, color: { $token: 'colors.text-primary' } });
+    try {
+      tx.commit('token');
+      expect.unreachable();
+    } catch (e) {
+      expect(e).toBeInstanceOf(LakarError);
+      expect((e as LakarError).code).toBe('TOKEN_UNKNOWN');
+      expect((e as LakarError).message).toContain('colors.text-primary');
+    }
+    expect(tx.open).toBe(false);
+    expect(doc).toEqual(before);
+  });
+
+  it('commit dengan token salah tipe → SCHEMA_INVALID, transaksi tertutup, dokumen asli utuh', () => {
+    const doc = { ...createDocument(), tokens: { 'spacing.2': 16 } };
+    const before = structuredClone(doc);
+    const tx = beginTransaction(doc, { sessionId: 's' });
+    const b = tx.add(null, boardIn);
+    tx.add(b, { type: 'text', name: 'T', content: 'a', size: 12, color: { $token: 'spacing.2' } });
+    try {
+      tx.commit('token');
+      expect.unreachable();
+    } catch (e) {
+      expect(e).toBeInstanceOf(LakarError);
+      expect((e as LakarError).code).toBe('SCHEMA_INVALID');
+      expect((e as LakarError).message).toContain('spacing.2');
+    }
+    expect(tx.open).toBe(false);
+    expect(doc).toEqual(before);
+  });
+
+  it('commit dengan token yang terdefinisi: ref disimpan apa adanya', () => {
+    const doc = { ...createDocument(), tokens: { 'colors.text-primary': '#1A1A1A' } };
+    const tx = beginTransaction(doc, { sessionId: 's' });
+    const b = tx.add(null, boardIn);
+    tx.add(b, { type: 'text', name: 'T', content: 'a', size: 12, color: { $token: 'colors.text-primary' } });
+    const r = tx.commit('token');
+    expect(r.doc.pages[0]!.children[0]!.children[0]).toMatchObject({ color: { $token: 'colors.text-primary' } });
+  });
 });

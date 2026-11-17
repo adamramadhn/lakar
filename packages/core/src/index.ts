@@ -4,6 +4,7 @@ import {
   LakarError,
   NodeInput,
   SCHEMA_VERSION,
+  resolveTokens,
   zodToLakarError,
   type BoardNode,
   type ChildNode,
@@ -71,7 +72,7 @@ export function collectIds(doc: Doc): string[] {
 /** Dokumen kosong: satu halaman, rev 0. */
 export function createDocument(random?: RandomSource): Doc {
   const ids = new IdAllocator([], random);
-  return { schemaVersion: SCHEMA_VERSION, id: ids.next(), rev: 0, pages: [{ id: ids.next(), name: 'Page 1', children: [] }] };
+  return { schemaVersion: SCHEMA_VERSION, id: ids.next(), rev: 0, tokens: {}, pages: [{ id: ids.next(), name: 'Page 1', children: [] }] };
 }
 
 /** Validasi dokumen dari luar (file). Rusak → SCHEMA_INVALID. */
@@ -147,7 +148,7 @@ export function beginTransaction(doc: Doc, opts: TransactionOptions): Transactio
       if (parentId === null) {
         if (input.type !== 'board') {
           throw new LakarError('SCHEMA_INVALID', `add(null, …) hanya untuk board, bukan ${input.type}`, {
-            hint: 'anak halaman hanya board; tambahkan frame/text ke dalam board: add(boardId, {...})',
+            hint: 'anak halaman hanya board; tambahkan node anak (frame, text, rect, ellipse, path, icon) ke dalam board: add(boardId, {...})',
           });
         }
         w.pages[0]!.children.push({ ...input, id, children: [] });
@@ -160,11 +161,12 @@ export function beginTransaction(doc: Doc, opts: TransactionOptions): Transactio
         if (input.type === 'board') {
           throw new LakarError('SCHEMA_INVALID', 'board hanya boleh menjadi anak halaman', { hint: 'pakai add(null, {type:"board",...})' });
         }
-        if (parent.node.type === 'text') {
-          throw new LakarError('SCHEMA_INVALID', `node text ${parentId} tidak bisa punya anak`, { hint: 'tambahkan ke board atau frame' });
+        const target = parent.node;
+        if (target.type !== 'board' && target.type !== 'frame') {
+          throw new LakarError('SCHEMA_INVALID', `node ${target.type} ${parentId} tidak bisa punya anak`, { hint: 'hanya board dan frame yang bisa punya anak; tambahkan ke board atau frame' });
         }
         const child: ChildNode = input.type === 'frame' ? { ...input, id, children: [] } : { ...input, id };
-        parent.node.children.push(child);
+        target.children.push(child);
         path = `${parent.path}/${input.name}`;
       }
       created.push({ id, name: input.name, path });
@@ -174,6 +176,9 @@ export function beginTransaction(doc: Doc, opts: TransactionOptions): Transactio
     commit(description) {
       const w = live();
       work = undefined;
+      // AD-16: ref token tak dikenal → TOKEN_UNKNOWN, token salah tipe → SCHEMA_INVALID, keduanya saat
+      // commit. Transaksi sudah tertutup; dokumen asli tidak tersentuh (salinan kerja dibuang).
+      resolveTokens(w);
       w.rev = doc.rev + 1;
       const opsSummary = Object.entries(ops).map(([op, n]) => `${op}×${n}`).join(', ') || 'kosong';
       const entry: HistoryEntry = { rev: w.rev, sessionId: opts.sessionId, description, opsSummary, at: now().toISOString() };

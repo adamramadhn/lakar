@@ -4,7 +4,15 @@ import { beginTransaction, createDocument } from '@lakar/core';
 import { runSnippet } from '@lakar/exec';
 import type { RenderPort } from '@lakar/ports';
 import { findBoard } from '@lakar/render';
-import { LakarError, SLUG_PATTERN, type ApiErrorBody, type ErrorCode, type LakarDocument } from '@lakar/schema';
+import {
+  LakarError,
+  SLUG_PATTERN,
+  resolveTokens,
+  type ApiErrorBody,
+  type ErrorCode,
+  type LakarDocument,
+  type ResolvedDocument,
+} from '@lakar/schema';
 import { z } from 'zod';
 import { readRenderModule, RENDER_PAGE_HTML } from './chromium.js';
 import type { DaemonConfig } from './config.js';
@@ -31,7 +39,7 @@ const OpenBody = z.object({ slug: z.string() });
 const ExecuteBody = z.object({ code: z.string().min(1), description: z.string().optional() });
 const ScreenshotBody = z.object({ boardId: z.string().optional() }).optional();
 
-export type BuildOptions = { config: DaemonConfig; render: RenderPort<LakarDocument> };
+export type BuildOptions = { config: DaemonConfig; render: RenderPort<ResolvedDocument> };
 
 export type Daemon = { app: FastifyInstance; store: DocStore; sessions: Sessions };
 
@@ -133,7 +141,8 @@ export function buildServer({ config, render }: BuildOptions): Daemon {
   app.post('/screenshot', async (req, reply) => {
     const { slug } = activeDoc(req.headers[SESSION_HEADER]);
     const body = parse(ScreenshotBody, req.body ?? undefined, 'kirim {boardId?}');
-    const doc = docs.get(slug)!;
+    // AD-6/AD-16: render hanya menerima dokumen ter-resolve; token diselesaikan di daemon.
+    const doc = resolveTokens(docs.get(slug)!);
     const boardId = body?.boardId ?? doc.pages[0]?.children[0]?.id;
     const board = boardId ? findBoard(doc, boardId) : undefined;
     if (!boardId || !board) {

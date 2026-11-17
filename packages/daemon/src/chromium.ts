@@ -3,7 +3,7 @@
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import type { RenderPort } from '@lakar/ports';
-import { LakarError, type LakarDocument } from '@lakar/schema';
+import { LakarError, type ResolvedDocument } from '@lakar/schema';
 import type { Browser, Page } from 'playwright-core';
 import { Mutex } from './mutex.js';
 
@@ -39,7 +39,7 @@ export type ChromiumOptions = {
   timeoutMs: number;
 };
 
-export class ChromiumRenderer implements RenderPort<LakarDocument> {
+export class ChromiumRenderer implements RenderPort<ResolvedDocument> {
   readonly #opts: ChromiumOptions;
   readonly #mutex = new Mutex();
   #browser: Browser | undefined;
@@ -64,7 +64,7 @@ export class ChromiumRenderer implements RenderPort<LakarDocument> {
     return page;
   }
 
-  screenshot(doc: LakarDocument, boardId: string): Promise<Uint8Array> {
+  screenshot(doc: ResolvedDocument, boardId: string): Promise<Uint8Array> {
     return this.#mutex.run(async () => {
       try {
         const page = await this.#ensurePage();

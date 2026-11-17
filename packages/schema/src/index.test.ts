@@ -31,14 +31,15 @@ describe('@lakar/schema', () => {
     ['text valid', { type: 'text', name: 'T', content: 'hai', size: 16 }, true],
     ['text warna hex8', { type: 'text', name: 'T', content: 'hai', size: 16, color: '#11223344' }, true],
     ['text warna rgba ditolak', { type: 'text', name: 'T', content: 'hai', size: 16, color: 'rgba(0,0,0,1)' }, false],
-    ['text dengan family ditolak (story 7)', { type: 'text', name: 'T', content: 'a', size: 16, family: 'Inter' }, false],
+    ['text dengan family (v1)', { type: 'text', name: 'T', content: 'a', size: 16, family: 'Inter' }, true],
     ['text dengan x ditolak (flow)', { type: 'text', name: 'T', content: 'a', size: 16, x: 10 }, false],
     ['text tanpa name ditolak', { type: 'text', content: 'a', size: 16 }, false],
     ['frame flow', { type: 'frame', name: 'F', layout: 'row', gap: -4, padding: 8, align: 'center', justify: 'space-between' }, true],
     ['frame flow dengan x ditolak', { type: 'frame', name: 'F', x: 1 }, false],
     ['frame absolute dengan x/y', { type: 'frame', name: 'F', position: 'absolute', x: 1, y: 2 }, true],
     ['frame layout asing', { type: 'frame', name: 'F', layout: 'grid' }, false],
-    ['tipe asing', { type: 'rect', name: 'R' }, false],
+    ['rect kini dalam katalog', { type: 'rect', name: 'R' }, true],
+    ['tipe asing', { type: 'image', name: 'I' }, false],
   ])('NodeInput: %s', (_label, input, ok) => {
     expect(NodeInput.safeParse(input).success).toBe(ok);
   });

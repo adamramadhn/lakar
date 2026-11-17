@@ -43,9 +43,16 @@ export function createLakarMcpServer(daemonUrl: string): McpServer {
       description:
         'Jalankan snippet JavaScript sinkron (sandbox QuickJS, tanpa fs/jaringan, batas 2 detik) terhadap dokumen aktif dalam satu transaksi: ' +
         'sukses = commit (rev +1), error tak tertangkap = rollback penuh. API: add(parentId|null, node) → id (string 8 karakter, langsung bisa dipakai). ' +
-        "Node: board {type:'board', name, x, y, width, height, screen:'landing'|'app'|'mobile'} (parent null); " +
-        "frame {type:'frame', name, layout?:'none'|'row'|'column', gap?, padding?, align?:'start'|'center'|'end'|'stretch', justify?:'start'|'center'|'end'|'space-between', width?, height?, position?:'absolute', x?, y?}; " +
-        "text {type:'text', name, content, size, color?:'#RRGGBB'}. x/y hanya untuk board atau frame position:'absolute'. " +
+        "Katalog node v1 (tertutup): board (parent null) {type:'board', name, x, y, width, height, screen:'landing'|'app'|'mobile', expectedSize?:{width,height}, fills?}; " +
+        "frame {layout?:'none'|'row'|'column', gap? (boleh negatif), padding?: n|[v,h]|[t,r,b,l], align?:'start'|'center'|'end'|'stretch', justify?:'start'|'center'|'end'|'space-between', clip?, scrollY?, children lewat add}; " +
+        "text {content, size, family?, weight? (100–900), style?:'normal'|'italic', lineHeight? px, letterSpacing? em, align?:'left'|'center'|'right'|'justify', wrap?:'auto'|'wrap'|'fixed', numeric?:'proportional'|'tabular', color?}; " +
+        "rect {}; ellipse {startDeg?, sweepDeg? (-360..360), inner? [0,1)}; path {d, viewBox:[x,y,w,h]}; icon {lib:'lucide'|'simple-icons', icon (nama kanonik, mis. 'arrow-right'), size, color?, strokeWidth?, filled?}. " +
+        "Semua node anak wajib name; sizing width/height: angka | 'hug' | 'fill' (+ minWidth/maxWidth/minHeight/maxHeight). " +
+        "Efek (semua node anak, termasuk text dan icon): shadows[] {x,y,blur,spread?,color,type?:'drop'|'inner'}, opacity 0..1, blend, blur, backdropBlur, rotation. " +
+        "Cat (frame/rect/ellipse/path; radius hanya frame/rect): fills[] ({type:'solid',color} | {type:'linear',angle,stops} | {type:'radial',center?,radius?,stops} | {type:'image',assetId,fit}), " +
+        "stroke {color, width, align:'inside'|'center'|'outside', sides?}, radius (n atau [tl,tr,br,bl]). " +
+        "Warna: '#RRGGBB' atau '#RRGGBBAA'. Nilai boleh referensi token {$token:'colors.nama'} (token harus ada di dokumen). " +
+        "x/y hanya untuk board atau node anak dengan position:'absolute'. Kunci di luar skema ditolak (SCHEMA_INVALID). " +
         'Mengembalikan {docId, rev, created:[{id,name,path}]}.',
       inputSchema: z.object({
         code: z.string().describe('snippet JavaScript'),

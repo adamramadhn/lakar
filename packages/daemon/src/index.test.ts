@@ -196,6 +196,132 @@ describe('@lakar/daemon', () => {
   });
 });
 
+describe('execute katalog v1', () => {
+  let s: string;
+  const file = () => join(dataDir, 'docs', 'katalog-v1.lakar.json');
+  const hist = () => join(dataDir, 'docs', 'katalog-v1.history.jsonl');
+  const snapshot = async () => ({ doc: await readFile(file(), 'utf8'), hist: existsSync(hist()) ? await readFile(hist(), 'utf8') : '' });
+  const SEVEN = `
+    const b = add(null, {type:'board', name:'Katalog', x:0, y:0, width:400, height:300, screen:'app', expectedSize:{width:400,height:300}, fills:[{type:'solid', color:'#F7F5F0'}]});
+    const f = add(b, {type:'frame', name:'Isi', layout:'column', gap:8, padding:[16,24], width:'fill', height:'hug', radius:8,
+      fills:[{type:'linear', angle:90, stops:[{offset:0,color:'#FFFFFF'},{offset:1,color:'#EEEEEEFF'}]}],
+      stroke:{color:'#E5E5E5', width:1, align:'inside'}, shadows:[{x:0,y:2,blur:4,color:'#0000001A'}]});
+    add(f, {type:'text', name:'Judul', content:'Halo', size:24, weight:600, family:'Inter', lineHeight:32, color:'#1A1A1A'});
+    add(f, {type:'rect', name:'Garis', width:100, height:1, fills:[{type:'solid', color:'#E5E5E5'}]});
+    add(f, {type:'ellipse', name:'Titik', width:12, height:12, inner:0.5, sweepDeg:270});
+    add(f, {type:'path', name:'Panah', d:'M0 0L10 10', viewBox:[0,0,10,10], width:10, height:10});
+    add(b, {type:'icon', name:'Icon / lucide / arrow-right', icon:'arrow-right', lib:'lucide', size:20, color:'#111111', position:'absolute', x:360, y:16});
+  `;
+
+  beforeAll(async () => {
+    s = await newSession();
+    await call('/docs/open', { slug: 'katalog-v1' }, s);
+  });
+
+  it('snippet berisi ketujuh tipe → ok, created 7 entri, file tersimpan', async () => {
+    const r = await call('/execute', { code: SEVEN, description: 'katalog tujuh tipe' }, s);
+    expect(r.status, JSON.stringify(r.body.error)).toBe(200);
+    expect(r.body.ok).toBe(true);
+    expect(r.body.data.created).toHaveLength(7);
+    expect(r.body.data.created.map((c: { path: string }) => c.path)).toEqual([
+      'Katalog',
+      'Katalog/Isi',
+      'Katalog/Isi/Judul',
+      'Katalog/Isi/Garis',
+      'Katalog/Isi/Titik',
+      'Katalog/Isi/Panah',
+      'Katalog/Icon / lucide / arrow-right',
+    ]);
+    const doc = JSON.parse(await readFile(file(), 'utf8'));
+    expect(doc.rev).toBe(1);
+    const board = doc.pages[0].children[0];
+    expect(board.children.map((c: { type: string }) => c.type)).toEqual(['frame', 'icon']);
+    expect(board.children[0].children.map((c: { type: string }) => c.type)).toEqual(['text', 'rect', 'ellipse', 'path']);
+  });
+
+  it.each([
+    ['warna non-hex', `const b=add(null,{type:'board',name:'X',x:0,y:0,width:10,height:10,screen:'app'}); add(b,{type:'rect',name:'R',fills:[{type:'solid',color:'rgba(0,0,0,1)'}]})`, /warna/],
+    ['x/y pada node flow', `const b=add(null,{type:'board',name:'X',x:0,y:0,width:10,height:10,screen:'app'}); add(b,{type:'rect',name:'R',x:4})`, /x\/y hanya untuk board\/node absolute/],
+    ['tipe asing', `const b=add(null,{type:'board',name:'X',x:0,y:0,width:10,height:10,screen:'app'}); add(b,{type:'image',name:'I'})`, /katalog/],
+  ])('%s → HTTP 400 SCHEMA_INVALID, rev tetap', async (_l, code, hint) => {
+    const before = await snapshot();
+    const r = await call('/execute', { code }, s);
+    expect(r.status).toBe(400);
+    expect(r.body).toMatchObject({ ok: false, error: { code: 'SCHEMA_INVALID' } });
+    expect(r.body.error!.hint).toMatch(hint);
+    expect(await snapshot()).toEqual(before);
+  });
+
+  it('ref token tak dikenal → TOKEN_UNKNOWN, rev tetap', async () => {
+    const before = await snapshot();
+    const r = await call('/execute', { code: `const b=add(null,{type:'board',name:'X',x:0,y:0,width:10,height:10,screen:'app'}); add(b,{type:'text',name:'T',content:'a',size:12,color:{$token:'colors.text-primary'}})` }, s);
+    expect(r.status).toBe(422);
+    expect(r.body).toMatchObject({ ok: false, error: { code: 'TOKEN_UNKNOWN' } });
+    expect(r.body.error!.message).toContain('colors.text-primary');
+    expect(await snapshot()).toEqual(before);
+    expect((await call('/docs/open', { slug: 'katalog-v1' }, await newSession())).body.data.rev).toBe(1);
+  });
+
+  it.skipIf(!browserInstalled)('screenshot board katalog: PNG 400×300, latar dari fills board', async () => {
+    const r = await call('/screenshot', {}, s);
+    expect(r.status, JSON.stringify(r.body.error)).toBe(200);
+    const img = decodePng(Buffer.from(r.body.data.png, 'base64'));
+    expect(img.width).toBe(400);
+    expect(img.height).toBe(300);
+    // piksel pojok kanan bawah = fill solid board #F7F5F0
+    const at = (299 * img.width + 399) * img.channels;
+    expect([...img.pixels.subarray(at, at + 3)]).toEqual([0xf7, 0xf5, 0xf0]);
+  }, 60_000);
+});
+
+describe('screenshot menerima dokumen ter-resolve', () => {
+  it('ref token diganti nilai sebelum RenderPort dipanggil', async () => {
+    const tmp = await mkdtemp(join(tmpdir(), 'lakar-tokens-'));
+    const seen: unknown[] = [];
+    const capture = { screenshot: async (doc: unknown) => (seen.push(doc), new Uint8Array([1])) };
+    const { app } = buildServer({ config: { ...baseConfig, port: 0, dataDir: tmp }, render: capture });
+    try {
+      const { mkdir } = await import('node:fs/promises');
+      await mkdir(join(tmp, 'docs'), { recursive: true });
+      const stored = {
+        schemaVersion: 1,
+        id: 'Dddddddd',
+        rev: 2,
+        tokens: { 'colors.surface': '#101010', 'colors.text-primary': '#FAFAFA', 'type.body.size': 18 },
+        pages: [
+          {
+            id: 'Pppppppp',
+            name: 'Page 1',
+            children: [
+              {
+                type: 'board', name: 'B', x: 0, y: 0, width: 100, height: 100, screen: 'app', id: 'Bbbbbbbb',
+                fills: [{ type: 'solid', color: { $token: 'colors.surface' } }],
+                children: [{ type: 'text', name: 'T', id: 'Tttttttt', content: 'a', size: { $token: 'type.body.size' }, color: { $token: 'colors.text-primary' } }],
+              },
+            ],
+          },
+        ],
+      };
+      await writeFile(join(tmp, 'docs', 'tok.lakar.json'), JSON.stringify(stored), 'utf8');
+      const post = (url: string, payload: unknown, session?: string) =>
+        app.inject({ method: 'POST', url, payload: payload as object, headers: session ? { 'x-lakar-session': session } : {} });
+      const sid = (await post('/sessions', {})).json().data.sessionId as string;
+      expect((await post('/docs/open', { slug: 'tok' }, sid)).json().ok).toBe(true);
+      const r = await post('/screenshot', {}, sid);
+      expect(r.statusCode, r.body).toBe(200);
+      expect(seen).toHaveLength(1);
+      const doc = seen[0] as typeof stored;
+      expect(doc.pages[0]!.children[0]!.fills).toEqual([{ type: 'solid', color: '#101010' }]);
+      expect(doc.pages[0]!.children[0]!.children[0]).toMatchObject({ size: 18, color: '#FAFAFA' });
+      // file tetap menyimpan referensi
+      expect(await readFile(join(tmp, 'docs', 'tok.lakar.json'), 'utf8')).toContain('"$token"');
+    } finally {
+      await app.close();
+      await rm(tmp, { recursive: true, force: true });
+    }
+  });
+});
+
 describe('RENDER_FAILED', () => {
   it('render port gagal → HTTP 503, RENDER_FAILED retryable, dokumen tidak berubah', async () => {
     const tmp = await mkdtemp(join(tmpdir(), 'lakar-render-fail-'));
