@@ -1,0 +1,314 @@
+{
+  "tool": "pen.dev",
+  "date": "2026-11-17T23:27:28.982Z",
+  "status": "lengkap",
+  "protocolHash": "907cb36f4674d422feded4506851b6391082b40b918dd46841edae607bedb85d",
+  "model": "claude-opus-5-5",
+  "modelUsageKeys": [
+    "claude-opus-5-5"
+  ],
+  "claudeVersion": "2.1.325",
+  "toolVersions": {
+    "pen.dev desktop (X-AppImage-Version)": "1.2.23",
+    "pen.dev MCP server (initialize serverInfo)": "pencil 1.0.0"
+  },
+  "effort": "default (tanpa `--effort`; `~/.claude/settings.json` tanpa `effortLevel`; CLAUDE_EFFORT pemanggil dibuang)",
+  "wrapper": "Mode benchmark tanpa interaksi: tidak ada pengguna yang bisa menjawab pertanyaan atau memberi konfirmasi. Jangan bertanya; ambil keputusan sendiri dan kerjakan tugas sampai tuntas.\nKerjakan di dokumen baru yang kosong dengan tool desain yang tersedia.\nSetelah tugas tuntas, akhiri jawabanmu dengan satu kata: selesai.\n\nTugas:\n{{PROMPT}}\n",
+  "prompts": {
+    "A": "Desain landing page desktop (lebar 1440px) untuk aplikasi SaaS pembukuan UMKM bernama \"Kasku\". Bagian: navbar, hero (headline, subjudul, 2 CTA, mockup dashboard), 3 kartu fitur, testimoni, pricing 3 tier (tengah ditonjolkan), footer. Gaya modern, bersih, profesional, aksen hijau. Bahasa Indonesia. Kualitas setara desainer produk senior: hierarki tipografi jelas, spacing konsisten (grid 8px), kontras baik, auto/flex layout.",
+    "B": "Desain layar beranda aplikasi mobile (390x844) untuk aplikasi kebugaran \"Gerak\". Isi: sapaan + avatar, ringkasan hari ini (langkah, kalori, menit aktif) dengan ring progress, jadwal latihan hari ini, 2 kartu rekomendasi program, bottom tab bar 4 ikon. Mode gelap, aksen oranye. Bahasa Indonesia. Kualitas setara desainer produk senior: hierarki tipografi jelas, spacing konsisten (grid 8px), kontras baik, auto/flex layout."
+  },
+  "argv": "claude -p '<prompt hasil render>' --model claude-opus-5-5 --strict-mcp-config --tools \"\" --output-format stream-json --verbose --disable-slash-commands --no-session-persistence --mcp-config bench/mcp/pencil.json --allowedTools mcp__pencil",
+  "env": {
+    "set": {
+      "ENABLE_TOOL_SEARCH": "false"
+    },
+    "scrubbed": [
+      "AI_AGENT",
+      "CLAUDECODE",
+      "CLAUDE_AGENT_SDK_VERSION",
+      "CLAUDE_CODE_CHILD_SESSION",
+      "CLAUDE_CODE_ENTRYPOINT",
+      "CLAUDE_CODE_EXECPATH",
+      "CLAUDE_CODE_MESSAGING_SOCKET",
+      "CLAUDE_CODE_MESSAGING_TOKEN",
+      "CLAUDE_CODE_SESSION_ATTENDED",
+      "CLAUDE_CODE_SESSION_ID",
+      "CLAUDE_EFFORT",
+      "CLAUDE_PID"
+    ]
+  },
+  "runsPerPrompt": 3,
+  "runs": [
+    {
+      "runId": "20261117T231042Z-A1",
+      "prompt": "A",
+      "attempt": 1,
+      "status": "success",
+      "uri": "file:///root/.pencil/documents/c47fceed-bb11-46b8-8ebc-1c62ef041bb0/untitled.pen",
+      "uriSource": "get_app_state",
+      "wallMs": 172108.661395,
+      "durationMs": 172154,
+      "durationApiMs": 155282,
+      "costUsd": 0.8427737999999999,
+      "numTurns": 18,
+      "toolCalls": 17,
+      "firstToolUseMs": 1551.4295419999999,
+      "lastToolResultMs": 161229.405959,
+      "spawnToFirstEventMs": 845.7974520000002,
+      "frames": [
+        {
+          "id": "x8OXb",
+          "name": "Kasku — Landing Page",
+          "width": 1440,
+          "height": 4255,
+          "png": "bench/runs/pendev/20261117T231042Z-A1/png/x8OXb.png",
+          "pngWidth": 1440,
+          "pngHeight": 4255
+        }
+      ],
+      "transcriptBytes": 950122,
+      "penPath": "bench/runs/pendev/20261117T231042Z-A1/design.pen",
+      "pngScaleMismatch": false,
+      "model": "claude-opus-5-5",
+      "modelUsageKeys": [
+        "claude-opus-5-5"
+      ],
+      "claudeCodeVersion": "2.1.325",
+      "startedAt": "2026-11-17T23:10:45.877Z"
+    },
+    {
+      "runId": "20261117T231042Z-B1",
+      "prompt": "B",
+      "attempt": 1,
+      "status": "success",
+      "uri": "file:///root/.pencil/documents/944e4031-5766-454f-87e1-487ab908f77d/untitled.pen",
+      "uriSource": "get_app_state",
+      "wallMs": 131343.15693599998,
+      "durationMs": 131461,
+      "durationApiMs": 120446,
+      "costUsd": 0.6423975999999999,
+      "numTurns": 16,
+      "toolCalls": 15,
+      "firstToolUseMs": 1400.7915489999868,
+      "lastToolResultMs": 120061.96389199997,
+      "spawnToFirstEventMs": 949.6478170000191,
+      "frames": [
+        {
+          "id": "E7FqG",
+          "name": "Gerak – Beranda",
+          "width": 390,
+          "height": 844,
+          "png": "bench/runs/pendev/20261117T231042Z-B1/png/E7FqG.png",
+          "pngWidth": 390,
+          "pngHeight": 844
+        }
+      ],
+      "transcriptBytes": 784332,
+      "penPath": "bench/runs/pendev/20261117T231042Z-B1/design.pen",
+      "pngScaleMismatch": false,
+      "model": "claude-opus-5-5",
+      "modelUsageKeys": [
+        "claude-opus-5-5"
+      ],
+      "claudeCodeVersion": "2.1.325",
+      "startedAt": "2026-11-17T23:13:45.733Z"
+    },
+    {
+      "runId": "20261117T231042Z-A2",
+      "prompt": "A",
+      "attempt": 2,
+      "status": "success",
+      "uri": "file:///root/.pencil/documents/f903b78f-4941-4190-bad6-05e7dbca99f8/untitled.pen",
+      "uriSource": "get_app_state",
+      "wallMs": 167296.132408,
+      "durationMs": 167353,
+      "durationApiMs": 150878,
+      "costUsd": 0.8439753999999999,
+      "numTurns": 17,
+      "toolCalls": 16,
+      "firstToolUseMs": 1251.0649220000487,
+      "lastToolResultMs": 156706.088637,
+      "spawnToFirstEventMs": 880.2644799999543,
+      "frames": [
+        {
+          "id": "UCa6A",
+          "name": "Kasku — Landing Page",
+          "width": 1440,
+          "height": 5001,
+          "png": "bench/runs/pendev/20261117T231042Z-A2/png/UCa6A.png",
+          "pngWidth": 1440,
+          "pngHeight": 5001
+        }
+      ],
+      "transcriptBytes": 864117,
+      "penPath": "bench/runs/pendev/20261117T231042Z-A2/design.pen",
+      "pngScaleMismatch": false,
+      "model": "claude-opus-5-5",
+      "modelUsageKeys": [
+        "claude-opus-5-5"
+      ],
+      "claudeCodeVersion": "2.1.325",
+      "startedAt": "2026-11-17T23:16:03.991Z"
+    },
+    {
+      "runId": "20261117T231042Z-B2",
+      "prompt": "B",
+      "attempt": 2,
+      "status": "success",
+      "uri": "file:///root/.pencil/documents/272717d5-1eee-402a-8441-9b2ddea046a0/untitled.pen",
+      "uriSource": "get_app_state",
+      "wallMs": 179310.72748400003,
+      "durationMs": 179379,
+      "durationApiMs": 159015,
+      "costUsd": 0.7967460000000002,
+      "numTurns": 18,
+      "toolCalls": 17,
+      "firstToolUseMs": 1149.3127719999757,
+      "lastToolResultMs": 167286.78886600002,
+      "spawnToFirstEventMs": 929.9273670000257,
+      "frames": [
+        {
+          "id": "hpMIy",
+          "name": "Gerak — Beranda",
+          "width": 390,
+          "height": 844,
+          "png": "bench/runs/pendev/20261117T231042Z-B2/png/hpMIy.png",
+          "pngWidth": 390,
+          "pngHeight": 844
+        }
+      ],
+      "transcriptBytes": 1154782,
+      "penPath": "bench/runs/pendev/20261117T231042Z-B2/design.pen",
+      "pngScaleMismatch": false,
+      "model": "claude-opus-5-5",
+      "modelUsageKeys": [
+        "claude-opus-5-5"
+      ],
+      "claudeCodeVersion": "2.1.325",
+      "startedAt": "2026-11-17T23:20:01.641Z"
+    },
+    {
+      "runId": "20261117T231042Z-A3",
+      "prompt": "A",
+      "attempt": 3,
+      "status": "success",
+      "uri": "file:///root/.pencil/documents/dd1c0c6e-fe69-4d06-8068-6ad6462d294f/untitled.pen",
+      "uriSource": "get_app_state",
+      "wallMs": 153174.737371,
+      "durationMs": 153221,
+      "durationApiMs": 135940,
+      "costUsd": 0.7669901999999998,
+      "numTurns": 13,
+      "toolCalls": 12,
+      "firstToolUseMs": 1502.9969819999533,
+      "lastToolResultMs": 142740.15826399997,
+      "spawnToFirstEventMs": 892.5929210000904,
+      "frames": [
+        {
+          "id": "TDR2A",
+          "name": "Kasku Landing Page",
+          "width": 1440,
+          "height": 4767,
+          "png": "bench/runs/pendev/20261117T231042Z-A3/png/TDR2A.png",
+          "pngWidth": 1440,
+          "pngHeight": 4767
+        }
+      ],
+      "transcriptBytes": 761577,
+      "penPath": "bench/runs/pendev/20261117T231042Z-A3/design.pen",
+      "pngScaleMismatch": false,
+      "model": "claude-opus-5-5",
+      "modelUsageKeys": [
+        "claude-opus-5-5"
+      ],
+      "claudeCodeVersion": "2.1.325",
+      "startedAt": "2026-11-17T23:23:07.567Z"
+    },
+    {
+      "runId": "20261117T231042Z-B3",
+      "prompt": "B",
+      "attempt": 3,
+      "status": "success",
+      "uri": "file:///root/.pencil/documents/7171cc47-8b65-4602-8668-d062c3fbfcdc/untitled.pen",
+      "uriSource": "get_app_state",
+      "wallMs": 97634.861775,
+      "durationMs": 97679,
+      "durationApiMs": 85827,
+      "costUsd": 0.5181058000000001,
+      "numTurns": 12,
+      "toolCalls": 11,
+      "firstToolUseMs": 1193.5859440000495,
+      "lastToolResultMs": 88077.95269000006,
+      "spawnToFirstEventMs": 907.6620999999577,
+      "frames": [
+        {
+          "id": "ZzPnW",
+          "name": "Gerak – Beranda",
+          "width": 390,
+          "height": 1024,
+          "png": "bench/runs/pendev/20261117T231042Z-B3/png/ZzPnW.png",
+          "pngWidth": 390,
+          "pngHeight": 1024
+        }
+      ],
+      "transcriptBytes": 794762,
+      "penPath": "bench/runs/pendev/20261117T231042Z-B3/design.pen",
+      "pngScaleMismatch": false,
+      "model": "claude-opus-5-5",
+      "modelUsageKeys": [
+        "claude-opus-5-5"
+      ],
+      "claudeCodeVersion": "2.1.325",
+      "startedAt": "2026-11-17T23:25:48.321Z"
+    }
+  ],
+  "notes": [
+    "Waktu gerbang (AD-13): `wall` = cap waktu monotonic saat baris event `result` diterima − cap waktu event stdout pertama. Setiap baris diberi cap waktu saat tiba; transkrip mentah byte-identik di `stream.jsonl`, cap waktu di `timing.json`.",
+    "Offset `tool_use` pertama → `tool_result` terakhir dan spawn → event pertama hanya diagnostik, bukan waktu gerbang.",
+    "Run gagal (is_error, subtype ≠ success, tanpa result, timeout, exit ≠ 0, 0 frame) tidak masuk median. Run tidak dipilih-pilih (C8): urutan berselang A1 B1 A2 B2 …, maksimal percobaan per prompt dari protocol.json.",
+    "`save`, salinan `.pen` (COPYFILE_EXCL), daftar frame, dan Export PNG dilakukan harness setelah `result`, di luar waktu. pen.dev menahan dokumen di app, sedangkan Lakar menulis file di setiap execute; bias ini membuat baseline pen.dev sedikit lebih cepat, jadi konservatif bagi gerbang 1,5×.",
+    "Export memakai `{scale:1}` (default pen.dev = 2, lihat `ExportOptions.scale` di execute.md dari read_skill). Ukuran frame diambil dari `ctx.bounds` karena `height` frame bisa null (fit content).",
+    "Setiap run memakai dokumen baru (`pen-newdoc.sh`) yang diverifikasi klien MCP harness: URI sama dengan get_app_state, berbeda dari run sebelumnya, tidak ada sebelum newdoc, bukan dokumen golden, 0 node top-level.",
+    "cwd claude = direktori tmp kosong baru di luar repo (dihapus setelah run). Env proses claude: variabel berawalan CLAUDE*/AI_AGENT* dari sesi pemanggil dibuang (mis. CLAUDE_EFFORT), lalu `ENABLE_TOOL_SEARCH=false` ditambahkan agar tool MCP dimuat langsung walau `--tools \"\"` (simetris untuk semua alat).",
+    "Event init divalidasi per run: hanya server MCP `pencil` (connected), semua tool berawalan `mcp__pencil__`, `mcp__pencil__execute` ada, cwd di luar repo. Pelanggaran = `invalid`, seri berhenti."
+  ],
+  "summary": [
+    {
+      "prompt": "A",
+      "successes": 3,
+      "attempts": 3,
+      "wallMs": {
+        "n": 3,
+        "median": 167296.132408,
+        "min": 153174.737371,
+        "max": 172108.661395
+      },
+      "costUsd": {
+        "n": 3,
+        "median": 0.8427737999999999,
+        "min": 0.7669901999999998,
+        "max": 0.8439753999999999
+      },
+      "failed": []
+    },
+    {
+      "prompt": "B",
+      "successes": 3,
+      "attempts": 3,
+      "wallMs": {
+        "n": 3,
+        "median": 131343.15693599998,
+        "min": 97634.861775,
+        "max": 179310.72748400003
+      },
+      "costUsd": {
+        "n": 3,
+        "median": 0.6423975999999999,
+        "min": 0.5181058000000001,
+        "max": 0.7967460000000002
+      },
+      "failed": []
+    }
+  ]
+}

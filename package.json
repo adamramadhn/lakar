@@ -11,7 +11,8 @@
     "test": "node scripts/assert-node.mjs && tsc -p tsconfig.test.json && vitest run",
     "clean": "tsc -b --clean",
     "lakard": "node packages/daemon/dist/main.js",
-    "install-browser": "bash scripts/install-browser.sh"
+    "install-browser": "bash scripts/install-browser.sh",
+    "bench:pendev": "node scripts/assert-node.mjs && node bench/dist/cli.js pendev-baseline"
   },
   "devDependencies": {
     "@types/node": "26.6.6",

@@ -1,1 +1,10 @@
 export const PACKAGE = '@lakar/bench';
+export * from './protocol.js';
+export * from './stream-metrics.js';
+export * from './claude-runner.js';
+export * from './stats.js';
+export * from './report.js';
+export * from './series.js';
+export * from './pendev/pencil-client.js';
+export * from './pendev/newdoc.js';
+export * from './pendev/artifacts.js';

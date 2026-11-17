@@ -1,0 +1,1 @@
+{"mcpServers":{"pencil":{"type":"stdio","command":"/opt/pen/squashfs-root/resources/app.asar.unpacked/out/mcp-server-linux-arm64","args":["--app","desktop","--agent","claudeCodeCLI"],"env":{}}}}

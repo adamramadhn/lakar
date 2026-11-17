@@ -17,6 +17,10 @@
     "dist"
   ],
   "dependencies": {
-    "@lakar/schema": "workspace:*"
+    "@lakar/schema": "workspace:*",
+    "@modelcontextprotocol/client": "2.4.0"
+  },
+  "devDependencies": {
+    "@types/node": "26.6.6"
   }
 }
