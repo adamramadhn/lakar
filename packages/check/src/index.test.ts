@@ -291,6 +291,120 @@ describe('LC-20 konten tertutup bar bawah', () => {
   });
 });
 
+describe('LC-20 zona bawah struktural', () => {
+  const solid = { fills: [{ type: 'solid', color: '#FFFFFF' }] };
+  const abs = (name: string, r: R, extra: Loose = {}) => frame(name, r, [], { position: 'absolute', layout: 'row', ...solid, ...extra });
+  const scroll = (kids: Loose[]) => frame('Scroll / Konten', [0, 0, 390, 844], kids, { clip: true });
+  const lc20 = (f: Finding[]) => only(f, 'LC-20');
+  const C7 = /rubrik|juri|skor|golden/i;
+
+  it('(a) kartu terpotong bilah aksi absolut → satu temuan pada kartu (unit terluar saja)', () => {
+    const kartu = frame('Kartu / Ulasan', [16, 662, 358, 98], [text('Isi ulasan', [32, 678, 300, 20]), rect('Avatar', [32, 702, 40, 40], solid)], solid);
+    const bar = abs('Bilah aksi', [0, 738, 390, 106]);
+    const f = run(clean([scroll([rect('Atas', [0, 0, 390, 662]), kartu, rect('Bawah', [0, 770, 390, 400])]), bar]));
+    expect(f.map((x) => [x.rule, x.nodeId])).toEqual([['LC-20', kartu.id]]);
+    expect(f[0]!.detail).toBe(`kartu terpotong zona bawah: terlihat y 662–738, tertutup "Bilah aksi" (${bar.id}) mulai y 738`);
+    expect(f[0]!.expected).toBe('seluruhnya di atas y 730 (zona − 8) atau seluruhnya di bawah zona: geser/padatkan konten di atasnya, atau akhiri layar pertama sebelum kartu ini');
+    expect(`${f[0]!.detail} ${f[0]!.expected}`).not.toMatch(C7);
+  });
+
+  it('(a′) elemen absolut sebelum konten (z-order) atau tanpa fill bukan zona', () => {
+    const kids = () => [rect('Atas', [0, 0, 390, 662]), rect('Kartu', [16, 662, 358, 98], solid), rect('Bawah', [0, 770, 390, 400])];
+    expect(lc20(run(clean([abs('Bilah aksi', [0, 738, 390, 106]), scroll(kids())])))).toEqual([]);
+    expect(lc20(run(clean([scroll(kids()), abs('Bilah aksi', [0, 738, 390, 106], { fills: [] })])))).toEqual([]);
+    expect(lc20(run(clean([scroll(kids()), abs('Bilah aksi', [0, 738, 390, 106], { fills: undefined, backdropBlur: 20 })])))).toHaveLength(1);
+    // Anak flow (non-absolut) tidak pernah jadi anggota zona; lebar < 50% juga bukan.
+    expect(lc20(run(clean([scroll(kids()), frame('Bilah aksi', [0, 738, 390, 106], [], solid)])))).toEqual([]);
+    expect(lc20(run(clean([scroll(kids()), abs('FAB', [300, 738, 80, 80])])))).toEqual([]);
+  });
+
+  it('(b) judul seksi yatim di atas mini player + tab bar → satu temuan pada judul; kartu seksi tidak terpisah', () => {
+    const judul = text('Episode baru', [16, 650, 200, 22], { size: 22, name: 'Judul' });
+    const item = (y: number) => frame(`Item ${y}`, [16, y, 358, 100], [text('Eps. 1', [32, y + 16, 200, 20])], solid);
+    const seksi = frame('Seksi / Episode baru', [0, 650, 390, 400], [judul, frame('Daftar', [0, 686, 390, 364], [item(686), item(794)])], { gap: 14 });
+    const f = run(clean([scroll([rect('Atas', [0, 0, 390, 634]), seksi]), abs('Mini player', [8, 690, 374, 56]), abs('Tab bar', [0, 746, 390, 64])]));
+    expect(f.map((x) => [x.rule, x.nodeId])).toEqual([['LC-20', judul.id]]);
+    expect(f[0]!.detail).toBe(`judul seksi "Episode baru" di Seksi / Episode baru (${seksi.id}) terlihat, isinya tertutup zona bawah "Mini player" + "Tab bar" mulai y 690`);
+    expect(f[0]!.expected).toBe('tampilkan ≥ 24 px isi di atas y 690 atau pindahkan seluruh seksi ke bawah zona (akhiri layar pertama dengan rapi)');
+  });
+
+  it('(b′) judul tidak lebih besar dari isi, atau isi terlihat ≥ 24 px → bukan judul yatim', () => {
+    const mk = (size: number, listY: number) =>
+      run(
+        clean([
+          scroll([rect('Atas', [0, 0, 390, 634]), frame('Seksi', [0, 650, 390, 400], [text('Judul', [16, 650, 200, 22], { size }), frame('Daftar', [0, listY, 390, 364], [text('Isi', [16, listY, 200, 20], { size: 14 })])])]),
+          abs('Mini player', [8, 690, 374, 56]),
+          abs('Tab bar', [0, 746, 390, 64]),
+        ]),
+      );
+    const heading = (f: Finding[]) => lc20(f).filter((x) => x.detail.startsWith('judul seksi'));
+    // Judul 14 px = isi 14 px: bukan judul; teks isi yang terpotong tetap dilaporkan sebagai unit.
+    expect(heading(mk(14, 686))).toEqual([]);
+    expect(lc20(mk(14, 686)).map((x) => x.detail.split(':')[0])).toEqual(['teks terpotong zona bawah']);
+    expect(lc20(mk(22, 660))).toEqual([]);
+  });
+
+  it('(b″) latar absolut setinggi layar di awal board tidak memutus tumpukan zona', () => {
+    const judul = text('Episode baru', [16, 650, 200, 22], { size: 22, name: 'Judul' });
+    const seksi = frame('Seksi', [0, 650, 390, 400], [judul, frame('Daftar', [0, 686, 390, 364], [frame('Item', [16, 686, 358, 100], [text('Eps. 1', [32, 702, 200, 20])], solid)])]);
+    const f = run(clean([abs('Latar', [0, 0, 390, 844]), scroll([rect('Atas', [0, 0, 390, 634]), seksi]), abs('Mini player', [8, 690, 374, 56]), abs('Tab bar', [0, 746, 390, 64])]));
+    expect(f.map((x) => [x.rule, x.nodeId])).toEqual([['LC-20', judul.id]]);
+  });
+
+  it('wadah utama / Scroll ber-fill gambar bukan unit; kartu terpotong clip gulir tepat di tepi zona → "terpotong"', () => {
+    const img = { fills: [{ type: 'image', assetId: 'a'.repeat(64), fit: 'cover' }] };
+    const s = frame('Scroll / Konten', [0, 0, 390, 844], [rect('Atas', [0, 0, 390, 700]), rect('Lanjut', [0, 790, 390, 400])], { clip: true, ...img });
+    expect(lc20(run(clean([s, abs('Tab bar', [0, 780, 390, 64])])))).toEqual([]);
+    const kartu = rect('Kartu', [16, 640, 358, 150], solid);
+    const feed = frame('Scroll / Feed', [0, 0, 390, 780], [rect('Atas', [0, 0, 390, 630]), kartu], { clip: true });
+    const f = lc20(run(clean([feed, abs('Tab bar', [0, 780, 390, 64])])));
+    expect(f.map((x) => x.nodeId)).toEqual([kartu.id]);
+    expect(f[0]!.detail).toMatch(/^kartu terpotong zona bawah: terlihat y 640–780/);
+  });
+
+  it('(c) tab bar absolut ber-fill, konten berakhir ≥ 8 px di atasnya → tanpa temuan', () => {
+    expect(run(clean([frame('Konten', [0, 0, 390, 772], [rect('Kartu', [16, 600, 358, 172], solid)]), abs('Tab bar', [0, 780, 390, 64])]))).toEqual([]);
+  });
+
+  it('(d) layar gulir: kartu terakhir terlihat utuh ≤ Z − 8, berikutnya seluruhnya di bawah zona → tanpa temuan', () => {
+    const kids = [rect('Kartu 1', [16, 0, 358, 550], solid), rect('Kartu 2', [16, 560, 358, 210], solid), rect('Kartu 3', [16, 786, 358, 200], solid)];
+    expect(run(clean([scroll(kids), abs('Tab bar', [0, 780, 390, 64])]))).toEqual([]);
+  });
+
+  it('(e)(f) landing desktop tanpa elemen bawah; footer anak flow di tepi bawah → tanpa temuan', () => {
+    const landing = (kids: Loose[]) => run({ screen: 'landing', width: 1440, height: 3000, children: kids });
+    expect(landing([frame('Hero', [0, 0, 1440, 800], [], solid), frame('Fitur', [0, 800, 1440, 2200], [], solid)])).toEqual([]);
+    expect(landing([frame('Isi', [0, 0, 1440, 2600], [rect('Blok', [0, 2400, 1440, 200], solid)]), frame('Footer', [0, 2600, 1440, 400], [text('© Kopi', [80, 2700, 200, 20])], solid)])).toEqual([]);
+  });
+
+  it('Crop dinilai sebagai satu unit (isinya dilewati)', () => {
+    const img = { fills: [{ type: 'image', assetId: 'a'.repeat(64), fit: 'cover' }] };
+    const crop = frame('Crop / Foto', [16, 700, 358, 100], [rect('Foto', [0, 650, 400, 300], img)], { clip: true });
+    const f = lc20(run(clean([scroll([rect('Atas', [0, 0, 390, 700]), crop, rect('Lanjut', [0, 800, 390, 400])]), abs('Tab bar', [0, 780, 390, 64])])));
+    expect(f.map((x) => x.nodeId)).toEqual([crop.id]);
+    expect(f[0]!.detail).toMatch(/^gambar terpotong zona bawah: terlihat y 700–780/);
+  });
+
+  it('baris berstroke sebagian dinilai dari isinya; sliver teks tanpa tinta tidak dilaporkan', () => {
+    const line = { stroke: { color: '#E5E5E5', width: 1, align: 'inside', sides: ['bottom'] } };
+    const row = (y: number) => frame(`Baris ${y}`, [16, y, 358, 66], [text('Nama', [32, y + 12, 200, 20], { size: 14 })], { layout: 'row', ...line });
+    // Baris 670–736 (isi 682–702) utuh; baris 736–802 hanya 2 px kosong di atas zona.
+    expect(lc20(run(clean([scroll([rect('Atas', [0, 0, 390, 670]), row(670), row(736), row(802)]), abs('Bilah', [0, 738, 390, 106])])))).toEqual([]);
+    const cutRow = row(700);
+    const f = lc20(run(clean([scroll([rect('Atas', [0, 0, 390, 700]), cutRow, row(766), row(832)]), abs('Bilah', [0, 738, 390, 106])])));
+    expect(f.map((x) => x.nodeId)).toEqual([cutRow.id]);
+    expect(f[0]!.detail).toMatch(/^baris /);
+    const sliver = text('Judul', [16, 736, 200, 28], { size: 20, lineHeight: 28 });
+    expect(lc20(run(clean([scroll([rect('Atas', [0, 0, 390, 736]), sliver, rect('Lanjut', [0, 764, 390, 400])]), abs('Bilah', [0, 738, 390, 106])])))).toEqual([]);
+  });
+
+  it('posisi akhir: padding bawah wadah transparan tidak dihitung sebagai konten', () => {
+    const wrap = frame('Konten', [0, 0, 390, 690], [rect('Kartu', [16, 0, 358, 666], solid)], { padding: [0, 0, 24, 0] });
+    const s = frame('Scroll / Konten', [0, 0, 390, 844], [wrap], { clip: true, scrollY: 400 });
+    expect(lc20(run(clean([s, abs('Mini player', [8, 690, 374, 56]), abs('Tab bar', [0, 746, 390, 64])])))).toEqual([]);
+  });
+});
+
 describe('fixture enam aturan', () => {
   it('tepat 6 temuan: LC-01a, LC-01b, LC-02a, LC-05, LC-20 (error) lalu LC-12 (warning); © bukan temuan', () => {
     const copy = text('© 2026 Kopi', [0, 80, 100, 15], { size: 12, name: 'Hak cipta' });
@@ -382,6 +496,15 @@ describe('kinerja aturan murni', () => {
     testLog(`[check] aturan G0 500 node: ${ms.toFixed(2)} ms`);
     expect(f.length).toBeGreaterThan(0);
     expect(ms).toBeLessThan(100);
+    // Dengan zona bawah (tab bar absolut ber-fill): LC-20 menilai setiap node.
+    const z = docOf([{ children: [...children, rect('Tab bar', [0, 780, 390, 64], { position: 'absolute', fills: [{ type: 'solid', color: '#FFFFFF' }] })], height: 844 }]);
+    const zm = z.measures.get(z.boards[0]!)!;
+    checkBoard({ doc: z.doc, boardId: z.boards[0]!, measure: zm });
+    const t1 = performance.now();
+    checkBoard({ doc: z.doc, boardId: z.boards[0]!, measure: zm });
+    const ms2 = performance.now() - t1;
+    testLog(`[check] aturan G0 500 node + zona bawah: ${ms2.toFixed(2)} ms`);
+    expect(ms2).toBeLessThan(100);
   });
 });
 

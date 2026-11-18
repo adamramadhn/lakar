@@ -675,7 +675,7 @@ describe.skipIf(!browserInstalled)('check G0 (AD-8): execute + /layout-check', (
     expect(t.body.data.check.boards).toEqual(r.body.data.check.boards.slice(0, 2));
   }, 60_000);
 
-  it('scroll akhir: board akhir (scrollY > 0) → LC-20; board awal (terpotong, scrollY 0) tidak', async () => {
+  it('scroll akhir: board akhir (scrollY > 0) → LC-20 pada wadah; board awal (scrollY 0) → wadah tidak dievaluasi, hanya kartu terpotong tab bar', async () => {
     const sid = await newSession();
     await call('/docs/open', { slug: 'check-scroll' }, sid);
     const code = `
@@ -690,10 +690,16 @@ describe.skipIf(!browserInstalled)('check G0 (AD-8): execute + /layout-check', (
     expect(r.status, JSON.stringify(r.body.error)).toBe(200);
     const [awal, akhir] = r.body.data.value as string[];
     expect(r.body.data.check.boards).toEqual([awal, akhir]);
-    expect(r.body.data.check.findings.map((f: { rule: string; nodeName: string }) => [f.rule, f.nodeName])).toEqual([['LC-20', 'Scroll / Feed']]);
+    // Awal: Kartu 4 (y 664–814) terpotong tab bar y 780; akhir: wadah dilaporkan, kartu di dalamnya tidak lagi.
+    expect(r.body.data.check.findings.map((f: { rule: string; nodeName: string }) => [f.rule, f.nodeName])).toEqual([
+      ['LC-20', 'Kartu 4'],
+      ['LC-20', 'Scroll / Feed'],
+    ]);
     const lc = await call('/layout-check', { boardId: akhir }, sid);
     expect(lc.body.data.findings).toHaveLength(1);
-    expect((await call('/layout-check', { boardId: awal }, sid)).body.data.findings).toEqual([]);
+    const f0 = (await call('/layout-check', { boardId: awal }, sid)).body.data.findings;
+    expect(f0.map((f: { nodeName: string }) => f.nodeName)).toEqual(['Kartu 4']);
+    expect(f0[0].detail).toMatch(/^kartu terpotong zona bawah: terlihat y 664–780, tertutup "Overlay \/ Tab bar" \(\w+\) mulai y 780$/);
   }, 60_000);
 
   it('allowGlyphs per glyph: `❤️ Favorit` + `Suka ❤` di satu board → 422 FONT_MISSING + editId, rev/file tetap; edits hapus ❤ → commit dengan LC-01a', async () => {
@@ -721,7 +727,7 @@ describe.skipIf(!browserInstalled)('check G0 (AD-8): execute + /layout-check', (
     expect(fixed.body.data.check.findings.map((f: { rule: string; nodeName: string }) => [f.rule, f.nodeName])).toEqual([['LC-01a', 'Favorit']]);
   }, 60_000);
 
-  it('LC-20 batas bawah terlihat: wrapper melewati board tanpa scroll akhir → tanpa LC-20; konten tertutup tab bar (wrapper hug / tinggi tetap tanpa clip) → LC-20', async () => {
+  it('LC-20 batas bawah terlihat: wrapper melewati board tanpa scroll akhir → wadah tanpa LC-20 (hanya kartu terpotong); konten tertutup tab bar (wrapper hug / tinggi tetap tanpa clip) → LC-20', async () => {
     const sid = await newSession();
     await call('/docs/open', { slug: 'check-lc20' }, sid);
     const mk = (name: string, x: number, wrap: string, cards: number) => `
@@ -740,8 +746,8 @@ describe.skipIf(!browserInstalled)('check G0 (AD-8): execute + /layout-check', (
     const [panjang, tertutup, tetap] = r.body.data.value as [string, string, string];
     const lc20 = async (boardId: string) =>
       (await call('/layout-check', { boardId }, sid)).body.data.findings.filter((f: { rule: string }) => f.rule === 'LC-20');
-    // 8×158 = 1264 > 844: posisi awal (terpotong board) → tidak dievaluasi.
-    expect(await lc20(panjang)).toEqual([]);
+    // 8×158 = 1264 > 844: posisi awal (terpotong board) → wadah tidak dievaluasi; Kartu 4 (y 632–790) terpotong tab bar.
+    expect((await lc20(panjang)).map((f: { nodeName: string }) => f.nodeName)).toEqual(['Kartu 4']);
     // 5×158 = 790 > 772 (y tab bar − 8), terlihat utuh → LC-20 pada Konten.
     for (const id of [tertutup, tetap]) {
       const f = await lc20(id);
@@ -749,7 +755,7 @@ describe.skipIf(!browserInstalled)('check G0 (AD-8): execute + /layout-check', (
       expect(f[0]).toMatchObject({ nodeName: 'Konten', level: 'error' });
       expect(f[0].detail).toMatch(/berakhir di y 790, Overlay \/ Tab bar \(\w+\) mulai di y 780/);
     }
-    expect(r.body.data.check.findings.filter((f: { rule: string }) => f.rule === 'LC-20')).toHaveLength(2);
+    expect(r.body.data.check.findings.filter((f: { rule: string }) => f.rule === 'LC-20')).toHaveLength(3);
   }, 60_000);
 
   it('latensi: 12 update pada board ±150 node → p50 checkMs ≤ 600 ms (anggaran p50 300 / p95 800)', async () => {

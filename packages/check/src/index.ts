@@ -9,9 +9,9 @@ import { boardContext } from './tree.js';
 export const PACKAGE = '@lakar/check';
 
 export { codePoints, emojiIn, graphemes, isEmojiGrapheme, leadingIconGlyph, LC01B_GLYPHS, onlyIconGlyphs } from './glyphs.js';
-export { BOTTOM_BAR_CLEARANCE, BOTTOM_BAR_MAX_GAP, lc01a, lc01b, lc02a, lc05, lc12, lc20, MIN_TEXT_SIZE, SCREEN_SIZES } from './rules.js';
+export { BOTTOM_BAR_CLEARANCE, BOTTOM_BAR_MAX_GAP, bottomZone, lc01a, lc01b, lc02a, lc05, lc12, lc20, MIN_TEXT_SIZE, ORPHAN_MIN_BODY, SCREEN_SIZES, type BottomZone } from './rules.js';
 export { changedNodeIds, touchedBoards } from './touched.js';
-export { TOLERANCE } from './tree.js';
+export { TOLERANCE, visibleRect } from './tree.js';
 
 const EMPTY_MEASURE: BoardMeasure = { width: 0, height: 0, nodes: [], texts: [] };
 

@@ -73,3 +73,27 @@ export function quote(s: string): string {
   const chars = [...s];
   return JSON.stringify(chars.length > 40 ? `${chars.slice(0, 40).join('')}…` : s);
 }
+
+/** Irisan dua persegi; undefined bila kosong (lebar atau tinggi ≤ 0). */
+export function intersect(a: Rect, b: Rect): Rect | undefined {
+  const x = Math.max(a.x, b.x);
+  const y = Math.max(a.y, b.y);
+  const w = Math.min(right(a), right(b)) - x;
+  const h = Math.min(bottom(a), bottom(b)) - y;
+  return w > 0 && h > 0 ? { x, y, width: w, height: h } : undefined;
+}
+
+/**
+ * Bagian `n` yang terlihat: bounds ∩ setiap frame leluhur ber-`clip:true` ∩ board (selalu clip).
+ * undefined bila tanpa ukuran atau tidak terlihat sama sekali.
+ */
+export function visibleRect(ctx: BoardContext, n: ChildNode): Rect | undefined {
+  const r = ctx.bounds.get(n.id);
+  let vis = r ? intersect(r, ctx.boardRect) : undefined;
+  for (let p = ctx.parentOf.get(n.id); vis && p && p.type === 'frame'; p = ctx.parentOf.get(p.id)) {
+    if (p.clip !== true) continue;
+    const pr = ctx.bounds.get(p.id);
+    vis = pr ? intersect(vis, pr) : undefined;
+  }
+  return vis;
+}

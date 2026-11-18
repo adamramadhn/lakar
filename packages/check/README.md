@@ -1,7 +1,7 @@
 # @lakar/check
 
 Aturan gerbang G0 atas dokumen ter-resolve + hasil ukur render: LC-01a (emoji), LC-01b (glyph sebagai ikon),
-LC-02a (terpotong clip), LC-05 (teks < 12px), LC-12 (ukuran board, warning), LC-20 (tertutup bar bawah).
+LC-02a (terpotong clip), LC-05 (teks < 12px), LC-12 (ukuran board, warning), LC-20 (tertutup zona bawah: konten akhir, unit terpotong, judul seksi yatim).
 
 - **AD terkait:** AD-8 (render board tersentuh + check sebelum commit; temuan tidak menolak commit).
 - **Arah dependensi:** `check → schema, ports`. Definisi emoji/glyph dari `@lakar/schema`.
@@ -9,7 +9,7 @@ LC-02a (terpotong clip), LC-05 (teks < 12px), LC-12 (ukuran board, warning), LC-
 ## Ekspor utama
 
 - `checkBoard`, `glyphScan` (temuan glyph tanpa render + `allowGlyphs`), `sortFindings`, `boundsOf`.
-- Aturan satuan: `lc01a`, `lc01b`, `lc02a`, `lc05`, `lc12`, `lc20`; `touchedBoards`, `changedNodeIds`.
+- Aturan satuan: `lc01a`, `lc01b`, `lc02a`, `lc05`, `lc12`, `lc20` (zona bawah: `bottomZone`); `touchedBoards`, `changedNodeIds`.
 
 ## Batasan
 
