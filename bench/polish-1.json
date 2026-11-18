@@ -1,0 +1,3478 @@
+{
+ "series": "polish",
+ "iter": 1,
+ "date": "2026-11-18T21:27:05.154Z",
+ "status": "lengkap",
+ "statusReasons": [],
+ "frozen": {
+  "head": "0347f15fc5119f57f630ee14d6d5a7c6573b5a62",
+  "porcelain": "",
+  "protocolHash": "907cb36f4674d422feded4506851b6391082b40b918dd46841edae607bedb85d",
+  "wrapperSha256": "0c496eecb409832e5a87f2dbe3960312457e3b26b472cc2d5d9673a4eeccab97",
+  "promptsSha256": "b41ba79e9ca6818f388da5bd9a1718f6899a631c95ca360a8f60e48a7a2dd036",
+  "model": "claude-opus-5-5",
+  "claude": "2.1.325 (Claude Code)",
+  "pendevDesktop": "1.2.23",
+  "lakard": {
+   "version": "0.1.0",
+   "schemaVersion": 2,
+   "pid": 1827930,
+   "startedAt": "2026-11-18T21:27:04.269Z",
+   "browser": "159.0.8154.6",
+   "node": "v26.13.1"
+  },
+  "skills": {
+   "api.md": "8dd023074dbc6688110c69e4e0202e14b3f22dd25a1a6805687840ca16117593",
+   "core.md": "ef90b5bd1e8c58010444b64dabf90bf22aa247eb6aa10a0eb9914310c7d090d2",
+   "icons.md": "967827ad79ef4be54169daf303506fb97cd73d9e848c5d6d0943dbda7af5a4c2",
+   "landing.md": "81c67338bf28baeb1e66e8ba631304605b1d790f899b5151ef485e37322eb7ec",
+   "mobile.md": "c3dc63658890f6137c6a90e8ce2a0d13009aaa37020acd1b7bca7428d17dbbbe"
+  },
+  "distSha": {
+   "check": "d6e141d8aff01d9668df887da4d317e0dd0b4ae9951a927a5fd241b91ac266e2",
+   "core": "81e7a1b9f116cc04cd5a8784ae53fa610dba37cb7c601249ff0862e3389ce390",
+   "daemon": "382d74606475cc78990a5892d835df5ad76f3e04dbfa93d0d6ab10a32cc2a3a0",
+   "exec": "f4bcd4b411bc8810c9194e423432c93e7f2cd7d62f365338ba6e15ed6d79224e",
+   "icons": "d04386eeeb4daf282c0b0787ec1a8bc07abd927bccabbb4f92f03312686cc303",
+   "mcp": "9906b7f8ef53ef3d8ed3c236189c616af56653f76c5be2085cd0b314f9f20cdb",
+   "ports": "bee2b68950ff0c819d5714c8d5149d5107d76df5f53233e18da643f025d66882",
+   "render": "a12b8d49651fbd374ad0b15b8b273147ea2327a3db3eec31f27274f33cec13ad",
+   "schema": "dab15a2563993f103e7969f140e0ec07bcbecec1c400cb33bcb65543564e8cbb",
+   "skills": "4bac99f55ffb6c64d8640f856146563424d172e2fac427c14e7a2649f77b8c15"
+  },
+  "rubric": {
+   "version": "2.1",
+   "lampiranBSha256": "cdba3dde5fccaaabbccdf8e0e4060c4cb2c9b4534bcae1fb67eee2fd26e387be"
+  },
+  "judge": {
+   "model": "claude-opus-5-5",
+   "argv": "claude -p --input-format stream-json --output-format stream-json --verbose --model claude-opus-5-5 --tools \"\" --strict-mcp-config --mcp-config bench/runs/practice-polish/1/judge/mcp-empty.json --disable-slash-commands --no-session-persistence",
+   "textSha256": {
+    "P7": "7c4c64c1ba201784e9f60fce6bfaec131a248af1cfef0b977fe3d4c4b6a708bd",
+    "P8": "03f7132b3264e52a232c879f5ad92d09e388b12656be529793b2540850c92df5",
+    "P9": "4b9f64e6da60eb9053c6ab80ca1416e274fe084eb281372b7ad3cf43d38d4fba"
+   }
+  }
+ },
+ "wrapper": "Mode benchmark tanpa interaksi: tidak ada pengguna yang bisa menjawab pertanyaan atau memberi konfirmasi. Jangan bertanya; ambil keputusan sendiri dan kerjakan tugas sampai tuntas.\nKerjakan di dokumen baru yang kosong dengan tool desain yang tersedia.\nSetelah tugas tuntas, akhiri jawabanmu dengan satu kata: selesai.\n\nTugas:\n{{PROMPT}}\n",
+ "argv": {
+  "lakar": "claude -p '<prompt hasil render>' --model claude-opus-5-5 --strict-mcp-config --tools \"\" --output-format stream-json --verbose --disable-slash-commands --no-session-persistence --mcp-config .mcp.json --allowedTools mcp__lakar",
+  "pendev": "claude -p '<prompt hasil render>' --model claude-opus-5-5 --strict-mcp-config --tools \"\" --output-format stream-json --verbose --disable-slash-commands --no-session-persistence --mcp-config bench/mcp/pencil.json --allowedTools mcp__pencil",
+  "judge": "claude -p --input-format stream-json --output-format stream-json --verbose --model claude-opus-5-5 --tools \"\" --strict-mcp-config --mcp-config bench/runs/practice-polish/1/judge/mcp-empty.json --disable-slash-commands --no-session-persistence"
+ },
+ "results": [
+  {
+   "id": "P7",
+   "name": "Rodaku",
+   "kind": "mobile",
+   "size": {
+    "width": 390,
+    "height": 844
+   },
+   "judgeTextSha256": "7c4c64c1ba201784e9f60fce6bfaec131a248af1cfef0b977fe3d4c4b6a708bd",
+   "runs": {
+    "lakar": {
+     "key": "P7-lakar",
+     "prompt": "P7",
+     "tool": "lakar",
+     "dir": "bench/runs/practice-polish/1/P7-lakar",
+     "record": {
+      "runId": "polish-1-P7-lakar",
+      "prompt": "P7",
+      "attempt": 1,
+      "status": "success",
+      "wallMs": 180692.72707999998,
+      "durationMs": 180745,
+      "durationApiMs": 164694,
+      "costUsd": 0.9718787999999999,
+      "numTurns": 13,
+      "toolCalls": 12,
+      "firstToolUseMs": 1545.0267059999896,
+      "lastToolResultMs": 169072.751706,
+      "spawnToFirstEventMs": 1033.115450000012,
+      "frames": [
+       {
+        "id": "rzAakbiv",
+        "name": "Rodaku / Beranda · mobile · Ramah",
+        "width": 390,
+        "height": 844,
+        "png": "bench/runs/practice-polish/1/P7-lakar/png/rzAakbiv.png",
+        "pngWidth": 390,
+        "pngHeight": 844
+       },
+       {
+        "id": "v1uyDayK",
+        "name": "Rodaku / Beranda (akhir) · mobile · Ramah",
+        "width": 390,
+        "height": 844,
+        "png": "bench/runs/practice-polish/1/P7-lakar/png/v1uyDayK.png",
+        "pngWidth": 390,
+        "pngHeight": 844
+       }
+      ],
+      "transcriptBytes": 1476062,
+      "pngScaleMismatch": false,
+      "model": "claude-opus-5-5",
+      "modelUsageKeys": [
+       "claude-opus-5-5"
+      ],
+      "claudeCodeVersion": "2.1.325",
+      "startedAt": "2026-11-18T21:28:50.251Z",
+      "lakar": {
+       "slug": "rodaku-beranda",
+       "opened": [
+        "rodaku-beranda"
+       ],
+       "boards": [
+        {
+         "id": "rzAakbiv",
+         "name": "Rodaku / Beranda · mobile · Ramah",
+         "page": "Page 1",
+         "screen": "mobile",
+         "x": 0,
+         "y": 0,
+         "width": 390,
+         "height": 844,
+         "wip": false,
+         "childCount": 5
+        },
+        {
+         "id": "v1uyDayK",
+         "name": "Rodaku / Beranda (akhir) · mobile · Ramah",
+         "page": "Page 1",
+         "screen": "mobile",
+         "x": 470,
+         "y": 0,
+         "width": 390,
+         "height": 844,
+         "wip": false,
+         "childCount": 5
+        }
+       ],
+       "layout": {
+        "rev": 3,
+        "summary": {
+         "error": 0,
+         "warning": 0,
+         "gate": 0
+        },
+        "findings": [],
+        "boards": [
+         {
+          "id": "rzAakbiv",
+          "name": "Rodaku / Beranda · mobile · Ramah",
+          "summary": {
+           "error": 0,
+           "warning": 0,
+           "gate": 0
+          }
+         },
+         {
+          "id": "v1uyDayK",
+          "name": "Rodaku / Beranda (akhir) · mobile · Ramah",
+          "summary": {
+           "error": 0,
+           "warning": 0,
+           "gate": 0
+          }
+         }
+        ]
+       },
+       "docPath": "bench/runs/practice-polish/1/P7-lakar/doc/rodaku-beranda.lakar.json",
+       "historyPath": "bench/runs/practice-polish/1/P7-lakar/doc/rodaku-beranda.history.jsonl",
+       "daemonBefore": {
+        "pid": 1827930,
+        "startedAt": "2026-11-18T21:27:04.269Z",
+        "recreated": 0,
+        "systemd": {
+         "ActiveState": "active",
+         "ActiveEnterTimestamp": "Wed 2026-11-18 21:27:03 UTC",
+         "MainPID": "1827930",
+         "NRestarts": "0"
+        }
+       },
+       "daemonAfter": {
+        "pid": 1827930,
+        "startedAt": "2026-11-18T21:27:04.269Z",
+        "recreated": 0,
+        "systemd": {
+         "ActiveState": "active",
+         "ActiveEnterTimestamp": "Wed 2026-11-18 21:27:03 UTC",
+         "MainPID": "1827930",
+         "NRestarts": "0"
+        }
+       },
+       "docsBefore": 3
+      }
+     },
+     "reconnect": {
+      "count": 0,
+      "affectedMs": 0,
+      "events": [],
+      "toolErrors": []
+     },
+     "agentEmoji": {
+      "emoji": 0,
+      "glyphs": 0,
+      "samples": []
+     },
+     "lintEmoji": {
+      "lc01a": 0,
+      "lc01b": 0
+     },
+     "strip": {
+      "path": "bench/runs/practice-polish/1/P7-lakar.png",
+      "width": 390,
+      "height": 1736,
+      "boards": 2
+     },
+     "previous": []
+    },
+    "pendev": {
+     "key": "P7-pendev",
+     "prompt": "P7",
+     "tool": "pendev",
+     "dir": "bench/runs/practice-polish/1/P7-pendev",
+     "record": {
+      "runId": "polish-1-P7-pendev",
+      "prompt": "P7",
+      "attempt": 1,
+      "status": "success",
+      "uri": "file:///root/.pencil/documents/67121c28-854b-4025-acb6-b59a2ff0c2db/untitled.pen",
+      "uriSource": "get_app_state",
+      "wallMs": 97499.990335,
+      "durationMs": 97588,
+      "durationApiMs": 87891,
+      "costUsd": 0.5735642000000001,
+      "numTurns": 12,
+      "toolCalls": 11,
+      "firstToolUseMs": 1472.8338699999995,
+      "lastToolResultMs": 87134.44987,
+      "spawnToFirstEventMs": 1724.2735510000002,
+      "frames": [
+       {
+        "id": "nkigu",
+        "name": "Rodaku – Beranda",
+        "width": 390,
+        "height": 1177,
+        "png": "bench/runs/practice-polish/1/P7-pendev/png/nkigu.png",
+        "pngWidth": 390,
+        "pngHeight": 1177
+       }
+      ],
+      "transcriptBytes": 519224,
+      "penPath": "bench/runs/practice-polish/1/P7-pendev/design.pen",
+      "pngScaleMismatch": false,
+      "model": "claude-opus-5-5",
+      "modelUsageKeys": [
+       "claude-opus-5-5"
+      ],
+      "claudeCodeVersion": "2.1.325",
+      "startedAt": "2026-11-18T21:27:08.833Z",
+      "pendevSystemd": {
+       "before": {
+        "ActiveState": "active",
+        "ActiveEnterTimestamp": "Wed 2026-11-18 18:16:46 UTC",
+        "MainPID": "1699601",
+        "NRestarts": "0"
+       },
+       "after": {
+        "ActiveState": "active",
+        "ActiveEnterTimestamp": "Wed 2026-11-18 18:16:46 UTC",
+        "MainPID": "1699601",
+        "NRestarts": "0"
+       }
+      }
+     },
+     "reconnect": {
+      "count": 0,
+      "affectedMs": 0,
+      "events": [],
+      "toolErrors": []
+     },
+     "agentEmoji": {
+      "emoji": 0,
+      "glyphs": 0,
+      "samples": []
+     },
+     "strip": {
+      "path": "bench/runs/practice-polish/1/P7-pendev.png",
+      "width": 390,
+      "height": 1177,
+      "boards": 1
+     },
+     "previous": []
+    }
+   },
+   "gate": {
+    "ok": false,
+    "reasons": [
+     "waktu 180.7 dtk > 1.5 × baseline 97.5 dtk (rasio 1.85)"
+    ],
+    "timeRatio": 1.8532589229922818
+   },
+   "sizeProblems": [],
+   "pendevSizeProblems": [
+    "board nkigu 390×1177 ≠ 390×844"
+   ],
+   "score": {
+    "prompt": "P7",
+    "validReps": 3,
+    "reps": [
+     {
+      "prompt": "P7",
+      "rep": 1,
+      "mapping": {
+       "X": "lakar",
+       "Y": "pendev"
+      },
+      "status": "ok",
+      "verdict": {
+       "X": {
+        "R1": {
+         "skor": 2,
+         "bukti": "Semua bagian yang diminta ada. Header berisi 'Honda Supra X 125' dan '18.462 km' (kiri atas). Kartu 'Servis berikutnya' memuat 'Estimasi biaya · Rp 485.000'. Riwayat servis berisi 5 item yang tersebar di dua artboard (kondisi awal dan kondisi setelah scroll): Ganti ban belakang, Perbaikan kelistrikan, Ganti oli mesin, Servis berkala 15.000 km, Ganti aki. Ketiga status muncul: Dijadwalkan, Menunggu suku cadang, Selesai. Kartu pengingat 'Ganti oli dalam 38 km' ada di artboard 2 bawah. Tab bar 4 ikon: Beranda, Servis, Bengkel, Profil. Mode terang, aksen hijau, Bahasa Indonesia, dan tiap frame berukuran 390x844."
+        },
+        "R2": {
+         "skor": 1,
+         "bukti": "Titik fokus adalah 'Rp 485.000' (bold, sekitar 28px) di kiri bawah kartu servis berikutnya. Fokus ini bersaing dengan nama motor 'Honda Supra X 125' di header, yang ukuran dan bobotnya hampir sama, dan berada di permukaan yang sama-sama terang."
+        },
+        "R4": {
+         "skor": 2,
+         "bukti": "Hijau dipakai konsisten untuk aksi dan keadaan aktif: tombol 'Konfirmasi', 'Lihat semua', progress bar, tab Beranda, dan baris Dijadwalkan yang di-highlight. Oranye hanya dipakai untuk peringatan, yaitu badge 'Menunggu suku cadang' dan kartu pengingat oli. Teks abu-abu (tanggal di kanan baris, '18.462 dari 20.000 km') masih terbaca."
+        },
+        "R5": {
+         "skor": 2,
+         "bukti": "Ikon memakai satu gaya garis dengan ukuran seragam: lonceng, ikon badge status, tetes oli, dan keempat ikon tab bar. Thumbnail foto bengkel/mekanik di setiap baris riwayat relevan dengan konteks. Tidak ada emoji."
+        },
+        "R6": {
+         "skor": 2,
+         "bukti": "Angka-angkanya konsisten. 18.462 dari 20.000 km menghasilkan 'Sisa 1.538 km'. 'Sen, 30 Nov 2026' sesuai dengan '12 hari lagi' dan memang jatuh pada hari Senin. Pengingat oli ('Terakhir 12 Sep 2026 di 16.000 km') cocok dengan item 'Ganti oli mesin 12 Sep 2026 Jaya Motor Cilandak'. Nama bengkel dan item ditulis spesifik."
+        },
+        "R8": {
+         "skor": 2,
+         "bukti": "Tidak ada pelanggaran checklist slop. Keputusan komposisi khas yang bisa ditunjuk: baris 'Ganti ban belakang' yang berstatus dijadwalkan di-highlight dengan tint hijau dan border hijau (atas daftar riwayat), thumbnail foto nyata di setiap baris, dan header yang tetap sticky pada artboard scroll."
+        },
+        "R9": {
+         "skor": 2,
+         "bukti": "Angka diberi konteks. Kartu servis memuat progress '18.462 dari 20.000 km', 'Sisa 1.538 km', '12 hari lagi', dan '3 pekerjaan'. Header menampilkan plat 'B 4127 TKS'. Daftar riwayat menunjukkan tiga variasi status dengan bengkel dan tanggal. Pengingat oli menyertakan tanggal dan km terakhir serta progress bar. Kepadatannya tetap terbaca."
+        },
+        "R10": {
+         "skor": 2,
+         "bukti": "Permukaannya berlapis: kartu servis ber-tint hijau dan baris dijadwalkan ber-tint hijau. Ada warna kedua yang bermakna, yaitu oranye, yang dipakai konsisten di badge 'Menunggu suku cadang' dan kartu pengingat oli (border, ikon, dan progress bar). Badge status punya ikon dan latar sendiri. Foto thumbnail menyatu dengan rounded corner."
+        },
+        "slop": {
+         "jumlah": 0,
+         "butir": []
+        },
+        "emoji": 0,
+        "fokus": "'Rp 485.000' di kiri bawah kartu 'Servis berikutnya' (bagian atas artboard 1)"
+       },
+       "Y": {
+        "R1": {
+         "skor": 2,
+         "bukti": "Semua bagian yang diminta ada. Header 'Honda Vario 160' dilengkapi kartu 'Jarak tempuh 12.480 km'. Kartu servis berikutnya memuat 'Estimasi biaya Rp285.000'. Pengingat oli 'Waktunya ganti oli' tampil. Riwayat servis berisi 5 item dengan tanggal, bengkel, biaya, dan tiga status. Tab bar 4 ikon: Beranda, Riwayat, Bengkel, Profil. Mode terang, aksen hijau, Bahasa Indonesia, frame 390x844."
+        },
+        "R2": {
+         "skor": 2,
+         "bukti": "Titik fokus yang tegas adalah 'Rp285.000' berwarna putih bold di kartu hijau tua (tengah atas). Kartu gelap itu menjadi satu-satunya bidang kontras tinggi di layar. Skala tipografinya bertingkat jelas: judul 'Honda Vario 160', lalu angka di kartu, lalu judul seksi 'Riwayat servis', lalu meta abu-abu. Tidak ada judul yatim."
+        },
+        "R4": {
+         "skor": 1,
+         "bukti": "Hijau dipakai konsisten (kartu hero, tombol 'Atur jadwal', progress bar, tab aktif, 'Lihat semua'), dan warna status punya makna: biru untuk Dijadwalkan, kuning/amber untuk Menunggu, hijau untuk Selesai. Namun ada satu teks lemah: 'Target 12.500 km' berwarna hijau-abu redup di atas latar hijau tua (kanan bawah progress bar di kartu hero)."
+        },
+        "R5": {
+         "skor": 2,
+         "bukti": "Ikon garis memakai satu gaya dan ukuran seragam, ditempatkan di kotak abu-abu membulat pada setiap baris riwayat. Gaya yang sama berlaku untuk ikon tetes oli, lonceng, dan tab bar. Visual utama berupa kartu hero dengan progress bar, dan itu relevan. Tidak ada emoji."
+        },
+        "R6": {
+         "skor": 1,
+         "bukti": "Ada satu inkonsistensi tanggal. Kartu hero menulis 'Sab, 23 Nov 2026' dengan keterangan 'dalam 5 hari', padahal 23 Nov 2026 jatuh pada hari Senin. Angka lainnya konsisten: 12.480 km dengan target 12.500 menghasilkan 'Sisa 20 km', dan '2.950 km sejak ganti oli terakhir' sesuai dengan 'tiap 3.000 km'."
+        },
+        "R8": {
+         "skor": 2,
+         "bukti": "Tidak ada pelanggaran checklist slop. Latar halaman putih/abu dingin, dan tint amber hanya dipakai di kartu peringatan. Keputusan komposisi khas: kartu hero hijau tua yang kontras dengan tombol hijau terang, tab bar pill mengambang di bawah, dan daftar riwayat yang disatukan dalam satu panel dengan divider."
+        },
+        "R9": {
+         "skor": 2,
+         "bukti": "Angka diberi konteks. Kartu atas berisi 'Jarak tempuh' dan 'Plat nomor B 4821 KZT'. Kartu hero memuat 'dalam 5 hari', 'Sisa 20 km', dan 'Target 12.500 km'. Pengingat oli menyertakan km sejak penggantian terakhir dan interval yang disarankan. Setiap baris riwayat memuat bengkel · tanggal dan badge status yang bervariasi. Dot merah notifikasi pada lonceng ikut menambah detail."
+        },
+        "R10": {
+         "skor": 2,
+         "bukti": "Permukaannya berlapis: kartu hijau tua, chip 'Servis berikutnya' ber-tint, kartu oli ber-tint amber, dan kotak ikon abu-abu. Ada warna kedua yang bermakna, yaitu amber, yang dipakai di kartu pengingat oli dan badge 'Menunggu suku cadang'. Badge status punya dot berwarna dan latarnya terdefinisi. Ikon matang, dan tab bar pill aktif ber-tint hijau."
+        },
+        "slop": {
+         "jumlah": 0,
+         "butir": []
+        },
+        "emoji": 0,
+        "fokus": "'Rp285.000' berwarna putih di kiri bawah kartu hijau tua 'Servis berikutnya' (tengah atas layar)"
+       }
+      },
+      "attempts": [
+       {
+        "dir": "/root/lakar/bench/runs/practice-polish/1/judge/P7/rep-1/attempt-1",
+        "status": "ok",
+        "problems": [],
+        "costUsd": 0.1837698,
+        "wallMs": 53054.93867000006
+       }
+      ],
+      "retried": false,
+      "costUsd": 0.1837698
+     },
+     {
+      "prompt": "P7",
+      "rep": 2,
+      "mapping": {
+       "X": "lakar",
+       "Y": "pendev"
+      },
+      "status": "ok",
+      "verdict": {
+       "X": {
+        "R1": {
+         "skor": 1,
+         "bukti": "Semua bagian ada dan sesuai: header 'Honda Supra X 125' dengan '18.462 km' (atas), kartu 'SERVIS BERIKUTNYA' dengan 'Rp 485.000', 5 riwayat servis dengan tiga status (frame 1 dan 2), pengingat 'Ganti oli dalam 38 km' (bawah frame 2), tab bar 4 ikon. Mode terang, aksen hijau, dan bahasa Indonesia juga sesuai. Satu hal minor: di frame 1 ada strip putih kosong di bawah home indicator (sekitar y 830–870), sehingga tab bar tidak menempel di dasar layar dan tinggi frame tampak melebihi 844."
+        },
+        "R2": {
+         "skor": 1,
+         "bukti": "Titik fokus 'Rp 485.000' (kiri bawah kartu hijau) berukuran besar dan bold. Namun fokus ini bersaing dengan nama motor 'Honda Supra X 125' di header, yang ukuran dan beratnya hampir sama."
+        },
+        "R4": {
+         "skor": 2,
+         "bukti": "Hijau dipakai konsisten untuk tombol 'Konfirmasi', chip '12 hari lagi', progress bar, 'Lihat semua', tab aktif 'Beranda', dan baris 'Dijadwalkan'. Oranye hanya muncul bila bermakna (chip 'Menunggu suku cadang', pengingat oli). Teks abu sekunder ('Tambal Ban Pak Darto', 'Terakhir 12 Sep 2026') tetap terbaca."
+        },
+        "R5": {
+         "skor": 1,
+         "bukti": "Ikon tab bar, lonceng, dan ikon chip memakai satu gaya garis yang seragam, tanpa emoji. Visual pendukungnya lemah: thumbnail header kiri atas berisi foto bengkel, bukan Honda Supra, dan thumbnail riwayat berupa foto gelap acak yang sulit dibaca."
+        },
+        "R6": {
+         "skor": 1,
+         "bukti": "Sebagian besar angka konsisten: 20.000 − 18.462 = 'Sisa 1.538 km', 30 Nov dari tanggal kini = '12 hari lagi', dan 'Terakhir 12 Sep 2026' cocok dengan baris 'Ganti oli mesin 12 Sep 2026'. Ada satu inkonsistensi: baris 'Ganti ban belakang – Dijadwalkan 21 Nov 2026' lebih dekat daripada kartu 'Servis berikutnya' tanggal 30 Nov."
+        },
+        "R8": {
+         "skor": 2,
+         "bukti": "Tidak ada pelanggaran checklist. Langkah khas yang bisa ditunjuk: baris riwayat berstatus dijadwalkan diangkat dengan tint dan border hijau (kartu pertama di bawah 'Riwayat servis'), serta progress odometer di dalam kartu servis berikutnya."
+        },
+        "R9": {
+         "skor": 2,
+         "bukti": "Angka diberi konteks: '18.462 dari 20.000 km', 'Sisa 1.538 km', '12 hari lagi', 'Estimasi biaya · 3 pekerjaan', serta 'Terakhir 12 Sep 2026 di 16.000 km' dengan progress bar pada pengingat. Daftar riwayat memuat tiga variasi status, dan ada metadata pelat 'B 4127 TKS'."
+        },
+        "R10": {
+         "skor": 2,
+         "bukti": "Permukaan berlapis: kartu servis dan baris dijadwalkan ber-tint hijau, pengingat oli ber-tint oranye. Warna kedua (oranye) bermakna dan dipakai di chip status serta kartu pengingat. Chip status berikon dan terdefinisi, dan thumbnail foto ada di setiap baris."
+        },
+        "slop": {
+         "jumlah": 0,
+         "butir": []
+        },
+        "emoji": 0,
+        "fokus": "Angka estimasi biaya 'Rp 485.000' di kiri bawah kartu hijau 'SERVIS BERIKUTNYA' (frame 1)"
+       },
+       "Y": {
+        "R1": {
+         "skor": 0,
+         "bukti": "Semua bagian konten ada: header 'Honda Vario 160' dengan 'Jarak tempuh 12.480 km', kartu servis berikutnya dengan 'Rp285.000', 5 riwayat servis dengan tiga status, pengingat 'Waktunya ganti oli', dan tab bar 4 ikon. Namun ukuran mengikat salah: artboard tunggal setinggi sekitar 1177 px, bukan 844, dan tidak dipecah menjadi viewport 390x844."
+        },
+        "R2": {
+         "skor": 2,
+         "bukti": "Fokus tegas pada kartu hijau gelap (tengah atas) dengan 'Servis Berkala 12.500 km' dan 'Rp285.000' putih besar. Lompatan skala ke judul seksi 'Riwayat servis' dan ke teks baris terlihat jelas, dan tidak ada judul yatim."
+        },
+        "R4": {
+         "skor": 1,
+         "bukti": "Hijau konsisten untuk progress bar, tombol 'Atur jadwal', 'Lihat semua', dan tab aktif. Biru ('Dijadwalkan'), amber ('Menunggu suku cadang' dan kartu oli), serta hijau ('Selesai') bermakna sebagai status. Ada satu pemakaian warna tanpa makna: tombol 'Pesan' hitam pekat di kartu oli keluar dari sistem aksen."
+        },
+        "R5": {
+         "skor": 2,
+         "bukti": "Ikon garis seragam dalam tile abu di setiap baris riwayat (kalender, cakram, tetes oli, gear), juga di tab bar dan lonceng. Visual utama berupa kartu hijau gelap dengan progress bar relevan, tanpa emoji."
+        },
+        "R6": {
+         "skor": 2,
+         "bukti": "Angka konsisten: target 12.500 − 12.480 = 'Sisa 20 km', 23 Nov = 'dalam 5 hari' dari 18 Nov, estimasi 'Rp285.000' sama dengan baris 'Servis berkala – Dijadwalkan 23 Nov', dan '2.950 km sejak ganti oli… tiap 3.000 km'. Copy spesifik, misalnya 'Servis CVT' dan 'Ganti kampas rem'."
+        },
+        "R8": {
+         "skor": 2,
+         "bukti": "Tidak ada pelanggaran checklist. Langkah khas: kartu servis berwarna hijau gelap pekat yang kontras dengan halaman terang, serta strip statistik dua kolom 'Jarak tempuh | Plat nomor' di bawah nama motor."
+        },
+        "R9": {
+         "skor": 2,
+         "bukti": "Angka diberi konteks: 'Target 12.500 km', 'Sisa 20 km', 'dalam 5 hari', dan 'Disarankan tiap 3.000 km'. Daftar riwayat memuat tiga variasi status, dan setiap baris punya metadata 'bengkel · tanggal'. Tata letak padat tetapi tetap terbaca."
+        },
+        "R10": {
+         "skor": 2,
+         "bukti": "Permukaan berlapis: kartu hijau gelap, kartu oli ber-tint amber, dan tile ikon abu. Warna kedua (amber) bermakna dan dipakai di chip 'Menunggu suku cadang' serta kartu pengingat. Chip status berwarna dengan dot terdefinisi, dan tab bar mengambang dengan pill aktif."
+        },
+        "slop": {
+         "jumlah": 0,
+         "butir": []
+        },
+        "emoji": 0,
+        "fokus": "Kartu hijau gelap 'Servis Berkala 12.500 km' dengan nominal 'Rp285.000' (tengah atas layar)"
+       }
+      },
+      "attempts": [
+       {
+        "dir": "/root/lakar/bench/runs/practice-polish/1/judge/P7/rep-2/attempt-1",
+        "status": "ok",
+        "problems": [],
+        "costUsd": 0.1965098,
+        "wallMs": 63111.10994400014
+       }
+      ],
+      "retried": false,
+      "costUsd": 0.1965098
+     },
+     {
+      "prompt": "P7",
+      "rep": 3,
+      "mapping": {
+       "X": "pendev",
+       "Y": "lakar"
+      },
+      "status": "ok",
+      "verdict": {
+       "X": {
+        "R1": {
+         "skor": 1,
+         "bukti": "Semua bagian yang diminta ada: header 'Honda Vario 160' dengan jarak tempuh 12.480 km (atas), kartu servis berikutnya dengan estimasi Rp285.000 (kartu hijau gelap), pengingat ganti oli (kartu amber), 5 riwayat servis dengan tanggal, bengkel, biaya, dan ketiga status (tengah-bawah), serta tab bar 4 ikon (bawah). Mode terang, aksen hijau, dan Bahasa Indonesia juga sesuai. Satu hal minor: artboard tunggal setinggi ±1177px, bukan 844px. Lebar 390 benar, dan bagian yang berlebih dibaca sebagai konten scroll."
+        },
+        "R2": {
+         "skor": 2,
+         "bukti": "Kartu servis berhijau gelap di tengah atas menjadi fokus. Angka 'Rp285.000' (±28px bold putih) tampil paling dominan di atas latar gelap. Lompatan skalanya tegas: judul layar 'Honda Vario 160' (±24px), judul seksi 'Riwayat servis' (±18px), judul item (±15px), lalu metadata (±12px). Tidak ada judul yatim."
+        },
+        "R4": {
+         "skor": 1,
+         "bukti": "Hijau dipakai konsisten untuk 'Atur jadwal', 'Lihat semua', tab aktif 'Beranda', dan progress bar. Warna status punya makna: biru untuk Dijadwalkan, amber untuk Menunggu suku cadang, hijau untuk Selesai. Pelanggarannya satu: tombol 'Pesan' di kartu pengingat oli berwarna hitam, padahal aksi lain memakai aksen hijau, sehingga warnanya keluar dari sistem aksi. Kontras teks secara umum baik."
+        },
+        "R5": {
+         "skor": 2,
+         "bukti": "Ikon bergaya garis seragam di ubin abu 40px pada daftar riwayat (kalender, cakram rem, tetes oli, roda gigi, ban), di tab bar, di lonceng notifikasi, dan di tetes oli kartu pengingat. Visual utamanya adalah progress bar menuju target 12.500 km di kartu hero, dan itu relevan. Tidak ada emoji."
+        },
+        "R6": {
+         "skor": 1,
+         "bukti": "Copy spesifik: 'Sisa 20 km', 'Target 12.500 km', '2.950 km sejak ganti oli terakhir. Disarankan tiap 3.000 km', serta nama bengkel nyata (Rodaku Tebet, Kalibata, Pancoran, Bengkel Jaya Motor). Angka di kartu hero cocok dengan item 'Servis berkala Rp285.000, 23 Nov 2026'. Ada satu inkonsistensi: 'Sab, 23 Nov 2026' di kartu hero, padahal 23 Nov 2026 jatuh pada hari Senin."
+        },
+        "R8": {
+         "skor": 2,
+         "bukti": "Tidak ada pelanggaran checklist slop. Keputusan komposisi khas yang terlihat: kartu servis berhijau gelap pekat yang kontras dengan halaman terang, lengkap dengan progress km menuju target, ditambah strip spesifikasi dua kolom (Jarak tempuh | Plat nomor) dengan pembatas vertikal di bawah header."
+        },
+        "R9": {
+         "skor": 2,
+         "bukti": "Angka diberi konteks: 12.480 km bersatuan, 'Sisa 20 km' terhadap 'Target 12.500 km', 'dalam 5 hari', 2.950 dari 3.000 km pada pengingat oli, dan tanggal plus jam plus bengkel pada servis berikutnya. Daftar riwayat memuat tiga variasi status dan ikon per kategori. Metadata bengkel dan tanggal ada di setiap item. Padat tetapi tetap terbaca."
+        },
+        "R10": {
+         "skor": 2,
+         "bukti": "Permukaannya berlapis: kartu hero hijau gelap, kartu pengingat ber-tint amber, ubin ikon abu, dan pill tab aktif ber-tint hijau. Warna kedua yang bermakna (amber/oranye sebagai peringatan) dipakai di kartu ganti oli dan di badge 'Menunggu suku cadang'. Badge status berbentuk pill berwarna dengan titik indikator. Ikon garis dan progress bar tampak matang dan menyatu."
+        },
+        "slop": {
+         "jumlah": 0,
+         "butir": []
+        },
+        "emoji": 0,
+        "fokus": "Angka 'Rp285.000' di kartu 'Servis berikutnya' berwarna hijau gelap, kiri bawah kartu, sekitar y≈450"
+       },
+       "Y": {
+        "R1": {
+         "skor": 2,
+         "bukti": "Desain terdiri dari dua artboard 390x844 (layar awal dan keadaan setelah scroll). Header 'Honda Supra X 125' memuat 18.462 km. Kartu 'Servis berikutnya' memuat estimasi Rp 485.000. Ada 5 riwayat servis (Ganti ban belakang, Perbaikan kelistrikan, Ganti oli mesin, Servis berkala 15.000 km, Ganti aki) dengan tanggal, bengkel, biaya, dan ketiga status. Pengingat ganti oli ada di artboard 2 bagian bawah, dan tab bar 4 ikon ada di bawah kedua artboard. Mode terang, aksen hijau, dan Bahasa Indonesia sesuai."
+        },
+        "R2": {
+         "skor": 2,
+         "bukti": "Angka 'Rp 485.000' (±28px bold) di kartu hijau muda pada layar pertama menjadi fokus. Jenjang skalanya jelas: judul motor ±22px, lalu 'Servis berkala 20.000 km' ±20px, 'Riwayat servis' ±20px, judul item ±15px, dan metadata ±13px. Label kecil kapital 'SERVIS BERIKUTNYA' memperjelas hierarki. Tidak ada judul yatim."
+        },
+        "R4": {
+         "skor": 2,
+         "bukti": "Hijau dipakai untuk 'Konfirmasi', 'Lihat semua', tab aktif, progress servis, 'Sisa 1.538 km', serta baris riwayat terjadwal yang disorot. Oranye bermakna peringatan dan dipakai di badge 'Menunggu suku cadang' serta kartu ganti oli. Status 'Selesai' memakai abu netral. Teks abu pada latar putih maupun hijau muda tetap terbaca."
+        },
+        "R5": {
+         "skor": 1,
+         "bukti": "Gaya ikon garis seragam di tab bar (rumah, kunci pas, pin, profil), di badge status, di speedometer header, dan di tetes oli. Visual utamanya lemah: foto thumbnail di header dan di setiap item riwayat (kiri, 48px) tampak gelap, ramai, dan mirip satu sama lain. Foto header bahkan tidak jelas menampilkan Honda Supra."
+        },
+        "R6": {
+         "skor": 2,
+         "bukti": "Angka konsisten: '18.462 dari 20.000 km' cocok dengan 'Sisa 1.538 km'. 'Sen, 30 Nov 2026' benar hari Senin, dan '12 hari lagi' sesuai jaraknya dari tanggal kini. Pengingat oli 'dalam 38 km, terakhir 12 Sep 2026 di 16.000 km' cocok dengan item 'Ganti oli mesin 12 Sep 2026'. Copy spesifik, misalnya 'Tambal Ban Pak Darto', 'AHASS Fatmawati', dan 'Estimasi biaya · 3 pekerjaan'."
+        },
+        "R8": {
+         "skor": 2,
+         "bukti": "Tidak ada pelanggaran checklist slop. Komposisi khas yang terlihat: baris riwayat terjadwal 'Ganti ban belakang' disorot dengan tint dan border hijau sebagai penanda item mendatang, header berisi thumbnail motor dengan odometer berikon speedometer, dan progress bar oranye pada kartu ganti oli."
+        },
+        "R9": {
+         "skor": 2,
+         "bukti": "Angka diberi konteks: progress km terhadap target 20.000, sisa km, hitung mundur hari, jumlah pekerjaan dalam estimasi, serta tanggal dan km ganti oli terakhir. Daftar memuat tiga status berikon, dengan bengkel, tanggal, dan foto per item. Padat dan tetap terbaca."
+        },
+        "R10": {
+         "skor": 2,
+         "bukti": "Permukaannya berlapis: kartu hero ber-tint hijau muda, baris terjadwal ber-tint hijau, kartu oli bertepi oranye dengan ubin ikon ber-tint, dan pill tab aktif. Warna kedua (oranye) dipakai di badge menunggu dan di kartu oli. Badge status berupa pill berwarna dengan ikon. Ada foto per item, meskipun kualitasnya sudah dinilai di R5."
+        },
+        "slop": {
+         "jumlah": 0,
+         "butir": []
+        },
+        "emoji": 0,
+        "fokus": "Angka 'Rp 485.000' di kartu 'Servis berikutnya' berwarna hijau muda, kiri bawah kartu, artboard 1 sekitar y≈318"
+       }
+      },
+      "attempts": [
+       {
+        "dir": "/root/lakar/bench/runs/practice-polish/1/judge/P7/rep-3/attempt-1",
+        "status": "ok",
+        "problems": [],
+        "costUsd": 0.21116580000000001,
+        "wallMs": 69933.10593299987
+       }
+      ],
+      "retried": false,
+      "costUsd": 0.21116580000000001
+     }
+    ],
+    "tools": {
+     "lakar": {
+      "criteria": {
+       "R1": {
+        "values": [
+         2,
+         1,
+         2
+        ],
+        "median": 2,
+        "range": 1,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 2,
+          "bukti": "Semua bagian yang diminta ada. Header berisi 'Honda Supra X 125' dan '18.462 km' (kiri atas). Kartu 'Servis berikutnya' memuat 'Estimasi biaya · Rp 485.000'. Riwayat servis berisi 5 item yang tersebar di dua artboard (kondisi awal dan kondisi setelah scroll): Ganti ban belakang, Perbaikan kelistrikan, Ganti oli mesin, Servis berkala 15.000 km, Ganti aki. Ketiga status muncul: Dijadwalkan, Menunggu suku cadang, Selesai. Kartu pengingat 'Ganti oli dalam 38 km' ada di artboard 2 bawah. Tab bar 4 ikon: Beranda, Servis, Bengkel, Profil. Mode terang, aksen hijau, Bahasa Indonesia, dan tiap frame berukuran 390x844."
+         },
+         {
+          "rep": 2,
+          "skor": 1,
+          "bukti": "Semua bagian ada dan sesuai: header 'Honda Supra X 125' dengan '18.462 km' (atas), kartu 'SERVIS BERIKUTNYA' dengan 'Rp 485.000', 5 riwayat servis dengan tiga status (frame 1 dan 2), pengingat 'Ganti oli dalam 38 km' (bawah frame 2), tab bar 4 ikon. Mode terang, aksen hijau, dan bahasa Indonesia juga sesuai. Satu hal minor: di frame 1 ada strip putih kosong di bawah home indicator (sekitar y 830–870), sehingga tab bar tidak menempel di dasar layar dan tinggi frame tampak melebihi 844."
+         },
+         {
+          "rep": 3,
+          "skor": 2,
+          "bukti": "Desain terdiri dari dua artboard 390x844 (layar awal dan keadaan setelah scroll). Header 'Honda Supra X 125' memuat 18.462 km. Kartu 'Servis berikutnya' memuat estimasi Rp 485.000. Ada 5 riwayat servis (Ganti ban belakang, Perbaikan kelistrikan, Ganti oli mesin, Servis berkala 15.000 km, Ganti aki) dengan tanggal, bengkel, biaya, dan ketiga status. Pengingat ganti oli ada di artboard 2 bagian bawah, dan tab bar 4 ikon ada di bawah kedua artboard. Mode terang, aksen hijau, dan Bahasa Indonesia sesuai."
+         }
+        ]
+       },
+       "R2": {
+        "values": [
+         1,
+         1,
+         2
+        ],
+        "median": 1,
+        "range": 1,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 1,
+          "bukti": "Titik fokus adalah 'Rp 485.000' (bold, sekitar 28px) di kiri bawah kartu servis berikutnya. Fokus ini bersaing dengan nama motor 'Honda Supra X 125' di header, yang ukuran dan bobotnya hampir sama, dan berada di permukaan yang sama-sama terang."
+         },
+         {
+          "rep": 2,
+          "skor": 1,
+          "bukti": "Titik fokus 'Rp 485.000' (kiri bawah kartu hijau) berukuran besar dan bold. Namun fokus ini bersaing dengan nama motor 'Honda Supra X 125' di header, yang ukuran dan beratnya hampir sama."
+         },
+         {
+          "rep": 3,
+          "skor": 2,
+          "bukti": "Angka 'Rp 485.000' (±28px bold) di kartu hijau muda pada layar pertama menjadi fokus. Jenjang skalanya jelas: judul motor ±22px, lalu 'Servis berkala 20.000 km' ±20px, 'Riwayat servis' ±20px, judul item ±15px, dan metadata ±13px. Label kecil kapital 'SERVIS BERIKUTNYA' memperjelas hierarki. Tidak ada judul yatim."
+         }
+        ]
+       },
+       "R4": {
+        "values": [
+         2,
+         2,
+         2
+        ],
+        "median": 2,
+        "range": 0,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 2,
+          "bukti": "Hijau dipakai konsisten untuk aksi dan keadaan aktif: tombol 'Konfirmasi', 'Lihat semua', progress bar, tab Beranda, dan baris Dijadwalkan yang di-highlight. Oranye hanya dipakai untuk peringatan, yaitu badge 'Menunggu suku cadang' dan kartu pengingat oli. Teks abu-abu (tanggal di kanan baris, '18.462 dari 20.000 km') masih terbaca."
+         },
+         {
+          "rep": 2,
+          "skor": 2,
+          "bukti": "Hijau dipakai konsisten untuk tombol 'Konfirmasi', chip '12 hari lagi', progress bar, 'Lihat semua', tab aktif 'Beranda', dan baris 'Dijadwalkan'. Oranye hanya muncul bila bermakna (chip 'Menunggu suku cadang', pengingat oli). Teks abu sekunder ('Tambal Ban Pak Darto', 'Terakhir 12 Sep 2026') tetap terbaca."
+         },
+         {
+          "rep": 3,
+          "skor": 2,
+          "bukti": "Hijau dipakai untuk 'Konfirmasi', 'Lihat semua', tab aktif, progress servis, 'Sisa 1.538 km', serta baris riwayat terjadwal yang disorot. Oranye bermakna peringatan dan dipakai di badge 'Menunggu suku cadang' serta kartu ganti oli. Status 'Selesai' memakai abu netral. Teks abu pada latar putih maupun hijau muda tetap terbaca."
+         }
+        ]
+       },
+       "R5": {
+        "values": [
+         2,
+         1,
+         1
+        ],
+        "median": 1,
+        "range": 1,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 2,
+          "bukti": "Ikon memakai satu gaya garis dengan ukuran seragam: lonceng, ikon badge status, tetes oli, dan keempat ikon tab bar. Thumbnail foto bengkel/mekanik di setiap baris riwayat relevan dengan konteks. Tidak ada emoji."
+         },
+         {
+          "rep": 2,
+          "skor": 1,
+          "bukti": "Ikon tab bar, lonceng, dan ikon chip memakai satu gaya garis yang seragam, tanpa emoji. Visual pendukungnya lemah: thumbnail header kiri atas berisi foto bengkel, bukan Honda Supra, dan thumbnail riwayat berupa foto gelap acak yang sulit dibaca."
+         },
+         {
+          "rep": 3,
+          "skor": 1,
+          "bukti": "Gaya ikon garis seragam di tab bar (rumah, kunci pas, pin, profil), di badge status, di speedometer header, dan di tetes oli. Visual utamanya lemah: foto thumbnail di header dan di setiap item riwayat (kiri, 48px) tampak gelap, ramai, dan mirip satu sama lain. Foto header bahkan tidak jelas menampilkan Honda Supra."
+         }
+        ]
+       },
+       "R6": {
+        "values": [
+         2,
+         1,
+         2
+        ],
+        "median": 2,
+        "range": 1,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 2,
+          "bukti": "Angka-angkanya konsisten. 18.462 dari 20.000 km menghasilkan 'Sisa 1.538 km'. 'Sen, 30 Nov 2026' sesuai dengan '12 hari lagi' dan memang jatuh pada hari Senin. Pengingat oli ('Terakhir 12 Sep 2026 di 16.000 km') cocok dengan item 'Ganti oli mesin 12 Sep 2026 Jaya Motor Cilandak'. Nama bengkel dan item ditulis spesifik."
+         },
+         {
+          "rep": 2,
+          "skor": 1,
+          "bukti": "Sebagian besar angka konsisten: 20.000 − 18.462 = 'Sisa 1.538 km', 30 Nov dari tanggal kini = '12 hari lagi', dan 'Terakhir 12 Sep 2026' cocok dengan baris 'Ganti oli mesin 12 Sep 2026'. Ada satu inkonsistensi: baris 'Ganti ban belakang – Dijadwalkan 21 Nov 2026' lebih dekat daripada kartu 'Servis berikutnya' tanggal 30 Nov."
+         },
+         {
+          "rep": 3,
+          "skor": 2,
+          "bukti": "Angka konsisten: '18.462 dari 20.000 km' cocok dengan 'Sisa 1.538 km'. 'Sen, 30 Nov 2026' benar hari Senin, dan '12 hari lagi' sesuai jaraknya dari tanggal kini. Pengingat oli 'dalam 38 km, terakhir 12 Sep 2026 di 16.000 km' cocok dengan item 'Ganti oli mesin 12 Sep 2026'. Copy spesifik, misalnya 'Tambal Ban Pak Darto', 'AHASS Fatmawati', dan 'Estimasi biaya · 3 pekerjaan'."
+         }
+        ]
+       },
+       "R8": {
+        "values": [
+         2,
+         2,
+         2
+        ],
+        "median": 2,
+        "range": 0,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 2,
+          "bukti": "Tidak ada pelanggaran checklist slop. Keputusan komposisi khas yang bisa ditunjuk: baris 'Ganti ban belakang' yang berstatus dijadwalkan di-highlight dengan tint hijau dan border hijau (atas daftar riwayat), thumbnail foto nyata di setiap baris, dan header yang tetap sticky pada artboard scroll."
+         },
+         {
+          "rep": 2,
+          "skor": 2,
+          "bukti": "Tidak ada pelanggaran checklist. Langkah khas yang bisa ditunjuk: baris riwayat berstatus dijadwalkan diangkat dengan tint dan border hijau (kartu pertama di bawah 'Riwayat servis'), serta progress odometer di dalam kartu servis berikutnya."
+         },
+         {
+          "rep": 3,
+          "skor": 2,
+          "bukti": "Tidak ada pelanggaran checklist slop. Komposisi khas yang terlihat: baris riwayat terjadwal 'Ganti ban belakang' disorot dengan tint dan border hijau sebagai penanda item mendatang, header berisi thumbnail motor dengan odometer berikon speedometer, dan progress bar oranye pada kartu ganti oli."
+         }
+        ]
+       },
+       "R9": {
+        "values": [
+         2,
+         2,
+         2
+        ],
+        "median": 2,
+        "range": 0,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 2,
+          "bukti": "Angka diberi konteks. Kartu servis memuat progress '18.462 dari 20.000 km', 'Sisa 1.538 km', '12 hari lagi', dan '3 pekerjaan'. Header menampilkan plat 'B 4127 TKS'. Daftar riwayat menunjukkan tiga variasi status dengan bengkel dan tanggal. Pengingat oli menyertakan tanggal dan km terakhir serta progress bar. Kepadatannya tetap terbaca."
+         },
+         {
+          "rep": 2,
+          "skor": 2,
+          "bukti": "Angka diberi konteks: '18.462 dari 20.000 km', 'Sisa 1.538 km', '12 hari lagi', 'Estimasi biaya · 3 pekerjaan', serta 'Terakhir 12 Sep 2026 di 16.000 km' dengan progress bar pada pengingat. Daftar riwayat memuat tiga variasi status, dan ada metadata pelat 'B 4127 TKS'."
+         },
+         {
+          "rep": 3,
+          "skor": 2,
+          "bukti": "Angka diberi konteks: progress km terhadap target 20.000, sisa km, hitung mundur hari, jumlah pekerjaan dalam estimasi, serta tanggal dan km ganti oli terakhir. Daftar memuat tiga status berikon, dengan bengkel, tanggal, dan foto per item. Padat dan tetap terbaca."
+         }
+        ]
+       },
+       "R10": {
+        "values": [
+         2,
+         2,
+         2
+        ],
+        "median": 2,
+        "range": 0,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 2,
+          "bukti": "Permukaannya berlapis: kartu servis ber-tint hijau dan baris dijadwalkan ber-tint hijau. Ada warna kedua yang bermakna, yaitu oranye, yang dipakai konsisten di badge 'Menunggu suku cadang' dan kartu pengingat oli (border, ikon, dan progress bar). Badge status punya ikon dan latar sendiri. Foto thumbnail menyatu dengan rounded corner."
+         },
+         {
+          "rep": 2,
+          "skor": 2,
+          "bukti": "Permukaan berlapis: kartu servis dan baris dijadwalkan ber-tint hijau, pengingat oli ber-tint oranye. Warna kedua (oranye) bermakna dan dipakai di chip status serta kartu pengingat. Chip status berikon dan terdefinisi, dan thumbnail foto ada di setiap baris."
+         },
+         {
+          "rep": 3,
+          "skor": 2,
+          "bukti": "Permukaannya berlapis: kartu hero ber-tint hijau muda, baris terjadwal ber-tint hijau, kartu oli bertepi oranye dengan ubin ikon ber-tint, dan pill tab aktif. Warna kedua (oranye) dipakai di badge menunggu dan di kartu oli. Badge status berupa pill berwarna dengan ikon. Ada foto per item, meskipun kualitasnya sudah dinilai di R5."
+         }
+        ]
+       }
+      },
+      "total": 14,
+      "slop": {
+       "values": [
+        0,
+        0,
+        0
+       ],
+       "median": 0,
+       "range": 0,
+       "flag": false,
+       "items": [
+        {
+         "rep": 1,
+         "butir": []
+        },
+        {
+         "rep": 2,
+         "butir": []
+        },
+        {
+         "rep": 3,
+         "butir": []
+        }
+       ]
+      },
+      "emoji": {
+       "values": [
+        0,
+        0,
+        0
+       ],
+       "median": 0,
+       "range": 0,
+       "flag": false
+      },
+      "focus": [
+       {
+        "rep": 1,
+        "fokus": "'Rp 485.000' di kiri bawah kartu 'Servis berikutnya' (bagian atas artboard 1)"
+       },
+       {
+        "rep": 2,
+        "fokus": "Angka estimasi biaya 'Rp 485.000' di kiri bawah kartu hijau 'SERVIS BERIKUTNYA' (frame 1)"
+       },
+       {
+        "rep": 3,
+        "fokus": "Angka 'Rp 485.000' di kartu 'Servis berikutnya' berwarna hijau muda, kiri bawah kartu, artboard 1 sekitar y≈318"
+       }
+      ]
+     },
+     "pendev": {
+      "criteria": {
+       "R1": {
+        "values": [
+         2,
+         0,
+         1
+        ],
+        "median": 1,
+        "range": 2,
+        "flag": true,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 2,
+          "bukti": "Semua bagian yang diminta ada. Header 'Honda Vario 160' dilengkapi kartu 'Jarak tempuh 12.480 km'. Kartu servis berikutnya memuat 'Estimasi biaya Rp285.000'. Pengingat oli 'Waktunya ganti oli' tampil. Riwayat servis berisi 5 item dengan tanggal, bengkel, biaya, dan tiga status. Tab bar 4 ikon: Beranda, Riwayat, Bengkel, Profil. Mode terang, aksen hijau, Bahasa Indonesia, frame 390x844."
+         },
+         {
+          "rep": 2,
+          "skor": 0,
+          "bukti": "Semua bagian konten ada: header 'Honda Vario 160' dengan 'Jarak tempuh 12.480 km', kartu servis berikutnya dengan 'Rp285.000', 5 riwayat servis dengan tiga status, pengingat 'Waktunya ganti oli', dan tab bar 4 ikon. Namun ukuran mengikat salah: artboard tunggal setinggi sekitar 1177 px, bukan 844, dan tidak dipecah menjadi viewport 390x844."
+         },
+         {
+          "rep": 3,
+          "skor": 1,
+          "bukti": "Semua bagian yang diminta ada: header 'Honda Vario 160' dengan jarak tempuh 12.480 km (atas), kartu servis berikutnya dengan estimasi Rp285.000 (kartu hijau gelap), pengingat ganti oli (kartu amber), 5 riwayat servis dengan tanggal, bengkel, biaya, dan ketiga status (tengah-bawah), serta tab bar 4 ikon (bawah). Mode terang, aksen hijau, dan Bahasa Indonesia juga sesuai. Satu hal minor: artboard tunggal setinggi ±1177px, bukan 844px. Lebar 390 benar, dan bagian yang berlebih dibaca sebagai konten scroll."
+         }
+        ]
+       },
+       "R2": {
+        "values": [
+         2,
+         2,
+         2
+        ],
+        "median": 2,
+        "range": 0,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 2,
+          "bukti": "Titik fokus yang tegas adalah 'Rp285.000' berwarna putih bold di kartu hijau tua (tengah atas). Kartu gelap itu menjadi satu-satunya bidang kontras tinggi di layar. Skala tipografinya bertingkat jelas: judul 'Honda Vario 160', lalu angka di kartu, lalu judul seksi 'Riwayat servis', lalu meta abu-abu. Tidak ada judul yatim."
+         },
+         {
+          "rep": 2,
+          "skor": 2,
+          "bukti": "Fokus tegas pada kartu hijau gelap (tengah atas) dengan 'Servis Berkala 12.500 km' dan 'Rp285.000' putih besar. Lompatan skala ke judul seksi 'Riwayat servis' dan ke teks baris terlihat jelas, dan tidak ada judul yatim."
+         },
+         {
+          "rep": 3,
+          "skor": 2,
+          "bukti": "Kartu servis berhijau gelap di tengah atas menjadi fokus. Angka 'Rp285.000' (±28px bold putih) tampil paling dominan di atas latar gelap. Lompatan skalanya tegas: judul layar 'Honda Vario 160' (±24px), judul seksi 'Riwayat servis' (±18px), judul item (±15px), lalu metadata (±12px). Tidak ada judul yatim."
+         }
+        ]
+       },
+       "R4": {
+        "values": [
+         1,
+         1,
+         1
+        ],
+        "median": 1,
+        "range": 0,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 1,
+          "bukti": "Hijau dipakai konsisten (kartu hero, tombol 'Atur jadwal', progress bar, tab aktif, 'Lihat semua'), dan warna status punya makna: biru untuk Dijadwalkan, kuning/amber untuk Menunggu, hijau untuk Selesai. Namun ada satu teks lemah: 'Target 12.500 km' berwarna hijau-abu redup di atas latar hijau tua (kanan bawah progress bar di kartu hero)."
+         },
+         {
+          "rep": 2,
+          "skor": 1,
+          "bukti": "Hijau konsisten untuk progress bar, tombol 'Atur jadwal', 'Lihat semua', dan tab aktif. Biru ('Dijadwalkan'), amber ('Menunggu suku cadang' dan kartu oli), serta hijau ('Selesai') bermakna sebagai status. Ada satu pemakaian warna tanpa makna: tombol 'Pesan' hitam pekat di kartu oli keluar dari sistem aksen."
+         },
+         {
+          "rep": 3,
+          "skor": 1,
+          "bukti": "Hijau dipakai konsisten untuk 'Atur jadwal', 'Lihat semua', tab aktif 'Beranda', dan progress bar. Warna status punya makna: biru untuk Dijadwalkan, amber untuk Menunggu suku cadang, hijau untuk Selesai. Pelanggarannya satu: tombol 'Pesan' di kartu pengingat oli berwarna hitam, padahal aksi lain memakai aksen hijau, sehingga warnanya keluar dari sistem aksi. Kontras teks secara umum baik."
+         }
+        ]
+       },
+       "R5": {
+        "values": [
+         2,
+         2,
+         2
+        ],
+        "median": 2,
+        "range": 0,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 2,
+          "bukti": "Ikon garis memakai satu gaya dan ukuran seragam, ditempatkan di kotak abu-abu membulat pada setiap baris riwayat. Gaya yang sama berlaku untuk ikon tetes oli, lonceng, dan tab bar. Visual utama berupa kartu hero dengan progress bar, dan itu relevan. Tidak ada emoji."
+         },
+         {
+          "rep": 2,
+          "skor": 2,
+          "bukti": "Ikon garis seragam dalam tile abu di setiap baris riwayat (kalender, cakram, tetes oli, gear), juga di tab bar dan lonceng. Visual utama berupa kartu hijau gelap dengan progress bar relevan, tanpa emoji."
+         },
+         {
+          "rep": 3,
+          "skor": 2,
+          "bukti": "Ikon bergaya garis seragam di ubin abu 40px pada daftar riwayat (kalender, cakram rem, tetes oli, roda gigi, ban), di tab bar, di lonceng notifikasi, dan di tetes oli kartu pengingat. Visual utamanya adalah progress bar menuju target 12.500 km di kartu hero, dan itu relevan. Tidak ada emoji."
+         }
+        ]
+       },
+       "R6": {
+        "values": [
+         1,
+         2,
+         1
+        ],
+        "median": 1,
+        "range": 1,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 1,
+          "bukti": "Ada satu inkonsistensi tanggal. Kartu hero menulis 'Sab, 23 Nov 2026' dengan keterangan 'dalam 5 hari', padahal 23 Nov 2026 jatuh pada hari Senin. Angka lainnya konsisten: 12.480 km dengan target 12.500 menghasilkan 'Sisa 20 km', dan '2.950 km sejak ganti oli terakhir' sesuai dengan 'tiap 3.000 km'."
+         },
+         {
+          "rep": 2,
+          "skor": 2,
+          "bukti": "Angka konsisten: target 12.500 − 12.480 = 'Sisa 20 km', 23 Nov = 'dalam 5 hari' dari 18 Nov, estimasi 'Rp285.000' sama dengan baris 'Servis berkala – Dijadwalkan 23 Nov', dan '2.950 km sejak ganti oli… tiap 3.000 km'. Copy spesifik, misalnya 'Servis CVT' dan 'Ganti kampas rem'."
+         },
+         {
+          "rep": 3,
+          "skor": 1,
+          "bukti": "Copy spesifik: 'Sisa 20 km', 'Target 12.500 km', '2.950 km sejak ganti oli terakhir. Disarankan tiap 3.000 km', serta nama bengkel nyata (Rodaku Tebet, Kalibata, Pancoran, Bengkel Jaya Motor). Angka di kartu hero cocok dengan item 'Servis berkala Rp285.000, 23 Nov 2026'. Ada satu inkonsistensi: 'Sab, 23 Nov 2026' di kartu hero, padahal 23 Nov 2026 jatuh pada hari Senin."
+         }
+        ]
+       },
+       "R8": {
+        "values": [
+         2,
+         2,
+         2
+        ],
+        "median": 2,
+        "range": 0,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 2,
+          "bukti": "Tidak ada pelanggaran checklist slop. Latar halaman putih/abu dingin, dan tint amber hanya dipakai di kartu peringatan. Keputusan komposisi khas: kartu hero hijau tua yang kontras dengan tombol hijau terang, tab bar pill mengambang di bawah, dan daftar riwayat yang disatukan dalam satu panel dengan divider."
+         },
+         {
+          "rep": 2,
+          "skor": 2,
+          "bukti": "Tidak ada pelanggaran checklist. Langkah khas: kartu servis berwarna hijau gelap pekat yang kontras dengan halaman terang, serta strip statistik dua kolom 'Jarak tempuh | Plat nomor' di bawah nama motor."
+         },
+         {
+          "rep": 3,
+          "skor": 2,
+          "bukti": "Tidak ada pelanggaran checklist slop. Keputusan komposisi khas yang terlihat: kartu servis berhijau gelap pekat yang kontras dengan halaman terang, lengkap dengan progress km menuju target, ditambah strip spesifikasi dua kolom (Jarak tempuh | Plat nomor) dengan pembatas vertikal di bawah header."
+         }
+        ]
+       },
+       "R9": {
+        "values": [
+         2,
+         2,
+         2
+        ],
+        "median": 2,
+        "range": 0,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 2,
+          "bukti": "Angka diberi konteks. Kartu atas berisi 'Jarak tempuh' dan 'Plat nomor B 4821 KZT'. Kartu hero memuat 'dalam 5 hari', 'Sisa 20 km', dan 'Target 12.500 km'. Pengingat oli menyertakan km sejak penggantian terakhir dan interval yang disarankan. Setiap baris riwayat memuat bengkel · tanggal dan badge status yang bervariasi. Dot merah notifikasi pada lonceng ikut menambah detail."
+         },
+         {
+          "rep": 2,
+          "skor": 2,
+          "bukti": "Angka diberi konteks: 'Target 12.500 km', 'Sisa 20 km', 'dalam 5 hari', dan 'Disarankan tiap 3.000 km'. Daftar riwayat memuat tiga variasi status, dan setiap baris punya metadata 'bengkel · tanggal'. Tata letak padat tetapi tetap terbaca."
+         },
+         {
+          "rep": 3,
+          "skor": 2,
+          "bukti": "Angka diberi konteks: 12.480 km bersatuan, 'Sisa 20 km' terhadap 'Target 12.500 km', 'dalam 5 hari', 2.950 dari 3.000 km pada pengingat oli, dan tanggal plus jam plus bengkel pada servis berikutnya. Daftar riwayat memuat tiga variasi status dan ikon per kategori. Metadata bengkel dan tanggal ada di setiap item. Padat tetapi tetap terbaca."
+         }
+        ]
+       },
+       "R10": {
+        "values": [
+         2,
+         2,
+         2
+        ],
+        "median": 2,
+        "range": 0,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 2,
+          "bukti": "Permukaannya berlapis: kartu hijau tua, chip 'Servis berikutnya' ber-tint, kartu oli ber-tint amber, dan kotak ikon abu-abu. Ada warna kedua yang bermakna, yaitu amber, yang dipakai di kartu pengingat oli dan badge 'Menunggu suku cadang'. Badge status punya dot berwarna dan latarnya terdefinisi. Ikon matang, dan tab bar pill aktif ber-tint hijau."
+         },
+         {
+          "rep": 2,
+          "skor": 2,
+          "bukti": "Permukaan berlapis: kartu hijau gelap, kartu oli ber-tint amber, dan tile ikon abu. Warna kedua (amber) bermakna dan dipakai di chip 'Menunggu suku cadang' serta kartu pengingat. Chip status berwarna dengan dot terdefinisi, dan tab bar mengambang dengan pill aktif."
+         },
+         {
+          "rep": 3,
+          "skor": 2,
+          "bukti": "Permukaannya berlapis: kartu hero hijau gelap, kartu pengingat ber-tint amber, ubin ikon abu, dan pill tab aktif ber-tint hijau. Warna kedua yang bermakna (amber/oranye sebagai peringatan) dipakai di kartu ganti oli dan di badge 'Menunggu suku cadang'. Badge status berbentuk pill berwarna dengan titik indikator. Ikon garis dan progress bar tampak matang dan menyatu."
+         }
+        ]
+       }
+      },
+      "total": 13,
+      "slop": {
+       "values": [
+        0,
+        0,
+        0
+       ],
+       "median": 0,
+       "range": 0,
+       "flag": false,
+       "items": [
+        {
+         "rep": 1,
+         "butir": []
+        },
+        {
+         "rep": 2,
+         "butir": []
+        },
+        {
+         "rep": 3,
+         "butir": []
+        }
+       ]
+      },
+      "emoji": {
+       "values": [
+        0,
+        0,
+        0
+       ],
+       "median": 0,
+       "range": 0,
+       "flag": false
+      },
+      "focus": [
+       {
+        "rep": 1,
+        "fokus": "'Rp285.000' berwarna putih di kiri bawah kartu hijau tua 'Servis berikutnya' (tengah atas layar)"
+       },
+       {
+        "rep": 2,
+        "fokus": "Kartu hijau gelap 'Servis Berkala 12.500 km' dengan nominal 'Rp285.000' (tengah atas layar)"
+       },
+       {
+        "rep": 3,
+        "fokus": "Angka 'Rp285.000' di kartu 'Servis berikutnya' berwarna hijau gelap, kiri bawah kartu, sekitar y≈450"
+       }
+      ]
+     }
+    }
+   },
+   "decision": {
+    "decision": "Kalah",
+    "why": "gerbang gagal: waktu 180.7 dtk > 1.5 × baseline 97.5 dtk (rasio 1.85)"
+   },
+   "emoji": {
+    "lakar": {
+     "agent": 0,
+     "glyphs": 0,
+     "lint": 0,
+     "judge": 0
+    },
+    "pendev": {
+     "agent": 0,
+     "glyphs": 0,
+     "judge": 0
+    }
+   },
+   "pngs": {
+    "lakar": "bench/practice/polish/1/P7-lakar.png",
+    "pendev": "bench/runs/practice-polish/1/P7-pendev.png"
+   },
+   "cost": {
+    "lakar": 0.9718787999999999,
+    "pendev": 0.5735642000000001,
+    "pendevCounted": true,
+    "judge": 0.5914454
+   }
+  },
+  {
+   "id": "P8",
+   "name": "Lumbung",
+   "kind": "dashboard",
+   "size": {
+    "width": 1440,
+    "height": 900
+   },
+   "judgeTextSha256": "03f7132b3264e52a232c879f5ad92d09e388b12656be529793b2540850c92df5",
+   "runs": {
+    "lakar": {
+     "key": "P8-lakar",
+     "prompt": "P8",
+     "tool": "lakar",
+     "dir": "bench/runs/practice-polish/1/P8-lakar",
+     "record": {
+      "runId": "polish-1-P8-lakar",
+      "prompt": "P8",
+      "attempt": 1,
+      "status": "success",
+      "wallMs": 161181.96633199998,
+      "durationMs": 161261,
+      "durationApiMs": 158412,
+      "costUsd": 0.6161454000000001,
+      "numTurns": 10,
+      "toolCalls": 9,
+      "firstToolUseMs": 1428.6360029999632,
+      "lastToolResultMs": 147860.70786700002,
+      "spawnToFirstEventMs": 1133.555577000021,
+      "frames": [
+       {
+        "id": "ZM61GLHV",
+        "name": "Lumbung / Dasbor gudang · app · Padat",
+        "width": 1440,
+        "height": 900,
+        "png": "bench/runs/practice-polish/1/P8-lakar/png/ZM61GLHV.png",
+        "pngWidth": 1440,
+        "pngHeight": 900
+       }
+      ],
+      "transcriptBytes": 1333126,
+      "pngScaleMismatch": false,
+      "model": "claude-opus-5-5",
+      "modelUsageKeys": [
+       "claude-opus-5-5"
+      ],
+      "claudeCodeVersion": "2.1.325",
+      "startedAt": "2026-11-18T21:35:34.316Z",
+      "lakar": {
+       "slug": "lumbung-dashboard",
+       "opened": [
+        "lumbung-dashboard"
+       ],
+       "boards": [
+        {
+         "id": "ZM61GLHV",
+         "name": "Lumbung / Dasbor gudang · app · Padat",
+         "page": "Page 1",
+         "screen": "app",
+         "x": 0,
+         "y": 0,
+         "width": 1440,
+         "height": 900,
+         "wip": false,
+         "childCount": 1
+        }
+       ],
+       "layout": {
+        "rev": 2,
+        "summary": {
+         "error": 0,
+         "warning": 0,
+         "gate": 0
+        },
+        "findings": [],
+        "boards": [
+         {
+          "id": "ZM61GLHV",
+          "name": "Lumbung / Dasbor gudang · app · Padat",
+          "summary": {
+           "error": 0,
+           "warning": 0,
+           "gate": 0
+          }
+         }
+        ]
+       },
+       "docPath": "bench/runs/practice-polish/1/P8-lakar/doc/lumbung-dashboard.lakar.json",
+       "historyPath": "bench/runs/practice-polish/1/P8-lakar/doc/lumbung-dashboard.history.jsonl",
+       "daemonBefore": {
+        "pid": 1827930,
+        "startedAt": "2026-11-18T21:27:04.269Z",
+        "recreated": 0,
+        "systemd": {
+         "ActiveState": "active",
+         "ActiveEnterTimestamp": "Wed 2026-11-18 21:27:03 UTC",
+         "MainPID": "1827930",
+         "NRestarts": "0"
+        }
+       },
+       "daemonAfter": {
+        "pid": 1827930,
+        "startedAt": "2026-11-18T21:27:04.269Z",
+        "recreated": 0,
+        "systemd": {
+         "ActiveState": "active",
+         "ActiveEnterTimestamp": "Wed 2026-11-18 21:27:03 UTC",
+         "MainPID": "1827930",
+         "NRestarts": "0"
+        }
+       },
+       "docsBefore": 4
+      }
+     },
+     "reconnect": {
+      "count": 0,
+      "affectedMs": 0,
+      "events": [],
+      "toolErrors": []
+     },
+     "agentEmoji": {
+      "emoji": 0,
+      "glyphs": 0,
+      "samples": []
+     },
+     "lintEmoji": {
+      "lc01a": 0,
+      "lc01b": 0
+     },
+     "strip": {
+      "path": "bench/runs/practice-polish/1/P8-lakar.png",
+      "width": 1440,
+      "height": 900,
+      "boards": 1
+     },
+     "previous": []
+    },
+    "pendev": {
+     "key": "P8-pendev",
+     "prompt": "P8",
+     "tool": "pendev",
+     "dir": "bench/runs/practice-polish/1/P8-pendev",
+     "record": {
+      "runId": "polish-1-P8-pendev",
+      "prompt": "P8",
+      "attempt": 1,
+      "status": "success",
+      "uri": "file:///root/.pencil/documents/2ec5e111-ecb8-4ac4-98c8-1b3a519b57f8/untitled.pen",
+      "uriSource": "get_app_state",
+      "wallMs": 213573.22010700003,
+      "durationMs": 213651,
+      "durationApiMs": 194488,
+      "costUsd": 1.0033728000000002,
+      "numTurns": 20,
+      "toolCalls": 19,
+      "firstToolUseMs": 1271.7902929999982,
+      "lastToolResultMs": 203150.14785400004,
+      "spawnToFirstEventMs": 803.0701779999654,
+      "frames": [
+       {
+        "id": "G7BA8",
+        "name": "Lumbung — Dasbor",
+        "width": 1440,
+        "height": 900,
+        "png": "bench/runs/practice-polish/1/P8-pendev/png/G7BA8.png",
+        "pngWidth": 1440,
+        "pngHeight": 900
+       }
+      ],
+      "transcriptBytes": 645910,
+      "penPath": "bench/runs/practice-polish/1/P8-pendev/design.pen",
+      "pngScaleMismatch": false,
+      "model": "claude-opus-5-5",
+      "modelUsageKeys": [
+       "claude-opus-5-5"
+      ],
+      "claudeCodeVersion": "2.1.325",
+      "startedAt": "2026-11-18T21:31:57.328Z",
+      "pendevSystemd": {
+       "before": {
+        "ActiveState": "active",
+        "ActiveEnterTimestamp": "Wed 2026-11-18 18:16:46 UTC",
+        "MainPID": "1699601",
+        "NRestarts": "0"
+       },
+       "after": {
+        "ActiveState": "active",
+        "ActiveEnterTimestamp": "Wed 2026-11-18 18:16:46 UTC",
+        "MainPID": "1699601",
+        "NRestarts": "0"
+       }
+      }
+     },
+     "reconnect": {
+      "count": 0,
+      "affectedMs": 0,
+      "events": [],
+      "toolErrors": []
+     },
+     "agentEmoji": {
+      "emoji": 0,
+      "glyphs": 0,
+      "samples": []
+     },
+     "strip": {
+      "path": "bench/runs/practice-polish/1/P8-pendev.png",
+      "width": 1440,
+      "height": 900,
+      "boards": 1
+     },
+     "previous": []
+    }
+   },
+   "gate": {
+    "ok": true,
+    "reasons": [],
+    "timeRatio": 0.7546918394134242
+   },
+   "sizeProblems": [],
+   "pendevSizeProblems": [],
+   "score": {
+    "prompt": "P8",
+    "validReps": 3,
+    "reps": [
+     {
+      "prompt": "P8",
+      "rep": 1,
+      "mapping": {
+       "X": "lakar",
+       "Y": "pendev"
+      },
+      "status": "ok",
+      "verdict": {
+       "X": {
+        "R1": {
+         "skor": 2,
+         "bukti": "Semua bagian ada: sidebar navigasi (kiri), header dengan pencarian SKU 'Cari SKU, mis. BR-PW-50' dan tombol 'Tambah pengiriman' (kanan atas), 4 kartu ringkasan dengan pembanding 'vs … minggu lalu', grafik garis 'Stok per gudang, 14 hari' (5–18 Nov, 3 gudang), panel 'Pemasok terlambat' (kanan tengah), tabel 'Pesanan keluar hari ini' dengan kolom pelanggan, jumlah karung, jadwal, dan status (bawah). Mode terang, aksen biru tua, berbahasa Indonesia, artboard 1440x900."
+        },
+        "R2": {
+         "skor": 1,
+         "bukti": "Angka KPI sekitar 28px jelas lebih besar daripada judul seksi (~16px) dan label (~13px), dan tidak ada judul yatim. Namun keempat kartu KPI (48.260 / 312 / 18.940 / 94,2%) memakai ukuran dan bobot yang sama, sehingga fokus utama 'Total stok 48.260' bersaing dengan tiga angka setara di baris atas."
+        },
+        "R4": {
+         "skor": 2,
+         "bukti": "Biru tua dipakai konsisten untuk tombol 'Tambah pengiriman', item aktif 'Dasbor', seri Karawang di grafik, dan tautan 'Semua pesanan'. Hijau dan merah menandai arah tren di KPI. Merah dan oranye di panel pemasok menunjukkan tingkat keterlambatan. Biru muda dan oranye membedakan kategori gudang (Cikampek, Subang) di grafik dan di dot kolom 'Gudang asal'. Badge status di tabel berwarna sesuai maknanya. Teks sekunder abu-abu masih terbaca."
+        },
+        "R5": {
+         "skor": 2,
+         "bukti": "Ikon garis satu gaya dan berukuran seragam di sidebar, kartu KPI (kotak, truk, jam), kolom jadwal, dan badge status. Ikon truk di kotak ber-tint pada daftar pemasok. Visual utama berupa grafik garis 3 gudang yang relevan, lengkap dengan sumbu, legenda, dan titik akhir. Tidak ada emoji."
+        },
+        "R6": {
+         "skor": 1,
+         "bukti": "Angka sebagian besar konsisten: legenda 21.840+15.920+10.500 = 48.260 (total stok); 280+420+860+150+300 = 2.010 karung; 1.600+1.240+860+480 = 4.180 karung tertahan; persentase +1,0%, +9,1%, −3,4% cocok dengan pembandingnya; kapasitas 48.260/65.000 = 74%. Ada satu inkonsistensi: baris SO-26-1186 berjadwal 13.00 berstatus 'Terlambat 40 mnt', padahal tabel 'diperbarui 10.42'."
+        },
+        "R8": {
+         "skor": 2,
+         "bukti": "Tidak ada pelanggaran checklist slop: latar abu-abu dingin, tanpa gradien, tanpa kartu bertumpuk, copy spesifik. Keputusan komposisi khas yang bisa ditunjuk: baris tabel terlambat (SO-26-1186) diberi tint merah muda, widget 'Kapasitas terpakai 74%' dengan progress bar di dasar sidebar, dan nilai stok per gudang langsung di legenda grafik. Catatan kecil: teks lokasi 'Subang' dan 'Karawang' di panel pemasok nyaris menabrak badge."
+        },
+        "R9": {
+         "skor": 2,
+         "bukti": "Setiap KPI punya satuan, persentase perubahan, dan nilai minggu lalu. Grafik punya periode '5–18 November 2026 · ribu karung' dan nilai terkini per gudang. Pemasok dilengkapi nomor PO, jumlah karung, kota, dan lama keterlambatan. Tabel memuat kota pelanggan, gudang asal dengan dot warna, dan 5 status berbeda. Sidebar menampilkan badge jumlah dan meter kapasitas. Padat tetapi tetap terbaca."
+        },
+        "R10": {
+         "skor": 2,
+         "bukti": "Permukaan berlapis: item nav aktif ber-tint biru, kartu kapasitas ber-tint, area di bawah garis grafik ber-tint, header tabel abu-abu muda, baris terlambat merah muda. Warna kedua yang bermakna (merah/oranye untuk keterlambatan, hijau/merah untuk tren) muncul konsisten di KPI, panel pemasok, tabel, dan badge sidebar. Badge status berikon dan berwarna terdefinisi. Grafik dan ikon tampak matang."
+        },
+        "slop": {
+         "jumlah": 0,
+         "butir": []
+        },
+        "emoji": 0,
+        "fokus": "Angka 'Total stok 48.260 karung' di kartu KPI pertama, kiri atas area konten"
+       },
+       "Y": {
+        "R1": {
+         "skor": 2,
+         "bukti": "Semua bagian ada: sidebar dengan grup Operasional/Mitra/Analisis (kiri), header dengan pencarian SKU 'Cari SKU, mis. BRS-PW-25' dan tombol 'Tambah Pengiriman' (kanan atas), 4 KPI dengan 'vs … minggu lalu', grafik batang bertumpuk 'Stok 14 hari per gudang' (5 Nov hingga 'Hari ini'), panel 'Pemasok terlambat', dan tabel 'Pesanan keluar' dengan pelanggan, jumlah karung, jadwal kirim, dan status. Mode terang, aksen biru tua, berbahasa Indonesia, 1440x900."
+        },
+        "R2": {
+         "skor": 2,
+         "bukti": "Satu titik fokus tegas: kartu 'Total stok tersedia 48.320 karung' di kiri atas tampil sebagai satu-satunya bidang biru tua penuh dengan teks putih, sementara tiga KPI lain berlatar putih. Lompatan skala jelas dari angka KPI ke judul seksi lalu ke label kecil. Tidak ada judul yatim."
+        },
+        "R4": {
+         "skor": 2,
+         "bukti": "Biru tua dipakai konsisten untuk tombol utama, nav aktif 'Dasbor', kartu hero, nomor pesanan, dan tautan 'Lihat semua'. Seri grafik memakai tiga nuansa biru per gudang. Hijau, amber, dan merah dipakai hanya untuk arah tren dan status: badge KPI, '+5 hari' merah vs '+2 hari' amber di panel pemasok, 'Tertunda' dan 'Kemarin' merah di tabel. Teks abu-abu sekunder masih terbaca."
+        },
+        "R5": {
+         "skor": 2,
+         "bukti": "Ikon garis satu gaya dan berukuran seragam di sidebar, kartu KPI, header (gudang, lonceng), dan tombol Filter. Avatar inisial (PB, UD, KM, CV) dipakai konsisten di daftar pemasok. Visual utama berupa grafik batang bertumpuk 14 hari dengan legenda, dan batang 'Hari ini' ditegaskan lebih gelap. Tidak ada emoji."
+        },
+        "R6": {
+         "skor": 1,
+         "bukti": "Angka KPI konsisten: 48.320 vs 45.490 = +6,2%; 126 vs 112 = +12,5%; 94,1 vs 95,9 = −1,8 poin; 7 vs 4 = +3. 600+450+520+290 = 1.860 karung. Badge sidebar '12' cocok dengan '12 aktif' di tabel. Ada satu inkonsistensi: tab 'Hari ini' aktif di tabel, tetapi baris SO-24862 berjadwal 'Besok 08:00' dan SO-24858 berjadwal 'Kemarin 14:00'."
+        },
+        "R8": {
+         "skor": 2,
+         "bukti": "Tidak ada pelanggaran checklist slop: latar abu-abu dingin, tanpa gradien, tanpa kartu bertumpuk, copy spesifik. Keputusan komposisi khas yang bisa ditunjuk: kartu KPI pertama dibalik menjadi blok biru tua solid sebagai jangkar visual, batang 'Hari ini' dibedakan lebih gelap dengan label biru, dan sidebar dikelompokkan per domain (Operasional/Mitra/Analisis)."
+        },
+        "R9": {
+         "skor": 2,
+         "bukti": "Setiap KPI memuat satuan (karung, trip, %, SKU), badge perubahan, dan nilai minggu lalu. Grafik diberi satuan dan periode 'Ribu karung · 5–18 Nov 2026'. Pemasok dilengkapi nomor PO, jumlah karung, kota, dan '+n hari'. Tabel memuat kota pelanggan, kolom SKU spesifik (Pandan Wangi 25 kg, IR64 Premium 50 kg), gudang, 5 status berbeda, dan menu aksi '⋯'. Header punya filter 'Semua Gudang'. Padat tetapi tetap terbaca."
+        },
+        "R10": {
+         "skor": 2,
+         "bukti": "Permukaan berlapis: kartu hero biru tua, nav aktif solid biru, avatar dan chip abu-abu ber-tint, header tabel abu-abu muda. Warna kedua yang bermakna (hijau/amber/merah) dipakai konsisten di badge KPI, label hari di panel pemasok, badge status dengan dot di tabel, badge 'Pemasok 4', dan dot notifikasi. Badge terdefinisi. Grafik batang dan ikon tampak matang dan menyatu."
+        },
+        "slop": {
+         "jumlah": 0,
+         "butir": []
+        },
+        "emoji": 0,
+        "fokus": "Kartu biru tua 'Total stok tersedia 48.320 karung' di kiri atas area konten"
+       }
+      },
+      "attempts": [
+       {
+        "dir": "/root/lakar/bench/runs/practice-polish/1/judge/P8/rep-1/attempt-1",
+        "status": "ok",
+        "problems": [],
+        "costUsd": 0.22598980000000002,
+        "wallMs": 56973.94985700003
+       }
+      ],
+      "retried": false,
+      "costUsd": 0.22598980000000002
+     },
+     {
+      "prompt": "P8",
+      "rep": 2,
+      "mapping": {
+       "X": "pendev",
+       "Y": "lakar"
+      },
+      "status": "ok",
+      "verdict": {
+       "X": {
+        "R1": {
+         "skor": 2,
+         "bukti": "Semua bagian ada di artboard 1440x900: sidebar navigasi (kiri), header dengan pencarian SKU 'Cari SKU, mis. BRS-PW-25' dan tombol 'Tambah Pengiriman' (kanan atas), 4 kartu ringkasan dengan pembanding 'minggu lalu' (atas), grafik 'Stok 14 hari per gudang' (tengah kiri), 'Pemasok terlambat' (tengah kanan), dan tabel 'Pesanan keluar' dengan pelanggan, jumlah karung, jadwal kirim, dan status (bawah). Mode terang, aksen biru tua, seluruh teks berbahasa Indonesia."
+        },
+        "R2": {
+         "skor": 2,
+         "bukti": "Ada satu titik fokus yang jelas: kartu 'Total stok tersedia' berlatar biru tua dengan angka besar 48.320 (kiri atas konten). Skala tipografi bertingkat tegas: angka KPI besar, judul seksi semibold, label kecil, header tabel huruf kapital kecil. Setiap judul seksi punya konten di bawahnya, tidak ada judul yatim."
+        },
+        "R4": {
+         "skor": 2,
+         "bukti": "Biru tua dipakai konsisten untuk nav aktif 'Dasbor', tombol utama, kartu fokus, dan tiga nuansa biru untuk seri grafik. Warna tambahan selalu bermakna: hijau untuk naik baik (+12,5%), kuning untuk turun ringan (−1,8 poin), merah untuk SKU di bawah minimum (+3) dan 'Kemarin'/'Tertunda', chip status berwarna di tabel, badge merah/kuning di daftar pemasok. Tidak ada teks yang tampak gagal kontras."
+        },
+        "R5": {
+         "skor": 2,
+         "bukti": "Ikon garis satu gaya dengan ukuran seragam di sidebar, di pojok kanan atas kartu KPI (truk, timer, segitiga peringatan), dan di header (lonceng, gudang). Grafik batang bertumpuk per gudang relevan, dengan batang 'Hari ini' ditegaskan. Pemasok ditandai avatar inisial (PB, UD, KM, CV). Tidak ada emoji."
+        },
+        "R6": {
+         "skor": 2,
+         "bukti": "Angka konsisten: 48.320 vs 45.490 = +6,2%; 126 vs 112 = +12,5%; 94,1 vs 95,9 = −1,8 poin; 7 vs 4 = +3. Total pemasok terlambat 600+450+520+290 = 1.860 karung, sesuai subjudul '4 PO', dan badge 'Pemasok 4' di sidebar cocok. 'Pesanan Keluar 12' di sidebar sama dengan chip '12 aktif'. Copy spesifik ke domain: Pandan Wangi, IR64, Setra Ramos, PO-1182."
+        },
+        "R8": {
+         "skor": 2,
+         "bukti": "Tidak ada pelanggaran checklist slop. Latar abu-biru dingin, bukan krem. Ada dua keputusan komposisi khas yang terlihat di PNG: kartu KPI pertama dibalik menjadi blok biru tua solid sebagai jangkar visual, dan batang 'Hari ini' di grafik diberi warna lebih pekat dengan label tebal."
+        },
+        "R9": {
+         "skor": 2,
+         "bukti": "Setiap KPI punya satuan, delta, dan pembanding minggu lalu. Grafik punya satuan 'Ribu karung' dan periode '5–18 Nov 2026'. Pemasok dilengkapi nomor PO, jumlah karung, asal, dan badge hari keterlambatan. Tabel memuat kota pelanggan, SKU, gudang, jadwal bertingkat (Hari ini/Besok/Kemarin), dan lima variasi status. Ada badge hitungan di sidebar. Padat tetapi tetap terbaca."
+        },
+        "R10": {
+         "skor": 2,
+         "bukti": "Permukaan berlapis: kartu biru tua, nav aktif terisi, chip delta dan status ber-tint, avatar pemasok berlatar abu. Warna kedua yang bermakna (hijau, kuning, merah) konsisten di KPI, tabel status, pemasok, dan badge sidebar. Badge dan chip terdefinisi dengan dot status. Grafik bertumpuk tampak matang dan menyatu dengan aksen."
+        },
+        "slop": {
+         "jumlah": 0,
+         "butir": []
+        },
+        "emoji": 0,
+        "fokus": "Kartu biru tua 'Total stok tersedia' dengan angka 48.320 karung, kiri atas area konten"
+       },
+       "Y": {
+        "R1": {
+         "skor": 2,
+         "bukti": "Semua bagian ada di 1440x900: sidebar (kiri), header dengan pencarian SKU dan tombol 'Tambah pengiriman' (kanan atas), 4 kartu ringkasan dengan pembanding 'minggu lalu', grafik garis 'Stok per gudang, 14 hari', 'Pemasok terlambat', dan tabel 'Pesanan keluar hari ini' dengan pelanggan, jumlah karung, jadwal, dan status. Mode terang, aksen biru tua, bahasa Indonesia."
+        },
+        "R2": {
+         "skor": 1,
+         "bukti": "Fokus ada di angka KPI 48.260 'Total stok' (kiri atas konten), tetapi keempat kartu KPI berlatar putih dengan ukuran angka yang sama (48.260 / 312 / 18.940 / 94,2%), sehingga fokus bersaing dan tidak ada satu elemen yang menonjol. Skala judul, label, dan tabel tetap jelas, dan tidak ada judul yatim."
+        },
+        "R4": {
+         "skor": 2,
+         "bukti": "Biru tua dipakai untuk tombol utama, nav aktif ber-tint, seri Karawang, dan bar kapasitas. Oranye menandai kategori Subang dan dipakai konsisten di legenda serta titik gudang di tabel. Hijau/merah dipakai untuk arah delta. Chip status berwarna sesuai makna, dan baris terlambat diberi tint merah muda. Tidak ada teks yang jelas gagal kontras."
+        },
+        "R5": {
+         "skor": 2,
+         "bukti": "Ikon garis satu gaya di sidebar, kartu KPI, chip status (centang, truk, kotak, peringatan, jam), kolom jadwal, dan ikon truk di daftar pemasok. Grafik garis tiga gudang dengan area ber-tint relevan. Tidak ada emoji."
+        },
+        "R6": {
+         "skor": 1,
+         "bukti": "Sebagian besar angka konsisten: 21.840+15.920+10.500 = 48.260 (legenda grafik = KPI = kartu kapasitas, 74% dari 65.000); 1.600+1.240+860+480 = 4.180 karung tertahan; total tabel = 2.010 karung; delta +1,0%, +9,1%, −3,4% semuanya benar. Ada satu inkonsistensi: SO-26-1186 dijadwalkan 'Rab, 18 Nov · 13.00' tetapi berstatus 'Terlambat 40 mnt', padahal subjudul tabel menyebut 'diperbarui 10.42'."
+        },
+        "R8": {
+         "skor": 2,
+         "bukti": "Tidak ada pelanggaran checklist slop, dan latar abu dingin. Keputusan komposisi khas yang terlihat di PNG: legenda grafik menampilkan nilai terkini per gudang, widget 'Kapasitas terpakai 74%' di dasar sidebar, dan baris tabel terlambat disorot tint merah. Catatan non-slop: badge 'ETA 16.00' dan '3 hari' di daftar pemasok (kanan tengah) berimpitan dengan teks metadata 'Subang'/'Cianjur'."
+        },
+        "R9": {
+         "skor": 2,
+         "bukti": "KPI dilengkapi satuan, delta, dan pembanding, dan 'Tepat waktu' memakai konteks 'dari 312'. Grafik punya periode, satuan, dan nilai legenda. Pemasok dilengkapi nomor PO, karung, kota, dan badge hari/ETA. Tabel menampilkan kota pelanggan, titik gudang, jadwal berikon, lima variasi status, serta subjudul '5 pesanan · 2.010 karung · diperbarui 10.42'. Kapasitas gudang juga ditampilkan di sidebar."
+        },
+        "R10": {
+         "skor": 2,
+         "bukti": "Permukaan berlapis: nav aktif dan kartu kapasitas ber-tint biru, fill gradien di area grafik, baris terlambat ber-tint merah, ikon pemasok berlatar merah/oranye muda. Warna kedua yang bermakna (oranye/merah/hijau) konsisten di grafik, tabel, pemasok, dan KPI. Chip status berikon dan terdefinisi. Grafik matang dan menyatu dengan aksen."
+        },
+        "slop": {
+         "jumlah": 0,
+         "butir": []
+        },
+        "emoji": 0,
+        "fokus": "Angka KPI 48.260 karung di kartu 'Total stok', kiri atas area konten (bersaing dengan tiga KPI sejajar)"
+       }
+      },
+      "attempts": [
+       {
+        "dir": "/root/lakar/bench/runs/practice-polish/1/judge/P8/rep-2/attempt-1",
+        "status": "ok",
+        "problems": [],
+        "costUsd": 0.21412979999999998,
+        "wallMs": 52532.337029000046
+       }
+      ],
+      "retried": false,
+      "costUsd": 0.21412979999999998
+     },
+     {
+      "prompt": "P8",
+      "rep": 3,
+      "mapping": {
+       "X": "pendev",
+       "Y": "lakar"
+      },
+      "status": "ok",
+      "verdict": {
+       "X": {
+        "R1": {
+         "skor": 2,
+         "bukti": "Semua bagian yang diminta ada. Sidebar navigasi ada di kiri (Dasbor, Stok & SKU, Pesanan Keluar, dan seterusnya). Header berisi pencarian 'Cari SKU, mis. BRS-PW-25' dan tombol navy '+ Tambah Pengiriman' di kanan atas. Empat kartu ringkasan dibanding minggu lalu ada di baris atas. Tabel 'Pesanan keluar' di bawah memuat kolom pelanggan, jumlah karung, jadwal kirim, dan status. Grafik 'Stok 14 hari per gudang' (5–18 Nov) ada di tengah kiri, dan 'Pemasok terlambat' di tengah kanan. Desain bermode terang dengan aksen biru tua, berbahasa Indonesia, berukuran 1440x900."
+        },
+        "R2": {
+         "skor": 2,
+         "bukti": "Titik fokusnya tegas: kartu KPI berisi navy penuh '48.320 karung' di kiri atas, dengan angka besar putih yang kontras dengan kartu lain berlatar putih. Tangga skalanya jelas: angka KPI ±32px, judul halaman 'Ringkasan Gudang' ±20px, judul seksi ±15px, lalu label kecil dan header tabel uppercase. Setiap seksi punya judul beserta subjudul (mis. 'Ribu karung · 5–18 Nov 2026'), sehingga tidak ada judul yatim."
+        },
+        "R4": {
+         "skor": 2,
+         "bukti": "Aksen navy dipakai konsisten untuk tombol utama, nav aktif 'Dasbor', kartu KPI utama, seri grafik (gradasi biru per gudang), dan nomor SO di tabel. Warna lain selalu bermakna. Hijau, amber, dan merah menandai arah perubahan KPI (+12,5% hijau, −1,8 poin amber, +3 SKU merah). Pada badge keterlambatan pemasok, +5 dan +3 hari merah, +2 dan +1 hari amber. Pada status tabel, Dalam perjalanan hijau, Menunggu amber, Tertunda merah, dan 'Kemarin' merah. Teks abu sekunder (mis. 'Jakarta Timur') kecil tetapi masih terbaca."
+        },
+        "R5": {
+         "skor": 2,
+         "bukti": "Ikon sidebar dan ikon kartu KPI (truk, timer, segitiga peringatan) memakai satu gaya garis dengan ukuran seragam. Visual utamanya grafik batang bertumpuk 14 hari yang relevan, dengan batang 'Hari ini' disorot lebih gelap. Inisial pemasok (PB, UD, KM, CV) ditampilkan di kotak netral seragam. Tidak ada emoji."
+        },
+        "R6": {
+         "skor": 2,
+         "bukti": "Copy spesifik domain beras: Pandan Wangi 25 kg, IR64 Premium 50 kg, Setra Ramos, serta PO-1182 dan seterusnya. Semua angka konsisten. Persentase KPI cocok dengan nilainya: 48.320 vs 45.490 = +6,2%, 126 vs 112 = +12,5%, 94,1 vs 95,9 = −1,8 poin, 7 vs 4 = +3. Total karung pemasok cocok: 600+450+520+290 = 1.860. Badge 'Pemasok 4' di sidebar sama dengan 4 PO. 'Pesanan Keluar 12' di sidebar sama dengan '12 aktif' di tabel. Tinggi batang terakhir (±50 ribu) wajar terhadap 48.320."
+        },
+        "R8": {
+         "skor": 2,
+         "bukti": "Tidak ada pelanggaran checklist slop. Ada dua keputusan komposisi khas yang terlihat di PNG. Pertama, kartu KPI pertama dibalik menjadi berisi navy penuh sebagai jangkar halaman (kiri atas). Kedua, batang 'Hari ini' di ujung kanan grafik diberi warna lebih pekat dan labelnya ditebalkan biru."
+        },
+        "R9": {
+         "skor": 2,
+         "bukti": "Setiap KPI punya satuan (karung, trip, %, SKU), chip delta, dan pembanding minggu lalu. Pemasok terlambat dilengkapi nomor PO, jumlah karung, asal kota, dan jumlah hari terlambat yang bervariasi. Tabel menampilkan kota pelanggan, SKU, gudang, jadwal relatif (Hari ini/Besok/Kemarin), dan lima status berbeda. Ada filter tab (Hari ini/Minggu ini/Semua), badge di sidebar, dan dropdown 'Semua Gudang'. Isinya padat tetapi tetap terbaca."
+        },
+        "R10": {
+         "skor": 2,
+         "bukti": "Permukaannya berlapis: latar abu kebiruan, kartu putih, kartu KPI berisi navy, dan chip tint pada badge. Warna kedua bermakna (hijau, amber, merah) dipakai konsisten di tiga bagian: delta KPI, badge pemasok, dan status tabel. Badge status punya titik warna dan latar tint yang terdefinisi. Grafik bertumpuk tiga nuansa biru tampil matang dan menyatu dengan aksen."
+        },
+        "slop": {
+         "jumlah": 0,
+         "butir": []
+        },
+        "emoji": 0,
+        "fokus": "Kartu KPI berlatar navy penuh 'Total stok tersedia 48.320 karung' di kiri atas area konten"
+       },
+       "Y": {
+        "R1": {
+         "skor": 2,
+         "bukti": "Semua bagian yang diminta ada. Sidebar ada di kiri. Header berisi pencarian 'Cari SKU, mis. BR-PW-50' dan tombol navy '+ Tambah pengiriman' di kanan atas. Empat KPI di baris atas membandingkan dengan minggu lalu. Grafik garis 'Stok per gudang, 14 hari' ada di tengah kiri, dan 'Pemasok terlambat' di tengah kanan. Tabel 'Pesanan keluar hari ini' di bawah memuat pelanggan, jumlah karung, jadwal, dan status. Desain bermode terang dengan aksen biru tua, berbahasa Indonesia, berukuran 1440x900."
+        },
+        "R2": {
+         "skor": 1,
+         "bukti": "Fokus terkuat adalah angka '48.260 karung' di kartu KPI kiri atas. Namun angka ini bersaing dengan tiga kartu KPI berukuran dan berbobot identik (312, 18.940, 94,2%), karena tidak ada kartu yang dibedakan. Judul halaman 'Dasbor operasional' relatif kecil. Tangga skala angka KPI, judul seksi, dan label sudah jelas."
+        },
+        "R4": {
+         "skor": 2,
+         "bukti": "Aksen navy dipakai untuk tombol, nav aktif (tint biru muda), seri utama Karawang, dan link 'Semua pesanan →'. Warna lain bermakna. Delta naik ditandai hijau dan delta turun merah (−3,4%, −1,8 poin). Badge keterlambatan memakai merah untuk 3 dan 2 hari serta oranye untuk 1 hari dan ETA. Titik gudang di tabel cocok dengan warna seri grafik (navy, biru muda, oranye). Status tabel diberi warna per jenis. Catatan minor: oranye dipakai ganda, sebagai kategori Subang dan sebagai peringatan. Tidak ada teks yang jelas gagal kontras."
+        },
+        "R5": {
+         "skor": 2,
+         "bukti": "Satu gaya ikon garis dengan ukuran seragam dipakai di sidebar, kartu KPI, ikon kalender di kolom jadwal, ikon di badge status, dan ikon truk ber-tint di daftar pemasok. Visual utamanya grafik garis tiga gudang dengan area fill dan titik akhir, dan relevan dengan konteks. Tidak ada emoji."
+        },
+        "R6": {
+         "skor": 1,
+         "bukti": "Sebagian besar angka konsisten. Persentase KPI cocok dengan nilainya: 48.260 vs 47.800 = +1,0%, 312 vs 286 = +9,1%, 18.940 vs 19.607 = −3,4%. Nilai legenda 21.840+15.920+10.500 = 48.260 sama dengan Total stok. Total karung pemasok cocok: 1.600+1.240+860+480 = 4.180. Total tabel cocok: 280+420+860+150+300 = 2.010. Kapasitas 48.260/65.000 = 74%. Ada satu inkonsistensi: subjudul tabel menyebut 'diperbarui 10.42', tetapi baris SO-26-1186 berjadwal 13.00 sudah berstatus 'Terlambat 40 mnt', padahal jadwalnya belum lewat."
+        },
+        "R8": {
+         "skor": 2,
+         "bukti": "Tidak ada pelanggaran checklist slop. Ada keputusan khas yang terlihat di PNG. Legenda grafik menampilkan nilai stok terkini per gudang, dan jumlahnya sama dengan KPI total. Widget 'Kapasitas terpakai 74%' dengan progress bar ada di dasar sidebar. Baris terlambat di tabel disorot dengan tint merah. Catatan kerapian: teks metadata pemasok ('Cianjur', 'Subang') di kolom kanan nyaris menempel atau bertabrakan dengan badge hari/ETA."
+        },
+        "R9": {
+         "skor": 2,
+         "bukti": "Setiap KPI punya satuan, tren berwarna, dan pembanding minggu lalu, ditambah 'dari 312' pada KPI tepat waktu. Legenda grafik menampilkan nilai terkini. Pemasok dilengkapi PO, jumlah karung, kota, dan durasi atau ETA keterlambatan, dengan badge '4 PO' dan '4.180 karung tertahan'. Tabel memuat kota pelanggan, gudang asal bertitik warna, tanggal dan jam jadwal, lima status berbeda, serta ringkasan '5 pesanan · 2.010 karung · diperbarui 10.42'. Widget kapasitas ada di sidebar. Isinya padat tetapi terbaca."
+        },
+        "R10": {
+         "skor": 2,
+         "bukti": "Permukaannya berlapis: tint biru muda pada nav aktif dan kartu kapasitas, area fill lembut di grafik, tint merah pada baris terlambat, serta kotak ikon truk ber-tint merah atau oranye di daftar pemasok. Warna kedua bermakna (oranye, merah, hijau) dipakai konsisten di KPI, grafik, daftar pemasok, dan tabel. Badge status punya ikon dan latar tint yang terdefinisi. Grafik garis tampil matang dan menyatu."
+        },
+        "slop": {
+         "jumlah": 0,
+         "butir": []
+        },
+        "emoji": 0,
+        "fokus": "Angka '48.260 karung' di kartu KPI 'Total stok' kiri atas, yang bersaing dengan tiga kartu KPI setara di sebelahnya"
+       }
+      },
+      "attempts": [
+       {
+        "dir": "/root/lakar/bench/runs/practice-polish/1/judge/P8/rep-3/attempt-1",
+        "status": "ok",
+        "problems": [],
+        "costUsd": 0.2326898,
+        "wallMs": 61643.199143999955
+       }
+      ],
+      "retried": false,
+      "costUsd": 0.2326898
+     }
+    ],
+    "tools": {
+     "lakar": {
+      "criteria": {
+       "R1": {
+        "values": [
+         2,
+         2,
+         2
+        ],
+        "median": 2,
+        "range": 0,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 2,
+          "bukti": "Semua bagian ada: sidebar navigasi (kiri), header dengan pencarian SKU 'Cari SKU, mis. BR-PW-50' dan tombol 'Tambah pengiriman' (kanan atas), 4 kartu ringkasan dengan pembanding 'vs … minggu lalu', grafik garis 'Stok per gudang, 14 hari' (5–18 Nov, 3 gudang), panel 'Pemasok terlambat' (kanan tengah), tabel 'Pesanan keluar hari ini' dengan kolom pelanggan, jumlah karung, jadwal, dan status (bawah). Mode terang, aksen biru tua, berbahasa Indonesia, artboard 1440x900."
+         },
+         {
+          "rep": 2,
+          "skor": 2,
+          "bukti": "Semua bagian ada di 1440x900: sidebar (kiri), header dengan pencarian SKU dan tombol 'Tambah pengiriman' (kanan atas), 4 kartu ringkasan dengan pembanding 'minggu lalu', grafik garis 'Stok per gudang, 14 hari', 'Pemasok terlambat', dan tabel 'Pesanan keluar hari ini' dengan pelanggan, jumlah karung, jadwal, dan status. Mode terang, aksen biru tua, bahasa Indonesia."
+         },
+         {
+          "rep": 3,
+          "skor": 2,
+          "bukti": "Semua bagian yang diminta ada. Sidebar ada di kiri. Header berisi pencarian 'Cari SKU, mis. BR-PW-50' dan tombol navy '+ Tambah pengiriman' di kanan atas. Empat KPI di baris atas membandingkan dengan minggu lalu. Grafik garis 'Stok per gudang, 14 hari' ada di tengah kiri, dan 'Pemasok terlambat' di tengah kanan. Tabel 'Pesanan keluar hari ini' di bawah memuat pelanggan, jumlah karung, jadwal, dan status. Desain bermode terang dengan aksen biru tua, berbahasa Indonesia, berukuran 1440x900."
+         }
+        ]
+       },
+       "R2": {
+        "values": [
+         1,
+         1,
+         1
+        ],
+        "median": 1,
+        "range": 0,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 1,
+          "bukti": "Angka KPI sekitar 28px jelas lebih besar daripada judul seksi (~16px) dan label (~13px), dan tidak ada judul yatim. Namun keempat kartu KPI (48.260 / 312 / 18.940 / 94,2%) memakai ukuran dan bobot yang sama, sehingga fokus utama 'Total stok 48.260' bersaing dengan tiga angka setara di baris atas."
+         },
+         {
+          "rep": 2,
+          "skor": 1,
+          "bukti": "Fokus ada di angka KPI 48.260 'Total stok' (kiri atas konten), tetapi keempat kartu KPI berlatar putih dengan ukuran angka yang sama (48.260 / 312 / 18.940 / 94,2%), sehingga fokus bersaing dan tidak ada satu elemen yang menonjol. Skala judul, label, dan tabel tetap jelas, dan tidak ada judul yatim."
+         },
+         {
+          "rep": 3,
+          "skor": 1,
+          "bukti": "Fokus terkuat adalah angka '48.260 karung' di kartu KPI kiri atas. Namun angka ini bersaing dengan tiga kartu KPI berukuran dan berbobot identik (312, 18.940, 94,2%), karena tidak ada kartu yang dibedakan. Judul halaman 'Dasbor operasional' relatif kecil. Tangga skala angka KPI, judul seksi, dan label sudah jelas."
+         }
+        ]
+       },
+       "R4": {
+        "values": [
+         2,
+         2,
+         2
+        ],
+        "median": 2,
+        "range": 0,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 2,
+          "bukti": "Biru tua dipakai konsisten untuk tombol 'Tambah pengiriman', item aktif 'Dasbor', seri Karawang di grafik, dan tautan 'Semua pesanan'. Hijau dan merah menandai arah tren di KPI. Merah dan oranye di panel pemasok menunjukkan tingkat keterlambatan. Biru muda dan oranye membedakan kategori gudang (Cikampek, Subang) di grafik dan di dot kolom 'Gudang asal'. Badge status di tabel berwarna sesuai maknanya. Teks sekunder abu-abu masih terbaca."
+         },
+         {
+          "rep": 2,
+          "skor": 2,
+          "bukti": "Biru tua dipakai untuk tombol utama, nav aktif ber-tint, seri Karawang, dan bar kapasitas. Oranye menandai kategori Subang dan dipakai konsisten di legenda serta titik gudang di tabel. Hijau/merah dipakai untuk arah delta. Chip status berwarna sesuai makna, dan baris terlambat diberi tint merah muda. Tidak ada teks yang jelas gagal kontras."
+         },
+         {
+          "rep": 3,
+          "skor": 2,
+          "bukti": "Aksen navy dipakai untuk tombol, nav aktif (tint biru muda), seri utama Karawang, dan link 'Semua pesanan →'. Warna lain bermakna. Delta naik ditandai hijau dan delta turun merah (−3,4%, −1,8 poin). Badge keterlambatan memakai merah untuk 3 dan 2 hari serta oranye untuk 1 hari dan ETA. Titik gudang di tabel cocok dengan warna seri grafik (navy, biru muda, oranye). Status tabel diberi warna per jenis. Catatan minor: oranye dipakai ganda, sebagai kategori Subang dan sebagai peringatan. Tidak ada teks yang jelas gagal kontras."
+         }
+        ]
+       },
+       "R5": {
+        "values": [
+         2,
+         2,
+         2
+        ],
+        "median": 2,
+        "range": 0,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 2,
+          "bukti": "Ikon garis satu gaya dan berukuran seragam di sidebar, kartu KPI (kotak, truk, jam), kolom jadwal, dan badge status. Ikon truk di kotak ber-tint pada daftar pemasok. Visual utama berupa grafik garis 3 gudang yang relevan, lengkap dengan sumbu, legenda, dan titik akhir. Tidak ada emoji."
+         },
+         {
+          "rep": 2,
+          "skor": 2,
+          "bukti": "Ikon garis satu gaya di sidebar, kartu KPI, chip status (centang, truk, kotak, peringatan, jam), kolom jadwal, dan ikon truk di daftar pemasok. Grafik garis tiga gudang dengan area ber-tint relevan. Tidak ada emoji."
+         },
+         {
+          "rep": 3,
+          "skor": 2,
+          "bukti": "Satu gaya ikon garis dengan ukuran seragam dipakai di sidebar, kartu KPI, ikon kalender di kolom jadwal, ikon di badge status, dan ikon truk ber-tint di daftar pemasok. Visual utamanya grafik garis tiga gudang dengan area fill dan titik akhir, dan relevan dengan konteks. Tidak ada emoji."
+         }
+        ]
+       },
+       "R6": {
+        "values": [
+         1,
+         1,
+         1
+        ],
+        "median": 1,
+        "range": 0,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 1,
+          "bukti": "Angka sebagian besar konsisten: legenda 21.840+15.920+10.500 = 48.260 (total stok); 280+420+860+150+300 = 2.010 karung; 1.600+1.240+860+480 = 4.180 karung tertahan; persentase +1,0%, +9,1%, −3,4% cocok dengan pembandingnya; kapasitas 48.260/65.000 = 74%. Ada satu inkonsistensi: baris SO-26-1186 berjadwal 13.00 berstatus 'Terlambat 40 mnt', padahal tabel 'diperbarui 10.42'."
+         },
+         {
+          "rep": 2,
+          "skor": 1,
+          "bukti": "Sebagian besar angka konsisten: 21.840+15.920+10.500 = 48.260 (legenda grafik = KPI = kartu kapasitas, 74% dari 65.000); 1.600+1.240+860+480 = 4.180 karung tertahan; total tabel = 2.010 karung; delta +1,0%, +9,1%, −3,4% semuanya benar. Ada satu inkonsistensi: SO-26-1186 dijadwalkan 'Rab, 18 Nov · 13.00' tetapi berstatus 'Terlambat 40 mnt', padahal subjudul tabel menyebut 'diperbarui 10.42'."
+         },
+         {
+          "rep": 3,
+          "skor": 1,
+          "bukti": "Sebagian besar angka konsisten. Persentase KPI cocok dengan nilainya: 48.260 vs 47.800 = +1,0%, 312 vs 286 = +9,1%, 18.940 vs 19.607 = −3,4%. Nilai legenda 21.840+15.920+10.500 = 48.260 sama dengan Total stok. Total karung pemasok cocok: 1.600+1.240+860+480 = 4.180. Total tabel cocok: 280+420+860+150+300 = 2.010. Kapasitas 48.260/65.000 = 74%. Ada satu inkonsistensi: subjudul tabel menyebut 'diperbarui 10.42', tetapi baris SO-26-1186 berjadwal 13.00 sudah berstatus 'Terlambat 40 mnt', padahal jadwalnya belum lewat."
+         }
+        ]
+       },
+       "R8": {
+        "values": [
+         2,
+         2,
+         2
+        ],
+        "median": 2,
+        "range": 0,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 2,
+          "bukti": "Tidak ada pelanggaran checklist slop: latar abu-abu dingin, tanpa gradien, tanpa kartu bertumpuk, copy spesifik. Keputusan komposisi khas yang bisa ditunjuk: baris tabel terlambat (SO-26-1186) diberi tint merah muda, widget 'Kapasitas terpakai 74%' dengan progress bar di dasar sidebar, dan nilai stok per gudang langsung di legenda grafik. Catatan kecil: teks lokasi 'Subang' dan 'Karawang' di panel pemasok nyaris menabrak badge."
+         },
+         {
+          "rep": 2,
+          "skor": 2,
+          "bukti": "Tidak ada pelanggaran checklist slop, dan latar abu dingin. Keputusan komposisi khas yang terlihat di PNG: legenda grafik menampilkan nilai terkini per gudang, widget 'Kapasitas terpakai 74%' di dasar sidebar, dan baris tabel terlambat disorot tint merah. Catatan non-slop: badge 'ETA 16.00' dan '3 hari' di daftar pemasok (kanan tengah) berimpitan dengan teks metadata 'Subang'/'Cianjur'."
+         },
+         {
+          "rep": 3,
+          "skor": 2,
+          "bukti": "Tidak ada pelanggaran checklist slop. Ada keputusan khas yang terlihat di PNG. Legenda grafik menampilkan nilai stok terkini per gudang, dan jumlahnya sama dengan KPI total. Widget 'Kapasitas terpakai 74%' dengan progress bar ada di dasar sidebar. Baris terlambat di tabel disorot dengan tint merah. Catatan kerapian: teks metadata pemasok ('Cianjur', 'Subang') di kolom kanan nyaris menempel atau bertabrakan dengan badge hari/ETA."
+         }
+        ]
+       },
+       "R9": {
+        "values": [
+         2,
+         2,
+         2
+        ],
+        "median": 2,
+        "range": 0,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 2,
+          "bukti": "Setiap KPI punya satuan, persentase perubahan, dan nilai minggu lalu. Grafik punya periode '5–18 November 2026 · ribu karung' dan nilai terkini per gudang. Pemasok dilengkapi nomor PO, jumlah karung, kota, dan lama keterlambatan. Tabel memuat kota pelanggan, gudang asal dengan dot warna, dan 5 status berbeda. Sidebar menampilkan badge jumlah dan meter kapasitas. Padat tetapi tetap terbaca."
+         },
+         {
+          "rep": 2,
+          "skor": 2,
+          "bukti": "KPI dilengkapi satuan, delta, dan pembanding, dan 'Tepat waktu' memakai konteks 'dari 312'. Grafik punya periode, satuan, dan nilai legenda. Pemasok dilengkapi nomor PO, karung, kota, dan badge hari/ETA. Tabel menampilkan kota pelanggan, titik gudang, jadwal berikon, lima variasi status, serta subjudul '5 pesanan · 2.010 karung · diperbarui 10.42'. Kapasitas gudang juga ditampilkan di sidebar."
+         },
+         {
+          "rep": 3,
+          "skor": 2,
+          "bukti": "Setiap KPI punya satuan, tren berwarna, dan pembanding minggu lalu, ditambah 'dari 312' pada KPI tepat waktu. Legenda grafik menampilkan nilai terkini. Pemasok dilengkapi PO, jumlah karung, kota, dan durasi atau ETA keterlambatan, dengan badge '4 PO' dan '4.180 karung tertahan'. Tabel memuat kota pelanggan, gudang asal bertitik warna, tanggal dan jam jadwal, lima status berbeda, serta ringkasan '5 pesanan · 2.010 karung · diperbarui 10.42'. Widget kapasitas ada di sidebar. Isinya padat tetapi terbaca."
+         }
+        ]
+       },
+       "R10": {
+        "values": [
+         2,
+         2,
+         2
+        ],
+        "median": 2,
+        "range": 0,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 2,
+          "bukti": "Permukaan berlapis: item nav aktif ber-tint biru, kartu kapasitas ber-tint, area di bawah garis grafik ber-tint, header tabel abu-abu muda, baris terlambat merah muda. Warna kedua yang bermakna (merah/oranye untuk keterlambatan, hijau/merah untuk tren) muncul konsisten di KPI, panel pemasok, tabel, dan badge sidebar. Badge status berikon dan berwarna terdefinisi. Grafik dan ikon tampak matang."
+         },
+         {
+          "rep": 2,
+          "skor": 2,
+          "bukti": "Permukaan berlapis: nav aktif dan kartu kapasitas ber-tint biru, fill gradien di area grafik, baris terlambat ber-tint merah, ikon pemasok berlatar merah/oranye muda. Warna kedua yang bermakna (oranye/merah/hijau) konsisten di grafik, tabel, pemasok, dan KPI. Chip status berikon dan terdefinisi. Grafik matang dan menyatu dengan aksen."
+         },
+         {
+          "rep": 3,
+          "skor": 2,
+          "bukti": "Permukaannya berlapis: tint biru muda pada nav aktif dan kartu kapasitas, area fill lembut di grafik, tint merah pada baris terlambat, serta kotak ikon truk ber-tint merah atau oranye di daftar pemasok. Warna kedua bermakna (oranye, merah, hijau) dipakai konsisten di KPI, grafik, daftar pemasok, dan tabel. Badge status punya ikon dan latar tint yang terdefinisi. Grafik garis tampil matang dan menyatu."
+         }
+        ]
+       }
+      },
+      "total": 14,
+      "slop": {
+       "values": [
+        0,
+        0,
+        0
+       ],
+       "median": 0,
+       "range": 0,
+       "flag": false,
+       "items": [
+        {
+         "rep": 1,
+         "butir": []
+        },
+        {
+         "rep": 2,
+         "butir": []
+        },
+        {
+         "rep": 3,
+         "butir": []
+        }
+       ]
+      },
+      "emoji": {
+       "values": [
+        0,
+        0,
+        0
+       ],
+       "median": 0,
+       "range": 0,
+       "flag": false
+      },
+      "focus": [
+       {
+        "rep": 1,
+        "fokus": "Angka 'Total stok 48.260 karung' di kartu KPI pertama, kiri atas area konten"
+       },
+       {
+        "rep": 2,
+        "fokus": "Angka KPI 48.260 karung di kartu 'Total stok', kiri atas area konten (bersaing dengan tiga KPI sejajar)"
+       },
+       {
+        "rep": 3,
+        "fokus": "Angka '48.260 karung' di kartu KPI 'Total stok' kiri atas, yang bersaing dengan tiga kartu KPI setara di sebelahnya"
+       }
+      ]
+     },
+     "pendev": {
+      "criteria": {
+       "R1": {
+        "values": [
+         2,
+         2,
+         2
+        ],
+        "median": 2,
+        "range": 0,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 2,
+          "bukti": "Semua bagian ada: sidebar dengan grup Operasional/Mitra/Analisis (kiri), header dengan pencarian SKU 'Cari SKU, mis. BRS-PW-25' dan tombol 'Tambah Pengiriman' (kanan atas), 4 KPI dengan 'vs … minggu lalu', grafik batang bertumpuk 'Stok 14 hari per gudang' (5 Nov hingga 'Hari ini'), panel 'Pemasok terlambat', dan tabel 'Pesanan keluar' dengan pelanggan, jumlah karung, jadwal kirim, dan status. Mode terang, aksen biru tua, berbahasa Indonesia, 1440x900."
+         },
+         {
+          "rep": 2,
+          "skor": 2,
+          "bukti": "Semua bagian ada di artboard 1440x900: sidebar navigasi (kiri), header dengan pencarian SKU 'Cari SKU, mis. BRS-PW-25' dan tombol 'Tambah Pengiriman' (kanan atas), 4 kartu ringkasan dengan pembanding 'minggu lalu' (atas), grafik 'Stok 14 hari per gudang' (tengah kiri), 'Pemasok terlambat' (tengah kanan), dan tabel 'Pesanan keluar' dengan pelanggan, jumlah karung, jadwal kirim, dan status (bawah). Mode terang, aksen biru tua, seluruh teks berbahasa Indonesia."
+         },
+         {
+          "rep": 3,
+          "skor": 2,
+          "bukti": "Semua bagian yang diminta ada. Sidebar navigasi ada di kiri (Dasbor, Stok & SKU, Pesanan Keluar, dan seterusnya). Header berisi pencarian 'Cari SKU, mis. BRS-PW-25' dan tombol navy '+ Tambah Pengiriman' di kanan atas. Empat kartu ringkasan dibanding minggu lalu ada di baris atas. Tabel 'Pesanan keluar' di bawah memuat kolom pelanggan, jumlah karung, jadwal kirim, dan status. Grafik 'Stok 14 hari per gudang' (5–18 Nov) ada di tengah kiri, dan 'Pemasok terlambat' di tengah kanan. Desain bermode terang dengan aksen biru tua, berbahasa Indonesia, berukuran 1440x900."
+         }
+        ]
+       },
+       "R2": {
+        "values": [
+         2,
+         2,
+         2
+        ],
+        "median": 2,
+        "range": 0,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 2,
+          "bukti": "Satu titik fokus tegas: kartu 'Total stok tersedia 48.320 karung' di kiri atas tampil sebagai satu-satunya bidang biru tua penuh dengan teks putih, sementara tiga KPI lain berlatar putih. Lompatan skala jelas dari angka KPI ke judul seksi lalu ke label kecil. Tidak ada judul yatim."
+         },
+         {
+          "rep": 2,
+          "skor": 2,
+          "bukti": "Ada satu titik fokus yang jelas: kartu 'Total stok tersedia' berlatar biru tua dengan angka besar 48.320 (kiri atas konten). Skala tipografi bertingkat tegas: angka KPI besar, judul seksi semibold, label kecil, header tabel huruf kapital kecil. Setiap judul seksi punya konten di bawahnya, tidak ada judul yatim."
+         },
+         {
+          "rep": 3,
+          "skor": 2,
+          "bukti": "Titik fokusnya tegas: kartu KPI berisi navy penuh '48.320 karung' di kiri atas, dengan angka besar putih yang kontras dengan kartu lain berlatar putih. Tangga skalanya jelas: angka KPI ±32px, judul halaman 'Ringkasan Gudang' ±20px, judul seksi ±15px, lalu label kecil dan header tabel uppercase. Setiap seksi punya judul beserta subjudul (mis. 'Ribu karung · 5–18 Nov 2026'), sehingga tidak ada judul yatim."
+         }
+        ]
+       },
+       "R4": {
+        "values": [
+         2,
+         2,
+         2
+        ],
+        "median": 2,
+        "range": 0,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 2,
+          "bukti": "Biru tua dipakai konsisten untuk tombol utama, nav aktif 'Dasbor', kartu hero, nomor pesanan, dan tautan 'Lihat semua'. Seri grafik memakai tiga nuansa biru per gudang. Hijau, amber, dan merah dipakai hanya untuk arah tren dan status: badge KPI, '+5 hari' merah vs '+2 hari' amber di panel pemasok, 'Tertunda' dan 'Kemarin' merah di tabel. Teks abu-abu sekunder masih terbaca."
+         },
+         {
+          "rep": 2,
+          "skor": 2,
+          "bukti": "Biru tua dipakai konsisten untuk nav aktif 'Dasbor', tombol utama, kartu fokus, dan tiga nuansa biru untuk seri grafik. Warna tambahan selalu bermakna: hijau untuk naik baik (+12,5%), kuning untuk turun ringan (−1,8 poin), merah untuk SKU di bawah minimum (+3) dan 'Kemarin'/'Tertunda', chip status berwarna di tabel, badge merah/kuning di daftar pemasok. Tidak ada teks yang tampak gagal kontras."
+         },
+         {
+          "rep": 3,
+          "skor": 2,
+          "bukti": "Aksen navy dipakai konsisten untuk tombol utama, nav aktif 'Dasbor', kartu KPI utama, seri grafik (gradasi biru per gudang), dan nomor SO di tabel. Warna lain selalu bermakna. Hijau, amber, dan merah menandai arah perubahan KPI (+12,5% hijau, −1,8 poin amber, +3 SKU merah). Pada badge keterlambatan pemasok, +5 dan +3 hari merah, +2 dan +1 hari amber. Pada status tabel, Dalam perjalanan hijau, Menunggu amber, Tertunda merah, dan 'Kemarin' merah. Teks abu sekunder (mis. 'Jakarta Timur') kecil tetapi masih terbaca."
+         }
+        ]
+       },
+       "R5": {
+        "values": [
+         2,
+         2,
+         2
+        ],
+        "median": 2,
+        "range": 0,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 2,
+          "bukti": "Ikon garis satu gaya dan berukuran seragam di sidebar, kartu KPI, header (gudang, lonceng), dan tombol Filter. Avatar inisial (PB, UD, KM, CV) dipakai konsisten di daftar pemasok. Visual utama berupa grafik batang bertumpuk 14 hari dengan legenda, dan batang 'Hari ini' ditegaskan lebih gelap. Tidak ada emoji."
+         },
+         {
+          "rep": 2,
+          "skor": 2,
+          "bukti": "Ikon garis satu gaya dengan ukuran seragam di sidebar, di pojok kanan atas kartu KPI (truk, timer, segitiga peringatan), dan di header (lonceng, gudang). Grafik batang bertumpuk per gudang relevan, dengan batang 'Hari ini' ditegaskan. Pemasok ditandai avatar inisial (PB, UD, KM, CV). Tidak ada emoji."
+         },
+         {
+          "rep": 3,
+          "skor": 2,
+          "bukti": "Ikon sidebar dan ikon kartu KPI (truk, timer, segitiga peringatan) memakai satu gaya garis dengan ukuran seragam. Visual utamanya grafik batang bertumpuk 14 hari yang relevan, dengan batang 'Hari ini' disorot lebih gelap. Inisial pemasok (PB, UD, KM, CV) ditampilkan di kotak netral seragam. Tidak ada emoji."
+         }
+        ]
+       },
+       "R6": {
+        "values": [
+         1,
+         2,
+         2
+        ],
+        "median": 2,
+        "range": 1,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 1,
+          "bukti": "Angka KPI konsisten: 48.320 vs 45.490 = +6,2%; 126 vs 112 = +12,5%; 94,1 vs 95,9 = −1,8 poin; 7 vs 4 = +3. 600+450+520+290 = 1.860 karung. Badge sidebar '12' cocok dengan '12 aktif' di tabel. Ada satu inkonsistensi: tab 'Hari ini' aktif di tabel, tetapi baris SO-24862 berjadwal 'Besok 08:00' dan SO-24858 berjadwal 'Kemarin 14:00'."
+         },
+         {
+          "rep": 2,
+          "skor": 2,
+          "bukti": "Angka konsisten: 48.320 vs 45.490 = +6,2%; 126 vs 112 = +12,5%; 94,1 vs 95,9 = −1,8 poin; 7 vs 4 = +3. Total pemasok terlambat 600+450+520+290 = 1.860 karung, sesuai subjudul '4 PO', dan badge 'Pemasok 4' di sidebar cocok. 'Pesanan Keluar 12' di sidebar sama dengan chip '12 aktif'. Copy spesifik ke domain: Pandan Wangi, IR64, Setra Ramos, PO-1182."
+         },
+         {
+          "rep": 3,
+          "skor": 2,
+          "bukti": "Copy spesifik domain beras: Pandan Wangi 25 kg, IR64 Premium 50 kg, Setra Ramos, serta PO-1182 dan seterusnya. Semua angka konsisten. Persentase KPI cocok dengan nilainya: 48.320 vs 45.490 = +6,2%, 126 vs 112 = +12,5%, 94,1 vs 95,9 = −1,8 poin, 7 vs 4 = +3. Total karung pemasok cocok: 600+450+520+290 = 1.860. Badge 'Pemasok 4' di sidebar sama dengan 4 PO. 'Pesanan Keluar 12' di sidebar sama dengan '12 aktif' di tabel. Tinggi batang terakhir (±50 ribu) wajar terhadap 48.320."
+         }
+        ]
+       },
+       "R8": {
+        "values": [
+         2,
+         2,
+         2
+        ],
+        "median": 2,
+        "range": 0,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 2,
+          "bukti": "Tidak ada pelanggaran checklist slop: latar abu-abu dingin, tanpa gradien, tanpa kartu bertumpuk, copy spesifik. Keputusan komposisi khas yang bisa ditunjuk: kartu KPI pertama dibalik menjadi blok biru tua solid sebagai jangkar visual, batang 'Hari ini' dibedakan lebih gelap dengan label biru, dan sidebar dikelompokkan per domain (Operasional/Mitra/Analisis)."
+         },
+         {
+          "rep": 2,
+          "skor": 2,
+          "bukti": "Tidak ada pelanggaran checklist slop. Latar abu-biru dingin, bukan krem. Ada dua keputusan komposisi khas yang terlihat di PNG: kartu KPI pertama dibalik menjadi blok biru tua solid sebagai jangkar visual, dan batang 'Hari ini' di grafik diberi warna lebih pekat dengan label tebal."
+         },
+         {
+          "rep": 3,
+          "skor": 2,
+          "bukti": "Tidak ada pelanggaran checklist slop. Ada dua keputusan komposisi khas yang terlihat di PNG. Pertama, kartu KPI pertama dibalik menjadi berisi navy penuh sebagai jangkar halaman (kiri atas). Kedua, batang 'Hari ini' di ujung kanan grafik diberi warna lebih pekat dan labelnya ditebalkan biru."
+         }
+        ]
+       },
+       "R9": {
+        "values": [
+         2,
+         2,
+         2
+        ],
+        "median": 2,
+        "range": 0,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 2,
+          "bukti": "Setiap KPI memuat satuan (karung, trip, %, SKU), badge perubahan, dan nilai minggu lalu. Grafik diberi satuan dan periode 'Ribu karung · 5–18 Nov 2026'. Pemasok dilengkapi nomor PO, jumlah karung, kota, dan '+n hari'. Tabel memuat kota pelanggan, kolom SKU spesifik (Pandan Wangi 25 kg, IR64 Premium 50 kg), gudang, 5 status berbeda, dan menu aksi '⋯'. Header punya filter 'Semua Gudang'. Padat tetapi tetap terbaca."
+         },
+         {
+          "rep": 2,
+          "skor": 2,
+          "bukti": "Setiap KPI punya satuan, delta, dan pembanding minggu lalu. Grafik punya satuan 'Ribu karung' dan periode '5–18 Nov 2026'. Pemasok dilengkapi nomor PO, jumlah karung, asal, dan badge hari keterlambatan. Tabel memuat kota pelanggan, SKU, gudang, jadwal bertingkat (Hari ini/Besok/Kemarin), dan lima variasi status. Ada badge hitungan di sidebar. Padat tetapi tetap terbaca."
+         },
+         {
+          "rep": 3,
+          "skor": 2,
+          "bukti": "Setiap KPI punya satuan (karung, trip, %, SKU), chip delta, dan pembanding minggu lalu. Pemasok terlambat dilengkapi nomor PO, jumlah karung, asal kota, dan jumlah hari terlambat yang bervariasi. Tabel menampilkan kota pelanggan, SKU, gudang, jadwal relatif (Hari ini/Besok/Kemarin), dan lima status berbeda. Ada filter tab (Hari ini/Minggu ini/Semua), badge di sidebar, dan dropdown 'Semua Gudang'. Isinya padat tetapi tetap terbaca."
+         }
+        ]
+       },
+       "R10": {
+        "values": [
+         2,
+         2,
+         2
+        ],
+        "median": 2,
+        "range": 0,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 2,
+          "bukti": "Permukaan berlapis: kartu hero biru tua, nav aktif solid biru, avatar dan chip abu-abu ber-tint, header tabel abu-abu muda. Warna kedua yang bermakna (hijau/amber/merah) dipakai konsisten di badge KPI, label hari di panel pemasok, badge status dengan dot di tabel, badge 'Pemasok 4', dan dot notifikasi. Badge terdefinisi. Grafik batang dan ikon tampak matang dan menyatu."
+         },
+         {
+          "rep": 2,
+          "skor": 2,
+          "bukti": "Permukaan berlapis: kartu biru tua, nav aktif terisi, chip delta dan status ber-tint, avatar pemasok berlatar abu. Warna kedua yang bermakna (hijau, kuning, merah) konsisten di KPI, tabel status, pemasok, dan badge sidebar. Badge dan chip terdefinisi dengan dot status. Grafik bertumpuk tampak matang dan menyatu dengan aksen."
+         },
+         {
+          "rep": 3,
+          "skor": 2,
+          "bukti": "Permukaannya berlapis: latar abu kebiruan, kartu putih, kartu KPI berisi navy, dan chip tint pada badge. Warna kedua bermakna (hijau, amber, merah) dipakai konsisten di tiga bagian: delta KPI, badge pemasok, dan status tabel. Badge status punya titik warna dan latar tint yang terdefinisi. Grafik bertumpuk tiga nuansa biru tampil matang dan menyatu dengan aksen."
+         }
+        ]
+       }
+      },
+      "total": 16,
+      "slop": {
+       "values": [
+        0,
+        0,
+        0
+       ],
+       "median": 0,
+       "range": 0,
+       "flag": false,
+       "items": [
+        {
+         "rep": 1,
+         "butir": []
+        },
+        {
+         "rep": 2,
+         "butir": []
+        },
+        {
+         "rep": 3,
+         "butir": []
+        }
+       ]
+      },
+      "emoji": {
+       "values": [
+        0,
+        0,
+        0
+       ],
+       "median": 0,
+       "range": 0,
+       "flag": false
+      },
+      "focus": [
+       {
+        "rep": 1,
+        "fokus": "Kartu biru tua 'Total stok tersedia 48.320 karung' di kiri atas area konten"
+       },
+       {
+        "rep": 2,
+        "fokus": "Kartu biru tua 'Total stok tersedia' dengan angka 48.320 karung, kiri atas area konten"
+       },
+       {
+        "rep": 3,
+        "fokus": "Kartu KPI berlatar navy penuh 'Total stok tersedia 48.320 karung' di kiri atas area konten"
+       }
+      ]
+     }
+    }
+   },
+   "decision": {
+    "decision": "Kalah",
+    "why": "total 14 < 16 − 1",
+    "checks": {
+     "total": {
+      "lakar": 14,
+      "pendev": 16
+     },
+     "appeal": {
+      "lakar": 4,
+      "pendev": 4
+     },
+     "appealLoss": [],
+     "otherLoss": [
+      "total 14 < 16 − 1"
+     ],
+     "zeroVsTwo": [],
+     "pendevBriefViolations": []
+    }
+   },
+   "emoji": {
+    "lakar": {
+     "agent": 0,
+     "glyphs": 0,
+     "lint": 0,
+     "judge": 0
+    },
+    "pendev": {
+     "agent": 0,
+     "glyphs": 0,
+     "judge": 0
+    }
+   },
+   "pngs": {
+    "lakar": "bench/practice/polish/1/P8-lakar.png",
+    "pendev": "bench/runs/practice-polish/1/P8-pendev.png"
+   },
+   "cost": {
+    "lakar": 0.6161454000000001,
+    "pendev": 1.0033728000000002,
+    "pendevCounted": true,
+    "judge": 0.6728094
+   }
+  },
+  {
+   "id": "P9",
+   "name": "Mejaku",
+   "kind": "landing",
+   "size": {
+    "width": 1440,
+    "height": null
+   },
+   "judgeTextSha256": "4b9f64e6da60eb9053c6ab80ca1416e274fe084eb281372b7ad3cf43d38d4fba",
+   "runs": {
+    "lakar": {
+     "key": "P9-lakar",
+     "prompt": "P9",
+     "tool": "lakar",
+     "dir": "bench/runs/practice-polish/1/P9-lakar",
+     "record": {
+      "runId": "polish-1-P9-lakar",
+      "prompt": "P9",
+      "attempt": 1,
+      "status": "success",
+      "wallMs": 214028.81666300003,
+      "durationMs": 214071,
+      "durationApiMs": 195629,
+      "costUsd": 1.2479484,
+      "numTurns": 14,
+      "toolCalls": 13,
+      "firstToolUseMs": 1967.790743999998,
+      "lastToolResultMs": 198074.96475199994,
+      "spawnToFirstEventMs": 995.3656210000627,
+      "frames": [
+       {
+        "id": "KYQOjxTM",
+        "name": "Mejaku / Beranda · landing · Jernih",
+        "width": 1440,
+        "height": 5310,
+        "png": "bench/runs/practice-polish/1/P9-lakar/png/KYQOjxTM.png",
+        "pngWidth": 1440,
+        "pngHeight": 5310
+       }
+      ],
+      "transcriptBytes": 2175446,
+      "pngScaleMismatch": false,
+      "model": "claude-opus-5-5",
+      "modelUsageKeys": [
+       "claude-opus-5-5"
+      ],
+      "claudeCodeVersion": "2.1.325",
+      "startedAt": "2026-11-18T21:41:07.779Z",
+      "lakar": {
+       "slug": "mejaku-landing",
+       "opened": [
+        "mejaku-landing"
+       ],
+       "boards": [
+        {
+         "id": "KYQOjxTM",
+         "name": "Mejaku / Beranda · landing · Jernih",
+         "page": "Page 1",
+         "screen": "landing",
+         "x": 0,
+         "y": 0,
+         "width": 1440,
+         "height": 5310,
+         "wip": false,
+         "childCount": 1
+        }
+       ],
+       "layout": {
+        "rev": 4,
+        "summary": {
+         "error": 0,
+         "warning": 0,
+         "gate": 0
+        },
+        "findings": [],
+        "boards": [
+         {
+          "id": "KYQOjxTM",
+          "name": "Mejaku / Beranda · landing · Jernih",
+          "summary": {
+           "error": 0,
+           "warning": 0,
+           "gate": 0
+          }
+         }
+        ]
+       },
+       "docPath": "bench/runs/practice-polish/1/P9-lakar/doc/mejaku-landing.lakar.json",
+       "historyPath": "bench/runs/practice-polish/1/P9-lakar/doc/mejaku-landing.history.jsonl",
+       "daemonBefore": {
+        "pid": 1827930,
+        "startedAt": "2026-11-18T21:27:04.269Z",
+        "recreated": 0,
+        "systemd": {
+         "ActiveState": "active",
+         "ActiveEnterTimestamp": "Wed 2026-11-18 21:27:03 UTC",
+         "MainPID": "1827930",
+         "NRestarts": "0"
+        }
+       },
+       "daemonAfter": {
+        "pid": 1827930,
+        "startedAt": "2026-11-18T21:27:04.269Z",
+        "recreated": 0,
+        "systemd": {
+         "ActiveState": "active",
+         "ActiveEnterTimestamp": "Wed 2026-11-18 21:27:03 UTC",
+         "MainPID": "1827930",
+         "NRestarts": "0"
+        }
+       },
+       "docsBefore": 5
+      }
+     },
+     "reconnect": {
+      "count": 0,
+      "affectedMs": 0,
+      "events": [],
+      "toolErrors": []
+     },
+     "agentEmoji": {
+      "emoji": 0,
+      "glyphs": 2,
+      "samples": []
+     },
+     "lintEmoji": {
+      "lc01a": 0,
+      "lc01b": 0
+     },
+     "strip": {
+      "path": "bench/runs/practice-polish/1/P9-lakar.png",
+      "width": 1440,
+      "height": 5310,
+      "boards": 1
+     },
+     "previous": []
+    },
+    "pendev": {
+     "key": "P9-pendev",
+     "prompt": "P9",
+     "tool": "pendev",
+     "dir": "bench/runs/practice-polish/1/P9-pendev",
+     "record": {
+      "runId": "polish-1-P9-pendev",
+      "prompt": "P9",
+      "attempt": 1,
+      "status": "success",
+      "uri": "file:///root/.pencil/documents/0775f603-1eac-4061-afd4-6f506f53b015/untitled.pen",
+      "uriSource": "get_app_state",
+      "wallMs": 161854.02067799994,
+      "durationMs": 161964,
+      "durationApiMs": 144167,
+      "costUsd": 0.83792,
+      "numTurns": 17,
+      "toolCalls": 16,
+      "firstToolUseMs": 1496.112010999932,
+      "lastToolResultMs": 150204.93780800002,
+      "spawnToFirstEventMs": 851.0911479999777,
+      "frames": [
+       {
+        "id": "iOy3R",
+        "name": "Mejaku — Landing Page",
+        "width": 1440,
+        "height": 5007,
+        "png": "bench/runs/practice-polish/1/P9-pendev/png/iOy3R.png",
+        "pngWidth": 1440,
+        "pngHeight": 5007
+       }
+      ],
+      "transcriptBytes": 885403,
+      "penPath": "bench/runs/practice-polish/1/P9-pendev/design.pen",
+      "pngScaleMismatch": false,
+      "model": "claude-opus-5-5",
+      "modelUsageKeys": [
+       "claude-opus-5-5"
+      ],
+      "claudeCodeVersion": "2.1.325",
+      "startedAt": "2026-11-18T21:38:21.254Z",
+      "pendevSystemd": {
+       "before": {
+        "ActiveState": "active",
+        "ActiveEnterTimestamp": "Wed 2026-11-18 18:16:46 UTC",
+        "MainPID": "1699601",
+        "NRestarts": "0"
+       },
+       "after": {
+        "ActiveState": "active",
+        "ActiveEnterTimestamp": "Wed 2026-11-18 18:16:46 UTC",
+        "MainPID": "1699601",
+        "NRestarts": "0"
+       }
+      }
+     },
+     "reconnect": {
+      "count": 0,
+      "affectedMs": 0,
+      "events": [],
+      "toolErrors": []
+     },
+     "agentEmoji": {
+      "emoji": 0,
+      "glyphs": 0,
+      "samples": []
+     },
+     "strip": {
+      "path": "bench/runs/practice-polish/1/P9-pendev.png",
+      "width": 1440,
+      "height": 5007,
+      "boards": 1
+     },
+     "previous": []
+    }
+   },
+   "gate": {
+    "ok": true,
+    "reasons": [],
+    "timeRatio": 1.322357120116275
+   },
+   "sizeProblems": [],
+   "pendevSizeProblems": [],
+   "score": {
+    "prompt": "P9",
+    "validReps": 3,
+    "reps": [
+     {
+      "prompt": "P9",
+      "rep": 1,
+      "mapping": {
+       "X": "pendev",
+       "Y": "lakar"
+      },
+      "status": "ok",
+      "verdict": {
+       "X": {
+        "R1": {
+         "skor": 1,
+         "bukti": "Semua bagian yang diminta ada: navigasi atas (bagian 1), hero dengan judul, subjudul, CTA, dan kartu 'Reservasi malam ini' (bagian 1), 3 fitur (bagian 2), 3 paket harga (bagian 2–3), testimoni dengan foto Ratna (bagian 3–4), FAQ (bagian 4–5), dan footer (bagian 5). Lebar 1440, aksen merah bata, dan Bahasa Indonesia sesuai. Ada 1 seksi ekstra di luar prompt: banner CTA merah 'Siap mengisi meja malam ini?' di bagian 5 sebelum footer."
+        },
+        "R2": {
+         "skor": 1,
+         "bukti": "Fokus tegas pada judul serif besar 'Meja penuh, malam tenang.' di kiri hero (bagian 1), dengan lompatan skala yang jelas ke subjudul dan judul seksi. Ada 1 judul yatim: 'Harga jujur, tanpa komisi per / tamu.' di bagian 2, dengan kata 'tamu.' sendirian di baris kedua."
+        },
+        "R4": {
+         "skor": 1,
+         "bukti": "Merah bata konsisten di CTA hero, label eyebrow, ikon fitur, badge 'Paling populer', dan tombol Bistro. Hijau dipakai bermakna untuk metrik naik dan badge 'Hadir'. Ada 1 kelemahan: angka penanda '01/02/03' di kanan atas kolom fitur (bagian 2) berwarna abu sangat terang di atas putih, sehingga kontrasnya lemah. Selain itu, tombol nav 'Coba gratis' berwarna hitam, tidak memakai aksen aksi."
+        },
+        "R5": {
+         "skor": 2,
+         "bukti": "Ikon line dengan satu gaya dan ukuran seragam di tile ber-tint: kalender, grid, lonceng (bagian 2), centang harga, ikon chat FAQ, dan play di tombol demo. Visual utama relevan: pratinjau aplikasi daftar reservasi di hero dan foto pemilik warung di dalam restoran (bagian 3–4). Tidak ada emoji."
+        },
+        "R6": {
+         "skor": 1,
+         "bukti": "Copy spesifik: 'Pengingat otomatis via WhatsApp H-1 dan 2 jam sebelumnya', 'Deposit reservasi via QRIS'. Ada 1 inkonsistensi: kartu hero 'Warung Ibu Ratna' menunjukkan '3/12 Meja kosong' (12 meja), sedangkan testimoni menyebut 'Pemilik Warung Ibu Ratna, Yogyakarta · 14 meja' (bagian 3)."
+        },
+        "R8": {
+         "skor": 1,
+         "bukti": "Ada 1 pelanggaran slop: latar off-white/krem hangat di hero, harga, dan FAQ. Keputusan khas yang bisa ditunjuk: judul display serif dipadukan dengan seksi testimoni gelap berisi foto besar, kutipan serif, dan baris statistik '−62% / +9 jam / 4,9/5' (bagian 3–4); fitur memakai kolom bernomor bergaris, bukan kartu."
+        },
+        "R9": {
+         "skor": 2,
+         "bukti": "Kartu hero memuat ringkasan (14 reservasi, 46 tamu, 3/12 meja kosong), jam, inisial, jumlah tamu, nomor meja, dan variasi status Hadir/Terkonfirmasi/Menunggu. Setiap fitur punya metrik bertanda tren ('Rata-rata +38% reservasi', 'Hemat 1 jam per shift'). Testimoni diberi kota dan jumlah meja. FAQ dilengkapi jam layanan WIB."
+        },
+        "R10": {
+         "skor": 2,
+         "bukti": "Permukaan berlapis: off-white, putih, seksi gelap testimoni dan footer, kartu Bistro gelap, serta banner CTA merah bata. Warna kedua bermakna, yaitu hijau, dipakai di badge 'Hadir' di hero dan metrik tren di fitur. Badge status berwarna terdefinisi (Hadir, Terkonfirmasi, Menunggu, Paling populer, Baru). Foto dan avatar testimoni matang dan menyatu."
+        },
+        "slop": {
+         "jumlah": 1,
+         "butir": [
+          "7: latar off-white/krem hangat di hero (bagian 1), seksi harga (bagian 2–3), dan FAQ (bagian 4–5)"
+         ]
+        },
+        "emoji": 0,
+        "fokus": "Judul serif 'Meja penuh, malam tenang.' di kiri atas hero, bagian 1"
+       },
+       "Y": {
+        "R1": {
+         "skor": 2,
+         "bukti": "Semua bagian ada dan berurutan sesuai prompt: nav (bagian 1), hero dengan judul, subjudul, dua CTA, dan kartu 'Reservasi malam ini' (bagian 1–2), 3 fitur (bagian 2–3), perbandingan 3 paket berbentuk tabel baris (bagian 3–4), testimoni pemilik dengan foto (bagian 4–5), FAQ (bagian 5), dan footer (bagian 6). Lebar 1440, aksen merah bata, dan Bahasa Indonesia sesuai. Tidak ada seksi ekstra."
+        },
+        "R2": {
+         "skor": 1,
+         "bukti": "Fokus pada judul hero 'Meja terisi tiap malam, tanpa tamu yang batal diam-diam' yang rata tengah (bagian 1). Ada 1 judul yatim: judul kartu fitur 'Satu daftar untuk WhatsApp, Instagram, dan / telepon' di bagian 2, dengan kata 'telepon' sendirian di baris kedua."
+        },
+        "R4": {
+         "skor": 1,
+         "bukti": "Merah bata konsisten di tombol utama, eyebrow, harga Resto, dan border paket terpilih. Hijau dipakai untuk tren positif dan status 'Sudah tiba'; amber untuk peringatan 'Belum balas', segmen Telepon, dan bintang. Ada 1 pemakaian warna tanpa makna yang konsisten: chip hasil positif 'Meja kosong terisi dalam 11 menit' (bagian 3) berwarna merah, padahal hasil positif lain di halaman memakai hijau."
+        },
+        "R5": {
+         "skor": 1,
+         "bukti": "Ikon line seragam di status hero, ikon fitur, chip harga, FAQ, dan sosial footer. Tidak ada emoji. Namun visual utama hero lemah relevansinya: foto restoran Thailand dengan papan 'Kr Thai' dan '…Lanna' serta harga 'B 179' (baht) di bagian 1, untuk produk Indonesia. Foto testimoni kanan (Reza) juga terpotong canggung di dahi (bagian 4)."
+        },
+        "R6": {
+         "skor": 2,
+         "bukti": "Angka konsisten. Saluran 239+111+62=412 dengan 58%+27%+15%=100% (bagian 2–3). No-show 14,6%→3,1% sama di kartu hero dan chip fitur. Harga tahunan hemat 2 bulan sesuai: Rp 1.490.000 = 10×149.000 dan Rp 3.490.000 = 10×349.000 (bagian 4). Pengingat '3 jam sebelum' konsisten di hero dan fitur. Copy spesifik: 'cukup membalas 1 untuk hadir atau 2 untuk batal'."
+        },
+        "R8": {
+         "skor": 2,
+         "bukti": "0 pelanggaran checklist; latar blush ber-tint merah adalah tint brand, bukan krem atau beige. Keputusan khas yang bisa ditunjuk: kartu reservasi dan kartu stat no-show melayang di atas foto restoran pada hero (bagian 1–2), fitur bento asimetris dengan bar saluran reservasi bertumpuk (bagian 2–3), dan harga sebagai tabel perbandingan per baris (bagian 3)."
+        },
+        "R9": {
+         "skor": 2,
+         "bukti": "Angka diberi konteks: '3,1% dari 14,6%', '412 reservasi · +18% vs September', 'Rp 6,8 jt ke Rp 8,1 jt', '4,8 dari 5 dari 612 ulasan', dan 'Berdasarkan 1.930 chat bulan Oktober'. Daftar hero menunjukkan variasi status Sudah tiba/Berikutnya/Terkonfirmasi/Belum balas. Paket berisi nilai per baris, testimoni diberi meja dan kota, dan ada catatan PPN di bawah harga."
+        },
+        "R10": {
+         "skor": 2,
+         "bukti": "Permukaan berlapis: bidang ber-tint merah muda di hero, harga, dan FAQ, kartu fitur ber-tint, dan footer merah gelap. Warna kedua bermakna, yaitu hijau untuk tren dan status, dipakai di hero, fitur, dan testimoni; amber untuk peringatan, kategori, dan rating. Chip dan badge berikon terdefinisi. Grafik bar saluran dan foto-foto menyatu dengan komposisi."
+        },
+        "slop": {
+         "jumlah": 0,
+         "butir": []
+        },
+        "emoji": 0,
+        "fokus": "Judul hero rata tengah 'Meja terisi tiap malam, tanpa tamu yang batal diam-diam', bagian 1 atas"
+       }
+      },
+      "attempts": [
+       {
+        "dir": "/root/lakar/bench/runs/practice-polish/1/judge/P9/rep-1/attempt-1",
+        "status": "ok",
+        "problems": [],
+        "costUsd": 0.3548698,
+        "wallMs": 67131.21366199991
+       }
+      ],
+      "retried": false,
+      "costUsd": 0.3548698
+     },
+     {
+      "prompt": "P9",
+      "rep": 2,
+      "mapping": {
+       "X": "lakar",
+       "Y": "pendev"
+      },
+      "status": "ok",
+      "verdict": {
+       "X": {
+        "R1": {
+         "skor": 2,
+         "bukti": "Semua bagian yang diminta ada dan berurutan, tanpa seksi ekstra. Bagian 1: navigasi atas; hero dengan judul, subjudul, tombol 'Coba gratis 14 hari' dan 'Lihat demo 3 menit', serta pratinjau 'Reservasi malam ini' berisi 6 baris. Bagian 2–3: 3 fitur. Bagian 3–4: perbandingan paket Warung/Resto/Cabang. Bagian 4–5: testimoni dengan foto Lina Wijaya dan Reza Hakim. Bagian 5: FAQ. Bagian 6: footer. Lebar 1440px, aksen merah bata, seluruh copy berbahasa Indonesia."
+        },
+        "R2": {
+         "skor": 2,
+         "bukti": "Judul hero 'Meja terisi tiap malam, tanpa tamu yang batal diam-diam' (bagian 1, tengah atas) jelas paling besar dan tebal. Skala turun tegas: H2 seksi ('Tiga hal yang membuat kursi…', 'Bayar sesuai jumlah meja…'), lalu judul kartu, lalu body, lalu eyebrow merah 'FITUR UTAMA'/'HARGA'. Tidak ada kata tunggal yatim di baris akhir judul."
+        },
+        "R4": {
+         "skor": 2,
+         "bukti": "Merah bata dipakai konsisten untuk CTA (nav, hero, paket Resto), harga paket unggulan 'Rp 149.000', border paket aktif, FAQ terbuka, dan eyebrow. Hijau hanya untuk status 'Sudah tiba' dan tren turun/naik positif ('dari 14,6%', '+19%'). Kuning tua untuk 'Belum balas' dan bintang rating. Segmen chart WhatsApp/Instagram/Telepon (bagian 3 atas) adalah kategori bermakna. Teks abu 'Tidak termasuk' sengaja diredam dan masih terbaca."
+        },
+        "R5": {
+         "skor": 1,
+         "bukti": "Ikon garis satu gaya, tanpa emoji. Namun wadah ikon fitur tidak konsisten (bagian 2): fitur 1 kotak putih, fitur 2 kotak merah solid, fitur 3 kotak tint. Selain itu, foto hero menampilkan restoran Thailand dengan papan 'Thai'/'Lanna' dan menu '฿179' (bagian 1–2), kurang relevan untuk restoran kecil Indonesia. Foto Reza Hakim (bagian 4 kanan) terpotong di dahi."
+        },
+        "R6": {
+         "skor": 2,
+         "bukti": "Copy spesifik ('bukan untuk hotel bintang lima', 'membalas 1 untuk hadir atau 2 untuk batal') dan angka konsisten. No-show '14,6% → 3,1%' sama di kartu hero (bagian 2) dan badge fitur. Chart 239+111+62 = 412 dengan 58/27/15% (bagian 2–3). Harga tahunan Rp1.490.000 dan Rp3.490.000 = 10× harga bulanan, sesuai 'hemat 2 bulan' (bagian 4). Tidak ada frasa terlarang."
+        },
+        "R8": {
+         "skor": 2,
+         "bukti": "Tidak ada pelanggaran checklist slop. Ada dua langkah komposisi khas yang bisa ditunjuk. Pertama, kartu daftar reservasi dan kartu statistik '3,1%' mengambang di atas foto restoran full-bleed berbingkai bulat (bagian 1–2). Kedua, fitur berbentuk bento asimetris: satu kartu besar ber-tint berisi bar chart sumber reservasi, plus dua kartu kecil bertumpuk (bagian 2–3)."
+        },
+        "R9": {
+         "skor": 2,
+         "bukti": "Angka hampir selalu diberi konteks: '23 dari 28 meja terisi', '412 reservasi · +18% vs September', '18% ke 4% · 3 bulan pertama', 'Rp 6,8 jt ke Rp 8,1 jt', 'Rata-rata 4,8 dari 5 dari 612 ulasan'. Daftar reservasi punya 4 status berbeda dan satu baris 'Berikutnya' yang disorot. Tabel harga per baris berisi nilai atau 'Tidak termasuk'. Testimoni memuat metadata jumlah meja dan kota. FAQ ditambah kartu 'Rata-rata dibalas 6 menit'."
+        },
+        "R10": {
+         "skor": 2,
+         "bukti": "Permukaan berlapis: hero, harga, dan FAQ memakai bidang ber-tint merah muda; seksi putih diselingi; footer merah marun gelap (bagian 6). Warna kedua bermakna, yaitu hijau untuk status/tren positif, muncul di hero, fitur, dan testimoni. Badge status dan chip berikon terdefinisi. Foto dan pratinjau aplikasi menyatu dengan komposisi."
+        },
+        "slop": {
+         "jumlah": 0,
+         "butir": []
+        },
+        "emoji": 0,
+        "fokus": "Judul hero 'Meja terisi tiap malam, tanpa tamu yang batal diam-diam', tengah atas bagian 1"
+       },
+       "Y": {
+        "R1": {
+         "skor": 1,
+         "bukti": "Semua bagian yang diminta ada: nav, hero dengan pratinjau 'Reservasi malam ini', 3 fitur, 3 paket harga, testimoni dengan foto Ratna Kusumawati, FAQ, footer. Lebar 1440px, aksen merah bata, bahasa Indonesia. Namun ada satu seksi ekstra di luar daftar prompt: banner CTA merah 'Siap mengisi meja malam ini?' di antara FAQ dan footer (bagian 5)."
+        },
+        "R2": {
+         "skor": 1,
+         "bukti": "Fokus jelas pada judul serif besar hero 'Meja penuh, malam tenang.' (bagian 1 kiri), dengan lompatan skala tegas ke H2 dan body. Ada satu judul yatim: 'Harga jujur, tanpa komisi per / tamu.' menyisakan satu kata 'tamu.' di baris kedua (bagian 2)."
+        },
+        "R4": {
+         "skor": 1,
+         "bukti": "Merah bata konsisten untuk CTA, eyebrow, ikon fitur, badge 'Paling populer', dan tombol FAQ aktif. Hijau dipakai untuk 'Hadir' dan metrik fitur, kuning untuk 'Menunggu'. Satu pemakaian warna tanpa makna: lingkaran avatar inisial di daftar reservasi (BS krem, KW hijau, SM ungu, A& kuning, DL biru; bagian 1 kanan) diwarnai pastel acak, tidak terkait status apa pun."
+        },
+        "R5": {
+         "skor": 2,
+         "bukti": "Ikon garis satu gaya dan ukuran seragam dalam kotak ber-tint merah (fitur, bagian 2), konsisten dengan ikon tombol dan FAQ. Visual utama relevan: pratinjau aplikasi daftar reservasi di hero dan foto besar pemilik warung di dalam restorannya (bagian 3). Avatar foto ada di 3 testimoni kecil. Tanpa emoji."
+        },
+        "R6": {
+         "skor": 0,
+         "bukti": "Ada dua kontradiksi angka. Pertama, pratinjau hero menulis 'Warung Ibu Ratna' dengan '3/12 Meja kosong' (12 meja, bagian 1), sedangkan testimoni pemilik warung yang sama menyebut '14 meja' (bagian 3). Kedua, fitur menyatakan 'No-show turun hingga 60%' (bagian 2), tetapi statistik testimoni '−62% tamu tidak datang' (bagian 4) melampaui batas 'hingga' tersebut."
+        },
+        "R8": {
+         "skor": 1,
+         "bukti": "Ada satu pelanggaran slop: latar krem/off-white hangat di hero, harga, dan FAQ (bagian 1–5). Langkah khas tetap ada, yaitu headline serif editorial dan seksi testimoni gelap berisi foto besar, kutipan serif, dan tiga statistik (bagian 3–4). Tetapi satu pelanggaran sudah menurunkan skor ke 1."
+        },
+        "R9": {
+         "skor": 1,
+         "bukti": "Sebagian bagian kaya: daftar reservasi punya 3 variasi status, tamu, dan nomor meja; testimoni memuat kota dan jumlah meja. Namun banyak angka berdiri tanpa konteks. '14 Reservasi' dan '46 Tamu' di hero tanpa pembanding. 'Rata-rata +38% reservasi' dan 'Hemat 1 jam per shift' (bagian 2) tanpa periode atau dasar. Daftar paket harga hanya berupa daftar centang, bukan perbandingan per atribut (bagian 3)."
+        },
+        "R10": {
+         "skor": 2,
+         "bukti": "Permukaan berlapis: krem, putih, seksi testimoni gelap, kartu harga Bistro gelap, banner CTA merah, dan footer gelap. Warna kedua bermakna, yaitu hijau, dipakai di status 'Hadir' (hero) dan metrik fitur (bagian 2). Badge status, 'Baru', dan 'Paling populer' terdefinisi. Foto testimoni dan pratinjau aplikasi matang dan menyatu."
+        },
+        "slop": {
+         "jumlah": 1,
+         "butir": [
+          "7: latar krem/off-white hangat di hero, seksi harga, dan FAQ (bagian 1, 2–3, 4–5)"
+         ]
+        },
+        "emoji": 0,
+        "fokus": "Judul serif hero 'Meja penuh, malam tenang.', kiri atas bagian 1"
+       }
+      },
+      "attempts": [
+       {
+        "dir": "/root/lakar/bench/runs/practice-polish/1/judge/P9/rep-2/attempt-1",
+        "status": "ok",
+        "problems": [],
+        "costUsd": 0.36393380000000003,
+        "wallMs": 72859.3427540001
+       }
+      ],
+      "retried": false,
+      "costUsd": 0.36393380000000003
+     },
+     {
+      "prompt": "P9",
+      "rep": 3,
+      "mapping": {
+       "X": "pendev",
+       "Y": "lakar"
+      },
+      "status": "ok",
+      "verdict": {
+       "X": {
+        "R1": {
+         "skor": 1,
+         "bukti": "Semua bagian yang diminta ada: navigasi atas, hero dengan pratinjau 'Reservasi malam ini' (bagian 1), 3 fitur (bagian 2), 3 paket harga (bagian 2–3), testimoni Ratna Kusumawati dengan foto (bagian 3–4), FAQ (bagian 4–5), footer (bagian 5). Lebar 1440px, aksen merah bata, berbahasa Indonesia. Ada satu seksi ekstra di luar daftar prompt: blok CTA merah 'Siap mengisi meja malam ini?' (bagian 5)."
+        },
+        "R2": {
+         "skor": 2,
+         "bukti": "Judul serif besar 'Meja penuh, malam tenang.' di kiri hero (bagian 1) menjadi fokus tunggal. Skala turun tegas ke H2 serif ('Semua yang dibutuhkan dapur kecil…', 'Harga jujur…'), lalu ke judul fitur sans dan body. Setiap judul seksi punya eyebrow dan isi, tidak ada judul yatim."
+        },
+        "R4": {
+         "skor": 2,
+         "bukti": "Merah bata dipakai konsisten untuk CTA 'Mulai gratis 30 hari', tombol paket Bistro, ikon fitur, eyebrow, ikon FAQ aktif, dan band CTA. Hijau hanya untuk tren positif ('Rata-rata +38% reservasi') dan status 'Hadir'; kuning untuk 'Menunggu'. Teks di latar gelap pada testimoni dan footer terbaca jelas."
+        },
+        "R5": {
+         "skor": 2,
+         "bukti": "Ikon garis satu gaya dengan ukuran seragam: kalender, grid, lonceng di kotak ber-tint (bagian 2), centang di daftar harga, ikon chat di FAQ. Foto pemilik warung di testimoni (bagian 3) relevan dan berkualitas, avatar foto di kartu testimoni kecil. Tidak ada emoji."
+        },
+        "R6": {
+         "skor": 1,
+         "bukti": "Copy spesifik dan lokal (WhatsApp H-1, QRIS, Warung Ibu Ratna, Yogyakarta). Ada satu inkonsistensi angka: fitur 3 menulis 'No-show turun hingga 60%' (bagian 2), tetapi statistik testimoni menulis '−62% tamu tidak datang' (bagian 4), melebihi batas 'hingga 60%'."
+        },
+        "R8": {
+         "skor": 1,
+         "bukti": "Ada satu pelanggaran slop: latar off-white/krem hangat di hero, harga, dan FAQ. Langkah khas yang bisa ditunjuk: headline serif editorial, kartu paket Bistro gelap di tengah, dan seksi testimoni gelap dengan foto besar plus strip statistik."
+        },
+        "R9": {
+         "skor": 2,
+         "bukti": "Pratinjau hero berisi ringkasan (14 Reservasi, 46 Tamu, 3/12 Meja kosong) dan daftar dengan variasi status Hadir/Terkonfirmasi/Menunggu serta metadata 'x tamu · Meja n'. Tiap fitur punya metrik hasil. Testimoni memuat lokasi, jumlah meja, dan 3 statistik berlabel. Label 'Paling populer', 'Baru', dan jam layanan FAQ melengkapi."
+        },
+        "R10": {
+         "skor": 2,
+         "bukti": "Permukaan berlapis: latar krem, putih, seksi gelap testimoni dan footer, serta band CTA merah. Warna kedua bermakna (hijau positif) muncul di status hero dan metrik fitur. Badge berwarna terdefinisi ('Baru', 'Paling populer', status reservasi). Ikon ber-tint dan foto menyatu."
+        },
+        "slop": {
+         "jumlah": 1,
+         "butir": [
+          "7: latar off-white/krem hangat di hero (bagian 1), seksi harga (bagian 2–3), dan FAQ (bagian 4–5)"
+         ]
+        },
+        "emoji": 0,
+        "fokus": "Headline serif 'Meja penuh, malam tenang.' di kiri hero, bagian 1"
+       },
+       "Y": {
+        "R1": {
+         "skor": 2,
+         "bukti": "Navigasi atas; hero dengan judul, subjudul, tombol 'Coba gratis 14 hari', dan pratinjau 'Reservasi malam ini' (bagian 1–2); 3 fitur dalam layout bento (bagian 2–3); perbandingan paket Warung/Resto/Cabang berupa tabel per baris fitur (bagian 3–4); testimoni pemilik dengan foto (bagian 4–5); FAQ (bagian 5); footer (bagian 6). Lebar 1440px, aksen merah bata, berbahasa Indonesia."
+        },
+        "R2": {
+         "skor": 2,
+         "bukti": "Headline tebal 'Meja terisi tiap malam, tanpa tamu yang batal diam-diam' di tengah hero (bagian 1) menjadi fokus. Skala turun tegas ke H2 seksi, judul kartu, lalu body dan metadata kecil. Tidak ada judul yatim."
+        },
+        "R4": {
+         "skor": 2,
+         "bukti": "Merah bata untuk CTA, harga paket unggulan 'Rp 149.000', border kartu Resto, baris aktif 'Berikutnya', dan eyebrow. Hijau untuk 'Sudah tiba' dan tren turun no-show; oranye/amber untuk 'Belum balas', segmen Telepon pada grafik, dan bintang rating, semuanya bermakna. Teks di latar merah muda dan maroon footer tetap kontras."
+        },
+        "R5": {
+         "skor": 1,
+         "bukti": "Ikon garis satu gaya (inbox, lonceng, grid, users, jam, sosial di footer) tanpa emoji. Namun visual utama hero lemah relevansinya: foto restoran bertuliskan 'Thai Lanna Café & Restaurant' dengan harga '฿179' (bagian 1), tidak cocok untuk produk restoran kecil Indonesia. Foto Reza Hakim juga terpotong di dahi (bagian 4)."
+        },
+        "R6": {
+         "skor": 2,
+         "bukti": "Angka konsisten: no-show 14,6% → 3,1% muncul di hero dan fitur; 239+111+62 = 412 reservasi dengan 58/27/15%; harga tahunan Resto Rp 1.490.000 = 10× Rp 149.000; uji coba 14 hari konsisten di nav, hero, dan harga. Copy spesifik (balas 1/2, PPN 11%, Dapur Pangsit Lina · 14 meja · Medan)."
+        },
+        "R8": {
+         "skor": 2,
+         "bukti": "Tidak ada pelanggaran checklist: latar ber-tint merah muda brand (bukan krem), fitur berupa bento tidak identik, teks seksi rata kiri, tidak ada frasa terlarang. Langkah khas: pratinjau aplikasi dan kartu statistik '3,1%' melayang di atas foto restoran (bagian 1–2), serta kartu fitur besar dengan grafik batang sumber reservasi (bagian 2–3)."
+        },
+        "R9": {
+         "skor": 2,
+         "bukti": "Angka diberi konteks: '3,1% dari 14,6%, Oktober', '412 reservasi · +18% vs September', 'Omzet malam Sabtu Rp 6,8 jt ke Rp 8,1 jt', 'Rata-rata dibalas 6 menit, berdasarkan 1.930 chat bulan Oktober'. Daftar hero menampilkan variasi status. Tabel harga menunjukkan kuota per paket dan 'Tidak termasuk'. Badge 'Paling dipilih · 71% pelanggan'."
+        },
+        "R10": {
+         "skor": 2,
+         "bukti": "Permukaan berlapis: tint merah muda di hero, harga, FAQ, dan kartu fitur; putih; footer maroon gelap. Warna kedua bermakna (hijau positif, amber peringatan/rating) dipakai di hero, fitur, dan testimoni. Chip status berikon terdefinisi. Grafik batang dan foto terintegrasi dengan kartu."
+        },
+        "slop": {
+         "jumlah": 0,
+         "butir": []
+        },
+        "emoji": 0,
+        "fokus": "Headline 'Meja terisi tiap malam, tanpa tamu yang batal diam-diam' di tengah hero, bagian 1"
+       }
+      },
+      "attempts": [
+       {
+        "dir": "/root/lakar/bench/runs/practice-polish/1/judge/P9/rep-3/attempt-1",
+        "status": "ok",
+        "problems": [],
+        "costUsd": 0.3102338,
+        "wallMs": 45652.83949099993
+       }
+      ],
+      "retried": false,
+      "costUsd": 0.3102338
+     }
+    ],
+    "tools": {
+     "lakar": {
+      "criteria": {
+       "R1": {
+        "values": [
+         2,
+         2,
+         2
+        ],
+        "median": 2,
+        "range": 0,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 2,
+          "bukti": "Semua bagian ada dan berurutan sesuai prompt: nav (bagian 1), hero dengan judul, subjudul, dua CTA, dan kartu 'Reservasi malam ini' (bagian 1–2), 3 fitur (bagian 2–3), perbandingan 3 paket berbentuk tabel baris (bagian 3–4), testimoni pemilik dengan foto (bagian 4–5), FAQ (bagian 5), dan footer (bagian 6). Lebar 1440, aksen merah bata, dan Bahasa Indonesia sesuai. Tidak ada seksi ekstra."
+         },
+         {
+          "rep": 2,
+          "skor": 2,
+          "bukti": "Semua bagian yang diminta ada dan berurutan, tanpa seksi ekstra. Bagian 1: navigasi atas; hero dengan judul, subjudul, tombol 'Coba gratis 14 hari' dan 'Lihat demo 3 menit', serta pratinjau 'Reservasi malam ini' berisi 6 baris. Bagian 2–3: 3 fitur. Bagian 3–4: perbandingan paket Warung/Resto/Cabang. Bagian 4–5: testimoni dengan foto Lina Wijaya dan Reza Hakim. Bagian 5: FAQ. Bagian 6: footer. Lebar 1440px, aksen merah bata, seluruh copy berbahasa Indonesia."
+         },
+         {
+          "rep": 3,
+          "skor": 2,
+          "bukti": "Navigasi atas; hero dengan judul, subjudul, tombol 'Coba gratis 14 hari', dan pratinjau 'Reservasi malam ini' (bagian 1–2); 3 fitur dalam layout bento (bagian 2–3); perbandingan paket Warung/Resto/Cabang berupa tabel per baris fitur (bagian 3–4); testimoni pemilik dengan foto (bagian 4–5); FAQ (bagian 5); footer (bagian 6). Lebar 1440px, aksen merah bata, berbahasa Indonesia."
+         }
+        ]
+       },
+       "R2": {
+        "values": [
+         1,
+         2,
+         2
+        ],
+        "median": 2,
+        "range": 1,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 1,
+          "bukti": "Fokus pada judul hero 'Meja terisi tiap malam, tanpa tamu yang batal diam-diam' yang rata tengah (bagian 1). Ada 1 judul yatim: judul kartu fitur 'Satu daftar untuk WhatsApp, Instagram, dan / telepon' di bagian 2, dengan kata 'telepon' sendirian di baris kedua."
+         },
+         {
+          "rep": 2,
+          "skor": 2,
+          "bukti": "Judul hero 'Meja terisi tiap malam, tanpa tamu yang batal diam-diam' (bagian 1, tengah atas) jelas paling besar dan tebal. Skala turun tegas: H2 seksi ('Tiga hal yang membuat kursi…', 'Bayar sesuai jumlah meja…'), lalu judul kartu, lalu body, lalu eyebrow merah 'FITUR UTAMA'/'HARGA'. Tidak ada kata tunggal yatim di baris akhir judul."
+         },
+         {
+          "rep": 3,
+          "skor": 2,
+          "bukti": "Headline tebal 'Meja terisi tiap malam, tanpa tamu yang batal diam-diam' di tengah hero (bagian 1) menjadi fokus. Skala turun tegas ke H2 seksi, judul kartu, lalu body dan metadata kecil. Tidak ada judul yatim."
+         }
+        ]
+       },
+       "R4": {
+        "values": [
+         1,
+         2,
+         2
+        ],
+        "median": 2,
+        "range": 1,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 1,
+          "bukti": "Merah bata konsisten di tombol utama, eyebrow, harga Resto, dan border paket terpilih. Hijau dipakai untuk tren positif dan status 'Sudah tiba'; amber untuk peringatan 'Belum balas', segmen Telepon, dan bintang. Ada 1 pemakaian warna tanpa makna yang konsisten: chip hasil positif 'Meja kosong terisi dalam 11 menit' (bagian 3) berwarna merah, padahal hasil positif lain di halaman memakai hijau."
+         },
+         {
+          "rep": 2,
+          "skor": 2,
+          "bukti": "Merah bata dipakai konsisten untuk CTA (nav, hero, paket Resto), harga paket unggulan 'Rp 149.000', border paket aktif, FAQ terbuka, dan eyebrow. Hijau hanya untuk status 'Sudah tiba' dan tren turun/naik positif ('dari 14,6%', '+19%'). Kuning tua untuk 'Belum balas' dan bintang rating. Segmen chart WhatsApp/Instagram/Telepon (bagian 3 atas) adalah kategori bermakna. Teks abu 'Tidak termasuk' sengaja diredam dan masih terbaca."
+         },
+         {
+          "rep": 3,
+          "skor": 2,
+          "bukti": "Merah bata untuk CTA, harga paket unggulan 'Rp 149.000', border kartu Resto, baris aktif 'Berikutnya', dan eyebrow. Hijau untuk 'Sudah tiba' dan tren turun no-show; oranye/amber untuk 'Belum balas', segmen Telepon pada grafik, dan bintang rating, semuanya bermakna. Teks di latar merah muda dan maroon footer tetap kontras."
+         }
+        ]
+       },
+       "R5": {
+        "values": [
+         1,
+         1,
+         1
+        ],
+        "median": 1,
+        "range": 0,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 1,
+          "bukti": "Ikon line seragam di status hero, ikon fitur, chip harga, FAQ, dan sosial footer. Tidak ada emoji. Namun visual utama hero lemah relevansinya: foto restoran Thailand dengan papan 'Kr Thai' dan '…Lanna' serta harga 'B 179' (baht) di bagian 1, untuk produk Indonesia. Foto testimoni kanan (Reza) juga terpotong canggung di dahi (bagian 4)."
+         },
+         {
+          "rep": 2,
+          "skor": 1,
+          "bukti": "Ikon garis satu gaya, tanpa emoji. Namun wadah ikon fitur tidak konsisten (bagian 2): fitur 1 kotak putih, fitur 2 kotak merah solid, fitur 3 kotak tint. Selain itu, foto hero menampilkan restoran Thailand dengan papan 'Thai'/'Lanna' dan menu '฿179' (bagian 1–2), kurang relevan untuk restoran kecil Indonesia. Foto Reza Hakim (bagian 4 kanan) terpotong di dahi."
+         },
+         {
+          "rep": 3,
+          "skor": 1,
+          "bukti": "Ikon garis satu gaya (inbox, lonceng, grid, users, jam, sosial di footer) tanpa emoji. Namun visual utama hero lemah relevansinya: foto restoran bertuliskan 'Thai Lanna Café & Restaurant' dengan harga '฿179' (bagian 1), tidak cocok untuk produk restoran kecil Indonesia. Foto Reza Hakim juga terpotong di dahi (bagian 4)."
+         }
+        ]
+       },
+       "R6": {
+        "values": [
+         2,
+         2,
+         2
+        ],
+        "median": 2,
+        "range": 0,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 2,
+          "bukti": "Angka konsisten. Saluran 239+111+62=412 dengan 58%+27%+15%=100% (bagian 2–3). No-show 14,6%→3,1% sama di kartu hero dan chip fitur. Harga tahunan hemat 2 bulan sesuai: Rp 1.490.000 = 10×149.000 dan Rp 3.490.000 = 10×349.000 (bagian 4). Pengingat '3 jam sebelum' konsisten di hero dan fitur. Copy spesifik: 'cukup membalas 1 untuk hadir atau 2 untuk batal'."
+         },
+         {
+          "rep": 2,
+          "skor": 2,
+          "bukti": "Copy spesifik ('bukan untuk hotel bintang lima', 'membalas 1 untuk hadir atau 2 untuk batal') dan angka konsisten. No-show '14,6% → 3,1%' sama di kartu hero (bagian 2) dan badge fitur. Chart 239+111+62 = 412 dengan 58/27/15% (bagian 2–3). Harga tahunan Rp1.490.000 dan Rp3.490.000 = 10× harga bulanan, sesuai 'hemat 2 bulan' (bagian 4). Tidak ada frasa terlarang."
+         },
+         {
+          "rep": 3,
+          "skor": 2,
+          "bukti": "Angka konsisten: no-show 14,6% → 3,1% muncul di hero dan fitur; 239+111+62 = 412 reservasi dengan 58/27/15%; harga tahunan Resto Rp 1.490.000 = 10× Rp 149.000; uji coba 14 hari konsisten di nav, hero, dan harga. Copy spesifik (balas 1/2, PPN 11%, Dapur Pangsit Lina · 14 meja · Medan)."
+         }
+        ]
+       },
+       "R8": {
+        "values": [
+         2,
+         2,
+         2
+        ],
+        "median": 2,
+        "range": 0,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 2,
+          "bukti": "0 pelanggaran checklist; latar blush ber-tint merah adalah tint brand, bukan krem atau beige. Keputusan khas yang bisa ditunjuk: kartu reservasi dan kartu stat no-show melayang di atas foto restoran pada hero (bagian 1–2), fitur bento asimetris dengan bar saluran reservasi bertumpuk (bagian 2–3), dan harga sebagai tabel perbandingan per baris (bagian 3)."
+         },
+         {
+          "rep": 2,
+          "skor": 2,
+          "bukti": "Tidak ada pelanggaran checklist slop. Ada dua langkah komposisi khas yang bisa ditunjuk. Pertama, kartu daftar reservasi dan kartu statistik '3,1%' mengambang di atas foto restoran full-bleed berbingkai bulat (bagian 1–2). Kedua, fitur berbentuk bento asimetris: satu kartu besar ber-tint berisi bar chart sumber reservasi, plus dua kartu kecil bertumpuk (bagian 2–3)."
+         },
+         {
+          "rep": 3,
+          "skor": 2,
+          "bukti": "Tidak ada pelanggaran checklist: latar ber-tint merah muda brand (bukan krem), fitur berupa bento tidak identik, teks seksi rata kiri, tidak ada frasa terlarang. Langkah khas: pratinjau aplikasi dan kartu statistik '3,1%' melayang di atas foto restoran (bagian 1–2), serta kartu fitur besar dengan grafik batang sumber reservasi (bagian 2–3)."
+         }
+        ]
+       },
+       "R9": {
+        "values": [
+         2,
+         2,
+         2
+        ],
+        "median": 2,
+        "range": 0,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 2,
+          "bukti": "Angka diberi konteks: '3,1% dari 14,6%', '412 reservasi · +18% vs September', 'Rp 6,8 jt ke Rp 8,1 jt', '4,8 dari 5 dari 612 ulasan', dan 'Berdasarkan 1.930 chat bulan Oktober'. Daftar hero menunjukkan variasi status Sudah tiba/Berikutnya/Terkonfirmasi/Belum balas. Paket berisi nilai per baris, testimoni diberi meja dan kota, dan ada catatan PPN di bawah harga."
+         },
+         {
+          "rep": 2,
+          "skor": 2,
+          "bukti": "Angka hampir selalu diberi konteks: '23 dari 28 meja terisi', '412 reservasi · +18% vs September', '18% ke 4% · 3 bulan pertama', 'Rp 6,8 jt ke Rp 8,1 jt', 'Rata-rata 4,8 dari 5 dari 612 ulasan'. Daftar reservasi punya 4 status berbeda dan satu baris 'Berikutnya' yang disorot. Tabel harga per baris berisi nilai atau 'Tidak termasuk'. Testimoni memuat metadata jumlah meja dan kota. FAQ ditambah kartu 'Rata-rata dibalas 6 menit'."
+         },
+         {
+          "rep": 3,
+          "skor": 2,
+          "bukti": "Angka diberi konteks: '3,1% dari 14,6%, Oktober', '412 reservasi · +18% vs September', 'Omzet malam Sabtu Rp 6,8 jt ke Rp 8,1 jt', 'Rata-rata dibalas 6 menit, berdasarkan 1.930 chat bulan Oktober'. Daftar hero menampilkan variasi status. Tabel harga menunjukkan kuota per paket dan 'Tidak termasuk'. Badge 'Paling dipilih · 71% pelanggan'."
+         }
+        ]
+       },
+       "R10": {
+        "values": [
+         2,
+         2,
+         2
+        ],
+        "median": 2,
+        "range": 0,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 2,
+          "bukti": "Permukaan berlapis: bidang ber-tint merah muda di hero, harga, dan FAQ, kartu fitur ber-tint, dan footer merah gelap. Warna kedua bermakna, yaitu hijau untuk tren dan status, dipakai di hero, fitur, dan testimoni; amber untuk peringatan, kategori, dan rating. Chip dan badge berikon terdefinisi. Grafik bar saluran dan foto-foto menyatu dengan komposisi."
+         },
+         {
+          "rep": 2,
+          "skor": 2,
+          "bukti": "Permukaan berlapis: hero, harga, dan FAQ memakai bidang ber-tint merah muda; seksi putih diselingi; footer merah marun gelap (bagian 6). Warna kedua bermakna, yaitu hijau untuk status/tren positif, muncul di hero, fitur, dan testimoni. Badge status dan chip berikon terdefinisi. Foto dan pratinjau aplikasi menyatu dengan komposisi."
+         },
+         {
+          "rep": 3,
+          "skor": 2,
+          "bukti": "Permukaan berlapis: tint merah muda di hero, harga, FAQ, dan kartu fitur; putih; footer maroon gelap. Warna kedua bermakna (hijau positif, amber peringatan/rating) dipakai di hero, fitur, dan testimoni. Chip status berikon terdefinisi. Grafik batang dan foto terintegrasi dengan kartu."
+         }
+        ]
+       }
+      },
+      "total": 15,
+      "slop": {
+       "values": [
+        0,
+        0,
+        0
+       ],
+       "median": 0,
+       "range": 0,
+       "flag": false,
+       "items": [
+        {
+         "rep": 1,
+         "butir": []
+        },
+        {
+         "rep": 2,
+         "butir": []
+        },
+        {
+         "rep": 3,
+         "butir": []
+        }
+       ]
+      },
+      "emoji": {
+       "values": [
+        0,
+        0,
+        0
+       ],
+       "median": 0,
+       "range": 0,
+       "flag": false
+      },
+      "focus": [
+       {
+        "rep": 1,
+        "fokus": "Judul hero rata tengah 'Meja terisi tiap malam, tanpa tamu yang batal diam-diam', bagian 1 atas"
+       },
+       {
+        "rep": 2,
+        "fokus": "Judul hero 'Meja terisi tiap malam, tanpa tamu yang batal diam-diam', tengah atas bagian 1"
+       },
+       {
+        "rep": 3,
+        "fokus": "Headline 'Meja terisi tiap malam, tanpa tamu yang batal diam-diam' di tengah hero, bagian 1"
+       }
+      ]
+     },
+     "pendev": {
+      "criteria": {
+       "R1": {
+        "values": [
+         1,
+         1,
+         1
+        ],
+        "median": 1,
+        "range": 0,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 1,
+          "bukti": "Semua bagian yang diminta ada: navigasi atas (bagian 1), hero dengan judul, subjudul, CTA, dan kartu 'Reservasi malam ini' (bagian 1), 3 fitur (bagian 2), 3 paket harga (bagian 2–3), testimoni dengan foto Ratna (bagian 3–4), FAQ (bagian 4–5), dan footer (bagian 5). Lebar 1440, aksen merah bata, dan Bahasa Indonesia sesuai. Ada 1 seksi ekstra di luar prompt: banner CTA merah 'Siap mengisi meja malam ini?' di bagian 5 sebelum footer."
+         },
+         {
+          "rep": 2,
+          "skor": 1,
+          "bukti": "Semua bagian yang diminta ada: nav, hero dengan pratinjau 'Reservasi malam ini', 3 fitur, 3 paket harga, testimoni dengan foto Ratna Kusumawati, FAQ, footer. Lebar 1440px, aksen merah bata, bahasa Indonesia. Namun ada satu seksi ekstra di luar daftar prompt: banner CTA merah 'Siap mengisi meja malam ini?' di antara FAQ dan footer (bagian 5)."
+         },
+         {
+          "rep": 3,
+          "skor": 1,
+          "bukti": "Semua bagian yang diminta ada: navigasi atas, hero dengan pratinjau 'Reservasi malam ini' (bagian 1), 3 fitur (bagian 2), 3 paket harga (bagian 2–3), testimoni Ratna Kusumawati dengan foto (bagian 3–4), FAQ (bagian 4–5), footer (bagian 5). Lebar 1440px, aksen merah bata, berbahasa Indonesia. Ada satu seksi ekstra di luar daftar prompt: blok CTA merah 'Siap mengisi meja malam ini?' (bagian 5)."
+         }
+        ]
+       },
+       "R2": {
+        "values": [
+         1,
+         1,
+         2
+        ],
+        "median": 1,
+        "range": 1,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 1,
+          "bukti": "Fokus tegas pada judul serif besar 'Meja penuh, malam tenang.' di kiri hero (bagian 1), dengan lompatan skala yang jelas ke subjudul dan judul seksi. Ada 1 judul yatim: 'Harga jujur, tanpa komisi per / tamu.' di bagian 2, dengan kata 'tamu.' sendirian di baris kedua."
+         },
+         {
+          "rep": 2,
+          "skor": 1,
+          "bukti": "Fokus jelas pada judul serif besar hero 'Meja penuh, malam tenang.' (bagian 1 kiri), dengan lompatan skala tegas ke H2 dan body. Ada satu judul yatim: 'Harga jujur, tanpa komisi per / tamu.' menyisakan satu kata 'tamu.' di baris kedua (bagian 2)."
+         },
+         {
+          "rep": 3,
+          "skor": 2,
+          "bukti": "Judul serif besar 'Meja penuh, malam tenang.' di kiri hero (bagian 1) menjadi fokus tunggal. Skala turun tegas ke H2 serif ('Semua yang dibutuhkan dapur kecil…', 'Harga jujur…'), lalu ke judul fitur sans dan body. Setiap judul seksi punya eyebrow dan isi, tidak ada judul yatim."
+         }
+        ]
+       },
+       "R4": {
+        "values": [
+         1,
+         1,
+         2
+        ],
+        "median": 1,
+        "range": 1,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 1,
+          "bukti": "Merah bata konsisten di CTA hero, label eyebrow, ikon fitur, badge 'Paling populer', dan tombol Bistro. Hijau dipakai bermakna untuk metrik naik dan badge 'Hadir'. Ada 1 kelemahan: angka penanda '01/02/03' di kanan atas kolom fitur (bagian 2) berwarna abu sangat terang di atas putih, sehingga kontrasnya lemah. Selain itu, tombol nav 'Coba gratis' berwarna hitam, tidak memakai aksen aksi."
+         },
+         {
+          "rep": 2,
+          "skor": 1,
+          "bukti": "Merah bata konsisten untuk CTA, eyebrow, ikon fitur, badge 'Paling populer', dan tombol FAQ aktif. Hijau dipakai untuk 'Hadir' dan metrik fitur, kuning untuk 'Menunggu'. Satu pemakaian warna tanpa makna: lingkaran avatar inisial di daftar reservasi (BS krem, KW hijau, SM ungu, A& kuning, DL biru; bagian 1 kanan) diwarnai pastel acak, tidak terkait status apa pun."
+         },
+         {
+          "rep": 3,
+          "skor": 2,
+          "bukti": "Merah bata dipakai konsisten untuk CTA 'Mulai gratis 30 hari', tombol paket Bistro, ikon fitur, eyebrow, ikon FAQ aktif, dan band CTA. Hijau hanya untuk tren positif ('Rata-rata +38% reservasi') dan status 'Hadir'; kuning untuk 'Menunggu'. Teks di latar gelap pada testimoni dan footer terbaca jelas."
+         }
+        ]
+       },
+       "R5": {
+        "values": [
+         2,
+         2,
+         2
+        ],
+        "median": 2,
+        "range": 0,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 2,
+          "bukti": "Ikon line dengan satu gaya dan ukuran seragam di tile ber-tint: kalender, grid, lonceng (bagian 2), centang harga, ikon chat FAQ, dan play di tombol demo. Visual utama relevan: pratinjau aplikasi daftar reservasi di hero dan foto pemilik warung di dalam restoran (bagian 3–4). Tidak ada emoji."
+         },
+         {
+          "rep": 2,
+          "skor": 2,
+          "bukti": "Ikon garis satu gaya dan ukuran seragam dalam kotak ber-tint merah (fitur, bagian 2), konsisten dengan ikon tombol dan FAQ. Visual utama relevan: pratinjau aplikasi daftar reservasi di hero dan foto besar pemilik warung di dalam restorannya (bagian 3). Avatar foto ada di 3 testimoni kecil. Tanpa emoji."
+         },
+         {
+          "rep": 3,
+          "skor": 2,
+          "bukti": "Ikon garis satu gaya dengan ukuran seragam: kalender, grid, lonceng di kotak ber-tint (bagian 2), centang di daftar harga, ikon chat di FAQ. Foto pemilik warung di testimoni (bagian 3) relevan dan berkualitas, avatar foto di kartu testimoni kecil. Tidak ada emoji."
+         }
+        ]
+       },
+       "R6": {
+        "values": [
+         1,
+         0,
+         1
+        ],
+        "median": 1,
+        "range": 1,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 1,
+          "bukti": "Copy spesifik: 'Pengingat otomatis via WhatsApp H-1 dan 2 jam sebelumnya', 'Deposit reservasi via QRIS'. Ada 1 inkonsistensi: kartu hero 'Warung Ibu Ratna' menunjukkan '3/12 Meja kosong' (12 meja), sedangkan testimoni menyebut 'Pemilik Warung Ibu Ratna, Yogyakarta · 14 meja' (bagian 3)."
+         },
+         {
+          "rep": 2,
+          "skor": 0,
+          "bukti": "Ada dua kontradiksi angka. Pertama, pratinjau hero menulis 'Warung Ibu Ratna' dengan '3/12 Meja kosong' (12 meja, bagian 1), sedangkan testimoni pemilik warung yang sama menyebut '14 meja' (bagian 3). Kedua, fitur menyatakan 'No-show turun hingga 60%' (bagian 2), tetapi statistik testimoni '−62% tamu tidak datang' (bagian 4) melampaui batas 'hingga' tersebut."
+         },
+         {
+          "rep": 3,
+          "skor": 1,
+          "bukti": "Copy spesifik dan lokal (WhatsApp H-1, QRIS, Warung Ibu Ratna, Yogyakarta). Ada satu inkonsistensi angka: fitur 3 menulis 'No-show turun hingga 60%' (bagian 2), tetapi statistik testimoni menulis '−62% tamu tidak datang' (bagian 4), melebihi batas 'hingga 60%'."
+         }
+        ]
+       },
+       "R8": {
+        "values": [
+         1,
+         1,
+         1
+        ],
+        "median": 1,
+        "range": 0,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 1,
+          "bukti": "Ada 1 pelanggaran slop: latar off-white/krem hangat di hero, harga, dan FAQ. Keputusan khas yang bisa ditunjuk: judul display serif dipadukan dengan seksi testimoni gelap berisi foto besar, kutipan serif, dan baris statistik '−62% / +9 jam / 4,9/5' (bagian 3–4); fitur memakai kolom bernomor bergaris, bukan kartu."
+         },
+         {
+          "rep": 2,
+          "skor": 1,
+          "bukti": "Ada satu pelanggaran slop: latar krem/off-white hangat di hero, harga, dan FAQ (bagian 1–5). Langkah khas tetap ada, yaitu headline serif editorial dan seksi testimoni gelap berisi foto besar, kutipan serif, dan tiga statistik (bagian 3–4). Tetapi satu pelanggaran sudah menurunkan skor ke 1."
+         },
+         {
+          "rep": 3,
+          "skor": 1,
+          "bukti": "Ada satu pelanggaran slop: latar off-white/krem hangat di hero, harga, dan FAQ. Langkah khas yang bisa ditunjuk: headline serif editorial, kartu paket Bistro gelap di tengah, dan seksi testimoni gelap dengan foto besar plus strip statistik."
+         }
+        ]
+       },
+       "R9": {
+        "values": [
+         2,
+         1,
+         2
+        ],
+        "median": 2,
+        "range": 1,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 2,
+          "bukti": "Kartu hero memuat ringkasan (14 reservasi, 46 tamu, 3/12 meja kosong), jam, inisial, jumlah tamu, nomor meja, dan variasi status Hadir/Terkonfirmasi/Menunggu. Setiap fitur punya metrik bertanda tren ('Rata-rata +38% reservasi', 'Hemat 1 jam per shift'). Testimoni diberi kota dan jumlah meja. FAQ dilengkapi jam layanan WIB."
+         },
+         {
+          "rep": 2,
+          "skor": 1,
+          "bukti": "Sebagian bagian kaya: daftar reservasi punya 3 variasi status, tamu, dan nomor meja; testimoni memuat kota dan jumlah meja. Namun banyak angka berdiri tanpa konteks. '14 Reservasi' dan '46 Tamu' di hero tanpa pembanding. 'Rata-rata +38% reservasi' dan 'Hemat 1 jam per shift' (bagian 2) tanpa periode atau dasar. Daftar paket harga hanya berupa daftar centang, bukan perbandingan per atribut (bagian 3)."
+         },
+         {
+          "rep": 3,
+          "skor": 2,
+          "bukti": "Pratinjau hero berisi ringkasan (14 Reservasi, 46 Tamu, 3/12 Meja kosong) dan daftar dengan variasi status Hadir/Terkonfirmasi/Menunggu serta metadata 'x tamu · Meja n'. Tiap fitur punya metrik hasil. Testimoni memuat lokasi, jumlah meja, dan 3 statistik berlabel. Label 'Paling populer', 'Baru', dan jam layanan FAQ melengkapi."
+         }
+        ]
+       },
+       "R10": {
+        "values": [
+         2,
+         2,
+         2
+        ],
+        "median": 2,
+        "range": 0,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 2,
+          "bukti": "Permukaan berlapis: off-white, putih, seksi gelap testimoni dan footer, kartu Bistro gelap, serta banner CTA merah bata. Warna kedua bermakna, yaitu hijau, dipakai di badge 'Hadir' di hero dan metrik tren di fitur. Badge status berwarna terdefinisi (Hadir, Terkonfirmasi, Menunggu, Paling populer, Baru). Foto dan avatar testimoni matang dan menyatu."
+         },
+         {
+          "rep": 2,
+          "skor": 2,
+          "bukti": "Permukaan berlapis: krem, putih, seksi testimoni gelap, kartu harga Bistro gelap, banner CTA merah, dan footer gelap. Warna kedua bermakna, yaitu hijau, dipakai di status 'Hadir' (hero) dan metrik fitur (bagian 2). Badge status, 'Baru', dan 'Paling populer' terdefinisi. Foto testimoni dan pratinjau aplikasi matang dan menyatu."
+         },
+         {
+          "rep": 3,
+          "skor": 2,
+          "bukti": "Permukaan berlapis: latar krem, putih, seksi gelap testimoni dan footer, serta band CTA merah. Warna kedua bermakna (hijau positif) muncul di status hero dan metrik fitur. Badge berwarna terdefinisi ('Baru', 'Paling populer', status reservasi). Ikon ber-tint dan foto menyatu."
+         }
+        ]
+       }
+      },
+      "total": 11,
+      "slop": {
+       "values": [
+        1,
+        1,
+        1
+       ],
+       "median": 1,
+       "range": 0,
+       "flag": false,
+       "items": [
+        {
+         "rep": 1,
+         "butir": [
+          "7: latar off-white/krem hangat di hero (bagian 1), seksi harga (bagian 2–3), dan FAQ (bagian 4–5)"
+         ]
+        },
+        {
+         "rep": 2,
+         "butir": [
+          "7: latar krem/off-white hangat di hero, seksi harga, dan FAQ (bagian 1, 2–3, 4–5)"
+         ]
+        },
+        {
+         "rep": 3,
+         "butir": [
+          "7: latar off-white/krem hangat di hero (bagian 1), seksi harga (bagian 2–3), dan FAQ (bagian 4–5)"
+         ]
+        }
+       ]
+      },
+      "emoji": {
+       "values": [
+        0,
+        0,
+        0
+       ],
+       "median": 0,
+       "range": 0,
+       "flag": false
+      },
+      "focus": [
+       {
+        "rep": 1,
+        "fokus": "Judul serif 'Meja penuh, malam tenang.' di kiri atas hero, bagian 1"
+       },
+       {
+        "rep": 2,
+        "fokus": "Judul serif hero 'Meja penuh, malam tenang.', kiri atas bagian 1"
+       },
+       {
+        "rep": 3,
+        "fokus": "Headline serif 'Meja penuh, malam tenang.' di kiri hero, bagian 1"
+       }
+      ]
+     }
+    }
+   },
+   "decision": {
+    "decision": "Lebih baik",
+    "why": "lolos gerbang, total 15 ≥ 11 + 3, daya tarik 4 ≥ 4",
+    "checks": {
+     "total": {
+      "lakar": 15,
+      "pendev": 11
+     },
+     "appeal": {
+      "lakar": 4,
+      "pendev": 4
+     },
+     "appealLoss": [],
+     "otherLoss": [],
+     "zeroVsTwo": [],
+     "pendevBriefViolations": []
+    }
+   },
+   "emoji": {
+    "lakar": {
+     "agent": 0,
+     "glyphs": 2,
+     "lint": 0,
+     "judge": 0
+    },
+    "pendev": {
+     "agent": 0,
+     "glyphs": 0,
+     "judge": 0
+    }
+   },
+   "pngs": {
+    "lakar": "bench/practice/polish/1/P9-lakar.png",
+    "pendev": "bench/runs/practice-polish/1/P9-pendev.png"
+   },
+   "cost": {
+    "lakar": 1.2479484,
+    "pendev": 0.83792,
+    "pendevCounted": true,
+    "judge": 1.0290374
+   }
+  }
+ ],
+ "outcome": {
+  "pass": false,
+  "passCount": 1,
+  "total": 3,
+  "reasons": [
+   "Setara/Lebih baik 1 dari 3 (< 3)",
+   "P7: waktu Lakar 180.7 dtk > 1.5 × pen.dev 97.5 dtk"
+  ]
+ },
+ "cost": {
+  "pendev": 2.4148570000000005,
+  "lakar": 2.8359726,
+  "judge": 2.2932922,
+  "iteration": 7.5441218,
+  "previous": {},
+  "cumulative": 7.5441218,
+  "budget": 15
+ },
+ "penGuard": {
+  "files": 45,
+  "changed": [],
+  "removed": [],
+  "added": [
+   "/root/.pencil/documents/0775f603-1eac-4061-afd4-6f506f53b015/untitled.pen",
+   "/root/.pencil/documents/2ec5e111-ecb8-4ac4-98c8-1b3a519b57f8/untitled.pen",
+   "/root/.pencil/documents/67121c28-854b-4025-acb6-b59a2ff0c2db/untitled.pen"
+  ]
+ },
+ "lakardActiveAfter": "active",
+ "notes": [
+  "Sebelum run: dokumen Lakar bench lain dipindah ke `bench/runs/lakar-archive/polish-1-20261118T212703Z` (gerak-beranda, kasku-landing), lalu lakard di-restart (pid 1693465 → 1827930)."
+ ],
+ "penDesktopRestart": {
+  "ok": true,
+  "ms": 12763,
+  "detail": "pen-desktop active; MCP pencil menjawab panggilan baca"
+ }
+}
