@@ -4,16 +4,16 @@
 id = 1
 slug = "epic-g0-inti-minimal"
 title = "G0: inti A minimal lolos gerbang A dan B"
-description = "Lakar berjalan sebagai service lokal; Claude Code membuat desain lewat MCP execute dengan layout flex, ikon, check gerbang minimal dan PNG; putaran benchmark A dan B sudah diputuskan terhadap pen.dev."
-covers = ["R1", "R2", "R3", "R4", "R5", "R6", "R7", "R8"]
+description = "Lakar berjalan sebagai service lokal; Claude Code membuat desain lewat MCP execute dengan layout flex, ikon, foto stok lokal, check gerbang minimal dan PNG; juri bench terkalibrasi terhadap penilaian Adam; putaran benchmark A dan B sudah diputuskan terhadap pen.dev."
+covers = ["R1", "R2", "R3", "R4", "R5", "R6", "R7", "R8", "R12"]
 
 [[epic]]
 id = 2
 slug = "epic-g1-inti-lengkap"
 title = "G1: inti A lengkap lolos golden set"
-description = "Seluruh aturan layout_check, skill webapp, foto lokal, dan desain target golden set di Lakar tersedia; putaran benchmark A-E sudah diputuskan terhadap pen.dev."
+description = "Seluruh aturan layout_check, skill webapp, dan desain target golden set di Lakar tersedia; prompt D memakai foto lokal dari G0; putaran benchmark A-E sudah diputuskan terhadap pen.dev."
 covers = ["R5", "R6", "R7", "R9", "R11", "R12"]
-after = [{ epic = 1, needs = "G0 lulus (C4) serta daemon, check, skill, dan harness bench yang dipakai ulang" }]
+after = [{ epic = 1, needs = "G0 lulus di putaran 2 dan dikonfirmasi Adam (C4) serta daemon, foto stok, check, skill, dan harness bench yang dipakai ulang" }]
 
 [[epic]]
 id = 3
