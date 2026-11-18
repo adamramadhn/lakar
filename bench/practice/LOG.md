@@ -390,6 +390,12 @@ perkiraan $7,60, anggaran cukup), lakard di-restart dan active.
   frozen.json = `582c5d11…` (beku). Arsip pra-run memindahkan dokumen sisa iterasi 4 (`dapur-wening-resep`, terhenti).
 - Disiplin execute baru tercapai di mobile (P2 3, P3 2); P1 (landing) dan P4 (dashboard) masih 7–9 execute, tetapi waktu
   tetap ≤ 1,01×. Thumbnail daftar P2 belum berfoto (foto dipakai untuk tile koleksi); avatar header P2 masih inisial.
+- Prinsip v7 yang **tidak** terwujud (catatan review): (a) layar pertama P2 (board `zsVQi7E1`) tidak memuat satu pun
+  butir "Episode baru" utuh — daftar seluruhnya di balik mini player, hanya irisan terpotong "Kopi Pagi · Hari ini" terlihat
+  di celah 8 px antara mini player (y 674–738) dan tab bar (y 746–810); LC-20 tidak menandainya (celah di antara dua bar
+  bertumpuk tidak diperiksa, hanya celah di bawah bar terbawah) sehingga gate 0 walau cacat terlihat; (b) batasan
+  intent-contract "alur 2–4 execute besar (mobile 1–2)" dilanggar P1 (9 execute + `inspect`) dan P4 (7 execute) —
+  lulus AC karena gerbang waktu, bukan karena disiplin execute.
 - Penjaga `.pen`: 41 file, berubah 0, hilang 0, baru 0. lakard active.
 - Biaya iterasi 8: $6,85 (Lakar $3,78 + juri $3,07); kumulatif **$54,94** dari $58,09.
 

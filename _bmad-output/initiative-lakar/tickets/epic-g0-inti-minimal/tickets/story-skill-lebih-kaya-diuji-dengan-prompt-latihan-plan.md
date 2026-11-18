@@ -3,7 +3,7 @@ title: 'Skill lebih kaya diuji dengan prompt latihan'
 type: feature
 ticket: '19'
 created: '2026-11-18'
-status: in-progress
+status: built
 baseline_revision: '97ec58176a5e8d7abf19dddc6f7d6ac79266cc85'
 route: full
 route_source: auto
@@ -33,6 +33,27 @@ deferred:
       PNG P2 iterasi 7 (bench/practice/7/P2-lakar.png) menampilkan butir daftar terpotong di y 810-844; layout-check gate 0. bottomZone mengecualikan Home indicator dan cut hanya memeriksa unit yang mulai di atas tepi atas zona.
     location: >-
       packages/check/src/rules.ts (lc20)
+    severity: medium
+  - summary: >-
+      LC-20 tidak memeriksa celah terbuka di antara dua bar zona bawah yang bertumpuk (mis. mini player dan tab bar mengambang), jadi konten terpotong di celah itu lolos gate.
+    evidence: |-
+      Iterasi 8 P2 board zsVQi7E1: Overlay / Mini player y674-738, Overlay / Tab bar y746-810; PNG menampilkan irisan butir "Kopi Pagi · Hari ini" di celah 8 px, layout-check gate 0. bottomZone menggabungkan anggota bertumpuk menjadi satu blok; sub-cek gap hanya memeriksa di bawah floor (anggota terbawah), dan cut menganggap unit yang mulai di bawah zone.top sudah tertutup penuh.
+    location: >-
+      packages/check/src/rules.ts:463
+    severity: medium
+  - summary: >-
+      Prinsip v7 "daftar layar pertama ≥ 3 butir utuh" tidak dipatuhi agen di P2 iterasi 8 (0 butir utuh di board pertama); thumbnail episode masih bidang warna dan avatar header inisial.
+    evidence: |-
+      bench/practice/8/P2-lakar.png board pertama; dicatat di bench/practice/LOG.md iterasi 8. Perbaikan butuh iterasi skill lain, yang tidak diizinkan (tidak ada iterasi ke-9).
+    location: >-
+      packages/skills/skills/mobile.md
+    severity: medium
+  - summary: >-
+      Batasan intent-contract "alur 2–4 execute besar (mobile 1–2)" dilanggar di iterasi lulus: P1 9 execute + inspect, P4 7 execute, walau skill v7 membatasi landing 4 / app 3.
+    evidence: |-
+      bench/runs/practice/8/P1-lakar/stream.jsonl (execute 9, inspect 1), P4-lakar (execute 7); waktu tetap ≤ 1,01× sehingga gerbang waktu lolos. Penegakan (mis. batas execute di daemon/MCP) di luar story ini; dicatat di LOG.md.
+    location: >-
+      packages/skills/skills/core.md:9
     severity: medium
 ---
 
@@ -217,6 +238,15 @@ Catatan orkestrator lanjutan 2026-11-18 (iterasi 8, ulang penuh iterasi 7; mengg
   - `[low]` `[reject]` `landing.md` masih memuat pola pricing/jadwal (tier/slot, kuota), alur bertahap, dan foto suasana hero yang mirip P1 — pola landing umum yang berlaku untuk banyak produk; "alur bertahap" sudah diputuskan dibiarkan di review sebelumnya (carried); penjaga n-gram C7 lulus.
   - `[low]` `[reject]` Biaya run tanpa `run.json`/`.prev-*` tidak masuk anggaran dan `readJson` bisa melempar pada `run.json` setengah tertulis — carried (biaya `.prev-*`, selisih < $0,30, ditolak di review sebelumnya); `run.json` setengah tertulis belum pernah terjadi (ditulis sekali di akhir run).
 
+### 2026-11-18 — Review pass (iterasi 8, skill v7)
+- verdicts: 4 findings — high 0, medium 3, low 0, false 1, maybe-false 0
+- catatan: diff ditulis sejak baseline 97ec581 tanpa PNG dan tanpa `bench/practice-*.json` (data hasil yang sama dengan `.md`), agar dapat dibaca lens.
+- findings:
+  - `[medium]` `[defer]` LC-20 tidak memeriksa celah di antara dua bar zona bawah bertumpuk (`packages/check/src/rules.ts` `gap`/`bottomZone`); P2 iterasi 8 board `zsVQi7E1` memperlihatkan irisan butir di celah 8 px mini player–tab bar dengan gate 0 — terverifikasi di PNG dan kode (sub-cek gap hanya memeriksa di bawah floor). Kode dari plan perbaikan terpisah (cb88e3e); memperbaikinya tidak dapat diuji ulang di latihan (tidak ada iterasi ke-9) dan akan mengubah gate P2 menjadi gagal (P2 → Kalah; iterasi tetap 3/4 ≥ 3). Ditangguhkan ke `deferred`, dicatat di LOG.md.
+  - `[medium]` `[defer]` P2 iterasi 8 tidak mematuhi prinsip v7 "≥ 3 butir utuh di layar pertama" (0 butir utuh), thumbnail episode bidang warna, avatar inisial — benar (dilihat di PNG); perilaku agen, tidak bisa dipatch tanpa iterasi skill baru. Catatan jujur ditambahkan ke `bench/practice/LOG.md` iterasi 8; ditangguhkan.
+  - `[medium]` `[defer]` Batasan "alur 2–4 execute besar (mobile 1–2)" dilanggar P1 (9 execute + `inspect`) dan P4 (7 execute) — terverifikasi dari stream.jsonl; AC waktu tetap terpenuhi. Catatan ditambahkan ke LOG.md; penegakan di luar story ini; ditangguhkan.
+  - `[false]` `[reject]` Frontmatter `deferred:` usang (arsip run terhenti dan celah di bawah tab bar mengambang sudah diperbaiki di cb88e3e) — perbaikannya mengubah plan build ini sendiri (aturan triage: ditolak); status perbaikan tercatat di Plan Change Log dan Auto Run Result.
+
 ## Design Notes
 
 **Diagnosis (aturan penyebab datar → prinsip baru, kata sendiri):**
@@ -357,3 +387,16 @@ $7,09, perkiraan $5,10) dan/atau perbaikan harness pengarsipan run tanpa `run.js
   + `inspect`) dan P4 (7 execute); thumbnail episode P2 masih bidang warna dan avatar header inisial; di board pertama P2
   sepotong butir daftar tampak di celah antara mini player dan tab bar tetapi LC-20 tidak menandainya (gate 0); Setara P3
   tetap bergantung pada board pen.dev iterasi 2; satu run per prompt (variasi run-ke-run tinggi).
+- Review step-04 (quick, iterasi 8): 4 temuan — 0 patch, 3 defer (LC-20 celah antara bar bertumpuk; P2 layar pertama
+  tanpa butir utuh; disiplin execute P1/P4), 1 ditolak (frontmatter `deferred` usang: perbaikan = edit plan sendiri).
+  Catatan jujur ditambahkan ke `bench/practice/LOG.md`. Follow-up review: tidak (0 patch).
+- Verifikasi orkestrator setelah review: build OK; 801/801 tes (48 file); api.md tanpa beda; protocolHash
+  907cb36f…edb85d; bench/protocol & bench/rubric bersih sejak 97ec581; `round --dry-run` rubric.json: sama; lakard
+  di-restart dan active; `tools/node26/verify.sh` exit 0.
+- PNG dilihat orkestrator (Lakar iterasi 8 vs pen.dev iterasi 2): P1 setara (Lakar konten lebih kaya — mockup kode,
+  jadwal berstatus, kartu harga; pen.dev hero foto lebih hidup; foto mentor Lakar acak/kurang cocok dengan jabatan).
+  P2 di bawah pen.dev: layar pertama tanpa butir episode utuh, irisan terpotong di celah bar, avatar inisial, thumbnail
+  episode bidang warna; tile mix berfoto dan tanpa duplikasi kartu/bilah sudah tercapai. P3 Lakar lebih rapi dari board
+  pertama pen.dev (pen.dev memotong daftar bahan tepat di bawah tab; board kedua pen.dev salah ukuran 390×1656). P4
+  setara (kartu KPI dan jadwal per dokter kaya; jadwal terpotong di bawah tanpa penanda gulir).
+- Status akhir: `built` (menunggu done_checkpoint: Adam melihat PNG).
