@@ -214,3 +214,13 @@ Blocking condition: 3 iterasi latihan selesai tanpa lulus (aturan Design Notes �
 - Skill v4 (prinsip umum): foto dipakai untuk isi nyata dengan satu pencarian `limit:12` per jenis slot dan kueri visual Inggris (orang = kueri potret stok); koleksi cerah bermakna dari `C.data` (aturan "nada redup" dicabut); pendamping/status muncul di ≥ 2 bagian; tanpa potongan/luberan (kartu `hug`, bar = persen × induk, kritik diri memeriksa). `core.md` 3999/4000 token. Build OK, 781/781 tes (48 file), C7 lulus, api.md sama.
 - Iterasi 4 (`--reuse-pendev 2`) dihentikan setelah P1/P2 Lakar (P3 parsial, tanpa juri; ≈ $2,7, kumulatif ≈ $30,5–30,8): setiap unduhan `upload.wikimedia.org` dari daemon dijawab HTTP 429 (HTTP/1.1 + User-Agent tanpa kontak; UA berkontak atau HTTP/2 → 200). Tidak diakali (kontak palsu/ganti protokol = mengakali rate limit; kontak asli = data Adam). Detail: `bench/practice/LOG.md`.
 - Butuh keputusan Adam: info kontak User-Agent untuk Wikimedia (atau penyedia lain), lalu iterasi 5 baru (`practice --iter 5 --reuse-pendev 2`). Verifikasi: protocolHash 907cb36f…, bench/protocol & bench/rubric bersih, `round --dry-run` sha = rubric.json, lakard active, verify.sh exit 0.
+
+### Lanjutan iterasi 5 (2026-11-18): **lulus** — menunggu done_checkpoint (Adam melihat PNG)
+
+- Harness: biaya kumulatif menghitung iterasi tanpa laporan dari run/juri tersimpan (iter 4 $2,66 terhitung; commit 0747216, + tes).
+- Iterasi 5 (`practice --iter 5 --reuse-pendev 2`, skill v4 tanpa perubahan, foto Wikimedia lewat thumbnail standar):
+  P1 Setara (1,22×), P2 Setara (1,01×), P3 Setara (1,26×), P4 Lebih baik (1,29×). Emoji Lakar 0, gate 0 di keempatnya.
+  Biaya $7,35; kumulatif $37,81 dari $57,80. Iterasi 6 tidak dijalankan.
+- Verifikasi: build OK, 781/781 tes (48 file, sebelum run), api.md sama, protocolHash 907cb36f…edb85d, bench/protocol &
+  bench/rubric tidak berubah, `round --dry-run` sha = rubric.json, penjaga .pen berubah/hilang 0, lakard active, verify.sh exit 0.
+- Laporan: bench/practice-5.md; PNG Lakar bench/practice/5/; PNG pen.dev lokal bench/runs/practice/2/. LOG: bench/practice/LOG.md.

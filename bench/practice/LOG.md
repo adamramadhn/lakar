@@ -200,3 +200,36 @@ Skill: `core.md` `39be8af8dcb0ad25`, `landing.md` `f0049a9b76822eea`, `mobile.md
   memakai thumbnail bucket standar dari path pratinjau `thumb.wikimedia.org` (maks 3840 JPEG/WebP, 1920 PNG); file asli
   tidak pernah diunduh. Uji langsung lewat `PhotoService` hasil build: 3/3 foto `wikimedia:` terimpor (1920 px).
 - Iterasi 4 tercatat `aborted` (tidak dijuri). Lanjut iterasi 5 baru `--iter 5 --reuse-pendev 2`; iterasi 6 terakhir.
+
+## Iterasi 5: skill v4 (tanpa perubahan), foto Wikimedia berfungsi — **lulus**
+
+Perubahan skill: tidak ada. Skill v4 (iterasi 4) belum pernah dijuri karena iterasi 4 dihentikan oleh kegagalan unduhan
+foto, jadi iterasi 5 menguji v4 apa adanya dengan impor Wikimedia lewat thumbnail standar (commit fada52e). Alasan: hanya
+infrastruktur foto yang berubah sejak iterasi 4; mengubah skill sebelum v4 dinilai berarti menebak tanpa bukti.
+
+Harness (commit 0747216): biaya kumulatif kini menghitung iterasi tanpa laporan dari `run.json`/`rep.json` tersimpan,
+sehingga iterasi 4 ($2,66 = P1 $1,79 + P2 $0,87) ikut terhitung. P3 parsial iterasi 4 tidak punya catatan biaya
+(perkiraan < $0,30) dan tidak terhitung.
+
+Skill: `core.md` `39be8af8dcb0ad25`, `landing.md` `f0049a9b76822eea`, `mobile.md` `0e06e3ff150f7560` (HEAD `0747216`).
+Run: `practice --iter 5 --reuse-pendev 2`. Prompt sha di frozen.json = `582c5d11…` (beku).
+
+| Prompt | Rasio waktu | T Lakar / pen.dev | D Lakar / pen.dev | Emoji | Gate | Keputusan |
+|---|---|---|---|---|---|---|
+| P1 | 1,22× | 15 / 13 | 4 / 4 | 0/0/0 | 0 | Setara |
+| P2 | 1,01× | 13 / 12 | 3 / 3 | 0/0/0 | 0 | Setara |
+| P3 | 1,26× | 14 / 15 | 3 / 4 | 0/0/0 | 0 | Setara |
+| P4 | 1,29× | 15 / 12 | 4 / 4 | 0/0/0 | 0 | Lebih baik |
+
+- Foto: impor Wikimedia berhasil (tanpa 429). Foto hero/mentor (P1), foto hidangan + avatar pengulas (P3), avatar
+  dokter (P4). Satu pencarian NOT_FOUND di P1 tidak diulang. Tidak ada teks kredit/atribusi di UI dokumen Lakar.
+- Kelemahan yang tersisa (catatan untuk story berikut, bukan diperbaiki di sini): P2 sampul episode masih monogram
+  dan permukaan gelap netral tanpa tint aksen (R10 = 1); P3 permukaan putih berbingkai dengan warna kedua hanya di satu
+  bagian (R10 = 1).
+- Penjaga `.pen`: berubah 0, hilang 0. lakard active.
+- Biaya iterasi 5: $7,35 (Lakar $4,39, juri $2,96); kumulatif **$37,81** dari $57,80.
+
+## Status: **lulus** di iterasi 5 (4 dari 4 Setara/Lebih baik)
+
+Iterasi 6 tidak dijalankan. Menunggu Adam melihat PNG (done_checkpoint): Lakar `bench/practice/5/<P>-lakar.png`,
+pen.dev lokal `bench/runs/practice/2/<P>-pendev.png`.
