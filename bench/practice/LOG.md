@@ -233,3 +233,17 @@ Run: `practice --iter 5 --reuse-pendev 2`. Prompt sha di frozen.json = `582c5d11
 
 Iterasi 6 tidak dijalankan. Menunggu Adam melihat PNG (done_checkpoint): Lakar `bench/practice/5/<P>-lakar.png`,
 pen.dev lokal `bench/runs/practice/2/<P>-pendev.png`.
+
+## Iterasi 6: skill v5 (validasi skill akhir setelah review)
+
+Review (lensa quick) atas iterasi 5 menemukan beberapa contoh/rincian skill v4 yang terlalu dekat dengan prompt latihan
+(contoh kueri foto bertema makanan/musik, "angkatan", "mentor", "tile 2 × 3", "pemutar"). Walau lolos penjaga C7, ini
+melanggar semangat "tanpa tambalan per prompt". Perubahan v5 (bukan perbaikan mutu, hanya menetralkan):
+
+- Contoh kueri foto diganti domain contoh skill sendiri (kopi/roti); orang = "testimoni, tim, profil"; pricing "tier atau
+  slot jadwal" dengan keadaan "sisa kuota, tanggal, habis/tersedia"; bilah menempel "keranjang, proses berjalan"; "tile
+  lebih kecil" tanpa ukuran grid.
+- Bug prelude: `Badge` dengan nada tak dikenal (mis. `info`) jatuh ke aksen, bukan `undefined`.
+
+Iterasi 6 (`--reuse-pendev 2`) menguji skill akhir ini agar hasil yang dilaporkan berasal dari skill yang di-commit.
+Skill: `core.md` 8f2fe336bcb1c7dc, `landing.md` b953c1b2bae4a8d4, `mobile.md` 38aa49528f9c464f.

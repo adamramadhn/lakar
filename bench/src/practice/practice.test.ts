@@ -32,7 +32,7 @@ const HAVE_SOURCES = existsSync(DESIGN_MD_PATH) && existsSync(GOLDEN_SET_PATH);
 const { prompts } = loadPracticePrompts();
 
 describe('practice: argumen', () => {
-  it('iter wajib, maks 3; only, reuse-pendev (< iter), resume, dry-run', () => {
+  it('iter wajib, maks 6; only, reuse-pendev (< iter), resume, dry-run', () => {
     expect(parsePracticeArgs(['--iter', '1'])).toEqual({ ok: true, value: { iter: 1, only: undefined, reusePendev: undefined, resume: false, dryRun: false } });
     expect(parsePracticeArgs(['--', '--iter=2', '--only', 'P1,P3,P1', '--reuse-pendev', '1', '--resume', '--dry-run'])).toEqual({
       ok: true,

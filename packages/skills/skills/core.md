@@ -34,7 +34,7 @@ const I=(p,icon,size=20,color=C.t2,o={})=>add(p,{type:'icon',lib:'lucide',icon,s
 const Btn=(p,label,kind='primary',o={})=>{const pri=kind==='primary';
  const b=Row(p,'Button / '+label,{height:48,padding:[0,24],gap:8,justify:'center',radius:8,fills:fill(pri?C.acc:C.bg),...(pri?{}:{stroke:line(C.line2)}),...o});
  T(b,'Label',label,'label',{color:pri?C.on:C.t1});return b;};
-const Badge=(p,label,tone='accent',icon)=>{const fg={accent:C.acc,success:C.ok,warning:C.warn,danger:C.bad,neutral:C.t2,extra:C.acc2}[tone];
+const Badge=(p,label,tone='accent',icon)=>{const fg={accent:C.acc,success:C.ok,warning:C.warn,danger:C.bad,neutral:C.t2,extra:C.acc2}[tone]??C.acc;
  const b=Row(p,'Badge / '+label,{width:'hug',height:24,padding:[0,8],gap:4,radius:9999,fills:fill(tone==='neutral'?C.sub:fg+'1F')});
  if(icon)I(b,icon,14,fg);T(b,'Teks',label,'caption',{color:fg});return b;};
 ```
@@ -111,7 +111,7 @@ Font terpasang (weight): Inter 100–900, DM Sans 100–900, Plus Jakarta Sans 2
 - Kartu: padding 24 (mobile 16), radius 12, border; header kartu boleh memuat `Badge` metrik. Chip 32 radius full.
 - Wadah ikon: tint + ikon aksen, atau solid aksen + ikon `C.on` untuk butir ditekankan. Rating: `star` `filled:true` `acc2` + angka.
 - Avatar 32/40/48 radius full: foto orang; inisial hanya cadangan kecil. Logo: wadah 32 aksen + ikon + wordmark h4, bukan path.
-- Foto: wajib untuk isi nyata (orang, tempat, makanan, produk, media) di hero, sampul, kartu konten, avatar; bukan ikon fitur/UI abstrak. Kueri 2–3 kata benda Inggris yang visual: tempat/objek/suasana (`fried rice plate`, `concert stage lights`); orang = `portrait woman unsplash` / `portrait man unsplash`, bukan nama/jabatan/rapat. Pilih dari pratinjau: berwarna, kontemporer, subjek jelas, CC0/PD dulu; foto berbeda per butir. `const p=photo('<ref>')` (literal) → `fills:[{type:'image',assetId:p.assetId,fit:'cover'}]` pada `Image / …` berukuran tetap; maks 6 foto baru per execute. Kredit tidak di UI kecuali diminta (metadata aset; sebut di ringkasan).
+- Foto: wajib untuk isi nyata (orang, tempat, makanan, produk, media) di hero, sampul, kartu konten, avatar; bukan ikon fitur/UI abstrak. Kueri 2–3 kata benda Inggris yang visual: tempat/objek/suasana (`coffee beans bag`, `bakery counter`); orang = `portrait woman unsplash` / `portrait man unsplash`, bukan nama/jabatan/rapat. Pilih dari pratinjau: berwarna, kontemporer, subjek jelas, CC0/PD dulu; foto berbeda per butir. `const p=photo('<ref>')` (literal) → `fills:[{type:'image',assetId:p.assetId,fit:'cover'}]` pada `Image / …` berukuran tetap; maks 6 foto baru per execute. Kredit tidak di UI kecuali diminta (metadata aset; sebut di ringkasan).
 - Pencarian gagal: pengganti tampak selesai, bukan label "Foto …" atau inisial di area besar. Hero: mockup produk/kartu data; sampul: bidang cerah `C.data` + tipografi tebal; tanpa ilustrasi rakitan ikon/bentuk.
 
 ## 12 anti-pattern

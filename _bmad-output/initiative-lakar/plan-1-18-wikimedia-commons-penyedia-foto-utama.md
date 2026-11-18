@@ -103,6 +103,11 @@ deferred: []
 
 ## Plan Change Log
 
+- 2026-11-18 (dari story 1.19, commit fada52e) — Impor Wikimedia **tidak lagi** mengunduh file asli: `upload.wikimedia.org`
+  menjawab klien otomatis dengan HTTP 429 dan meminta thumbnail ukuran standar (https://w.wiki/GHai). `wikimediaImportUrl`
+  kini selalu memakai bucket standar terbesar < lebar asli dari path `thumb.wikimedia.org` (maks 3840 JPEG/WebP, 1920 PNG).
+  Teks Design Notes/Ringkasan di bawah yang menyebut "impor = asli" sudah usang.
+
 - 2026-11-18 (implementasi): penyesuaian kecil di luar teks plan:
   - Pola non-foto memakai batas kata dan bentuk jamak (`\bmaps?\b`, `\bscans?\b`, …) supaya tidak salah cocok di dalam kata lain (mis. "scan" di "Scandinavia", "icon" di "iconic").
   - URL impor: bila lebar ≤ 3840 tetapi `size` > 12 MiB, dipakai bucket standar terbesar yang < lebar asli (maks 3840 JPEG/WebP, 1920 PNG), karena Wikimedia tidak memperbesar thumbnail. Untuk lebar > 3840 hasilnya sama dengan plan (`3840px-`/`1920px-`).

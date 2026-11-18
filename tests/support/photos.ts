@@ -106,7 +106,7 @@ const UTM = '?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_conten
 /** ID halaman Wikimedia palsu per kasus. */
 export const WIKI = {
   bySa: 1001, // relevansi 1, CC BY-SA, 4000 lebar → impor turunan 3840px
-  cc0: 1002, // CC0, 3000 lebar, 2 MiB → impor URL asli
+  cc0: 1002, // CC0, 3000 lebar, 2 MiB → impor thumbnail 1920px
   featured: 1003, // Featured pictures → naik
   bw: 1004, // hitam-putih → turun
   spam1: 1005,

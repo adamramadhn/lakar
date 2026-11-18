@@ -448,7 +448,7 @@ describe('Wikimedia Commons', () => {
     expect(plainText('<a href="x">Petar Milo&#353;evi&#x107;</a>&nbsp;&amp; <b>tim</b>')).toBe('Petar Milošević & tim');
   });
 
-  it('URL impor: asli bila ≤ 3840 & ≤ 12 MiB; selain itu bucket 3840 (JPEG/WebP) / 1920 (PNG); turunan gagal → undefined', () => {
+  it('URL impor: selalu bucket standar terbesar < lebar asli (maks 3840 JPEG/WebP, 1920 PNG); terlalu kecil/turunan gagal → undefined', () => {
     const t = 'https://thumb.wikimedia.org/wikipedia/commons/thumb/8/81/X.jpg/330px-X.jpg';
     const url = 'https://upload.wikimedia.org/wikipedia/commons/8/81/X.jpg';
     expect(wikimediaImportUrl({ url, thumbUrl: t, width: 2709, size: 3_000_000, mime: 'image/jpeg' })).toBe(t.replace('/330px-', '/1920px-'));
