@@ -9,7 +9,7 @@ import { loadProtocol } from '../protocol.js';
 import type { TimedLine } from '../stream-metrics.js';
 import { timedLines, toolResultEvent, toolUseEvent } from '../../../tests/support/stream.ts';
 import { LakardClient } from './lakard-client.js';
-import { boardSizeProblems, findCommittedSlug, lakarPreflightProblems, runLakar, snapshotLakarDocs } from './run.js';
+import { boardSizeProblems, boardSizeProblemsFor, findCommittedSlug, lakarPreflightProblems, runLakar, snapshotLakarDocs } from './run.js';
 
 const protocol = loadProtocol();
 const L = (evs: unknown[]): TimedLine[] => timedLines(evs, 100);
@@ -54,6 +54,12 @@ describe('preflight dan ukuran board', () => {
     expect(boardSizeProblems('B', [{ id: 'b', width: 390, height: 844 }, { id: 'c', width: 390, height: 844 }])).toEqual([]);
     expect(boardSizeProblems('B', [{ id: 'b', width: 390, height: 900 }])).toEqual(['board b 390×900 ≠ 390×844']);
     expect(boardSizeProblems('B', [])).toEqual(['tidak ada board']);
+    // Spesifikasi eksplisit (prompt latihan): tinggi null = bebas; prompt tanpa spesifikasi hanya cek ada board.
+    expect(boardSizeProblemsFor({ width: 1440, height: 900 }, [{ id: 'd', width: 1440, height: 1024 }])).toEqual(['board d 1440×1024 ≠ 1440×900']);
+    expect(boardSizeProblemsFor({ width: 1440, height: null }, [{ id: 'l', width: 1440, height: 7000 }])).toEqual([]);
+    expect(boardSizeProblemsFor({ width: 390, height: 844 }, [{ id: 'm', width: 375, height: 844 }])).toEqual(['board m 375×844 ≠ 390×844']);
+    expect(boardSizeProblemsFor(undefined, [{ id: 'x', width: 1, height: 1 }])).toEqual([]);
+    expect(boardSizeProblems('C', [{ id: 'x', width: 1, height: 1 }])).toEqual([]);
   });
 });
 
@@ -236,6 +242,14 @@ describe('arsip dokumen bench lama (slug bentrok)', () => {
       put('uji-2/B-lakar', { slug: 'gerak-beranda', opened: ['gerak-beranda', '../jahat'] });
       put('1/A-lakar', { slug: 'putaran-ini' });
       expect(benchLakarSlugs(rounds, '1')).toEqual(['gerak-beranda', 'gerak-coba', 'kasku-landing']);
+      // Multi-root: latihan (runs/practice/<iter>) ikut; yang dikecualikan hanya dir <root>/<id> yang sedang berjalan.
+      const practice = join(root, 'practice');
+      mkdirSync(join(practice, '1', 'P1-lakar'), { recursive: true });
+      writeFileSync(join(practice, '1', 'P1-lakar', 'run.json'), JSON.stringify({ lakar: { slug: 'latihan-satu', opened: ['latihan-satu'] } }));
+      mkdirSync(join(practice, '2', 'P2-lakar'), { recursive: true });
+      writeFileSync(join(practice, '2', 'P2-lakar', 'run.json'), JSON.stringify({ lakar: { slug: 'latihan-dua' } }));
+      expect(benchLakarSlugs([rounds, practice], { root: rounds, id: '1' })).toEqual(['gerak-beranda', 'gerak-coba', 'kasku-landing', 'latihan-dua', 'latihan-satu']);
+      expect(benchLakarSlugs([rounds, practice], { root: practice, id: '2' })).toEqual(['gerak-beranda', 'gerak-coba', 'kasku-landing', 'latihan-satu', 'putaran-ini']);
 
       const data = join(root, 'data');
       mkdirSync(join(data, 'docs'), { recursive: true });

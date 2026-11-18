@@ -4,6 +4,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { BENCH_ROOT } from '../protocol.js';
+import type { BoardSpec } from '../lakar/run.js';
 import { sha256 } from '../sys.js';
 
 export const PRACTICE_DIR = join(BENCH_ROOT, 'practice');
@@ -16,8 +17,6 @@ export const CLOSING_SENTENCE =
 export const PRACTICE_ID = /^P[1-9]$/;
 
 export type PracticeKind = 'landing' | 'mobile' | 'dashboard';
-/** Ukuran mengikat: lebar selalu, tinggi bila bukan null (landing = tinggi bebas). */
-export type BoardSpec = { width: number; height: number | null };
 export type PracticePrompt = { id: string; name: string; kind: PracticeKind; text: string; size: BoardSpec };
 
 /** Validasi bentuk (murni). */

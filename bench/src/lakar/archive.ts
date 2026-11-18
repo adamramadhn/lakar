@@ -11,28 +11,34 @@ import { SLUG_PATTERN } from '@lakar/schema';
 const LAKAR_RUN_DIR = /^[A-Za-z0-9]+-lakar(\.prev-.+)?$/;
 
 /**
- * Slug dokumen Lakar yang dibuat/dibuka agen di putaran bench selain `currentRound` (dari `run.json`:
- * `lakar.slug` + `lakar.opened`, karena `open_doc` membuat dokumen yang belum ada). Terurut, unik.
+ * Slug dokumen Lakar yang dibuat/dibuka agen di putaran bench (dir run di bawah setiap root: `runs/rounds/<round>`,
+ * `runs/practice/<iter>`) selain putaran yang sedang berjalan (dari `run.json`: `lakar.slug` + `lakar.opened`, karena
+ * `open_doc` membuat dokumen yang belum ada). `exclude` string = ID putaran di root pertama (perilaku lama);
+ * `{root, id}` = dir `<root>/<id>` saja. Terurut, unik.
  */
-export function benchLakarSlugs(roundsRoot: string, currentRound: string): string[] {
+export function benchLakarSlugs(roots: string | readonly string[], exclude: string | { root: string; id: string }): string[] {
+  const list = typeof roots === 'string' ? [roots] : roots;
+  const ex = typeof exclude === 'string' ? { root: list[0], id: exclude } : exclude;
   const out = new Set<string>();
-  if (!existsSync(roundsRoot)) return [];
-  for (const round of readdirSync(roundsRoot)) {
-    if (round === currentRound) continue;
-    const rdir = join(roundsRoot, round);
-    if (!statSync(rdir).isDirectory()) continue;
-    for (const d of readdirSync(rdir)) {
-      if (!LAKAR_RUN_DIR.test(d)) continue;
-      const f = join(rdir, d, 'run.json');
-      if (!existsSync(f)) continue;
-      let rec: { lakar?: { slug?: unknown; opened?: unknown } };
-      try {
-        rec = JSON.parse(readFileSync(f, 'utf8'));
-      } catch {
-        continue;
+  for (const root of list) {
+    if (!existsSync(root)) continue;
+    for (const round of readdirSync(root)) {
+      if (root === ex.root && round === ex.id) continue;
+      const rdir = join(root, round);
+      if (!statSync(rdir).isDirectory()) continue;
+      for (const d of readdirSync(rdir)) {
+        if (!LAKAR_RUN_DIR.test(d)) continue;
+        const f = join(rdir, d, 'run.json');
+        if (!existsSync(f)) continue;
+        let rec: { lakar?: { slug?: unknown; opened?: unknown } };
+        try {
+          rec = JSON.parse(readFileSync(f, 'utf8'));
+        } catch {
+          continue;
+        }
+        const cands = [rec.lakar?.slug, ...(Array.isArray(rec.lakar?.opened) ? rec.lakar!.opened : [])];
+        for (const s of cands) if (typeof s === 'string' && SLUG_PATTERN.test(s)) out.add(s);
       }
-      const cands = [rec.lakar?.slug, ...(Array.isArray(rec.lakar?.opened) ? rec.lakar!.opened : [])];
-      for (const s of cands) if (typeof s === 'string' && SLUG_PATTERN.test(s)) out.add(s);
     }
   }
   return [...out].sort();

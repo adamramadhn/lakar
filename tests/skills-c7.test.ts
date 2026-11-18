@@ -5,17 +5,23 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { GOLDEN_SET_PATH, PROTOCOL_DIR, forbiddenPhrases, forbiddenSources, loadProtocol, words } from '../bench/src/protocol.ts';
+import { loadPracticePrompts } from '../bench/src/practice/prompts.ts';
 
 const ROOT = join(import.meta.dirname, '..');
 const SKILLS = join(ROOT, 'packages/skills/skills');
 const DESIGN_PATH = join(ROOT, '_bmad-output/initiative-lakar/ux-lakar/DESIGN.md');
 const ALLOW_MISSING = process.env.LAKAR_C7_ALLOW_MISSING_SOURCES === '1';
 
-/** Token terlarang di skill (bahasa penilaian, nama produk prompt, label rubrik). */
+const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+/** Prompt latihan beku (story 19): teksnya sumber terlarang, nama produknya token terlarang. */
+const practice = loadPracticePrompts().prompts;
+
+/** Token terlarang di skill (bahasa penilaian, nama produk prompt golden dan latihan, label rubrik R1–R10). */
 export const SKILL_FORBIDDEN_TOKENS: readonly RegExp[] = [
   /rubrik|\bjuri\b|kriteria|golden|\bskor|benchmark|pen\.dev|pencil|Lampiran B/i,
-  /\bR[1-8]\b/,
+  /\bR(?:[1-9]|10)\b/,
   /\bKasku\b|\bGerak\b/,
+  new RegExp(practice.map((p) => `\\b${escapeRe(p.name)}\\b`).join('|'), 'i'),
 ];
 
 type Sources = { texts: string[]; missing: string[] };
@@ -34,6 +40,7 @@ function loadSources(): Sources {
   const promptsPath = join(PROTOCOL_DIR, 'prompts.json');
   if (existsSync(promptsPath)) texts.push(...Object.values(loadProtocol().prompts).filter((p): p is string => typeof p === 'string'));
   else missing.push(promptsPath);
+  texts.push(...practice.map((p) => p.text));
   return { texts, missing };
 }
 
@@ -80,6 +87,8 @@ describe('C7: isi skill bebas sumber terlarang', () => {
       expect(skillC7Problems(synthetic, phrases)).toContain(`frasa sumber terlarang: "${sample}"`);
     } else expect(ALLOW_MISSING).toBe(true);
     expect(skillC7Problems('teks netral tentang kopi', phrases)).toEqual([]);
-    for (const t of ['skor akhir', 'lolos R3', 'nilai juri', 'Kasku', 'lihat pen.dev']) expect(skillC7Problems(t, phrases).length, t).toBeGreaterThan(0);
+    const practicePhrase = words(practice[0]!.text).slice(4, 10).join(' ');
+    expect(skillC7Problems(`Catatan: ${practicePhrase}.`, phrases)).toContain(`frasa sumber terlarang: "${practicePhrase}"`);
+    for (const t of ['skor akhir', 'lolos R3', 'naik di R9', 'R10 penuh', 'nilai juri', 'Kasku', 'lihat pen.dev', ...practice.map((p) => `contoh ${p.name}`)]) expect(skillC7Problems(t, phrases).length, t).toBeGreaterThan(0);
   });
 });

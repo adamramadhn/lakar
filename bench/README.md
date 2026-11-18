@@ -13,6 +13,7 @@ dan laporan `bench/round-<id>.md|json`, `bench/score-<prompt>.md|json`.
 /opt/node-26/bin/node bench/dist/cli.js round --round <uji-k|n> [--dry-run] [--resume]
 /opt/node-26/bin/node bench/dist/cli.js rejudge --from <uji-k|n> --label <slug> [--resume] [--dry-run]
 /opt/node-26/bin/node bench/dist/cli.js rubric-snapshot [--version <v>]
+/opt/node-26/bin/node bench/dist/cli.js practice --iter <k> [--only P1,P3] [--reuse-pendev <j>] [--resume] [--dry-run]
 ```
 
 ## Rubrik juri (v2) dan snapshot
@@ -48,6 +49,34 @@ rubrik saat ini, tanpa agen desain: hanya `claude -p` juri (3 ulangan per prompt
   (sumber, model, Claude Code, HEAD, versi rubrik, sha per prompt, skor median + rentang, T dan D, keputusan v2 vs
   keputusan sumber vs keputusan Adam, bukti R9/R10 per ulangan, pelanggaran brief pen.dev, biaya). Untuk `--from 1`
   laporan juga menilai ambang lulus kalibrasi yang ditetapkan sebelum run; putaran lain = hold-out, hanya dilaporkan.
+
+## Latihan skill (`practice`)
+
+Latihan menguji revisi skill Lakar pada empat prompt latihan (`bench/practice/prompts.json`, P1–P4, bukan A–E) dengan
+runner, pembungkus (`bench/protocol/wrapper.txt`, read-only), dan juri rubrik v2.1 yang sama dengan `round`.
+**Latihan bukan gerbang G0**: keputusan G0 hanya dari putaran resmi A/B. Hasilnya dipakai untuk mengiterasi skill.
+
+- **Prompt beku:** sha256 `prompts.json` dikunci di `bench/src/practice/prompts.ts` (`PRACTICE_PROMPTS_SHA256`);
+  loader menolak isi lain. Tes `tests/practice-prompts.test.ts`: sha, tanpa n-gram 6 kata prompt A–E (kalimat penutup baku
+  dibuang), tanpa frasa Kriteria/Prosedur/Risiko golden atau token terlarang, nama produk tidak ada di golden-set.
+  `tests/skills-c7.test.ts` memperlakukan teks dan nama produk latihan sebagai sumber/token terlarang untuk skill.
+- **Juri:** teks juri dibangun tanpa kriteria golden (`buildJudgeTextWith(design, undefined, prompt)`: bagian kriteria
+  diganti satu kalimat netral). Preflight mewajibkan rubrik `rubric.json` = 2.1 = baris versi Lampiran B dan sha
+  Lampiran B = snapshot, lalu penjaga bocor + C7 juri (target `c7Targets` + prompt latihan hasil render).
+- **Run:** per prompt pen.dev (lewat `runOne`, dokumen baru terverifikasi) lalu Lakar; satu run per alat per prompt per
+  iterasi (C8). Sebelum run, dokumen Lakar bench lain (`runs/rounds` + `runs/practice`) diarsip dan lakard **selalu**
+  di-restart, lalu `startedAt` wajib > mtime `packages/*/dist` terbaru. `frozen.json` mencatat HEAD, porcelain, sha skill,
+  sha dist, versi claude/pen.dev, sha prompt dan teks juri.
+- **Keputusan:** strip → juri 3× → `aggregateScores` → `decide` v2 dengan `lakarGate` memakai wall pen.dev prompt yang
+  sama sebagai baseline waktu (≤ 1,5×) dan ukuran dari spesifikasi prompt (`boardSizeProblemsFor`). Iterasi lulus bila
+  Lakar Setara/Lebih baik di ≥ 3 dari 4 prompt dan di setiap prompt waktu ≤ 1,5 × pen.dev, emoji Lakar (a)/(b)/(c) = 0,
+  layout_check gate = 0.
+- **`--reuse-pendev <j>`:** run pen.dev iterasi j dipakai apa adanya (tercatat di laporan, biayanya tidak dihitung ulang);
+  iterasi sumber tidak lengkap → Abort sebelum spawn. `--resume` hanya mengulang run `aborted`/`invalid`.
+- **Anggaran:** iterasi maks 3; biaya kumulatif (dari `bench/practice-<j>.json`) + perkiraan sisa > $30 → Abort.
+- **Keluaran:** `bench/practice-<k>.md|json` (tracked), strip Lakar `bench/practice/<k>/<P>-lakar.png` (tracked,
+  eksklusif), artefak mentah dan strip/`.pen` pen.dev lokal di `bench/runs/practice/<k>/` (EULA). Log iterasi skill:
+  `bench/practice/LOG.md`.
 
 ## Batasan
 

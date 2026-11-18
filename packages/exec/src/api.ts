@@ -566,14 +566,14 @@ export const API: { readonly [K in keyof LakarApi]: ApiFunction } = {
       "Foto stok untuk ref dari tool photo_search (mis. 'pexels:2014422' atau 'openverse:<uuid>'). Tulis ref sebagai literal string di kode " +
       "(photo('pexels:2014422')), bukan variabel: daemon mengunduhnya sekali ke store aset lokal sebelum snippet berjalan, lalu render hanya memakai file lokal. " +
       "Pakai assetId di fill {type:'image', assetId, fit:'cover'} pada frame/rect bernama 'Image / …'; width/height = ukuran piksel asli; " +
-      'credit = baris kredit siap pakai (cantumkan bila lisensi meminta atribusi, mis. CC BY).',
+      'credit = baris kredit siap pakai. Atribusi sudah tercatat di metadata aset: kredit tidak ditampilkan di UI kecuali pengguna memintanya; sebut di ringkasan akhir.',
     returns: '{assetId, width, height, credit, license, creator, sourcePageUrl}',
     errors: ['NOT_FOUND', 'SCHEMA_INVALID'],
     example:
       `${BOARD}\nconst p = photo('pexels:2014422');\n` +
       "const k = add(b, {type:'frame', name:'Kartu', layout:'column', gap:8, padding:16, width:'fill'});\n" +
       "add(k, {type:'rect', name:'Image / Kamar', width:'fill', height:200, radius:12, fills:[{type:'image', assetId:p.assetId, fit:'cover'}]});\n" +
-      "add(k, {type:'text', name:'Kredit', content:p.credit, size:12, lineHeight:16, color:'#667085'});",
+      "add(k, {type:'text', name:'Judul', content:'Kamar deluks, 2 tamu', size:16, lineHeight:24, weight:600, color:'#101828'});",
     call(ctx, [ref]) {
       if (typeof ref !== 'string' || !PHOTO_REF_PATTERN.test(ref)) {
         throw new LakarError('SCHEMA_INVALID', `photo: ref harus 'pexels:<id>' atau 'openverse:<uuid>', bukan ${show(ref)}`, {

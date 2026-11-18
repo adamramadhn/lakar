@@ -6,12 +6,12 @@ Board `1440 × bebas` (`screen:'landing'`). Mulai dengan tinggi besar (mis. 2000
 
 - Wrapper `Halaman` (kolom, `width:'fill'`) langsung di board; setiap seksi `Seksi / …` lebar fill dengan padding horizontal 80 (konten maks 1280, gutter 24). Ritme: padding vertikal seksi 96–128; judul seksi ↔ isi 32–48; antar-kartu 24; dalam grup 12–16; ikon ↔ teks 4–8.
 - **Navbar 72:** logo kiri (wadah 32 aksen + ikon + wordmark), 3–5 tautan `Link /` body-sm, kanan satu tombol sekunder + satu primer (tinggi 40). Garis bawah satu sisi.
-- **Hero ≥ 640:** headline display ≤ 3 baris berupa klaim hasil, bukan nama fitur; subjudul body-lg ≤ 2 baris; satu CTA primer + satu sekunder; baris penguat kecil di bawah CTA (mis. "Gratis ongkir 3 kali pertama"). Visual hero adalah anak frame hero dan menyatu dengan latarnya (mockup produk di `Crop / …` yang terpotong tepi bawah), bukan kartu berbingkai di kolom terpisah.
+- **Hero ≥ 640** di bidang merek (`C.field`) atau putih: headline display ≤ 3 baris berupa klaim hasil, bukan nama fitur; subjudul body-lg ≤ 2 baris; satu CTA primer + satu sekunder; baris penguat kecil di bawah CTA (mis. "Gratis ongkir 3 kali pertama"). Visual hero adalah anak frame hero dan menyatu dengan latarnya: mockup produk di `Crop / …` terpotong tepi bawah, atau foto suasana nyata (`Image /`, radius 16–24) dengan 1–2 kartu data kecil `Overlay /` di atasnya. Bukan kartu berbingkai di kolom terpisah.
 - **Header seksi:** overline aksen → h2 → body-lg secondary, lebar ≤ 720. Rata kiri atau tengah, konsisten.
-- **Ritme:** dua seksi bersebelahan tidak boleh berstruktur sama (variasikan: bento, dua kolom teks + visual, daftar langkah, tabel banding, seksi gelap). Dalam grid ≥ 3 kartu, minimal satu kartu berbeda lebar atau memuat elemen non-teks.
-- **Kartu fitur:** ikon 24 di wadah tint 48, judul h4, deskripsi body-sm, opsional satu detail konkret (angka, durasi, harga).
-- **Testimoni:** kutipan spesifik (hasil + konteks), nama, peran/usaha, kota. Rating: ikon `star` dengan `filled:true`, atau angka + satu bintang.
-- **Pricing:** 2–4 tier. Tier unggulan ditonjolkan satu cara (latar gelap/aksen atau border aksen) + badge; CTA-nya primer, tier lain sekunder. Harga h1/display-lg tabular, fitur dengan ikon `check`. Kartu tier sama tinggi (`align:'stretch'` pada baris), CTA sejajar di bawah (`justify:'space-between'`). Label CTA dengan maksud sama memakai teks yang sama di seluruh halaman.
+- **Ritme:** dua seksi bersebelahan tidak boleh berstruktur sama (variasikan: bento, dua kolom teks + visual, daftar langkah, tabel banding, seksi bidang merek). Latar seksi bergantian putih → `C.field` → putih → `C.deep` (teks `C.on`/terang, satu seksi saja), bukan abu polos. Dalam grid ≥ 3 kartu, minimal satu kartu berbeda lebar, ditekankan (bidang/solid), atau memuat elemen non-teks.
+- **Kartu fitur/langkah:** ikon 24 di wadah 48 (tint; solid aksen untuk butir yang ditekankan), judul h4, deskripsi body-sm, dan satu detail konkret berpembanding (angka, durasi, harga) atau `Badge`. Alur bertahap: nomor/penanda tahap + garis penghubung, tahap kini disorot.
+- **Orang (testimoni, mentor, tim):** foto avatar 48–64 atau foto potret kartu; kutipan spesifik (hasil + konteks: angka sebelum → sesudah), nama, peran/usaha, kota. Rating: ikon `star` `filled:true` warna `C.acc2` + angka. Kartu orang tidak kembar: satu kartu sorotan (bidang/lebih lebar) atau metrik hasil berwarna.
+- **Pricing/jadwal:** 2–4 tier atau angkatan. Unggulan ditonjolkan satu cara (`C.deep` dengan teks terang + bayangan md, atau border aksen) + `Badge`; CTA-nya primer, lainnya sekunder. Keadaan tiap pilihan terlihat (sisa kursi, tanggal mulai, penuh/buka). Harga h1/display-lg tabular, fitur dengan ikon `check`. Kartu tier sama tinggi (`align:'stretch'` pada baris), CTA sejajar di bawah (`justify:'space-between'`). Label CTA dengan maksud sama memakai teks yang sama di seluruh halaman.
 - **CTA penutup** (boleh `Ekstra /`) dan **footer:** logo + satu kalimat, 3–4 kolom tautan, hak cipta; tautan sosial dengan logo simple-icons atau teks.
 
 ## Alur execute
@@ -23,7 +23,7 @@ Board `1440 × bebas` (`screen:'landing'`). Mulai dengan tinggi besar (mis. 2000
 
 ## Contoh teruji
 
-Board, navbar, dan hero (langkah khas: mockup jadwal pengiriman terpotong tepi hero):
+Board, navbar, dan hero di bidang merek (langkah khas: mockup jadwal pengiriman terpotong tepi hero; baris memperlihatkan keadaan):
 
 ```js
 // pakai prelude
@@ -43,7 +43,7 @@ const act=Row(nav,'Aksi',{gap:12});
 Btn(act,'Masuk','secondary',{height:40,padding:[0,16]});
 Btn(act,'Coba sampel','primary',{height:40,padding:[0,16]});
 // Hero
-const hero=F(page,'Seksi / Hero',{width:'fill',padding:[96,80,0,80],gap:64,align:'center',fills:fill(C.sub)});
+const hero=F(page,'Seksi / Hero',{width:'fill',padding:[96,80,0,80],gap:64,align:'center',fills:fill(C.field)});
 const copy=F(hero,'Hero / Teks',{width:800,gap:24,align:'center'});
 T(copy,'Overline','LANGGANAN BIJI KOPI UNTUK KAFE','overline',{color:C.acc});
 T(copy,'Headline','Biji segar tiba tiap Senin, disangrai 72 jam sebelumnya','display-lg',{width:'fill',align:'center'});
@@ -57,22 +57,24 @@ const crop=F(hero,'Crop / Dasbor',{width:1040,height:320,clip:true});
 const app=F(crop,'Mockup / Dasbor',{width:'fill',height:'hug',padding:24,gap:20,radius:[16,16,0,0],fills:fill(C.bg),stroke:line(),shadows:[{x:0,y:4,blur:16,color:'#10182814'}]});
 const top=Row(app,'Header',{width:'fill',justify:'space-between'});
 T(top,'Judul','Pengiriman minggu ini','h4');
-const chip=Row(top,'Badge / Status',{gap:6,padding:[2,8],radius:9999,fills:fill(C.tint)});
-add(chip,{type:'ellipse',name:'Titik',width:6,height:6,fills:fill(C.acc)});
-T(chip,'Teks','Disangrai Jumat','caption',{color:C.acc});
+const meta=Row(top,'Meta',{gap:8});
+Badge(meta,'36,5 kg · +4 kg vs minggu lalu','success','trending-up');
+Badge(meta,'Disangrai Jumat','accent','flame');
 const rows=F(app,'Daftar',{width:'fill'});
-for(const [n,k,q] of [['Kafe Teras, Bandung','Gayo · medium','12 kg'],['Ruang Seduh, Jakarta','Kintamani · light','8 kg'],['Pojok Arang, Bogor','Toraja · medium-dark','6,5 kg'],['Kopi Lantai Dua, Malang','Gayo · espresso','10 kg']]){
- const r=Row(rows,'Baris / '+n,{width:'fill',height:56,gap:16,stroke:{...line(),sides:['bottom']}});
- const ic=Row(r,'Ikon',{width:32,height:32,radius:8,justify:'center',fills:fill(C.sub)}); I(ic,'package',16);
+// Daftar memperlihatkan keadaan: tiba (selesai), dikemas (berikutnya, disorot), stok tipis (peringatan)
+for(const [n,k,q,st,tone,ic,hot] of [['Kafe Teras, Bandung','Gayo · medium','12 kg','Tiba Senin','success','circle-check',0],['Ruang Seduh, Jakarta','Kintamani · light','8 kg','Dikemas','accent','package',1],['Pojok Arang, Bogor','Toraja · medium-dark','6,5 kg','Stok 2 hari','warning','triangle-exclamation-point',0],['Kopi Lantai Dua, Malang','Gayo · espresso','10 kg','Terjadwal','neutral','calendar',0]]){
+ const r=Row(rows,'Baris / '+n,{width:'fill',height:56,gap:16,padding:[0,12],radius:8,fills:fill(hot?C.tint:C.bg)});
+ const w=Row(r,'Ikon',{width:32,height:32,radius:8,justify:'center',fills:fill(hot?C.acc:C.sub)}); I(w,ic,16,hot?C.on:C.t2);
  T(r,'Cabang',n,'body-sm',{width:'fill',weight:500});
  T(r,'Biji',k,'body-sm',{width:200,color:C.t2});
- T(r,'Jumlah',q,'body-sm',{numeric:'tabular'});
+ T(r,'Jumlah',q,'body-sm',{width:64,numeric:'tabular'});
+ const sc=Row(r,'Status',{width:136,justify:'end'}); Badge(sc,st,tone);
 }
 keep.page=page;
 b
 ```
 
-Seksi fitur bento: satu kartu lebar berisi linimasa + dua kartu sempit (bukan tiga kartu kembar):
+Seksi fitur bento: satu kartu lebar berisi stok berpembanding + linimasa, dua kartu sempit (satu ditekankan), bukan tiga kartu kembar:
 
 ```js
 // pakai prelude
@@ -83,15 +85,15 @@ T(head,'Overline','CARA KERJA','overline',{color:C.acc});
 T(head,'Judul','Dari sangrai ke rak bar dalam tiga hari','h2',{width:'fill'});
 T(head,'Deskripsi','Setiap kiriman membawa tanggal sangrai, profil, dan saran resep. Barista tahu kapan biji mencapai puncak rasa.','body-lg',{width:'fill',color:C.t2});
 const grid=Row(s,'Grid fitur',{width:'fill',gap:24,align:'stretch'});
-const big=F(grid,'Kartu / Jadwal',{width:'fill',padding:32,justify:'space-between',radius:12,fills:fill(C.sub)});
+const big=F(grid,'Kartu / Jadwal',{width:'fill',padding:32,justify:'space-between',radius:12,fills:fill(C.field)});
 const bt=F(big,'Teks',{width:'fill',gap:12});
 T(bt,'Judul','Jadwal sangrai mengikuti stok tiap cabang','h3',{width:'fill'});
 T(bt,'Deskripsi','Sistem membaca sisa stok dari kasir dan menggeser jumlah kiriman sebelum biji habis.','body',{width:480,color:C.t2});
 const st=F(big,'Stok',{width:'fill',padding:16,gap:12,radius:8,fills:fill(C.bg)});
 const sr=Row(st,'Baris',{width:'fill',justify:'space-between'});
-T(sr,'Label','Stok Kafe Teras','body-sm',{color:C.t2}); T(sr,'Nilai','3,1 kg dari 12 kg','label',{numeric:'tabular'});
+T(sr,'Label','Stok Kafe Teras','body-sm',{color:C.t2}); Badge(sr,'3,1 dari 12 kg · habis Kamis','warning','triangle-exclamation-point');
 const bar=Row(st,'Bar',{width:'fill',height:8,radius:9999,fills:fill(C.line)});
-add(bar,{type:'rect',name:'Isi',width:196,height:8,radius:9999,fills:fill(C.acc)}); // 3,1 / 12 ≈ 26% × 760
+add(bar,{type:'rect',name:'Isi',width:196,height:8,radius:9999,fills:fill(C.warn)}); // 3,1 / 12 ≈ 26% × 760
 const tl=Row(big,'Linimasa',{width:'fill',gap:12});
 for(const [d,t,on] of [['Jum','Sangrai',1],['Sab','Istirahat',1],['Min','Dikemas',1],['Sen','Tiba di kafe',0]]){
  const c=F(tl,'Langkah / '+t,{width:'fill',padding:16,gap:4,radius:8,fills:fill(on?C.bg:C.acc)});
@@ -99,17 +101,17 @@ for(const [d,t,on] of [['Jum','Sangrai',1],['Sab','Istirahat',1],['Min','Dikemas
  T(c,'Status',t,'label',{color:on?C.t1:C.on});
 }
 const side=F(grid,'Kolom kanan',{width:400,gap:24});
-for(const [ic,j,dsc,det] of [['flame','Profil sangrai per menu','Espresso, filter, dan susu punya kurva sendiri.','3 profil tersimpan'],['receipt','Tagihan ikut pemakaian','Bulan sepi, tagihan turun otomatis.','Rp 186.000 / kg rata-rata']]){
- const k=F(side,'Kartu / '+j,{width:'fill',padding:24,gap:12,radius:12,stroke:line()});
- const w=Row(k,'Ikon',{width:48,height:48,radius:12,justify:'center',fills:fill(C.tint)}); I(w,ic,24,C.acc);
+for(const [ic,j,dsc,det,tone,hot] of [['flame','Profil sangrai per menu','Espresso, filter, dan susu punya kurva sendiri.','3 profil tersimpan','accent',1],['receipt','Tagihan ikut pemakaian','Bulan sepi, tagihan turun otomatis.','Rp 186.000/kg · −6% vs Q1','success',0]]){
+ const k=F(side,'Kartu / '+j,{width:'fill',padding:24,gap:12,radius:12,stroke:line(),...(hot?{shadows:[{x:0,y:4,blur:16,color:'#10182814'}]}:{})});
+ const w=Row(k,'Ikon',{width:48,height:48,radius:12,justify:'center',fills:fill(hot?C.acc:C.tint)}); I(w,ic,24,hot?C.on:C.acc);
  T(k,'Judul',j,'h4');
  T(k,'Deskripsi',dsc,'body-sm',{width:'fill',color:C.t2});
- T(k,'Detail',det,'label',{color:C.acc});
+ Badge(k,det,tone);
 }
 ```
 
-Execute penutup setelah screenshot: tinggi dari `bounds` seksi terakhir (y 908 + tinggi 872), lalu lepas `[WIP] `:
+Execute penutup setelah screenshot: tinggi dari `bounds` seksi terakhir (y 908 + tinggi 880), lalu lepas `[WIP] `:
 
 ```js
-update(keep.board, {height:1780, name:'Biji Pagi / Beranda · landing · Jernih'});
+update(keep.board, {height:1788, name:'Biji Pagi / Beranda · landing · Jernih'});
 ```

@@ -227,10 +227,25 @@ export const JUDGE_JSON_SHAPE = `{
   "Y": { ...bentuk yang sama... }
 }`;
 
-/** Teks juri untuk satu prompt. `promptText` = teks prompt tanpa pembungkus. */
+/**
+ * Pengganti bagian kriteria golden untuk prompt tanpa kriteria khusus (prompt latihan, story 19): satu kalimat netral.
+ * Teks A/B tidak memakainya (tetap byte-identik dengan `bench/rubric/rubric.json`).
+ */
+export const NO_CRITERIA_SENTENCE =
+  'Prompt ini tidak punya daftar kriteria khusus. Nilai setiap R hanya dari deskripsi kolom 2, 1, dan 0 di tabel di atas, dengan prompt sebagai patokan isi yang diminta.';
+
+/** Teks juri untuk satu prompt golden (kriteria dari golden-set). `promptText` = teks prompt tanpa pembungkus. */
 export function buildJudgeText(designMd: string, goldenMd: string, promptId: string, promptText: string): JudgeTextParts {
+  return buildJudgeTextWith(designMd, extractCriteria(goldenMd, promptId), promptText);
+}
+
+/**
+ * Teks juri dengan kriteria opsional. `criteria` = butir kriteria golden bernomor (A/B); `undefined` = prompt tanpa
+ * kriteria khusus: bagian kriteria diganti `NO_CRITERIA_SENTENCE`.
+ */
+export function buildJudgeTextWith(designMd: string, criteria: readonly string[] | undefined, promptText: string): JudgeTextParts {
   const r = extractRubric(designMd);
-  const criteria = extractCriteria(goldenMd, promptId);
+  const criteriaPart = criteria ? ['## Kriteria golden untuk prompt ini', '', ...criteria] : [NO_CRITERIA_SENTENCE];
   const secretParts = [
     '## Aturan skor',
     '',
@@ -240,9 +255,7 @@ export function buildJudgeText(designMd: string, goldenMd: string, promptId: str
     '',
     r.oneR,
     '',
-    '## Kriteria golden untuk prompt ini',
-    '',
-    ...criteria,
+    ...criteriaPart,
     '',
     '## Bukti',
     '',

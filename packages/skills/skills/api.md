@@ -189,7 +189,7 @@ add(b, {type:'icon', lib:m.lib, icon:m.icon, size:24});
 
 `photo(ref: string): {assetId, width, height, credit, license, creator, sourcePageUrl}`
 
-Foto stok untuk ref dari tool photo_search (mis. 'pexels:2014422' atau 'openverse:<uuid>'). Tulis ref sebagai literal string di kode (photo('pexels:2014422')), bukan variabel: daemon mengunduhnya sekali ke store aset lokal sebelum snippet berjalan, lalu render hanya memakai file lokal. Pakai assetId di fill {type:'image', assetId, fit:'cover'} pada frame/rect bernama 'Image / …'; width/height = ukuran piksel asli; credit = baris kredit siap pakai (cantumkan bila lisensi meminta atribusi, mis. CC BY).
+Foto stok untuk ref dari tool photo_search (mis. 'pexels:2014422' atau 'openverse:<uuid>'). Tulis ref sebagai literal string di kode (photo('pexels:2014422')), bukan variabel: daemon mengunduhnya sekali ke store aset lokal sebelum snippet berjalan, lalu render hanya memakai file lokal. Pakai assetId di fill {type:'image', assetId, fit:'cover'} pada frame/rect bernama 'Image / …'; width/height = ukuran piksel asli; credit = baris kredit siap pakai. Atribusi sudah tercatat di metadata aset: kredit tidak ditampilkan di UI kecuali pengguna memintanya; sebut di ringkasan akhir.
 
 - Mengembalikan: {assetId, width, height, credit, license, creator, sourcePageUrl}
 - Error: NOT_FOUND, SCHEMA_INVALID
@@ -199,7 +199,7 @@ const b = add(null, {type:'board', name:'Beranda', x:0, y:0, width:390, height:8
 const p = photo('pexels:2014422');
 const k = add(b, {type:'frame', name:'Kartu', layout:'column', gap:8, padding:16, width:'fill'});
 add(k, {type:'rect', name:'Image / Kamar', width:'fill', height:200, radius:12, fills:[{type:'image', assetId:p.assetId, fit:'cover'}]});
-add(k, {type:'text', name:'Kredit', content:p.credit, size:12, lineHeight:16, color:'#667085'});
+add(k, {type:'text', name:'Judul', content:'Kamar deluks, 2 tamu', size:16, lineHeight:24, weight:600, color:'#101828'});
 ```
 
 ## Global lain

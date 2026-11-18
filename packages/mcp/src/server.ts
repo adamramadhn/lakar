@@ -161,7 +161,7 @@ export const EXECUTE_DESCRIPTION =
   'place(w, h, {near?, gap?}) → {x,y} posisi board baru yang tidak tumpang tindih (gap default 80); ' +
   "iconSearch(query, {lib?:'lucide'|'simple-icons', limit?}) → [{lib, icon, tags?, title?, aliasOf?}] cari ikon (default 10, maks 50; sama dengan tool icon_search). " +
   "photo('<ref>') → {assetId, width, height, credit, license, creator, sourcePageUrl} foto stok untuk ref dari tool photo_search; tulis ref sebagai literal string " +
-  "(daemon mengunduhnya sekali ke aset lokal sebelum snippet berjalan; ref dari variabel → NOT_FOUND), pakai di fills [{type:'image', assetId:p.assetId, fit:'cover'}]. " +
+  "(daemon mengunduhnya sekali ke aset lokal sebelum snippet berjalan; ref dari variabel → NOT_FOUND), pakai di fills [{type:'image', assetId:p.assetId, fit:'cover'}]; credit untuk ringkasan akhir, bukan node UI kecuali diminta. " +
   'keep: objek JSON per sesi yang bertahan antar-execute bila sukses (mis. keep.hero = add(...); lalu get(keep.hero)). ' +
   'console.log(...) → data.logs. Nilai ekspresi terakhir → data.value (JSON; dipotong di 32 KB dengan valueTruncated). ' +
   "Katalog node v1 (tertutup): board (parent null) {type:'board', name, x, y, width, height, screen:'landing'|'app'|'mobile', expectedSize?:{width,height}, fills?}; " +
@@ -200,15 +200,16 @@ export const PHOTO_THUMBNAILS_MAX = 6;
 
 /** Deskripsi tool `photo_search`. */
 export const PHOTO_SEARCH_DESCRIPTION =
-  'Cari foto stok nyata untuk gambar di desain (sampul, kartu, hero, avatar tempat). Photos provided by Pexels; tanpa key Pexels, ' +
+  'Cari foto stok nyata untuk gambar di desain (sampul, kartu, hero, avatar orang/tempat, makanan, produk; bukan ikon fitur). Photos provided by Pexels; tanpa key Pexels, ' +
   'cadangan Openverse (hanya CC0, Public Domain Mark, CC BY dari Flickr/Wikimedia). ' +
   'Mengembalikan teks JSON {provider, fallbackReason?, query, results:[{ref, width, height, alt, avgColor?, creator, license, sourcePageUrl, credit}], previews} ' +
   `lalu thumbnail pratinjau (maks ${PHOTO_THUMBNAILS_MAX} gambar; previews:[ref] di JSON = urutan gambar). ` +
   "Pakai di execute: const p = photo('<ref>'); lalu fills:[{type:'image', assetId:p.assetId, fit:'cover'}] pada frame/rect bernama 'Image / …'. " +
   'Ref ditulis literal di kode; foto diunduh sekali ke aset lokal saat execute (maks 6 foto baru per execute), render tidak memakai jaringan. ' +
-  'credit = baris kredit siap pakai (wajib dicantumkan untuk CC BY; untuk Pexels dianjurkan bila ada tempat). ' +
-  'Kata kunci boleh Indonesia atau Inggris; Openverse lebih cocok dengan kata kunci Inggris. orientation: landscape | portrait | square. ' +
-  'Tidak ada hasil → NOT_FOUND; penyedia sibuk/gagal → EXEC_ERROR (retryable) dengan hint.';
+  'Dahulukan kandidat CC0/PDM bila ada, lalu Pexels; CC BY hanya bila tidak ada pilihan lain. ' +
+  'credit = baris kredit siap pakai; atribusi (pembuat, lisensi, sumber) tercatat di metadata aset saat impor, jadi kredit tidak ditampilkan di UI kecuali pengguna memintanya; sebut kredit di ringkasan akhir. ' +
+  'Pakai kata kunci Inggris yang konkret (Openverse berindeks Inggris). orientation: landscape | portrait | square. ' +
+  'Cari di awal (maks 2 pencarian per desain, paralel, sebelum execute pertama). Tidak ada hasil → NOT_FOUND; penyedia sibuk/gagal → EXEC_ERROR (retryable): satu percobaan saja, lalu pakai blok gambar pengganti.';
 
 export function createLakarMcpServer(daemonUrl: string): McpServer {
   const client = new DaemonClient(daemonUrl);

@@ -77,15 +77,28 @@ export function findCommittedSlug(lines: readonly TimedLine[], server = LAKAR_SE
   return { slug: committed, opened };
 }
 
-/** Ukuran board mengikat (gerbang): A semua board lebar 1440; B semua board 390×844. */
-export function boardSizeProblems(promptId: string, boards: readonly { id: string; width: number; height: number }[]): string[] {
+/** Ukuran board mengikat: lebar selalu, tinggi bila bukan null (landing = tinggi bebas). */
+export type BoardSpec = { width: number; height: number | null };
+
+/** Spesifikasi ukuran prompt golden A/B (A lebar 1440, B 390×844). Prompt lain: tidak ada spesifikasi. */
+export const GOLDEN_BOARD_SPECS: Readonly<Record<string, BoardSpec>> = { A: { width: 1440, height: null }, B: { width: 390, height: 844 } };
+
+/** Masalah ukuran board terhadap spesifikasi (murni). Tanpa board → masalah; tanpa spesifikasi → hanya cek ada board. */
+export function boardSizeProblemsFor(spec: BoardSpec | undefined, boards: readonly { id: string; width: number; height: number }[]): string[] {
   if (!boards.length) return ['tidak ada board'];
+  if (!spec) return [];
   const out: string[] = [];
   for (const b of boards) {
-    if (promptId === 'A' && b.width !== 1440) out.push(`board ${b.id} lebar ${b.width} ≠ 1440`);
-    if (promptId === 'B' && (b.width !== 390 || b.height !== 844)) out.push(`board ${b.id} ${b.width}×${b.height} ≠ 390×844`);
+    if (spec.height === null) {
+      if (b.width !== spec.width) out.push(`board ${b.id} lebar ${b.width} ≠ ${spec.width}`);
+    } else if (b.width !== spec.width || b.height !== spec.height) out.push(`board ${b.id} ${b.width}×${b.height} ≠ ${spec.width}×${spec.height}`);
   }
   return out;
+}
+
+/** Ukuran board mengikat (gerbang): A semua board lebar 1440; B semua board 390×844. */
+export function boardSizeProblems(promptId: string, boards: readonly { id: string; width: number; height: number }[]): string[] {
+  return boardSizeProblemsFor(GOLDEN_BOARD_SPECS[promptId], boards);
 }
 
 export type LakarExtra = {

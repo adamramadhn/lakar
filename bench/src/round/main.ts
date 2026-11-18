@@ -93,14 +93,14 @@ export function officialFreezeProblems(i: OfficialFreezeInput): string[] {
 }
 
 /** Dir `packages/<nama>/dist` yang ada (nama terurut). */
-function distDirs(): [string, string][] {
+export function distDirs(): [string, string][] {
   return readdirSync(PACKAGES_DIR)
     .sort()
     .map((n) => [n, join(PACKAGES_DIR, n, 'dist')] as [string, string])
     .filter(([, d]) => existsSync(d));
 }
 
-function newestDistMtime(): number | undefined {
+export function newestDistMtime(): number | undefined {
   const ms = distDirs().map(([, d]) => newestMtimeMs(d)).filter((x): x is number => x !== undefined);
   return ms.length ? Math.max(...ms) : undefined;
 }
@@ -306,7 +306,7 @@ export function harnessErrorStatus(agentRan: boolean): 'failed' | 'aborted' {
 }
 
 /** Tunggu lakard hidup lagi setelah restart: pid baru dan pool render siap (≤ 90 dtk). */
-async function waitLakard(client: LakardClient, oldPid: number, timeoutMs = 90_000): Promise<LakardStatus> {
+export async function waitLakard(client: LakardClient, oldPid: number, timeoutMs = 90_000): Promise<LakardStatus> {
   const until = Date.now() + timeoutMs;
   let last = 'belum menjawab';
   while (Date.now() < until) {
@@ -322,14 +322,14 @@ async function waitLakard(client: LakardClient, oldPid: number, timeoutMs = 90_0
   throw new Abort(`lakard tidak siap ${timeoutMs / 1000} dtk setelah restart (${last})`);
 }
 
-function runRecordPath(dir: string): string {
+export function runRecordPath(dir: string): string {
   return join(dir, 'run.json');
 }
 
-type StoredRun = RunRecord & { lakar?: RoundRun['record']['lakar']; pendevSystemd?: { before: SystemdInfo; after: SystemdInfo } };
+export type StoredRun = RunRecord & { lakar?: RoundRun['record']['lakar']; pendevSystemd?: { before: SystemdInfo; after: SystemdInfo } };
 
 /** Bangun RoundRun dari dir run (dipakai juga saat --resume). */
-function roundRunFrom(roundDir: string, key: string, prompt: string, tool: Tool, rec: StoredRun, previous: string[]): RoundRun {
+export function roundRunFrom(roundDir: string, key: string, prompt: string, tool: Tool, rec: StoredRun, previous: string[]): RoundRun {
   const dir = join(roundDir, key);
   const lines = loadTimedLines(dir);
   const lakar = rec.lakar;
@@ -352,7 +352,7 @@ function roundRunFrom(roundDir: string, key: string, prompt: string, tool: Tool,
 }
 
 /** Strip PNG dari frame/board run (urutan dokumen). Ditulis ke `<roundDir>/<key>.png`. */
-function writeStrip(roundDir: string, run: RoundRun): DesignImages | undefined {
+export function writeStrip(roundDir: string, run: RoundRun): DesignImages | undefined {
   const pngs = run.record.frames.flatMap((f) => (f.png ? [join(REPO_ROOT, f.png)] : []));
   if (!pngs.length || pngs.length !== run.record.frames.length) return undefined;
   const strip = buildStrip(pngs.map((p) => readFileSync(p)));
@@ -516,7 +516,7 @@ export async function roundMain(argv: string[]): Promise<number> {
   // Dokumen Lakar buatan putaran bench lain: dipindah ke arsip bench sebelum run agar slug pilihan agen tidak bentrok
   // (`dokumen lama` → invalid). Dokumen non-bench tidak disentuh.
   const archiveDir = join(RUNS_ROOT, 'lakar-archive', `${round}-${stamp()}`);
-  const archivePlan = planLakarArchive(status.dataDir, benchLakarSlugs(join(RUNS_ROOT, 'rounds'), round), archiveDir);
+  const archivePlan = planLakarArchive(status.dataDir, benchLakarSlugs([join(RUNS_ROOT, 'rounds'), join(RUNS_ROOT, 'practice')], { root: join(RUNS_ROOT, 'rounds'), id: round }), archiveDir);
   console.log(`\narsip dokumen Lakar bench lama (sebelum run, lalu restart lakard): ${archivePlan.length ? archivePlan.map((x) => relative(status!.dataDir, x.from)).join(', ') : '-'}`);
   const preFreeze = official ? officialFreezeProblems(freezeInput(status, false)) : [];
   if (official) {
