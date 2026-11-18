@@ -198,7 +198,6 @@ Keputusan G0 final: menunggu konfirmasi Adam (sementara: gagal).
 - skill \`core.md\` sha256 \`aa\`
 - \`G0_RULES\`: \`{}\`
 - sha256 \`packages/check/dist\`: \`cc\`
-- sha256 \`packages/check/dist\`: \`c1\`
 - sha256 \`packages/daemon/dist\`: \`d1\`
 - pen.dev desktop: 1.2.23; MCP server: pencil 1.0.0
 - Juri: model \`claude-opus-5-5\`; argv \`claude -p\`

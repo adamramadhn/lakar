@@ -1,6 +1,6 @@
-# Skor juri prompt A (putaran uji-1)
+# Skor juri prompt A (putaran 1)
 
-Juri LLM buta, 3 ulangan dengan label X/Y diacak. Keputusan **Lebih baik** (sementara, menunggu konfirmasi Adam): lolos gerbang, total 10 ≥ 6 + 2.
+Juri LLM buta, 3 ulangan dengan label X/Y diacak. Keputusan **Lebih baik** (sementara, menunggu konfirmasi Adam): lolos gerbang, total 9 ≥ 6 + 2.
 
 Ulangan valid: 3 dari 3.
 
@@ -9,18 +9,18 @@ Ulangan valid: 3 dari 3.
 | Kriteria | Alat | Ulangan 1 | Ulangan 2 | Ulangan 3 | Median | Rentang | Periksa |
 |---|---|---|---|---|---|---|---|
 | R1 | Lakar | 2 | 2 | 2 | 2 | 0 |  |
-| R1 | pen.dev | 2 | 1 | 1 | 1 | 1 |  |
-| R2 | Lakar | 2 | 2 | 2 | 2 | 0 |  |
-| R2 | pen.dev | 1 | 2 | 1 | 1 | 1 |  |
+| R1 | pen.dev | 2 | 2 | 2 | 2 | 0 |  |
+| R2 | Lakar | 1 | 1 | 1 | 1 | 0 |  |
+| R2 | pen.dev | 1 | 1 | 1 | 1 | 0 |  |
 | R4 | Lakar | 1 | 1 | 1 | 1 | 0 |  |
-| R4 | pen.dev | 1 | 1 | 1 | 1 | 0 |  |
+| R4 | pen.dev | 1 | 0 | 0 | 0 | 1 |  |
 | R5 | Lakar | 2 | 2 | 2 | 2 | 0 |  |
 | R5 | pen.dev | 1 | 1 | 1 | 1 | 0 |  |
-| R6 | Lakar | 2 | 2 | 2 | 2 | 0 |  |
+| R6 | Lakar | 1 | 1 | 1 | 1 | 0 |  |
 | R6 | pen.dev | 1 | 1 | 1 | 1 | 0 |  |
-| R8 | Lakar | 2 | 1 | 1 | 1 | 1 |  |
+| R8 | Lakar | 2 | 2 | 2 | 2 | 0 |  |
 | R8 | pen.dev | 1 | 1 | 1 | 1 | 0 |  |
-| **Total** | Lakar |  |  |  | **10** | | |
+| **Total** | Lakar |  |  |  | **9** | | |
 | **Total** | pen.dev |  |  |  | **6** | | |
 
 ## Slop dan emoji menurut juri
@@ -28,7 +28,7 @@ Ulangan valid: 3 dari 3.
 | Alat | Slop (median, rentang) | Emoji terlihat (median, rentang) |
 |---|---|---|
 | Lakar | 0 (rentang 0) | 0 (rentang 0) |
-| pen.dev | 1 (rentang 0) | 1 (rentang 0) |
+| pen.dev | 2 (rentang 1) | 1 (rentang 0) |
 
 ## Bukti per ulangan
 
@@ -36,45 +36,45 @@ Ulangan valid: 3 dari 3.
 
 **R1**
 
-- Ulangan 1 (skor 2): Tujuh bagian hadir sesuai urutan dan tanpa seksi ekstra: navbar (bagian 1), hero dengan headline, subjudul, 2 CTA, dan mockup dashboard (bagian 1–2), 3 kartu fitur dalam layout 1 besar + 2 kecil (bagian 2), testimoni (bagian 3), pricing 3 tier dengan tier Usaha ditonjolkan (bagian 3–4), footer (bagian 4–5). Lebar 1440, aksen hijau, dan bahasa Indonesia.
-- Ulangan 2 (skor 2): Tujuh bagian berurutan tanpa seksi ekstra: navbar, hero (headline, subjudul, CTA 'Coba gratis 14 hari' + 'Lihat demo 2 menit', mockup dashboard), 3 kartu fitur (bento: Laporan laba rugi, Tagih utang WhatsApp, Stok), testimoni gelap, pricing 3 tier, footer. Lebar 1440, aksen hijau, dan Bahasa Indonesia sesuai.
-- Ulangan 3 (skor 2): Semua bagian hadir sesuai urutan: navbar (bagian 1 atas), hero dengan headline, subjudul, 2 CTA dan mockup dashboard (bagian 1), 3 kartu fitur bento (bagian 2), testimoni (bagian 3), pricing 3 tier dengan tier tengah 'Usaha' ditonjolkan (bagian 4), footer (bagian 4–5). Lebar 1440px, mode terang, aksen hijau, seluruh copy berbahasa Indonesia, tanpa seksi ekstra.
+- Ulangan 1 (skor 2): Urutan bagian lengkap dan benar: navbar (bagian 1 atas), hero dengan headline, subjudul, 2 CTA dan mockup dashboard (bagian 1–2), seksi fitur berisi 3 kartu dalam bento (bagian 2), testimoni (bagian 3), pricing 3 tier dengan 'Tumbuh' di tengah (bagian 4), footer (bagian 4–5). Lebar 1440px, aksen hijau, Bahasa Indonesia.
+- Ulangan 2 (skor 2): Semua bagian hadir berurutan: navbar (bagian 1 atas), hero dengan headline, subjudul, CTA 'Coba gratis 14 hari' + 'Lihat demo 3 menit' dan mockup dashboard (bagian 1), 3 kartu fitur bento 'Laporan laba rugi…', 'Catat dari HP…', 'Tagih utang…' (bagian 2), testimoni berlatar gelap (bagian 3), pricing 3 tier dengan 'Tumbuh' ditonjolkan (bagian 4), footer (bagian 4–5). Lebar 1440px, aksen hijau, seluruh copy berbahasa Indonesia.
+- Ulangan 3 (skor 2): Ketujuh bagian hadir sesuai urutan. Navbar (bagian 1 atas), hero dengan headline, subjudul, CTA 'Coba gratis 14 hari' dan 'Lihat demo 3 menit', serta mockup dashboard (bagian 1–2). Lalu 3 kartu fitur dalam bento: 'Laporan laba rugi…', 'Catat dari HP…', 'Tagih utang…' (bagian 2), testimoni (bagian 3), pricing 3 tier dengan tier tengah 'Tumbuh' ditonjolkan (bagian 4), dan footer (bagian 4–5). Lebar 1440px, aksen hijau, seluruh copy berbahasa Indonesia.
 
 **R2**
 
-- Ulangan 1 (skor 2): Satu titik fokus: headline hero 2 baris 'Tahu untung bersih usahamu setiap sore, tanpa buka Excel'. Headline ini berupa klaim hasil dan tidak menyisakan kata yatim. Ada lompatan skala tegas ke subjudul abu-abu dan ke judul seksi berukuran sekitar 36px. CTA primer hijau 'Coba gratis 14 hari' dan sekunder outline 'Lihat demo 2 menit'. Judul testimoni pecah menjadi '… pembukuan / tetap rapi' (dua kata), jadi bukan yatim.
-- Ulangan 2 (skor 2): Headline display dua baris 'Tahu untung bersih usahamu setiap sore, tanpa buka Excel' (bagian 1, tengah) berupa klaim hasil, tanpa kata yatim. Lompatan skala tegas ke judul seksi (~32px) dan body. CTA primer hijau solid + sekunder outline.
-- Ulangan 3 (skor 2): Headline hero 'Tahu untung bersih usahamu setiap sore, tanpa buka Excel' (bagian 1, tengah) berukuran display dan tampil dalam 2 baris. Isinya klaim hasil dan tidak ada kata yatim. Skalanya melompat tegas ke subjudul dan ke H2 seksi ('Pembukuan rapi tanpa perlu paham akuntansi', bagian 2). CTA 'Coba gratis 14 hari' berwarna hijau solid sebagai primer, 'Lihat demo 2 menit' outline sebagai sekunder. Judul testimoni berakhir 'tetap rapi' (2 kata), jadi bukan yatim.
+- Ulangan 1 (skor 1): Fokus tunggal: headline display 'Tutup buku 5 menit tiap malam, laba rugi langsung siap' (2 baris, klaim hasil, bagian 1). Dua CTA sesuai: 'Coba gratis 14 hari' primer hijau dan 'Lihat demo 3 menit' outline. Ada 1 judul yatim: judul kartu 'Tagih utang pelanggan lewat / WhatsApp' menyisakan satu kata di baris kedua (bagian 2 kanan bawah).
+- Ulangan 2 (skor 1): Headline display 'Tutup buku 5 menit tiap malam, laba rugi langsung siap' 2 baris, berisi klaim hasil, dengan lompatan skala tegas ke subjudul. CTA primer hijau dan sekunder outline sudah sesuai. Namun judul kartu fitur 'Tagih utang pelanggan lewat / WhatsApp' (bagian 2, kartu kanan bawah) menyisakan satu kata yatim 'WhatsApp' di baris kedua.
+- Ulangan 3 (skor 1): Headline hero display 2 baris dengan klaim hasil yang jelas ('Tutup buku 5 menit tiap malam, laba rugi langsung siap'). Dua CTA hadir: primer hijau dan sekunder outline. Ada satu judul yatim: judul kartu fitur kanan bawah 'Tagih utang pelanggan lewat / WhatsApp' menyisakan satu kata 'WhatsApp' di baris kedua (bagian 2, kanan bawah).
 
 **R4**
 
-- Ulangan 1 (skor 1): Hijau dipakai untuk CTA, kartu aktif 'Laba bersih' yang diberi border hijau, seri 'Masuk' di grafik, angka positif, dan badge 'Paling populer'. Ritme terang/gelap terpenuhi: hero terang, fitur putih, testimoni hitam, pricing abu terang, footer putih. Ada satu penyimpangan: ikon kutip hijau dan angka '6 jam' hijau di kartu testimoni utama (bagian 3) dipakai sebagai dekorasi.
-- Ulangan 2 (skor 1): Hijau dipakai untuk CTA dengan teks putih, nav aktif mockup, seri 'Masuk' di grafik, dan kartu 'Laba bersih' aktif. Ritme terang/gelap ada: hero tint, fitur putih, testimoni hitam, harga abu terang, footer putih. Satu penyimpangan aksen: teks callout hijau non-aksi 'Lunas rata-rata 9 hari lebih cepat' dan 'Peringatan di bawah 10 unit' di kartu fitur (bagian 2, kanan).
-- Ulangan 3 (skor 1): Hijau dipakai untuk CTA, item navigasi aktif 'Ringkasan', seri 'Masuk' pada grafik, dan kartu 'Laba bersih' di mockup. Ada satu penyimpangan: hijau juga dipakai untuk teks statistik dekoratif, yaitu 'Lunas rata-rata 9 hari lebih cepat' dan 'Peringatan di bawah 10 unit' (bagian 2, kartu kanan) serta '6 jam' (bagian 3, kartu testimoni kiri). Ritme terang/gelap baik: hero terang → fitur putih → testimoni gelap (bagian 3) → pricing abu terang → footer putih. CTA tier tengah memakai hijau terang dengan teks gelap, kontrasnya cukup.
+- Ulangan 1 (skor 1): Hijau mendekati #15803D, dengan teks putih di tombol 'Coba gratis 14 hari' dan badge 'Paling dipilih'. Ritme terang/gelap baik: hero terang, fitur putih, testimoni hitam, harga putih, footer abu muda. Ada 1 penyimpangan aksen: angka '4 jam' berwarna hijau terang dipakai sebagai dekorasi statistik pada kartu testimoni utama, bukan aksi (bagian 3 kanan). Teks kecil abu 'hemat waktu tiap minggu' di bawahnya juga lemah di atas latar gelap.
+- Ulangan 2 (skor 1): Tombol hijau dengan teks putih, ada ritme terang→gelap (testimoni bagian 3)→terang, dan kontras teks baik. Satu penyimpangan: hijau juga dipakai untuk teks informasi non-aksi, yaitu baris 'Rata-rata 6 detik per transaksi' dan 'Pengingat terjadwal 08.00 WIB' (bagian 2) serta angka '4 jam' di testimoni (bagian 3).
+- Ulangan 3 (skor 1): Hijau setara #15803D dengan teks putih dipakai di tombol primer navbar, hero, dan tier tengah. Ritme seksi: hero tint hijau terang, fitur putih, testimoni gelap, pricing putih, footer abu terang. Ada satu penyimpangan aksen: hijau terang dipakai untuk angka dekoratif '4 jam' pada kartu testimoni utama dan baris sorotan 'Rata-rata 6 detik per transaksi' / 'Pengingat terjadwal 08.00 WIB' di kartu fitur (bagian 2–3). Tidak ada teks yang jelas gagal kontras.
 
 **R5**
 
-- Ulangan 1 (skor 2): Ikon fitur bergaya Lucide line (bar-chart, message-circle, package) dalam wadah tint hijau muda (bagian 2). Ikon sidebar mockup dan ikon trending pada KPI satu gaya. Rating memakai ikon star (bagian 3, kanan atas testimoni). Tidak ada emoji, termasuk di header mockup 'Ringkasan November 2026'. Visual hero berupa mockup dashboard nyata yang relevan. Ikon sosial di footer adalah logo merek, bukan set ikon UI.
-- Ulangan 2 (skor 2): Ikon fitur Lucide (bar-chart, message-circle, package) dalam wadah tint hijau berukuran seragam (bagian 2). Ikon sidebar mockup outline konsisten, rating memakai ikon bintang, tanpa emoji termasuk di header mockup 'Toko Bu Ratna'. Visual utama berupa mockup dashboard nyata dengan grafik dan transaksi.
-- Ulangan 3 (skor 2): Ikon fitur bergaya garis ala Lucide (bar-chart, message-circle, package) dalam wadah tint hijau berukuran seragam (bagian 2). Ikon sidebar mockup dan ikon sosial footer (bagian 5) bergaya garis yang konsisten. Rating memakai ikon bintang (bagian 3 kanan atas). Visual utama hero berupa mockup dashboard yang relevan, tanpa emoji, termasuk di header mockup 'Ringkasan November 2026'.
+- Ulangan 1 (skor 2): Ikon bergaya Lucide seragam di sidebar mockup, tren, check, clock dan shield. Ikon fitur file-chart, smartphone dan bell-ring berada dalam wadah tint hijau muda dengan ukuran seragam (bagian 2). Rating memakai ikon star terisi (bagian 3 kiri). Visual utama berupa dashboard nyata yang relevan. Tidak ada emoji, termasuk di mockup.
+- Ulangan 2 (skor 2): Ikon fitur bergaya garis Lucide (file-chart, smartphone, bell-ring) dalam wadah tint hijau muda dengan ukuran seragam (bagian 2). Rating memakai ikon bintang (bagian 3 kiri). Sapaan mockup 'Toko Bu Sari' tanpa emoji. Visual hero berupa mockup dashboard nyata yang relevan.
+- Ulangan 3 (skor 2): Ikon fitur bergaris ala Lucide (file-chart, smartphone, bell-ring) dalam wadah tint hijau berukuran seragam (bagian 2). Ikon sidebar mockup dan ikon trending juga bergaris konsisten. Rating di testimoni memakai ikon star (bagian 3 kiri). Visual hero berupa mockup dashboard yang relevan. Tidak ada emoji; sapaan mockup hanya 'Toko Bu Sari'.
 
 **R6**
 
-- Ulangan 1 (skor 2): Angka mockup konsisten: Pemasukan Rp 48,2 jt − Pengeluaran Rp 31,7 jt = Laba bersih Rp 16,5 jt (bagian 1). Kartu fitur laba rugi cocok dengan mockup: 48.200.000 − 22.900.000 − 8.800.000 = 16.500.000, dan HPP + operasional = 31,7 jt (bagian 2). Testimoni memuat nama, usaha, dan kota: Ratna Wulandari (Katering Dapur Bu Ratna · Semarang), Dedi Kurniawan (Garut), Maria Sitanggang (Medan). Trial 14 hari konsisten di navbar, hero, dan pricing. Copy spesifik: 'H-1 jatuh tempo', 'di bawah 10 unit', 'KUR Rp 50 jt'.
-- Ulangan 2 (skor 2): Mockup: Rp 48,2 jt − Rp 31,7 jt = Rp 16,5 jt. Tabel fitur: 48.200.000 − 22.900.000 − 8.800.000 = 16.500.000, dan 22,9 + 8,8 = 31,7 cocok dengan Pengeluaran (bagian 1–2). Testimoni berisi nama + usaha + kota (Ratna Wulandari · Semarang, Dedi Kurniawan · Garut, Maria Sitanggang · Medan), dengan bintang dan '4,8 dari 1.932 ulasan'. Copy spesifik (KUR, HPP, pajak 0,5%).
-- Ulangan 3 (skor 2): Angka mockup konsisten: Pemasukan Rp 48,2 jt − Pengeluaran Rp 31,7 jt = Laba bersih Rp 16,5 jt (bagian 1). Tabel laba rugi di kartu fitur juga konsisten: 48.200.000 − 22.900.000 − 8.800.000 = 16.500.000 (bagian 2). Testimoni mencantumkan nama, usaha, dan kota: Ratna Wulandari · Katering Dapur Bu Ratna · Semarang; Dedi Kurniawan · Toko Kelontong Berkah · Garut; Maria Sitanggang · Konveksi Sinar Jaya · Medan. Masa uji 14 hari konsisten antara hero dan pricing. Copy spesifik (KUR, HPP, pajak UMKM 0,5%).
+- Ulangan 1 (skor 1): Angka mockup konsisten: Pemasukan Rp 48,2jt − Pengeluaran Rp 31,6jt = Laba bersih Rp 16,6jt, margin 34,4% (bagian 1). Tabel laba rugi juga konsisten: 42.870.000 − 23.150.000 − 4.910.000 = 14.810.000 (bagian 2). Uji coba 14 hari konsisten di semua tempat. Testimoni lengkap dengan nama, usaha dan kota (Yogyakarta, Medan, Surabaya). Ada 1 inkonsistensi: kartu Pengeluaran bertuliskan '+3,1% dari Oktober' tetapi memakai ikon tren turun (bagian 1 tengah).
+- Ulangan 2 (skor 1): Mockup hero konsisten: Pemasukan Rp 48,2 jt − Pengeluaran Rp 31,6 jt = Laba bersih Rp 16,6 jt dengan margin 34,4%. Tabel laba rugi Oktober (bagian 2) juga benar: 42.870.000 − 23.150.000 − 4.910.000 = 14.810.000. Testimoni memuat nama, usaha, dan kota (Yogyakarta, Medan, Surabaya). Satu inkonsistensi: kartu Pengeluaran menulis '+3,1% dari Oktober' tetapi memakai ikon tren turun (bagian 1).
+- Ulangan 3 (skor 1): Mockup memenuhi rumus: Pemasukan Rp 48,2 jt − Pengeluaran Rp 31,6 jt = Laba bersih Rp 16,6 jt, margin 34,4% (bagian 1). Kartu laba rugi Oktober juga konsisten: 42.870.000 − 23.150.000 − 4.910.000 = 14.810.000. Testimoni lengkap dengan nama, usaha, dan kota (Yogyakarta, Medan, Surabaya). Ada satu inkonsistensi: kartu Pengeluaran menulis '+3,1% dari Oktober' dengan ikon tren turun. Selain itu, pengeluaran Oktober 28,06 jt → 31,6 jt sebenarnya naik ±12,6%, bukan 3,1% (bagian 1, kartu tengah mockup).
 
 **R8**
 
-- Ulangan 1 (skor 2): Tidak ada pelanggaran checklist slop. Angka sosial bersifat spesifik dan tidak bulat ('Dipakai 12.846 UMKM', '4,8 dari 1.932 ulasan'). Keputusan komposisi khas: grid fitur bento asimetris dengan kartu besar berisi tabel laba rugi nyata yang angkanya sama dengan mockup hero (bagian 2). Tier tengah 'Usaha' ditonjolkan dengan satu cara utama (latar hijau tua) + badge 'Paling populer', CTA tengah primer, tier lain outline, fitur ditandai check, harga Rp 79.000 / bulan (bagian 4).
-- Ulangan 2 (skor 1): Tier tengah 'Usaha' memakai kartu hijau tua + badge 'Paling populer', CTA primer hijau, tier lain outline, dan fitur dengan ikon check (bagian 4). Satu kriteria golden gagal: harga ditulis 'Rp 79.000 / bulan', bukan 'Rp 79rb/bulan'. Ada keputusan khas: fitur bento dengan tabel laba rugi nyata di kartu besar (bagian 2). Tidak ada pelanggaran slop.
-- Ulangan 3 (skor 1): Kriteria golden 6 gagal satu butir: harga tier tengah ditulis 'Rp 79.000 / bulan' (bagian 4), bukan 'Rp 79rb/bulan'. Butir lainnya terpenuhi: tier tengah ditonjolkan dengan fill hijau gelap plus badge 'Paling populer', CTA tengah primer sementara tier lain outline, dan fitur memakai ikon check. Tidak ada pelanggaran slop. Keputusan komposisi khas: bento fitur dengan kartu besar berisi tabel laba rugi nyata (bagian 2) dan testimoni asimetris dengan satu kutipan besar plus metrik '6 jam' (bagian 3).
+- Ulangan 1 (skor 2): Tidak ada pelanggaran slop. Keputusan komposisi khas: fitur disusun bento asimetris, dengan kartu besar yang memuat tabel 'Laba rugi · Oktober 2026' nyata plus dua kartu kecil di kanan (bagian 2). Testimoni memakai kolom judul kiri dan kutipan besar di kanan (bagian 3). Tier tengah 'Tumbuh' ditonjolkan dengan panel tint dan border hijau, diberi badge 'Paling dipilih'. Harganya Rp 79.000 / bulan. CTA tengah primer, tier lain outline, fitur memakai ikon check (bagian 4).
+- Ulangan 2 (skor 2): Tier tengah 'Tumbuh' ditonjolkan lewat border dan tint hijau, dilengkapi badge 'Paling dipilih'. CTA tengah primer, tier lain outline. Harga Rp 79.000/bulan (= Rp 79rb) dan fitur memakai ikon check (bagian 4). Tidak ada pelanggaran slop. Langkah khas yang bisa ditunjuk: grid fitur bento dengan tabel laba rugi tertanam (bagian 2), serta testimoni asimetris dengan kutipan utama dan metrik '4 jam hemat waktu' (bagian 3).
+- Ulangan 3 (skor 2): Tidak ada pelanggaran checklist slop maupun frasa terlarang. Tier tengah 'Tumbuh' ditonjolkan dengan border hijau dan tint, ditambah badge 'Paling dipilih'. CTA tier tengah primer, tier lain outline. Harga Rp 79.000/bulan (setara Rp 79rb) dan fitur memakai ikon check (bagian 4). Ada dua keputusan komposisi khas yang bisa ditunjuk: grid fitur bento asimetris dengan tabel laba rugi tertanam di kartu besar (bagian 2), dan testimoni asimetris dengan judul di kolom kiri plus kutipan utama berisi metrik '4 jam' (bagian 3).
 
 **Titik fokus (R2)**
 
-- Ulangan 1: Headline hero 'Tahu untung bersih usahamu setiap sore, tanpa buka Excel' di tengah bagian 1
-- Ulangan 2: Headline hero 'Tahu untung bersih usahamu setiap sore, tanpa buka Excel' di tengah bagian 1
-- Ulangan 3: Headline hero 'Tahu untung bersih usahamu setiap sore, tanpa buka Excel', bagian 1 tengah-atas
+- Ulangan 1: Headline hero 'Tutup buku 5 menit tiap malam, laba rugi langsung siap' di tengah atas bagian 1
+- Ulangan 2: Headline hero 'Tutup buku 5 menit tiap malam, laba rugi langsung siap' di tengah bagian 1
+- Ulangan 3: Headline hero 'Tutup buku 5 menit tiap malam, laba rugi langsung siap', tengah atas bagian 1
 
 **Slop**
 
@@ -86,56 +86,56 @@ Ulangan valid: 3 dari 3.
 
 **R1**
 
-- Ulangan 1 (skor 2): Bagian 1–6 lengkap dan berurutan: navbar (logo Kasku, Fitur/Harga/Testimoni/Bantuan, Masuk + Coba Gratis), hero dengan mockup dashboard (bagian 1–2), 3 kartu fitur (bagian 2–3), testimoni pada seksi gelap (bagian 3–4), pricing 3 tier dengan tier Bisnis ditonjolkan (bagian 4–5), CTA penutup hijau (opsional, bagian 5), lalu footer (bagian 5–6). Lebar 1440, aksen hijau, mode terang dengan seksi gelap, dan seluruh copy berbahasa Indonesia. Strip statistik di bawah mockup dihitung di R8 (slop #5), bukan di sini.
-- Ulangan 2 (skor 1): Navbar, hero (headline, subjudul, CTA 'Mulai Gratis 30 Hari' + 'Lihat Demo', mockup dashboard), 3 kartu fitur, testimoni gelap, pricing 3 tier, CTA penutup hijau (opsional) dan footer hadir berurutan. Lebar 1440, aksen hijau, dan Bahasa Indonesia sesuai. Ada satu seksi ekstra di luar aturan: strip statistik 'Dipercaya 25.000+ UMKM…' di bawah mockup (bagian 2, atas).
-- Ulangan 3 (skor 1): Navbar, hero dengan mockup, 3 kartu fitur, testimoni, pricing, dan footer hadir sesuai urutan (bagian 1–6). CTA penutup hijau (bagian 5) diizinkan. Ada satu seksi ekstra di luar aturan: strip statistik '25.000+ / Rp4,8 T / 4,9/5 / 2 menit' di bawah mockup (bagian 2 atas). Lebar 1440px, aksen hijau, dan bahasa Indonesia sudah sesuai.
+- Ulangan 1 (skor 2): Urutan bagian lengkap dan benar: navbar (bagian 1, atas), hero dengan headline, subjudul, 2 CTA dan mockup dashboard (bagian 1–2), 3 kartu fitur 'FITUR UTAMA' (bagian 2), testimoni pada latar gelap (bagian 3), pricing 3 tier dengan 'Bisnis' di tengah ditonjolkan (bagian 4), CTA penutup opsional dan footer (bagian 5). Lebar 1440px, aksen hijau, seluruh copy berbahasa Indonesia.
+- Ulangan 2 (skor 2): Urutan bagian lengkap: navbar, hero dengan headline, subjudul, CTA 'Mulai Gratis 30 Hari' + 'Lihat Demo' dan mockup (bagian 1–2), 3 kartu fitur (bagian 2), testimoni (bagian 3), pricing 3 tier dengan tengah ditonjolkan (bagian 4), CTA penutup yang memang opsional, dan footer (bagian 5). Lebar 1440px, aksen hijau, berbahasa Indonesia.
+- Ulangan 3 (skor 2): Semua bagian hadir sesuai urutan. Navbar (bagian 1), hero dengan headline, subjudul, 'Mulai Gratis 30 Hari', 'Lihat Demo', dan mockup (bagian 1–2). Lalu 3 kartu fitur (bagian 2), testimoni (bagian 3), pricing 3 tier dengan 'Bisnis' ditonjolkan (bagian 4), CTA penutup yang opsional, dan footer (bagian 5). Lebar 1440px, aksen hijau, berbahasa Indonesia.
 
 **R2**
 
-- Ulangan 1 (skor 1): Fokus jelas pada headline hero display 3 baris di tengah bagian 1, dengan lompatan skala tegas ke subjudul dan judul seksi. CTA primer hijau 'Mulai Gratis 30 Hari' dan sekunder outline 'Lihat Demo' sesuai. Namun judul CTA penutup 'Siap merapikan keuangan usaha / Anda?' (bagian 5) menyisakan satu kata yatim 'Anda?' di baris kedua.
-- Ulangan 2 (skor 2): Headline hero display tiga baris 'Pembukuan rapi, usaha tenang. Fokus jualan, biar Kasku yang mencatat.' (bagian 1, tengah) jauh lebih besar dari judul seksi (~44px) dan body. Baris terakhir berisi tiga kata, jadi tidak yatim. CTA primer hijau solid + sekunder outline. Judul seksi fitur, testimoni, dan harga memakai skala konsisten.
-- Ulangan 3 (skor 1): Fokusnya jelas: headline hero display 3 baris 'Pembukuan rapi, usaha tenang. Fokus jualan, biar Kasku yang mencatat.' (bagian 1). CTA primer hijau 'Mulai Gratis 30 Hari' dan sekunder outline 'Lihat Demo'. Ada satu baris yatim: subjudul pricing berakhir dengan satu kata 'web.' di baris tersendiri (bagian 4, tengah).
+- Ulangan 1 (skor 1): Titik fokus jelas: headline display 'Pembukuan rapi, usaha makin tenang.' (2 baris, bagian 1 tengah). Lompatan skala ke subjudul dan judul seksi tegas. Dua CTA sesuai: 'Mulai Gratis 30 Hari' primer hijau dan 'Lihat Demo' outline. Ada 1 judul yatim: judul CTA penutup 'Siap merapikan keuangan usaha / Anda?' menyisakan satu kata 'Anda?' di baris kedua (bagian 5 kiri atas).
+- Ulangan 2 (skor 1): Headline display 'Pembukuan rapi, usaha makin tenang.' 2 baris menjadi fokus jelas. CTA primer hijau dan sekunder outline sudah sesuai. Namun judul CTA penutup 'Siap merapikan keuangan usaha / Anda?' (bagian 5) menyisakan satu kata yatim 'Anda?' di baris kedua.
+- Ulangan 3 (skor 1): Headline hero 'Pembukuan rapi, usaha makin tenang.' tampil display 2 baris dan menjadi fokus yang jelas. Dua CTA hadir: primer hijau dan sekunder outline. Ada satu judul yatim: judul CTA penutup 'Siap merapikan keuangan usaha / Anda?' menyisakan satu kata 'Anda?' di baris kedua (bagian 5, kiri atas banner hijau).
 
 **R4**
 
-- Ulangan 1 (skor 1): Hijau umumnya dipakai untuk aksi: tombol navbar, CTA hero, badge 'Paling Populer', tombol tier Bisnis, seri 'Masuk' di grafik. Ritme terang/gelap terpenuhi: hero terang, fitur putih, testimoni hijau tua, pricing terang, banner CTA hijau, footer putih. Ada satu penyimpangan: angka '16 jam' (bagian 3, kartu testimoni utama) diwarnai hijau aksen hanya sebagai dekorasi, bukan aksi atau seri data.
-- Ulangan 2 (skor 1): Ritme terang/gelap ada: hero tint hijau, fitur putih, testimoni hijau tua, harga terang, CTA hijau. CTA hijau memakai teks putih (on-accent). Satu penyimpangan aksen: ketiga wadah ikon fitur diisi hijau solid sebagai dekorasi (bagian 2, bawah), bukan tint. Teks meta kecil di dark section ('Pemilik Lapis Bu Sari, Surabaya') redup tetapi masih terbaca.
-- Ulangan 3 (skor 1): Hijau dipakai untuk CTA, item nav aktif, seri grafik, dan badge. Ritme terang/gelap baik: hero terang → fitur putih → testimoni hijau gelap (bagian 3) → pricing terang → CTA hijau → footer putih. Ada satu teks lemah: meta testimoni berwarna abu kehijauan redup di atas hijau gelap ('dihemat setiap bulan', 'Pemilik Lapis Bu Sari, Surabaya', bagian 3–4) yang kontrasnya rendah.
+- Ulangan 1 (skor 1): Ritme terang/gelap antar-seksi baik: hero terang, fitur putih, testimoni gelap, harga terang, footer gelap. Teks putih di atas tombol hijau. Penyimpangan: aksen hijau dipakai sebagai isi kartu testimoni besar 'Sari Wulandari', padahal elemen itu bukan aksi (bagian 3 kiri). Selain itu, teks kecil 'Pemilik Dapur Sari, Yogyakarta' berwarna hijau muda di atas hijau tampak lemah. Hijau terlihat lebih ke teal gelap, bukan #15803D.
+- Ulangan 2 (skor 0): Aksen hijau berceceran di luar aksi/aktif: wadah ikon fitur berisi hijau solid (bagian 2) dan kartu testimoni utama berlatar hijau penuh (bagian 3 kiri). Teks lemah: 'Pemilik Dapur Sari, Yogyakarta' abu kehijauan di atas hijau (bagian 3), serta bintang outline kuning tipis di atas latar gelap (bagian 3 kanan). Hijau tombol tampak lebih kebiruan dibanding #15803D.
+- Ulangan 3 (skor 0): Hijau yang dipakai cenderung teal (±#0F7A4A), bukan #15803D (tombol navbar, CTA hero, pricing). Aksen juga berceceran ke permukaan dekoratif: kartu testimoni besar berlatar hijau penuh (bagian 3 kiri), tile ikon fitur hijau solid (bagian 2), dan banner CTA hijau (bagian 5). Teks lemah terlihat pada 'Pemilik Dapur Sari, Yogyakarta' di atas hijau (bagian 3) serta label kecil 'UMKM aktif' / 'Rating Play Store' di latar hijau gelap.
 
 **R5**
 
-- Ulangan 1 (skor 1): Ikon fitur bergaya line yang seragam (zap, pie-chart, boxes), ikon sidebar mockup, ikon star pada rating, dan ikon sosial outline di footer. Namun golden #4 gagal pada dua hal. Pertama, ada emoji 👋 pada sapaan mockup 'Halo, Toko Bu Sari 👋' (bagian 1, kanan atas mockup). Kedua, ikon fitur ditempatkan dalam wadah hijau solid, bukan wadah tint (bagian 2). Hitungannya: satu kriteria golden gagal dan satu emoji dekoratif di sapaan.
-- Ulangan 2 (skor 1): Ikon fitur bergaya Lucide (zap, pie-chart, boxes) dan ikon sidebar mockup konsisten outline. Visual utama berupa mockup dashboard nyata. Namun ada satu emoji 👋 di sapaan 'Halo, Toko Bu Sari 👋' (bagian 1, mockup kiri atas), dan wadah ikon fitur solid, bukan tint.
-- Ulangan 3 (skor 1): Ada 1 emoji dekoratif di sapaan mockup 'Halo, Toko Bu Sari 👋' (bagian 1, header mockup), sehingga golden 4 gagal. Selebihnya ikon bergaya garis konsisten (sidebar, transaksi terakhir, footer). Ikon fitur berada dalam wadah hijau solid (bagian 2 bawah). Visual utama hero berupa mockup dashboard yang relevan.
+- Ulangan 1 (skor 1): Ikon UI bergaya garis konsisten: sidebar mockup, check, bintang outline, ikon sosial. Visual utama berupa mockup dashboard yang relevan. Ada 1 emoji tangan melambai pada sapaan 'Halo, Toko Bu Sari 👋' di mockup (bagian 1 tengah bawah). Ikon fitur zap, file-check dan chart memakai wadah hijau solid, bukan tint (bagian 2).
+- Ulangan 2 (skor 1): Ada 1 emoji dekoratif 👋 di sapaan mockup 'Halo, Toko Bu Sari' (bagian 1). Ikon fitur bergaya Lucide (zap, file-check, chart) tetapi berada dalam wadah hijau solid, bukan tint (bagian 2). Foto avatar testimoni dan mockup dashboard relevan.
+- Ulangan 3 (skor 1): Ikon fitur ala Lucide (zap, file-check, chart-column) seragam, tetapi wadahnya hijau solid, bukan tint (bagian 2). Sapaan mockup 'Halo, Toko Bu Sari 👋' memakai emoji tangan melambai (bagian 1, header mockup). Rating testimoni memakai ikon star outline (bagian 3). Visual hero berupa mockup dashboard yang relevan.
 
 **R6**
 
-- Ulangan 1 (skor 1): Angka mockup konsisten: Pemasukan Rp48,2 jt − Pengeluaran Rp21,7 jt = Laba Bersih Rp26,5 jt (bagian 1). Testimoni memuat nama, usaha, dan kota: Sari Rahayu (Lapis Bu Sari, Surabaya), Dimas Pratama (Kopi Senja, Yogyakarta), Ayu Nirmala (Batik Ayu Store, Pekalongan), dengan rating ikon star. Masa trial 30 hari konsisten di hero, pricing, dan CTA penutup. Satu frasa generik: judul fitur 'Semua yang usaha Anda butuhkan untuk naik kelas' (bagian 2).
-- Ulangan 2 (skor 1): Mockup: Pemasukan Rp48,2 jt − Pengeluaran Rp21,7 jt = Laba Bersih Rp26,5 jt, konsisten (bagian 1). Testimoni berisi nama + usaha + kota (Sari Rahayu – Lapis Bu Sari, Surabaya; Dimas Pratama – Kopi Senja, Yogyakarta; Ayu Nirmala – Batik Ayu Store, Pekalongan), dengan rating ikon bintang. Ada satu frasa generik: judul fitur 'Semua yang usaha Anda butuhkan untuk naik kelas' (bagian 2).
-- Ulangan 3 (skor 1): Angka mockup konsisten: Pemasukan Rp48,2 jt − Pengeluaran Rp21,7 jt = Laba Bersih Rp26,5 jt (bagian 1). Testimoni lengkap dengan nama, usaha, dan kota: Sari Rahayu · Lapis Bu Sari, Surabaya; Dimas Pratama · Kopi Senja, Yogyakarta; Ayu Nirmala · Batik Ayu Store, Pekalongan. Bintang ditampilkan di kartu utama (bagian 3). Ada satu frasa generik: judul fitur 'Semua yang usaha Anda butuhkan untuk naik kelas' (bagian 2).
+- Ulangan 1 (skor 1): Copy spesifik: KUR, SAK EMKM, QRIS, SPT, WhatsApp. Testimoni lengkap dengan nama, usaha dan kota (Yogyakarta, Surabaya, Bandung), rating memakai ikon bintang. Kriteria golden 3 gagal: mockup menampilkan Pemasukan Rp32.180.000 dan Pengeluaran Rp14.900.000, tetapi tidak ada kartu Laba. Yang ada justru Saldo Kas Rp48.250.000 dan Piutang (bagian 1 bawah).
+- Ulangan 2 (skor 1): Kriteria golden mockup gagal: ada Pemasukan Rp32.180.000 dan Pengeluaran Rp14.900.000, tetapi tidak ada kartu Laba, yang tampil justru Saldo Kas Rp48.250.000 (bagian 1). Testimoni memuat nama, usaha, dan kota (Yogyakarta, Surabaya, Bandung) dengan ikon bintang (bagian 3). Copy fitur cukup spesifik (SAK EMKM, QRIS, KUR).
+- Ulangan 3 (skor 1): Mockup menampilkan Saldo Kas Rp48.250.000, Pemasukan Rp32.180.000, Pengeluaran Rp14.900.000, dan Piutang, tetapi tidak ada nilai Laba. Akibatnya rumus Pemasukan − Pengeluaran = Laba tidak ditampilkan (bagian 1), sehingga kriteria golden 3 gagal. Testimoni memenuhi syarat: nama, peran/usaha, dan kota (Yogyakarta, Surabaya, Bandung), dengan ikon star.
 
 **R8**
 
-- Ulangan 1 (skor 1): Ada 1 pelanggaran slop, yaitu strip statistik bulat (lihat slop.butir). Keputusan khas yang bisa ditunjuk: grid testimoni asimetris, dengan satu kutipan besar ber-metrik '16 jam dihemat setiap bulan' di kiri dan dua kutipan kecil bertumpuk di kanan (bagian 3). Tier tengah memakai latar gelap + badge, CTA tengah primer, tier lain outline, dan fitur ditandai check. Kekurangannya, kartu Pemula dan Pro berbeda tinggi posisi (bertangga) sehingga baris pricing tidak rata.
-- Ulangan 2 (skor 1): Tier tengah 'Bisnis' memakai kartu hijau tua + badge 'Paling Populer', harga 'Rp79rb /bulan', CTA primer hijau, tier lain outline, dan fitur dengan ikon check (bagian 4–5). Keputusan khas: testimoni asimetris dengan kutipan besar + metrik '16 jam' (bagian 3), serta kartu harga bertingkat tinggi. Ada satu pelanggaran slop, yaitu statistik bulat '25.000+ UMKM' dan 'Rp4,8 T'.
-- Ulangan 3 (skor 1): Golden 6 terpenuhi: tier tengah 'Bisnis' memakai fill gelap plus badge 'Paling Populer', harga 'Rp79rb/bulan', CTA tengah primer sementara tier lain outline, dan fitur memakai ikon check (bagian 4–5). Ada satu pelanggaran slop: statistik bulat dan berlebihan yang tidak diberikan prompt di strip angka (bagian 2). Langkah khas yang terlihat: kartu pricing bertingkat dengan tinggi berbeda (bagian 4).
+- Ulangan 1 (skor 1): Ada keputusan komposisi khas: testimoni asimetris dengan satu kartu kutipan besar berwarna hijau dan dua kartu bertumpuk (bagian 3). Tier tengah 'Bisnis' ditonjolkan dengan latar gelap dan bayangan, diberi badge 'Paling Populer'. CTA tengah primer, tier lain outline. Harga Rp99rb, bukan Rp 79rb/bulan, jadi kriteria golden 6 gagal. Ada 1 pelanggaran slop, yaitu statistik bulat berlebihan.
+- Ulangan 2 (skor 1): Tier tengah 'Bisnis' ditonjolkan dengan latar gelap dan badge 'Paling Populer', CTA tengah primer dan tier lain outline, fitur memakai check (bagian 4). Namun harga Rp99rb/bulan, bukan Rp 79rb/bulan. Ada 2 pelanggaran slop: tiga kartu fitur identik berikon dan statistik bulat. Langkah khas: kartu testimoni utama hijau besar di latar gelap (bagian 3).
+- Ulangan 3 (skor 1): Ada 2 pelanggaran slop (lihat butir). Harga tier tengah Rp99rb/bulan, bukan Rp 79rb/bulan, sehingga kriteria golden 6 gagal (bagian 4 tengah). Sisanya terpenuhi: tier tengah ditonjolkan dengan kartu gelap terangkat plus badge 'Paling Populer', CTA tengah primer, tier lain outline, dan fitur memakai ikon check.
 
 **Titik fokus (R2)**
 
-- Ulangan 1: Headline hero 'Pembukuan rapi, usaha tenang. Fokus jualan, biar Kasku yang mencatat.' di tengah bagian 1
-- Ulangan 2: Headline hero 'Pembukuan rapi, usaha tenang. Fokus jualan, biar Kasku yang mencatat.' di tengah bagian 1
-- Ulangan 3: Headline hero 'Pembukuan rapi, usaha tenang. Fokus jualan, biar Kasku yang mencatat.', bagian 1 tengah
+- Ulangan 1: Headline hero 'Pembukuan rapi, usaha makin tenang.' di tengah atas bagian 1
+- Ulangan 2: Headline hero 'Pembukuan rapi, usaha makin tenang.' di tengah bagian 1
+- Ulangan 3: Headline hero 'Pembukuan rapi, usaha makin tenang.', tengah atas bagian 1
 
 **Slop**
 
-- Ulangan 1: 5: Strip statistik di bawah mockup (bagian 2): '25.000+ UMKM aktif', 'Rp4,8 T transaksi tercatat / bulan', '4,9/5', '2 menit'. Ini klaim angka bulat yang tidak diberikan prompt.
-- Ulangan 2: 5: strip statistik '25.000+ UMKM aktif', 'Rp4,8 T transaksi tercatat / bulan' di bawah mockup hero (bagian 2, atas), tidak diberikan prompt
-- Ulangan 3: 5: strip statistik '25.000+ UMKM aktif' dan 'Rp4,8 T transaksi tercatat / bulan' di bawah mockup hero (bagian 2 atas), angka bulat besar yang tidak diberikan prompt
+- Ulangan 1: 5: statistik bulat berlebihan '12.000+ UMKM aktif', '4,9/5' dan 'Rp2,1T Transaksi tercatat' di kanan atas seksi testimoni (bagian 3), juga '2.000+ pemilik warung' di seksi fitur (bagian 2 kanan atas)
+- Ulangan 2: 2: Tiga kartu fitur identik, masing-masing dengan ikon dalam kotak hijau di atas judul, menjadi pola utama seksi fitur (bagian 2) · 5: Statistik bulat berlebihan '12.000+ UMKM aktif' dan 'Rp2,1T Transaksi tercatat' di testimoni (bagian 3 kanan atas), ditambah '2.000+ pemilik warung' (bagian 2)
+- Ulangan 3: 5: Statistik bulat yang tidak diberikan prompt: '12.000+ UMKM aktif', 'Rp2,1T Transaksi tercatat' (bagian 3 kanan atas), dan 'Dibuat bersama 2.000+ pemilik warung' (bagian 2 kanan atas) · 2: Tiga kartu fitur identik, masing-masing dengan ikon di tile hijau di atas judul, menjadi pola utama seksi fitur (bagian 2)
 
 ## Pemetaan X/Y per ulangan (dibuka setelah penilaian)
 
 | Ulangan | Desain X | Desain Y | Status | Biaya |
 |---|---|---|---|---|
-| 1 | pen.dev | Lakar | ok | $0.37 |
-| 2 | pen.dev | Lakar | ok | $0.33 |
-| 3 | Lakar | pen.dev | ok | $0.32 |
+| 1 | pen.dev | Lakar | ok | $0.32 |
+| 2 | Lakar | pen.dev | ok | $0.34 |
+| 3 | Lakar | pen.dev | ok | $0.36 |

@@ -238,7 +238,8 @@ export function renderRoundMarkdown(r: RoundReport): string {
   for (const [k, v] of Object.entries(f.skills)) L.push(`- skill \`${k}\` sha256 \`${v}\``);
   L.push(`- \`G0_RULES\`: \`${f.g0Rules}\``);
   L.push(`- sha256 \`packages/check/dist\`: \`${f.checkDist}\``);
-  if (f.distSha) for (const [k, v] of Object.entries(f.distSha)) L.push(`- sha256 \`packages/${k}/dist\`: \`${v}\``);
+  // `packages/check/dist` sudah dicetak di atas (`checkDist`); jangan diulang.
+  if (f.distSha) for (const [k, v] of Object.entries(f.distSha)) if (k !== 'check') L.push(`- sha256 \`packages/${k}/dist\`: \`${v}\``);
   L.push(`- pen.dev desktop: ${f.pendevDesktop ?? '–'}; MCP server: ${f.pendevMcp ?? '–'}`);
   L.push(`- Juri: model \`${f.judge.model}\`; argv \`${f.judge.argv}\``);
   L.push('');
