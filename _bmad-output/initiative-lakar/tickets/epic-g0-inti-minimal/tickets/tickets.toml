@@ -233,13 +233,28 @@ plan_checkpoint = true
 done_checkpoint = true
 
 [[entry]]
+id = 22
+type = "story"
+title = "Efek visual gradien dan shader setara pen.dev"
+description = "pen.dev mengklaim efek visual memukau dengan shader; Lakar baru punya gradien linear/radial berlapis (story 8) tanpa conic, grain/noise, mesh, atau shader, dan skill hanya mendokumentasikan API gradien tanpa panduan kapan gradien membuat desain matang. Langkah: (1) investigasi read-only kemampuan efek/shader pen.dev lewat MCP pencil (read_skill, get_style, panduan; tanpa menimpa .pen), diringkas di dokumen story: efek apa, statis atau parametrik; (2) prompt latihan efek baru P5 (dan P6 bila perlu, mis. hero landing produk teknologi berlatar efek abstrak ekspresif, layar onboarding mobile bergradasi) di bench/practice/, bukan turunan A/B, tanpa teks rubrik (C7), dibekukan dengan sha256 sebelum perubahan mesin atau skill; harness latihan diperluas untuk seri efek ini (set prompt efek terpisah dari P1–P4 yang ber-sha, batas iterasi dan penghitung anggaran sendiri dengan batas $15, aturan lulus semua prompt efek) karena batas iterasi 8 dan anggaran $58,09 story 19 sudah terpakai; (3) baseline P5/P6 di kedua alat (pen.dev lewat pen-newdoc.sh dengan verifikasi dokumen baru; restart pen-desktop setelah seri untuk melepas RAM, diizinkan Adam), juri buta v2.1, PNG ditinjau; (4) peningkatan Lakar dengan kedalaman yang ditetapkan dari investigasi di plan_checkpoint: minimal conic gradient, grain/noise, dan panduan gradien di skill (tint bidang merek, glow, scrim foto, sorot kartu unggulan, ring/donut bergradasi) dalam batas anti-slop; bila gap berasal dari shader sungguhan, ditambah shader fill statis berupa preset efek parametrik (mis. mesh gradient, aurora, noise flow, blob blur) yang dirender WebGL di Chromium menjadi bitmap saat render, render tetap murni browser (AD-6), skema berubah lewat schemaVersion/migrasi (AD-1–AD-4, AD-15), golden render teruji (grain/noise deterministik dengan seed tetap), latensi terukur, dan WebGL dipastikan jalan di chromium-headless-shell sebelum dipilih; panduan skill tetap di dalam DESIGN.md (glow dilarang, maks satu gradien per board, mesh di hero hanya dengan alasan merek) kecuali Adam menyetujui amandemen DESIGN.md di plan_checkpoint; (5) run ulang Lakar pada P5/P6 dengan PNG pen.dev dipakai ulang dari langkah 3 (C8: satu run per alat per prompt, tanpa memilih run terbaik). Bagian per requirement: R3 = fill efek baru di render, R6 = panduan gradien di skill, R7 = perluasan harness latihan untuk seri efek, R13 = seluruhnya. Temuan review dan plan yang ditunda diserahkan ke refactor sweep (20)."
+verify = "Dokumen story memuat ringkasan investigasi pen.dev dan sha256 prompt P5/P6 yang tercatat sebelum commit perubahan mesin/skill pertama. bench/practice-<n>.md berisi PNG kedua alat, skor juri v2.1, waktu, dan biaya untuk P5/P6 baseline dan run ulang. Lakar Setara atau Lebih baik di semua prompt efek, waktu Lakar <= 1,5x pen.dev per prompt, nol emoji, 0 error gerbang. pnpm --filter @lakar/render test lulus untuk golden render conic gradient dan grain dengan seed tetap, dua kali render menghasilkan PNG identik (dan tiap preset shader fill bila dibangun, beserta latensi render terukur); modul render tetap termuat di browser biasa tanpa API Node; tes skill lulus (contoh lolos terhadap api.ts, core.md <= 4k token, pencarian frasa rubrik, kata khas A/B, dan teks P5/P6 di skill kosong). pnpm build dan pnpm test lulus. Biaya kumulatif tercatat (anggaran sekitar $10-15). Adam sudah melihat PNG."
+covers = ["R13", "R3", "R6", "R7"]
+after = [19]
+hitl = true
+risk = "high"
+references = ["_bmad-output/initiative-lakar/architecture-lakar-core/architecture-lakar-core.md", "bench/README.md", "bench/practice/LOG.md"]
+notes = ["Keputusan Adam 2026-11-18: story efek visual gradien dan shader setara pen.dev ditambahkan sebelum refactor sweep (20) dan putaran 2 (21); anggaran sekitar $10-15, dicatat.", "C7, C8, C9 berlaku: tidak ada rubrik atau prompt latihan di skill; satu run per alat per prompt; tanpa paket global, port, atau service baru di luar lakard; restart pen-desktop hanya setelah seri pen.dev selesai.", "Kedalaman (cukup conic + grain + panduan skill, atau ditambah shader fill WebGL) diputuskan di plan_checkpoint dari hasil investigasi dan baseline."]
+plan_checkpoint = true
+done_checkpoint = true
+
+[[entry]]
 id = 20
 type = "story"
 title = "Refactor sweep putaran perbaikan"
-description = "Pembersihan saja. Cakupannya ditetapkan saat mulai dari temuan review dan plan yang ditunda di story 17–19, lalu di-commit sebelum putaran 2 dibekukan."
+description = "Pembersihan saja. Cakupannya ditetapkan saat mulai dari temuan review dan plan yang ditunda di story 17–19 dan 22, lalu di-commit sebelum putaran 2 dibekukan."
 verify = "pnpm build dan pnpm test lulus. Setiap temuan tunda yang dipilih tertutup atau dicatat alasannya. git status --porcelain untuk kode produk dan harness kosong setelah commit."
 covers = []
-after = [17, 18, 19]
+after = [17, 18, 19, 22]
 hitl = false
 risk = "low"
 

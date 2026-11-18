@@ -19,7 +19,7 @@ risk: high
 
 Epic ini membangun inti A minimal sesuai spine arsitektur: schema, core, render, exec, icons, check (subset G0), daemon, mcp, skill, dan harness bench. Hasilnya Claude Code bisa mendesain prompt A (landing) dan B (mobile) di Lakar. Satu putaran benchmark lalu memutuskan G0 terhadap pen.dev. Epic dibuka dengan upgrade mesin ke Node 26 LTS.
 
-Putaran 1 gagal (A Kalah, B Setara; dikonfirmasi Adam 2026-11-18). Epic ini lalu mendapat putaran perbaikan (story 17–21): juri dikalibrasi terhadap penilaian Adam, foto stok lokal ditarik dari G1, skill direvisi agar lebih kaya, lalu putaran resmi 2 untuk A dan B.
+Putaran 1 gagal (A Kalah, B Setara; dikonfirmasi Adam 2026-11-18). Epic ini lalu mendapat putaran perbaikan (story 17–21): juri dikalibrasi terhadap penilaian Adam, foto stok lokal ditarik dari G1, skill direvisi agar lebih kaya, lalu putaran resmi 2 untuk A dan B. Sebelum refactor sweep dan putaran 2 ada story 22: efek visual gradien dan shader setara pen.dev (keputusan Adam 2026-11-18).
 
 ## Outcome
 
@@ -37,11 +37,12 @@ Adam tahu apakah arah editor sendiri layak: prompt A dan B setara atau lebih bai
 - R8 (parent R8): keputusan G0 tercatat di `bench/round-<n>.md` dan sudah dikonfirmasi Adam.
 - R9 (architecture §Stack, §Deployment; C9): `lakard` berjalan di Node 26 LTS yang terpasang berdampingan dengan Node sistem, sebagai systemd user service yang bind ke 127.0.0.1. Rilis memakai `pnpm build` dan instal chromium-headless-shell.
 
-Catatan: R10–R12 di bawah adalah ID lokal epic dan berbeda arti dari R10–R12 inisiatif. Sumber parent disebut di tiap baris.
+Catatan: R10–R13 di bawah adalah ID lokal epic dan berbeda arti dari R10–R13 inisiatif. Sumber parent disebut di tiap baris.
 
 - R10 (parent R7; bench/round-1.md §Konfirmasi Adam dan §Evaluasi arah, keputusan Adam 2026-11-18): juri bench menilai juga kekayaan informasi & detail serta polesan warna & komponen, dengan kriteria umum yang tidak menyebut isi prompt tertentu, dan tetap buta. Terbukti bila juri baru pada pasangan PNG putaran 1 memberi A → pen.dev unggul (Lakar Kalah, paling baik Setara) dan B → Setara.
 - R11 (parent R12, bagian G0: cari, impor, atribusi, render offline; bukti prompt D milik G1; architecture AD-10 dan §Deferred; keputusan Adam 2026-11-18): agen mencari foto stok lewat tool Lakar. Foto diimpor sekali ke asset store `<dataDir>/assets/<sha256>` lalu dipakai sebagai fill gambar, dengan sumber, pembuat, dan lisensi tercatat. Render tidak bergantung pada jaringan.
 - R12 (parent R6; bench/round-1.md §Evaluasi arah; keputusan Adam 2026-11-18): skill mengarahkan hasil yang kaya dan berpoles, tidak datar. Isinya tint merek di bidang gelap, warna kedua semantik untuk status, chip/badge metrik, microcopy konteks, variasi status di daftar, ring/chart multi-warna, dan pemakaian foto. Anti-slop tetap berlaku, dan skill tetap tidak memuat rubrik (C7).
+- R13 (parent R3 dan R6; klaim pen.dev "stunning visual effects with shaders"; keputusan Adam 2026-11-18): render Lakar menyediakan efek visual setara pen.dev, minimal conic gradient dan grain/noise di atas gradien linear/radial berlapis yang sudah ada, dan bila investigasi menunjukkan pen.dev memakai shader sungguhan, shader fill statis berupa preset parametrik yang dirender WebGL di Chromium menjadi bitmap saat render (render tetap murni browser, AD-6; skema berubah lewat versi dan migrasi, AD-1–AD-4, AD-15). Skill memberi panduan kapan gradien membuat desain matang (tint bidang merek, glow, scrim foto, sorot kartu unggulan, ring/donut bergradasi) dalam batas anti-slop. Terbukti bila pada prompt latihan efek baru (bukan A–E) Lakar Setara atau Lebih baik dari pen.dev menurut juri v2.1, dan Adam sudah melihat PNG.
 
 ## Constraints
 
@@ -61,12 +62,13 @@ Catatan: R10–R12 di bawah adalah ID lokal epic dan berbeda arti dari R10–R12
 - `bench/round-1.md` berisi baseline pen.dev (median 3 run), hasil Lakar, skor juri, dan keputusan A dan B, sudah dikonfirmasi Adam (terpenuhi 2026-11-18: G0 gagal).
 - Juri terkalibrasi (versi dan sha256 teks juri tercatat) memberi hasil yang sejalan dengan penilaian Adam pada PNG putaran 1.
 - Agen bisa mencari, mengimpor, dan memakai foto stok lokal dengan atribusi tercatat, dan PNG tetap terbentuk tanpa jaringan.
+- Pada prompt latihan efek visual (P5/P6), Lakar Setara atau Lebih baik dari pen.dev menurut juri v2.1, waktu ≤ 1,5×, nol emoji, dan 0 error gerbang. Efek baru (conic, grain/noise, dan shader fill bila dibangun) lolos golden render, dan Adam sudah melihat PNG.
 - `bench/round-2.md` menunjukkan prompt A dan B setara atau lebih baik, nol emoji, dan waktu ≤ 1,5× median baseline, dengan juri terkalibrasi. Adam sudah mengonfirmasi. Tanpa ini G1 tidak dimulai.
 
 ## Boundaries
 
 - Milik G1: LC-02b, LC-03, LC-04, LC-06–LC-11, LC-13–LC-19, LC-21, LC-22, `webapp.md`, prompt C/D/E (termasuk bukti foto relevan di prompt D), dan desain target golden set di Lakar.
-- Milik G0 (putaran perbaikan): foto stok lokal (pencarian, impor, atribusi, render offline), kalibrasi juri, dan revisi skill.
+- Milik G0 (putaran perbaikan): foto stok lokal (pencarian, impor, atribusi, render offline), kalibrasi juri, revisi skill, dan efek visual gradien/shader (story 22).
 - Di luar G0: gambar AI (inisiatif boundaries, D).
 - Milik B: UI canvas, WebSocket progres, dan seleksi.
 - Must not change: modul render tetap bisa dimuat di browser biasa tanpa API Node (AD-6), karena epic B memakainya.
@@ -102,3 +104,9 @@ Catatan: R10–R12 di bawah adalah ID lokal epic dan berbeda arti dari R10–R12
 - Decision: 2026-11-18 — AD-10/§Deferred (penyedia foto) di spine arsitektur diputuskan oleh story 18. Spine tidak diedit Sofia. Tawarkan `bmad-architecture` untuk mencatatnya.
 - Decision: 2026-11-18 — ambang keputusan baru dan teks rubrik baru ditinjau Adam di plan_checkpoint story 17, sebelum dipakai. Hold-out kalibrasi: hasil uji-1 dilihat Adam, dan prompt latihan story 19 menjadi uji lanjutan di luar dua contoh putaran 1.
 - Decision: 2026-11-18 — story 19 tidak dipecah walau besar (revisi skill, run latihan di kedua alat, penilaian). Daftar story ditetapkan Adam, dan iterasi skill tanpa bukti latihan tidak berguna. Bila sesi build tidak cukup, builder memecahnya lewat REPLAN.
+- Decision: 2026-11-18 — Adam menambah story 22 "Efek visual gradien dan shader setara pen.dev" ke putaran perbaikan. pen.dev mengklaim efek visual dengan shader, sedangkan Lakar hanya punya gradien linear/radial berlapis tanpa conic, grain/noise, mesh, atau shader, dan skill belum memberi panduan kapan gradien membuat desain matang. Urutan build: 19 → 22 → 20 → 21. Story 20 kini menunggu 22 juga, karena sweep membersihkan temuan tunda 22 dan putaran 2 harus memakai kode yang sudah beku. Story 21 tetap menunggu 20 (dan 19). Requirement lokal R13 ditambahkan. Flag: plan_checkpoint, done_checkpoint, hitl (Adam melihat PNG), risk high. Anggaran sekitar $10–15, dicatat di laporan latihan.
+- Decision: 2026-11-18 — kedalaman story 22 ditetapkan di plan_checkpoint dari investigasi read-only pen.dev (MCP pencil, tanpa menimpa .pen) dan baseline P5/P6. Lantai: conic gradient, grain/noise, dan panduan gradien di skill. Shader fill WebGL statis hanya dibangun bila gap berasal dari shader sungguhan. Prompt efek P5/P6 baru, bukan turunan A/B, tanpa teks rubrik (C7), dan dibekukan dengan sha256 sebelum perubahan mesin/skill. Target: Setara/Lebih baik di semua prompt efek (bukan sebagian besar seperti story 19), karena jumlah promptnya hanya 1–2. PNG pen.dev baseline dipakai ulang di run ulang (C8: satu run per alat per prompt). Restart pen-desktop setelah seri pen.dev diizinkan Adam untuk melepas RAM (C9 tetap: tanpa service atau port baru).
+- Decision: 2026-11-18 — story 22 tidak dipecah (investigasi, prompt, baseline, mesin, skill, run ulang). Seperti story 19, bukti latihan adalah tujuan iterasinya. Bila sesi build tidak cukup atau plan memilih shader fill, builder memecahnya lewat REPLAN (mis. shader fill sebagai story terpisah sebelum 20).
+- Decision: 2026-11-18 — tipe fill baru (conic, grain/noise, dan shader fill bila dibangun) pasti mengubah katalog `fills[]` AD-15. Perubahannya lewat schemaVersion dan migrasi (AD-1–AD-4) dan dicatat di plan story 22. Spine arsitektur tidak diedit Sofia. Tawarkan `bmad-architecture` untuk memperbarui AD-15 saat plan_checkpoint story 22.
+- Decision: 2026-11-18 — konflik dengan DESIGN.md: DESIGN.md melarang glow (§Shadows), lebih dari satu gradien per board (§Colors, LC-21 milik G1), dan mesh di hero tanpa alasan merek (anti-slop). Panduan skill story 22 tetap di dalam aturan itu: tint merek, scrim foto, sorot kartu unggulan, dan ring/donut bergradasi dipakai satu efek gradien dominan per board, dan mesh hanya dengan alasan merek. Glow dan lebih dari satu gradien per board baru masuk skill bila Adam menyetujui amandemen DESIGN.md di plan_checkpoint (DESIGN.md di-exclude git, jadi versinya dicatat di plan).
+- Decision: 2026-11-18 — harness latihan story 19 sudah mencapai batas iterasi 8 dan memakai $54,94 dari anggaran $58,09. Story 22 memakai seri efek sendiri: set prompt efek terpisah dari P1–P4 yang ber-sha, batas iterasi sendiri, penghitung anggaran sendiri dengan batas $15 (keputusan Adam: sekitar $10–15), dan aturan lulus semua prompt efek. Bukti P1–P4 story 19 tidak diubah.
