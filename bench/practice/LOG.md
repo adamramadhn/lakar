@@ -631,3 +631,18 @@ dari isi `QlUl5ORY`, sisa −4,5 px ke lencana) dan `LC-24` `P2QitxDJ` (tinggi 2
   `landing.md` 5be5eaa2102a22eb (3500/3500, prosa 1490), `mobile.md` bdf73b6f372d6857 (total 3209, prosa 1500/1500).
   Contoh teruji (core/polish/landing/mobile/icons/api) lulus 0 error / 0 gerbang / 0 warning; `pnpm test` 922/922.
 - Seri iterasi 2 (`--iter 2 --reuse-pendev 1`) dijalankan sesi orkestrasi sesudah review; hasilnya dicatat di bawah.
+
+## Seri polish iterasi 2 (skill/check story 23, pen.dev dipakai ulang dari iterasi 1)
+
+Commit kode `f267188`; laporan `bench/polish-2.md`; strip Lakar `bench/practice/polish/2/`.
+
+| Prompt | Iter 1 (lama) | Iter 2 (baru) | T Lakar–pen.dev iter 1 → 2 | D | Waktu Lakar dtk (pen.dev) | Gerbang |
+|---|---|---|---|---|---|---|
+| P7 Rodaku (mobile) | Kalah (waktu 1,85×) | Kalah (waktu 1,79×) | 14–13 → 14–12 | 4–4 | 180,7 → 174,4 (97,5) | waktu gagal; layout gate 0 |
+| P8 Lumbung (dashboard) | Kalah (14–16) | **Setara** | 14–16 → 15–15 | 4–4 | 161,2 → 200,4 (213,6) | lolos |
+| P9 Mejaku (landing) | Lebih baik | **Setara** | 15–11 → 14–12 | 4–4 | 214,0 → 213,0 (161,9) | lolos |
+
+Emoji 0 di semua run. Biaya iterasi 2 $5,20; kumulatif $12,74 dari $15. Seri **belum lulus**: P7 kalah hanya karena
+gerbang waktu terhadap run pen.dev P7 yang cepat (97,5 dtk; board pen.dev 390×1177 melanggar ukuran 390×844), skor Lakar
+unggul. Sisa $2,26 tidak cukup untuk iterasi 3 penuh (perkiraan $5,70); iterasi P7 saja tanpa perubahan yang menyasar
+waktu = mengulang demi hasil (C8), jadi tidak dijalankan. Story berhenti `blocked` menunggu keputusan Adam.
