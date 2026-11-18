@@ -32,7 +32,7 @@ function fakeDaemon() {
     if (req.url === '/docs/open') return send(200, { ok: true, data: { docId: 'Dddddddd', slug: body.slug, rev: 0, created: true } });
     if (req.url === '/execute') {
       if (body.code === 'boom') return send(422, { ok: false, error: { code: 'EXEC_ERROR', message: 'error tak tertangkap', hint: 'perbaiki', retryable: false } });
-      return send(200, { ok: true, data: { docId: 'Dddddddd', rev: 1, created: [{ id: 'Bbbbbbbb', name: 'Tracer', path: 'Tracer' }] } });
+      return send(200, { ok: true, data: { docId: 'Dddddddd', rev: 1, created: [{ id: 'Bbbbbbbb', name: 'Tracer', path: ['Tracer'] }] } });
     }
     if (req.url === '/screenshot') {
       if (body.boardId === 'ZZZZZZZZ') return send(404, { ok: false, error: { code: 'NOT_FOUND', message: 'board tidak ada', hint: 'pakai id', retryable: false } });

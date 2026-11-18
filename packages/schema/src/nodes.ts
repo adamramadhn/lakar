@@ -357,7 +357,8 @@ export type HistoryEntry = {
   at: string;
 };
 
-export type CreatedEntry = { id: string; name: string; path: string };
+/** `path` = list nama dari board ke node (nama boleh memuat " / "); hanya untuk dibaca, alamat op tetap `id`. */
+export type CreatedEntry = { id: string; name: string; path: string[] };
 
 // ---------------------------------------------------------------------------
 // Pemetaan issue zod → LakarError SCHEMA_INVALID

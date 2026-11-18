@@ -89,7 +89,18 @@ describe('@lakar/daemon', () => {
     expect((await call('/docs/open', { slug: 'rusak2' }, await newSession())).body.error!.code).toBe('SCHEMA_INVALID');
   });
 
-  it.each(['../x', 'A B', ''])('slug tidak valid %j → SCHEMA_INVALID + hint pola', async (slug) => {
+  it('file schemaVersion lebih baru → VERSION_MISMATCH + hint perbarui, bukan "rusak"', async () => {
+    const { mkdir } = await import('node:fs/promises');
+    await mkdir(join(dataDir, 'docs'), { recursive: true });
+    await writeFile(join(dataDir, 'docs', 'masa-depan.lakar.json'), '{"schemaVersion":2,"id":"Dddddddd","rev":0,"pages":[]}', 'utf8');
+    const r = await call('/docs/open', { slug: 'masa-depan' }, await newSession());
+    expect(r.body.ok).toBe(false);
+    expect(r.body.error!.code).toBe('VERSION_MISMATCH');
+    expect(r.body.error!.hint).toMatch(/perbarui Lakar/);
+    expect(r.body.error!.message).not.toMatch(/rusak/);
+  });
+
+    it.each(['../x', 'A B', ''])('slug tidak valid %j → SCHEMA_INVALID + hint pola', async (slug) => {
     const r = await call('/docs/open', { slug }, await newSession());
     expect(r.status).toBe(400);
     expect(r.body.error).toMatchObject({ code: 'SCHEMA_INVALID', retryable: false });
@@ -133,8 +144,8 @@ describe('@lakar/daemon', () => {
       expect(r.status).toBe(200);
       expect(r.body.data.rev).toBe(1);
       expect(r.body.data.created).toEqual([
-        { id: expect.stringMatching(/^[A-Za-z0-9]{8}$/), name: 'Tracer', path: 'Tracer' },
-        { id: expect.stringMatching(/^[A-Za-z0-9]{8}$/), name: 'Judul', path: 'Tracer/Judul' },
+        { id: expect.stringMatching(/^[A-Za-z0-9]{8}$/), name: 'Tracer', path: ['Tracer'] },
+        { id: expect.stringMatching(/^[A-Za-z0-9]{8}$/), name: 'Judul', path: ['Tracer', 'Judul'] },
       ]);
       const doc = JSON.parse(await readFile(file(), 'utf8'));
       expect(doc.rev).toBe(1);
@@ -144,6 +155,14 @@ describe('@lakar/daemon', () => {
       expect(JSON.parse(lines[0]!)).toMatchObject({ rev: 1, sessionId: s, description: 'board tracer', opsSummary: 'add×2' });
       const files = readdirSync(join(dataDir, 'docs'));
       expect(files.filter((f) => f.endsWith('.tmp'))).toEqual([]);
+    });
+
+    it('snippet tanpa mutasi → ok, rev tetap, file dan riwayat tidak berubah', async () => {
+      const before = await snapshot();
+      const r = await call('/execute', { code: '1+1', description: 'baca saja' }, s);
+      expect(r.status, JSON.stringify(r.body.error)).toBe(200);
+      expect(r.body).toEqual({ ok: true, data: { docId: expect.stringMatching(/^[A-Za-z0-9]{8}$/), rev: 1, created: [] } });
+      expect(await snapshot()).toEqual(before);
     });
 
     it('x/y pada node flow → SCHEMA_INVALID + hint, rollback penuh, file tidak berubah', async () => {
@@ -223,14 +242,14 @@ describe('execute katalog v1', () => {
     expect(r.status, JSON.stringify(r.body.error)).toBe(200);
     expect(r.body.ok).toBe(true);
     expect(r.body.data.created).toHaveLength(7);
-    expect(r.body.data.created.map((c: { path: string }) => c.path)).toEqual([
-      'Katalog',
-      'Katalog/Isi',
-      'Katalog/Isi/Judul',
-      'Katalog/Isi/Garis',
-      'Katalog/Isi/Titik',
-      'Katalog/Isi/Panah',
-      'Katalog/Icon / lucide / arrow-right',
+    expect(r.body.data.created.map((c: { path: string[] }) => c.path)).toEqual([
+      ['Katalog'],
+      ['Katalog', 'Isi'],
+      ['Katalog', 'Isi', 'Judul'],
+      ['Katalog', 'Isi', 'Garis'],
+      ['Katalog', 'Isi', 'Titik'],
+      ['Katalog', 'Isi', 'Panah'],
+      ['Katalog', 'Icon / lucide / arrow-right'],
     ]);
     const doc = JSON.parse(await readFile(file(), 'utf8'));
     expect(doc.rev).toBe(1);

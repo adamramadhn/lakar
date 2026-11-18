@@ -16,6 +16,9 @@
   "files": [
     "dist"
   ],
+  "scripts": {
+    "test": "vitest run --root ../.. packages/core/"
+  },
   "dependencies": {
     "@lakar/schema": "workspace:*"
   }

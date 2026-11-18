@@ -51,7 +51,7 @@ describe('@lakar/core', () => {
     const r = tx.commit('tracer board');
     expect(r.doc.rev).toBe(1);
     expect(r.entry).toEqual({ rev: 1, sessionId: 's1', description: 'tracer board', opsSummary: 'add×4', at: '2026-11-17T00:00:00.000Z' });
-    expect(r.created.map((c) => c.path)).toEqual(['Tracer', 'Tracer/Isi', 'Tracer/Isi/Judul', 'Tracer/Isi/Judul']);
+    expect(r.created.map((c) => c.path)).toEqual([['Tracer'], ['Tracer', 'Isi'], ['Tracer', 'Isi', 'Judul'], ['Tracer', 'Isi', 'Judul']]);
     expect(new Set(r.created.map((c) => c.id)).size).toBe(4);
     expect(parseDocument(r.doc)).toEqual(r.doc);
     expect(doc).toEqual(before); // dokumen asli tidak dimutasi

@@ -1,4 +1,4 @@
-/** Mutex FIFO sederhana berbasis promise. */
+/** Mutex FIFO sederhana berbasis promise (adaptor Chromium). Kunci per dokumen: `DocumentLocks` di core. */
 export class Mutex {
   #tail: Promise<void> = Promise.resolve();
   async run<T>(fn: () => Promise<T>): Promise<T> {
@@ -14,12 +14,3 @@ export class Mutex {
   }
 }
 
-/** Satu mutex per kunci (mis. per dokumen, AD-4). */
-export class KeyedMutex {
-  readonly #locks = new Map<string, Mutex>();
-  run<T>(key: string, fn: () => Promise<T>): Promise<T> {
-    let m = this.#locks.get(key);
-    if (!m) this.#locks.set(key, (m = new Mutex()));
-    return m.run(fn);
-  }
-}

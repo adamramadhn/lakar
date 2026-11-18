@@ -39,7 +39,8 @@ export class DocStore {
     try {
       return parseDocument(json);
     } catch (e) {
-      if (e instanceof LakarError) {
+      // VERSION_MISMATCH (dokumen lebih baru / migrasi hilang) bukan file rusak: teruskan dengan hint pembaruan.
+      if (e instanceof LakarError && e.code !== 'VERSION_MISMATCH') {
         throw new LakarError(e.code, `file dokumen ${slug}.lakar.json rusak: ${e.message}`, { hint: 'pulihkan file dari cadangan atau buka slug lain' });
       }
       throw e;

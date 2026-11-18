@@ -1,6 +1,6 @@
 // HTTP API lakard (fastify, 127.0.0.1). Bentuk respons AD-11: {ok:true,data} | {ok:false,error}.
 import Fastify, { type FastifyInstance, type FastifyReply } from 'fastify';
-import { beginTransaction, createDocument } from '@lakar/core';
+import { DocumentLocks, createDocument, transact } from '@lakar/core';
 import { runSnippet } from '@lakar/exec';
 import type { RenderPort } from '@lakar/ports';
 import { findBoard } from '@lakar/render';
@@ -16,7 +16,6 @@ import {
 import { z } from 'zod';
 import { readRenderModule, RENDER_PAGE_HTML } from './chromium.js';
 import type { DaemonConfig } from './config.js';
-import { KeyedMutex } from './mutex.js';
 import { SESSION_HEADER, Sessions, UnknownSessionError } from './sessions.js';
 import { DocStore } from './store.js';
 
@@ -47,7 +46,7 @@ export function buildServer({ config, render }: BuildOptions): Daemon {
   const app = Fastify({ logger: false, bodyLimit: 1024 * 1024 });
   const store = new DocStore(config.dataDir);
   const sessions = new Sessions();
-  const docLocks = new KeyedMutex();
+  const docLocks = new DocumentLocks();
   /** Daemon pemilik tunggal (AD-1): salinan terkini per slug. */
   const docs = new Map<string, LakarDocument>();
 
@@ -122,13 +121,14 @@ export function buildServer({ config, render }: BuildOptions): Daemon {
     const { code, description } = parse(ExecuteBody, req.body, 'kirim {code, description?}');
     const data = await docLocks.run(slug, async () => {
       const doc = docs.get(slug)!;
-      const tx = beginTransaction(doc, { sessionId: session.id });
-      const run = await runSnippet(code, tx, { timeoutMs: config.execTimeoutMs, memoryBytes: config.execMemoryBytes });
-      if (!run.ok) {
-        tx.rollback();
-        throw run.error;
-      }
-      const committed = tx.commit(description?.trim() || 'execute');
+      // AD-4: error tak tertangkap di snippet → lempar di dalam body → rollback penuh oleh `transact`.
+      const committed = await transact(doc, { sessionId: session.id, description: description?.trim() || 'execute' }, async (tx) => {
+        const run = await runSnippet(code, tx, { timeoutMs: config.execTimeoutMs, memoryBytes: config.execMemoryBytes });
+        if (!run.ok) throw run.error;
+        return run.value;
+      });
+      // Tanpa op sukses (snippet baca-saja): tidak ada revisi baru, file dan riwayat tidak disentuh.
+      if (committed.entry === null) return { docId: doc.id, rev: doc.rev, created: [] };
       await store.write(slug, committed.doc);
       // Disk sudah rev N+1: memori harus ikut sebelum langkah yang bisa gagal berikutnya.
       docs.set(slug, committed.doc);
