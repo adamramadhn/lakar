@@ -137,3 +137,56 @@ Sesuai plan §Iterasi butir 4, tidak ada iterasi ke-4 (juga sisa anggaran $2,20 
 - Butuh keputusan Adam: (a) key Pexels (bila tersedia) atau penyedia foto lain/timeout Openverse lebih panjang di
   luar story ini; (b) apakah iterasi skill dilanjutkan dengan anggaran baru; (c) penilaian PNG
   `bench/practice/<k>/<P>-lakar.png` vs `bench/runs/practice/<k>/<P>-pendev.png`.
+
+## Blokir dibuka (2026-11-18, keputusan Adam)
+
+Penyedia foto utama kini Wikimedia Commons (`wikimedia:<pageid>`, commit da36b22); anggaran tambahan ≤ $30 untuk
+maksimal 3 iterasi lagi (4–6; batas kumulatif $57,80); semua iterasi 4–6 memakai `--reuse-pendev 2` (pen.dev tidak
+dijalankan ulang). Harness: `MAX_ITER` 6, `BUDGET_USD` 57,8, preflight mode reuse tidak mewajibkan service pen-desktop
+aktif (penjaga md5 `.pen` tetap). Prompt beku dan aturan juri/keputusan v2.1 tidak berubah.
+
+## Iterasi 4: skill v4
+
+Perubahan (prinsip umum, dari bukti iterasi 3 lintas prompt):
+
+- **Foto benar-benar dipakai.** Foto wajib untuk isi nyata (orang, tempat, makanan, produk, media) di hero, sampul,
+  kartu konten, avatar. Satu pencarian `limit:12` mengisi semua slot sejenis (maks 2 pencarian paralel bersama
+  `open_doc`, tanpa pengulangan). Kueri 2–3 kata benda Inggris yang visual (tempat/objek/suasana); orang = kueri potret
+  stok umum, bukan nama/jabatan/rapat. Pilih foto berwarna, kontemporer, subjek jelas, berbeda per butir. Alasan: R1/R5/R10
+  di P1/P2 jatuh karena foto yang diminta tidak ada (sampul/avatar inisial dibaca placeholder); Wikimedia kini andal
+  (diuji: hasil relevan untuk makanan, tempat, objek, dan potret stok CC0).
+- **Koleksi cerah dan bermakna, bukan redup.** Aturan v2 "koleksi memakai nada redup" dicabut. Tile/kategori tanpa foto
+  memakai bidang cerah `C.data` dengan teks kontras, nada = kategori tertulis; bukan kusam, bukan pelangi acak. Fokus
+  dijaga lewat ukuran/posisi. Alasan: juri menyebut "tile mix kusam" (P2 R10).
+- **Pendamping dan status berulang.** `acc2` dan warna status masing-masing muncul di ≥ 2 bagian dengan makna sama.
+  Alasan: "hijau hanya muncul sekali" (P2 R10).
+- **Tanpa potongan/luberan.** Kartu berteks tinggi `hug` (baris `align:'stretch'`), lebar isi bar = persen × lebar induk;
+  kritik diri screenshot memeriksa teks terpotong, bar meluber, dan slot foto kosong. Alasan: kartu mentor terpotong dan
+  bar meluber di P1 (R10).
+- Pengganti saat pencarian gagal: tidak lagi inisial di area foto besar.
+- `core.md` dipadatkan agar ≤ 4000 token (3999); detail jenis layar ke `landing.md` (foto hero/potret mentor) dan
+  `mobile.md` (sampul/tile/thumbnail foto, avatar foto).
+
+Skill: `core.md` `39be8af8dcb0ad25`, `landing.md` `f0049a9b76822eea`, `mobile.md` `0e06e3ff150f7560` (HEAD `bdd7d04`).
+
+### Iterasi 4 dihentikan (2026-11-18, sebelum juri): unduhan foto Wikimedia ditolak 429
+
+- Run: P1 Lakar `success` (272,0 dtk = 1,24× pen.dev, $1,79), P2 Lakar `success` (140,0 dtk = 0,95×, $0,87), P3 Lakar
+  dihentikan di tengah run (belum ada `run.json`; biaya tidak tercatat, perkiraan < $0,30), P4 dan juri belum
+  dijalankan. Belum ada `bench/practice-4.md`. Terpakai iterasi 4 ≈ $2,66 (+ P3 parsial); kumulatif ≈ $30,5–30,8.
+- Skill v4 bekerja sesuai niat: agen memanggil `photo_search` paralel bersama `open_doc` dengan `limit:12`, memilih
+  foto untuk hero, mentor, sampul, dan avatar. Pencarian (API `commons.wikimedia.org`) berhasil.
+- **Penghambat (bukan skill):** setiap **unduhan** gambar ke `upload.wikimedia.org` dari daemon dijawab
+  `HTTP 429 Too many requests` (`retry-after: 120`), untuk file asli maupun thumbnail 1280/1920/3840. Di P1 hanya 2
+  foto yang sempat terimpor; agen menghabiskan 6 execute gagal (waktu + biaya). Di P2 semua foto gagal → sampul inisial.
+- Diagnosis (diuji dengan `curl` dan `SafeNet` daemon, URL sama): HTTP/1.1 + User-Agent tanpa info kontak
+  (`Lakar/0.1 (internal design tool)`, juga `curl/8.5.0`) → 429; User-Agent yang memuat URL kontak → 200; HTTP/2 → 200.
+  Kebijakan User-Agent Wikimedia meminta info kontak (URL atau email) untuk klien otomatis; klien tanpa kontak
+  dibatasi keras. Pada story 1.18 batas ini belum terpicu (volume kecil).
+- Tidak diakali: mengisi URL/email kontak palsu atau mengganti protokol hanya untuk lolos pembatas sama dengan
+  mengakali rate limit (dilarang plan 1.18), dan info kontak asli adalah data Adam (tidak boleh diisi tanpa izin).
+  Iterasi dihentikan agar anggaran tidak terbuang pada run tanpa foto.
+- **Butuh keputusan Adam:** info kontak untuk User-Agent Lakar (URL repo/proyek atau email operasional) yang boleh
+  dikirim ke Wikimedia, atau penyedia foto lain. Sesudah itu: lanjutkan iterasi 4 (`--resume` hanya mengulang P3; P1/P2
+  tetap dengan foto gagal) atau mulai iterasi 5 baru (`--iter 5 --reuse-pendev 2`, disarankan; sisa iterasi 5–6,
+  sisa anggaran ≈ $27).
