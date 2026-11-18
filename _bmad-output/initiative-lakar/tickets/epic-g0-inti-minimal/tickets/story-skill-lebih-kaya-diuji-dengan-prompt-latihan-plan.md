@@ -3,7 +3,7 @@ title: 'Skill lebih kaya diuji dengan prompt latihan'
 type: feature
 ticket: '19'
 created: '2026-11-18'
-status: blocked
+status: in-progress
 baseline_revision: '97ec58176a5e8d7abf19dddc6f7d6ac79266cc85'
 route: full
 route_source: auto
@@ -34,8 +34,6 @@ deferred:
     location: >-
       packages/check/src/rules.ts (lc20)
     severity: medium
-blocked_at: "2026-11-18"
-blocked_reason: "Iterasi 7 (konfirmasi terakhir) dibatalkan: P3 invalid (dokumen sisa iterasi 4 tidak diarsip), juri tidak berjalan, P4 tidak dijalankan; butuh keputusan Adam (run ulang P3/P4+juri, perbaikan arsip)"
 ---
 
 <intent-contract>
@@ -151,6 +149,13 @@ Catatan orkestrator lanjutan 2026-11-18 (iterasi 7, konfirmasi; menggantikan but
 - LC-20 kini error gerbang untuk konten terpotong/tertutup zona bawah (commit db1df37; plan `plan-1-11-lc20-zona-bawah-struktural.md`).
 - Iterasi 7 belum lulus → HALT `blocked` dengan LOG.
 
+Catatan orkestrator lanjutan 2026-11-18 (iterasi 8, ulang penuh iterasi 7; menggantikan butir "Tidak ada iterasi ke-8" dan "Iterasi 7 belum lulus → HALT" di atas, lihat Plan Change Log):
+- Iterasi 7 dibatalkan karena cacat harness (dokumen sisa run terhenti tidak diarsip → P3 `invalid`, juri tidak jalan, P4 tidak dijalankan), bukan karena hasil desain. Pengecualian C8: iterasi 7 diulang **penuh** sebagai iterasi **8** (keempat prompt + juri), `practice --iter 8 --reuse-pendev 2` (pen.dev tidak dijalankan/disentuh). Alasan ini dicatat di LOG.md.
+- Anggaran iterasi 8 ≤ **$10** → batas kumulatif = kumulatif sebelum iterasi 8 + $10; `MAX_ITER` 8 / `BUDGET_USD` disesuaikan di `bench/src/practice/main.ts` + tes. Tidak ada iterasi ke-9.
+- Sebelum run: `--dry-run` harus menunjukkan dokumen sisa run terhenti diarsip (perbaikan arsip commit cb88e3e; plan `plan-1-19-arsip-run-terhenti-dan-lc20-tab-bar-mengambang.md`; LC-20 tab bar mengambang ikut diperbaiki).
+- Skill v7 (prinsip umum, kata sendiri, C7; tanpa rubrik/prompt A/B/teks prompt latihan/nama produk latihan): layar pertama mobile tanpa duplikasi konten (item yang sama tidak muncul dua kali, mis. di kartu "lanjut" dan di player/bilah); daftar/thumbnail konten nyata memakai foto bila tersedia, bukan bidang warna polos; cukup banyak item agar layar terasa hidup tanpa terpotong; disiplin execute: maks 3 execute, tanpa `inspect` di langkah akhir, temuan diperbaiki dalam satu execute. `core.md` ≤ 4000 token; detail mobile di `mobile.md`.
+- Iterasi 8 belum lulus → HALT `blocked` dengan LOG.
+
 ## Plan Change Log
 
 - 2026-11-18 — Blokir dibuka atas keputusan Adam (setelah HALT `blocked` iterasi 3, $27,80 terpakai):
@@ -178,6 +183,15 @@ Catatan orkestrator lanjutan 2026-11-18 (iterasi 7, konfirmasi; menggantikan but
   (3) SATU iterasi konfirmasi (iterasi 7) dengan anggaran ≤ $10 (batas kumulatif $55,18; `MAX_ITER` 7) dan
   `--reuse-pendev 2` (tanpa run pen.dev; RAM terbatas). Intent-contract, prompt latihan (sha 582c5d11…), dan aturan
   keputusan/juri v2.1 tidak diubah. Bila iterasi 7 belum lulus → HALT `blocked` dengan LOG; tidak ada iterasi ke-8.
+- 2026-11-18 — Blokir dibuka atas keputusan Adam (setelah HALT `blocked` iterasi 7 yang dibatalkan karena cacat harness:
+  P3 `invalid` akibat dokumen sisa run terhenti iterasi 4, P4 tidak dijalankan, juri tidak berjalan): (1) arsip run
+  terhenti dan LC-20 tab bar mengambang diperbaiki (commit cb88e3e; plan
+  `plan-1-19-arsip-run-terhenti-dan-lc20-tab-bar-mengambang.md`); (2) skill v7 menambah prinsip mobile (layar pertama
+  tanpa duplikasi konten, thumbnail konten nyata berfoto, cukup banyak item tanpa terpotong) dan disiplin execute (maks 3,
+  tanpa `inspect` di akhir, perbaikan dalam satu execute); (3) iterasi 7 diulang PENUH sebagai iterasi 8 (keempat prompt +
+  juri) — pengecualian C8 karena run sebelumnya batal akibat cacat harness, bukan pemilihan hasil; anggaran iterasi 8
+  ≤ $10, `--reuse-pendev 2` (tanpa run pen.dev). Intent-contract, prompt latihan (sha 582c5d11…), dan aturan
+  keputusan/juri v2.1 tidak diubah. Bila iterasi 8 belum lulus → HALT `blocked` dengan LOG; tidak ada iterasi ke-9.
 
 ## Review Triage Log
 
