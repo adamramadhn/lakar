@@ -80,6 +80,7 @@ runner, pembungkus (`bench/protocol/wrapper.txt`, read-only), dan juri rubrik v2
 - **Keluaran:** `bench/practice-<k>.md|json` (tracked), strip Lakar `bench/practice/<k>/<P>-lakar.png` (tracked,
   eksklusif), artefak mentah dan strip/`.pen` pen.dev lokal di `bench/runs/practice/<k>/` (EULA). Log iterasi skill:
   `bench/practice/LOG.md`.
+- Arsip slug Lakar sebelum run (semua seri dan `round`) memindai `runs/rounds`, `runs/practice`, `runs/practice-effects`, dan `runs/practice-polish`.
 
 ### Seri efek (`practice --series effects`, story 22)
 
@@ -97,6 +98,7 @@ md5 `.pen` sama dengan seri `practice`; tanpa `--series` perilaku seri P1–P4 t
   sebelum juri (`restartPenDesktopAfterSeries`, `bench/src/sys.ts`): `systemctl restart pen-desktop`, tunggu `is-active`
   dan satu panggilan baca MCP pencil (`get_app_state`) berhasil, maks 120 dtk. Hasil dan durasi tercatat di laporan;
   gagal → laporan ditandai, juri tetap jalan. Tidak pernah saat `--reuse-pendev` atau `--dry-run`.
+
 ### Seri polish (`practice --series polish`, story 23)
 
 Seri ketiga untuk disiplin spacing dan komponen: tiga prompt hold-out beku `bench/practice/polish/prompts.json` (P7 mobile
@@ -104,8 +106,6 @@ terang, P8 dashboard 1440×900, P9 landing; sha `POLISH_PROMPTS_SHA256`, penjaga
 maks 3 iterasi, anggaran kumulatif $15 (`bench/polish-<j>.json`), semua prompt wajib Setara/Lebih baik. Iterasi 1 =
 baseline skill/check lama (pen.dev + Lakar + juri); iterasi 2 = sesudah perubahan dengan `--reuse-pendev 1` (C8), laporan
 memuat tabel iterasi 1 vs sesudah. Run di `bench/runs/practice-polish/<k>/`, strip Lakar `bench/practice/polish/<k>/`.
-
-- Arsip slug Lakar sebelum run (semua seri dan `round`) memindai `runs/rounds`, `runs/practice`, `runs/practice-effects`, dan `runs/practice-polish`.
 
 ## Batasan
 

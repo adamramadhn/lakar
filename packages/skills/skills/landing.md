@@ -11,8 +11,8 @@ Board `1440 × bebas` (`screen:'landing'`). Mulai dengan tinggi besar (mis. 2000
 - **Header seksi:** h2 → body-lg secondary, lebar ≤ 720. Rata kiri atau tengah, konsisten. Overline aksen maks 2 per halaman dan hanya bila membawa informasi (kategori, langkah), bukan di setiap seksi. Baris meta maks 2 "·".
 - **Ritme:** dua seksi bersebelahan tidak boleh berstruktur sama (variasikan: bento, dua kolom teks + visual, daftar langkah, tabel banding, seksi bidang merek). Latar seksi bergantian putih → `C.field` → putih → `C.deep` (teks `C.on`/terang, satu seksi saja), bukan abu polos. Dalam grid ≥ 3 kartu, minimal satu kartu berbeda lebar, ditekankan (bidang/solid), atau memuat elemen non-teks.
 - **Kartu fitur/langkah:** ikon 24 di wadah 48 (tint; solid aksen untuk butir yang ditekankan), judul h4, deskripsi body-sm, dan satu detail konkret berpembanding (angka, durasi, harga) atau `Badge`. Alur bertahap: nomor/penanda tahap + garis penghubung, tahap kini disorot.
-- **Orang (testimoni, tim, profil):** foto potret kartu (`Image /` tinggi 240–320, fill cover) atau avatar foto 48–64, semua dari satu pencarian potret (`limit:12`), satu orang berbeda per kartu; kutipan spesifik (hasil + konteks: angka sebelum → sesudah), nama, peran/usaha, kota. Rating: ikon `star` `filled:true` warna `C.acc2` + angka. Kartu orang tidak kembar: satu kartu sorotan (bidang/lebih lebar) atau metrik hasil berwarna.
-- **Pricing/jadwal:** 2–4 tier atau slot jadwal. Unggulan ditonjolkan satu cara (`C.deep` dengan teks terang + bayangan md, atau border aksen) + `Badge`; CTA-nya primer, lainnya sekunder. Keadaan tiap pilihan terlihat (sisa kuota, tanggal, habis/tersedia). Harga h1/display-lg tabular, fitur dengan ikon `check`. Kartu tier sama tinggi (`align:'stretch'` pada baris), CTA sejajar di bawah (`justify:'space-between'`). Label CTA dengan maksud sama memakai teks yang sama di seluruh halaman.
+- **Orang (testimoni, tim, profil):** foto potret kartu (`Image /` tinggi 240–320, fill cover) atau avatar foto 48–64, semua dari satu pencarian potret (`limit:12`), satu orang berbeda per kartu; kutipan spesifik (hasil + konteks: angka sebelum → sesudah), nama, peran/usaha, kota. Rating: ikon `star` `filled:true` warna `C.acc2` + angka. Kartu orang tidak kembar: satu sorotan (bidang/lebih lebar) atau metrik hasil berwarna.
+- **Pricing/jadwal:** 2–4 tier atau slot jadwal. Unggulan ditonjolkan satu cara (`C.deep` dengan teks terang + bayangan md, atau border aksen) + `Badge` (di `C.deep`: arg ke-6 `C.deep`); CTA-nya primer, lainnya sekunder. Keadaan tiap pilihan terlihat (kuota, tanggal, habis/tersedia). Harga h1/display-lg tabular, fitur dengan ikon `check`. Kartu tier sama tinggi (`align:'stretch'` pada baris), CTA sejajar di bawah (`justify:'space-between'`). Label CTA bermaksud sama = teks sama di seluruh halaman.
 - **CTA penutup** (boleh `Ekstra /`) dan **footer:** logo + satu kalimat, 3–4 kolom tautan, hak cipta; tautan sosial dengan logo simple-icons atau teks.
 
 ## Alur execute
@@ -58,7 +58,7 @@ const cta=Row(copy,'CTA',{gap:12,padding:[8,0,0,0]});
 Btn(cta,'Coba sampel');
 Btn(cta,'Lihat jadwal sangrai','secondary');
 T(copy,'Penguat','Gratis ongkir untuk 3 pengiriman pertama · berhenti kapan saja','body-sm',{color:C.t3});
-// Mockup dasbor dipotong tepi bawah
+// Mockup dipotong tepi bawah
 const crop=F(hero,'Crop / Dasbor',{width:1040,height:240,clip:true});
 const app=F(crop,'Mockup / Dasbor',{width:'fill',height:'hug',padding:24,gap:20,radius:[16,16,0,0],fills:fill(C.bg),stroke:line(),shadows:[{x:0,y:4,blur:16,color:'#10182814'}]});
 const top=Row(app,'Header',{width:'fill',justify:'space-between'});

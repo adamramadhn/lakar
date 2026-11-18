@@ -623,10 +623,11 @@ dari isi `QlUl5ORY`, sisa −4,5 px ke lencana) dan `LC-24` `P2QitxDJ` (tinggi 2
 - `@lakar/check`: LC-02b, LC-04, LC-11 (error·gerbang) dan LC-18, LC-23–LC-30 (warning), maks 3 warning per aturan per
   board (`(+n serupa)`), detail ≤ 120. Temuan LC-04 level warning (gradien/opacity/blend) tidak dihitung gerbang.
 - Skill: `polish.md` baru (dibaca paralel dengan `core` + jenis layar); `core.md` `Badge(p,label,tone,icon,size='sm')`
-  sm 20 / md 24 dengan teks nada gelap (fg × 0,5; latar gelap tetap fg terang), alur langkah 1 membaca `polish`, frasa
+  sm 20 / md 24 dengan teks nada gelap (fg × 0,5; board gelap tetap fg terang; arg ke-6 = permukaan gelap di board terang,
+  mis. `C.deep` → teks `C.on` di atas `C.on`+1F), alur langkah 1 membaca `polish`, frasa
   terlarang dan detail spacing/radius dipindah ke `polish`; `landing.md`/`mobile.md` overline maks 2, "·" maks 2 per meta,
   grid 12 kolom landing; contoh disesuaikan (Badge sm, radius konsentris, kelompok judul + daftar, ≤ 6 ukuran huruf).
-- Skill sha16 / token: `core.md` 4b76e5eaa59219ec (4000/4000), `polish.md` 16bd668b35f25124 (total 2056, prosa 1739),
-  `landing.md` 98a40de3e63f4f57 (3500/3500, prosa 1488), `mobile.md` bdf73b6f372d6857 (total 3209, prosa 1500/1500).
+- Skill sha16 / token: `core.md` a12fcb7624abcbe6 (3988/4000), `polish.md` cfc47f389dbe80cd (total 2207, prosa 1818),
+  `landing.md` 5be5eaa2102a22eb (3500/3500, prosa 1490), `mobile.md` bdf73b6f372d6857 (total 3209, prosa 1500/1500).
   Contoh teruji (core/polish/landing/mobile/icons/api) lulus 0 error / 0 gerbang / 0 warning; `pnpm test` 922/922.
 - Seri iterasi 2 (`--iter 2 --reuse-pendev 1`) dijalankan sesi orkestrasi sesudah review; hasilnya dicatat di bawah.

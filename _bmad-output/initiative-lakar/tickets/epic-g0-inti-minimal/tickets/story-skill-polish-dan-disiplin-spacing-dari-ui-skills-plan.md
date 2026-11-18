@@ -3,14 +3,14 @@ title: 'Skill polish dan disiplin spacing dari ui-skills'
 type: feature
 ticket: '23'
 created: '2026-11-18'
-status: in-progress
+status: in-review
 baseline_revision: '7fce0c5b13eafef6df9ef04fa73644fe1092f6a3'
 route: full
 route_source: auto
 risk: high
-review: ''
-review_source: ''
-lenses_ran: []
+review: quick
+review_source: pinned
+lenses_ran: [quick]
 review_loop_iteration: 0
 followup_review_recommended: false
 context:
@@ -100,7 +100,8 @@ deferred: []
 - Implementer (2026-11-18): task ketiga s.d. kesembilan selesai; build + `pnpm test` (922/922) + restart lakard + `tools/node26/verify.sh` lulus. Task terakhir (seri `--iter 2 --reuse-pendev 1`, iterasi 3 bila perlu, laporan ke Adam) tetap untuk sesi orkestrasi. Implementer tidak menjalankan seri bench dan tidak membaca `bench/polish-1.md`, berkas juri, atau rubrik.
 - Pindaian arsip (90 dok, 126 board; detail di `bench/practice/LOG.md` §1.23): sebelum = 34 error (LC-20). Sesudah: LC-20 34, LC-02b 36 (16 dok), LC-04 579 error (55 dok) + 36 warning, LC-11 0; warning LC-18 26, LC-23 42, LC-24 125, LC-25 110, LC-26 26, LC-27 30, LC-28 10, LC-29 0, LC-30 0. Dok dengan gate > 0: 16 → 65. LC-04: 579/579 latar terhitung = latar piksel (selisih kanal ≤ 1) → 0 positif palsu. LC-02b: definisi awal 92 temuan dengan positif palsu (luapan 1–4 px ke padding lega); diperbaiki sekali (sisa jarak < 4 px ke batas tampak) → 36 temuan, semua cacat nyata di crop PNG. Ketiga aturan error tetap error·gerbang.
 - Bukti B round-2: `LC-02b` `c2KYVEr1` (16,5 px, sisa −4,5 px ke lencana) dan `LC-24` `P2QitxDJ` (24 > 20), plus `LC-23`.
-- Skill: core 4000/4000, polish 2056/3200 (prosa 1739), landing 3500/3500, mobile 3209 (prosa 1500/1500).
+- Skill: core 3988/4000, polish 2207/3200 (prosa 1818), landing 3500/3500, mobile 3209 (prosa 1500/1500).
+- Perbaikan review: `Badge` arg ke-6 `on` (permukaan; default `C.bg`): permukaan gelap di board terang → teks/ikon `C.on` di atas `C.on`+1F (contoh teruji di `polish.md`, disebut di core dan baris pricing landing); "Pencarian gagal" dipindah dari core ke polish. Laporan putaran menurunkan daftar R3/R7 dari `frozen.g0Rules` (fallback `G0_RULES`). README bench: butir arsip slug kembali ke bagian latihan umum.
 
 ## Plan Change Log
 
@@ -111,6 +112,14 @@ deferred: []
 - 2026-11-18 (implementer): frasa terlarang dipindah dari `core.md` ke `polish.md` (tidak dihapus) agar core ≤ 4000 token.
 
 ## Review Triage Log
+
+### 2026-11-18 — Review pass
+- verdicts: 4 findings — high 0, medium 2, low 2, false 0, maybe-false 0
+- findings:
+  - `[medium]` `[patch]` Prelude `Badge` memilih tinta dari `C.bg` seluruh board, sehingga Badge di permukaan `C.deep` pada board terang (tier unggulan pricing, seksi deep) mendapat teks gelap di tint gelap → error gerbang LC-04 — dipatch: argumen ke-6 opsional `on` (permukaan); permukaan gelap di board terang → teks/ikon `C.on` + tint `C.on+'1F'`; disebut di core (Peran T) dan baris pricing landing; contoh polish berakhir dengan Badge di baris `C.deep` (0/0/0); core 3988/4000, landing 3500/3500.
+  - `[medium]` `[patch]` `r3r7Missing` membaca `G0_RULES` hidup, sehingga laporan putaran lama yang di-render ulang (`--resume`) mengklaim LC-11/LC-18 ada — dipatch: `frozenG0Rules(r.frozen?.g0Rules)` dengan fallback ke `G0_RULES`; snapshot historis dipulihkan; tes baru.
+  - `[low]` `[patch]` Butir umum "Arsip slug Lakar…" di `bench/README.md` terletak di bawah `### Seri polish` — dipindah kembali ke bagian umum latihan.
+  - `[low]` `[reject]` `RANGE_HYPHEN` (LC-30) tidak menandai `Rp50-100` atau rentang tahun 4 digit — hanya warning; memperluas regex menambah risiko menandai tanggal ISO/kode; format Indonesia memakai spasi setelah `Rp` (fixture lulus), kasus jarang.
 
 ## Design Notes
 

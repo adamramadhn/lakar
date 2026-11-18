@@ -46,7 +46,7 @@ Aturan: putaran dibatalkan → tidak dapat diputuskan; ada prompt Kalah → gaga
 - Ukuran board: Beranda 390×844 → sesuai
 - Waktu ≤ 1,5 × median baseline: rasio 0.91
 - Hasil: **lolos**
-- R3/R7 tidak dihitung di G0 (keputusan epic): aturan LC-03/06/07/13/14/17/21 belum ada di \`G0_RULES\`.
+- R3/R7 tidak dihitung di G0 (keputusan epic): aturan LC-03/06/07/11/13/14/17/18/21 belum ada di \`G0_RULES\`.
 - Dokumen Lakar: slug \`gerak-beranda\` (dibuka agen: gerak-beranda), salinan \`bench/runs/rounds/uji-1/B-lakar/doc/gerak-beranda.lakar.json\`
 
 ### Emoji
@@ -108,7 +108,7 @@ Strip: \`bench/runs/rounds/uji-1/B-lakar.png\` (390×844, 1 board), pen.dev –
 - Ukuran board: Beranda 390×844 → sesuai
 - Waktu ≤ 1,5 × median baseline: rasio 0.91
 - Hasil: **lolos**
-- R3/R7 tidak dihitung di G0 (keputusan epic): aturan LC-03/06/07/13/14/17/21 belum ada di \`G0_RULES\`.
+- R3/R7 tidak dihitung di G0 (keputusan epic): aturan LC-03/06/07/11/13/14/17/18/21 belum ada di \`G0_RULES\`.
 - Dokumen Lakar: slug \`gerak-beranda\` (dibuka agen: gerak-beranda), salinan \`bench/runs/rounds/uji-1/B-lakar/doc/gerak-beranda.lakar.json\`
 
 ### Emoji
@@ -314,7 +314,7 @@ Aturan: putaran dibatalkan → tidak dapat diputuskan; ada prompt Kalah → gaga
 - Ukuran board: Beranda 390×844 → sesuai
 - Waktu ≤ 1,5 × median baseline: rasio 0.91
 - Hasil: **lolos**
-- R3/R7 tidak dihitung di G0 (keputusan epic): aturan LC-03/06/07/13/14/17/21 belum ada di \`G0_RULES\`.
+- R3/R7 tidak dihitung di G0 (keputusan epic): aturan LC-03/06/07/11/13/14/17/18/21 belum ada di \`G0_RULES\`.
 - Dokumen Lakar: slug \`gerak-beranda\` (dibuka agen: gerak-beranda), salinan \`bench/runs/rounds/uji-1/B-lakar/doc/gerak-beranda.lakar.json\`
 
 ### Emoji

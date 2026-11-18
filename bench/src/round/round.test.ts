@@ -17,7 +17,7 @@ import { claudeSemver, copyPngExclusive, photoProbeProblems, scoreReportBase, ju
 import { LAKAR_INIT_RULES } from '../lakar/run.js';
 import { validateInit } from '../stream-metrics.js';
 import { lakarReconnect, pendevReconnect } from './reconnect.js';
-import { AWAITING_ADAM, isOfficialRound, r3r7Missing, renderRoundMarkdown, renderScoreMarkdown, ROUND_ID, type RoundPrompt, type RoundReport } from './report.js';
+import { AWAITING_ADAM, frozenG0Rules, isOfficialRound, r3r7Missing, renderRoundMarkdown, renderScoreMarkdown, ROUND_ID, type RoundPrompt, type RoundReport } from './report.js';
 import { aggregateScores, appealAxis, decide, decideG0, lakarGate, type Decision, type DecisionInput, type GateResult, type PromptScore } from './score.js';
 
 const L = (evs: unknown[]): TimedLine[] => timedLines(evs, 1000);
@@ -624,6 +624,11 @@ describe('round --resume dengan hasil juri rubrik lama', () => {
 describe('daftar aturan R3/R7 yang belum dihitung diturunkan dari G0_RULES', () => {
   it('G0_RULES saat ini: LC-11 dan LC-18 sudah ada', () => {
     expect(r3r7Missing()).toBe('aturan LC-03/06/07/13/14/17/21 belum ada di `G0_RULES`.');
+  });
+  it('laporan memakai G0_RULES beku putaran (pra-1.23 tanpa LC-11/LC-18); tidak terbaca → aturan saat ini', () => {
+    const pre = JSON.stringify({ 'LC-01a': {}, 'LC-02a': {}, 'LC-05': {}, 'LC-12': {}, 'LC-20': {} });
+    expect(r3r7Missing(frozenG0Rules(pre))).toBe('aturan LC-03/06/07/11/13/14/17/18/21 belum ada di `G0_RULES`.');
+    for (const bad of [undefined, '[]', 'bukan json']) expect(r3r7Missing(frozenG0Rules(bad))).toBe('aturan LC-03/06/07/13/14/17/21 belum ada di `G0_RULES`.');
   });
   it('tanpa aturan katalog / semua ada', () => {
     expect(r3r7Missing({})).toBe('aturan LC-03/06/07/11/13/14/17/18/21 belum ada di `G0_RULES`.');

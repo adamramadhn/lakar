@@ -17,6 +17,17 @@ export function r3r7Missing(rules: Readonly<Record<string, unknown>> = G0_RULES)
   return `aturan ${missing.map((r, i) => (i === 0 ? r : r.slice(3))).join('/')} belum ada di \`G0_RULES\`.`;
 }
 
+/** `G0_RULES` beku putaran (`frozen.g0Rules`, JSON objek); tidak ada/tidak terbaca → `G0_RULES` saat ini. */
+export function frozenG0Rules(g0Rules: string | undefined): Readonly<Record<string, unknown>> {
+  try {
+    const v: unknown = g0Rules === undefined ? undefined : JSON.parse(g0Rules);
+    if (v && typeof v === 'object' && !Array.isArray(v)) return v as Record<string, unknown>;
+  } catch {
+    // jatuh ke aturan saat ini
+  }
+  return G0_RULES;
+}
+
 export const ROUND_ID = /^(uji-[1-9]\d*|[1-9]\d*)$/;
 /** Putaran resmi (story 16): ID angka polos. */
 export const isOfficialRound = (round: string): boolean => /^[1-9]\d*$/.test(round);
@@ -186,7 +197,7 @@ export function renderRoundMarkdown(r: RoundReport): string {
     L.push(`- Ukuran board: ${lk?.boards.length ? lk.boards.map((b) => `${b.name} ${b.width}×${b.height}`).join(', ') : '–'}${p.sizeProblems.length ? ` → ${p.sizeProblems.join('; ')}` : ' → sesuai'}`);
     L.push(`- Waktu ≤ 1,5 × median baseline: ${p.gate?.timeRatio === undefined ? '–' : `rasio ${p.gate.timeRatio.toFixed(2)}`}`);
     L.push(`- Hasil: ${p.gate ? (p.gate.ok ? '**lolos**' : `**gagal** (${p.gate.reasons.join('; ')})`) : '–'}`);
-    L.push(`- R3/R7 tidak dihitung di G0 (keputusan epic): ${r3r7Missing()}`);
+    L.push(`- R3/R7 tidak dihitung di G0 (keputusan epic): ${r3r7Missing(frozenG0Rules(r.frozen?.g0Rules))}`);
     if (lk) L.push(`- Dokumen Lakar: slug \`${lk.slug ?? '–'}\` (dibuka agen: ${lk.opened.join(', ') || '–'}), salinan \`${lk.docPath ?? '–'}\``);
     L.push('');
     L.push('### Emoji', '');

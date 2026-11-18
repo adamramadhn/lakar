@@ -50,6 +50,7 @@ Dibaca di giliran yang sama dengan `core` dan skill jenis layar (paralel). Tidak
 - Layar kerja memuat satu keadaan yang layak dilihat: peringatan, terdegradasi, atau kosong.
 - Buktikan, jangan klaim: fragmen produk sedang bekerja dengan data demo lengkap. Hero landing memperagakan aksi kategori (field pencarian, pemilih slot), bukan hanya tombol. Bukti diletakkan di sebelah klaimnya.
 - Field kosong dihilangkan, bukan diisi "—". Angka dan tanggal tidak dipotong.
+- Pencarian foto gagal: pengganti tampak selesai (hero: mockup produk/kartu data; sampul: bidang cerah + tipografi tebal), bukan label "Foto …", inisial di area besar, atau ilustrasi rakitan ikon/bentuk.
 
 ## Tanda slop
 
@@ -65,12 +66,12 @@ Frasa terlarang (kata utuh): "solusi terbaik", "revolusioner", "tingkatkan produ
 
 ## Contoh teruji
 
-Baris daftar berkeadaan: kolom teks fill, meta `t2` di bidang tint, `Badge` sm, wadah ikon konsentris (radius 20 = 8 + padding 12):
+Baris daftar berkeadaan: kolom teks fill, meta `t2` di bidang tint, `Badge` sm, wadah ikon konsentris (radius 20 = 8 + padding 12); `Badge` di permukaan `C.deep` memakai arg ke-6:
 
 ```js
 // pakai prelude
-const p=place(390,274);
-const b=add(null,{type:'board',name:'Contoh / Pinjaman · mobile · Jernih',x:p.x,y:p.y,width:390,height:274,screen:'mobile',expectedSize:{width:390,height:274},fills:fill(C.bg)});
+const p=place(390,334);
+const b=add(null,{type:'board',name:'Contoh / Pinjaman · mobile · Jernih',x:p.x,y:p.y,width:390,height:334,screen:'mobile',expectedSize:{width:390,height:334},fills:fill(C.bg)});
 const list=F(b,'Daftar pinjaman',{width:'fill',padding:20,gap:8});
 for(const [ic,j,m,st,tone] of [['book-open','Laut Bercerita','Kembali 21 Nov · sisa 3 hari','Dipinjam','accent'],['clock','Cantik Itu Luka','Terlambat 2 hari · denda Rp 4.000','Terlambat','danger'],['circle-check','Bumi Manusia','Dikembalikan 9 Nov','Selesai','success']]){
  const hot=tone==='accent';
@@ -80,5 +81,8 @@ for(const [ic,j,m,st,tone] of [['book-open','Laut Bercerita','Kembali 21 Nov · 
  T(tx,'Judul',j,'label',{width:'fill'}); T(tx,'Meta',m,'body-sm',{width:'fill',color:C.t2});
  Badge(r,st,tone);
 }
+const hl=Row(list,'Sorotan / Anggota',{width:'fill',gap:12,padding:16,radius:20,fills:fill(C.deep)});
+T(hl,'Teks','Anggota aktif sampai Mar 2027','label',{width:'fill',color:C.on});
+Badge(hl,'Premium','accent','star','sm',C.deep);
 b
 ```
