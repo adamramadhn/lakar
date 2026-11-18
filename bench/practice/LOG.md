@@ -247,3 +247,25 @@ melanggar semangat "tanpa tambalan per prompt". Perubahan v5 (bukan perbaikan mu
 
 Iterasi 6 (`--reuse-pendev 2`) menguji skill akhir ini agar hasil yang dilaporkan berasal dari skill yang di-commit.
 Skill: `core.md` 8f2fe336bcb1c7dc, `landing.md` b953c1b2bae4a8d4, `mobile.md` 38aa49528f9c464f.
+
+### Hasil iterasi 6 (`bench/practice-6.md`, HEAD `07ab5c6`, pen.dev dipakai ulang dari iterasi 2)
+
+| Prompt | Waktu Lakar / pen.dev | T L–P | D L–P | Keputusan | Catatan |
+|---|---|---|---|---|---|
+| P1 | 216,1 / 219,5 dtk (0,98) | 14–12 | 4–4 | Setara | foto hero + 3 mentor + avatar alumni |
+| P2 | 121,9 / 147,7 dtk (0,83) | 13–13 | 3–3 | Setara | thumbnail episode kini foto; tile satu keluarga ungu |
+| P3 | 222,2 / 129,9 dtk (**1,71**) | 14–14 | 3–4 | Kalah (gerbang waktu) | proses: 1 SCHEMA_INVALID + 2 screenshot + 6 execute (board gulir dibangun terpisah); iterasi 5 P3 = 1,26× dengan alur 4 execute |
+| P4 | 271,0 / 231,5 dtk (1,17) | 15–11 | 4–4 | Lebih baik | – |
+
+- 3 dari 4 Setara/Lebih baik, emoji 0, gate 0, tetapi P3 waktu 1,71× → **belum lulus** (AC: waktu ≤ 1,5× di keempat
+  prompt). Perubahan v5 tidak menyentuh alur proses mobile; kelambatan P3 berasal dari variasi proses agen (galat skema
+  + putaran screenshot tambahan), bukan foto (2 pencarian paralel, 0 galat foto).
+- Biaya iterasi 6: $7,37; kumulatif **$45,18** dari $57,80.
+
+## Status: HALT `blocked` (iterasi 6 = batas, belum lulus)
+
+- Iterasi 5 (skill v4) lulus 4/4; iterasi 6 (skill v5 = v4 yang dinetralkan setelah review + perbaikan `Badge`) 3/4 dengan
+  gerbang waktu P3 gagal. Tidak ada iterasi ke-7 (batas Adam).
+- Butuh keputusan Adam: (a) menerima hasil iterasi 5 sebagai bukti lulus walau skill akhir v5 hanya teruji di iterasi 6
+  (gagal hanya karena waktu P3), atau (b) dana/iterasi tambahan untuk mengukur ulang v5 dan/atau mengencangkan disiplin
+  alur akhir mobile; serta (c) tinjauan PNG.

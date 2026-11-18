@@ -3,7 +3,7 @@ title: 'Skill lebih kaya diuji dengan prompt latihan'
 type: feature
 ticket: '19'
 created: '2026-11-18'
-status: in-review
+status: blocked
 baseline_revision: '97ec58176a5e8d7abf19dddc6f7d6ac79266cc85'
 route: full
 route_source: auto
@@ -12,7 +12,7 @@ review: 'quick'
 review_source: 'pinned'
 lenses_ran: [quick]
 review_loop_iteration: 0
-followup_review_recommended: false
+followup_review_recommended: true
 context:
   - '{project-root}/bench/round-1.md'
   - '{project-root}/bench/README.md'
@@ -152,6 +152,17 @@ Catatan orkestrator lanjutan 2026-11-18 (iterasi 4–6; menggantikan butir "Iter
 
 ## Review Triage Log
 
+### 2026-11-18 — Review pass
+- verdicts: 7 findings — high 0, medium 2, low 5, false 0, maybe-false 0
+- findings:
+  - `[medium]` `[patch]` Rincian skill v4 mirip prompt latihan (contoh kueri foto makanan/musik, "angkatan", "mentor", "tile 2 × 3", "pemutar"), melanggar Never "tanpa tambalan per prompt" walau lolos penjaga C7 — dinetralkan di skill v5 (07ab5c6): kueri contoh domain kopi/roti, "testimoni, tim, profil", "tier atau slot jadwal", "keranjang, proses berjalan", "tile lebih kecil"; diuji ulang di iterasi 6. `sidebar/header` app desktop dan "alur bertahap" dibiarkan (pola umum).
+  - `[low]` `[reject]` Biaya run `aborted` yang diulang `--resume` (`.prev-*`) dan P3 parsial iterasi 4 tidak masuk kumulatif — jarang (resume belum pernah dipakai di iter 4–6), selisih < $0,30 tercatat di LOG; perbaikan butuh cabang penjumlahan baru.
+  - `[low]` `[reject]` Impor Wikimedia bisa lebih kecil dari asli (lebar 800–959 → 500 px) — konsekuensi wajib arahan Wikimedia (asli → 429, ukuran non-standar → 400); slot potret 240–320 px tetap tercakup; parameter `url`/`size` tak terpakai bersifat kosmetik. Dicatat sebagai risiko sisa.
+  - `[low]` `[patch]` Plan 1.18 masih menyebut impor file asli — entri Plan Change Log ditambahkan di plan 1.18 (07ab5c6).
+  - `[low]` `[patch]` Nama tes/komentar usang (`maks 3`, "URL impor: asli", fixture "impor URL asli") — diperbarui (07ab5c6).
+  - `[medium]` `[patch]` Prelude `Badge` dengan nada tak dikenal (mis. `info`) menghasilkan `undefined` — fallback `??C.acc` (07ab5c6); core.md tetap ≤ 4000 token (tes lulus).
+  - `[low]` `[reject]` Baris mode gelap `mobile.md:5` berbentuk kode setengah prosa — P2 gelap dirender tanpa galat execute di keenam iterasi; agen membacanya sebagai panduan, bukan salinan.
+
 ## Design Notes
 
 **Diagnosis (aturan penyebab datar → prinsip baru, kata sendiri):**
@@ -224,3 +235,15 @@ Blocking condition: 3 iterasi latihan selesai tanpa lulus (aturan Design Notes �
 - Verifikasi: build OK, 781/781 tes (48 file, sebelum run), api.md sama, protocolHash 907cb36f…edb85d, bench/protocol &
   bench/rubric tidak berubah, `round --dry-run` sha = rubric.json, penjaga .pen berubah/hilang 0, lakard active, verify.sh exit 0.
 - Laporan: bench/practice-5.md; PNG Lakar bench/practice/5/; PNG pen.dev lokal bench/runs/practice/2/. LOG: bench/practice/LOG.md.
+
+### Hasil akhir lanjutan (2026-11-18): **blocked** — iterasi 6 (batas) belum lulus
+
+Blocking condition: iterasi 6 (iterasi terakhir yang diizinkan) belum lulus: 3/4 Setara/Lebih baik tetapi P3 waktu 1,71× pen.dev (> 1,5×). Iterasi 5 (skill v4) lulus 4/4, tetapi review menemukan rincian v4 yang mirip prompt latihan; skill akhir v5 (dinetralkan) diuji di iterasi 6 dan gagal hanya pada gerbang waktu P3. Butuh keputusan Adam: terima iterasi 5 + v5, atau dana/iterasi tambahan; plus tinjauan PNG.
+
+- Ringkasan perubahan: harness `MAX_ITER` 6 / `BUDGET_USD` 57,8 / preflight reuse tanpa pen-desktop (bdd7d04); biaya kumulatif menghitung iterasi tanpa laporan (0747216); impor Wikimedia selalu thumbnail bucket standar (fada52e); skill v4 (foto dipakai, koleksi cerah bermakna, tanpa potongan) lalu v5 (netralisasi + `Badge`).
+- File: `bench/src/practice/main.ts` (+tes) batas/biaya; `bench/src/pendev/run.ts` preflight reuse; `bench/README.md`; `packages/daemon/src/photos/providers.ts` (+`photos.test.ts`, `tests/support/photos.ts`) URL impor; `packages/skills/skills/{core,landing,mobile}.md` skill v4/v5; `bench/practice/LOG.md`; `bench/practice-5.*`, `bench/practice-6.*`, `bench/practice/{5,6}/*.png`; plan 1.18 (catatan).
+- Iterasi: 4 dihentikan (unduhan Wikimedia 429, $2,66, tanpa juri); 5 lulus 4/4 ($7,35); 6 3/4, P3 waktu 1,71× ($7,37). Kumulatif $45,18 dari $57,80 (tambahan $17,38 dari $30).
+- Review quick: 7 temuan — 4 patch (2 medium, 2 low), 0 defer, 3 reject (alasan di Review Triage Log). `followup_review_recommended: true`: 2 medium di-patch; risiko yang belum diverifikasi: skill v5 hanya satu run per prompt, dan kode harness biaya (0747216) hanya dilihat satu lensa quick.
+- Verifikasi: build OK; 781/781 tes (48 file) setelah patch; api.md tanpa beda; protocolHash 907cb36f…edb85d; bench/protocol & bench/rubric tidak berubah sejak 97ec581; `round --dry-run` sha = rubric.json; `practice --dry-run` OK; penjaga `.pen` 41 file tidak berubah/hilang; lakard active; `tools/node26/verify.sh` exit 0. PNG iterasi 5 dan 6 dilihat orkestrator.
+- Risiko sisa: variasi run-ke-run (P3 1,26× → 1,71× pada prompt sama); impor Wikimedia kecil untuk gambar < 960 px; potret Wikimedia tidak seragam gaya; biaya run `.prev-*` tidak dihitung.
+
