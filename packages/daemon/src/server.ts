@@ -19,7 +19,7 @@ import { readAsset } from './assets.js';
 import { readRenderModule, RENDER_PAGE_HTML } from './chromium.js';
 import type { DaemonConfig } from './config.js';
 import { FontRegistry } from './fonts.js';
-import { SESSION_HEADER, Sessions, UnknownSessionError } from './sessions.js';
+import { SESSION_HEADER, Sessions, UnknownSessionError, logExecute, recallFailed, rememberFailed } from './sessions.js';
 import { DocStore } from './store.js';
 
 const STATUS: Record<ErrorCode, number> = {
@@ -40,7 +40,52 @@ const STATUS: Record<ErrorCode, number> = {
 const notFound = (what: string) => new LakarError('NOT_FOUND', `${what} tidak ada`, { hint: 'periksa path' });
 
 const OpenBody = z.object({ slug: z.string() });
-const ExecuteBody = z.object({ code: z.string().min(1), description: z.string().optional() });
+const ExecuteBody = z
+  .object({
+    code: z.string().min(1).optional(),
+    description: z.string().optional(),
+    editId: z.string().optional(),
+    edits: z.array(z.object({ find: z.string().min(1), replace: z.string() }).strict()).optional(),
+  })
+  .strict();
+const EXECUTE_BODY_HINT =
+  "kirim {code, description} (description 3–8 kata, mis. 'tambah hero landing kopi') atau perbaikan {editId, edits:[{find, replace}], description?}";
+const DESCRIPTION_EXAMPLE = "mis. description: 'tambah hero landing kopi'";
+
+/** Label riwayat wajib 3–8 kata (AD-7). */
+function descriptionProblem(description: string | undefined): string | undefined {
+  if (description === undefined || !description.trim()) return 'description wajib diisi (label riwayat 3–8 kata)';
+  const words = description.trim().split(/\s+/).length;
+  if (words < 3 || words > 8) return `description harus 3–8 kata, bukan ${words} kata: ${JSON.stringify(description)}`;
+  return undefined;
+}
+
+/** Terapkan edit find/replace berurutan; setiap `find` harus muncul tepat sekali di teks saat itu. */
+function applyEdits(code: string, edits: { find: string; replace: string }[]): string {
+  let out = code;
+  edits.forEach(({ find, replace }, i) => {
+    let count = 0;
+    let at = -1;
+    for (let pos = out.indexOf(find); pos !== -1; pos = out.indexOf(find, pos + 1)) {
+      if (count === 0) at = pos;
+      count++;
+    }
+    if (count !== 1) {
+      throw new LakarError(
+        'SCHEMA_INVALID',
+        count === 0 ? `edits[${i}].find tidak ditemukan di snippet: ${JSON.stringify(find)}` : `edits[${i}].find muncul ${count} kali di snippet (harus tepat sekali): ${JSON.stringify(find)}`,
+        {
+          hint:
+            count === 0
+              ? 'find harus potongan teks persis dari snippet (termasuk spasi dan tanda kutip), setelah edit sebelumnya diterapkan; editId tetap berlaku'
+              : 'perpanjang find dengan teks di sekitarnya agar unik; editId tetap berlaku',
+        },
+      );
+    }
+    out = out.slice(0, at) + replace + out.slice(at + find.length);
+  });
+  return out;
+}
 const ScreenshotBody = z.object({ boardId: z.string().optional() }).optional();
 
 export type BuildOptions = {
@@ -128,22 +173,83 @@ export function buildServer({ config, render, fonts = FontRegistry.load() }: Bui
 
   app.post('/execute', async (req, reply) => {
     const { session, slug } = activeDoc(req.headers[SESSION_HEADER]);
-    const { code, description } = parse(ExecuteBody, req.body, 'kirim {code, description?}');
+    const body = parse(ExecuteBody, req.body, EXECUTE_BODY_HINT);
+    if (body.code !== undefined && body.editId !== undefined) {
+      throw new LakarError('SCHEMA_INVALID', 'kirim code ATAU editId, bukan keduanya', {
+        hint: 'snippet baru → {code, description}; perbaikan snippet gagal → {editId, edits:[{find, replace}]}',
+      });
+    }
+    if (body.code === undefined && body.editId === undefined) {
+      throw new LakarError('SCHEMA_INVALID', 'code atau editId wajib', { hint: EXECUTE_BODY_HINT });
+    }
+    if (body.edits !== undefined && body.editId === undefined) {
+      throw new LakarError('SCHEMA_INVALID', 'edits hanya berlaku bersama editId', { hint: 'kirim {editId, edits:[{find, replace}]} dengan editId dari error execute sebelumnya' });
+    }
+
+    // 1. Resolusi kode.
+    let code: string;
+    let description: string | undefined;
+    if (body.editId !== undefined) {
+      const prev = recallFailed(session, body.editId);
+      if (!prev) {
+        throw new LakarError('NOT_FOUND', `editId ${body.editId} tidak dikenal di sesi ini`, {
+          hint: 'editId hanya berlaku di sesi yang sama dan hilang saat daemon restart; kirim ulang snippet lengkap: execute({code, description})',
+        });
+      }
+      code = applyEdits(prev.code, body.edits ?? []);
+      description = body.description ?? prev.description;
+    } else {
+      code = body.code!;
+      description = body.description;
+    }
+
+    // Gagal setelah kode diketahui: simpan snippet, beri editId agar bisa diperbaiki tanpa mengirim ulang.
+    const failWith = (err: LakarError, rev: number, extraHint?: string): LakarError => {
+      const editId = rememberFailed(session, { code, description });
+      logExecute(session, { at: new Date().toISOString(), description: description ?? '', ok: false, code: err.code, rev });
+      const repair = `perbaiki tanpa mengirim ulang kode: execute({editId:'${editId}', edits:[{find:'<potongan lama persis>', replace:'<pengganti>'}]})`;
+      const hint = [err.hint, extraHint ?? repair].filter(Boolean).join('; ');
+      return new LakarError(err.code, err.message, { hint, retryable: err.retryable, editId });
+    };
+
+    // 2. Validasi description.
+    const problem = descriptionProblem(description);
+    if (problem) {
+      throw failWith(new LakarError('SCHEMA_INVALID', problem, { hint: DESCRIPTION_EXAMPLE }), docs.get(slug)!.rev, 'kirim ulang tanpa kode: execute({editId, description})');
+    }
+    const label = description!.trim();
+
+    // 3. Transaksi + snippet → commit → simpan → keep.
     const data = await docLocks.run(slug, async () => {
       const doc = docs.get(slug)!;
-      // AD-4: error tak tertangkap di snippet → lempar di dalam body → rollback penuh oleh `transact`.
-      const committed = await transact(doc, { sessionId: session.id, description: description?.trim() || 'execute' }, async (tx) => {
-        const run = await runSnippet(code, tx, { timeoutMs: config.execTimeoutMs, memoryBytes: config.execMemoryBytes });
-        if (!run.ok) throw run.error;
-        return run.value;
-      });
+      let committed;
+      try {
+        // AD-4: error tak tertangkap di snippet → lempar di dalam body → rollback penuh oleh `transact`.
+        committed = await transact(doc, { sessionId: session.id, description: label }, async (tx) => {
+          const run = await runSnippet(code, tx, { timeoutMs: config.execTimeoutMs, memoryBytes: config.execMemoryBytes, keep: session.keep });
+          if (!run.ok) throw run.error;
+          return run;
+        });
+      } catch (e) {
+        if (e instanceof LakarError) throw failWith(e, doc.rev);
+        throw e;
+      }
+      const run = committed.value;
+      let result = { docId: doc.id, rev: doc.rev, created: committed.created };
       // Tanpa op sukses (snippet baca-saja): tidak ada revisi baru, file dan riwayat tidak disentuh.
-      if (committed.entry === null) return { docId: doc.id, rev: doc.rev, created: [] };
-      await store.write(slug, committed.doc);
-      // Disk sudah rev N+1: memori harus ikut sebelum langkah yang bisa gagal berikutnya.
-      docs.set(slug, committed.doc);
-      await store.appendHistory(slug, committed.entry);
-      return { docId: committed.doc.id, rev: committed.doc.rev, created: committed.created };
+      if (committed.entry !== null) {
+        await store.commit(slug, committed.doc, committed.entry);
+        docs.set(slug, committed.doc);
+        result = { docId: committed.doc.id, rev: committed.doc.rev, created: committed.created };
+      }
+      session.keep = run.keep;
+      logExecute(session, { at: new Date().toISOString(), description: label, ok: true, rev: result.rev });
+      return {
+        ...result,
+        ...(run.value !== undefined ? { value: run.value } : {}),
+        ...(run.valueTruncated ? { valueTruncated: true } : {}),
+        ...(run.logs.length ? { logs: run.logs.join('\n') } : {}),
+      };
     });
     return ok(reply, data);
   });

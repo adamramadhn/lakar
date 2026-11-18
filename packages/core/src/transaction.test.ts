@@ -476,3 +476,16 @@ describe('transact', () => {
     expect(doc).toEqual(before);
   });
 });
+
+describe('view', () => {
+  it('salinan kerja hidup: melihat op yang sudah sukses; dokumen asli tidak berubah; tertutup → melempar', () => {
+    const doc = createDocument(seeded());
+    const tx = beginTransaction(doc, { sessionId: 's', random: seeded(7), now: fixedNow });
+    expect(tx.view().pages[0]!.children).toHaveLength(0);
+    const b = tx.add(null, boardIn());
+    expect(tx.view().pages[0]!.children.map((n) => n.id)).toEqual([b]);
+    expect(doc.pages[0]!.children).toHaveLength(0);
+    tx.rollback();
+    expect(() => tx.view()).toThrow(/ditutup/);
+  });
+});

@@ -44,6 +44,11 @@ export interface Transaction {
   remove(id: string): void;
   /** Merge peta token datar ke `doc.tokens`; `null` menghapus token. */
   setTokens(map: unknown): void;
+  /**
+   * Salinan kerja hidup (melihat op yang sudah sukses di transaksi ini). Hanya-baca menurut kontrak:
+   * pemanggil tidak boleh memutasinya. Melempar bila transaksi sudah ditutup.
+   */
+  view(): Doc;
   commit(description: string): CommitResult;
   rollback(): void;
   readonly open: boolean;
@@ -174,6 +179,10 @@ export function beginTransaction(doc: Doc, opts: TransactionOptions): Transactio
   return {
     get open() {
       return work !== undefined;
+    },
+
+    view() {
+      return live();
     },
 
     add(parentId, raw) {

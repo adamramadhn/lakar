@@ -17,7 +17,8 @@ export const ErrorCode = z.enum([
 ]);
 export type ErrorCode = z.infer<typeof ErrorCode>;
 
-export type ApiErrorBody = { code: ErrorCode; message: string; hint: string; retryable: boolean };
+/** `editId` (AD-7): ada hanya bila snippet gagal dan bisa diperbaiki lewat `execute({editId, edits})`. */
+export type ApiErrorBody = { code: ErrorCode; message: string; hint: string; retryable: boolean; editId?: string };
 export type ApiResult<T> = { ok: true; data: T } | { ok: false; error: ApiErrorBody };
 
 /** Error berkode AD-11. Dilempar lintas paket, dipetakan ke `{ok:false,error}` di tepi HTTP. */
@@ -25,14 +26,18 @@ export class LakarError extends Error {
   readonly code: ErrorCode;
   readonly hint: string;
   readonly retryable: boolean;
-  constructor(code: ErrorCode, message: string, opts: { hint?: string; retryable?: boolean } = {}) {
+  readonly editId: string | undefined;
+  constructor(code: ErrorCode, message: string, opts: { hint?: string; retryable?: boolean; editId?: string } = {}) {
     super(message);
     this.name = 'LakarError';
     this.code = code;
     this.hint = opts.hint ?? '';
     this.retryable = opts.retryable ?? false;
+    this.editId = opts.editId;
   }
   toBody(): ApiErrorBody {
-    return { code: this.code, message: this.message, hint: this.hint, retryable: this.retryable };
+    const body: ApiErrorBody = { code: this.code, message: this.message, hint: this.hint, retryable: this.retryable };
+    if (this.editId !== undefined) body.editId = this.editId;
+    return body;
   }
 }

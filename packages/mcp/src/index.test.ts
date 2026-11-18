@@ -31,7 +31,10 @@ function fakeDaemon() {
     }
     if (req.url === '/docs/open') return send(200, { ok: true, data: { docId: 'Dddddddd', slug: body.slug, rev: 0, created: true } });
     if (req.url === '/execute') {
-      if (body.code === 'boom') return send(422, { ok: false, error: { code: 'EXEC_ERROR', message: 'error tak tertangkap', hint: 'perbaiki', retryable: false } });
+      if (body.code === 'boom') {
+        return send(422, { ok: false, error: { code: 'EXEC_ERROR', message: 'baris 1:1: error tak tertangkap', hint: 'perbaiki', retryable: false, editId: 'Eeeeeeee' } });
+      }
+      if (body.editId === 'Eeeeeeee') return send(200, { ok: true, data: { docId: 'Dddddddd', rev: 2, created: [], value: 1, logs: 'halo' } });
       return send(200, { ok: true, data: { docId: 'Dddddddd', rev: 1, created: [{ id: 'Bbbbbbbb', name: 'Tracer', path: ['Tracer'] }] } });
     }
     if (req.url === '/screenshot') {
@@ -111,10 +114,24 @@ describe('@lakar/mcp', () => {
     const c = await connect(url);
     const e = await c.callTool({ name: 'execute', arguments: { code: 'boom' } });
     expect(e.isError).toBe(true);
-    expect((e.content as any)[0].text).toMatch(/^EXEC_ERROR: .*\nhint: perbaiki/);
+    expect((e.content as any)[0].text).toMatch(/^EXEC_ERROR: .*\nhint: perbaiki\neditId: Eeeeeeee$/);
     const s = await c.callTool({ name: 'screenshot', arguments: { boardId: 'ZZZZZZZZ' } });
     expect(s.isError).toBe(true);
     expect((s.content as any)[0].text).toMatch(/^NOT_FOUND/);
+  });
+
+  it('execute perbaikan: editId + edits diteruskan apa adanya, tanpa code; value/logs dikembalikan', async () => {
+    fake.seen.length = 0;
+    const c = await connect(url);
+    const edits = [{ find: 'boom', replace: '1' }];
+    const r = await c.callTool({ name: 'execute', arguments: { editId: 'Eeeeeeee', edits } });
+    expect(r.isError).toBeFalsy();
+    expect(JSON.parse((r.content as any)[0].text)).toMatchObject({ rev: 2, value: 1, logs: 'halo' });
+    expect(fake.seen.find((x) => x.path === '/execute')!.body).toEqual({ editId: 'Eeeeeeee', edits });
+    const { tools } = await c.listTools();
+    const exec = tools.find((t) => t.name === 'execute')!;
+    expect(Object.keys((exec.inputSchema as any).properties).sort()).toEqual(['code', 'description', 'editId', 'edits']);
+    expect(exec.description).toMatch(/3–8 kata/);
   });
 
   it('sesi hilang (401) → sesi baru, permintaan diulang sekali', async () => {

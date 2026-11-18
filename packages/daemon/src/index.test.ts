@@ -23,12 +23,18 @@ if (!browserInstalled) {
   console.warn(`[@lakar/daemon] SKIP tes Chromium: chromium-headless-shell belum terpasang di ${browsersPath}. Jalankan: bash scripts/install-browser.sh`);
 }
 
-type Res = { status: number; body: { ok: boolean; data?: any; error?: { code: string; message: string; hint: string; retryable: boolean } } };
+type Res = { status: number; body: { ok: boolean; data?: any; error?: { code: string; message: string; hint: string; retryable: boolean; editId?: string } } };
 
 let d: RunningDaemon;
 let dataDir: string;
 
-async function call(path: string, body: unknown, session?: string): Promise<Res> {
+/** Label riwayat default untuk /execute di tes yang tidak menguji description (kunci `description` ada → tidak diisi). */
+const DESC = 'langkah uji daemon lakar';
+const withDesc = (path: string, body: unknown) =>
+  path === '/execute' && body && typeof body === 'object' && 'code' in body && !('description' in body) ? { ...body, description: DESC } : body;
+
+async function call(path: string, rawBody: unknown, session?: string): Promise<Res> {
+  const body = withDesc(path, rawBody);
   const r = await fetch(`${d.url}${path}`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', ...(session ? { 'x-lakar-session': session } : {}) },
@@ -146,7 +152,7 @@ describe('@lakar/daemon', () => {
     });
 
     it('sukses: rev +1, file ditulis, satu baris riwayat, created 2 entri', async () => {
-      const r = await call('/execute', { code: TRACER, description: 'board tracer' }, s);
+      const r = await call('/execute', { code: TRACER, description: 'board tracer halo lakar' }, s);
       expect(r.status).toBe(200);
       expect(r.body.data.rev).toBe(1);
       expect(r.body.data.created).toEqual([
@@ -158,16 +164,16 @@ describe('@lakar/daemon', () => {
       expect(doc.pages[0].children[0]).toMatchObject({ type: 'board', width: 390, height: 844 });
       const lines = (await readFile(hist(), 'utf8')).trim().split('\n');
       expect(lines).toHaveLength(1);
-      expect(JSON.parse(lines[0]!)).toMatchObject({ rev: 1, sessionId: s, description: 'board tracer', opsSummary: 'add×2' });
+      expect(JSON.parse(lines[0]!)).toMatchObject({ rev: 1, sessionId: s, description: 'board tracer halo lakar', opsSummary: 'add×2' });
       const files = readdirSync(join(dataDir, 'docs'));
       expect(files.filter((f) => f.endsWith('.tmp'))).toEqual([]);
     });
 
     it('snippet tanpa mutasi → ok, rev tetap, file dan riwayat tidak berubah', async () => {
       const before = await snapshot();
-      const r = await call('/execute', { code: '1+1', description: 'baca saja' }, s);
+      const r = await call('/execute', { code: '1+1', description: 'baca saja tanpa mutasi' }, s);
       expect(r.status, JSON.stringify(r.body.error)).toBe(200);
-      expect(r.body).toEqual({ ok: true, data: { docId: expect.stringMatching(/^[A-Za-z0-9]{8}$/), rev: 1, created: [] } });
+      expect(r.body).toEqual({ ok: true, data: { docId: expect.stringMatching(/^[A-Za-z0-9]{8}$/), rev: 1, created: [], value: 2 } });
       expect(await snapshot()).toEqual(before);
     });
 
@@ -299,6 +305,135 @@ describe('execute katalog v1', () => {
   }, 60_000);
 });
 
+describe('execute AD-7: description, editId, keep, value/logs', () => {
+  let s: string;
+  const slug = 'ad7-exec';
+  const file = () => join(dataDir, 'docs', `${slug}.lakar.json`);
+  const hist = () => join(dataDir, 'docs', `${slug}.history.jsonl`);
+  const snapshot = async () => ({ doc: await readFile(file(), 'utf8'), hist: existsSync(hist()) ? await readFile(hist(), 'utf8') : '' });
+  const BOARD = `add(null,{type:'board',name:'Hero',x:0,y:0,width:390,height:844,screen:'mobile'})`;
+
+  beforeAll(async () => {
+    s = await newSession();
+    await call('/docs/open', { slug }, s);
+  });
+
+  it.each([
+    ['tanpa description', { code: BOARD, description: undefined }],
+    ['2 kata', { code: BOARD, description: 'dua kata' }],
+    ['9 kata', { code: BOARD, description: 'satu dua tiga empat lima enam tujuh delapan sembilan' }],
+  ])('%s → SCHEMA_INVALID + contoh label + editId; kirim ulang {editId, description} tanpa kode → jalan', async (_l, body) => {
+    const before = await snapshot();
+    const r = await call('/execute', body, s);
+    expect(r.status).toBe(400);
+    expect(r.body.error!.code).toBe('SCHEMA_INVALID');
+    expect(r.body.error!.message).toMatch(/description/);
+    expect(r.body.error!.hint).toMatch(/mis\. description: /);
+    expect(r.body.error!.editId).toMatch(/^[A-Za-z0-9]{8}$/);
+    expect(await snapshot()).toEqual(before);
+    const again = await call('/execute', { editId: r.body.error!.editId, description: 'board hero dari editId' }, s);
+    expect(again.status, JSON.stringify(again.body.error)).toBe(200);
+    expect(again.body.data.created.map((c: { name: string }) => c.name)).toEqual(['Hero']);
+    const last = JSON.parse((await readFile(hist(), 'utf8')).trim().split('\n').at(-1)!);
+    expect(last).toMatchObject({ description: 'board hero dari editId', rev: again.body.data.rev });
+  });
+
+  it('description 3–8 kata → jalan; value dan logs dikembalikan', async () => {
+    const r = await call('/execute', { code: `console.log('halo', {a: 1}); find({name:'Hero'}).length`, description: 'hitung board hero yang ada' }, s);
+    expect(r.status, JSON.stringify(r.body.error)).toBe(200);
+    expect(r.body.data).toMatchObject({ value: 3, logs: 'halo {"a":1}' });
+    expect(r.body.data).not.toHaveProperty('valueTruncated');
+    const u = await call('/execute', { code: 'let x = 1', description: 'tanpa nilai akhir apa pun' }, s);
+    expect(u.body.data).not.toHaveProperty('value');
+    expect(u.body.data).not.toHaveProperty('logs');
+  });
+
+  it('snippet gagal → editId + hint edits; perbaikan via edits commit; description diwarisi', async () => {
+    const before = await snapshot();
+    const code = `const b = ${BOARD};\nconst t = add(b, {type:'text', name:'Judul', content:'Halo', size:'besar'});`;
+    const r = await call('/execute', { code, description: 'judul hero lewat perbaikan' }, s);
+    expect(r.body.error!.code).toBe('SCHEMA_INVALID');
+    expect(r.body.error!.message).toMatch(/^baris 2:/);
+    expect(r.body.error!.hint).toMatch(/execute\(\{editId:'[A-Za-z0-9]{8}', edits:\[\{find:/);
+    const editId = r.body.error!.editId!;
+    expect(await snapshot()).toEqual(before);
+
+    // find 0 kali / >1 kali → SCHEMA_INVALID menyebut indeks; editId lama tetap berlaku
+    const none = await call('/execute', { editId, edits: [{ find: "size:'besar'", replace: 'size:32' }, { find: 'tidak-ada', replace: '' }] }, s);
+    expect(none.body.error!.code).toBe('SCHEMA_INVALID');
+    expect(none.body.error!.message).toMatch(/edits\[1\]\.find tidak ditemukan/);
+    const many = await call('/execute', { editId, edits: [{ find: 'add(', replace: 'add (' }] }, s);
+    expect(many.body.error!.message).toMatch(/edits\[0\]\.find muncul 2 kali/);
+    expect(many.body.error!.hint).toMatch(/perpanjang find/);
+    const overlap = await call('/execute', { editId, edits: [{ find: "size:'besar'", replace: "size:'aaa'" }, { find: 'aa', replace: 'a' }] }, s);
+    expect(overlap.body.error!.message).toMatch(/edits\[1\]\.find muncul 2 kali/);
+
+    // gagal lagi → editId baru, yang lama tetap berlaku
+    const again = await call('/execute', { editId, edits: [{ find: "size:'besar'", replace: "size:'raksasa'" }] }, s);
+    expect(again.body.error!.code).toBe('SCHEMA_INVALID');
+    expect(again.body.error!.editId).toMatch(/^[A-Za-z0-9]{8}$/);
+    expect(again.body.error!.editId).not.toBe(editId);
+
+    const fixed = await call('/execute', { editId, edits: [{ find: "size:'besar'", replace: 'size:32' }] }, s);
+    expect(fixed.status, JSON.stringify(fixed.body.error)).toBe(200);
+    expect(fixed.body.data.created.map((c: { path: string[] }) => c.path)).toEqual([['Hero'], ['Hero', 'Judul']]);
+    const last = JSON.parse((await readFile(hist(), 'utf8')).trim().split('\n').at(-1)!);
+    expect(last.description).toBe('judul hero lewat perbaikan');
+  });
+
+  it('EXEC_ERROR dan EXEC_TIMEOUT juga memberi editId; edits kosong = jalankan ulang', async () => {
+    const e = await call('/execute', { code: `throw new Error('sengaja')`, description: 'lempar error untuk tes' }, s);
+    expect(e.body.error!.code).toBe('EXEC_ERROR');
+    expect(e.body.error!.editId).toBeDefined();
+    const t = await call('/execute', { code: 'while(true){}', description: 'loop tanpa akhir untuk tes' }, s);
+    expect(t.body.error!.code).toBe('EXEC_TIMEOUT');
+    expect(t.body.error!.editId).toBeDefined();
+    const rerun = await call('/execute', { editId: e.body.error!.editId }, s);
+    expect(rerun.body.error!.code).toBe('EXEC_ERROR');
+  });
+
+  it('editId tak dikenal / sesi lain → NOT_FOUND + hint kirim code lengkap; code+editId / edits tanpa editId / kunci asing → SCHEMA_INVALID', async () => {
+    const e = await call('/execute', { code: 'throw 1', description: 'gagal di sesi pertama' }, s);
+    const other = await newSession();
+    await call('/docs/open', { slug }, other);
+    const r = await call('/execute', { editId: e.body.error!.editId }, other);
+    expect(r.status).toBe(404);
+    expect(r.body.error!.code).toBe('NOT_FOUND');
+    expect(r.body.error!.hint).toMatch(/code/);
+    expect((await call('/execute', { editId: 'ZZZZZZZZ' }, s)).body.error!.code).toBe('NOT_FOUND');
+    const both = await call('/execute', { code: '1', editId: e.body.error!.editId, description: 'dua dua dua' }, s);
+    expect(both.body.error!.code).toBe('SCHEMA_INVALID');
+    expect(both.body.error!.editId).toBeUndefined();
+    expect((await call('/execute', { code: '1', edits: [], description: 'tiga kata saja' }, s)).body.error!.code).toBe('SCHEMA_INVALID');
+    expect((await call('/execute', { code: '1', description: 'tiga kata saja', extra: 1 }, s)).body.error!.code).toBe('SCHEMA_INVALID');
+  });
+
+  it('keep bertahan antar-panggilan di sesi yang sama; sesi lain {}; panggilan gagal tidak mengubah keep', async () => {
+    const r1 = await call('/execute', { code: `keep.hero = ${BOARD}; keep.n = 1`, description: 'simpan hero di keep' }, s);
+    expect(r1.status, JSON.stringify(r1.body.error)).toBe(200);
+    const heroId = r1.body.data.created[0].id;
+    const fail = await call('/execute', { code: `keep.n = 99; keep.hero = null; throw new Error('batal')`, description: 'ubah keep lalu gagal' }, s);
+    expect(fail.body.error!.code).toBe('EXEC_ERROR');
+    const bigKeep = await call('/execute', { code: `keep.x = 'a'.repeat(70000)`, description: 'keep terlalu besar ditolak' }, s);
+    expect(bigKeep.body.error!.code).toBe('SCHEMA_INVALID');
+    const r2 = await call('/execute', { code: `[keep.n, get(keep.hero).name, get(keep.hero).id]`, description: 'baca hero dari keep' }, s);
+    expect(r2.body.data.value).toEqual([1, 'Hero', heroId]);
+    const other = await newSession();
+    await call('/docs/open', { slug }, other);
+    expect((await call('/execute', { code: 'keep', description: 'keep sesi lain kosong' }, other)).body.data.value).toEqual({});
+  });
+
+  it('loop tak berujung: permintaan lain dijawab setelahnya, kunci dokumen lepas, execute berikutnya sukses', async () => {
+    const loop = call('/execute', { code: 'while(true){}', description: 'loop tanpa akhir untuk tes' }, s);
+    const other = call('/sessions', {});
+    const next = call('/execute', { code: '1+1', description: 'execute setelah loop selesai' }, s);
+    const [r, o, n] = await Promise.all([loop, other, next]);
+    expect(r.body.error!.code).toBe('EXEC_TIMEOUT');
+    expect(o.body.ok).toBe(true);
+    expect(n.body).toMatchObject({ ok: true, data: { value: 2 } });
+  });
+});
+
 describe('screenshot menerima dokumen ter-resolve', () => {
   it('ref token diganti nilai sebelum RenderPort dipanggil', async () => {
     const tmp = await mkdtemp(join(tmpdir(), 'lakar-tokens-'));
@@ -361,7 +496,7 @@ describe('RENDER_FAILED', () => {
         app.inject({ method: 'POST', url, payload: payload as object, headers: session ? { 'x-lakar-session': session } : {} });
       const s = (await post('/sessions', {})).json().data.sessionId as string;
       await post('/docs/open', { slug: 'rf' }, s);
-      expect((await post('/execute', { code: TRACER }, s)).json().ok).toBe(true);
+      expect((await post('/execute', { code: TRACER, description: DESC }, s)).json().ok).toBe(true);
       const before = await readFile(join(tmp, 'docs', 'rf.lakar.json'), 'utf8');
       const r = await post('/screenshot', {}, s);
       expect(r.statusCode).toBe(503);

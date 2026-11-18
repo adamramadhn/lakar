@@ -67,5 +67,5 @@ export class DaemonClient {
 }
 
 export function formatError(e: ApiErrorBody): string {
-  return `${e.code}: ${e.message}${e.hint ? `\nhint: ${e.hint}` : ''}${e.retryable ? '\n(retryable)' : ''}`;
+  return `${e.code}: ${e.message}${e.hint ? `\nhint: ${e.hint}` : ''}${e.editId ? `\neditId: ${e.editId}` : ''}${e.retryable ? '\n(retryable)' : ''}`;
 }
