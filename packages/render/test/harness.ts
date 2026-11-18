@@ -1,5 +1,7 @@
 // Harness tes render di Chromium Lakar TANPA daemon (bukti AD-6): server statis node:http di
-// 127.0.0.1:0 menyajikan halaman kosong (tanpa import map), dist render apa adanya, dan font Inter.
+// 127.0.0.1:0 menyajikan halaman kosong (tanpa import map), dist render apa adanya, font Inter, dan
+// aset gambar in-memory di `/assets/<sha256>` (sama dengan daemon).
+import { createHash } from 'node:crypto';
 import { existsSync, readdirSync } from 'node:fs';
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { createServer, type Server } from 'node:http';
@@ -37,6 +39,16 @@ export function interFaces(weight = 400, style: 'normal' | 'italic' = 'normal', 
   }));
 }
 
+/** Aset in-memory: sha256 → bytes (disajikan di `/assets/<sha256>`). */
+const assets = new Map<string, Buffer>();
+/** Daftarkan bytes gambar; mengembalikan assetId (sha256 hex). */
+export function addAsset(bytes: Buffer): string {
+  const hash = createHash('sha256').update(bytes).digest('hex');
+  assets.set(hash, bytes);
+  return hash;
+}
+export const ASSET_BASE = '/assets/';
+
 let server: Server | undefined;
 let browser: Browser | undefined;
 let page: Page | undefined;
@@ -55,6 +67,8 @@ export async function start(): Promise<void> {
       if (m) return send(200, 'text/javascript; charset=utf-8', await readFile(join(RENDER_DIST, m[1]!)));
       m = /^\/fonts\/inter\/(inter-[a-z0-9-]+\.woff2)$/.exec(url.pathname);
       if (m) return send(200, 'font/woff2', await readFile(join(INTER_FILES, m[1]!)));
+      m = /^\/assets\/([a-f0-9]{64})$/.exec(url.pathname);
+      if (m && assets.has(m[1]!)) return send(200, 'image/png', assets.get(m[1]!)!);
     } catch {
       /* jatuh ke 404 */
     }
@@ -92,9 +106,9 @@ export async function freshPage(): Promise<Page> {
 }
 
 // Kode yang dievaluasi di halaman ditulis sebagai string: transform vitest tidak boleh menyentuh `import()`.
-const RENDER_IN_PAGE = `async ([doc, boardId, fonts]) => {
+const RENDER_IN_PAGE = `async ([doc, boardId, fonts, assetBase]) => {
   const m = await import('/render/index.js');
-  return m.renderBoard(doc, boardId, document.getElementById('root'), { fonts });
+  return m.renderBoard(doc, boardId, document.getElementById('root'), { fonts, assetBase });
 }`;
 
 /** Render board di halaman harness: viewport = ukuran board sebelum mount, lalu screenshot elemen board. */
@@ -103,14 +117,57 @@ export async function render(
   boardId: string,
   fonts: readonly FontFaceSource[],
   p: Page = currentPage(),
+  opts: { assetBase?: string } = {},
 ): Promise<{ result: RenderResult; png: Buffer | undefined }> {
   const board = doc.pages.flatMap((pg) => pg.children).find((b) => b.id === boardId);
   if (board) await p.setViewportSize({ width: Math.max(1, Math.ceil(board.width)), height: Math.max(1, Math.ceil(board.height)) });
-  const result = (await p.evaluate(`(${RENDER_IN_PAGE})(${JSON.stringify([doc, boardId, fonts])})`)) as RenderResult;
+  const args = [doc, boardId, fonts, opts.assetBase ?? ASSET_BASE];
+  const result = (await p.evaluate(`(${RENDER_IN_PAGE})(${JSON.stringify(args)})`)) as RenderResult;
   if (!result.ok) return { result, png: undefined };
   const png = await p.locator(`[data-lakar-id="${boardId}"]`).screenshot({ type: 'png', scale: 'css', animations: 'disabled', caret: 'hide' });
   return { result, png };
 }
+
+const TEST_IMAGE_IN_PAGE = `async () => {
+  const c = new OffscreenCanvas(64, 48);
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = '#E53935'; ctx.fillRect(0, 0, 32, 24);
+  ctx.fillStyle = '#43A047'; ctx.fillRect(32, 0, 32, 24);
+  ctx.fillStyle = '#1E88E5'; ctx.fillRect(0, 24, 32, 24);
+  ctx.fillStyle = '#FDD835'; ctx.fillRect(32, 24, 32, 24);
+  ctx.strokeStyle = '#000000'; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(64, 48); ctx.stroke();
+  const buf = new Uint8Array(await (await c.convertToBlob({ type: 'image/png' })).arrayBuffer());
+  let s = '';
+  for (let i = 0; i < buf.length; i += 0x8000) s += String.fromCharCode.apply(null, buf.subarray(i, i + 0x8000));
+  return btoa(s);
+}`;
+
+/**
+ * Gambar uji deterministik dibuat di halaman (tanpa fixture biner): 64×48, kuadran merah/hijau/biru/kuning
+ * + diagonal hitam dari kiri atas. Didaftarkan sebagai aset; mengembalikan assetId.
+ */
+export async function testImageAsset(): Promise<string> {
+  const b64 = (await currentPage().evaluate(`(${TEST_IMAGE_IN_PAGE})()`)) as string;
+  return addAsset(Buffer.from(b64, 'base64'));
+}
+
+/** Piksel RGBA dari PNG pada titik (x,y), di-decode di halaman. */
+export async function pixels(png: Buffer, points: readonly (readonly [number, number])[]): Promise<[number, number, number, number][]> {
+  return (await currentPage().evaluate(
+    `(${PIXELS_IN_PAGE})(${JSON.stringify([png.toString('base64'), points])})`,
+  )) as [number, number, number, number][];
+}
+
+const PIXELS_IN_PAGE = `async ([b64, points]) => {
+  const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+  const bmp = await createImageBitmap(new Blob([bytes], { type: 'image/png' }), { colorSpaceConversion: 'none', premultiplyAlpha: 'none' });
+  const c = new OffscreenCanvas(bmp.width, bmp.height);
+  const ctx = c.getContext('2d', { colorSpace: 'srgb' });
+  ctx.drawImage(bmp, 0, 0);
+  const data = ctx.getImageData(0, 0, bmp.width, bmp.height).data;
+  return points.map(([x, y]) => { const i = (y * bmp.width + x) * 4; return [data[i], data[i + 1], data[i + 2], data[i + 3]]; });
+}`;
 
 const COMPARE_IN_PAGE = `async ([a, b, tol, maxRatio]) => {
   const decode = async (b64) => {
@@ -146,6 +203,17 @@ const COMPARE_IN_PAGE = `async ([a, b, tol, maxRatio]) => {
 /** Selisih kanal maksimum per piksel yang masih ditoleransi, dan rasio piksel buruk maksimum. */
 export const GOLDEN_TOLERANCE = 24;
 export const GOLDEN_MAX_RATIO = 0.005;
+
+/** Rasio piksel yang selisih kanal maksimumnya > `tol` antara dua PNG berdimensi sama. */
+export async function pixelDiffRatio(a: Buffer, b: Buffer, tol = GOLDEN_TOLERANCE): Promise<number> {
+  const r = (await currentPage().evaluate(`(${COMPARE_IN_PAGE})(${JSON.stringify([a.toString('base64'), b.toString('base64'), tol, 1])})`)) as {
+    ok: boolean;
+    ratio?: number;
+    reason?: string;
+  };
+  if (r.ratio === undefined) throw new Error(`pixelDiffRatio: ${r.reason}`);
+  return r.ratio;
+}
 
 /**
  * Tulis `test/out/<name>.png`, bandingkan dengan `test/golden/<name>.png` di halaman.
@@ -185,9 +253,16 @@ export const nid = () => `Node${String(++seq).padStart(4, '0')}`;
 /** Frame/text dengan id otomatis. `children` boleh berisi node lain. */
 export const frame = (props: Loose, children: Loose[] = []): Loose => ({ type: 'frame', name: 'Frame', id: nid(), ...props, children });
 export const text = (content: string, props: Loose = {}): Loose => ({ type: 'text', name: 'Teks', id: nid(), content, size: 16, lineHeight: 20, ...props });
+export const rect = (props: Loose = {}): Loose => ({ type: 'rect', name: 'Rect', id: nid(), ...props });
+export const ellipse = (props: Loose = {}): Loose => ({ type: 'ellipse', name: 'Ellipse', id: nid(), ...props });
+export const path = (d: string, viewBox: [number, number, number, number], props: Loose = {}): Loose => ({ type: 'path', name: 'Path', id: nid(), d, viewBox, ...props });
 
 /** Dokumen satu board (latar putih). */
-export function boardDoc(children: Loose[], size: { width: number; height: number } = { width: 440, height: 160 }): { doc: ResolvedDocument; boardId: string } {
+export function boardDoc(
+  children: Loose[],
+  size: { width: number; height: number } = { width: 440, height: 160 },
+  fills: Loose[] = [{ type: 'solid', color: '#FFFFFF' }],
+): { doc: ResolvedDocument; boardId: string } {
   const boardId = nid();
   const doc = {
     schemaVersion: 1,
@@ -197,7 +272,7 @@ export function boardDoc(children: Loose[], size: { width: number; height: numbe
       {
         id: 'Page0001',
         name: 'Page 1',
-        children: [{ type: 'board', name: 'Uji', id: boardId, x: 0, y: 0, ...size, screen: 'app', fills: [{ type: 'solid', color: '#FFFFFF' }], children }],
+        children: [{ type: 'board', name: 'Uji', id: boardId, x: 0, y: 0, ...size, screen: 'app', fills, children }],
       },
     ],
   };

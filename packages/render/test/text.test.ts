@@ -53,7 +53,7 @@ describe.skipIf(!browserInstalled)('render teks dan font (Chromium, tanpa daemon
     const { doc, boardId } = boardDoc([text('Halo', { weight: 700 }), text('Roboto', { family: 'Roboto' })]);
     const { result } = await render(doc, boardId, interFaces(400));
     expect(result).toMatchObject({ ok: false, code: 'FONT_MISSING' });
-    if (result.ok) return;
+    if (result.ok || result.code !== 'FONT_MISSING') return;
     expect(result.missing).toEqual([
       { family: 'Inter', weight: 700, style: 'normal' },
       { family: 'Roboto', weight: 400, style: 'normal' },
@@ -76,7 +76,7 @@ describe.skipIf(!browserInstalled)('render teks dan font (Chromium, tanpa daemon
     const { doc, boardId } = boardDoc([a, b, ok]);
     const { result } = await render(doc, boardId, [...interFaces(400), ...interFaces(700)]);
     expect(result).toMatchObject({ ok: false, code: 'FONT_MISSING' });
-    if (result.ok) return;
+    if (result.ok || result.code !== 'FONT_MISSING') return;
     expect(result.message).toContain('"→" U+2192');
     expect(result.message).toContain('"✓" U+2713');
     expect(result.message).toContain(String(a.id));

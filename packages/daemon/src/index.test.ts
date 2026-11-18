@@ -5,6 +5,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createServer } from 'node:net';
 import { spawn } from 'node:child_process';
+import { createHash } from 'node:crypto';
+import { crc32, deflateSync } from 'node:zlib';
 import { fileURLToPath } from 'node:url';
 import { ChromiumRenderer, FontRegistry, PACKAGE, RENDER_DIST_DIR, buildServer, loadConfig, startDaemon, type RunningDaemon } from './index.js';
 import { LakarError } from '@lakar/schema';
@@ -504,6 +506,95 @@ describe('font lokal (registry + FONT_MISSING)', () => {
     expect((await fetch(`${d.url}/render/..%2Fpackage.json`)).status).toBe(404);
     expect((await fetch(`${d.url}/render/index.d.ts`)).status).toBe(404);
   });
+});
+
+/** PNG RGB 8-bit `w`×`h` satu warna (encoder minimal untuk fixture aset). */
+function solidPng(w: number, h: number, rgb: [number, number, number]): Buffer {
+  const chunk = (type: string, data: Buffer) => {
+    const len = Buffer.alloc(4);
+    len.writeUInt32BE(data.length);
+    const td = Buffer.concat([Buffer.from(type, 'latin1'), data]);
+    const crc = Buffer.alloc(4);
+    crc.writeUInt32BE(crc32(td));
+    return Buffer.concat([len, td, crc]);
+  };
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(w, 0);
+  ihdr.writeUInt32BE(h, 4);
+  ihdr[8] = 8;
+  ihdr[9] = 2;
+  const row = Buffer.concat([Buffer.from([0]), Buffer.from(Array.from({ length: w }, () => rgb).flat())]);
+  const raw = Buffer.concat(Array.from({ length: h }, () => row));
+  return Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), chunk('IHDR', ihdr), chunk('IDAT', deflateSync(raw)), chunk('IEND', Buffer.alloc(0))]);
+}
+
+describe('aset gambar (/assets + fill image)', () => {
+  let s: string;
+  let pngHash: string;
+  const sha = (b: Buffer) => createHash('sha256').update(b).digest('hex');
+  const putAsset = async (bytes: Buffer, name = sha(bytes)) => {
+    const { mkdir } = await import('node:fs/promises');
+    await mkdir(join(dataDir, 'assets'), { recursive: true });
+    await writeFile(join(dataDir, 'assets', name), bytes);
+    return name;
+  };
+  const imageBoard = async (assetId: string, name: string) => {
+    const code = `const b=add(null,{type:'board',name:'${name}',x:0,y:0,width:100,height:80,screen:'app'}); add(b,{type:'frame',name:'Gambar',width:60,height:40,fills:[{type:'image',assetId:'${assetId}',fit:'cover'}]}); b`;
+    const r = await call('/execute', { code }, s);
+    expect(r.status, JSON.stringify(r.body.error)).toBe(200);
+    return r.body.data.created[0].id as string;
+  };
+
+  beforeAll(async () => {
+    pngHash = await putAsset(solidPng(16, 16, [0xe5, 0x39, 0x35]));
+    s = await newSession();
+    await call('/docs/open', { slug: 'aset-gambar' }, s);
+  });
+
+  it('GET /assets: PNG valid → 200 image/png immutable; traversal/hash salah/non-raster/tak ada → 404', async () => {
+    const ok = await fetch(`${d.url}/assets/${pngHash}`);
+    expect(ok.status).toBe(200);
+    expect(ok.headers.get('content-type')).toBe('image/png');
+    expect(ok.headers.get('cache-control')).toMatch(/immutable/);
+    expect(sha(Buffer.from(await ok.arrayBuffer()))).toBe(pngHash);
+    const svg = await putAsset(Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>'));
+    const html = await putAsset(Buffer.from('<!doctype html><p>x</p>'));
+    for (const path of [
+      '/assets/..%2Fdocs%2Faset-gambar.lakar.json',
+      '/assets/..%2F..%2Fetc%2Fpasswd',
+      '/assets/abc',
+      `/assets/${pngHash.toUpperCase()}`,
+      `/assets/${pngHash}.png`,
+      `/assets/${svg}`,
+      `/assets/${html}`,
+      `/assets/${'0'.repeat(64)}`,
+    ]) {
+      const r = await fetch(`${d.url}${path}`);
+      expect(r.status, path).toBe(404);
+    }
+  });
+
+  it.skipIf(!browserInstalled)('screenshot fill gambar dari store → 200 PNG menampilkan gambar; assetId tak ada → 404 NOT_FOUND; berikutnya 200', async () => {
+    const good = await imageBoard(pngHash, 'Gambar');
+    const r = await call('/screenshot', { boardId: good }, s);
+    expect(r.status, JSON.stringify(r.body.error)).toBe(200);
+    const img = decodePng(Buffer.from(r.body.data.png, 'base64'));
+    const at = (x: number, y: number) => [...img.pixels.subarray((y * img.width + x) * img.channels, (y * img.width + x) * img.channels + 3)];
+    expect(at(30, 20)).toEqual([0xe5, 0x39, 0x35]);
+    expect(at(80, 60)).toEqual([0xff, 0xff, 0xff]);
+
+    const missing = 'a'.repeat(64);
+    const bad = await imageBoard(missing, 'Hilang');
+    const r2 = await call('/screenshot', { boardId: bad }, s);
+    expect(r2.status).toBe(404);
+    expect(r2.body).toMatchObject({ ok: false, error: { code: 'NOT_FOUND', retryable: false } });
+    expect(r2.body.error!.message).toContain(missing);
+    expect(r2.body.error!.hint).toMatch(/sha256/);
+
+    const r3 = await call('/screenshot', { boardId: good }, s);
+    expect(r3.status, JSON.stringify(r3.body.error)).toBe(200);
+    expect(r3.body.data.png).toBe(r.body.data.png);
+  }, 60_000);
 });
 
 describe('lakard main', () => {

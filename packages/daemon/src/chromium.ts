@@ -23,7 +23,8 @@ export const RENDER_PAGE_HTML = `<!doctype html>
 <script type="module">
 import { renderBoard } from '/render/index.js';
 // AD-5/AD-6: render memuat face yang diberikan, ukur setelah fonts.ready + dua rAF.
-window.__lakarRender = (doc, boardId, fonts) => renderBoard(doc, boardId, document.getElementById('root'), { fonts });
+// Aset gambar disajikan daemon di /assets/<sha256> (store aset <dataDir>/assets).
+window.__lakarRender = (doc, boardId, fonts) => renderBoard(doc, boardId, document.getElementById('root'), { fonts, assetBase: '/assets/' });
 window.__lakarReady = true;
 </script></body></html>
 `;
@@ -33,6 +34,8 @@ export async function readRenderModule(file: string): Promise<string | undefined
   if (!RENDER_FILE.test(file)) return undefined;
   return readFile(join(RENDER_DIST_DIR, file), 'utf8').catch(() => undefined);
 }
+
+export const ASSET_HINT = 'assetId adalah sha256 file gambar di store aset daemon; impor gambar dulu (aset harus ada di store)';
 
 export type ChromiumOptions = {
   browsersPath: string;
@@ -88,8 +91,11 @@ export class ChromiumRenderer implements RenderPort<ResolvedDocument> {
       } catch (e) {
         throw await this.#failed(e);
       }
+      // Halaman tetap dipakai: hanya dokumen yang salah.
+      if (!result.ok && result.code === 'NOT_FOUND') {
+        throw new LakarError('NOT_FOUND', result.message, { hint: ASSET_HINT, retryable: false });
+      }
       if (!result.ok) {
-        // Halaman tetap dipakai: hanya dokumen yang salah.
         throw new LakarError('FONT_MISSING', result.message, {
           hint:
             `keluarga terdaftar: ${this.#opts.fonts.families().join(', ')}. ` +

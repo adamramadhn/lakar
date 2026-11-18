@@ -15,6 +15,7 @@ import {
 } from '@lakar/schema';
 import { z } from 'zod';
 import { readFile } from 'node:fs/promises';
+import { readAsset } from './assets.js';
 import { readRenderModule, RENDER_PAGE_HTML } from './chromium.js';
 import type { DaemonConfig } from './config.js';
 import { FontRegistry } from './fonts.js';
@@ -175,6 +176,13 @@ export function buildServer({ config, render, fonts = FontRegistry.load() }: Bui
     const path = fonts.filePath(req.params.pkg, req.params.file);
     if (!path) throw notFound(`font ${req.params.pkg}/${req.params.file}`);
     return reply.type('font/woff2').header('cache-control', 'public, max-age=31536000, immutable').send(await readFile(path));
+  });
+
+  // Aset gambar (story 8): `<dataDir>/assets/<sha256>`, hanya raster dari magic bytes; lainnya → 404.
+  app.get<{ Params: { hash: string } }>('/assets/:hash', async (req, reply) => {
+    const asset = await readAsset(config.dataDir, req.params.hash);
+    if (!asset) throw notFound(`aset ${req.params.hash}`);
+    return reply.type(asset.type).header('cache-control', 'public, max-age=31536000, immutable').send(asset.body);
   });
 
   return { app, store, sessions, fonts };
