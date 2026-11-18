@@ -376,3 +376,23 @@ Skill: `core.md` 56f70449dbed0f12, `landing.md` b953c1b2bae4a8d4 (tidak berubah)
 Verifikasi sebelum run: build OK, 801/801 tes (48 file; termasuk C7, batas token, contoh skill 0 error/warning/gate),
 api.md sama, `practice --iter 8 --reuse-pendev 2 --dry-run` OK (prompt sha 582c5d11… beku, rubrik 2.1, C7 lulus,
 perkiraan $7,60, anggaran cukup), lakard di-restart dan active.
+
+### Hasil iterasi 8 (`bench/practice-8.md`, HEAD `70a2a5e`, pen.dev dipakai ulang dari iterasi 2): **lulus**
+
+| Prompt | Waktu Lakar / pen.dev | Rasio | T L–P | D L–P | Gate | Emoji (a/b/c) | Keputusan | Catatan proses |
+|---|---|---|---|---|---|---|---|---|
+| P1 | 221,9 / 219,5 dtk | 1,01 | 13–11 | 4–4 | 0 | 0/0/0 | Setara | 9 execute (FONT_MISSING `≤`, ICON_UNKNOWN, 3 execute pangkas tinggi) + 1 `inspect`; pencarian foto suasana kosong |
+| P2 | 177,7 / 147,7 dtk | 1,20 | 13–12 | 3–2 | 0 | 0/0/0 | Setara | 3 execute + 1 `layout_check`; tanpa duplikasi kartu/bilah; tile mix berfoto; thumbnail episode masih bidang warna; 4 episode di board posisi akhir |
+| P3 | 139,7 / 129,9 dtk | 1,08 | 16–15 | 4–4 | 0 | 0/0/0 | Setara | 2 execute + 1 `layout_check` |
+| P4 | 223,4 / 231,5 dtk | 0,96 | 14–13 | 4–4 | 0 | 0/0/0 | Setara | 7 execute |
+
+- 4 dari 4 Setara, waktu ≤ 1,20× di keempat prompt, emoji Lakar 0, layout_check gate 0 → **lulus** (AC). Prompt sha di
+  frozen.json = `582c5d11…` (beku). Arsip pra-run memindahkan dokumen sisa iterasi 4 (`dapur-wening-resep`, terhenti).
+- Disiplin execute baru tercapai di mobile (P2 3, P3 2); P1 (landing) dan P4 (dashboard) masih 7–9 execute, tetapi waktu
+  tetap ≤ 1,01×. Thumbnail daftar P2 belum berfoto (foto dipakai untuk tile koleksi); avatar header P2 masih inisial.
+- Penjaga `.pen`: 41 file, berubah 0, hilang 0, baru 0. lakard active.
+- Biaya iterasi 8: $6,85 (Lakar $3,78 + juri $3,07); kumulatif **$54,94** dari $58,09.
+
+## Status: lulus di iterasi 8 — menunggu done_checkpoint (Adam melihat PNG)
+
+PNG Lakar: `bench/practice/8/P{1..4}-lakar.png` (tracked); PNG pen.dev lokal: `bench/runs/practice/2/P{1..4}-pendev.png` (EULA).

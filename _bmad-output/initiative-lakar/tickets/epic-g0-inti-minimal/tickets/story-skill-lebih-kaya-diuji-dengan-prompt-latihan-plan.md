@@ -337,3 +337,23 @@ $7,09, perkiraan $5,10) dan/atau perbaikan harness pengarsipan run tanpa `run.js
   Kesan: P2 kemungkinan di bawah pen.dev.
 - Risiko sisa: v6 belum pernah dijuri; Setara P3 bergantung pada board pen.dev iterasi 2 yang salah ukuran; variasi
   run-ke-run tinggi; disiplin execute (P1 `inspect`, P2 3 execute perapatan) belum tercapai.
+
+### Lanjutan iterasi 8 (2026-11-18): **lulus** — menunggu done_checkpoint (Adam melihat PNG)
+
+- Harness: `MAX_ITER` 8, `BUDGET_USD` 58,09 ($48,09 iter 1–7 + $10) + tes; README (commit 70a2a5e). `--dry-run` menunjukkan
+  dokumen sisa run P3 iterasi 4 (terhenti) ikut diarsip; run nyata mengarsipkannya sebelum restart lakard.
+- Skill v7 (commit 70a2a5e): `mobile.md` tanpa duplikasi butir di satu layar (bilah yang menempel vs kartu sorotan/daftar),
+  foto untuk sampul/thumbnail konten nyata (bidang warna hanya bila pencarian gagal atau tile kategori abstrak), daftar
+  layar pertama ≥ 3 butir utuh (rapatkan dulu), §Alur execute maks 3 tanpa `inspect`; `core.md` langkah 3 (mobile/app
+  maks 3, landing maks 4 execute termasuk perbaikan), langkah 6 tanpa `inspect`, sisa non-error → ringkasan, foto
+  + thumbnail daftar. core 3999/4000, mobile prosa 1481/1500.
+- Iterasi 8 (`practice --iter 8 --reuse-pendev 2`): P1 Setara (1,01×), P2 Setara (1,20×), P3 Setara (1,08×), P4 Setara
+  (0,96×); emoji Lakar 0, gate 0 di keempatnya → lulus 4/4. Biaya $6,85; kumulatif $54,94 dari $58,09.
+- Verifikasi: build OK; 801/801 tes (48 file) sebelum run; api.md tanpa beda; protocolHash 907cb36f…edb85d;
+  bench/protocol & bench/rubric tidak berubah sejak 97ec581; `round --dry-run` rubric.json: sama; frozen.json prompt sha
+  = `PRACTICE_PROMPTS_SHA256`; penjaga `.pen` 41 file berubah/hilang 0; lakard active; `tools/node26/verify.sh` exit 0.
+- Laporan: bench/practice-8.md; PNG Lakar bench/practice/8/; PNG pen.dev lokal bench/runs/practice/2/; LOG bench/practice/LOG.md.
+- Risiko sisa: semua Setara dengan selisih T 1–2 (tidak ada Lebih baik); disiplin execute belum tercapai di P1 (9 execute
+  + `inspect`) dan P4 (7 execute); thumbnail episode P2 masih bidang warna dan avatar header inisial; di board pertama P2
+  sepotong butir daftar tampak di celah antara mini player dan tab bar tetapi LC-20 tidak menandainya (gate 0); Setara P3
+  tetap bergantung pada board pen.dev iterasi 2; satu run per prompt (variasi run-ke-run tinggi).
