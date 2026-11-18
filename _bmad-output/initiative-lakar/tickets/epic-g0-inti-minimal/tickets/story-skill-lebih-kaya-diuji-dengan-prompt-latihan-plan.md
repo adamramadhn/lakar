@@ -3,14 +3,14 @@ title: 'Skill lebih kaya diuji dengan prompt latihan'
 type: feature
 ticket: '19'
 created: '2026-11-18'
-status: in-progress
+status: in-review
 baseline_revision: '97ec58176a5e8d7abf19dddc6f7d6ac79266cc85'
 route: full
 route_source: auto
 risk: high
-review: 'none'
-review_source: 'halt-blocked-before-review'
-lenses_ran: []
+review: 'quick'
+review_source: 'pinned'
+lenses_ran: [quick]
 review_loop_iteration: 0
 followup_review_recommended: false
 context:
