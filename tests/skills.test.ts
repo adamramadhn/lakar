@@ -1,0 +1,100 @@
+// Isi skill (`packages/skills/skills/*.md`): batas token, api.md mutakhir terhadap api.ts (AD-12), nama ikon
+// di icons.md ada di katalog terpasang, klaim weight font sesuai registry, dan struktur blok kode.
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { describe, expect, it } from 'vitest';
+import { renderApiMarkdown } from '../packages/exec/src/api-md.ts';
+import { IconCatalog } from '../packages/icons/src/index.ts';
+import { FontRegistry } from '../packages/daemon/src/fonts.ts';
+import { SKILL_NAMES, SKILLS_DIR, estimateTokens, splitCode } from '../packages/skills/src/index.ts';
+
+const read = (name: string) => readFileSync(join(SKILLS_DIR, `${name}.md`), 'utf8');
+const REGEN = 'regenerasi: /opt/node-26/bin/pnpm build && /opt/node-26/bin/node scripts/gen-skill-api.mjs';
+
+/** Batas token (DESIGN.md §Turunan): core total; landing/mobile prosa + total. */
+const LIMITS = { core: { total: 4000 }, landing: { prose: 1500, total: 3500 }, mobile: { prose: 1500, total: 3500 } } as const;
+
+describe('skill: batas token (estimateTokens = karakter / 3.2)', () => {
+  it.each(Object.entries(LIMITS))('%s', (name, lim) => {
+    const md = read(name);
+    const total = estimateTokens(md);
+    const prose = estimateTokens(splitCode(md).prose);
+    console.log(`[skills] ${name}.md: total ${total} token, prosa ${prose} token`);
+    expect(total, `${name}.md total ${total} > ${lim.total}`).toBeLessThanOrEqual(lim.total);
+    if ('prose' in lim) expect(prose, `${name}.md prosa ${prose} > ${lim.prose}`).toBeLessThanOrEqual(lim.prose);
+  });
+});
+
+describe('skill: api.md dihasilkan dari api.ts', () => {
+  it('api.md sama persis dengan renderApiMarkdown()', () => {
+    expect(read('api') === renderApiMarkdown(), `api.md basi; ${REGEN}`).toBe(true);
+  });
+  it('urut relevansi (bukan istilah lama)', () => {
+    expect(read('api')).toMatch(/urut relevansi/i);
+  });
+});
+
+describe('skill: struktur', () => {
+  it.each(SKILL_NAMES)('%s.md diawali judul, semua blok berpagar js atau text', (name) => {
+    const md = read(name);
+    expect(md.startsWith('# ')).toBe(true);
+    const { blocks } = splitCode(md);
+    for (const b of blocks) expect(['js', 'text'], `${name}.md blok berbahasa "${b.lang}"`).toContain(b.lang);
+    expect(md.match(/^```/gm)!.length).toBe(blocks.length * 2);
+  });
+
+  it('core.md punya tepat satu blok prelude (baris pertama // prelude); blok // pakai prelude ada di landing dan mobile', () => {
+    expect(splitCode(read('core')).blocks.filter((b) => b.code.startsWith('// prelude'))).toHaveLength(1);
+    for (const name of ['landing', 'mobile']) expect(splitCode(read(name)).blocks.some((b) => b.code.startsWith('// pakai prelude')), name).toBe(true);
+  });
+
+  it('klaim weight font di core.md sesuai registry font terpasang', () => {
+    const line = read('core')
+      .split('\n')
+      .find((l) => l.startsWith('Font terpasang'));
+    expect(line).toBeDefined();
+    const claims = [...line!.matchAll(/([A-Z][A-Za-z ]+?) (\d{3})–(\d{3})/g)].map((m) => ({ family: m[1]!.trim(), lo: Number(m[2]), hi: Number(m[3]) }));
+    const reg = FontRegistry.load();
+    expect(claims.map((c) => c.family).sort()).toEqual(reg.families().sort());
+    for (const c of claims) {
+      const w = reg.entry(c.family)!.weights;
+      expect([Math.min(...w), Math.max(...w)], c.family).toEqual([c.lo, c.hi]);
+    }
+  });
+});
+
+describe('skill: nama ikon di icons.md ada di katalog terpasang', () => {
+  const cat = IconCatalog.load();
+  const md = read('icons');
+  const section = (head: string) => {
+    const i = md.indexOf(head);
+    expect(i, head).toBeGreaterThanOrEqual(0);
+    const j = md.indexOf('\n## ', i + 1);
+    return md.slice(i, j < 0 ? undefined : j);
+  };
+  const codes = (s: string) => [...s.matchAll(/`([a-z0-9-]+)`/g)].map((m) => m[1]!);
+
+  it('tabel konsep → lucide: ≥ 80 baris, semua nama kanonik', () => {
+    const rows = section('## Konsep').split('\n').filter((l) => /^\| [^-|][^|]* \| `/.test(l));
+    expect(rows.length).toBeGreaterThanOrEqual(80);
+    const bad = rows.map((r) => codes(r.split('|')[2]!)[0]!).filter((n) => cat.resolve('lucide', n) !== n);
+    expect(bad).toEqual([]);
+  });
+
+  it('alias lama → kanonik sesuai katalog', () => {
+    const rows = section('## Alias').split('\n').filter((l) => l.startsWith('| `'));
+    expect(rows.length).toBeGreaterThanOrEqual(10);
+    for (const r of rows) {
+      const [, aliases, canon] = r.split('|');
+      const target = codes(canon!)[0]!;
+      expect(cat.resolve('lucide', target), target).toBe(target);
+      for (const a of codes(aliases!)) expect(cat.resolve('lucide', a), a).toBe(target);
+    }
+  });
+
+  it('logo brand simple-icons ada', () => {
+    const names = codes(section('## Logo brand').split('\n').find((l) => l.startsWith('`'))!);
+    expect(names.length).toBeGreaterThanOrEqual(10);
+    expect(names.filter((n) => cat.resolve('simple-icons', n) !== n)).toEqual([]);
+  });
+});

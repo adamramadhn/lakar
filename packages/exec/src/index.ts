@@ -12,12 +12,11 @@ import {
 import type { Transaction } from '@lakar/core';
 import type { IconCatalogPort } from '@lakar/ports';
 import { LakarError } from '@lakar/schema';
-import { API, KEEP_MAX_BYTES, LOG_MAX_BYTES, LOG_MAX_LINES, MAX_OPS, SNIPPET_GLOBALS, VALUE_MAX_BYTES, type ApiContext } from './api.js';
+import { API, DEFAULT_TIMEOUT_MS, KEEP_MAX_BYTES, LOG_MAX_BYTES, LOG_MAX_LINES, MAX_OPS, SNIPPET_GLOBALS, VALUE_MAX_BYTES, type ApiContext } from './api.js';
 
 export const PACKAGE = '@lakar/exec';
 export * from './api.js';
 
-export const DEFAULT_TIMEOUT_MS = 2000;
 export const DEFAULT_MEMORY_BYTES = 64 * 1024 * 1024;
 
 export type RunOptions = {
@@ -377,3 +376,4 @@ function toHandle(ctx: QuickJSContext, v: unknown): QuickJSHandle | undefined {
 function errMessage(e: unknown): string {
   return e instanceof Error ? e.message : String(e);
 }
+export { renderApiMarkdown } from './api-md.js';

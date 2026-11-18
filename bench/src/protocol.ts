@@ -114,7 +114,8 @@ export const NGRAM = 6;
 /** Kalimat utuh sependek ini (di bawah NGRAM) juga dianggap frasa terlarang. */
 export const MIN_SENTENCE_WORDS = 5;
 
-function forbiddenPhrases(sources: string[]): Set<string> {
+/** Frasa terlarang: n-gram NGRAM kata + kalimat utuh pendek (≥ MIN_SENTENCE_WORDS) dari `sources`. */
+export function forbiddenPhrases(sources: string[]): Set<string> {
   const out = new Set<string>();
   for (const src of sources) {
     const w = words(src);

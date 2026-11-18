@@ -11,6 +11,8 @@ import { ID_PATTERN, LakarError, NODE_TYPES, type AnyNode, type ErrorCode, type 
 
 /** Maksimum op mutasi sukses per snippet; lebih dari ini → EXEC_ERROR + rollback. */
 export const MAX_OPS = 5000;
+/** Batas waktu default satu snippet (ms). */
+export const DEFAULT_TIMEOUT_MS = 2000;
 /** Ukuran maksimum `keep` (JSON, UTF-8). */
 export const KEEP_MAX_BYTES = 64 * 1024;
 /** Ukuran maksimum `value` (JSON, UTF-8) sebelum dipotong. */
@@ -116,7 +118,7 @@ export interface LakarApi {
   /** Posisi bebas tumpang tindih untuk board baru berukuran `w`×`h`. */
   place(w: number, h: number, opts?: PlaceOptions): Point;
   /**
-   * Cari ikon di katalog terpasang (lucide = ikon UI, simple-icons = logo brand). Urut skor: nama persis >
+   * Cari ikon di katalog terpasang (lucide = ikon UI, simple-icons = logo brand). Urut relevansi: nama persis >
    * awalan nama/alias > token nama > tag persis > tag sebagian. Pakai `lib` + `icon` hasilnya di node icon.
    */
   iconSearch(query: string, opts?: IconSearchOptions): IconSearchMatch[];
@@ -515,7 +517,7 @@ export const API: { readonly [K in keyof LakarApi]: ApiFunction } = {
     kind: 'read',
     signature: "iconSearch(query: string, opts?: {lib?: 'lucide'|'simple-icons', limit?: number}): {lib, icon, tags?, title?, aliasOf?}[]",
     doc:
-      'Cari ikon di katalog terpasang: lucide (ikon UI) dan simple-icons (khusus logo brand). Urut skor: nama persis > awalan nama/alias > ' +
+      'Cari ikon di katalog terpasang: lucide (ikon UI) dan simple-icons (khusus logo brand). Urut relevansi: nama persis > awalan nama/alias > ' +
       `token nama > tag persis > tag sebagian; default ${ICON_SEARCH_DEFAULT_LIMIT} hasil, maks ${ICON_SEARCH_MAX_LIMIT}. Pakai lib + icon hasilnya di node icon (alias juga diterima, disimpan sebagai nama kanonik).`,
     returns: '{lib, icon, tags?, title?, aliasOf?}[] (bisa kosong)',
     errors: ['SCHEMA_INVALID'],
@@ -552,3 +554,98 @@ function isUnder(parents: ReadonlyMap<string, string | null>, e: Entry, ancestor
 
 /** Nama semua global snippet (fungsi API + keep + console). */
 export const SNIPPET_GLOBALS: readonly string[] = [...Object.keys(API), 'keep', 'console.log'];
+
+// ---------------------------------------------------------------------------
+// Referensi node/properti/respons (sumber `api.md`, AD-12)
+// ---------------------------------------------------------------------------
+
+/** Satu bagian referensi: butir ringkas + contoh opsional (snippet mandiri yang sukses di dokumen kosong). */
+export type ApiReferenceSection = { title: string; items: readonly string[]; example?: string };
+
+/** Referensi node, properti, respons execute, dan kode error. Dipakai `renderApiMarkdown()`. */
+export const API_REFERENCE: readonly ApiReferenceSection[] = [
+  {
+    title: 'Katalog node v1',
+    items: [
+      "Tertutup: board, frame, text, rect, ellipse, path, icon. Kunci di luar skema → SCHEMA_INVALID. Semua node anak wajib `name`.",
+      "board (parent null): `{type:'board', name, x, y, width, height, screen:'landing'|'app'|'mobile', expectedSize?:{width,height}, fills?}`. Selalu clip; anak disusun kolom dari kiri atas (seperti frame `layout:'column'`, align start).",
+      "frame: `layout?:'none'|'row'|'column'` (default `'none'` = semua anak absolut di x/y, default 0,0), `gap?` (boleh negatif), `padding?`, `align?:'start'|'center'|'end'|'stretch'` (sumbu silang), `justify?:'start'|'center'|'end'|'space-between'` (sumbu utama), `clip?`, `scrollY?` (geser isi ke atas), sizing, cat, radius, efek.",
+      "text: `content, size, family?` (default Inter), `weight?` (100–900, default 400), `style?:'normal'|'italic'`, `lineHeight?` (px), `letterSpacing?` (em), `align?:'left'|'center'|'right'|'justify'`, `wrap?`, `numeric?:'proportional'|'tabular'`, `color?` (default #000000), sizing, efek.",
+      'rect: sizing, cat, radius, efek. ellipse: sizing, cat, efek + `startDeg?` (0 = jam 12, searah jarum jam), `sweepDeg?` (-360..360), `inner?` (rasio lubang [0,1)) untuk busur/ring.',
+      'path: `d` (SVG path), `viewBox:[x,y,w,h]`, sizing, cat, efek. icon: `lib, icon, size, color?, strokeWidth?, filled?`, efek (lihat add).',
+    ],
+    example:
+      `${BOARD}\nconst f = add(b, {type:'frame', name:'Kartu', layout:'column', gap:8, padding:16, width:'fill', radius:12, fills:[{type:'solid', color:'#F6F7F9'}]});\n` +
+      "add(f, {type:'text', name:'Judul', content:'Ringkasan', size:20, lineHeight:28, weight:600, color:'#101828'});\n" +
+      "add(f, {type:'ellipse', name:'Ring', width:64, height:64, inner:0.8, startDeg:0, sweepDeg:216, fills:[{type:'solid', color:'#4F46E5'}]});\n" +
+      "add(f, {type:'path', name:'Shape / Gelombang', d:'M0 8 Q 12 0 24 8 T 48 8', viewBox:[0,0,48,16], stroke:{color:'#0F766E', width:2, align:'center'}});",
+  },
+  {
+    title: 'Sizing',
+    items: [
+      "`width`/`height`: angka (fixed) | `'hug'` (ikut isi) | `'fill'` (isi sisa ruang di sumbu utama parent, regang di sumbu silang) + `minWidth`/`maxWidth`/`minHeight`/`maxHeight`.",
+      "Tanpa width/height: ikut isi di sumbu utama; di sumbu silang ikut `align` parent (board: start = ikut isi). `'fill'` butuh parent yang ukurannya diketahui.",
+      "Teks: `wrap` default `'auto'` (satu baris, tidak dibungkus) bila width kosong/'hug', `'wrap'` bila width angka/'fill' (tinggi ikut isi). `'fixed'` = kotak width×height apa adanya. Paragraf: beri width angka atau 'fill'.",
+      'icon: kotak `size`×`size`. path tanpa width/height (atau hug) memakai ukuran viewBox.',
+    ],
+    example:
+      `${BOARD}\nconst row = add(b, {type:'frame', name:'Baris', layout:'row', gap:12, width:'fill', padding:[0,20], align:'center'});\n` +
+      "add(row, {type:'text', name:'Paragraf', content:'Teks panjang yang dibungkus mengikuti lebar sisa baris ini.', size:16, lineHeight:24, width:'fill'});\n" +
+      "add(row, {type:'rect', name:'Penanda', width:24, height:24, radius:6, fills:[{type:'solid', color:'#2563EB'}]});",
+  },
+  {
+    title: 'Padding dan posisi',
+    items: [
+      '`padding`: angka | `[vertikal, horizontal]` | `[atas, kanan, bawah, kiri]` (urutan CSS).',
+      "`position:'absolute'` + `x`/`y`: relatif kotak parent, keluar dari flow (x/y tanpa position → SCHEMA_INVALID). Anak frame `layout:'none'` selalu absolut. Pakai untuk node `Overlay /`; selebihnya flex.",
+    ],
+    example:
+      `${BOARD}\nconst bar = add(b, {type:'frame', name:'Overlay / Tab bar', position:'absolute', x:20, y:746, width:350, height:64, layout:'row', padding:[0,8], align:'center', radius:24, fills:[{type:'solid', color:'#FFFFFF'}], stroke:{color:'#E4E7EC', width:1, align:'inside'}});\n` +
+      "add(bar, {type:'icon', lib:'lucide', icon:'house', size:24, color:'#2563EB'});",
+  },
+  {
+    title: 'Cat, stroke, radius',
+    items: [
+      "`fills[]` (frame/rect/ellipse/path/board): `fills[0]` lapisan paling bawah. `{type:'solid', color}` | `{type:'linear', angle, stops:[{offset, color}]}` (sudut ala CSS: 0 = ke atas, 90 = ke kanan, searah jarum jam) | `{type:'radial', center?:[cx,cy] (0..1, default tengah), radius? (relatif kotak, default 0.5), stops}` | `{type:'image', assetId, fit:'cover'|'contain'|'fill'|'tile'}`.",
+      "Warna: `'#RRGGBB'` atau `'#RRGGBBAA'` (alpha di 2 digit akhir, mis. tint `#2563EB14`). rgba()/nama warna ditolak.",
+      "`stroke: {color, width, align:'inside'|'center'|'outside', sides?:['top'|'right'|'bottom'|'left']}`; pemisah satu sisi = `sides:['bottom']`.",
+      '`radius` (frame/rect): angka atau `[kiriAtas, kananAtas, kananBawah, kiriBawah]`.',
+    ],
+    example:
+      `${BOARD}\nadd(b, {type:'rect', name:'Latar', width:390, height:200, fills:[{type:'solid', color:'#0B0C0F'}, {type:'radial', center:[0.8,0.2], radius:0.6, stops:[{offset:0, color:'#2563EB66'}, {offset:1, color:'#2563EB00'}]}]});\n` +
+      "add(b, {type:'frame', name:'Garis bawah', width:'fill', height:48, stroke:{color:'#E4E7EC', width:1, align:'inside', sides:['bottom']}});",
+  },
+  {
+    title: 'Efek',
+    items: [
+      "Semua node anak: `shadows[]` `{x, y, blur, spread?, color, type?:'drop'|'inner'}` (makna sama dengan CSS box-shadow), `opacity` 0..1, `blend`, `blur`, `backdropBlur`, `rotation` (derajat, searah jarum jam, poros tengah, tidak memengaruhi layout).",
+      'Keterbatasan: pada ellipse busur/ring, path, dan icon bayangan mengikuti bentuk tetapi `spread` dan `inner` tidak didukung; `stroke.sides` diabaikan pada ellipse busur dan path. Text: hanya bayangan drop.',
+    ],
+    example:
+      `${BOARD}\nadd(b, {type:'frame', name:'Kartu terangkat', width:200, height:120, radius:12, fills:[{type:'solid', color:'#FFFFFF'}], shadows:[{x:0, y:4, blur:16, color:'#10182814'}]});`,
+  },
+  {
+    title: 'Token',
+    items: [
+      "`setTokens({'colors.primary':'#0F62FE', 'spacing.4':16})`; nilai properti boleh `{$token:'colors.primary'}` (token harus ada → selain itu TOKEN_UNKNOWN). get/find mengembalikan referensi apa adanya.",
+    ],
+  },
+  {
+    title: 'Respons execute',
+    items: [
+      'Sukses: `{docId, rev, created:[{id, name, path}], value?, valueTruncated?, logs?, check?, bounds?, boundsTruncated?}`. `value` = nilai ekspresi terakhir (JSON). Snippet tanpa op mutasi tidak menaikkan rev (tanpa check/bounds).',
+      '`check {boards, summary:{error, warning, gate}, findings:[{level, rule, nodeId, nodeName, detail, expected}]}`: board yang disentuh dirender dan dicek sebelum commit. Temuan tidak membatalkan commit; perbaiki lalu execute lagi.',
+      '`bounds {id:[x,y,w,h]}`: dibulatkan, relatif board, untuk board tersentuh, node baru, dan node berubah (maks 60). Pakai untuk tinggi akhir board landing.',
+      'Gagal: rollback penuh; error menyebut baris:kolom dan membawa `editId`. Perbaiki tanpa mengirim ulang kode: `execute({editId, edits:[{find, replace}]})` (find muncul tepat sekali; description diwarisi; edits kosong = jalankan ulang; editId hilang saat daemon restart).',
+    ],
+  },
+  {
+    title: 'Kode error',
+    items: [
+      'SCHEMA_INVALID: properti/kunci/nilai salah (pesan menyebut path). NOT_FOUND: ID/dokumen/aset/skill tidak ada. CONFLICT: perubahan bersamaan (dicadangkan).',
+      `NO_ACTIVE_DOC: panggil open_doc dulu. EXEC_TIMEOUT: snippet > ${DEFAULT_TIMEOUT_MS / 1000} detik. EXEC_ERROR: error JavaScript atau > ${MAX_OPS} op.`,
+      'ICON_UNKNOWN: nama ikon tidak ada (+3 saran). TOKEN_UNKNOWN: token belum di-setTokens. FONT_MISSING: keluarga/weight tidak terdaftar atau karakter di luar latin/latin-ext (ganti dengan node icon).',
+      'RENDER_FAILED (retryable): render gagal, coba lagi. EXPORT_FAILED: PNG gagal ditulis. VERSION_MISMATCH: versi mcp ≠ lakard (restart service).',
+    ],
+  },
+];

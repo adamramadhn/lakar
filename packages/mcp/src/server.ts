@@ -95,8 +95,16 @@ export const STATUS_DESCRIPTION =
 
 /** Deskripsi tool `read_skill`. */
 export const READ_SKILL_DESCRIPTION =
-  'Baca panduan skill Lakar (Markdown). Tanpa name → daftar {skills:[{name, available}]}; dengan name → isi skill. ' +
+  'Baca panduan skill Lakar (Markdown). Urutan baca: core dulu (alur kerja, prelude helper, token, konvensi), lalu skill jenis layar ' +
+  '(landing atau mobile, berisi contoh teruji); icons bila ragu nama ikon; api hanya untuk referensi lengkap. ' +
+  'Tanpa name → daftar {skills:[{name, available}]}; dengan name → isi skill. ' +
   'Nama: core, landing, mobile, icons, api. Nama lain atau skill yang belum tersedia → NOT_FOUND dengan daftar yang tersedia.';
+
+/** Instruksi server MCP (dikirim saat initialize): urutan kerja singkat. */
+export const SERVER_INSTRUCTIONS =
+  'Lakar: canvas desain lewat kode. Sebelum menggambar, read_skill core lalu read_skill landing atau mobile sesuai jenis layar. ' +
+  'Lalu open_doc dan bangun lewat sedikit execute besar (2–4 untuk landing, 1–2 untuk mobile) yang diawali prelude dari skill core; ' +
+  'baca check di respons execute, perbaiki dengan editId/edits atau update, akhiri dengan satu screenshot, perbaikan, lalu export PNG.';
 
 /** Deskripsi tool `list_boards`. */
 export const LIST_BOARDS_DESCRIPTION =
@@ -178,7 +186,7 @@ export const ICON_SEARCH_DESCRIPTION =
 
 export function createLakarMcpServer(daemonUrl: string): McpServer {
   const client = new DaemonClient(daemonUrl);
-  const server = new McpServer({ name: SERVER_NAME, version: SERVER_VERSION });
+  const server = new McpServer({ name: SERVER_NAME, version: SERVER_VERSION }, { instructions: SERVER_INSTRUCTIONS });
 
   server.registerTool(
     'status',

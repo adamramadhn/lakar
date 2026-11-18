@@ -28,3 +28,24 @@ export async function readSkill(name: string, dir: string = SKILLS_DIR): Promise
   if (!isSkillName(name)) return undefined;
   return readFile(skillPath(name, dir), 'utf8').catch(() => undefined);
 }
+
+/**
+ * Perkiraan token konservatif untuk batas ukuran skill: `ceil(karakter / 3.2)` (karakter = unit UTF-16, ≥ code point).
+ * Teks Indonesia + kode cenderung ~3.5–4 karakter per token; 3.2 sengaja melebihkan.
+ */
+export function estimateTokens(text: string): number {
+  return Math.ceil(text.length / 3.2);
+}
+
+/** Satu blok kode berpagar di Markdown skill. */
+export type FencedBlock = { lang: string; code: string };
+
+/** Pisahkan Markdown skill menjadi blok berpagar (```lang … ```) dan prosa (sisanya, tanpa pagar). */
+export function splitCode(md: string): { blocks: FencedBlock[]; prose: string } {
+  const blocks: FencedBlock[] = [];
+  const prose = md.replace(/^```([^\n]*)\n([\s\S]*?)^```[ \t]*$/gm, (_m, lang: string, code: string) => {
+    blocks.push({ lang: lang.trim(), code: code.replace(/\n$/, '') });
+    return '';
+  });
+  return { blocks, prose };
+}

@@ -9,7 +9,12 @@ import { fileURLToPath } from 'node:url';
 import { Client, InMemoryTransport } from '@modelcontextprotocol/client';
 import { StdioClientTransport } from '@modelcontextprotocol/client/stdio';
 import { LAKAR_VERSION, SCHEMA_VERSION } from '@lakar/schema';
-import { PACKAGE, SERVER_VERSION, createLakarMcpServer, formatStatus } from './index.js';
+import { PACKAGE, READ_SKILL_DESCRIPTION, SERVER_INSTRUCTIONS, SERVER_VERSION, createLakarMcpServer, formatStatus } from './index.js';
+import { readFile } from 'node:fs/promises';
+
+/** Skill v1 (packages/skills; mcp tidak bergantung pada paket itu, hanya membaca file untuk perbandingan). */
+const SKILL_NAMES = ['core', 'landing', 'mobile', 'icons', 'api'] as const;
+const readSkill = (name: string) => readFile(fileURLToPath(new URL(`../../skills/skills/${name}.md`, import.meta.url)), 'utf8');
 
 const PNG_B64 = Buffer.from('fake-png').toString('base64');
 
@@ -155,6 +160,16 @@ describe('@lakar/mcp', () => {
     );
     expect(SERVER_VERSION).toBe(LAKAR_VERSION);
     expect(c.getServerVersion()?.version).toBe(LAKAR_VERSION);
+  });
+
+  it('instructions server: read_skill core lalu skill jenis layar, sedikit execute besar; deskripsi read_skill menyarankan urutan', async () => {
+    const c = await connect(url);
+    const ins = c.getInstructions() ?? '';
+    expect(ins).toBe(SERVER_INSTRUCTIONS);
+    expect(ins.indexOf('read_skill core')).toBeGreaterThanOrEqual(0);
+    expect(ins.indexOf('read_skill core')).toBeLessThan(ins.indexOf('landing atau mobile'));
+    expect(ins).toContain('sedikit execute besar');
+    expect(READ_SKILL_DESCRIPTION).toMatch(/core dulu.*landing atau mobile/);
   });
 
   it('sesi dibuat dengan versi mcp: POST /sessions {client, version, schemaVersion}', async () => {
@@ -528,6 +543,23 @@ describe.skipIf(!browserInstalled)('layout_check dengan respons lakard asli', ()
     expect(lines[6]).toMatch(/^warning · LC-12 · Home · mobile \([A-Za-z0-9]{8}\) · ukuran 390×800 · 390×844$/);
     expect(text).not.toMatch(/golden|juri|rubrik|Lampiran B|skor|pen\.dev|benchmark/i);
     console.log(`[mcp] layout_check:\n${text}`);
+  }, 60_000);
+
+  it('read_skill terhadap lakard asli: kelima skill tersedia, isi sama dengan file skill', async () => {
+    const c = await connect(proxyUrl);
+    const list = await c.callTool({ name: 'read_skill', arguments: {} });
+    expect(list.isError).toBeFalsy();
+    expect(JSON.parse((list.content as any)[0].text)).toEqual({ skills: SKILL_NAMES.map((name) => ({ name, available: true })) });
+    for (const name of SKILL_NAMES) {
+      const r = await c.callTool({ name: 'read_skill', arguments: { name } });
+      expect(r.isError, name).toBeFalsy();
+      const text = (r.content as any)[0].text as string;
+      expect(text.startsWith('# '), name).toBe(true);
+      expect(text, name).toBe(await readSkill(name));
+    }
+    const none = await c.callTool({ name: 'read_skill', arguments: { name: 'webapp' } });
+    expect(none.isError).toBe(true);
+    expect((none.content as any)[0].text).toContain('NOT_FOUND');
   }, 60_000);
 
   it('status terhadap lakard asli: versi cocok, pool 2 halaman', async () => {

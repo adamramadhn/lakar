@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, sep } from 'node:path';
-import { PACKAGE, SKILL_NAMES, SKILLS_DIR, isSkillName, listSkills, readSkill } from './index.js';
+import { PACKAGE, SKILL_NAMES, SKILLS_DIR, estimateTokens, isSkillName, listSkills, readSkill, splitCode } from './index.js';
 
 describe('@lakar/skills', () => {
   let dir: string;
@@ -34,5 +34,24 @@ describe('@lakar/skills', () => {
     expect(await readSkill('landing', dir)).toBeUndefined();
     expect(await readSkill('lain', dir)).toBeUndefined();
     expect(await readSkill('../core', dir)).toBeUndefined();
+  });
+
+  it('estimateTokens: ceil(panjang string / 3.2)', () => {
+    expect(estimateTokens('')).toBe(0);
+    expect(estimateTokens('abcd')).toBe(2);
+    expect(estimateTokens('a'.repeat(32))).toBe(10);
+    expect(estimateTokens('😀'.repeat(16))).toBe(10); // 32 unit UTF-16
+  });
+
+  it('splitCode: blok berpagar dipisah dari prosa', () => {
+    const md = '# Judul\n\nprosa\n\n```js\nadd(null, {})\n```\n\nlagi\n\n```text\ncatatan\n```\n';
+    const { blocks, prose } = splitCode(md);
+    expect(blocks).toEqual([
+      { lang: 'js', code: 'add(null, {})' },
+      { lang: 'text', code: 'catatan' },
+    ]);
+    expect(prose).not.toContain('```');
+    expect(prose).toContain('prosa');
+    expect(prose).toContain('lagi');
   });
 });
