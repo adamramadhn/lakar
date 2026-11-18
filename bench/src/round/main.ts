@@ -1,5 +1,6 @@
 // Perintah `round --round <uji-k|n> [--dry-run] [--resume]`: satu putaran A dan B, Lakar vs pen.dev, lalu juri buta 3×
-// per prompt, lalu `bench/round-<round>.md|json` dan `bench/score-<id>.md|json`.
+// per prompt, lalu `bench/round-<round>.md|json` dan laporan skor (`scoreReportBase`: `bench/score-<id>` atau
+// `bench/round-<n>/score-<id>` untuk putaran resmi ≥ 2).
 import { constants, copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { G0_RULES, LAKAR_VERSION, SCHEMA_VERSION, errorMessage } from '@lakar/schema';
@@ -8,7 +9,7 @@ import { assignLabels, buildJudgeArgs, buildJudgeBlocks, EMPTY_MCP, JUDGE_REPS, 
 import { buildJudgeText, DESIGN_MD_PATH, JUDGE_CRITERIA, judgeC7Problems, judgeLeaks } from '../judge/prompt.js';
 import { readRubricJson, rubricShaProblems, type RubricJson } from '../judge/rubric.js';
 import { boardSizeProblems, LAKAR_ALLOWED_TOOLS, LAKAR_MCP_CONFIG, LAKARD_UNIT, lakarPreflightProblems, mcpServerNames, runLakar } from '../lakar/run.js';
-import { LakardClient, type LakardStatus } from '../lakar/lakard-client.js';
+import { LakardClient, type LakardStatus, type PhotoSearchResult } from '../lakar/lakard-client.js';
 import { Abort, log, sleep, stamp } from '../log.js';
 import { emptyRecord, PENDEV_ALLOWED_TOOLS, PENDEV_MCP_CONFIG, penDesktopVersion, preflight, runOne, RUNS_ROOT, type Preflight } from '../pendev/run.js';
 import { encodePngRgb } from '../png/codec.js';
@@ -38,7 +39,7 @@ import { PencilClient } from '../pendev/pencil-client.js';
 import { applyLakarArchive, benchLakarSources, describeLakarArchive, planLakarArchive } from '../lakar/archive.js';
 import { countAgentEmoji, countLintEmoji } from './emoji.js';
 import { lakarReconnect, pendevReconnect } from './reconnect.js';
-import { isOfficialRound, OFFICIAL_CODE_PATHS, renderRoundJson, renderRoundMarkdown, renderScoreJson, renderScoreMarkdown, ROUND_ID, type FrozenVersions, type JudgeTextInfo, type RoundPrompt, type RoundReport, type RoundRun } from './report.js';
+import { isOfficialRound, OFFICIAL_CODE_PATHS, renderRoundJson, renderRoundMarkdown, renderScoreJson, renderScoreMarkdown, ROUND_ID, type FrozenVersions, type JudgeTextInfo, type PhotoProbe, type RoundPrompt, type RoundReport, type RoundRun } from './report.js';
 import { aggregateScores, decide, decideG0, lakarGate, NO_VALID_REPS } from './score.js';
 
 const ROUND_ORDER: readonly [PromptId, Tool][] = [
@@ -66,8 +67,8 @@ export type OfficialFreezeInput = {
   claude: string;
   pendevDesktop: string | undefined;
   baseline: { protocolHash: string; model: string; claude: string; pendevDesktop: string | undefined };
-  /** `/status` lakard: startedAt, fonts, pool. */
-  lakard: Pick<LakardStatus, 'startedAt' | 'fonts' | 'pool'> | undefined;
+  /** `/status` lakard: startedAt, fonts, pool, schemaVersion (f), photos (g). */
+  lakard: Pick<LakardStatus, 'startedAt' | 'fonts' | 'pool' | 'schemaVersion' | 'photos'> | undefined;
   /** mtime (ms) file terbaru di `packages/*\/dist`. */
   newestDistMtimeMs: number | undefined;
   /** (c) dicek hanya sesudah restart wajib (sebelum restart / dry-run: lakard memang boleh lebih tua dari build). */
@@ -81,7 +82,8 @@ export type OfficialFreezeInput = {
  * Cek pembekuan putaran resmi (murni). Setiap masalah → Abort sebelum run apa pun.
  * (a) kode bersih, (b) protokol/model/claude/pen.dev = baseline (C9: tidak di-upgrade/downgrade),
  * (c) lakard startedAt > mtime dist terbaru (sesudah restart), (d) font lengkap dan pool siap,
- * (e) sha256 teks juri dan versi rubrik = `bench/rubric/rubric.json` (snapshot tracked).
+ * (e) sha256 teks juri dan versi rubrik = `bench/rubric/rubric.json` (snapshot tracked),
+ * (f) `schemaVersion` lakard = `SCHEMA_VERSION` bench, (g) penyedia foto lakard = `wikimedia` (tanpa key Pexels, plan 1.18).
  */
 export function officialFreezeProblems(i: OfficialFreezeInput): string[] {
   const out: string[] = [];
@@ -105,9 +107,36 @@ export function officialFreezeProblems(i: OfficialFreezeInput): string[] {
     if (!i.lakard.fonts) out.push('fonts tidak ada di /status');
     else if (i.lakard.fonts.missing.length) out.push(`font hilang: ${i.lakard.fonts.missing.join(', ')}`);
     if (!((i.lakard.pool?.ready ?? 0) >= 1)) out.push(`pool render belum siap (ready=${i.lakard.pool?.ready ?? '?'})`);
+    if (i.lakard.schemaVersion !== SCHEMA_VERSION) out.push(`schemaVersion lakard ${i.lakard.schemaVersion ?? '(tidak ada)'} ≠ ${SCHEMA_VERSION} (bench)`);
+    if (i.lakard.photos?.provider !== EXPECTED_PHOTO_PROVIDER)
+      out.push(`penyedia foto lakard ${i.lakard.photos?.provider ?? '(tidak ada di /status)'} ≠ ${EXPECTED_PHOTO_PROVIDER} (keputusan Adam plan 1.18: tanpa key Pexels)`);
   }
   out.push(...rubricShaProblems({ version: i.judgeText.rubricVersion, sha: i.judgeText.textSha256 }, i.rubric).map((p) => `rubrik juri: ${p}`));
   return out;
+}
+
+/** Penyedia foto yang wajib aktif di putaran resmi (g). */
+export const EXPECTED_PHOTO_PROVIDER = 'wikimedia';
+/** Probe rate limit foto sebelum run berbayar: kueri netral (tidak terkait prompt A/B). */
+export const PHOTO_PROBE = { query: 'mountain lake landscape', limit: 3, preview: true } as const;
+
+/**
+ * Masalah hasil probe foto (murni). Lulus bila penyedia `wikimedia`, ≥ 1 hasil, dan `fallbackReason` tidak diawali
+ * `wikimedia-` (`no-key` normal). Error → masalah. Tanpa retry otomatis (plan 1.18).
+ */
+export function photoProbeProblems(r: { res: PhotoSearchResult } | { error: string }): string[] {
+  if ('error' in r) return [`probe foto gagal: ${r.error}`];
+  const out: string[] = [];
+  const { res } = r;
+  if (res.provider !== EXPECTED_PHOTO_PROVIDER) out.push(`probe foto: penyedia ${res.provider} ≠ ${EXPECTED_PHOTO_PROVIDER}${res.fallbackReason ? ` (fallbackReason ${res.fallbackReason})` : ''}`);
+  else if (res.fallbackReason?.startsWith('wikimedia-')) out.push(`probe foto: fallbackReason ${res.fallbackReason}`);
+  if (!res.results.length) out.push('probe foto: 0 hasil');
+  return out;
+}
+
+/** Awal path laporan skor (relatif repo): putaran resmi ≥ 2 → `bench/round-<n>/score-`; putaran 1 dan uji → `bench/score-`. */
+export function scoreReportBase(round: string): string {
+  return isOfficialRound(round) && Number(round) >= 2 ? `bench/round-${round}/score-` : 'bench/score-';
 }
 
 /** Dir `packages/<nama>/dist` yang ada (nama terurut). */
@@ -276,7 +305,7 @@ const CONVENTION = [
   'Sebelum run, dokumen Lakar yang dibuat/dibuka agen di putaran bench lain (`run.json` → `lakar.slug`/`lakar.opened`; run terhenti tanpa `run.json` lewat `docs-before.json` + `lakar-docs.jsonl`/`stream.jsonl`; slug di `docs-before.json` run itu tidak dihitung) dipindah dari dataDir lakard ke `bench/runs/lakar-archive/<round>-<stamp>/`, lalu lakard di-restart (salinan dokumen di memori), agar slug pilihan agen tidak bentrok (`dokumen lama`). Dokumen non-bench tidak disentuh; pembungkus dan prompt tidak berubah.',
   'Versi beku dicatat sekali di awal putaran (`frozen.json`); `--resume` memakainya dan melaporkan perbedaan.',
   'Artefak di `bench/runs/rounds/<round>/` (gitignored): dir run per `<prompt>-<alat>`, strip `<prompt>-<alat>.png`, dan `judge/<prompt>/rep-<k>/` (pemetaan X/Y, transkrip juri).',
-  'Putaran resmi (ID angka) dibekukan ketat sebelum run: `git status --porcelain` kode produk + harness kosong; protocolHash, model, Claude Code, dan pen.dev desktop = `bench/baseline-pendev.json`; lakard selalu di-restart dan `startedAt` harus lebih baru dari file `packages/*/dist` terbaru; font lengkap dan pool siap. Strip Lakar disalin ke `bench/round-<n>/` (tracked); strip dan `.pen` pen.dev tetap lokal di `bench/runs/` (EULA).',
+  'Putaran resmi (ID angka) dibekukan ketat sebelum run: `git status --porcelain` kode produk + harness kosong; protocolHash, model, Claude Code, dan pen.dev desktop = `bench/baseline-pendev.json`; lakard selalu di-restart dan `startedAt` harus lebih baru dari file `packages/*/dist` terbaru; font lengkap dan pool siap; sha256 teks juri = `bench/rubric/rubric.json`; `schemaVersion` lakard = bench; penyedia foto `wikimedia`. Sesudah restart lakard, satu probe `POST /photos/search` (kueri netral, tanpa retry otomatis) wajib dijawab Wikimedia dengan ≥ 1 hasil; gagal → abort sebelum `frozen.json` dan run. Strip Lakar disalin ke `bench/round-<n>/` (tracked); strip dan `.pen` pen.dev tetap lokal di `bench/runs/` (EULA). Putaran resmi ≥ 2 menulis skor ke `bench/round-<n>/score-<prompt>.md|json`; putaran 1 dan uji ke `bench/score-<prompt>.md|json`.',
 ];
 
 const DEFINITIONS = [
@@ -309,6 +338,7 @@ export function frozenDrift(first: FrozenVersions, now: FrozenVersions): string[
     playwright: f.playwright,
     fonts: JSON.stringify(f.fonts),
     distSha: JSON.stringify(f.distSha),
+    photos: f.photos?.provider,
   });
   const a = pick(first);
   const b = pick(now);
@@ -474,6 +504,26 @@ export async function judgePrompt(i: JudgePromptInput): Promise<{ reps: JudgeRep
   return { reps, fatal: undefined };
 }
 
+/**
+ * Probe rate limit foto (putaran resmi, bukan dry-run): satu `POST /photos/search` lewat sesi `LakardClient` baru.
+ * Masalah → Abort (tanpa retry otomatis; percobaan ulang manual hanya sebelum run, plan 1.21).
+ */
+export async function runPhotoProbe(client = new LakardClient()): Promise<PhotoProbe> {
+  const t0 = Date.now();
+  let r: { res: PhotoSearchResult } | { error: string };
+  try {
+    await client.createSession(LAKAR_VERSION, SCHEMA_VERSION);
+    r = { res: await client.photoSearch({ ...PHOTO_PROBE }) };
+  } catch (e) {
+    r = { error: errorMessage(e) };
+  }
+  const ms = Date.now() - t0;
+  const problems = photoProbeProblems(r);
+  if (problems.length) throw new Abort(`probe foto sebelum run gagal (${ms} ms; tanpa retry otomatis, belum ada run): ${problems.join('; ')}`);
+  const res = (r as { res: PhotoSearchResult }).res;
+  return { query: PHOTO_PROBE.query, provider: res.provider, ...(res.fallbackReason ? { fallbackReason: res.fallbackReason } : {}), results: res.results.length, ms };
+}
+
 export async function roundMain(argv: string[]): Promise<number> {
   const parsed = parseRoundArgs(argv);
   if (!parsed.ok) {
@@ -565,7 +615,9 @@ export async function roundMain(argv: string[]): Promise<number> {
         `- git status --porcelain -- ${OFFICIAL_CODE_PATHS.join(' ')}: ${porcelainCode ? `TIDAK KOSONG\n${porcelainCode}` : 'kosong'}\n` +
         `- claude ${claudeSemver(pre.claudeVersion)} (baseline ${baseline.claude}); pen.dev desktop ${penDesktopVersion() ?? '?'} (baseline ${baseline.pendevDesktop ?? '?'}); model ${cfg.model} (baseline ${baseline.model}); protocolHash ${protocol.hash === baseline.protocolHash ? '= baseline' : '≠ baseline'}\n` +
         `- font missing: ${JSON.stringify(status.fonts?.missing ?? null)}; pool ready ${status.pool?.ready ?? '?'}\n` +
+        `- schemaVersion lakard ${status.schemaVersion} (bench ${SCHEMA_VERSION}); penyedia foto ${status.photos?.provider ?? '(tidak ada di /status)'} (wajib ${EXPECTED_PHOTO_PROVIDER}), key ${status.photos?.keyFile ?? '?'}\n` +
         `- rencana: restart lakard (wajib untuk putaran resmi${archivePlan.length ? ', sesudah arsip' : ''}), lalu startedAt harus > mtime dist terbaru ${distMs === undefined ? '(dist tidak ada)' : new Date(distMs).toISOString()} (lakard sekarang: startedAt ${status.startedAt}, ${fresh ? 'sudah lebih baru' : 'lebih tua; restart akan memuat build ini'})\n` +
+        `- rencana probe foto (sesudah restart lakard, sebelum frozen.json/run): satu POST /photos/search ${JSON.stringify(PHOTO_PROBE)} lewat sesi baru; wajib penyedia ${EXPECTED_PHOTO_PROVIDER}, ≥ 1 hasil, fallbackReason bukan wikimedia-*; gagal → abort tanpa retry${dryRun ? ' (dry-run: tidak dijalankan)' : ''}\n` +
         `- masalah: ${preFreeze.length ? `\n  ${preFreeze.join('\n  ')}` : 'tidak ada'}`,
     );
   }
@@ -577,6 +629,7 @@ export async function roundMain(argv: string[]): Promise<number> {
   if (preFreeze.length) throw new Abort(`putaran resmi tidak beku:\n  ${preFreeze.join('\n  ')}`);
   if (porcelain) throw new Abort(`produk tidak beku: git status --porcelain -- packages tools .mcp.json tidak kosong:\n${porcelain}`);
   const archiveNotes: string[] = [];
+  let photoProbe: PhotoProbe | undefined;
   // Putaran resmi: restart lakard wajib (juga saat rencana arsip kosong), agar lakard memuat build saat ini. Satu restart saja.
   if (archivePlan.length || official) {
     if (archivePlan.length) {
@@ -593,6 +646,8 @@ export async function roundMain(argv: string[]): Promise<number> {
       const post = officialFreezeProblems(freezeInput(status, true));
       if (post.length) throw new Abort(`putaran resmi tidak beku sesudah restart lakard:\n  ${post.join('\n  ')}`);
       log(`lakard di-restart dari build saat ini (startedAt ${status.startedAt}); cek pembekuan resmi lulus`);
+      photoProbe = await runPhotoProbe();
+      log(`probe foto: ${photoProbe.provider}, ${photoProbe.results} hasil, ${photoProbe.ms} ms${photoProbe.fallbackReason ? `, fallbackReason ${photoProbe.fallbackReason}` : ''}`);
     }
     archiveNotes.push(
       archivePlan.length
@@ -630,6 +685,7 @@ export async function roundMain(argv: string[]): Promise<number> {
       packages: Object.fromEntries(Object.entries((JSON.parse(readFileSync(DAEMON_PKG, 'utf8')).dependencies ?? {}) as Record<string, string>).filter(([k]) => k.startsWith('@fontsource/')).sort(([a], [b]) => a.localeCompare(b))),
     },
     distSha: Object.fromEntries(distDirs().map(([n, d]) => [n, sha256Dir(d)])),
+    ...(status.photos ? { photos: { provider: status.photos.provider, keyFile: status.photos.keyFile, ...(photoProbe ? { probe: photoProbe } : {}) } } : {}),
     baseline: { model: baseline.model, claude: baseline.claude, pendevDesktop: baseline.pendevDesktop },
     icons: status.icons ?? {},
     skills: Object.fromEntries(readdirSync(SKILLS_DIR).filter((f) => f.endsWith('.md')).sort().map((f) => [f, sha256(readFileSync(join(SKILLS_DIR, f)))])),
@@ -816,7 +872,7 @@ export async function roundMain(argv: string[]): Promise<number> {
         });
     // Juri dilewati karena putaran berhenti: alasannya itu, bukan "tidak ada ulangan juri yang valid".
     const decision = judgeSkipped && !reps.length && decided.why === NO_VALID_REPS ? { ...decided, why: `juri tidak dijalankan: putaran dihentikan (${fatal})` } : decided;
-    results.push({ prompt: p, baselineMedianMs: baseline.medians[p], baselineCostUsd: baseline.costMedians[p], runs: r, gate, sizeProblems, score, decision, pendevSizeProblems });
+    results.push({ prompt: p, scoreReport: `${scoreReportBase(round)}${p}.md`, baselineMedianMs: baseline.medians[p], baselineCostUsd: baseline.costMedians[p], runs: r, gate, sizeProblems, score, decision, pendevSizeProblems });
   }
 
   // ---------- penjaga .pen + status ----------
@@ -868,9 +924,11 @@ export async function roundMain(argv: string[]): Promise<number> {
   };
   writeFileSync(mdPath, renderRoundMarkdown(report));
   writeFileSync(join(BENCH_ROOT, `round-${round}.json`), renderRoundJson(report));
+  const scoreBase = join(REPO_ROOT, scoreReportBase(round));
+  mkdirSync(join(scoreBase, '..'), { recursive: true });
   for (const p of results) {
-    writeFileSync(join(BENCH_ROOT, `score-${p.prompt}.md`), renderScoreMarkdown(round, p));
-    writeFileSync(join(BENCH_ROOT, `score-${p.prompt}.json`), renderScoreJson(round, p));
+    writeFileSync(`${scoreBase}${p.prompt}.md`, renderScoreMarkdown(round, p));
+    writeFileSync(`${scoreBase}${p.prompt}.json`, renderScoreJson(round, p));
     log(`${p.prompt}: ${p.decision.decision} (${p.decision.why})`);
   }
   log(`laporan: ${relative(REPO_ROOT, mdPath)} (${roundStatus})`);

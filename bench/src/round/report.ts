@@ -33,6 +33,8 @@ export type RoundRun = {
 
 export type RoundPrompt = {
   prompt: string;
+  /** Path laporan skor (relatif repo, `scoreReportBase`); tanpa field → `bench/score-<prompt>.md` (laporan lama). */
+  scoreReport?: string;
   baselineMedianMs: number | undefined;
   /** Median biaya baseline pen.dev (`bench/baseline-pendev.json`), hanya dilaporkan. */
   baselineCostUsd?: number | undefined;
@@ -44,6 +46,9 @@ export type RoundPrompt = {
   /** Masalah ukuran frame pen.dev terhadap ukuran mengikat (`boardSizeProblems`); kosong = sesuai. */
   pendevSizeProblems?: string[];
 };
+
+/** Hasil probe foto sebelum run (putaran resmi). */
+export type PhotoProbe = { query: string; provider: string; fallbackReason?: string; results: number; ms: number };
 
 /** Versi rubrik + sha256 teks juri per prompt (sama dengan `bench/rubric/rubric.json`). */
 export type JudgeTextInfo = { rubricVersion: string | undefined; textSha256: Record<string, string> };
@@ -67,6 +72,8 @@ export type FrozenVersions = {
   fonts?: { families: string[]; missing: string[]; packages: Record<string, string> };
   /** sha256 per `packages/<nama>/dist`. */
   distSha?: Record<string, string>;
+  /** Penyedia foto lakard (`/status.photos`) + probe sebelum run (putaran resmi). */
+  photos?: { provider: string; keyFile: string; probe?: PhotoProbe };
   /** Pembanding `bench/baseline-pendev.json` (putaran resmi wajib sama). */
   baseline?: { model: string; claude: string; pendevDesktop: string | undefined };
   icons: Record<string, string>;
@@ -160,6 +167,7 @@ export function renderRoundMarkdown(r: RoundReport): string {
     L.push('');
     L.push(`- Rasio Lakar/pen.dev (putaran ini): ${ratio(p.runs.lakar?.record.wallMs, p.runs.pendev?.record.wallMs)}`);
     L.push(`- Rasio Lakar/median baseline pen.dev (${sec(p.baselineMedianMs)} dtk): ${ratio(p.runs.lakar?.record.wallMs, p.baselineMedianMs)}`);
+    L.push(`- Rasio pen.dev putaran ini/median baseline pen.dev: ${ratio(p.runs.pendev?.record.wallMs, p.baselineMedianMs)} (indikator drift, bukan gerbang)`);
     for (const t of TOOLS) if (p.runs[t]?.previous.length) L.push(`- Percobaan ${TOOL_LABEL[t]} sebelumnya (tidak dihitung): ${p.runs[t]!.previous.map((x) => `\`${x}\``).join(', ')}`);
     L.push('');
     const lk = p.runs.lakar?.record.lakar;
@@ -191,7 +199,7 @@ export function renderRoundMarkdown(r: RoundReport): string {
     L.push('');
     L.push('### Skor juri (median 3 ulangan)', '');
     if (p.score) {
-      L.push(`Ulangan valid: ${p.score.validReps} dari ${p.score.reps.length}. Detail dan bukti: \`bench/score-${p.prompt}.md\`.`, '');
+      L.push(`Ulangan valid: ${p.score.validReps} dari ${p.score.reps.length}. Detail dan bukti: \`${p.scoreReport ?? `bench/score-${p.prompt}.md`}\`.`, '');
       L.push('| Kriteria | Lakar | pen.dev |');
       L.push('|---|---|---|');
       for (const c of JUDGE_CRITERIA) L.push(`| ${c} | ${aggText(p.score.tools.lakar.criteria[c])} | ${aggText(p.score.tools.pendev.criteria[c])} |`);
@@ -252,6 +260,10 @@ export function renderRoundMarkdown(r: RoundReport): string {
   L.push(`- lakard: version ${f.lakard.version ?? '–'}, schemaVersion ${f.lakard.schemaVersion ?? '–'}, pid ${f.lakard.pid ?? '–'}, startedAt ${f.lakard.startedAt ?? '–'}, Chromium ${f.lakard.browser ?? '–'}${f.lakard.node ? `, Node ${f.lakard.node}` : ''}`);
   if (f.playwright) L.push(`- playwright-core: ${f.playwright}`);
   if (f.fonts) L.push(`- Font (/status): ${f.fonts.families.join(', ') || '–'}; missing: ${f.fonts.missing.length ? f.fonts.missing.join(', ') : '[]'}; paket: ${Object.entries(f.fonts.packages).map(([k, v]) => `${k} ${v}`).join(', ') || '–'}`);
+  if (f.photos) {
+    const pr = f.photos.probe;
+    L.push(`- Foto: penyedia ${f.photos.provider}, key ${f.photos.keyFile}, probe ${pr ? `\`${pr.query}\` → ${pr.provider}, ${pr.results} hasil, ${pr.ms} ms, fallbackReason ${pr.fallbackReason ?? '–'}` : 'tidak dijalankan'}`);
+  }
   L.push(`- Ikon (/status): ${Object.entries(f.icons).map(([k, v]) => `${k} ${v}`).join(', ') || '–'}`);
   for (const [k, v] of Object.entries(f.skills)) L.push(`- skill \`${k}\` sha256 \`${v}\``);
   L.push(`- \`G0_RULES\`: \`${f.g0Rules}\``);

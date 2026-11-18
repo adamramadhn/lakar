@@ -12,7 +12,12 @@ export type LakardStatus = {
   icons: Record<string, string>;
   fonts?: { families: string[]; missing: string[] };
   node?: string;
+  /** Penyedia foto stok (`/status.photos`, sejak story 18). */
+  photos?: { provider: string; keyFile: string; imported: number };
 };
+
+/** Bentuk minimal respons `POST /photos/search` (daemon `SearchResponse`; tidak diimpor dari paket daemon). */
+export type PhotoSearchResult = { provider: string; fallbackReason?: string; query: string; results: { ref: string }[]; thumbnails: unknown[] };
 
 export type LakardBoard = { id: string; name: string; page: string; width: number; height: number; x: number; y: number; screen?: string; expectedSize?: unknown; wip: boolean };
 export type LayoutCheck = { docId: string; rev: number; boards: { id: string; name: string; summary: FindingSummary }[]; summary: FindingSummary; findings: Finding[] };
@@ -82,5 +87,10 @@ export class LakardClient {
 
   exportPng(id: string): Promise<ExportResult> {
     return this.#req('POST', '/export', { id, scale: 1 });
+  }
+
+  /** `POST /photos/search` (butuh sesi). */
+  photoSearch(body: { query: string; limit?: number; preview?: boolean; orientation?: string }): Promise<PhotoSearchResult> {
+    return this.#req('POST', '/photos/search', body);
   }
 }

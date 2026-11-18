@@ -13,7 +13,7 @@ import { emptyRecord } from '../pendev/run.js';
 import type { TimedLine } from '../stream-metrics.js';
 import { timedLines, toolResultEvent, toolUseEvent } from '../../../tests/support/stream.ts';
 import { countAgentEmoji, countEmojiInText, countLintEmoji } from './emoji.js';
-import { claudeSemver, copyPngExclusive, judgePrompt, ROUND_JUDGE_REUSE, staleJudgeTexts, frozenDrift, harnessErrorStatus, isFinalRun, officialFreezeProblems, parseRoundArgs, penBaseline, roundOutcome, roundStartProblem, type OfficialFreezeInput } from './main.js';
+import { claudeSemver, copyPngExclusive, photoProbeProblems, scoreReportBase, judgePrompt, ROUND_JUDGE_REUSE, staleJudgeTexts, frozenDrift, harnessErrorStatus, isFinalRun, officialFreezeProblems, parseRoundArgs, penBaseline, roundOutcome, roundStartProblem, type OfficialFreezeInput } from './main.js';
 import { LAKAR_INIT_RULES } from '../lakar/run.js';
 import { validateInit } from '../stream-metrics.js';
 import { lakarReconnect, pendevReconnect } from './reconnect.js';
@@ -348,6 +348,22 @@ describe('laporan (snapshot)', () => {
     expect(renderRoundMarkdown({ ...official, g0: { decision: 'lolos', why: 'A Lebih baik, B Setara' } })).not.toContain('## Evaluasi arah');
   });
 
+  it('putaran resmi 2: baris foto + probe di Versi beku, rasio pen.dev/baseline, path skor per putaran', () => {
+    const r2: RoundReport = {
+      ...report,
+      round: '2',
+      frozen: { ...report.frozen, lakard: { ...report.frozen.lakard, schemaVersion: 2 }, photos: { provider: 'wikimedia', keyFile: 'absent', probe: { query: 'mountain lake landscape', provider: 'wikimedia', fallbackReason: 'no-key', results: 3, ms: 812 } } },
+      results: [{ ...p, scoreReport: 'bench/round-2/score-B.md' }],
+    };
+    const md = renderRoundMarkdown(r2);
+    expect(md).toContain('- Foto: penyedia wikimedia, key absent, probe `mountain lake landscape` → wikimedia, 3 hasil, 812 ms, fallbackReason no-key');
+    expect(md).toContain('schemaVersion 2');
+    expect(md).toContain('Detail dan bukti: `bench/round-2/score-B.md`.');
+    expect(md).toContain('- Rasio pen.dev putaran ini/median baseline pen.dev: 0.99 (indikator drift, bukan gerbang)');
+    expect(renderRoundMarkdown(report)).toContain('Detail dan bukti: `bench/score-B.md`.');
+    expect(renderRoundMarkdown(report)).not.toContain('- Foto:');
+  });
+
   it('score md: 8 kriteria × 2 alat, bukti per ulangan, pemetaan X/Y setelah penilaian, ulangan failed dicatat', () => {
     const md = renderScoreMarkdown('uji-1', p);
     expect(md).toContain('putaran uji-1');
@@ -417,6 +433,9 @@ describe('resume (C8) dan baseline .pen', () => {
     };
     expect(frozenDrift(f, { ...f, lakard: { ...f.lakard, pid: 2, startedAt: 's2' } })).toEqual([]);
     expect(frozenDrift(f, { ...f, head: 'bbb', skills: { 'core.md': 'y' } })).toEqual(['head: aaa → bbb', 'skills: {"core.md":"x"} → {"core.md":"y"}']);
+    const fp = { ...f, photos: { provider: 'wikimedia', keyFile: 'absent', probe: { query: 'q', provider: 'wikimedia', results: 3, ms: 900 } } };
+    expect(frozenDrift(fp, { ...fp, photos: { ...fp.photos, probe: { ...fp.photos.probe, ms: 1200 } } })).toEqual([]);
+    expect(frozenDrift(fp, { ...fp, photos: { ...fp.photos, provider: 'openverse' } })).toEqual(['photos: wikimedia → openverse']);
   });
 });
 
@@ -440,7 +459,7 @@ describe('pembekuan putaran resmi', () => {
     claude: '2.1.325 (Claude Code)',
     pendevDesktop: '1.2.23',
     baseline: { protocolHash: 'h', model: 'claude-opus-5-5', claude: '2.1.325', pendevDesktop: '1.2.23' },
-    lakard: { startedAt: '2026-11-18T06:00:00.000Z', fonts: { families: ['Inter'], missing: [] }, pool: { size: 2, ready: 2, recreated: 0 } },
+    lakard: { startedAt: '2026-11-18T06:00:00.000Z', fonts: { families: ['Inter'], missing: [] }, pool: { size: 2, ready: 2, recreated: 0 }, schemaVersion: SCHEMA_VERSION, photos: { provider: 'wikimedia', keyFile: 'absent', imported: 0 } },
     newestDistMtimeMs: Date.parse('2026-11-18T05:00:00.000Z'),
     checkLakardFresh: true,
     judgeText: { rubricVersion: '2', textSha256: { A: 'aa', B: 'bb' } },
@@ -474,6 +493,30 @@ describe('pembekuan putaran resmi', () => {
     expect(officialFreezeProblems({ ...base, lakard: { ...base.lakard!, fonts: { families: [], missing: ['Inter'] } } })).toEqual(['font hilang: Inter']);
     expect(officialFreezeProblems({ ...base, lakard: { ...base.lakard!, pool: { size: 2, ready: 0, recreated: 0 } } })[0]).toContain('pool');
     expect(officialFreezeProblems({ ...base, lakard: undefined })[0]).toContain('lakard');
+  });
+  it('(f) schemaVersion lakard ≠ bench / (g) penyedia foto bukan wikimedia → masalah', () => {
+    expect(officialFreezeProblems({ ...base, lakard: { ...base.lakard!, schemaVersion: 1 } })).toEqual([`schemaVersion lakard 1 ≠ ${SCHEMA_VERSION} (bench)`]);
+    expect(SCHEMA_VERSION).toBe(2);
+    const g = (photos: NonNullable<OfficialFreezeInput['lakard']>['photos']) => officialFreezeProblems({ ...base, lakard: { ...base.lakard!, photos } });
+    expect(g({ provider: 'pexels', keyFile: 'present', imported: 0 })[0]).toContain('penyedia foto lakard pexels ≠ wikimedia');
+    expect(g(undefined)[0]).toContain('penyedia foto lakard (tidak ada di /status) ≠ wikimedia');
+  });
+  it('probe foto: wikimedia ok / no-key ok; openverse wikimedia-429, 0 hasil, error → masalah', () => {
+    const res = (x: Partial<{ provider: string; fallbackReason: string; n: number }>) => ({
+      res: { provider: x.provider ?? 'wikimedia', ...(x.fallbackReason ? { fallbackReason: x.fallbackReason } : {}), query: 'q', results: Array.from({ length: x.n ?? 3 }, (_, i) => ({ ref: `wikimedia:${i}` })), thumbnails: [] },
+    });
+    expect(photoProbeProblems(res({}))).toEqual([]);
+    expect(photoProbeProblems(res({ fallbackReason: 'no-key' }))).toEqual([]);
+    expect(photoProbeProblems(res({ provider: 'openverse', fallbackReason: 'wikimedia-429' }))).toEqual(['probe foto: penyedia openverse ≠ wikimedia (fallbackReason wikimedia-429)']);
+    expect(photoProbeProblems(res({ fallbackReason: 'wikimedia-maxlag' }))).toEqual(['probe foto: fallbackReason wikimedia-maxlag']);
+    expect(photoProbeProblems(res({ n: 0 }))).toEqual(['probe foto: 0 hasil']);
+    expect(photoProbeProblems({ error: 'EXEC_ERROR: pencarian foto gagal' })).toEqual(['probe foto gagal: EXEC_ERROR: pencarian foto gagal']);
+  });
+  it('path skor: putaran resmi ≥ 2 → bench/round-<n>/; putaran 1 dan uji → bench/score-', () => {
+    expect(scoreReportBase('2')).toBe('bench/round-2/score-');
+    expect(scoreReportBase('10')).toBe('bench/round-10/score-');
+    expect(scoreReportBase('1')).toBe('bench/score-');
+    expect(scoreReportBase('uji-3')).toBe('bench/score-');
   });
   it('mtime terbaru dir (rekursif)', () => {
     const d = mkdtempSync(join(tmpdir(), 'mtime-'));

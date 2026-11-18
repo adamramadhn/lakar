@@ -38,6 +38,7 @@ Aturan: putaran dibatalkan → tidak dapat diputuskan; ada prompt Kalah → gaga
 
 - Rasio Lakar/pen.dev (putaran ini): 0.92
 - Rasio Lakar/median baseline pen.dev (131.3 dtk): 0.91
+- Rasio pen.dev putaran ini/median baseline pen.dev: 0.99 (indikator drift, bukan gerbang)
 
 ### Gerbang G0 Lakar (otomatis)
 
@@ -99,6 +100,7 @@ Strip: \`bench/runs/rounds/uji-1/B-lakar.png\` (390×844, 1 board), pen.dev –
 
 - Rasio Lakar/pen.dev (putaran ini): 0.92
 - Rasio Lakar/median baseline pen.dev (131.3 dtk): 0.91
+- Rasio pen.dev putaran ini/median baseline pen.dev: 0.99 (indikator drift, bukan gerbang)
 
 ### Gerbang G0 Lakar (otomatis)
 
@@ -304,6 +306,7 @@ Aturan: putaran dibatalkan → tidak dapat diputuskan; ada prompt Kalah → gaga
 
 - Rasio Lakar/pen.dev (putaran ini): 0.92
 - Rasio Lakar/median baseline pen.dev (131.3 dtk): 0.91
+- Rasio pen.dev putaran ini/median baseline pen.dev: 0.99 (indikator drift, bukan gerbang)
 
 ### Gerbang G0 Lakar (otomatis)
 

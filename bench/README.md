@@ -1,7 +1,8 @@
 # @lakar/bench
 
 Harness benchmark Lakar vs pen.dev: baseline pen.dev, putaran A/B (agen `claude -p` per alat), juri buta 3×,
-dan laporan `bench/round-<id>.md|json`, `bench/score-<prompt>.md|json`.
+dan laporan `bench/round-<id>.md|json`, `bench/score-<prompt>.md|json` (putaran resmi ≥ 2:
+`bench/round-<n>/score-<prompt>.md|json`).
 
 - **AD terkait:** AD-13 (protokol beku, C7: teks juri tanpa nama alat/istilah internal).
 - **Arah dependensi:** `bench → schema` saja (klien HTTP lakard sendiri, tanpa mengimpor mcp/daemon).
@@ -112,12 +113,19 @@ ID angka polos (`--round 1`, …) adalah putaran resmi; `uji-<k>` adalah putaran
 Sebelum run apa pun, putaran resmi di-abort bila `officialFreezeProblems` menemukan masalah: `git status --porcelain`
 kode produk + harness (`packages tools scripts bench/src bench/protocol bench/mcp bench/package.json package.json
 pnpm-lock.yaml .mcp.json`) tidak kosong; protocolHash, model, Claude Code, atau pen.dev desktop ≠
-`bench/baseline-pendev.json`; `fonts.missing` tidak kosong atau pool belum siap; atau, sesudah restart lakard yang
-wajib (juga saat arsip kosong), `startedAt` lakard tidak lebih baru dari file `packages/*/dist` terbaru. `--dry-run`
-hanya mencetak hasil cek dan rencana restart. Kode di-commit sebelum putaran agar SHA beku memuat produk dan harness.
+`bench/baseline-pendev.json`; `fonts.missing` tidak kosong atau pool belum siap; sha256 teks juri ≠
+`bench/rubric/rubric.json`; `schemaVersion` lakard ≠ `SCHEMA_VERSION` bench (f); penyedia foto `/status.photos` bukan
+`wikimedia` (g); atau, sesudah restart lakard yang wajib (juga saat arsip kosong), `startedAt` lakard tidak lebih baru
+dari file `packages/*/dist` terbaru. Sesudah restart, harness menjalankan satu probe rate limit foto (`POST
+/photos/search` kueri netral lewat sesi baru): penyedia harus `wikimedia`, ≥ 1 hasil, dan `fallbackReason` tidak
+diawali `wikimedia-`. Probe gagal → abort sebelum `frozen.json` dan run, tanpa retry otomatis. Penyedia, key, dan hasil
+probe dicatat di Versi beku. `--dry-run` hanya mencetak hasil cek serta rencana probe dan restart. Kode di-commit sebelum putaran agar SHA beku memuat produk dan harness.
 Laporan memuat keputusan G0 sementara (`decideG0`), evaluasi arah bila belum lolos, dan bagian "Konfirmasi Adam" yang
 hanya diisi Adam. Strip Lakar disalin ke `bench/round-<n>/<prompt>-lakar.png` (tracked, eksklusif); strip dan `.pen`
 pen.dev tetap lokal di `bench/runs/rounds/<n>/` (EULA, tidak di-commit).
+Putaran resmi ≥ 2 menulis skor ke `bench/round-<n>/score-<prompt>.md|json` agar bukti juri putaran 1
+(`bench/score-<prompt>.*`, dirujuk `bench/round-1.md`) tidak tertimpa. Laporan juga memuat rasio wall pen.dev putaran
+ini/median baseline sebagai indikator drift (bukan gerbang).
 
 ## Tes
 
