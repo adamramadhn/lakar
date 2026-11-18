@@ -733,7 +733,10 @@ export async function practiceMain(argv: string[]): Promise<number> {
   if (fatal) statusReasons.push(`dihentikan: ${fatal}`);
   if (cmp.changed.length || cmp.removed.length) statusReasons.push(`.pen lama berubah/hilang: ${[...cmp.changed, ...cmp.removed].join(', ')}`);
   const complete = results.every((x) => x.score?.reps.length === JUDGE_REPS) && prompts.length === all.length;
-  if (!statusReasons.length && !complete) statusReasons.push(prompts.length === all.length ? 'ulangan juri belum lengkap' : `--only ${prompts.map((p) => p.id).join(',')}: bukan semua prompt`);
+  if (!statusReasons.length && !complete) {
+    if (prompts.length !== all.length) statusReasons.push(`--only ${prompts.map((p) => p.id).join(',')}: bukan semua prompt`);
+    for (const x of results) if (x.score?.reps.length !== JUDGE_REPS) statusReasons.push(`${x.id} tanpa juri lengkap: ${x.decision.decision} (${x.decision.why})`);
+  }
   const report: PracticeReport = {
     iter,
     date: frozenFirst.date,

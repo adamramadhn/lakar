@@ -1,0 +1,3768 @@
+{
+ "iter": 1,
+ "date": "2026-11-18T08:18:04.767Z",
+ "status": "tidak lengkap",
+ "statusReasons": [
+  "ulangan juri belum lengkap"
+ ],
+ "frozen": {
+  "head": "bf5462d42efa206fc9545e2fa8a006fba0b0312b",
+  "porcelain": "",
+  "protocolHash": "907cb36f4674d422feded4506851b6391082b40b918dd46841edae607bedb85d",
+  "wrapperSha256": "0c496eecb409832e5a87f2dbe3960312457e3b26b472cc2d5d9673a4eeccab97",
+  "promptsSha256": "582c5d117b05c93dff3b2335d0eb55f24b499e261ebc453c65eaaf32a453a1da",
+  "model": "claude-opus-5-5",
+  "claude": "2.1.325 (Claude Code)",
+  "pendevDesktop": "1.2.23",
+  "lakard": {
+   "version": "0.1.0",
+   "schemaVersion": 1,
+   "pid": 1175815,
+   "startedAt": "2026-11-18T08:18:03.772Z",
+   "browser": "159.0.8154.6",
+   "node": "v26.13.1"
+  },
+  "skills": {
+   "api.md": "2e57e7048c9211adcbd582390239026dde2feb0f7f07d732f5d3c821e291a07d",
+   "core.md": "97b295de0a084ee5e3f418c2cbafcf5685c7cff34746106adff88f5fb4e8c888",
+   "icons.md": "967827ad79ef4be54169daf303506fb97cd73d9e848c5d6d0943dbda7af5a4c2",
+   "landing.md": "3daa5de39ffc37ac1d94c541712e43b7c3f7608aff20b155b50e23666dbabcc9",
+   "mobile.md": "d6baefe94e5498a260497012eaaa99679b1abd4ca8451a3ecd1b3dd9f5345ef6"
+  },
+  "distSha": {
+   "check": "c00e58ac95d20b709ddb2fc29f2c1207d68fea3ff36608e6286a4b65b1ebde8f",
+   "core": "1ae8683cf3262505c38eaec25dc5aa605c9d3df02631fde9a20885a6540d5fd2",
+   "daemon": "f130d50e186c6eb854cc2355debaa23b80e9eb632f98d18c5434f931b293738e",
+   "exec": "d27af506f8bd766d4e7c83ffab67a5439e06f68e70cd7479eacba438b5fe4d9b",
+   "icons": "d04386eeeb4daf282c0b0787ec1a8bc07abd927bccabbb4f92f03312686cc303",
+   "mcp": "c9bc3aebf7e397b4c4a1302ab6cc9d2f428d9d52d3f9b034f705f3222afb6db4",
+   "ports": "bee2b68950ff0c819d5714c8d5149d5107d76df5f53233e18da643f025d66882",
+   "render": "21ad1b38824064a3b48950fd908703d183b192fef5ea60539ddf2d7db5667735",
+   "schema": "c6a8f0697a2572f1eff732521ce7508aa0c9ba3fadcb8b6279d0107e7a48b75d",
+   "skills": "4bac99f55ffb6c64d8640f856146563424d172e2fac427c14e7a2649f77b8c15"
+  },
+  "rubric": {
+   "version": "2.1",
+   "lampiranBSha256": "cdba3dde5fccaaabbccdf8e0e4060c4cb2c9b4534bcae1fb67eee2fd26e387be"
+  },
+  "judge": {
+   "model": "claude-opus-5-5",
+   "argv": "claude -p --input-format stream-json --output-format stream-json --verbose --model claude-opus-5-5 --tools \"\" --strict-mcp-config --mcp-config bench/runs/practice/1/judge/mcp-empty.json --disable-slash-commands --no-session-persistence",
+   "textSha256": {
+    "P1": "97cea533ac19b6a917e6ec3dc39d1801ca4c6937184dc2a410c95058b2311ee0",
+    "P2": "660c44056881e20ab82a4c1a754df19551103563929df47e3172f29793c67393",
+    "P3": "41298e297f8d89b837412e52fc3ca61f952595597bd72d1e472b89b4efe8d4db",
+    "P4": "69a553ad4402d4e510e514ce32a465c07936adb4df844770609d1f4f89374161"
+   }
+  }
+ },
+ "wrapper": "Mode benchmark tanpa interaksi: tidak ada pengguna yang bisa menjawab pertanyaan atau memberi konfirmasi. Jangan bertanya; ambil keputusan sendiri dan kerjakan tugas sampai tuntas.\nKerjakan di dokumen baru yang kosong dengan tool desain yang tersedia.\nSetelah tugas tuntas, akhiri jawabanmu dengan satu kata: selesai.\n\nTugas:\n{{PROMPT}}\n",
+ "argv": {
+  "lakar": "claude -p '<prompt hasil render>' --model claude-opus-5-5 --strict-mcp-config --tools \"\" --output-format stream-json --verbose --disable-slash-commands --no-session-persistence --mcp-config .mcp.json --allowedTools mcp__lakar",
+  "pendev": "claude -p '<prompt hasil render>' --model claude-opus-5-5 --strict-mcp-config --tools \"\" --output-format stream-json --verbose --disable-slash-commands --no-session-persistence --mcp-config bench/mcp/pencil.json --allowedTools mcp__pencil",
+  "judge": "claude -p --input-format stream-json --output-format stream-json --verbose --model claude-opus-5-5 --tools \"\" --strict-mcp-config --mcp-config bench/runs/practice/1/judge/mcp-empty.json --disable-slash-commands --no-session-persistence"
+ },
+ "results": [
+  {
+   "id": "P1",
+   "name": "Rakit Kode",
+   "kind": "landing",
+   "size": {
+    "width": 1440,
+    "height": null
+   },
+   "judgeTextSha256": "97cea533ac19b6a917e6ec3dc39d1801ca4c6937184dc2a410c95058b2311ee0",
+   "runs": {
+    "lakar": {
+     "key": "P1-lakar",
+     "prompt": "P1",
+     "tool": "lakar",
+     "dir": "bench/runs/practice/1/P1-lakar",
+     "record": {
+      "runId": "practice-1-P1-lakar",
+      "prompt": "P1",
+      "attempt": 1,
+      "status": "success",
+      "wallMs": 265867.922472,
+      "durationMs": 266004,
+      "durationApiMs": 224843,
+      "costUsd": 1.4403052000000003,
+      "numTurns": 22,
+      "toolCalls": 21,
+      "firstToolUseMs": 1846.9322999999858,
+      "lastToolResultMs": 250008.021944,
+      "spawnToFirstEventMs": 1764.9810759999964,
+      "frames": [
+       {
+        "id": "Dahx7vLb",
+        "name": "Rakit Kode / Beranda · landing · Jernih",
+        "width": 1440,
+        "height": 5500,
+        "png": "bench/runs/practice/1/P1-lakar/png/Dahx7vLb.png",
+        "pngWidth": 1440,
+        "pngHeight": 5500
+       }
+      ],
+      "transcriptBytes": 1869578,
+      "pngScaleMismatch": false,
+      "model": "claude-opus-5-5",
+      "modelUsageKeys": [
+       "claude-opus-5-5"
+      ],
+      "claudeCodeVersion": "2.1.325",
+      "startedAt": "2026-11-18T08:22:03.721Z",
+      "lakar": {
+       "slug": "rakit-kode-landing",
+       "opened": [
+        "rakit-kode-landing"
+       ],
+       "boards": [
+        {
+         "id": "Dahx7vLb",
+         "name": "Rakit Kode / Beranda · landing · Jernih",
+         "page": "Page 1",
+         "screen": "landing",
+         "x": 0,
+         "y": 0,
+         "width": 1440,
+         "height": 5500,
+         "wip": false,
+         "childCount": 1
+        }
+       ],
+       "layout": {
+        "rev": 6,
+        "summary": {
+         "error": 0,
+         "warning": 0,
+         "gate": 0
+        },
+        "findings": [],
+        "boards": [
+         {
+          "id": "Dahx7vLb",
+          "name": "Rakit Kode / Beranda · landing · Jernih",
+          "summary": {
+           "error": 0,
+           "warning": 0,
+           "gate": 0
+          }
+         }
+        ]
+       },
+       "docPath": "bench/runs/practice/1/P1-lakar/doc/rakit-kode-landing.lakar.json",
+       "historyPath": "bench/runs/practice/1/P1-lakar/doc/rakit-kode-landing.history.jsonl",
+       "daemonBefore": {
+        "pid": 1175815,
+        "startedAt": "2026-11-18T08:18:03.772Z",
+        "recreated": 0,
+        "systemd": {
+         "ActiveState": "active",
+         "ActiveEnterTimestamp": "Wed 2026-11-18 08:18:03 UTC",
+         "MainPID": "1175815",
+         "NRestarts": "0"
+        }
+       },
+       "daemonAfter": {
+        "pid": 1175815,
+        "startedAt": "2026-11-18T08:18:03.772Z",
+        "recreated": 0,
+        "systemd": {
+         "ActiveState": "active",
+         "ActiveEnterTimestamp": "Wed 2026-11-18 08:18:03 UTC",
+         "MainPID": "1175815",
+         "NRestarts": "0"
+        }
+       },
+       "docsBefore": 2
+      }
+     },
+     "reconnect": {
+      "count": 0,
+      "affectedMs": 0,
+      "events": [],
+      "toolErrors": []
+     },
+     "agentEmoji": {
+      "emoji": 0,
+      "glyphs": 0,
+      "samples": []
+     },
+     "lintEmoji": {
+      "lc01a": 0,
+      "lc01b": 0
+     },
+     "strip": {
+      "path": "bench/runs/practice/1/P1-lakar.png",
+      "width": 1440,
+      "height": 5500,
+      "boards": 1
+     },
+     "previous": []
+    },
+    "pendev": {
+     "key": "P1-pendev",
+     "prompt": "P1",
+     "tool": "pendev",
+     "dir": "bench/runs/practice/1/P1-pendev",
+     "record": {
+      "runId": "practice-1-P1-pendev",
+      "prompt": "P1",
+      "attempt": 1,
+      "status": "success",
+      "uri": "file:///root/.pencil/documents/97e1ba2b-1db7-4ad5-8ce3-9dc0bbc1eaf7/untitled.pen",
+      "uriSource": "get_app_state",
+      "wallMs": 227400.321316,
+      "durationMs": 227488,
+      "durationApiMs": 202081,
+      "costUsd": 1.179242,
+      "numTurns": 26,
+      "toolCalls": 25,
+      "firstToolUseMs": 1454.4985620000007,
+      "lastToolResultMs": 216720.311626,
+      "spawnToFirstEventMs": 1354.2171449999987,
+      "frames": [
+       {
+        "id": "I5tm0M",
+        "name": "Rakit Kode — Landing",
+        "width": 1440,
+        "height": 6383,
+        "png": "bench/runs/practice/1/P1-pendev/png/I5tm0M.png",
+        "pngWidth": 1440,
+        "pngHeight": 6383
+       }
+      ],
+      "transcriptBytes": 2023266,
+      "penPath": "bench/runs/practice/1/P1-pendev/design.pen",
+      "pngScaleMismatch": false,
+      "model": "claude-opus-5-5",
+      "modelUsageKeys": [
+       "claude-opus-5-5"
+      ],
+      "claudeCodeVersion": "2.1.325",
+      "startedAt": "2026-11-18T08:18:10.288Z",
+      "pendevSystemd": {
+       "before": {
+        "ActiveState": "active",
+        "ActiveEnterTimestamp": "Tue 2026-11-17 07:15:37 UTC",
+        "MainPID": "1798021",
+        "NRestarts": "0"
+       },
+       "after": {
+        "ActiveState": "active",
+        "ActiveEnterTimestamp": "Tue 2026-11-17 07:15:37 UTC",
+        "MainPID": "1798021",
+        "NRestarts": "0"
+       }
+      }
+     },
+     "reconnect": {
+      "count": 0,
+      "affectedMs": 0,
+      "events": [],
+      "toolErrors": []
+     },
+     "agentEmoji": {
+      "emoji": 0,
+      "glyphs": 0,
+      "samples": []
+     },
+     "strip": {
+      "path": "bench/runs/practice/1/P1-pendev.png",
+      "width": 1440,
+      "height": 6383,
+      "boards": 1
+     },
+     "previous": []
+    }
+   },
+   "gate": {
+    "ok": true,
+    "reasons": [],
+    "timeRatio": 1.1691624749401506
+   },
+   "sizeProblems": [],
+   "pendevSizeProblems": [],
+   "score": {
+    "prompt": "P1",
+    "validReps": 3,
+    "reps": [
+     {
+      "prompt": "P1",
+      "rep": 1,
+      "mapping": {
+       "X": "pendev",
+       "Y": "lakar"
+      },
+      "status": "ok",
+      "verdict": {
+       "X": {
+        "R1": {
+         "skor": 1,
+         "bukti": "Semua bagian yang diminta ada dan berurutan, dalam Bahasa Indonesia dengan aksen biru dan lebar 1440px: menu atas (bagian 1), hero dengan judul, subjudul, dua tombol 'Daftar Angkatan 14' dan 'Coba Kelas Gratis' serta foto laptop berisi kode (bagian 1), alur 3 tahap (bagian 2), 3 mentor berfoto (bagian 3), cerita alumni beserta pekerjaan sekarang (bagian 4), jadwal angkatan dan biaya (bagian 5), FAQ (bagian 5–6), dan footer (bagian 7). Ada satu seksi ekstra di luar prompt: banner CTA biru 'Kursi Angkatan 14 tinggal 8…' sebelum footer (bagian 6)."
+        },
+        "R2": {
+         "skor": 1,
+         "bukti": "Titik fokus jelas, yaitu headline hero 'Dari nol coding jadi web developer siap kerja.' (bagian 1). Lompatan skalanya tegas ke judul seksi lalu ke body. Namun judul seksi alumni menyisakan satu kata yatim 'produk.' di baris sendiri (bagian 3 ke 4)."
+        },
+        "R4": {
+         "skor": 2,
+         "bukti": "Biru dipakai konsisten untuk tombol utama, kartu tahap aktif 02, angkatan terpilih, dan ikon FAQ. Lime dipakai untuk pekerjaan alumni sekarang, chip 'Hemat 25%', dan label 'MINGGU 6–11' sebagai penanda highlight. Merah pada 'Sisa 8 kursi' dan hijau pada 'Pendaftaran dibuka' menandai status (bagian 5). Teks putih dan abu terang di latar navy masih terbaca."
+        },
+        "R5": {
+         "skor": 2,
+         "bukti": "Ikon bergaya garis seragam: ikon tahap, ikon koper di chip mentor dan alumni, kalender jadwal, plus/minus FAQ, dan ikon sosial di footer. Foto hero (laptop berisi kode) relevan, ditambah foto 3 mentor (bagian 3) dan foto alumni (bagian 4). Tidak ada emoji."
+        },
+        "R6": {
+         "skor": 1,
+         "bukti": "Copy spesifik dan sebagian besar angkanya konsisten: 12 Jan 2027 cocok di hero dan jadwal, 'Sisa 8 kursi' cocok dengan banner 'tinggal 8', cicilan Rp499.000×12 ≈ Rp5.990.000, dan 64 sesi = 16 minggu × 4. Ada satu inkonsistensi: kartu hero berisi kutipan Rina 'Tiga bulan lalu aku belum tahu apa itu div', padahal program berlangsung 16 minggu dan ia diterima 'dua bulan setelah lulus' (bagian 4)."
+        },
+        "R8": {
+         "skor": 2,
+         "bukti": "Tidak ada pelanggaran checklist slop. Keputusan komposisi khas: kartu 'Baru diterima kerja' yang menimpa foto hero (bagian 1), dan blok alumni utama dengan chip transisi 'Staf Akuntansi → Frontend Developer · Tokopedia' di samping daftar tiga alumni (bagian 4)."
+        },
+        "R9": {
+         "skor": 2,
+         "bukti": "Statistik hero diberi konteks ('alumni sejak 2021', 'kerja ≤ 6 bulan'). Mentor punya chip tahun pengalaman dan keahlian. Alumni dilengkapi angkatan, pekerjaan sebelumnya, dan pekerjaan sekarang. Jadwal memuat status variatif (Sisa 8 kursi, Pendaftaran dibuka, Segera dibuka), harga coret, cicilan, garansi, dan beasiswa (bagian 5)."
+        },
+        "R10": {
+         "skor": 2,
+         "bukti": "Permukaan berlapis: hero ber-tint biru, seksi abu-kebiruan, seksi alumni dan kartu harga navy, banner CTA biru bergradien. Warna kedua bermakna (lime) muncul di alur, alumni, dan harga. Chip status berwarna jelas. Foto dan ikon tampak matang dan menyatu."
+        },
+        "slop": {
+         "jumlah": 0,
+         "butir": []
+        },
+        "emoji": 0,
+        "fokus": "Headline hero 'Dari nol coding jadi web developer siap kerja.' di kiri atas bagian 1"
+       },
+       "Y": {
+        "R1": {
+         "skor": 2,
+         "bukti": "Semua bagian ada sesuai urutan prompt, dalam Bahasa Indonesia dengan aksen biru dan lebar 1440px: menu (bagian 1), hero dengan judul, subjudul, dua tombol 'Daftar Angkatan 14' dan 'Lihat alur belajar' serta area foto (bagian 1), alur 3 tahap (bagian 2), 3 mentor (bagian 3), alumni dengan 'Dulu/Sekarang' (bagian 3–4), jadwal dan biaya untuk tiga angkatan (bagian 4–5), FAQ (bagian 5), dan footer (bagian 6). Tidak ada seksi ekstra. Foto yang tidak terisi dinilai di R5."
+        },
+        "R2": {
+         "skor": 2,
+         "bukti": "Fokus tunggal pada headline hero 'Rilis aplikasi web pertamamu dalam 16 minggu, mulai dari nol' (bagian 1). Judul seksi seperti 'Tiga tahap menuju portofolio…' jauh lebih kecil, dan body lebih kecil lagi. Tidak ada judul yatim."
+        },
+        "R4": {
+         "skor": 2,
+         "bukti": "Biru dipakai konsisten untuk CTA, kartu Angkatan 14 terpilih, progress bar, dan FAQ terbuka. Oranye bermakna untuk rating bintang, peringatan 'Sisa 8 dari 40 kursi', dan diskon 'Pra-daftar · hemat 10%'. Hijau menandai status 'Diterima…' dan 'Pendaftaran dibuka'. Abu pada Angkatan 13 menandakan angkatan penuh. Tidak terlihat teks yang gagal kontras."
+        },
+        "R5": {
+         "skor": 0,
+         "bukti": "Visual utama kosong. Area hero hanya berisi ikon orang dan label 'Foto suasana kelas live Rakit Kode' di bidang biru (bagian 1). Ketiga foto mentor juga diganti ikon orang dengan inisial DP, SN, dan RA (bagian 3). Ikon garisnya sendiri seragam dan tidak ada emoji."
+        },
+        "R6": {
+         "skor": 2,
+         "bukti": "Angka konsisten: 11 Jan 2027 jatuh pada hari Senin; 12× Rp700.000 = Rp8.400.000; diskon 10% menghasilkan Rp7.560.000 = 12× Rp630.000; 274/386 = 71% cocok dengan statistik hero 71%; 10 jam/minggu = 4×2 jam live + review Sabtu; '3 proyek portofolio' cocok dengan tiga chip proyek. Copy spesifik, misalnya 'Dulu: Kasir minimarket → Junior React Developer'."
+        },
+        "R8": {
+         "skor": 2,
+         "bukti": "Tidak ada pelanggaran checklist slop; placeholder-nya berlabel dan ber-tint, jadi tidak masuk butir 12. Keputusan komposisi khas: kartu mentor utama yang lebih lebar dengan kutipan dan statistik di samping dua kartu kecil (bagian 3), metrik '274 dari 386' dengan progress bar di header alumni, dan kartu angkatan dengan bar kuota kursi (bagian 4)."
+        },
+        "R9": {
+         "skor": 2,
+         "bukti": "Angka diberi konteks: '4,8/5 dari 912 ulasan', 'Skor 86/100 · naik dari 64', '1 mentor : 12 peserta' dengan rata-rata jawaban 3 jam 20 menit. Status angkatan bervariasi (Sedang berjalan, Pendaftaran dibuka, Pra-daftar). Alumni dilengkapi kota, angkatan, dan durasi sampai diterima kerja. Tetap padat tetapi terbaca."
+        },
+        "R10": {
+         "skor": 1,
+         "bukti": "Permukaan berlapis sudah ada (hero dan FAQ ber-tint biru, alumni navy), warna kedua oranye bermakna di beberapa bagian, dan chip status berwarna. Namun unsur 'visual matang' tidak terpenuhi: foto hero dan foto mentor hanya placeholder ikon (bagian 1 dan 3)."
+        },
+        "slop": {
+         "jumlah": 0,
+         "butir": []
+        },
+        "emoji": 0,
+        "fokus": "Headline hero 'Rilis aplikasi web pertamamu dalam 16 minggu, mulai dari nol' di kiri atas bagian 1"
+       }
+      },
+      "attempts": [
+       {
+        "dir": "/root/lakar/bench/runs/practice/1/judge/P1/rep-1/attempt-1",
+        "status": "ok",
+        "problems": [],
+        "costUsd": 0.36244180000000004,
+        "wallMs": 57821.78200000012
+       }
+      ],
+      "retried": false,
+      "costUsd": 0.36244180000000004
+     },
+     {
+      "prompt": "P1",
+      "rep": 2,
+      "mapping": {
+       "X": "pendev",
+       "Y": "lakar"
+      },
+      "status": "ok",
+      "verdict": {
+       "X": {
+        "R1": {
+         "skor": 1,
+         "bukti": "Semua bagian yang diminta ada dan berurutan: menu atas (bagian 1), hero dengan judul, subjudul, tombol 'Daftar Angkatan 14' dan 'Coba Kelas Gratis' serta foto laptop berisi kode (bagian 1), alur 3 tahap (bagian 2), 3 mentor berfoto (bagian 3), cerita alumni dengan pekerjaan sekarang (bagian 3–4), jadwal dan biaya (bagian 5), FAQ (bagian 5–6), dan footer (bagian 7). Lebar 1440px, aksen biru, dan bahasa Indonesia sesuai. Ada 1 seksi ekstra di luar daftar prompt, yaitu banner CTA biru 'Kursi Angkatan 14 tinggal 8' di bagian 6."
+        },
+        "R2": {
+         "skor": 2,
+         "bukti": "Titik fokus tunggal adalah judul hero 'Dari nol coding jadi web developer siap kerja.' (bagian 1, kiri atas, sekitar 64px extra-bold). Skalanya melompat tegas ke subjudul (sekitar 20px) dan ke judul seksi (sekitar 44px, misalnya 'Tiga tahap, 16 minggu…'). Setiap judul diawali eyebrow biru (ALUR BELAJAR, MENTOR, CERITA ALUMNI) dan diikuti konten, sehingga tidak ada judul yatim."
+        },
+        "R4": {
+         "skor": 2,
+         "bukti": "Biru dipakai konsisten untuk CTA (nav, hero, pricing), kartu tahap aktif 02, ikon, dan eyebrow. Merah 'Sisa 8 kursi', hijau 'Pendaftaran dibuka', dan abu 'Segera dibuka' adalah status (bagian 5). Lime menandai pencapaian: 'Sekarang: …', chip 'Frontend Developer · Tokopedia', dan 'Hemat 25%'. Teks putih dan abu terang di seksi navy terbaca baik. Angka '01/03' yang pucat adalah dekorasi."
+        },
+        "R5": {
+         "skor": 2,
+         "bukti": "Ikon bergaya garis seragam: ikon tahap dalam kotak tint, ceklis, ikon briefcase di chip mentor dan alumni, serta ikon sosial di footer. Foto hero (tangan mengetik di laptop dengan editor kode, bagian 1) relevan. Ketiga mentor punya foto nyata (bagian 3), alumni punya foto besar dan avatar (bagian 4). Tidak ada emoji."
+        },
+        "R6": {
+         "skor": 1,
+         "bukti": "Angka umumnya konsisten: Rp5.990.000 dibanding Rp8.000.000 sama dengan hemat 25%, cicilan Rp499.000 ×12 sekitar Rp5.990.000, 64 sesi sama dengan 16 minggu ×4, dan sisa 8 kursi sama di jadwal dan banner CTA. Ada 1 inkonsistensi: kartu hero 'Tiga bulan lalu aku belum tahu apa itu div — Rina, Angkatan 11' bertentangan dengan program 16 minggu ditambah 'dua bulan setelah lulus saya diterima' pada testimoni Rina Maharani (bagian 4)."
+        },
+        "R8": {
+         "skor": 2,
+         "bukti": "Tidak ada pelanggaran checklist slop: tidak ada gradien ungu, latar putih dan biru dingin, tidak ada frasa terlarang, dan tombolnya spesifik. Keputusan komposisi khas yang bisa ditunjuk: seksi alumni navy dengan testimoni utama berfoto besar plus chip transisi 'Staf Akuntansi → Frontend Developer · Tokopedia' (bagian 4), dan kartu 'Baru diterima kerja' yang mengambang menumpuk tepi foto hero (bagian 1)."
+        },
+        "R9": {
+         "skor": 2,
+         "bukti": "Angka diberi konteks: '87% kerja ≤ 6 bulan', '2.400+ alumni sejak 2021', harga coret dengan cicilan, dan 'beasiswa 50% untuk 10 peserta per angkatan'. Daftar menunjukkan variasi status (Sisa 8 kursi / Pendaftaran dibuka / Segera dibuka). Ada metadata di sebagian besar seksi: label 'MINGGU 1–5', chip tahun pengalaman dan keahlian mentor, 'Angkatan 9 · dulu Driver ojol', dan garansi 14 hari."
+        },
+        "R10": {
+         "skor": 2,
+         "bukti": "Permukaan berlapis: gradien biru muda di hero, kartu tahap biru penuh, seksi alumni dan kartu harga navy, serta banner CTA biru. Warna kedua bermakna (lime) muncul di beberapa seksi: hero, tahap 02, alumni, dan pricing. Badge berwarna terdefinisi (BARU, Hemat 25%, chip status jadwal). Foto dan ikon matang dan menyatu."
+        },
+        "slop": {
+         "jumlah": 0,
+         "butir": []
+        },
+        "emoji": 0,
+        "fokus": "Judul hero 'Dari nol coding jadi web developer siap kerja.' di kiri atas bagian 1"
+       },
+       "Y": {
+        "R1": {
+         "skor": 2,
+         "bukti": "Semua bagian ada dan berurutan tanpa seksi ekstra: nav (bagian 1), hero dengan judul, subjudul, dua tombol ('Daftar Angkatan 14' dan 'Lihat alur belajar') dan slot foto (bagian 1), alur 3 tahap (bagian 2), 3 mentor (bagian 3), alumni dengan 'Sekarang: …' (bagian 3–4), jadwal dan biaya (bagian 4–5), FAQ (bagian 5), dan footer (bagian 6). Lebar 1440px, aksen biru, dan bahasa Indonesia sesuai. Foto yang tidak terisi dinilai di R5."
+        },
+        "R2": {
+         "skor": 2,
+         "bukti": "Titik fokus tunggal adalah judul hero 'Rilis aplikasi web pertamamu dalam 16 minggu, mulai dari nol' (bagian 1, kiri, sekitar 56px). Skalanya melompat tegas ke subjudul (sekitar 18px) dan judul seksi (sekitar 32px). Setiap judul punya eyebrow dan konten, sehingga tidak ada judul yatim."
+        },
+        "R4": {
+         "skor": 2,
+         "bukti": "Biru dipakai konsisten untuk CTA, kartu Angkatan 14 yang aktif, progress bar, dan eyebrow. Oranye bermakna: bintang rating (bagian 3), 'Sisa 8 dari 40 kursi' sebagai urgensi, 'Pra-daftar · hemat 10%', dan 'Paling menantang' (bagian 2). Hijau menandai status lulus dan diterima, merah menandai live. Harga Angkatan 13 sengaja diabukan karena penuh. Teks lain terbaca."
+        },
+        "R5": {
+         "skor": 0,
+         "bukti": "Visual utama kosong. Hero (bagian 1, kanan) hanya berisi bidang biru dengan ikon orang dan label 'Foto suasana kelas live Rakit Kode', bukan foto. Ketiga foto mentor (bagian 3) juga diganti kotak biru berisi ikon dan inisial (DP, SN, RA). Ikon garis sendiri seragam dan tidak ada emoji."
+        },
+        "R6": {
+         "skor": 2,
+         "bukti": "Angka spesifik dan saling cocok. '274 dari 386 · 71%' sama dengan '71%' di hero. 12× Rp700.000 = Rp8.400.000 dan 12× Rp630.000 = Rp7.560.000 (hemat 10%). Angka 'Sisa 8 kursi' sama di hero dan jadwal. Tanggal 2 Nov 2026, 11 Jan 2027, dan 15 Mar 2027 sama-sama jatuh pada hari Senin. '10 jam per minggu' cocok dengan kelas Senin–Kamis 2 jam ditambah review Sabtu. '3 proyek portofolio' cocok dengan 3 chip proyek."
+        },
+        "R8": {
+         "skor": 2,
+         "bukti": "Tidak ada pelanggaran checklist: placeholder berlabel dan bertint biru (bukan abu-abu kosong), tidak ada gradien ungu, tidak ada frasa terlarang, dan tombolnya spesifik. Langkah komposisi khas yang bisa ditunjuk: kartu lead mentor yang lebih lebar dari dua mentor lain (bagian 3), metrik '274 dari 386' dengan progress bar di header alumni (bagian 3), dan progress bar kuota kursi per angkatan (bagian 4)."
+        },
+        "R9": {
+         "skor": 2,
+         "bukti": "Konteks angka sangat kaya: '4,8/5 dari 912 ulasan', rating mentor beserta jumlah ulasan dan peserta, '1 mentor : 12 peserta · rata-rata jawaban 3 jam 20 menit', 'Skor 86/100 · naik dari 64 di minggu 3', dan alumni 'Diterima 11 minggu setelah lulus'. Status bervariasi (Sedang berjalan / Pendaftaran dibuka / Pra-daftar). Ada metadata di hampir semua seksi, tetap terbaca."
+        },
+        "R10": {
+         "skor": 1,
+         "bukti": "Permukaan berlapis (hero dan mentor bertint biru, alumni navy, tahap 02 navy), warna kedua oranye yang konsisten di beberapa seksi, serta badge dan indikator terdefinisi sudah ada. Namun unsur 'visual matang dan menyatu' tidak terpenuhi karena foto hero dan ketiga foto mentor masih placeholder (bagian 1 dan 3)."
+        },
+        "slop": {
+         "jumlah": 0,
+         "butir": []
+        },
+        "emoji": 0,
+        "fokus": "Judul hero 'Rilis aplikasi web pertamamu dalam 16 minggu, mulai dari nol' di kiri bagian 1"
+       }
+      },
+      "attempts": [
+       {
+        "dir": "/root/lakar/bench/runs/practice/1/judge/P1/rep-2/attempt-1",
+        "status": "ok",
+        "problems": [],
+        "costUsd": 0.38786980000000004,
+        "wallMs": 71557.555162
+       }
+      ],
+      "retried": false,
+      "costUsd": 0.38786980000000004
+     },
+     {
+      "prompt": "P1",
+      "rep": 3,
+      "mapping": {
+       "X": "lakar",
+       "Y": "pendev"
+      },
+      "status": "ok",
+      "verdict": {
+       "X": {
+        "R1": {
+         "skor": 1,
+         "bukti": "Semua bagian yang diminta ada dan berurutan dalam lebar 1440px: menu atas, hero, alur 3 tahap, 3 mentor, cerita alumni, jadwal & biaya, FAQ, dan footer. Aksen biru dan bahasa Indonesia sesuai. Namun foto suasana belajar di hero kanan hanya bidang biru berikon dengan label 'Foto suasana kelas live Rakit Kode', dan ketiga foto mentor (bagian 3) berupa placeholder ikon orang dengan inisial DP/SN/RA. Prompt secara eksplisit meminta foto."
+        },
+        "R2": {
+         "skor": 2,
+         "bukti": "Judul hero 'Rilis aplikasi web pertamamu dalam 16 minggu, mulai dari nol' (bagian 1, kiri atas) jauh lebih besar dari judul seksi (~32px) dan judul kartu (~24px), sehingga lompatan skalanya tegas. Setiap seksi memakai pola eyebrow, judul, lalu subjudul secara konsisten, dan tidak ada judul yatim."
+        },
+        "R4": {
+         "skor": 2,
+         "bukti": "Biru dipakai konsisten untuk CTA 'Daftar Angkatan 14', eyebrow, centang, dan progress bar. Hijau berarti status positif ('Lulus', 'Diterima 11 minggu setelah lulus', 'Pendaftaran dibuka'). Oranye berarti peringatan atau perhatian ('Sisa 8 dari 40 kursi', 'Paling menantang', 'Pra-daftar · hemat 10%'), dan bintang rating juga oranye. Harga abu-abu pada Angkatan 13 menandai kelas yang sudah penuh. Tidak terlihat teks yang gagal kontras."
+        },
+        "R5": {
+         "skor": 0,
+         "bukti": "Ikon garis (gaya lucide) seragam di seluruh halaman dan tidak ada emoji. Namun visual utama hilang: area foto hero (bagian 1, kanan) kosong, hanya berisi ikon orang dan label teks. Ketiga foto mentor (bagian 3) juga placeholder ikon dengan inisial."
+        },
+        "R6": {
+         "skor": 1,
+         "bukti": "Sebagian besar angka konsisten: 12× Rp 700.000 = Rp 8.400.000; Rp 7.560.000 = diskon 10% dengan 12× Rp 630.000; 274/386 ≈ 71% cocok dengan statistik hero 71%; 16 minggu × 4 = 64 sesi; 'sisa 8 kursi' muncul sama di hero dan kartu jadwal. Ada satu inkonsistensi: mentor disebut memegang 'maksimal 12 peserta per angkatan' (bagian 3, kiri atas), padahal Dimas tercatat membimbing '412 peserta' dalam 13 angkatan (maksimal ±156)."
+        },
+        "R8": {
+         "skor": 2,
+         "bukti": "Tidak ditemukan pelanggaran checklist slop. Placeholder foto berlabel sehingga tidak dihitung sebagai butir 12; pelanggarannya sudah dinilai di R5. Keputusan komposisi khas yang bisa ditunjuk: kartu tahap 02 berwarna navy gelap dan menonjol di tengah alur belajar (bagian 2), kartu mentor lead yang dibuat lebih lebar secara asimetris (bagian 3), serta blok 'Dulu → Sekarang' di kartu alumni pada latar navy (bagian 4)."
+        },
+        "R9": {
+         "skor": 2,
+         "bukti": "Angka hampir selalu diberi konteks: '71% dapat kerja maks. 6 bulan', '4,8/5 dari 912 ulasan', 'Skor 86/100 · naik dari 64 di minggu 3', '274 dari 386 lulusan 2025'. Item dalam daftar bervariasi status: Angkatan 13 'Sedang berjalan', 14 'Pendaftaran dibuka', 15 'Pra-daftar'. Metadata hadir di hampir semua bagian, misalnya chip '16 minggu/64 sesi live', jumlah ulasan mentor, kota dan angkatan alumni, serta waktu respons konsultasi."
+        },
+        "R10": {
+         "skor": 1,
+         "bukti": "Permukaan berlapis sudah ada: hero dan seksi mentor ber-tint biru muda, seksi alumni navy. Warna kedua bermakna juga ada (hijau untuk status, oranye untuk peringatan) beserta badge berwarna. Namun syarat 'visual matang dan menyatu' gagal karena foto hero dan foto mentor hanya placeholder."
+        },
+        "slop": {
+         "jumlah": 0,
+         "butir": []
+        },
+        "emoji": 0,
+        "fokus": "Judul hero 'Rilis aplikasi web pertamamu dalam 16 minggu, mulai dari nol' di kiri atas bagian 1"
+       },
+       "Y": {
+        "R1": {
+         "skor": 1,
+         "bukti": "Semua bagian yang diminta ada dalam lebar 1440px: menu, hero dengan foto laptop berisi kode, alur 3 tahap, 3 mentor berfoto, cerita alumni berikut pekerjaan sekarang, jadwal & biaya, FAQ, dan footer. Aksen biru dan bahasa Indonesia sesuai. Terdapat satu seksi ekstra di luar daftar prompt, yaitu banner CTA biru 'Kursi Angkatan 14 tinggal 8…' sebelum footer (bagian 6)."
+        },
+        "R2": {
+         "skor": 2,
+         "bukti": "Judul hero 'Dari nol coding jadi web developer siap kerja.' (bagian 1, kiri) menjadi teks terbesar dan terberat di halaman. Judul seksi ~48px tetap berada satu tingkat di bawahnya, dan tidak ada judul yatim."
+        },
+        "R4": {
+         "skor": 1,
+         "bukti": "Biru konsisten untuk CTA dan elemen aktif. Lime dipakai bermakna untuk hasil atau keuntungan ('Sekarang: …' di kartu alumni, 'Hemat 25%', centang fitur harga). Merah dan hijau dipakai sebagai status jadwal. Ada satu teks lemah: label 'Alumni kami bekerja di' (bagian 3, kanan bawah) berukuran kecil dan abu redup di atas navy. Teks catatan beasiswa di kartu harga juga tipis."
+        },
+        "R5": {
+         "skor": 2,
+         "bukti": "Ikon bergaya garis dan seragam: kalender di jadwal, centang di daftar, koper di chip mentor dan alumni. Foto hero (laptop berisi kode saat kelas) relevan, foto mentor dan alumni nyata, dan tidak ada emoji."
+        },
+        "R6": {
+         "skor": 1,
+         "bukti": "Angka harga konsisten: Rp8.000.000 menjadi Rp5.990.000 (≈25%, sesuai badge 'Hemat 25%'), dan cicilan 12× Rp499.000 ≈ total harga. Angka 'Sisa 8 kursi' juga cocok dengan banner CTA. Namun ada satu kontradiksi tentang Rina (Angkatan 11): kartu di hero berbunyi 'Tiga bulan lalu aku belum tahu apa itu div' dengan label 'Baru diterima kerja', sedangkan testimoni di bagian 4 menyebut ia diterima dua bulan setelah lulus dari program 16 minggu."
+        },
+        "R8": {
+         "skor": 1,
+         "bukti": "Ada satu pelanggaran slop, yaitu statistik bulat '2.400+' dan '120+ mitra' (lihat butir slop). Langkah komposisi khas tetap ada: kartu alumni unggulan dengan foto terpisah dan chip 'Staf Akuntansi → Frontend Developer · Tokopedia' (bagian 4), serta jadwal berupa daftar bersisian dengan kartu harga navy (bagian 5)."
+        },
+        "R9": {
+         "skor": 2,
+         "bukti": "Angka diberi konteks: harga coret beserta cicilan per bulan, rentang tanggal tiap angkatan dengan durasi '16 minggu · Daring', dan 'Kelas live · 128 peserta'. Status bervariasi: 'Sisa 8 kursi' (merah), 'Pendaftaran dibuka' (hijau), 'Segera dibuka' (abu). Detail sekunder juga kaya: chip pengalaman dan keahlian mentor, label 'Angkatan · dulu …' pada alumni, deretan perusahaan tempat alumni bekerja, serta garansi 14 hari."
+        },
+        "R10": {
+         "skor": 2,
+         "bukti": "Permukaan berlapis: hero ber-tint, kartu tahap 02 biru penuh, seksi alumni navy, kartu harga navy, dan banner CTA bergradasi biru. Warna kedua (lime) dipakai konsisten di lebih dari satu bagian: hero, alur, alumni, dan harga. Badge status berwarna terdefinisi dengan jelas, dan foto serta ikon tampak matang dan menyatu."
+        },
+        "slop": {
+         "jumlah": 1,
+         "butir": [
+          "5: Statistik bulat yang tidak diberikan prompt, yaitu '2.400+ alumni sejak 2021' (hero, bagian 1) dan 'penyaluran ke 120+ mitra' (kartu harga, bagian 5)"
+         ]
+        },
+        "emoji": 0,
+        "fokus": "Judul hero 'Dari nol coding jadi web developer siap kerja.' di kiri bagian 1"
+       }
+      },
+      "attempts": [
+       {
+        "dir": "/root/lakar/bench/runs/practice/1/judge/P1/rep-3/attempt-1",
+        "status": "ok",
+        "problems": [],
+        "costUsd": 0.35288980000000003,
+        "wallMs": 58034.02750999993
+       }
+      ],
+      "retried": false,
+      "costUsd": 0.35288980000000003
+     }
+    ],
+    "tools": {
+     "lakar": {
+      "criteria": {
+       "R1": {
+        "values": [
+         2,
+         2,
+         1
+        ],
+        "median": 2,
+        "range": 1,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 2,
+          "bukti": "Semua bagian ada sesuai urutan prompt, dalam Bahasa Indonesia dengan aksen biru dan lebar 1440px: menu (bagian 1), hero dengan judul, subjudul, dua tombol 'Daftar Angkatan 14' dan 'Lihat alur belajar' serta area foto (bagian 1), alur 3 tahap (bagian 2), 3 mentor (bagian 3), alumni dengan 'Dulu/Sekarang' (bagian 3–4), jadwal dan biaya untuk tiga angkatan (bagian 4–5), FAQ (bagian 5), dan footer (bagian 6). Tidak ada seksi ekstra. Foto yang tidak terisi dinilai di R5."
+         },
+         {
+          "rep": 2,
+          "skor": 2,
+          "bukti": "Semua bagian ada dan berurutan tanpa seksi ekstra: nav (bagian 1), hero dengan judul, subjudul, dua tombol ('Daftar Angkatan 14' dan 'Lihat alur belajar') dan slot foto (bagian 1), alur 3 tahap (bagian 2), 3 mentor (bagian 3), alumni dengan 'Sekarang: …' (bagian 3–4), jadwal dan biaya (bagian 4–5), FAQ (bagian 5), dan footer (bagian 6). Lebar 1440px, aksen biru, dan bahasa Indonesia sesuai. Foto yang tidak terisi dinilai di R5."
+         },
+         {
+          "rep": 3,
+          "skor": 1,
+          "bukti": "Semua bagian yang diminta ada dan berurutan dalam lebar 1440px: menu atas, hero, alur 3 tahap, 3 mentor, cerita alumni, jadwal & biaya, FAQ, dan footer. Aksen biru dan bahasa Indonesia sesuai. Namun foto suasana belajar di hero kanan hanya bidang biru berikon dengan label 'Foto suasana kelas live Rakit Kode', dan ketiga foto mentor (bagian 3) berupa placeholder ikon orang dengan inisial DP/SN/RA. Prompt secara eksplisit meminta foto."
+         }
+        ]
+       },
+       "R2": {
+        "values": [
+         2,
+         2,
+         2
+        ],
+        "median": 2,
+        "range": 0,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 2,
+          "bukti": "Fokus tunggal pada headline hero 'Rilis aplikasi web pertamamu dalam 16 minggu, mulai dari nol' (bagian 1). Judul seksi seperti 'Tiga tahap menuju portofolio…' jauh lebih kecil, dan body lebih kecil lagi. Tidak ada judul yatim."
+         },
+         {
+          "rep": 2,
+          "skor": 2,
+          "bukti": "Titik fokus tunggal adalah judul hero 'Rilis aplikasi web pertamamu dalam 16 minggu, mulai dari nol' (bagian 1, kiri, sekitar 56px). Skalanya melompat tegas ke subjudul (sekitar 18px) dan judul seksi (sekitar 32px). Setiap judul punya eyebrow dan konten, sehingga tidak ada judul yatim."
+         },
+         {
+          "rep": 3,
+          "skor": 2,
+          "bukti": "Judul hero 'Rilis aplikasi web pertamamu dalam 16 minggu, mulai dari nol' (bagian 1, kiri atas) jauh lebih besar dari judul seksi (~32px) dan judul kartu (~24px), sehingga lompatan skalanya tegas. Setiap seksi memakai pola eyebrow, judul, lalu subjudul secara konsisten, dan tidak ada judul yatim."
+         }
+        ]
+       },
+       "R4": {
+        "values": [
+         2,
+         2,
+         2
+        ],
+        "median": 2,
+        "range": 0,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 2,
+          "bukti": "Biru dipakai konsisten untuk CTA, kartu Angkatan 14 terpilih, progress bar, dan FAQ terbuka. Oranye bermakna untuk rating bintang, peringatan 'Sisa 8 dari 40 kursi', dan diskon 'Pra-daftar · hemat 10%'. Hijau menandai status 'Diterima…' dan 'Pendaftaran dibuka'. Abu pada Angkatan 13 menandakan angkatan penuh. Tidak terlihat teks yang gagal kontras."
+         },
+         {
+          "rep": 2,
+          "skor": 2,
+          "bukti": "Biru dipakai konsisten untuk CTA, kartu Angkatan 14 yang aktif, progress bar, dan eyebrow. Oranye bermakna: bintang rating (bagian 3), 'Sisa 8 dari 40 kursi' sebagai urgensi, 'Pra-daftar · hemat 10%', dan 'Paling menantang' (bagian 2). Hijau menandai status lulus dan diterima, merah menandai live. Harga Angkatan 13 sengaja diabukan karena penuh. Teks lain terbaca."
+         },
+         {
+          "rep": 3,
+          "skor": 2,
+          "bukti": "Biru dipakai konsisten untuk CTA 'Daftar Angkatan 14', eyebrow, centang, dan progress bar. Hijau berarti status positif ('Lulus', 'Diterima 11 minggu setelah lulus', 'Pendaftaran dibuka'). Oranye berarti peringatan atau perhatian ('Sisa 8 dari 40 kursi', 'Paling menantang', 'Pra-daftar · hemat 10%'), dan bintang rating juga oranye. Harga abu-abu pada Angkatan 13 menandai kelas yang sudah penuh. Tidak terlihat teks yang gagal kontras."
+         }
+        ]
+       },
+       "R5": {
+        "values": [
+         0,
+         0,
+         0
+        ],
+        "median": 0,
+        "range": 0,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 0,
+          "bukti": "Visual utama kosong. Area hero hanya berisi ikon orang dan label 'Foto suasana kelas live Rakit Kode' di bidang biru (bagian 1). Ketiga foto mentor juga diganti ikon orang dengan inisial DP, SN, dan RA (bagian 3). Ikon garisnya sendiri seragam dan tidak ada emoji."
+         },
+         {
+          "rep": 2,
+          "skor": 0,
+          "bukti": "Visual utama kosong. Hero (bagian 1, kanan) hanya berisi bidang biru dengan ikon orang dan label 'Foto suasana kelas live Rakit Kode', bukan foto. Ketiga foto mentor (bagian 3) juga diganti kotak biru berisi ikon dan inisial (DP, SN, RA). Ikon garis sendiri seragam dan tidak ada emoji."
+         },
+         {
+          "rep": 3,
+          "skor": 0,
+          "bukti": "Ikon garis (gaya lucide) seragam di seluruh halaman dan tidak ada emoji. Namun visual utama hilang: area foto hero (bagian 1, kanan) kosong, hanya berisi ikon orang dan label teks. Ketiga foto mentor (bagian 3) juga placeholder ikon dengan inisial."
+         }
+        ]
+       },
+       "R6": {
+        "values": [
+         2,
+         2,
+         1
+        ],
+        "median": 2,
+        "range": 1,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 2,
+          "bukti": "Angka konsisten: 11 Jan 2027 jatuh pada hari Senin; 12× Rp700.000 = Rp8.400.000; diskon 10% menghasilkan Rp7.560.000 = 12× Rp630.000; 274/386 = 71% cocok dengan statistik hero 71%; 10 jam/minggu = 4×2 jam live + review Sabtu; '3 proyek portofolio' cocok dengan tiga chip proyek. Copy spesifik, misalnya 'Dulu: Kasir minimarket → Junior React Developer'."
+         },
+         {
+          "rep": 2,
+          "skor": 2,
+          "bukti": "Angka spesifik dan saling cocok. '274 dari 386 · 71%' sama dengan '71%' di hero. 12× Rp700.000 = Rp8.400.000 dan 12× Rp630.000 = Rp7.560.000 (hemat 10%). Angka 'Sisa 8 kursi' sama di hero dan jadwal. Tanggal 2 Nov 2026, 11 Jan 2027, dan 15 Mar 2027 sama-sama jatuh pada hari Senin. '10 jam per minggu' cocok dengan kelas Senin–Kamis 2 jam ditambah review Sabtu. '3 proyek portofolio' cocok dengan 3 chip proyek."
+         },
+         {
+          "rep": 3,
+          "skor": 1,
+          "bukti": "Sebagian besar angka konsisten: 12× Rp 700.000 = Rp 8.400.000; Rp 7.560.000 = diskon 10% dengan 12× Rp 630.000; 274/386 ≈ 71% cocok dengan statistik hero 71%; 16 minggu × 4 = 64 sesi; 'sisa 8 kursi' muncul sama di hero dan kartu jadwal. Ada satu inkonsistensi: mentor disebut memegang 'maksimal 12 peserta per angkatan' (bagian 3, kiri atas), padahal Dimas tercatat membimbing '412 peserta' dalam 13 angkatan (maksimal ±156)."
+         }
+        ]
+       },
+       "R8": {
+        "values": [
+         2,
+         2,
+         2
+        ],
+        "median": 2,
+        "range": 0,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 2,
+          "bukti": "Tidak ada pelanggaran checklist slop; placeholder-nya berlabel dan ber-tint, jadi tidak masuk butir 12. Keputusan komposisi khas: kartu mentor utama yang lebih lebar dengan kutipan dan statistik di samping dua kartu kecil (bagian 3), metrik '274 dari 386' dengan progress bar di header alumni, dan kartu angkatan dengan bar kuota kursi (bagian 4)."
+         },
+         {
+          "rep": 2,
+          "skor": 2,
+          "bukti": "Tidak ada pelanggaran checklist: placeholder berlabel dan bertint biru (bukan abu-abu kosong), tidak ada gradien ungu, tidak ada frasa terlarang, dan tombolnya spesifik. Langkah komposisi khas yang bisa ditunjuk: kartu lead mentor yang lebih lebar dari dua mentor lain (bagian 3), metrik '274 dari 386' dengan progress bar di header alumni (bagian 3), dan progress bar kuota kursi per angkatan (bagian 4)."
+         },
+         {
+          "rep": 3,
+          "skor": 2,
+          "bukti": "Tidak ditemukan pelanggaran checklist slop. Placeholder foto berlabel sehingga tidak dihitung sebagai butir 12; pelanggarannya sudah dinilai di R5. Keputusan komposisi khas yang bisa ditunjuk: kartu tahap 02 berwarna navy gelap dan menonjol di tengah alur belajar (bagian 2), kartu mentor lead yang dibuat lebih lebar secara asimetris (bagian 3), serta blok 'Dulu → Sekarang' di kartu alumni pada latar navy (bagian 4)."
+         }
+        ]
+       },
+       "R9": {
+        "values": [
+         2,
+         2,
+         2
+        ],
+        "median": 2,
+        "range": 0,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 2,
+          "bukti": "Angka diberi konteks: '4,8/5 dari 912 ulasan', 'Skor 86/100 · naik dari 64', '1 mentor : 12 peserta' dengan rata-rata jawaban 3 jam 20 menit. Status angkatan bervariasi (Sedang berjalan, Pendaftaran dibuka, Pra-daftar). Alumni dilengkapi kota, angkatan, dan durasi sampai diterima kerja. Tetap padat tetapi terbaca."
+         },
+         {
+          "rep": 2,
+          "skor": 2,
+          "bukti": "Konteks angka sangat kaya: '4,8/5 dari 912 ulasan', rating mentor beserta jumlah ulasan dan peserta, '1 mentor : 12 peserta · rata-rata jawaban 3 jam 20 menit', 'Skor 86/100 · naik dari 64 di minggu 3', dan alumni 'Diterima 11 minggu setelah lulus'. Status bervariasi (Sedang berjalan / Pendaftaran dibuka / Pra-daftar). Ada metadata di hampir semua seksi, tetap terbaca."
+         },
+         {
+          "rep": 3,
+          "skor": 2,
+          "bukti": "Angka hampir selalu diberi konteks: '71% dapat kerja maks. 6 bulan', '4,8/5 dari 912 ulasan', 'Skor 86/100 · naik dari 64 di minggu 3', '274 dari 386 lulusan 2025'. Item dalam daftar bervariasi status: Angkatan 13 'Sedang berjalan', 14 'Pendaftaran dibuka', 15 'Pra-daftar'. Metadata hadir di hampir semua bagian, misalnya chip '16 minggu/64 sesi live', jumlah ulasan mentor, kota dan angkatan alumni, serta waktu respons konsultasi."
+         }
+        ]
+       },
+       "R10": {
+        "values": [
+         1,
+         1,
+         1
+        ],
+        "median": 1,
+        "range": 0,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 1,
+          "bukti": "Permukaan berlapis sudah ada (hero dan FAQ ber-tint biru, alumni navy), warna kedua oranye bermakna di beberapa bagian, dan chip status berwarna. Namun unsur 'visual matang' tidak terpenuhi: foto hero dan foto mentor hanya placeholder ikon (bagian 1 dan 3)."
+         },
+         {
+          "rep": 2,
+          "skor": 1,
+          "bukti": "Permukaan berlapis (hero dan mentor bertint biru, alumni navy, tahap 02 navy), warna kedua oranye yang konsisten di beberapa seksi, serta badge dan indikator terdefinisi sudah ada. Namun unsur 'visual matang dan menyatu' tidak terpenuhi karena foto hero dan ketiga foto mentor masih placeholder (bagian 1 dan 3)."
+         },
+         {
+          "rep": 3,
+          "skor": 1,
+          "bukti": "Permukaan berlapis sudah ada: hero dan seksi mentor ber-tint biru muda, seksi alumni navy. Warna kedua bermakna juga ada (hijau untuk status, oranye untuk peringatan) beserta badge berwarna. Namun syarat 'visual matang dan menyatu' gagal karena foto hero dan foto mentor hanya placeholder."
+         }
+        ]
+       }
+      },
+      "total": 13,
+      "slop": {
+       "values": [
+        0,
+        0,
+        0
+       ],
+       "median": 0,
+       "range": 0,
+       "flag": false,
+       "items": [
+        {
+         "rep": 1,
+         "butir": []
+        },
+        {
+         "rep": 2,
+         "butir": []
+        },
+        {
+         "rep": 3,
+         "butir": []
+        }
+       ]
+      },
+      "emoji": {
+       "values": [
+        0,
+        0,
+        0
+       ],
+       "median": 0,
+       "range": 0,
+       "flag": false
+      },
+      "focus": [
+       {
+        "rep": 1,
+        "fokus": "Headline hero 'Rilis aplikasi web pertamamu dalam 16 minggu, mulai dari nol' di kiri atas bagian 1"
+       },
+       {
+        "rep": 2,
+        "fokus": "Judul hero 'Rilis aplikasi web pertamamu dalam 16 minggu, mulai dari nol' di kiri bagian 1"
+       },
+       {
+        "rep": 3,
+        "fokus": "Judul hero 'Rilis aplikasi web pertamamu dalam 16 minggu, mulai dari nol' di kiri atas bagian 1"
+       }
+      ]
+     },
+     "pendev": {
+      "criteria": {
+       "R1": {
+        "values": [
+         1,
+         1,
+         1
+        ],
+        "median": 1,
+        "range": 0,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 1,
+          "bukti": "Semua bagian yang diminta ada dan berurutan, dalam Bahasa Indonesia dengan aksen biru dan lebar 1440px: menu atas (bagian 1), hero dengan judul, subjudul, dua tombol 'Daftar Angkatan 14' dan 'Coba Kelas Gratis' serta foto laptop berisi kode (bagian 1), alur 3 tahap (bagian 2), 3 mentor berfoto (bagian 3), cerita alumni beserta pekerjaan sekarang (bagian 4), jadwal angkatan dan biaya (bagian 5), FAQ (bagian 5–6), dan footer (bagian 7). Ada satu seksi ekstra di luar prompt: banner CTA biru 'Kursi Angkatan 14 tinggal 8…' sebelum footer (bagian 6)."
+         },
+         {
+          "rep": 2,
+          "skor": 1,
+          "bukti": "Semua bagian yang diminta ada dan berurutan: menu atas (bagian 1), hero dengan judul, subjudul, tombol 'Daftar Angkatan 14' dan 'Coba Kelas Gratis' serta foto laptop berisi kode (bagian 1), alur 3 tahap (bagian 2), 3 mentor berfoto (bagian 3), cerita alumni dengan pekerjaan sekarang (bagian 3–4), jadwal dan biaya (bagian 5), FAQ (bagian 5–6), dan footer (bagian 7). Lebar 1440px, aksen biru, dan bahasa Indonesia sesuai. Ada 1 seksi ekstra di luar daftar prompt, yaitu banner CTA biru 'Kursi Angkatan 14 tinggal 8' di bagian 6."
+         },
+         {
+          "rep": 3,
+          "skor": 1,
+          "bukti": "Semua bagian yang diminta ada dalam lebar 1440px: menu, hero dengan foto laptop berisi kode, alur 3 tahap, 3 mentor berfoto, cerita alumni berikut pekerjaan sekarang, jadwal & biaya, FAQ, dan footer. Aksen biru dan bahasa Indonesia sesuai. Terdapat satu seksi ekstra di luar daftar prompt, yaitu banner CTA biru 'Kursi Angkatan 14 tinggal 8…' sebelum footer (bagian 6)."
+         }
+        ]
+       },
+       "R2": {
+        "values": [
+         1,
+         2,
+         2
+        ],
+        "median": 2,
+        "range": 1,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 1,
+          "bukti": "Titik fokus jelas, yaitu headline hero 'Dari nol coding jadi web developer siap kerja.' (bagian 1). Lompatan skalanya tegas ke judul seksi lalu ke body. Namun judul seksi alumni menyisakan satu kata yatim 'produk.' di baris sendiri (bagian 3 ke 4)."
+         },
+         {
+          "rep": 2,
+          "skor": 2,
+          "bukti": "Titik fokus tunggal adalah judul hero 'Dari nol coding jadi web developer siap kerja.' (bagian 1, kiri atas, sekitar 64px extra-bold). Skalanya melompat tegas ke subjudul (sekitar 20px) dan ke judul seksi (sekitar 44px, misalnya 'Tiga tahap, 16 minggu…'). Setiap judul diawali eyebrow biru (ALUR BELAJAR, MENTOR, CERITA ALUMNI) dan diikuti konten, sehingga tidak ada judul yatim."
+         },
+         {
+          "rep": 3,
+          "skor": 2,
+          "bukti": "Judul hero 'Dari nol coding jadi web developer siap kerja.' (bagian 1, kiri) menjadi teks terbesar dan terberat di halaman. Judul seksi ~48px tetap berada satu tingkat di bawahnya, dan tidak ada judul yatim."
+         }
+        ]
+       },
+       "R4": {
+        "values": [
+         2,
+         2,
+         1
+        ],
+        "median": 2,
+        "range": 1,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 2,
+          "bukti": "Biru dipakai konsisten untuk tombol utama, kartu tahap aktif 02, angkatan terpilih, dan ikon FAQ. Lime dipakai untuk pekerjaan alumni sekarang, chip 'Hemat 25%', dan label 'MINGGU 6–11' sebagai penanda highlight. Merah pada 'Sisa 8 kursi' dan hijau pada 'Pendaftaran dibuka' menandai status (bagian 5). Teks putih dan abu terang di latar navy masih terbaca."
+         },
+         {
+          "rep": 2,
+          "skor": 2,
+          "bukti": "Biru dipakai konsisten untuk CTA (nav, hero, pricing), kartu tahap aktif 02, ikon, dan eyebrow. Merah 'Sisa 8 kursi', hijau 'Pendaftaran dibuka', dan abu 'Segera dibuka' adalah status (bagian 5). Lime menandai pencapaian: 'Sekarang: …', chip 'Frontend Developer · Tokopedia', dan 'Hemat 25%'. Teks putih dan abu terang di seksi navy terbaca baik. Angka '01/03' yang pucat adalah dekorasi."
+         },
+         {
+          "rep": 3,
+          "skor": 1,
+          "bukti": "Biru konsisten untuk CTA dan elemen aktif. Lime dipakai bermakna untuk hasil atau keuntungan ('Sekarang: …' di kartu alumni, 'Hemat 25%', centang fitur harga). Merah dan hijau dipakai sebagai status jadwal. Ada satu teks lemah: label 'Alumni kami bekerja di' (bagian 3, kanan bawah) berukuran kecil dan abu redup di atas navy. Teks catatan beasiswa di kartu harga juga tipis."
+         }
+        ]
+       },
+       "R5": {
+        "values": [
+         2,
+         2,
+         2
+        ],
+        "median": 2,
+        "range": 0,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 2,
+          "bukti": "Ikon bergaya garis seragam: ikon tahap, ikon koper di chip mentor dan alumni, kalender jadwal, plus/minus FAQ, dan ikon sosial di footer. Foto hero (laptop berisi kode) relevan, ditambah foto 3 mentor (bagian 3) dan foto alumni (bagian 4). Tidak ada emoji."
+         },
+         {
+          "rep": 2,
+          "skor": 2,
+          "bukti": "Ikon bergaya garis seragam: ikon tahap dalam kotak tint, ceklis, ikon briefcase di chip mentor dan alumni, serta ikon sosial di footer. Foto hero (tangan mengetik di laptop dengan editor kode, bagian 1) relevan. Ketiga mentor punya foto nyata (bagian 3), alumni punya foto besar dan avatar (bagian 4). Tidak ada emoji."
+         },
+         {
+          "rep": 3,
+          "skor": 2,
+          "bukti": "Ikon bergaya garis dan seragam: kalender di jadwal, centang di daftar, koper di chip mentor dan alumni. Foto hero (laptop berisi kode saat kelas) relevan, foto mentor dan alumni nyata, dan tidak ada emoji."
+         }
+        ]
+       },
+       "R6": {
+        "values": [
+         1,
+         1,
+         1
+        ],
+        "median": 1,
+        "range": 0,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 1,
+          "bukti": "Copy spesifik dan sebagian besar angkanya konsisten: 12 Jan 2027 cocok di hero dan jadwal, 'Sisa 8 kursi' cocok dengan banner 'tinggal 8', cicilan Rp499.000×12 ≈ Rp5.990.000, dan 64 sesi = 16 minggu × 4. Ada satu inkonsistensi: kartu hero berisi kutipan Rina 'Tiga bulan lalu aku belum tahu apa itu div', padahal program berlangsung 16 minggu dan ia diterima 'dua bulan setelah lulus' (bagian 4)."
+         },
+         {
+          "rep": 2,
+          "skor": 1,
+          "bukti": "Angka umumnya konsisten: Rp5.990.000 dibanding Rp8.000.000 sama dengan hemat 25%, cicilan Rp499.000 ×12 sekitar Rp5.990.000, 64 sesi sama dengan 16 minggu ×4, dan sisa 8 kursi sama di jadwal dan banner CTA. Ada 1 inkonsistensi: kartu hero 'Tiga bulan lalu aku belum tahu apa itu div — Rina, Angkatan 11' bertentangan dengan program 16 minggu ditambah 'dua bulan setelah lulus saya diterima' pada testimoni Rina Maharani (bagian 4)."
+         },
+         {
+          "rep": 3,
+          "skor": 1,
+          "bukti": "Angka harga konsisten: Rp8.000.000 menjadi Rp5.990.000 (≈25%, sesuai badge 'Hemat 25%'), dan cicilan 12× Rp499.000 ≈ total harga. Angka 'Sisa 8 kursi' juga cocok dengan banner CTA. Namun ada satu kontradiksi tentang Rina (Angkatan 11): kartu di hero berbunyi 'Tiga bulan lalu aku belum tahu apa itu div' dengan label 'Baru diterima kerja', sedangkan testimoni di bagian 4 menyebut ia diterima dua bulan setelah lulus dari program 16 minggu."
+         }
+        ]
+       },
+       "R8": {
+        "values": [
+         2,
+         2,
+         1
+        ],
+        "median": 2,
+        "range": 1,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 2,
+          "bukti": "Tidak ada pelanggaran checklist slop. Keputusan komposisi khas: kartu 'Baru diterima kerja' yang menimpa foto hero (bagian 1), dan blok alumni utama dengan chip transisi 'Staf Akuntansi → Frontend Developer · Tokopedia' di samping daftar tiga alumni (bagian 4)."
+         },
+         {
+          "rep": 2,
+          "skor": 2,
+          "bukti": "Tidak ada pelanggaran checklist slop: tidak ada gradien ungu, latar putih dan biru dingin, tidak ada frasa terlarang, dan tombolnya spesifik. Keputusan komposisi khas yang bisa ditunjuk: seksi alumni navy dengan testimoni utama berfoto besar plus chip transisi 'Staf Akuntansi → Frontend Developer · Tokopedia' (bagian 4), dan kartu 'Baru diterima kerja' yang mengambang menumpuk tepi foto hero (bagian 1)."
+         },
+         {
+          "rep": 3,
+          "skor": 1,
+          "bukti": "Ada satu pelanggaran slop, yaitu statistik bulat '2.400+' dan '120+ mitra' (lihat butir slop). Langkah komposisi khas tetap ada: kartu alumni unggulan dengan foto terpisah dan chip 'Staf Akuntansi → Frontend Developer · Tokopedia' (bagian 4), serta jadwal berupa daftar bersisian dengan kartu harga navy (bagian 5)."
+         }
+        ]
+       },
+       "R9": {
+        "values": [
+         2,
+         2,
+         2
+        ],
+        "median": 2,
+        "range": 0,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 2,
+          "bukti": "Statistik hero diberi konteks ('alumni sejak 2021', 'kerja ≤ 6 bulan'). Mentor punya chip tahun pengalaman dan keahlian. Alumni dilengkapi angkatan, pekerjaan sebelumnya, dan pekerjaan sekarang. Jadwal memuat status variatif (Sisa 8 kursi, Pendaftaran dibuka, Segera dibuka), harga coret, cicilan, garansi, dan beasiswa (bagian 5)."
+         },
+         {
+          "rep": 2,
+          "skor": 2,
+          "bukti": "Angka diberi konteks: '87% kerja ≤ 6 bulan', '2.400+ alumni sejak 2021', harga coret dengan cicilan, dan 'beasiswa 50% untuk 10 peserta per angkatan'. Daftar menunjukkan variasi status (Sisa 8 kursi / Pendaftaran dibuka / Segera dibuka). Ada metadata di sebagian besar seksi: label 'MINGGU 1–5', chip tahun pengalaman dan keahlian mentor, 'Angkatan 9 · dulu Driver ojol', dan garansi 14 hari."
+         },
+         {
+          "rep": 3,
+          "skor": 2,
+          "bukti": "Angka diberi konteks: harga coret beserta cicilan per bulan, rentang tanggal tiap angkatan dengan durasi '16 minggu · Daring', dan 'Kelas live · 128 peserta'. Status bervariasi: 'Sisa 8 kursi' (merah), 'Pendaftaran dibuka' (hijau), 'Segera dibuka' (abu). Detail sekunder juga kaya: chip pengalaman dan keahlian mentor, label 'Angkatan · dulu …' pada alumni, deretan perusahaan tempat alumni bekerja, serta garansi 14 hari."
+         }
+        ]
+       },
+       "R10": {
+        "values": [
+         2,
+         2,
+         2
+        ],
+        "median": 2,
+        "range": 0,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 2,
+          "bukti": "Permukaan berlapis: hero ber-tint biru, seksi abu-kebiruan, seksi alumni dan kartu harga navy, banner CTA biru bergradien. Warna kedua bermakna (lime) muncul di alur, alumni, dan harga. Chip status berwarna jelas. Foto dan ikon tampak matang dan menyatu."
+         },
+         {
+          "rep": 2,
+          "skor": 2,
+          "bukti": "Permukaan berlapis: gradien biru muda di hero, kartu tahap biru penuh, seksi alumni dan kartu harga navy, serta banner CTA biru. Warna kedua bermakna (lime) muncul di beberapa seksi: hero, tahap 02, alumni, dan pricing. Badge berwarna terdefinisi (BARU, Hemat 25%, chip status jadwal). Foto dan ikon matang dan menyatu."
+         },
+         {
+          "rep": 3,
+          "skor": 2,
+          "bukti": "Permukaan berlapis: hero ber-tint, kartu tahap 02 biru penuh, seksi alumni navy, kartu harga navy, dan banner CTA bergradasi biru. Warna kedua (lime) dipakai konsisten di lebih dari satu bagian: hero, alur, alumni, dan harga. Badge status berwarna terdefinisi dengan jelas, dan foto serta ikon tampak matang dan menyatu."
+         }
+        ]
+       }
+      },
+      "total": 14,
+      "slop": {
+       "values": [
+        0,
+        0,
+        1
+       ],
+       "median": 0,
+       "range": 1,
+       "flag": false,
+       "items": [
+        {
+         "rep": 1,
+         "butir": []
+        },
+        {
+         "rep": 2,
+         "butir": []
+        },
+        {
+         "rep": 3,
+         "butir": [
+          "5: Statistik bulat yang tidak diberikan prompt, yaitu '2.400+ alumni sejak 2021' (hero, bagian 1) dan 'penyaluran ke 120+ mitra' (kartu harga, bagian 5)"
+         ]
+        }
+       ]
+      },
+      "emoji": {
+       "values": [
+        0,
+        0,
+        0
+       ],
+       "median": 0,
+       "range": 0,
+       "flag": false
+      },
+      "focus": [
+       {
+        "rep": 1,
+        "fokus": "Headline hero 'Dari nol coding jadi web developer siap kerja.' di kiri atas bagian 1"
+       },
+       {
+        "rep": 2,
+        "fokus": "Judul hero 'Dari nol coding jadi web developer siap kerja.' di kiri atas bagian 1"
+       },
+       {
+        "rep": 3,
+        "fokus": "Judul hero 'Dari nol coding jadi web developer siap kerja.' di kiri bagian 1"
+       }
+      ]
+     }
+    }
+   },
+   "decision": {
+    "decision": "Kalah",
+    "why": "R5: Lakar 0 sementara pen.dev 2",
+    "checks": {
+     "total": {
+      "lakar": 13,
+      "pendev": 14
+     },
+     "appeal": {
+      "lakar": 3,
+      "pendev": 4
+     },
+     "appealLoss": [],
+     "otherLoss": [
+      "R5: Lakar 0 sementara pen.dev 2"
+     ],
+     "zeroVsTwo": [
+      "R5"
+     ],
+     "pendevBriefViolations": []
+    }
+   },
+   "emoji": {
+    "lakar": {
+     "agent": 0,
+     "glyphs": 0,
+     "lint": 0,
+     "judge": 0
+    },
+    "pendev": {
+     "agent": 0,
+     "glyphs": 0,
+     "judge": 0
+    }
+   },
+   "pngs": {
+    "lakar": "bench/practice/1/P1-lakar.png",
+    "pendev": "bench/runs/practice/1/P1-pendev.png"
+   },
+   "cost": {
+    "lakar": 1.4403052000000003,
+    "pendev": 1.179242,
+    "pendevCounted": true,
+    "judge": 1.1032014
+   }
+  },
+  {
+   "id": "P2",
+   "name": "Siaru",
+   "kind": "mobile",
+   "size": {
+    "width": 390,
+    "height": 844
+   },
+   "judgeTextSha256": "660c44056881e20ab82a4c1a754df19551103563929df47e3172f29793c67393",
+   "runs": {
+    "lakar": {
+     "key": "P2-lakar",
+     "prompt": "P2",
+     "tool": "lakar",
+     "dir": "bench/runs/practice/1/P2-lakar",
+     "record": {
+      "runId": "practice-1-P2-lakar",
+      "prompt": "P2",
+      "attempt": 1,
+      "status": "success",
+      "wallMs": 175248.41460000002,
+      "durationMs": 175300,
+      "durationApiMs": 141171,
+      "costUsd": 0.8730737999999999,
+      "numTurns": 17,
+      "toolCalls": 16,
+      "firstToolUseMs": 2084.056654999964,
+      "lastToolResultMs": 162959.42556300003,
+      "spawnToFirstEventMs": 2098.923265999998,
+      "frames": [
+       {
+        "id": "vL1AHrab",
+        "name": "Siaru / Beranda · mobile · Malam",
+        "width": 390,
+        "height": 844,
+        "png": "bench/runs/practice/1/P2-lakar/png/vL1AHrab.png",
+        "pngWidth": 390,
+        "pngHeight": 844
+       },
+       {
+        "id": "qFjGWWuG",
+        "name": "Siaru / Beranda (gulir akhir) · mobile · Malam",
+        "width": 390,
+        "height": 844,
+        "png": "bench/runs/practice/1/P2-lakar/png/qFjGWWuG.png",
+        "pngWidth": 390,
+        "pngHeight": 844
+       }
+      ],
+      "transcriptBytes": 644986,
+      "pngScaleMismatch": false,
+      "model": "claude-opus-5-5",
+      "modelUsageKeys": [
+       "claude-opus-5-5"
+      ],
+      "claudeCodeVersion": "2.1.325",
+      "startedAt": "2026-11-18T08:30:44.824Z",
+      "lakar": {
+       "slug": "siaru-beranda-mobile",
+       "opened": [
+        "siaru-beranda-mobile"
+       ],
+       "boards": [
+        {
+         "id": "vL1AHrab",
+         "name": "Siaru / Beranda · mobile · Malam",
+         "page": "Page 1",
+         "screen": "mobile",
+         "x": 0,
+         "y": 0,
+         "width": 390,
+         "height": 844,
+         "wip": false,
+         "childCount": 6
+        },
+        {
+         "id": "qFjGWWuG",
+         "name": "Siaru / Beranda (gulir akhir) · mobile · Malam",
+         "page": "Page 1",
+         "screen": "mobile",
+         "x": 470,
+         "y": 0,
+         "width": 390,
+         "height": 844,
+         "wip": false,
+         "childCount": 6
+        }
+       ],
+       "layout": {
+        "rev": 4,
+        "summary": {
+         "error": 0,
+         "warning": 0,
+         "gate": 0
+        },
+        "findings": [],
+        "boards": [
+         {
+          "id": "vL1AHrab",
+          "name": "Siaru / Beranda · mobile · Malam",
+          "summary": {
+           "error": 0,
+           "warning": 0,
+           "gate": 0
+          }
+         },
+         {
+          "id": "qFjGWWuG",
+          "name": "Siaru / Beranda (gulir akhir) · mobile · Malam",
+          "summary": {
+           "error": 0,
+           "warning": 0,
+           "gate": 0
+          }
+         }
+        ]
+       },
+       "docPath": "bench/runs/practice/1/P2-lakar/doc/siaru-beranda-mobile.lakar.json",
+       "historyPath": "bench/runs/practice/1/P2-lakar/doc/siaru-beranda-mobile.history.jsonl",
+       "daemonBefore": {
+        "pid": 1175815,
+        "startedAt": "2026-11-18T08:18:03.772Z",
+        "recreated": 0,
+        "systemd": {
+         "ActiveState": "active",
+         "ActiveEnterTimestamp": "Wed 2026-11-18 08:18:03 UTC",
+         "MainPID": "1175815",
+         "NRestarts": "0"
+        }
+       },
+       "daemonAfter": {
+        "pid": 1175815,
+        "startedAt": "2026-11-18T08:18:03.772Z",
+        "recreated": 0,
+        "systemd": {
+         "ActiveState": "active",
+         "ActiveEnterTimestamp": "Wed 2026-11-18 08:18:03 UTC",
+         "MainPID": "1175815",
+         "NRestarts": "0"
+        }
+       },
+       "docsBefore": 3
+      }
+     },
+     "reconnect": {
+      "count": 0,
+      "affectedMs": 0,
+      "events": [],
+      "toolErrors": []
+     },
+     "agentEmoji": {
+      "emoji": 0,
+      "glyphs": 0,
+      "samples": []
+     },
+     "lintEmoji": {
+      "lc01a": 0,
+      "lc01b": 0
+     },
+     "strip": {
+      "path": "bench/runs/practice/1/P2-lakar.png",
+      "width": 390,
+      "height": 1736,
+      "boards": 2
+     },
+     "previous": []
+    },
+    "pendev": {
+     "key": "P2-pendev",
+     "prompt": "P2",
+     "tool": "pendev",
+     "dir": "bench/runs/practice/1/P2-pendev",
+     "record": {
+      "runId": "practice-1-P2-pendev",
+      "prompt": "P2",
+      "attempt": 1,
+      "status": "success",
+      "uri": "file:///root/.pencil/documents/249f85ee-2d0b-4080-bae6-cd812868dc0f/untitled.pen",
+      "uriSource": "get_app_state",
+      "wallMs": 179032.7637570001,
+      "durationMs": 179169,
+      "durationApiMs": 151374,
+      "costUsd": 0.7835776,
+      "numTurns": 16,
+      "toolCalls": 15,
+      "firstToolUseMs": 1713.8812410000246,
+      "lastToolResultMs": 167478.94865400007,
+      "spawnToFirstEventMs": 1695.8160889999708,
+      "frames": [
+       {
+        "id": "DrAi4",
+        "name": "Siaru — Beranda",
+        "width": 390,
+        "height": 844,
+        "png": "bench/runs/practice/1/P2-pendev/png/DrAi4.png",
+        "pngWidth": 390,
+        "pngHeight": 844
+       },
+       {
+        "id": "fmjnH",
+        "name": "Siaru — Beranda (scroll penuh)",
+        "width": 390,
+        "height": 1218,
+        "png": "bench/runs/practice/1/P2-pendev/png/fmjnH.png",
+        "pngWidth": 390,
+        "pngHeight": 1218
+       }
+      ],
+      "transcriptBytes": 1257828,
+      "penPath": "bench/runs/practice/1/P2-pendev/design.pen",
+      "pngScaleMismatch": false,
+      "model": "claude-opus-5-5",
+      "modelUsageKeys": [
+       "claude-opus-5-5"
+      ],
+      "claudeCodeVersion": "2.1.325",
+      "startedAt": "2026-11-18T08:27:39.800Z",
+      "pendevSystemd": {
+       "before": {
+        "ActiveState": "active",
+        "ActiveEnterTimestamp": "Tue 2026-11-17 07:15:37 UTC",
+        "MainPID": "1798021",
+        "NRestarts": "0"
+       },
+       "after": {
+        "ActiveState": "active",
+        "ActiveEnterTimestamp": "Tue 2026-11-17 07:15:37 UTC",
+        "MainPID": "1798021",
+        "NRestarts": "0"
+       }
+      }
+     },
+     "reconnect": {
+      "count": 0,
+      "affectedMs": 0,
+      "events": [],
+      "toolErrors": []
+     },
+     "agentEmoji": {
+      "emoji": 0,
+      "glyphs": 0,
+      "samples": []
+     },
+     "strip": {
+      "path": "bench/runs/practice/1/P2-pendev.png",
+      "width": 390,
+      "height": 2110,
+      "boards": 2
+     },
+     "previous": []
+    }
+   },
+   "gate": {
+    "ok": true,
+    "reasons": [],
+    "timeRatio": 0.978862253603276
+   },
+   "sizeProblems": [],
+   "pendevSizeProblems": [
+    "board fmjnH 390×1218 ≠ 390×844"
+   ],
+   "score": {
+    "prompt": "P2",
+    "validReps": 3,
+    "reps": [
+     {
+      "prompt": "P2",
+      "rep": 1,
+      "mapping": {
+       "X": "pendev",
+       "Y": "lakar"
+      },
+      "status": "ok",
+      "verdict": {
+       "X": {
+        "R1": {
+         "skor": 1,
+         "bukti": "Semua bagian ada: header 'Rabu, 18 November / Selamat malam, Dimas' dengan bel dan foto profil (atas), kartu 'LANJUTKAN MENDENGARKAN' dengan 'Sisa 18 mnt', 6 tile mix (Indie Pagi s.d. Hip-hop Lokal, Mix 01–06), 4 episode baru dengan durasi dan status unduhan, mini player 'Langit Jingga' di atas tab bar 4 ikon (Beranda/Cari/Pustaka/Unduhan). Mode gelap, aksen ungu, dan bahasa Indonesia sesuai. Artboard pertama 390x844 sesuai. Ada satu artboard tambahan (artboard kedua, bagian 1 bawah s.d. bagian 2) dengan tinggi jauh melebihi 844 yang menampilkan seluruh isi secara memanjang; dihitung sebagai 1 hal minor."
+        },
+        "R2": {
+         "skor": 2,
+         "bukti": "Titik fokus jelas pada kartu lanjutkan mendengarkan (atas-tengah): judul tebal 'Merawat Kota Lewat Kebun Kolektif', tombol play ungu bulat, dan bidang ber-tint ungu. Lompatan skala tegas: sapaan besar → judul seksi 'Mix harian untukmu'/'Episode baru' → judul item → metadata abu kecil. Setiap judul seksi punya subjudul dan isi, sehingga tidak ada judul yatim."
+        },
+        "R4": {
+         "skor": 2,
+         "bukti": "Ungu dipakai konsisten untuk aksi dan status aktif: label 'LANJUTKAN MENDENGARKAN', tombol play, progress bar, 'Lihat semua', tab Beranda aktif, status 'Terunduh', ring unduh 64%, ikon hati di mini player. Titik ungu kategori pada 2 episode teratas (Kopi & Kode, Cerita Rantau) terbaca sebagai penanda episode baru. Teks putih dan abu di latar hampir hitam semuanya terbaca; metadata 'Mix 01' redup tetapi masih cukup."
+        },
+        "R5": {
+         "skor": 2,
+         "bukti": "Satu gaya ikon garis dengan ukuran seragam: bel, jam metadata, unduh, centang, tab bar, hati, pause, next, bluetooth. Visual utama berupa foto mikrofon di kartu lanjutkan, relevan dengan podcast. Tile mix memakai foto konser, kaset, dan saksofon yang relevan. Tidak ada emoji."
+        },
+        "R6": {
+         "skor": 2,
+         "bukti": "Copy spesifik dan lokal: 'Obrolan Senja · Eps. 48', 'Jejak Rempah di Pelabuhan Banda', 'Dana Darurat: Berapa yang Cukup?'. Durasi '52 mnt', '1 j 04 mnt' beserta waktu relatif. 'Dari 12 podcast yang kamu ikuti'. Jam 21.41 konsisten dengan sapaan 'Selamat malam'. Tidak ada kontradiksi angka."
+        },
+        "R8": {
+         "skor": 2,
+         "bukti": "0 pelanggaran checklist; blur hanya dipakai pada mini player dan tab bar yang mengambang, sehingga diizinkan. Keputusan komposisi khas: tab bar pill mengambang dengan indikator aktif berbentuk pill ungu (bawah), ring progres unduhan '64%' sebagai status per episode, dan baris perangkat 'Nadira · Buds Pro' dengan ikon bluetooth di mini player."
+        },
+        "R9": {
+         "skor": 2,
+         "bukti": "Angka diberi konteks: 'Kemarin, 22.10', 'Sisa 18 mnt' dengan progress bar, durasi plus waktu rilis relatif ('2 jam lalu', 'Hari ini'), 'Dari 12 podcast'. Daftar episode menunjukkan variasi status: Terunduh, 64% mengunduh, Unduh, Terunduh. Ada label kategori, penanda baru, dan perangkat audio. Tile mix hanya berisi 'Mix 0x', tetapi desain secara keseluruhan padat dan terbaca."
+        },
+        "R10": {
+         "skor": 1,
+         "bukti": "Ada permukaan berlapis (kartu lanjutkan ber-tint ungu, tile abu gelap, mini player ber-tint) dan foto yang matang. Namun tidak ada warna kedua bermakna: semua status dan aksen hanya ungu di atas netral ('Terunduh', ring 64%, kategori). Badge berwarna juga minim. Salah satu unsur kolom 2 tidak ada."
+        },
+        "slop": {
+         "jumlah": 0,
+         "butir": []
+        },
+        "emoji": 0,
+        "fokus": "Kartu 'LANJUTKAN MENDENGARKAN' (atas-tengah): judul 'Merawat Kota Lewat Kebun Kolektif' dengan tombol play ungu di kanan"
+       },
+       "Y": {
+        "R1": {
+         "skor": 0,
+         "bukti": "Prompt meminta foto profil, tetapi header kiri atas hanya memakai avatar inisial 'NA'. Tile mix 04–06 tidak pernah tampil utuh: di artboard 1 tertutup mini player (bawah), dan di artboard 2 hanya label 'Mix Akustik / Mix Rindu / Mix 2000-an' tanpa tile di bawah header. Ada lebih dari satu bagian yang tidak terpenuhi. Mode gelap, aksen ungu, bahasa Indonesia, tab bar 4 ikon, dan mini player sudah sesuai."
+        },
+        "R2": {
+         "skor": 1,
+         "bukti": "Fokus ada pada kartu lanjutkan dengan tombol solid 'Lanjutkan putar' (atas). Fokus ini bersaing dengan tile mix ungu solid jenuh, terutama tile '03' Mix Semangat yang berwarna ungu terang dan berukuran besar di tengah layar. Sapaan 'Halo, Nadia' berukuran hampir sama dengan judul seksi."
+        },
+        "R4": {
+         "skor": 1,
+         "bukti": "Aksen ungu konsisten (tombol Lanjutkan putar, progress, chip 'Sisa 24 mnt', 'Lihat semua', tab aktif). Warna tambahan bermakna: hijau untuk status Terunduh, dan merah/pink/magenta per podcast yang konsisten (Ruang Sore crimson di kartu lanjutkan dan di daftar). Satu teks lemah: label 'LANJUTKAN MENDENGARKAN' berupa caps kecil abu redup di atas kartu gelap."
+        },
+        "R5": {
+         "skor": 1,
+         "bukti": "Ikon garis konsisten (bel, cangkir, headphone, petir, antena, unduh, cast, tab bar). Namun visual utama lemah: kartu lanjutkan hanya memakai ikon mikrofon di kotak crimson, dan keempat thumbnail episode memakai ikon antena yang identik, tanpa foto atau cover art sama sekali. Tidak ada emoji."
+        },
+        "R6": {
+         "skor": 2,
+         "bukti": "Angka konsisten: '38:12 didengar' + '-23:48' = 62 mnt, sesuai 'Eps 42 · 62 mnt'; chip 'Sisa 24 mnt' adalah pembulatan dari -23:48. Copy spesifik: 'Trem Batavia yang Hilang', 'Dana Darurat untuk Freelancer', artis nyata 'Hindia, Nadin Amizah', 'Diperbarui tiap pagi pukul 06.00'. Jam 21:14 konsisten dengan sapaan malam."
+        },
+        "R8": {
+         "skor": 2,
+         "bukti": "0 pelanggaran checklist; thumbnail berwarna berikon dan berlabel, sehingga bukan placeholder abu kosong. Keputusan khas yang bisa ditunjuk: tile mix bernomor monospace '01/02/03' dengan ikon mood (tengah), warna per podcast yang dibawa dari kartu lanjutkan ke daftar episode, dan tombol pause putih bulat menonjol di mini player."
+        },
+        "R9": {
+         "skor": 2,
+         "bukti": "Konteks lengkap: waktu didengar dan sisa, chip sisa menit, jadwal pembaruan 'pukul 06.00', nama artis di setiap tile mix, tanggal/durasi/status per episode. Variasi status terlihat: Terunduh (centang hijau), 'Mengunduh 62%' (spinner), dan tombol unduh. Ada juga label kategori berwarna dan sumber lagu 'dari Mix Santai' di mini player."
+        },
+        "R10": {
+         "skor": 1,
+         "bukti": "Permukaan berlapis ada (tile ungu bertingkat, kartu abu gelap ber-border), warna kedua bermakna dipakai konsisten (crimson/pink per podcast di kartu lanjutkan dan daftar; hijau untuk status), dan ada chip 'Sisa 24 mnt'. Namun visual pendukung belum matang: semua artwork berupa ikon generik dalam kotak warna, tanpa foto atau cover, dan tile mix 04–06 terpotong."
+        },
+        "slop": {
+         "jumlah": 0,
+         "butir": []
+        },
+        "emoji": 0,
+        "fokus": "Kartu 'LANJUTKAN MENDENGARKAN' (atas): judul 'Kota yang Ramah Pejalan Kaki' dengan tombol ungu 'Lanjutkan putar'"
+       }
+      },
+      "attempts": [
+       {
+        "dir": "/root/lakar/bench/runs/practice/1/judge/P2/rep-1/attempt-1",
+        "status": "ok",
+        "problems": [],
+        "costUsd": 0.2085538,
+        "wallMs": 66664.16033999994
+       }
+      ],
+      "retried": false,
+      "costUsd": 0.2085538
+     },
+     {
+      "prompt": "P2",
+      "rep": 2,
+      "mapping": {
+       "X": "pendev",
+       "Y": "lakar"
+      },
+      "status": "ok",
+      "verdict": {
+       "X": {
+        "R1": {
+         "skor": 2,
+         "bukti": "Semua bagian yang diminta ada di artboard 390 lebar. Header berisi sapaan 'Selamat malam, Dimas', foto profil bulat di kanan atas, dan lonceng. Kartu 'LANJUTKAN MENDENGARKAN' memuat episode 'Merawat Kota Lewat Kebun Kolektif' dan 'Sisa 18 mnt'. Ada 6 tile mix dalam grid 2x3. Daftar 'Episode baru' berisi 4 item dengan durasi dan status unduhan (bagian 2). Mini player 'Langit Jingga' menempel di atas tab bar 4 ikon (Beranda, Cari, Pustaka, Unduhan). Mode gelap, aksen ungu, bahasa Indonesia."
+        },
+        "R2": {
+         "skor": 2,
+         "bukti": "Fokusnya kartu lanjutkan mendengarkan di atas: judul bold dua baris dan tombol play ungu besar di kanan, di bidang ber-tint ungu. Skala turun dengan tegas: sapaan besar, lalu judul seksi ('Mix harian untukmu', 'Episode baru'), judul item, lalu metadata kecil abu. Setiap judul seksi punya subjudul dan tautan 'Lihat semua', jadi tidak ada judul yatim."
+        },
+        "R4": {
+         "skor": 2,
+         "bukti": "Ungu dipakai konsisten untuk aksi dan status aktif: tombol play, progress bar kartu, 'Lihat semua', tab Beranda aktif, ikon hati, cincin unduh 64%, centang 'Terunduh', dan titik baru di 'Kopi & Kode'/'Cerita Rantau'. Tidak ada warna tambahan tanpa makna. Teks putih dan abu di latar hitam tetap terbaca, termasuk 'Mix 01' dan metadata episode."
+        },
+        "R5": {
+         "skor": 2,
+         "bukti": "Ikon outline seragam di tab bar, lonceng, jam di metadata, dan bluetooth di mini player. Foto relevan: mikrofon di kartu lanjutkan, foto konser/kaset/saksofon di tile mix, dan foto per episode (kopi, Masjid, kue, pelabuhan). Status unduhan memakai tiga ikon dengan gaya yang sama: centang dalam lingkaran, cincin progres, dan panah unduh. Tidak ada emoji."
+        },
+        "R6": {
+         "skor": 2,
+         "bukti": "Copy spesifik dan lokal: 'Obrolan Senja · Eps. 48', 'Kemarin, 22.10', 'Dana Darurat: Berapa yang Cukup?', 'Jejak Rempah di Pelabuhan Banda'. Angka konsisten: '52 mnt', '38 mnt', '45 mnt', '1 j 04 mnt', unduhan '64%', dan 'Dari 12 podcast yang kamu ikuti'. Tidak ada frasa generik atau lorem."
+        },
+        "R8": {
+         "skor": 2,
+         "bukti": "Tidak ada pelanggaran checklist slop. Ada keputusan komposisi khas yang bisa ditunjuk: kolom status unduhan di kanan setiap episode memakai tiga keadaan visual berbeda (Terunduh, cincin 64%, Unduh), dan mini player menampilkan perangkat output 'Buds Pro' dengan ikon bluetooth beserta garis progres di tepi bawahnya, di atas tab bar pill yang mengambang."
+        },
+        "R9": {
+         "skor": 2,
+         "bukti": "Angka diberi konteks: 'Sisa 18 mnt' dengan progress bar, 'Kemarin, 22.10', durasi plus waktu rilis ('2 jam lalu', 'Hari ini', 'Kemarin'), dan '64%'. Daftar episode bervariasi status (terunduh, mengunduh, belum) dan punya penanda titik baru. Metadata kecil ada di hampir setiap bagian. Satu kelemahan: tile mix hanya berisi 'Mix 01–06'."
+        },
+        "R10": {
+         "skor": 1,
+         "bukti": "Permukaan berlapis sudah ada: kartu lanjutkan ber-tint ungu dengan border, tile dan mini player ber-tint, tab aktif berbentuk pill ungu. Foto matang dan menyatu. Namun tidak ada warna kedua bermakna; semua status, termasuk 'Terunduh', memakai ungu di atas netral."
+        },
+        "slop": {
+         "jumlah": 0,
+         "butir": []
+        },
+        "emoji": 0,
+        "fokus": "Kartu 'LANJUTKAN MENDENGARKAN' di atas: judul 'Merawat Kota Lewat Kebun Kolektif' dan tombol play ungu bulat di kanan"
+       },
+       "Y": {
+        "R1": {
+         "skor": 1,
+         "bukti": "Kartu lanjutkan, 6 mix, 4 episode dengan durasi dan status unduhan, mini player, dan tab bar 4 ikon semuanya ada. Mode gelap, aksen ungu, bahasa Indonesia, lebar 390. Satu hal tidak sesuai: foto profil di kiri atas header diganti avatar inisial 'NA', bukan foto."
+        },
+        "R2": {
+         "skor": 1,
+         "bukti": "Fokus ada di kartu lanjutkan dengan tombol penuh ungu 'Lanjutkan putar'. Pada artboard kedua, label 'Mix Akustik', 'Mix Rindu', dan 'Mix 2000-an' beserta nama artisnya muncul tepat di bawah header tanpa tile kotaknya, sehingga menjadi teks yatim."
+        },
+        "R4": {
+         "skor": 2,
+         "bukti": "Ungu dipakai untuk aksi dan status aktif: tombol 'Lanjutkan putar', progress bar, chip 'Sisa 24 mnt', 'Lihat semua'/'Semua', tab Beranda aktif, dan spinner unduh. Warna tambahan bermakna: hijau untuk centang 'Terunduh', merah muda untuk label nama podcast. Teks utama dan sekunder terbaca di latar gelap."
+        },
+        "R5": {
+         "skor": 1,
+         "bukti": "Gaya ikon line konsisten (cangkir, headphone, petir, mic, siaran, cast, tab bar) dan tanpa emoji. Namun visual utama lemah: tidak ada foto sama sekali. Sampul mix dan episode hanya kotak warna dengan ikon, dan keempat episode di daftar memakai ikon siaran yang sama."
+        },
+        "R6": {
+         "skor": 2,
+         "bukti": "Copy spesifik: 'Kota yang Ramah Pejalan Kaki', 'Sambal dari Tujuh Kota', 'Trem Batavia yang Hilang', serta artis nyata (Hindia, Nadin Amizah, Reality Club, Sal Priadi, Sheila on 7). Angka konsisten: 38:12 didengar ditambah -23:48 sama dengan 62 mnt, dan cocok dengan 'Sisa 24 mnt'. Ada juga 'Mengunduh 62%' dan 'pukul 06.00'."
+        },
+        "R8": {
+         "skor": 2,
+         "bukti": "Tidak ada pelanggaran checklist slop. Keputusan khas yang bisa ditunjuk: tile mix berupa kotak ungu dengan nuansa berbeda, berisi ikon suasana di kiri atas dan nomor monospace '01/02/03' di kiri bawah, dengan daftar artis di bawah tile. Kartu lanjutkan juga punya baris waktu ganda 'didengar/-sisa' dan tombol bookmark terpisah."
+        },
+        "R9": {
+         "skor": 2,
+         "bukti": "Konteks waktu rinci: '38:12 didengar', '-23:48', chip 'Sisa 24 mnt', 'Eps 42 · 62 mnt', 'Diperbarui tiap pagi pukul 06.00'. Tile mix mencantumkan artis. Episode punya nama podcast, tanggal, durasi, dan status bervariasi (Terunduh, Mengunduh 62%, unduh), serta 'Dari 7 podcast yang kamu ikuti'."
+        },
+        "R10": {
+         "skor": 1,
+         "bukti": "Permukaan ber-tint ungu bertingkat terlihat di tile mix dan kartu, chip 'Sisa 24 mnt' terdefinisi, dan sampul episode berwarna merah-magenta. Namun hijau hanya muncul sekali (centang Terunduh), dan merah muda hanya di daftar episode. Visual pendukung juga belum matang: tidak ada foto, sampul hanya kotak dengan ikon yang berulang."
+        },
+        "slop": {
+         "jumlah": 0,
+         "butir": []
+        },
+        "emoji": 0,
+        "fokus": "Kartu 'LANJUTKAN MENDENGARKAN' di atas: judul 'Kota yang Ramah Pejalan Kaki' dan tombol ungu penuh 'Lanjutkan putar'"
+       }
+      },
+      "attempts": [
+       {
+        "dir": "/root/lakar/bench/runs/practice/1/judge/P2/rep-2/attempt-1",
+        "status": "ok",
+        "problems": [],
+        "costUsd": 0.19292579999999998,
+        "wallMs": 59681.41923099989
+       }
+      ],
+      "retried": false,
+      "costUsd": 0.19292579999999998
+     },
+     {
+      "prompt": "P2",
+      "rep": 3,
+      "mapping": {
+       "X": "lakar",
+       "Y": "pendev"
+      },
+      "status": "ok",
+      "verdict": {
+       "X": {
+        "R1": {
+         "skor": 1,
+         "bukti": "Semua bagian ada dalam 2 artboard 390x844. Header 'Selamat malam / Halo, Nadia' dengan avatar inisial 'NA' di kiri atas. Kartu 'LANJUTKAN MENDENGARKAN' memuat episode dan 'Sisa 24 mnt'. Mix harian berisi 6 item (01–03 di artboard 1; Mix Akustik, Mix Rindu, Mix 2000-an di artboard 2). 'Episode baru' berisi 4 item dengan durasi dan status unduhan. Mini player 'Pulang' menempel di atas tab bar 4 ikon. Mode gelap, aksen ungu, bahasa Indonesia. Ada 1 hal minor: di artboard 2, tile 04–06 tertutup header lengket sehingga hanya label nama mix yang tampak, tanpa tile."
+        },
+        "R2": {
+         "skor": 2,
+         "bukti": "Fokus jelas pada kartu lanjutkan mendengarkan di atas, dengan tombol lavender penuh 'Lanjutkan putar' sebagai bidang paling terang. Skalanya bertingkat tegas: sapaan 'Halo, Nadia' tebal besar, judul seksi 'Mix harian untukmu' / 'Episode baru' sedang, metadata abu kecil. Setiap judul seksi punya subjudul dan konten, jadi tidak ada judul yatim."
+        },
+        "R4": {
+         "skor": 2,
+         "bukti": "Ungu dipakai konsisten untuk tombol CTA, progress bar, tab aktif 'Beranda', tautan 'Lihat semua'/'Semua', dan chip 'Sisa 24 mnt'. Warna tambahan bermakna: merah muda menandai nama podcast di daftar episode, hijau menandai status 'Terunduh' (item 1). Metadata abu tetap terbaca di latar gelap."
+        },
+        "R5": {
+         "skor": 1,
+         "bukti": "Ikon garis satu gaya dengan ukuran seragam: lonceng, mic, bookmark, cangkir/headphone/petir di tile, ikon tab, unduh, cast, dan tidak ada emoji. Kelemahannya ada di visual utama. Tile mix hanya kotak ungu polos berisi ikon dan nomor, tanpa artwork. Keempat thumbnail episode memakai ikon siaran yang sama di atas kotak magenta, jadi tidak ada cover asli."
+        },
+        "R6": {
+         "skor": 2,
+         "bukti": "Copy spesifik: 'Kota yang Ramah Pejalan Kaki · Ruang Sore · Eps 42 · 62 mnt', 'Diperbarui tiap pagi pukul 06.00', artis per mix ('Hindia, Nadin Amizah'), 'Mengunduh 62%'. Angkanya konsisten: 38:12 didengar + sisa 23:48 = 62 mnt, sesuai chip 'Sisa 24 mnt'."
+        },
+        "R8": {
+         "skor": 2,
+         "bukti": "Tidak ada butir checklist slop yang terlihat. Ada keputusan komposisi khas yang bisa ditunjuk: tile mix bernomor monospace '01/02/03' di sudut kiri bawah, chip sisa waktu di kanan atas kartu lanjutkan, dan progress tipis di tepi bawah mini player."
+        },
+        "R9": {
+         "skor": 2,
+         "bukti": "Angka diberi konteks: progress dengan '38:12 didengar' / '-23:48', 'Dari 7 podcast yang kamu ikuti', 'Mengunduh 62%'. Status unduhan bervariasi: terunduh (centang hijau), sedang mengunduh (spinner), belum (tombol unduh). Ada metadata sekunder seperti tanggal relatif ('Hari ini', 'Kemarin', '16 Nov'), artis tiap mix, dan sumber lagu di mini player ('Float · dari Mix Santai')."
+        },
+        "R10": {
+         "skor": 1,
+         "bukti": "Permukaan berlapis bertint ungu sudah ada: kartu lanjutkan, tile ungu bergradasi nuansa, pill tab aktif. Warna kedua bermakna juga ada: merah muda untuk nama podcast dan hijau untuk status. Namun visual pendukung tetap polos, karena tile tanpa artwork dan thumbnail episode seragam berikon generik, sehingga polesan komponen hanya sebagian."
+        },
+        "slop": {
+         "jumlah": 0,
+         "butir": []
+        },
+        "emoji": 0,
+        "fokus": "Kartu 'LANJUTKAN MENDENGARKAN' di bagian atas artboard 1, dengan tombol lavender 'Lanjutkan putar'"
+       },
+       "Y": {
+        "R1": {
+         "skor": 2,
+         "bukti": "Header berisi tanggal 'Rabu, 18 November', sapaan 'Selamat malam, Dimas', dan foto profil di kanan atas. Kartu lanjutkan mendengarkan memuat 'Sisa 18 mnt'. Grid 6 mix (Indie Pagi s.d. Hip-hop Lokal) ada di tengah. 'Episode baru' berisi 4 item dengan durasi dan status unduhan. Mini player 'Langit Jingga' menempel di atas tab bar 4 ikon (Beranda, Cari, Pustaka, Unduhan). Mode gelap, aksen ungu, bahasa Indonesia, ukuran 390x844."
+        },
+        "R2": {
+         "skor": 1,
+         "bukti": "Fokus ada pada kartu lanjutkan (judul 'Merawat Kota Lewat Kebun Kolektif' plus tombol play ungu bulat). Namun fokus ini bersaing dengan sapaan 'Selamat malam, Dimas' di header yang berukuran setara atau lebih besar."
+        },
+        "R4": {
+         "skor": 1,
+         "bukti": "Ungu dipakai konsisten untuk label seksi, play, progress, 'Lihat semua', status 'Terunduh', dan tab aktif. Namun ada teks lemah: label tab tidak aktif ('Cari', 'Pustaka', 'Unduhan') dan sub-label 'Mix 01–06' berukuran sangat kecil dengan abu gelap di atas kartu gelap, sehingga kontrasnya rendah."
+        },
+        "R5": {
+         "skor": 2,
+         "bukti": "Ikon garis seragam: lonceng, riwayat, jam, unduh, hati, pause/next, bluetooth, ikon tab. Tidak ada emoji. Visual utama berupa foto yang relevan: mikrofon di kartu lanjutkan, foto konser, kaset, dan saksofon di tile mix, foto Banda di 'Jejak Rempah', serta artwork mini player dan avatar."
+        },
+        "R6": {
+         "skor": 2,
+         "bukti": "Copy spesifik: 'Obrolan Senja · Eps. 48', 'Kemarin, 22.10', 'Dari 12 podcast yang kamu ikuti', 'Dana Darurat: Berapa yang Cukup?', '1 j 04 mnt · 2 hari lalu'. Angka konsisten: progress kartu sekitar 60% dengan 'Sisa 18 mnt', dan 'Rabu, 18 November' sesuai kalender."
+        },
+        "R8": {
+         "skor": 2,
+         "bukti": "Tidak ada pelanggaran checklist slop. Blur hanya dipakai pada mini player dan tab bar yang mengambang. Langkah khas yang bisa ditunjuk: tab bar pill mengambang di bawah, grid mix 2 kolom berupa kartu horizontal foto+judul, dan mini player yang menampilkan perangkat bluetooth 'Nadira · Buds Pro'."
+        },
+        "R9": {
+         "skor": 2,
+         "bukti": "Ada konteks waktu ('Kemarin, 22.10', '2 jam lalu', 'Hari ini'). Status unduhan bervariasi: Terunduh, ring progres 64%, Unduh. Titik ungu menandai episode baru (Kopi & Kode, Cerita Rantau) dibanding yang lain. Indikator notifikasi ada di lonceng. Mini player menampilkan perangkat output dan progress. Satu kelemahan kecil: tile mix hanya berlabel 'Mix 0x'."
+        },
+        "R10": {
+         "skor": 1,
+         "bukti": "Permukaan bertint ungu (kartu lanjutkan, mini player, pill tab aktif) dan foto yang matang sudah ada. Namun tidak ada warna kedua bermakna: semua status, label, dan indikator hanya ungu di atas netral, sehingga satu unsur kolom 2 hilang."
+        },
+        "slop": {
+         "jumlah": 0,
+         "butir": []
+        },
+        "emoji": 0,
+        "fokus": "Kartu 'LANJUTKAN MENDENGARKAN' di atas: foto mikrofon, judul 'Merawat Kota Lewat Kebun Kolektif', dan tombol play ungu di kanan"
+       }
+      },
+      "attempts": [
+       {
+        "dir": "/root/lakar/bench/runs/practice/1/judge/P2/rep-3/attempt-1",
+        "status": "ok",
+        "problems": [],
+        "costUsd": 0.1812298,
+        "wallMs": 53646.67656900035
+       }
+      ],
+      "retried": false,
+      "costUsd": 0.1812298
+     }
+    ],
+    "tools": {
+     "lakar": {
+      "criteria": {
+       "R1": {
+        "values": [
+         0,
+         1,
+         1
+        ],
+        "median": 1,
+        "range": 1,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 0,
+          "bukti": "Prompt meminta foto profil, tetapi header kiri atas hanya memakai avatar inisial 'NA'. Tile mix 04–06 tidak pernah tampil utuh: di artboard 1 tertutup mini player (bawah), dan di artboard 2 hanya label 'Mix Akustik / Mix Rindu / Mix 2000-an' tanpa tile di bawah header. Ada lebih dari satu bagian yang tidak terpenuhi. Mode gelap, aksen ungu, bahasa Indonesia, tab bar 4 ikon, dan mini player sudah sesuai."
+         },
+         {
+          "rep": 2,
+          "skor": 1,
+          "bukti": "Kartu lanjutkan, 6 mix, 4 episode dengan durasi dan status unduhan, mini player, dan tab bar 4 ikon semuanya ada. Mode gelap, aksen ungu, bahasa Indonesia, lebar 390. Satu hal tidak sesuai: foto profil di kiri atas header diganti avatar inisial 'NA', bukan foto."
+         },
+         {
+          "rep": 3,
+          "skor": 1,
+          "bukti": "Semua bagian ada dalam 2 artboard 390x844. Header 'Selamat malam / Halo, Nadia' dengan avatar inisial 'NA' di kiri atas. Kartu 'LANJUTKAN MENDENGARKAN' memuat episode dan 'Sisa 24 mnt'. Mix harian berisi 6 item (01–03 di artboard 1; Mix Akustik, Mix Rindu, Mix 2000-an di artboard 2). 'Episode baru' berisi 4 item dengan durasi dan status unduhan. Mini player 'Pulang' menempel di atas tab bar 4 ikon. Mode gelap, aksen ungu, bahasa Indonesia. Ada 1 hal minor: di artboard 2, tile 04–06 tertutup header lengket sehingga hanya label nama mix yang tampak, tanpa tile."
+         }
+        ]
+       },
+       "R2": {
+        "values": [
+         1,
+         1,
+         2
+        ],
+        "median": 1,
+        "range": 1,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 1,
+          "bukti": "Fokus ada pada kartu lanjutkan dengan tombol solid 'Lanjutkan putar' (atas). Fokus ini bersaing dengan tile mix ungu solid jenuh, terutama tile '03' Mix Semangat yang berwarna ungu terang dan berukuran besar di tengah layar. Sapaan 'Halo, Nadia' berukuran hampir sama dengan judul seksi."
+         },
+         {
+          "rep": 2,
+          "skor": 1,
+          "bukti": "Fokus ada di kartu lanjutkan dengan tombol penuh ungu 'Lanjutkan putar'. Pada artboard kedua, label 'Mix Akustik', 'Mix Rindu', dan 'Mix 2000-an' beserta nama artisnya muncul tepat di bawah header tanpa tile kotaknya, sehingga menjadi teks yatim."
+         },
+         {
+          "rep": 3,
+          "skor": 2,
+          "bukti": "Fokus jelas pada kartu lanjutkan mendengarkan di atas, dengan tombol lavender penuh 'Lanjutkan putar' sebagai bidang paling terang. Skalanya bertingkat tegas: sapaan 'Halo, Nadia' tebal besar, judul seksi 'Mix harian untukmu' / 'Episode baru' sedang, metadata abu kecil. Setiap judul seksi punya subjudul dan konten, jadi tidak ada judul yatim."
+         }
+        ]
+       },
+       "R4": {
+        "values": [
+         1,
+         2,
+         2
+        ],
+        "median": 2,
+        "range": 1,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 1,
+          "bukti": "Aksen ungu konsisten (tombol Lanjutkan putar, progress, chip 'Sisa 24 mnt', 'Lihat semua', tab aktif). Warna tambahan bermakna: hijau untuk status Terunduh, dan merah/pink/magenta per podcast yang konsisten (Ruang Sore crimson di kartu lanjutkan dan di daftar). Satu teks lemah: label 'LANJUTKAN MENDENGARKAN' berupa caps kecil abu redup di atas kartu gelap."
+         },
+         {
+          "rep": 2,
+          "skor": 2,
+          "bukti": "Ungu dipakai untuk aksi dan status aktif: tombol 'Lanjutkan putar', progress bar, chip 'Sisa 24 mnt', 'Lihat semua'/'Semua', tab Beranda aktif, dan spinner unduh. Warna tambahan bermakna: hijau untuk centang 'Terunduh', merah muda untuk label nama podcast. Teks utama dan sekunder terbaca di latar gelap."
+         },
+         {
+          "rep": 3,
+          "skor": 2,
+          "bukti": "Ungu dipakai konsisten untuk tombol CTA, progress bar, tab aktif 'Beranda', tautan 'Lihat semua'/'Semua', dan chip 'Sisa 24 mnt'. Warna tambahan bermakna: merah muda menandai nama podcast di daftar episode, hijau menandai status 'Terunduh' (item 1). Metadata abu tetap terbaca di latar gelap."
+         }
+        ]
+       },
+       "R5": {
+        "values": [
+         1,
+         1,
+         1
+        ],
+        "median": 1,
+        "range": 0,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 1,
+          "bukti": "Ikon garis konsisten (bel, cangkir, headphone, petir, antena, unduh, cast, tab bar). Namun visual utama lemah: kartu lanjutkan hanya memakai ikon mikrofon di kotak crimson, dan keempat thumbnail episode memakai ikon antena yang identik, tanpa foto atau cover art sama sekali. Tidak ada emoji."
+         },
+         {
+          "rep": 2,
+          "skor": 1,
+          "bukti": "Gaya ikon line konsisten (cangkir, headphone, petir, mic, siaran, cast, tab bar) dan tanpa emoji. Namun visual utama lemah: tidak ada foto sama sekali. Sampul mix dan episode hanya kotak warna dengan ikon, dan keempat episode di daftar memakai ikon siaran yang sama."
+         },
+         {
+          "rep": 3,
+          "skor": 1,
+          "bukti": "Ikon garis satu gaya dengan ukuran seragam: lonceng, mic, bookmark, cangkir/headphone/petir di tile, ikon tab, unduh, cast, dan tidak ada emoji. Kelemahannya ada di visual utama. Tile mix hanya kotak ungu polos berisi ikon dan nomor, tanpa artwork. Keempat thumbnail episode memakai ikon siaran yang sama di atas kotak magenta, jadi tidak ada cover asli."
+         }
+        ]
+       },
+       "R6": {
+        "values": [
+         2,
+         2,
+         2
+        ],
+        "median": 2,
+        "range": 0,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 2,
+          "bukti": "Angka konsisten: '38:12 didengar' + '-23:48' = 62 mnt, sesuai 'Eps 42 · 62 mnt'; chip 'Sisa 24 mnt' adalah pembulatan dari -23:48. Copy spesifik: 'Trem Batavia yang Hilang', 'Dana Darurat untuk Freelancer', artis nyata 'Hindia, Nadin Amizah', 'Diperbarui tiap pagi pukul 06.00'. Jam 21:14 konsisten dengan sapaan malam."
+         },
+         {
+          "rep": 2,
+          "skor": 2,
+          "bukti": "Copy spesifik: 'Kota yang Ramah Pejalan Kaki', 'Sambal dari Tujuh Kota', 'Trem Batavia yang Hilang', serta artis nyata (Hindia, Nadin Amizah, Reality Club, Sal Priadi, Sheila on 7). Angka konsisten: 38:12 didengar ditambah -23:48 sama dengan 62 mnt, dan cocok dengan 'Sisa 24 mnt'. Ada juga 'Mengunduh 62%' dan 'pukul 06.00'."
+         },
+         {
+          "rep": 3,
+          "skor": 2,
+          "bukti": "Copy spesifik: 'Kota yang Ramah Pejalan Kaki · Ruang Sore · Eps 42 · 62 mnt', 'Diperbarui tiap pagi pukul 06.00', artis per mix ('Hindia, Nadin Amizah'), 'Mengunduh 62%'. Angkanya konsisten: 38:12 didengar + sisa 23:48 = 62 mnt, sesuai chip 'Sisa 24 mnt'."
+         }
+        ]
+       },
+       "R8": {
+        "values": [
+         2,
+         2,
+         2
+        ],
+        "median": 2,
+        "range": 0,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 2,
+          "bukti": "0 pelanggaran checklist; thumbnail berwarna berikon dan berlabel, sehingga bukan placeholder abu kosong. Keputusan khas yang bisa ditunjuk: tile mix bernomor monospace '01/02/03' dengan ikon mood (tengah), warna per podcast yang dibawa dari kartu lanjutkan ke daftar episode, dan tombol pause putih bulat menonjol di mini player."
+         },
+         {
+          "rep": 2,
+          "skor": 2,
+          "bukti": "Tidak ada pelanggaran checklist slop. Keputusan khas yang bisa ditunjuk: tile mix berupa kotak ungu dengan nuansa berbeda, berisi ikon suasana di kiri atas dan nomor monospace '01/02/03' di kiri bawah, dengan daftar artis di bawah tile. Kartu lanjutkan juga punya baris waktu ganda 'didengar/-sisa' dan tombol bookmark terpisah."
+         },
+         {
+          "rep": 3,
+          "skor": 2,
+          "bukti": "Tidak ada butir checklist slop yang terlihat. Ada keputusan komposisi khas yang bisa ditunjuk: tile mix bernomor monospace '01/02/03' di sudut kiri bawah, chip sisa waktu di kanan atas kartu lanjutkan, dan progress tipis di tepi bawah mini player."
+         }
+        ]
+       },
+       "R9": {
+        "values": [
+         2,
+         2,
+         2
+        ],
+        "median": 2,
+        "range": 0,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 2,
+          "bukti": "Konteks lengkap: waktu didengar dan sisa, chip sisa menit, jadwal pembaruan 'pukul 06.00', nama artis di setiap tile mix, tanggal/durasi/status per episode. Variasi status terlihat: Terunduh (centang hijau), 'Mengunduh 62%' (spinner), dan tombol unduh. Ada juga label kategori berwarna dan sumber lagu 'dari Mix Santai' di mini player."
+         },
+         {
+          "rep": 2,
+          "skor": 2,
+          "bukti": "Konteks waktu rinci: '38:12 didengar', '-23:48', chip 'Sisa 24 mnt', 'Eps 42 · 62 mnt', 'Diperbarui tiap pagi pukul 06.00'. Tile mix mencantumkan artis. Episode punya nama podcast, tanggal, durasi, dan status bervariasi (Terunduh, Mengunduh 62%, unduh), serta 'Dari 7 podcast yang kamu ikuti'."
+         },
+         {
+          "rep": 3,
+          "skor": 2,
+          "bukti": "Angka diberi konteks: progress dengan '38:12 didengar' / '-23:48', 'Dari 7 podcast yang kamu ikuti', 'Mengunduh 62%'. Status unduhan bervariasi: terunduh (centang hijau), sedang mengunduh (spinner), belum (tombol unduh). Ada metadata sekunder seperti tanggal relatif ('Hari ini', 'Kemarin', '16 Nov'), artis tiap mix, dan sumber lagu di mini player ('Float · dari Mix Santai')."
+         }
+        ]
+       },
+       "R10": {
+        "values": [
+         1,
+         1,
+         1
+        ],
+        "median": 1,
+        "range": 0,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 1,
+          "bukti": "Permukaan berlapis ada (tile ungu bertingkat, kartu abu gelap ber-border), warna kedua bermakna dipakai konsisten (crimson/pink per podcast di kartu lanjutkan dan daftar; hijau untuk status), dan ada chip 'Sisa 24 mnt'. Namun visual pendukung belum matang: semua artwork berupa ikon generik dalam kotak warna, tanpa foto atau cover, dan tile mix 04–06 terpotong."
+         },
+         {
+          "rep": 2,
+          "skor": 1,
+          "bukti": "Permukaan ber-tint ungu bertingkat terlihat di tile mix dan kartu, chip 'Sisa 24 mnt' terdefinisi, dan sampul episode berwarna merah-magenta. Namun hijau hanya muncul sekali (centang Terunduh), dan merah muda hanya di daftar episode. Visual pendukung juga belum matang: tidak ada foto, sampul hanya kotak dengan ikon yang berulang."
+         },
+         {
+          "rep": 3,
+          "skor": 1,
+          "bukti": "Permukaan berlapis bertint ungu sudah ada: kartu lanjutkan, tile ungu bergradasi nuansa, pill tab aktif. Warna kedua bermakna juga ada: merah muda untuk nama podcast dan hijau untuk status. Namun visual pendukung tetap polos, karena tile tanpa artwork dan thumbnail episode seragam berikon generik, sehingga polesan komponen hanya sebagian."
+         }
+        ]
+       }
+      },
+      "total": 12,
+      "slop": {
+       "values": [
+        0,
+        0,
+        0
+       ],
+       "median": 0,
+       "range": 0,
+       "flag": false,
+       "items": [
+        {
+         "rep": 1,
+         "butir": []
+        },
+        {
+         "rep": 2,
+         "butir": []
+        },
+        {
+         "rep": 3,
+         "butir": []
+        }
+       ]
+      },
+      "emoji": {
+       "values": [
+        0,
+        0,
+        0
+       ],
+       "median": 0,
+       "range": 0,
+       "flag": false
+      },
+      "focus": [
+       {
+        "rep": 1,
+        "fokus": "Kartu 'LANJUTKAN MENDENGARKAN' (atas): judul 'Kota yang Ramah Pejalan Kaki' dengan tombol ungu 'Lanjutkan putar'"
+       },
+       {
+        "rep": 2,
+        "fokus": "Kartu 'LANJUTKAN MENDENGARKAN' di atas: judul 'Kota yang Ramah Pejalan Kaki' dan tombol ungu penuh 'Lanjutkan putar'"
+       },
+       {
+        "rep": 3,
+        "fokus": "Kartu 'LANJUTKAN MENDENGARKAN' di bagian atas artboard 1, dengan tombol lavender 'Lanjutkan putar'"
+       }
+      ]
+     },
+     "pendev": {
+      "criteria": {
+       "R1": {
+        "values": [
+         1,
+         2,
+         2
+        ],
+        "median": 2,
+        "range": 1,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 1,
+          "bukti": "Semua bagian ada: header 'Rabu, 18 November / Selamat malam, Dimas' dengan bel dan foto profil (atas), kartu 'LANJUTKAN MENDENGARKAN' dengan 'Sisa 18 mnt', 6 tile mix (Indie Pagi s.d. Hip-hop Lokal, Mix 01–06), 4 episode baru dengan durasi dan status unduhan, mini player 'Langit Jingga' di atas tab bar 4 ikon (Beranda/Cari/Pustaka/Unduhan). Mode gelap, aksen ungu, dan bahasa Indonesia sesuai. Artboard pertama 390x844 sesuai. Ada satu artboard tambahan (artboard kedua, bagian 1 bawah s.d. bagian 2) dengan tinggi jauh melebihi 844 yang menampilkan seluruh isi secara memanjang; dihitung sebagai 1 hal minor."
+         },
+         {
+          "rep": 2,
+          "skor": 2,
+          "bukti": "Semua bagian yang diminta ada di artboard 390 lebar. Header berisi sapaan 'Selamat malam, Dimas', foto profil bulat di kanan atas, dan lonceng. Kartu 'LANJUTKAN MENDENGARKAN' memuat episode 'Merawat Kota Lewat Kebun Kolektif' dan 'Sisa 18 mnt'. Ada 6 tile mix dalam grid 2x3. Daftar 'Episode baru' berisi 4 item dengan durasi dan status unduhan (bagian 2). Mini player 'Langit Jingga' menempel di atas tab bar 4 ikon (Beranda, Cari, Pustaka, Unduhan). Mode gelap, aksen ungu, bahasa Indonesia."
+         },
+         {
+          "rep": 3,
+          "skor": 2,
+          "bukti": "Header berisi tanggal 'Rabu, 18 November', sapaan 'Selamat malam, Dimas', dan foto profil di kanan atas. Kartu lanjutkan mendengarkan memuat 'Sisa 18 mnt'. Grid 6 mix (Indie Pagi s.d. Hip-hop Lokal) ada di tengah. 'Episode baru' berisi 4 item dengan durasi dan status unduhan. Mini player 'Langit Jingga' menempel di atas tab bar 4 ikon (Beranda, Cari, Pustaka, Unduhan). Mode gelap, aksen ungu, bahasa Indonesia, ukuran 390x844."
+         }
+        ]
+       },
+       "R2": {
+        "values": [
+         2,
+         2,
+         1
+        ],
+        "median": 2,
+        "range": 1,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 2,
+          "bukti": "Titik fokus jelas pada kartu lanjutkan mendengarkan (atas-tengah): judul tebal 'Merawat Kota Lewat Kebun Kolektif', tombol play ungu bulat, dan bidang ber-tint ungu. Lompatan skala tegas: sapaan besar → judul seksi 'Mix harian untukmu'/'Episode baru' → judul item → metadata abu kecil. Setiap judul seksi punya subjudul dan isi, sehingga tidak ada judul yatim."
+         },
+         {
+          "rep": 2,
+          "skor": 2,
+          "bukti": "Fokusnya kartu lanjutkan mendengarkan di atas: judul bold dua baris dan tombol play ungu besar di kanan, di bidang ber-tint ungu. Skala turun dengan tegas: sapaan besar, lalu judul seksi ('Mix harian untukmu', 'Episode baru'), judul item, lalu metadata kecil abu. Setiap judul seksi punya subjudul dan tautan 'Lihat semua', jadi tidak ada judul yatim."
+         },
+         {
+          "rep": 3,
+          "skor": 1,
+          "bukti": "Fokus ada pada kartu lanjutkan (judul 'Merawat Kota Lewat Kebun Kolektif' plus tombol play ungu bulat). Namun fokus ini bersaing dengan sapaan 'Selamat malam, Dimas' di header yang berukuran setara atau lebih besar."
+         }
+        ]
+       },
+       "R4": {
+        "values": [
+         2,
+         2,
+         1
+        ],
+        "median": 2,
+        "range": 1,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 2,
+          "bukti": "Ungu dipakai konsisten untuk aksi dan status aktif: label 'LANJUTKAN MENDENGARKAN', tombol play, progress bar, 'Lihat semua', tab Beranda aktif, status 'Terunduh', ring unduh 64%, ikon hati di mini player. Titik ungu kategori pada 2 episode teratas (Kopi & Kode, Cerita Rantau) terbaca sebagai penanda episode baru. Teks putih dan abu di latar hampir hitam semuanya terbaca; metadata 'Mix 01' redup tetapi masih cukup."
+         },
+         {
+          "rep": 2,
+          "skor": 2,
+          "bukti": "Ungu dipakai konsisten untuk aksi dan status aktif: tombol play, progress bar kartu, 'Lihat semua', tab Beranda aktif, ikon hati, cincin unduh 64%, centang 'Terunduh', dan titik baru di 'Kopi & Kode'/'Cerita Rantau'. Tidak ada warna tambahan tanpa makna. Teks putih dan abu di latar hitam tetap terbaca, termasuk 'Mix 01' dan metadata episode."
+         },
+         {
+          "rep": 3,
+          "skor": 1,
+          "bukti": "Ungu dipakai konsisten untuk label seksi, play, progress, 'Lihat semua', status 'Terunduh', dan tab aktif. Namun ada teks lemah: label tab tidak aktif ('Cari', 'Pustaka', 'Unduhan') dan sub-label 'Mix 01–06' berukuran sangat kecil dengan abu gelap di atas kartu gelap, sehingga kontrasnya rendah."
+         }
+        ]
+       },
+       "R5": {
+        "values": [
+         2,
+         2,
+         2
+        ],
+        "median": 2,
+        "range": 0,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 2,
+          "bukti": "Satu gaya ikon garis dengan ukuran seragam: bel, jam metadata, unduh, centang, tab bar, hati, pause, next, bluetooth. Visual utama berupa foto mikrofon di kartu lanjutkan, relevan dengan podcast. Tile mix memakai foto konser, kaset, dan saksofon yang relevan. Tidak ada emoji."
+         },
+         {
+          "rep": 2,
+          "skor": 2,
+          "bukti": "Ikon outline seragam di tab bar, lonceng, jam di metadata, dan bluetooth di mini player. Foto relevan: mikrofon di kartu lanjutkan, foto konser/kaset/saksofon di tile mix, dan foto per episode (kopi, Masjid, kue, pelabuhan). Status unduhan memakai tiga ikon dengan gaya yang sama: centang dalam lingkaran, cincin progres, dan panah unduh. Tidak ada emoji."
+         },
+         {
+          "rep": 3,
+          "skor": 2,
+          "bukti": "Ikon garis seragam: lonceng, riwayat, jam, unduh, hati, pause/next, bluetooth, ikon tab. Tidak ada emoji. Visual utama berupa foto yang relevan: mikrofon di kartu lanjutkan, foto konser, kaset, dan saksofon di tile mix, foto Banda di 'Jejak Rempah', serta artwork mini player dan avatar."
+         }
+        ]
+       },
+       "R6": {
+        "values": [
+         2,
+         2,
+         2
+        ],
+        "median": 2,
+        "range": 0,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 2,
+          "bukti": "Copy spesifik dan lokal: 'Obrolan Senja · Eps. 48', 'Jejak Rempah di Pelabuhan Banda', 'Dana Darurat: Berapa yang Cukup?'. Durasi '52 mnt', '1 j 04 mnt' beserta waktu relatif. 'Dari 12 podcast yang kamu ikuti'. Jam 21.41 konsisten dengan sapaan 'Selamat malam'. Tidak ada kontradiksi angka."
+         },
+         {
+          "rep": 2,
+          "skor": 2,
+          "bukti": "Copy spesifik dan lokal: 'Obrolan Senja · Eps. 48', 'Kemarin, 22.10', 'Dana Darurat: Berapa yang Cukup?', 'Jejak Rempah di Pelabuhan Banda'. Angka konsisten: '52 mnt', '38 mnt', '45 mnt', '1 j 04 mnt', unduhan '64%', dan 'Dari 12 podcast yang kamu ikuti'. Tidak ada frasa generik atau lorem."
+         },
+         {
+          "rep": 3,
+          "skor": 2,
+          "bukti": "Copy spesifik: 'Obrolan Senja · Eps. 48', 'Kemarin, 22.10', 'Dari 12 podcast yang kamu ikuti', 'Dana Darurat: Berapa yang Cukup?', '1 j 04 mnt · 2 hari lalu'. Angka konsisten: progress kartu sekitar 60% dengan 'Sisa 18 mnt', dan 'Rabu, 18 November' sesuai kalender."
+         }
+        ]
+       },
+       "R8": {
+        "values": [
+         2,
+         2,
+         2
+        ],
+        "median": 2,
+        "range": 0,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 2,
+          "bukti": "0 pelanggaran checklist; blur hanya dipakai pada mini player dan tab bar yang mengambang, sehingga diizinkan. Keputusan komposisi khas: tab bar pill mengambang dengan indikator aktif berbentuk pill ungu (bawah), ring progres unduhan '64%' sebagai status per episode, dan baris perangkat 'Nadira · Buds Pro' dengan ikon bluetooth di mini player."
+         },
+         {
+          "rep": 2,
+          "skor": 2,
+          "bukti": "Tidak ada pelanggaran checklist slop. Ada keputusan komposisi khas yang bisa ditunjuk: kolom status unduhan di kanan setiap episode memakai tiga keadaan visual berbeda (Terunduh, cincin 64%, Unduh), dan mini player menampilkan perangkat output 'Buds Pro' dengan ikon bluetooth beserta garis progres di tepi bawahnya, di atas tab bar pill yang mengambang."
+         },
+         {
+          "rep": 3,
+          "skor": 2,
+          "bukti": "Tidak ada pelanggaran checklist slop. Blur hanya dipakai pada mini player dan tab bar yang mengambang. Langkah khas yang bisa ditunjuk: tab bar pill mengambang di bawah, grid mix 2 kolom berupa kartu horizontal foto+judul, dan mini player yang menampilkan perangkat bluetooth 'Nadira · Buds Pro'."
+         }
+        ]
+       },
+       "R9": {
+        "values": [
+         2,
+         2,
+         2
+        ],
+        "median": 2,
+        "range": 0,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 2,
+          "bukti": "Angka diberi konteks: 'Kemarin, 22.10', 'Sisa 18 mnt' dengan progress bar, durasi plus waktu rilis relatif ('2 jam lalu', 'Hari ini'), 'Dari 12 podcast'. Daftar episode menunjukkan variasi status: Terunduh, 64% mengunduh, Unduh, Terunduh. Ada label kategori, penanda baru, dan perangkat audio. Tile mix hanya berisi 'Mix 0x', tetapi desain secara keseluruhan padat dan terbaca."
+         },
+         {
+          "rep": 2,
+          "skor": 2,
+          "bukti": "Angka diberi konteks: 'Sisa 18 mnt' dengan progress bar, 'Kemarin, 22.10', durasi plus waktu rilis ('2 jam lalu', 'Hari ini', 'Kemarin'), dan '64%'. Daftar episode bervariasi status (terunduh, mengunduh, belum) dan punya penanda titik baru. Metadata kecil ada di hampir setiap bagian. Satu kelemahan: tile mix hanya berisi 'Mix 01–06'."
+         },
+         {
+          "rep": 3,
+          "skor": 2,
+          "bukti": "Ada konteks waktu ('Kemarin, 22.10', '2 jam lalu', 'Hari ini'). Status unduhan bervariasi: Terunduh, ring progres 64%, Unduh. Titik ungu menandai episode baru (Kopi & Kode, Cerita Rantau) dibanding yang lain. Indikator notifikasi ada di lonceng. Mini player menampilkan perangkat output dan progress. Satu kelemahan kecil: tile mix hanya berlabel 'Mix 0x'."
+         }
+        ]
+       },
+       "R10": {
+        "values": [
+         1,
+         1,
+         1
+        ],
+        "median": 1,
+        "range": 0,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 1,
+          "bukti": "Ada permukaan berlapis (kartu lanjutkan ber-tint ungu, tile abu gelap, mini player ber-tint) dan foto yang matang. Namun tidak ada warna kedua bermakna: semua status dan aksen hanya ungu di atas netral ('Terunduh', ring 64%, kategori). Badge berwarna juga minim. Salah satu unsur kolom 2 tidak ada."
+         },
+         {
+          "rep": 2,
+          "skor": 1,
+          "bukti": "Permukaan berlapis sudah ada: kartu lanjutkan ber-tint ungu dengan border, tile dan mini player ber-tint, tab aktif berbentuk pill ungu. Foto matang dan menyatu. Namun tidak ada warna kedua bermakna; semua status, termasuk 'Terunduh', memakai ungu di atas netral."
+         },
+         {
+          "rep": 3,
+          "skor": 1,
+          "bukti": "Permukaan bertint ungu (kartu lanjutkan, mini player, pill tab aktif) dan foto yang matang sudah ada. Namun tidak ada warna kedua bermakna: semua status, label, dan indikator hanya ungu di atas netral, sehingga satu unsur kolom 2 hilang."
+         }
+        ]
+       }
+      },
+      "total": 15,
+      "slop": {
+       "values": [
+        0,
+        0,
+        0
+       ],
+       "median": 0,
+       "range": 0,
+       "flag": false,
+       "items": [
+        {
+         "rep": 1,
+         "butir": []
+        },
+        {
+         "rep": 2,
+         "butir": []
+        },
+        {
+         "rep": 3,
+         "butir": []
+        }
+       ]
+      },
+      "emoji": {
+       "values": [
+        0,
+        0,
+        0
+       ],
+       "median": 0,
+       "range": 0,
+       "flag": false
+      },
+      "focus": [
+       {
+        "rep": 1,
+        "fokus": "Kartu 'LANJUTKAN MENDENGARKAN' (atas-tengah): judul 'Merawat Kota Lewat Kebun Kolektif' dengan tombol play ungu di kanan"
+       },
+       {
+        "rep": 2,
+        "fokus": "Kartu 'LANJUTKAN MENDENGARKAN' di atas: judul 'Merawat Kota Lewat Kebun Kolektif' dan tombol play ungu bulat di kanan"
+       },
+       {
+        "rep": 3,
+        "fokus": "Kartu 'LANJUTKAN MENDENGARKAN' di atas: foto mikrofon, judul 'Merawat Kota Lewat Kebun Kolektif', dan tombol play ungu di kanan"
+       }
+      ]
+     }
+    }
+   },
+   "decision": {
+    "decision": "Kalah",
+    "why": "total 12 < 15 − 1",
+    "checks": {
+     "total": {
+      "lakar": 12,
+      "pendev": 15
+     },
+     "appeal": {
+      "lakar": 3,
+      "pendev": 3
+     },
+     "appealLoss": [],
+     "otherLoss": [
+      "total 12 < 15 − 1"
+     ],
+     "zeroVsTwo": [],
+     "pendevBriefViolations": [
+      "ukuran: board fmjnH 390×1218 ≠ 390×844"
+     ]
+    }
+   },
+   "emoji": {
+    "lakar": {
+     "agent": 0,
+     "glyphs": 0,
+     "lint": 0,
+     "judge": 0
+    },
+    "pendev": {
+     "agent": 0,
+     "glyphs": 0,
+     "judge": 0
+    }
+   },
+   "pngs": {
+    "lakar": "bench/practice/1/P2-lakar.png",
+    "pendev": "bench/runs/practice/1/P2-pendev.png"
+   },
+   "cost": {
+    "lakar": 0.8730737999999999,
+    "pendev": 0.7835776,
+    "pendevCounted": true,
+    "judge": 0.5827093999999999
+   }
+  },
+  {
+   "id": "P3",
+   "name": "Dapur Wening",
+   "kind": "mobile",
+   "size": {
+    "width": 390,
+    "height": 844
+   },
+   "judgeTextSha256": "41298e297f8d89b837412e52fc3ca61f952595597bd72d1e472b89b4efe8d4db",
+   "runs": {
+    "lakar": {
+     "key": "P3-lakar",
+     "prompt": "P3",
+     "tool": "lakar",
+     "dir": "bench/runs/practice/1/P3-lakar",
+     "record": {
+      "runId": "practice-1-P3-lakar",
+      "prompt": "P3",
+      "attempt": 1,
+      "status": "success",
+      "wallMs": 159772.80298799998,
+      "durationMs": 159835,
+      "durationApiMs": 134873,
+      "costUsd": 0.9602911999999998,
+      "numTurns": 15,
+      "toolCalls": 14,
+      "firstToolUseMs": 1626.2060310000088,
+      "lastToolResultMs": 145720.586595,
+      "spawnToFirstEventMs": 1776.4423169998918,
+      "frames": [
+       {
+        "id": "qDFcjZWc",
+        "name": "Dapur Wening / Detail resep (awal) · mobile · Ramah",
+        "width": 390,
+        "height": 844,
+        "png": "bench/runs/practice/1/P3-lakar/png/qDFcjZWc.png",
+        "pngWidth": 390,
+        "pngHeight": 844
+       },
+       {
+        "id": "R39c0D16",
+        "name": "Dapur Wening / Detail resep (akhir) · mobile · Ramah",
+        "width": 390,
+        "height": 844,
+        "png": "bench/runs/practice/1/P3-lakar/png/R39c0D16.png",
+        "pngWidth": 390,
+        "pngHeight": 844
+       }
+      ],
+      "transcriptBytes": 744816,
+      "pngScaleMismatch": false,
+      "model": "claude-opus-5-5",
+      "modelUsageKeys": [
+       "claude-opus-5-5"
+      ],
+      "claudeCodeVersion": "2.1.325",
+      "startedAt": "2026-11-18T08:36:06.186Z",
+      "lakar": {
+       "slug": "dapur-wening-detail-resep",
+       "opened": [
+        "dapur-wening-detail-resep"
+       ],
+       "boards": [
+        {
+         "id": "qDFcjZWc",
+         "name": "Dapur Wening / Detail resep (awal) · mobile · Ramah",
+         "page": "Page 1",
+         "screen": "mobile",
+         "x": 0,
+         "y": 0,
+         "width": 390,
+         "height": 844,
+         "wip": false,
+         "childCount": 4
+        },
+        {
+         "id": "R39c0D16",
+         "name": "Dapur Wening / Detail resep (akhir) · mobile · Ramah",
+         "page": "Page 1",
+         "screen": "mobile",
+         "x": 470,
+         "y": 0,
+         "width": 390,
+         "height": 844,
+         "wip": false,
+         "childCount": 4
+        }
+       ],
+       "layout": {
+        "rev": 4,
+        "summary": {
+         "error": 0,
+         "warning": 0,
+         "gate": 0
+        },
+        "findings": [],
+        "boards": [
+         {
+          "id": "qDFcjZWc",
+          "name": "Dapur Wening / Detail resep (awal) · mobile · Ramah",
+          "summary": {
+           "error": 0,
+           "warning": 0,
+           "gate": 0
+          }
+         },
+         {
+          "id": "R39c0D16",
+          "name": "Dapur Wening / Detail resep (akhir) · mobile · Ramah",
+          "summary": {
+           "error": 0,
+           "warning": 0,
+           "gate": 0
+          }
+         }
+        ]
+       },
+       "docPath": "bench/runs/practice/1/P3-lakar/doc/dapur-wening-detail-resep.lakar.json",
+       "historyPath": "bench/runs/practice/1/P3-lakar/doc/dapur-wening-detail-resep.history.jsonl",
+       "daemonBefore": {
+        "pid": 1175815,
+        "startedAt": "2026-11-18T08:18:03.772Z",
+        "recreated": 0,
+        "systemd": {
+         "ActiveState": "active",
+         "ActiveEnterTimestamp": "Wed 2026-11-18 08:18:03 UTC",
+         "MainPID": "1175815",
+         "NRestarts": "0"
+        }
+       },
+       "daemonAfter": {
+        "pid": 1175815,
+        "startedAt": "2026-11-18T08:18:03.772Z",
+        "recreated": 0,
+        "systemd": {
+         "ActiveState": "active",
+         "ActiveEnterTimestamp": "Wed 2026-11-18 08:18:03 UTC",
+         "MainPID": "1175815",
+         "NRestarts": "0"
+        }
+       },
+       "docsBefore": 4
+      }
+     },
+     "reconnect": {
+      "count": 0,
+      "affectedMs": 0,
+      "events": [],
+      "toolErrors": []
+     },
+     "agentEmoji": {
+      "emoji": 0,
+      "glyphs": 0,
+      "samples": []
+     },
+     "lintEmoji": {
+      "lc01a": 0,
+      "lc01b": 0
+     },
+     "strip": {
+      "path": "bench/runs/practice/1/P3-lakar.png",
+      "width": 390,
+      "height": 1736,
+      "boards": 2
+     },
+     "previous": []
+    },
+    "pendev": {
+     "key": "P3-pendev",
+     "prompt": "P3",
+     "tool": "pendev",
+     "dir": "bench/runs/practice/1/P3-pendev",
+     "record": {
+      "runId": "practice-1-P3-pendev",
+      "prompt": "P3",
+      "attempt": 1,
+      "status": "success",
+      "uri": "file:///root/.pencil/documents/476b2dc2-2389-4e0c-8c1e-372a54420860/untitled.pen",
+      "uriSource": "get_app_state",
+      "wallMs": 130809.52850399993,
+      "durationMs": 131038,
+      "durationApiMs": 112959,
+      "costUsd": 0.6453966000000001,
+      "numTurns": 15,
+      "toolCalls": 14,
+      "firstToolUseMs": 1616.0349670000141,
+      "lastToolResultMs": 118988.31895199989,
+      "spawnToFirstEventMs": 3692.8790580000496,
+      "frames": [
+       {
+        "id": "A6qNdN",
+        "name": "Detail Resep — Soto Ayam",
+        "width": 390,
+        "height": 844,
+        "png": "bench/runs/practice/1/P3-pendev/png/A6qNdN.png",
+        "pngWidth": 390,
+        "pngHeight": 844
+       }
+      ],
+      "transcriptBytes": 1434597,
+      "penPath": "bench/runs/practice/1/P3-pendev/design.pen",
+      "pngScaleMismatch": false,
+      "model": "claude-opus-5-5",
+      "modelUsageKeys": [
+       "claude-opus-5-5"
+      ],
+      "claudeCodeVersion": "2.1.325",
+      "startedAt": "2026-11-18T08:33:48.853Z",
+      "pendevSystemd": {
+       "before": {
+        "ActiveState": "active",
+        "ActiveEnterTimestamp": "Tue 2026-11-17 07:15:37 UTC",
+        "MainPID": "1798021",
+        "NRestarts": "0"
+       },
+       "after": {
+        "ActiveState": "active",
+        "ActiveEnterTimestamp": "Tue 2026-11-17 07:15:37 UTC",
+        "MainPID": "1798021",
+        "NRestarts": "0"
+       }
+      }
+     },
+     "reconnect": {
+      "count": 0,
+      "affectedMs": 0,
+      "events": [],
+      "toolErrors": []
+     },
+     "agentEmoji": {
+      "emoji": 0,
+      "glyphs": 0,
+      "samples": []
+     },
+     "strip": {
+      "path": "bench/runs/practice/1/P3-pendev.png",
+      "width": 390,
+      "height": 844,
+      "boards": 1
+     },
+     "previous": []
+    }
+   },
+   "gate": {
+    "ok": true,
+    "reasons": [],
+    "timeRatio": 1.2214156324484757
+   },
+   "sizeProblems": [],
+   "pendevSizeProblems": [],
+   "score": {
+    "prompt": "P3",
+    "validReps": 3,
+    "reps": [
+     {
+      "prompt": "P3",
+      "rep": 1,
+      "mapping": {
+       "X": "lakar",
+       "Y": "pendev"
+      },
+      "status": "ok",
+      "verdict": {
+       "X": {
+        "R1": {
+         "skor": 2,
+         "bukti": "Semua bagian yang diminta ada. Hero atas punya tombol kembali (kiri atas) serta bagikan dan simpan (kanan atas). Di bawahnya ada judul 'Sop Ayam Bening Jahe', kartu statistik (45 menit, 4 porsi, Mudah), rating 4,8 (1.236 ulasan), tab Bahan/Langkah, daftar bahan dengan takaran dan checkbox, dan tombol 'Mulai memasak · 8 langkah' yang menempel di bawah pada kedua artboard. Mode terang, aksen merah tomat, Bahasa Indonesia, lebar 390."
+        },
+        "R2": {
+         "skor": 2,
+         "bukti": "Judul 'Sop Ayam Bening Jahe' (bold besar, di bawah hero) menjadi fokus tunggal. Lompatan skala tegas ke subjudul 'Bahan untuk 4 porsi' dan 'Ulasan pengguna', lalu ke metadata kecil abu-abu. Setiap judul seksi punya isi di bawahnya."
+        },
+        "R4": {
+         "skor": 1,
+         "bukti": "Aksen merah dipakai konsisten untuk CTA, tab aktif, checkbox, progress bar, bookmark, dan 'Lihat semua'. Hijau hanya untuk status 'Sudah masak', oranye-cokelat untuk bintang dan bar distribusi rating. Satu teks lemah: label 'Foto hidangan · Sop Ayam Bening Jahe' berukuran kecil, merah muda di atas latar pink hero."
+        },
+        "R5": {
+         "skor": 1,
+         "bukti": "Ikon garis seragam: panah kembali, share, bookmark, jam, orang, speedometer, dan topi koki di CTA. Tanpa emoji. Visual utama lemah: hero hanya placeholder gradien pink dengan ikon mangkuk garis dan label 'Foto hidangan', bukan foto masakan."
+        },
+        "R6": {
+         "skor": 2,
+         "bukti": "Copy spesifik, misalnya 'Potong 8 bagian', '1 ekor (±900 g)', '±350 ml/porsi', dan ulasan yang menyebut pala dan kentang. Angkanya konsisten: 15 + 30 = 45 menit; tab Langkah 8 sama dengan CTA '8 langkah'; Bahan 9 sama dengan '3 dari 9 sudah disiapkan'; distribusi 84+11+3+1+1 = 100%; jumlah 1.236 ulasan sama di header dan panel rating."
+        },
+        "R8": {
+         "skor": 2,
+         "bukti": "Tidak ada pelanggaran checklist: latar putih, hero pink bukan gradien ungu-biru, dan placeholder hero berlabel. Ada keputusan khas yang bisa ditunjuk: stepper porsi (− 4 +) digabung dengan progress persiapan '3 dari 9' di atas daftar bahan, serta panel distribusi rating ber-tint pink di bagian ulasan."
+        },
+        "R9": {
+         "skor": 2,
+         "bukti": "Angka diberi konteks: '15 + 30 mnt masak', '±350 ml/porsi', 'Cocok pemula', persentase per bintang. Setiap bahan punya catatan sekunder ('Simpan untuk taburan', 'Sesuai selera'). Daftar bahan menunjukkan status tercentang dan belum. Ulasan memuat avatar inisial, waktu ('2 hari lalu'), dan badge 'Sudah masak'. Badge jumlah di tab (9, 8) dan chip kategori ('Sup rumahan', 'Tanpa santan') melengkapi."
+        },
+        "R10": {
+         "skor": 1,
+         "bukti": "Permukaan berlapis ada (panel rating pink, chip 'Sup rumahan' pink, tab container abu). Warna kedua bermakna juga ada: hijau untuk badge 'Sudah masak' dan oranye untuk rating. Namun visual utama tidak matang: hero berupa placeholder ikon mangkuk di atas gradien pink, bukan foto, sehingga unsur 'visual matang dan menyatu' tidak terpenuhi."
+        },
+        "slop": {
+         "jumlah": 0,
+         "butir": []
+        },
+        "emoji": 0,
+        "fokus": "Judul 'Sop Ayam Bening Jahe' tepat di bawah hero, artboard pertama"
+       },
+       "Y": {
+        "R1": {
+         "skor": 2,
+         "bukti": "Semua bagian yang diminta ada. Foto soto lebar di atas dengan tombol kembali, share, dan bookmark. Di bawahnya judul 'Soto Ayam Lamongan', kartu 45 mnt / 4 porsi / Sedang, ulasan (avatar, 4,8 · 1.248 ulasan, kutipan), tab Bahan/Langkah, bahan dengan takaran dan checkbox, serta tombol 'Mulai Memasak' tetap di bawah. Mode terang, aksen merah tomat, Bahasa Indonesia, 390x844."
+        },
+        "R2": {
+         "skor": 2,
+         "bukti": "Judul 'Soto Ayam Lamongan' (bold besar, tepat di bawah foto) jadi fokus tunggal. Skala turun tegas ke nilai statistik (45 mnt), lalu 'Untuk 4 porsi', lalu label kecil 'Waktu masak'. Tidak ada judul yatim."
+        },
+        "R4": {
+         "skor": 1,
+         "bukti": "Aksen merah konsisten untuk eyebrow 'MASAKAN JAWA TIMUR', badge 12, '3 dari 12 siap', progress bar, checkbox, 'Lihat', dan CTA. Bintang kuning bermakna. Satu teks lemah: nama bahan yang sudah dicentang ('Ayam kampung', 'Bawang merah') tampil abu muda tipis di atas putih."
+        },
+        "R5": {
+         "skor": 2,
+         "bukti": "Ikon garis seragam di tombol hero, kartu statistik (timer, orang, topi koki), tombol keranjang, dan CTA. Foto soto asli di atas kayu sangat relevan dan berkualitas, lengkap dengan penanda galeri '1/6'. Tanpa emoji."
+        },
+        "R6": {
+         "skor": 2,
+         "bukti": "Copy spesifik: 'Masakan Jawa Timur · Sup & Kuah', 'oleh Bu Ratih Wening', kutipan 'Kuahnya gurih, persis soto kampung.', '1 ekor (±1 kg)', '8 butir'. Angkanya konsisten: badge Bahan 12 sama dengan '3 dari 12 siap', progress sekitar 25%, Langkah 8."
+        },
+        "R8": {
+         "skor": 1,
+         "bukti": "Satu pelanggaran: bidang krem/beige hangat dipakai untuk kartu statistik dan container tab. Keputusan khas tetap ada: tumpukan avatar pengulas dengan kutipan inline, penanda galeri '1/6' di foto, dan tombol keranjang di samping CTA bawah."
+        },
+        "R9": {
+         "skor": 1,
+         "bukti": "Ada detail sekunder seperti label 'Waktu masak/Porsi/Kesulitan', kategori daerah, galeri '1/6', avatar pengulas, dan kutipan. Namun daftar bahan seragam (nama dan takaran tanpa catatan) dan ulasan hanya berupa satu ringkasan tanpa distribusi atau ulasan individual. Konteks hanya ada di sebagian bagian."
+        },
+        "R10": {
+         "skor": 1,
+         "bukti": "Permukaan berlapis ada (kartu beige, tombol keranjang ber-tint pink), badge merah '12', dan foto matang yang menyatu dengan desain. Namun tidak ada warna kedua bermakna yang dipakai konsisten di lebih dari satu bagian; kuning hanya muncul di satu bintang."
+        },
+        "slop": {
+         "jumlah": 1,
+         "butir": [
+          "7: bidang krem/beige hangat pada kartu statistik 45 mnt/4 porsi/Sedang dan container tab Bahan/Langkah di bagian tengah"
+         ]
+        },
+        "emoji": 0,
+        "fokus": "Judul 'Soto Ayam Lamongan' tepat di bawah foto hero"
+       }
+      },
+      "attempts": [
+       {
+        "dir": "/root/lakar/bench/runs/practice/1/judge/P3/rep-1/attempt-1",
+        "status": "ok",
+        "problems": [],
+        "costUsd": 0.1552258,
+        "wallMs": 41866.035346999764
+       }
+      ],
+      "retried": false,
+      "costUsd": 0.1552258
+     },
+     {
+      "prompt": "P3",
+      "rep": 2,
+      "mapping": {
+       "X": "pendev",
+       "Y": "lakar"
+      },
+      "status": "ok",
+      "verdict": {
+       "X": {
+        "R1": {
+         "skor": 2,
+         "bukti": "Semua bagian yang diminta ada dalam satu artboard 390x844. Foto soto lebar di atas dengan tombol kembali (kiri atas) serta bagikan dan simpan (kanan atas). Di bawahnya ada judul 'Soto Ayam Lamongan', kartu statistik '45 mnt / 4 porsi / Sedang', baris ulasan '4,8 · 1.248 ulasan', tab 'Bahan 12 / Langkah 8', daftar bahan dengan takaran dan checkbox, serta tombol 'Mulai Memasak' tetap di bawah. Mode terang, aksen merah tomat, Bahasa Indonesia."
+        },
+        "R2": {
+         "skor": 2,
+         "bukti": "Judul 'Soto Ayam Lamongan' (bold besar, tengah atas di bawah foto) menjadi satu-satunya fokus. Ada lompatan skala yang tegas ke eyebrow 'MASAKAN JAWA TIMUR', nilai statistik bold dengan label kecil, dan subjudul 'Untuk 4 porsi'. Tidak ada judul yatim."
+        },
+        "R4": {
+         "skor": 1,
+         "bukti": "Merah tomat dipakai konsisten untuk eyebrow, badge tab '12', progres '3 dari 12 siap', checkbox, dan CTA. Bintang kuning bermakna rating. Namun nama bahan yang sudah dicentang ('Ayam kampung', 'Bawang merah', kiri bawah) memakai abu-abu muda di atas putih, sehingga kontrasnya lemah."
+        },
+        "R5": {
+         "skor": 2,
+         "bukti": "Ikon garis memiliki satu gaya dan ukuran seragam: kembali, bagikan, simpan, timer, orang, topi koki, keranjang. Foto hero soto dengan telur dan koya relevan dan matang, dilengkapi penanda galeri '1/6'. Tidak ada emoji."
+        },
+        "R6": {
+         "skor": 2,
+         "bukti": "Copy spesifik: 'oleh Bu Ratih Wening', kutipan 'Kuahnya gurih, persis soto kampung.', dan '1 ekor (±1 kg)'. Angka konsisten: porsi 4 di kartu statistik sama dengan 'Untuk 4 porsi', dan badge tab '12' sama dengan '3 dari 12 siap'."
+        },
+        "R8": {
+         "skor": 1,
+         "bukti": "Ada satu pelanggaran: kartu statistik dan segmented tab memakai bidang krem/off-white hangat (butir 7). Keputusan komposisi khasnya bisa ditunjuk: tumpukan avatar ulasan dengan kutipan inline, penanda galeri '1/6' pada foto, dan tombol keranjang terpisah di samping CTA."
+        },
+        "R9": {
+         "skor": 1,
+         "bukti": "Sebagian angka sudah diberi konteks: progres '3 dari 12 siap', '±1 kg', jumlah ulasan, dan label di bawah statistik. Namun daftar bahan yang terlihat hanya berisi item tercentang yang seragam tanpa catatan persiapan. Bagian ulasan juga hanya satu baris ringkas tanpa distribusi atau detail."
+        },
+        "R10": {
+         "skor": 1,
+         "bukti": "Ada permukaan berlapis (kartu krem, tombol keranjang ber-tint merah muda) dan badge merah pada tab. Namun tidak ada warna kedua yang bermakna dan dipakai di lebih dari satu bagian; kuning hanya muncul sekali pada bintang rating."
+        },
+        "slop": {
+         "jumlah": 1,
+         "butir": [
+          "7: bidang krem/off-white hangat pada kartu statistik (tengah) dan segmented tab Bahan/Langkah"
+         ]
+        },
+        "emoji": 0,
+        "fokus": "Judul 'Soto Ayam Lamongan' di bawah foto hero, kiri atas area konten"
+       },
+       "Y": {
+        "R1": {
+         "skor": 2,
+         "bukti": "Ada dua artboard 390x844: keadaan awal dan keadaan tergulir. Header memuat tombol kembali, bagikan, dan simpan, diikuti judul 'Sop Ayam Bening Jahe', statistik '45 menit / 4 porsi / Mudah', rating '4,8 (1.236 ulasan)', tab 'Bahan 9 / Langkah 8', daftar bahan bertakaran dengan checkbox, bagian 'Ulasan pengguna', dan CTA 'Mulai memasak · 8 langkah' tetap di bawah. Mode terang, aksen merah tomat, Bahasa Indonesia. Hero yang hanya placeholder dinilai di R5."
+        },
+        "R2": {
+         "skor": 2,
+         "bukti": "Judul 'Sop Ayam Bening Jahe' (bold besar, kiri atas area konten artboard 1) menjadi fokus. Skalanya tegas turun ke subjudul 'Bahan untuk 4 porsi' dan 'Ulasan pengguna'. Angka besar '4,8' berada di layar tergulir sehingga tidak bersaing dengan judul. Tidak ada judul yatim."
+        },
+        "R4": {
+         "skor": 2,
+         "bukti": "Merah dipakai konsisten untuk tab aktif 'Bahan', checkbox, progres, tombol '+', 'Lihat semua', dan CTA. Hijau pada badge 'Sudah masak' bermakna status. Oranye-cokelat pada bintang dan bar histogram bermakna rating. Teks sekunder abu-abu masih terbaca."
+        },
+        "R5": {
+         "skor": 0,
+         "bukti": "Visual utama hilang. Area hero (atas artboard 1) hanya berisi ikon mangkuk garis di atas gradien merah muda dengan label 'Foto hidangan · Sop Ayam Bening Jahe', bukan foto hidangan. Ikon UI lainnya konsisten bergaya garis, dan tidak ada emoji."
+        },
+        "R6": {
+         "skor": 2,
+         "bukti": "Copy spesifik: 'Potong 8 bagian', 'Simpan untuk taburan', serta ulasan tentang pala dan kentang. Angka konsisten: '15 + 30 mnt' sama dengan 45 menit, '1.236 ulasan' muncul di header dan di ringkasan, distribusi 84+11+3+1+1 = 100%, '9' bahan sama dengan '3 dari 9 sudah disiapkan', dan '8' langkah di tab sama dengan CTA."
+        },
+        "R8": {
+         "skor": 2,
+         "bukti": "Tidak ada pelanggaran checklist: latar putih, tint merah muda bukan krem, tidak ada gradien ungu-biru. Keputusan komposisi khasnya bisa ditunjuk: stepper porsi '− 4 +' di samping 'Bahan untuk 4 porsi', histogram rating di kartu ber-tint, dan CTA yang menyertakan jumlah langkah."
+        },
+        "R9": {
+         "skor": 2,
+         "bukti": "Angka diberi konteks: '15 + 30 mnt masak', '±350 ml/porsi', 'Cocok pemula', '±900 g', dan progres '3 dari 9'. Daftar bahan bervariasi antara tercentang dan belum, masing-masing dengan catatan persiapan. Ulasan dilengkapi histogram, waktu ('2 hari lalu'), rating per ulasan, dan badge 'Sudah masak'. Desain padat tetapi tetap terbaca."
+        },
+        "R10": {
+         "skor": 1,
+         "bukti": "Ada permukaan ber-tint merah muda (hero dan kartu ringkasan rating), chip 'Sup rumahan' / 'Tanpa santan', badge hijau 'Sudah masak', dan warna kedua oranye untuk rating di header serta ulasan. Namun unsur visual tidak matang: hero hanya berupa ikon placeholder, bukan foto."
+        },
+        "slop": {
+         "jumlah": 0,
+         "butir": []
+        },
+        "emoji": 0,
+        "fokus": "Judul 'Sop Ayam Bening Jahe' di kiri atas area konten artboard 1, di bawah chip kategori"
+       }
+      },
+      "attempts": [
+       {
+        "dir": "/root/lakar/bench/runs/practice/1/judge/P3/rep-2/attempt-1",
+        "status": "ok",
+        "problems": [],
+        "costUsd": 0.1598658,
+        "wallMs": 45661.59159700014
+       }
+      ],
+      "retried": false,
+      "costUsd": 0.1598658
+     },
+     {
+      "prompt": "P3",
+      "rep": 3,
+      "mapping": {
+       "X": "lakar",
+       "Y": "pendev"
+      },
+      "status": "ok",
+      "verdict": {
+       "X": {
+        "R1": {
+         "skor": 2,
+         "bukti": "Semua bagian ada: hero atas dengan tombol kembali, bagikan, dan simpan; judul 'Sop Ayam Bening Jahe'; kartu metadata '45 menit', '4 porsi', 'Mudah'; tab 'Bahan 9'/'Langkah 8'; daftar bahan dengan takaran (1 ekor (±900 g), 2 liter, 3 tangkai, Secukupnya) dan checkbox; seksi 'Ulasan pengguna'; tombol merah 'Mulai memasak · 8 langkah' tetap di bawah pada kedua artboard. Lebar 390, mode terang, aksen merah tomat, Bahasa Indonesia."
+        },
+        "R2": {
+         "skor": 2,
+         "bukti": "Judul 'Sop Ayam Bening Jahe' (bold besar, di bawah hero) jelas menjadi fokus. Lompatan skala tegas ke subjudul 'Bahan untuk 4 porsi' dan teks meta kecil. Angka besar '4,8' baru muncul di artboard kedua sehingga tidak bersaing. Tidak ada judul yatim: 'Ulasan pengguna' diikuti kartu ringkasan."
+        },
+        "R4": {
+         "skor": 1,
+         "bukti": "Merah konsisten untuk CTA, tab aktif, checkbox, progress bar, tombol '+', dan 'Lihat semua'. Bintang oranye-cokelat dan badge hijau 'Sudah masak' bermakna. Ada 1 teks lemah: caption 'Foto hidangan · Sop Ayam Bening Jahe' merah muda kecil di atas hero merah muda, kontrasnya rendah."
+        },
+        "R5": {
+         "skor": 1,
+         "bukti": "Ikon garis seragam (panah kembali, bagikan, bookmark, jam, orang, speedometer, topi koki). Visual utama lemah: hero hanya ikon garis mangkuk berasap di atas gradien merah muda dengan label placeholder, bukan foto hidangan. Tidak ada emoji."
+        },
+        "R6": {
+         "skor": 2,
+         "bukti": "Copy spesifik ('Potong 8 bagian', '±350 ml/porsi', ulasan 'Saya tambah sedikit pala'). Angka konsisten: '15 + 30 mnt' = 45 menit; 'Langkah 8' = '8 langkah' di CTA; '1.236 ulasan' sama di header dan kartu rating; distribusi 84/11/3/1/1 berjumlah 100% dan rata-ratanya ≈4,8; 'Bahan 9' cocok dengan '3 dari 9 sudah disiapkan'."
+        },
+        "R8": {
+         "skor": 2,
+         "bukti": "Tidak ada pelanggaran checklist: latar putih, hero merah muda berlabel bukan placeholder abu-abu, tidak ada kartu bertingkat. Ada langkah khas yang bisa ditunjuk: stepper porsi (−/4/+) yang menempel pada 'Bahan untuk 4 porsi' dengan progress bar persiapan, serta kartu distribusi rating berwarna."
+        },
+        "R9": {
+         "skor": 2,
+         "bukti": "Angka diberi konteks: waktu dipecah '15 + 30 mnt masak', '±350 ml/porsi', 'Cocok pemula', progress '3 dari 9'. Setiap bahan punya catatan ('Simpan untuk taburan', 'Sesuai selera'). Ulasan dilengkapi distribusi persentase, waktu relatif, dan badge 'Sudah masak'. Chip 'Sup rumahan'/'Tanpa santan' dan penulis 'oleh Ratna Wulandari' memberi metadata. Padat tetapi terbaca."
+        },
+        "R10": {
+         "skor": 1,
+         "bukti": "Ada permukaan ber-tint (hero merah muda, kartu ringkasan rating merah muda, chip 'Sup rumahan'), badge hijau 'Sudah masak', dan badge hitungan di tab. Namun unsur 'visual matang' tidak terpenuhi: hero hanya ikon placeholder, bukan foto. Warna kedua (hijau) hanya muncul di seksi ulasan."
+        },
+        "slop": {
+         "jumlah": 0,
+         "butir": []
+        },
+        "emoji": 0,
+        "fokus": "Judul 'Sop Ayam Bening Jahe' di bagian atas sheet putih, tepat di bawah hero"
+       },
+       "Y": {
+        "R1": {
+         "skor": 2,
+         "bukti": "Foto lebar di atas dengan tombol kembali, bagikan, dan simpan plus indikator '1/6'; judul 'Soto Ayam Lamongan'; kartu '45 mnt Waktu masak', '4 porsi', 'Sedang Kesulitan'; baris ulasan '4,8 · 1.248 ulasan' dengan kutipan; tab 'Bahan 12'/'Langkah 8'; daftar bahan dengan takaran dan checkbox; CTA 'Mulai Memasak' tetap di bawah. 390x844, mode terang, aksen merah tomat, Bahasa Indonesia."
+        },
+        "R2": {
+         "skor": 2,
+         "bukti": "Judul 'Soto Ayam Lamongan' (bold besar, di bawah eyebrow merah 'MASAKAN JAWA TIMUR') menjadi fokus tunggal. Skala turun tegas ke angka metadata bold sedang, lalu label kecil abu-abu. 'Untuk 4 porsi' langsung diikuti daftar bahan, tidak yatim."
+        },
+        "R4": {
+         "skor": 2,
+         "bukti": "Merah konsisten untuk eyebrow kategori, badge tab '12', '3 dari 12 siap', progress bar, checkbox, 'Lihat', dan CTA. Kuning hanya pada bintang rating (bermakna). Teks utama gelap di atas putih/beige terbaca. Bahan yang sudah dicentang sengaja diredupkan sebagai status."
+        },
+        "R5": {
+         "skor": 2,
+         "bukti": "Hero berupa foto soto nyata yang relevan (mangkuk, telur, sambal). Ikon garis seragam: kembali, bagikan, bookmark, timer, orang, topi koki, keranjang, dan galeri '1/6'. Avatar penulis dan pengulas berupa foto. Tanpa emoji."
+        },
+        "R6": {
+         "skor": 2,
+         "bukti": "Copy spesifik ('oleh Bu Ratih Wening', kutipan 'Kuahnya gurih, persis soto kampung.', '1 ekor (±1 kg)', '8 butir'). Angka konsisten: 'Bahan 12' sama dengan '3 dari 12 siap', 'Langkah 8', dan '4 porsi' sama di kartu metadata dan header daftar."
+        },
+        "R8": {
+         "skor": 1,
+         "bukti": "1 pelanggaran: butir 7, permukaan beige/krem hangat pada kartu metadata dan kontainer tab. Ada langkah khas: tumpukan avatar pengulas dengan kutipan inline di baris rating, serta tombol keranjang sekunder di samping CTA sticky."
+        },
+        "R9": {
+         "skor": 1,
+         "bukti": "Ada konteks sebagian: label di bawah metadata, '3 dari 12 siap' dengan progress bar, '1/6' foto, kutipan ulasan, eyebrow kategori 'Sup & Kuah'. Namun item bahan seragam tanpa catatan persiapan, dan ulasan hanya satu baris ringkasan tanpa distribusi atau detail."
+        },
+        "R10": {
+         "skor": 1,
+         "bukti": "Visual matang (foto hero, avatar), badge merah '12', tombol keranjang ber-tint merah muda. Namun permukaan berlapis berupa beige netral, bukan tint warna utama. Warna kedua bermakna (kuning bintang) hanya muncul di satu tempat, sehingga salah satu unsur kolom 2 tidak ada."
+        },
+        "slop": {
+         "jumlah": 1,
+         "butir": [
+          "7: latar beige/krem hangat pada kartu metadata '45 mnt/4 porsi/Sedang' dan kontainer tab 'Bahan/Langkah' di bagian tengah"
+         ]
+        },
+        "emoji": 0,
+        "fokus": "Judul 'Soto Ayam Lamongan' di atas sheet putih, tepat di bawah foto hero"
+       }
+      },
+      "attempts": [
+       {
+        "dir": "/root/lakar/bench/runs/practice/1/judge/P3/rep-3/attempt-1",
+        "status": "ok",
+        "problems": [],
+        "costUsd": 0.16066180000000002,
+        "wallMs": 45245.12390899984
+       }
+      ],
+      "retried": false,
+      "costUsd": 0.16066180000000002
+     }
+    ],
+    "tools": {
+     "lakar": {
+      "criteria": {
+       "R1": {
+        "values": [
+         2,
+         2,
+         2
+        ],
+        "median": 2,
+        "range": 0,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 2,
+          "bukti": "Semua bagian yang diminta ada. Hero atas punya tombol kembali (kiri atas) serta bagikan dan simpan (kanan atas). Di bawahnya ada judul 'Sop Ayam Bening Jahe', kartu statistik (45 menit, 4 porsi, Mudah), rating 4,8 (1.236 ulasan), tab Bahan/Langkah, daftar bahan dengan takaran dan checkbox, dan tombol 'Mulai memasak · 8 langkah' yang menempel di bawah pada kedua artboard. Mode terang, aksen merah tomat, Bahasa Indonesia, lebar 390."
+         },
+         {
+          "rep": 2,
+          "skor": 2,
+          "bukti": "Ada dua artboard 390x844: keadaan awal dan keadaan tergulir. Header memuat tombol kembali, bagikan, dan simpan, diikuti judul 'Sop Ayam Bening Jahe', statistik '45 menit / 4 porsi / Mudah', rating '4,8 (1.236 ulasan)', tab 'Bahan 9 / Langkah 8', daftar bahan bertakaran dengan checkbox, bagian 'Ulasan pengguna', dan CTA 'Mulai memasak · 8 langkah' tetap di bawah. Mode terang, aksen merah tomat, Bahasa Indonesia. Hero yang hanya placeholder dinilai di R5."
+         },
+         {
+          "rep": 3,
+          "skor": 2,
+          "bukti": "Semua bagian ada: hero atas dengan tombol kembali, bagikan, dan simpan; judul 'Sop Ayam Bening Jahe'; kartu metadata '45 menit', '4 porsi', 'Mudah'; tab 'Bahan 9'/'Langkah 8'; daftar bahan dengan takaran (1 ekor (±900 g), 2 liter, 3 tangkai, Secukupnya) dan checkbox; seksi 'Ulasan pengguna'; tombol merah 'Mulai memasak · 8 langkah' tetap di bawah pada kedua artboard. Lebar 390, mode terang, aksen merah tomat, Bahasa Indonesia."
+         }
+        ]
+       },
+       "R2": {
+        "values": [
+         2,
+         2,
+         2
+        ],
+        "median": 2,
+        "range": 0,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 2,
+          "bukti": "Judul 'Sop Ayam Bening Jahe' (bold besar, di bawah hero) menjadi fokus tunggal. Lompatan skala tegas ke subjudul 'Bahan untuk 4 porsi' dan 'Ulasan pengguna', lalu ke metadata kecil abu-abu. Setiap judul seksi punya isi di bawahnya."
+         },
+         {
+          "rep": 2,
+          "skor": 2,
+          "bukti": "Judul 'Sop Ayam Bening Jahe' (bold besar, kiri atas area konten artboard 1) menjadi fokus. Skalanya tegas turun ke subjudul 'Bahan untuk 4 porsi' dan 'Ulasan pengguna'. Angka besar '4,8' berada di layar tergulir sehingga tidak bersaing dengan judul. Tidak ada judul yatim."
+         },
+         {
+          "rep": 3,
+          "skor": 2,
+          "bukti": "Judul 'Sop Ayam Bening Jahe' (bold besar, di bawah hero) jelas menjadi fokus. Lompatan skala tegas ke subjudul 'Bahan untuk 4 porsi' dan teks meta kecil. Angka besar '4,8' baru muncul di artboard kedua sehingga tidak bersaing. Tidak ada judul yatim: 'Ulasan pengguna' diikuti kartu ringkasan."
+         }
+        ]
+       },
+       "R4": {
+        "values": [
+         1,
+         2,
+         1
+        ],
+        "median": 1,
+        "range": 1,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 1,
+          "bukti": "Aksen merah dipakai konsisten untuk CTA, tab aktif, checkbox, progress bar, bookmark, dan 'Lihat semua'. Hijau hanya untuk status 'Sudah masak', oranye-cokelat untuk bintang dan bar distribusi rating. Satu teks lemah: label 'Foto hidangan · Sop Ayam Bening Jahe' berukuran kecil, merah muda di atas latar pink hero."
+         },
+         {
+          "rep": 2,
+          "skor": 2,
+          "bukti": "Merah dipakai konsisten untuk tab aktif 'Bahan', checkbox, progres, tombol '+', 'Lihat semua', dan CTA. Hijau pada badge 'Sudah masak' bermakna status. Oranye-cokelat pada bintang dan bar histogram bermakna rating. Teks sekunder abu-abu masih terbaca."
+         },
+         {
+          "rep": 3,
+          "skor": 1,
+          "bukti": "Merah konsisten untuk CTA, tab aktif, checkbox, progress bar, tombol '+', dan 'Lihat semua'. Bintang oranye-cokelat dan badge hijau 'Sudah masak' bermakna. Ada 1 teks lemah: caption 'Foto hidangan · Sop Ayam Bening Jahe' merah muda kecil di atas hero merah muda, kontrasnya rendah."
+         }
+        ]
+       },
+       "R5": {
+        "values": [
+         1,
+         0,
+         1
+        ],
+        "median": 1,
+        "range": 1,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 1,
+          "bukti": "Ikon garis seragam: panah kembali, share, bookmark, jam, orang, speedometer, dan topi koki di CTA. Tanpa emoji. Visual utama lemah: hero hanya placeholder gradien pink dengan ikon mangkuk garis dan label 'Foto hidangan', bukan foto masakan."
+         },
+         {
+          "rep": 2,
+          "skor": 0,
+          "bukti": "Visual utama hilang. Area hero (atas artboard 1) hanya berisi ikon mangkuk garis di atas gradien merah muda dengan label 'Foto hidangan · Sop Ayam Bening Jahe', bukan foto hidangan. Ikon UI lainnya konsisten bergaya garis, dan tidak ada emoji."
+         },
+         {
+          "rep": 3,
+          "skor": 1,
+          "bukti": "Ikon garis seragam (panah kembali, bagikan, bookmark, jam, orang, speedometer, topi koki). Visual utama lemah: hero hanya ikon garis mangkuk berasap di atas gradien merah muda dengan label placeholder, bukan foto hidangan. Tidak ada emoji."
+         }
+        ]
+       },
+       "R6": {
+        "values": [
+         2,
+         2,
+         2
+        ],
+        "median": 2,
+        "range": 0,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 2,
+          "bukti": "Copy spesifik, misalnya 'Potong 8 bagian', '1 ekor (±900 g)', '±350 ml/porsi', dan ulasan yang menyebut pala dan kentang. Angkanya konsisten: 15 + 30 = 45 menit; tab Langkah 8 sama dengan CTA '8 langkah'; Bahan 9 sama dengan '3 dari 9 sudah disiapkan'; distribusi 84+11+3+1+1 = 100%; jumlah 1.236 ulasan sama di header dan panel rating."
+         },
+         {
+          "rep": 2,
+          "skor": 2,
+          "bukti": "Copy spesifik: 'Potong 8 bagian', 'Simpan untuk taburan', serta ulasan tentang pala dan kentang. Angka konsisten: '15 + 30 mnt' sama dengan 45 menit, '1.236 ulasan' muncul di header dan di ringkasan, distribusi 84+11+3+1+1 = 100%, '9' bahan sama dengan '3 dari 9 sudah disiapkan', dan '8' langkah di tab sama dengan CTA."
+         },
+         {
+          "rep": 3,
+          "skor": 2,
+          "bukti": "Copy spesifik ('Potong 8 bagian', '±350 ml/porsi', ulasan 'Saya tambah sedikit pala'). Angka konsisten: '15 + 30 mnt' = 45 menit; 'Langkah 8' = '8 langkah' di CTA; '1.236 ulasan' sama di header dan kartu rating; distribusi 84/11/3/1/1 berjumlah 100% dan rata-ratanya ≈4,8; 'Bahan 9' cocok dengan '3 dari 9 sudah disiapkan'."
+         }
+        ]
+       },
+       "R8": {
+        "values": [
+         2,
+         2,
+         2
+        ],
+        "median": 2,
+        "range": 0,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 2,
+          "bukti": "Tidak ada pelanggaran checklist: latar putih, hero pink bukan gradien ungu-biru, dan placeholder hero berlabel. Ada keputusan khas yang bisa ditunjuk: stepper porsi (− 4 +) digabung dengan progress persiapan '3 dari 9' di atas daftar bahan, serta panel distribusi rating ber-tint pink di bagian ulasan."
+         },
+         {
+          "rep": 2,
+          "skor": 2,
+          "bukti": "Tidak ada pelanggaran checklist: latar putih, tint merah muda bukan krem, tidak ada gradien ungu-biru. Keputusan komposisi khasnya bisa ditunjuk: stepper porsi '− 4 +' di samping 'Bahan untuk 4 porsi', histogram rating di kartu ber-tint, dan CTA yang menyertakan jumlah langkah."
+         },
+         {
+          "rep": 3,
+          "skor": 2,
+          "bukti": "Tidak ada pelanggaran checklist: latar putih, hero merah muda berlabel bukan placeholder abu-abu, tidak ada kartu bertingkat. Ada langkah khas yang bisa ditunjuk: stepper porsi (−/4/+) yang menempel pada 'Bahan untuk 4 porsi' dengan progress bar persiapan, serta kartu distribusi rating berwarna."
+         }
+        ]
+       },
+       "R9": {
+        "values": [
+         2,
+         2,
+         2
+        ],
+        "median": 2,
+        "range": 0,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 2,
+          "bukti": "Angka diberi konteks: '15 + 30 mnt masak', '±350 ml/porsi', 'Cocok pemula', persentase per bintang. Setiap bahan punya catatan sekunder ('Simpan untuk taburan', 'Sesuai selera'). Daftar bahan menunjukkan status tercentang dan belum. Ulasan memuat avatar inisial, waktu ('2 hari lalu'), dan badge 'Sudah masak'. Badge jumlah di tab (9, 8) dan chip kategori ('Sup rumahan', 'Tanpa santan') melengkapi."
+         },
+         {
+          "rep": 2,
+          "skor": 2,
+          "bukti": "Angka diberi konteks: '15 + 30 mnt masak', '±350 ml/porsi', 'Cocok pemula', '±900 g', dan progres '3 dari 9'. Daftar bahan bervariasi antara tercentang dan belum, masing-masing dengan catatan persiapan. Ulasan dilengkapi histogram, waktu ('2 hari lalu'), rating per ulasan, dan badge 'Sudah masak'. Desain padat tetapi tetap terbaca."
+         },
+         {
+          "rep": 3,
+          "skor": 2,
+          "bukti": "Angka diberi konteks: waktu dipecah '15 + 30 mnt masak', '±350 ml/porsi', 'Cocok pemula', progress '3 dari 9'. Setiap bahan punya catatan ('Simpan untuk taburan', 'Sesuai selera'). Ulasan dilengkapi distribusi persentase, waktu relatif, dan badge 'Sudah masak'. Chip 'Sup rumahan'/'Tanpa santan' dan penulis 'oleh Ratna Wulandari' memberi metadata. Padat tetapi terbaca."
+         }
+        ]
+       },
+       "R10": {
+        "values": [
+         1,
+         1,
+         1
+        ],
+        "median": 1,
+        "range": 0,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 1,
+          "bukti": "Permukaan berlapis ada (panel rating pink, chip 'Sup rumahan' pink, tab container abu). Warna kedua bermakna juga ada: hijau untuk badge 'Sudah masak' dan oranye untuk rating. Namun visual utama tidak matang: hero berupa placeholder ikon mangkuk di atas gradien pink, bukan foto, sehingga unsur 'visual matang dan menyatu' tidak terpenuhi."
+         },
+         {
+          "rep": 2,
+          "skor": 1,
+          "bukti": "Ada permukaan ber-tint merah muda (hero dan kartu ringkasan rating), chip 'Sup rumahan' / 'Tanpa santan', badge hijau 'Sudah masak', dan warna kedua oranye untuk rating di header serta ulasan. Namun unsur visual tidak matang: hero hanya berupa ikon placeholder, bukan foto."
+         },
+         {
+          "rep": 3,
+          "skor": 1,
+          "bukti": "Ada permukaan ber-tint (hero merah muda, kartu ringkasan rating merah muda, chip 'Sup rumahan'), badge hijau 'Sudah masak', dan badge hitungan di tab. Namun unsur 'visual matang' tidak terpenuhi: hero hanya ikon placeholder, bukan foto. Warna kedua (hijau) hanya muncul di seksi ulasan."
+         }
+        ]
+       }
+      },
+      "total": 13,
+      "slop": {
+       "values": [
+        0,
+        0,
+        0
+       ],
+       "median": 0,
+       "range": 0,
+       "flag": false,
+       "items": [
+        {
+         "rep": 1,
+         "butir": []
+        },
+        {
+         "rep": 2,
+         "butir": []
+        },
+        {
+         "rep": 3,
+         "butir": []
+        }
+       ]
+      },
+      "emoji": {
+       "values": [
+        0,
+        0,
+        0
+       ],
+       "median": 0,
+       "range": 0,
+       "flag": false
+      },
+      "focus": [
+       {
+        "rep": 1,
+        "fokus": "Judul 'Sop Ayam Bening Jahe' tepat di bawah hero, artboard pertama"
+       },
+       {
+        "rep": 2,
+        "fokus": "Judul 'Sop Ayam Bening Jahe' di kiri atas area konten artboard 1, di bawah chip kategori"
+       },
+       {
+        "rep": 3,
+        "fokus": "Judul 'Sop Ayam Bening Jahe' di bagian atas sheet putih, tepat di bawah hero"
+       }
+      ]
+     },
+     "pendev": {
+      "criteria": {
+       "R1": {
+        "values": [
+         2,
+         2,
+         2
+        ],
+        "median": 2,
+        "range": 0,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 2,
+          "bukti": "Semua bagian yang diminta ada. Foto soto lebar di atas dengan tombol kembali, share, dan bookmark. Di bawahnya judul 'Soto Ayam Lamongan', kartu 45 mnt / 4 porsi / Sedang, ulasan (avatar, 4,8 · 1.248 ulasan, kutipan), tab Bahan/Langkah, bahan dengan takaran dan checkbox, serta tombol 'Mulai Memasak' tetap di bawah. Mode terang, aksen merah tomat, Bahasa Indonesia, 390x844."
+         },
+         {
+          "rep": 2,
+          "skor": 2,
+          "bukti": "Semua bagian yang diminta ada dalam satu artboard 390x844. Foto soto lebar di atas dengan tombol kembali (kiri atas) serta bagikan dan simpan (kanan atas). Di bawahnya ada judul 'Soto Ayam Lamongan', kartu statistik '45 mnt / 4 porsi / Sedang', baris ulasan '4,8 · 1.248 ulasan', tab 'Bahan 12 / Langkah 8', daftar bahan dengan takaran dan checkbox, serta tombol 'Mulai Memasak' tetap di bawah. Mode terang, aksen merah tomat, Bahasa Indonesia."
+         },
+         {
+          "rep": 3,
+          "skor": 2,
+          "bukti": "Foto lebar di atas dengan tombol kembali, bagikan, dan simpan plus indikator '1/6'; judul 'Soto Ayam Lamongan'; kartu '45 mnt Waktu masak', '4 porsi', 'Sedang Kesulitan'; baris ulasan '4,8 · 1.248 ulasan' dengan kutipan; tab 'Bahan 12'/'Langkah 8'; daftar bahan dengan takaran dan checkbox; CTA 'Mulai Memasak' tetap di bawah. 390x844, mode terang, aksen merah tomat, Bahasa Indonesia."
+         }
+        ]
+       },
+       "R2": {
+        "values": [
+         2,
+         2,
+         2
+        ],
+        "median": 2,
+        "range": 0,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 2,
+          "bukti": "Judul 'Soto Ayam Lamongan' (bold besar, tepat di bawah foto) jadi fokus tunggal. Skala turun tegas ke nilai statistik (45 mnt), lalu 'Untuk 4 porsi', lalu label kecil 'Waktu masak'. Tidak ada judul yatim."
+         },
+         {
+          "rep": 2,
+          "skor": 2,
+          "bukti": "Judul 'Soto Ayam Lamongan' (bold besar, tengah atas di bawah foto) menjadi satu-satunya fokus. Ada lompatan skala yang tegas ke eyebrow 'MASAKAN JAWA TIMUR', nilai statistik bold dengan label kecil, dan subjudul 'Untuk 4 porsi'. Tidak ada judul yatim."
+         },
+         {
+          "rep": 3,
+          "skor": 2,
+          "bukti": "Judul 'Soto Ayam Lamongan' (bold besar, di bawah eyebrow merah 'MASAKAN JAWA TIMUR') menjadi fokus tunggal. Skala turun tegas ke angka metadata bold sedang, lalu label kecil abu-abu. 'Untuk 4 porsi' langsung diikuti daftar bahan, tidak yatim."
+         }
+        ]
+       },
+       "R4": {
+        "values": [
+         1,
+         1,
+         2
+        ],
+        "median": 1,
+        "range": 1,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 1,
+          "bukti": "Aksen merah konsisten untuk eyebrow 'MASAKAN JAWA TIMUR', badge 12, '3 dari 12 siap', progress bar, checkbox, 'Lihat', dan CTA. Bintang kuning bermakna. Satu teks lemah: nama bahan yang sudah dicentang ('Ayam kampung', 'Bawang merah') tampil abu muda tipis di atas putih."
+         },
+         {
+          "rep": 2,
+          "skor": 1,
+          "bukti": "Merah tomat dipakai konsisten untuk eyebrow, badge tab '12', progres '3 dari 12 siap', checkbox, dan CTA. Bintang kuning bermakna rating. Namun nama bahan yang sudah dicentang ('Ayam kampung', 'Bawang merah', kiri bawah) memakai abu-abu muda di atas putih, sehingga kontrasnya lemah."
+         },
+         {
+          "rep": 3,
+          "skor": 2,
+          "bukti": "Merah konsisten untuk eyebrow kategori, badge tab '12', '3 dari 12 siap', progress bar, checkbox, 'Lihat', dan CTA. Kuning hanya pada bintang rating (bermakna). Teks utama gelap di atas putih/beige terbaca. Bahan yang sudah dicentang sengaja diredupkan sebagai status."
+         }
+        ]
+       },
+       "R5": {
+        "values": [
+         2,
+         2,
+         2
+        ],
+        "median": 2,
+        "range": 0,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 2,
+          "bukti": "Ikon garis seragam di tombol hero, kartu statistik (timer, orang, topi koki), tombol keranjang, dan CTA. Foto soto asli di atas kayu sangat relevan dan berkualitas, lengkap dengan penanda galeri '1/6'. Tanpa emoji."
+         },
+         {
+          "rep": 2,
+          "skor": 2,
+          "bukti": "Ikon garis memiliki satu gaya dan ukuran seragam: kembali, bagikan, simpan, timer, orang, topi koki, keranjang. Foto hero soto dengan telur dan koya relevan dan matang, dilengkapi penanda galeri '1/6'. Tidak ada emoji."
+         },
+         {
+          "rep": 3,
+          "skor": 2,
+          "bukti": "Hero berupa foto soto nyata yang relevan (mangkuk, telur, sambal). Ikon garis seragam: kembali, bagikan, bookmark, timer, orang, topi koki, keranjang, dan galeri '1/6'. Avatar penulis dan pengulas berupa foto. Tanpa emoji."
+         }
+        ]
+       },
+       "R6": {
+        "values": [
+         2,
+         2,
+         2
+        ],
+        "median": 2,
+        "range": 0,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 2,
+          "bukti": "Copy spesifik: 'Masakan Jawa Timur · Sup & Kuah', 'oleh Bu Ratih Wening', kutipan 'Kuahnya gurih, persis soto kampung.', '1 ekor (±1 kg)', '8 butir'. Angkanya konsisten: badge Bahan 12 sama dengan '3 dari 12 siap', progress sekitar 25%, Langkah 8."
+         },
+         {
+          "rep": 2,
+          "skor": 2,
+          "bukti": "Copy spesifik: 'oleh Bu Ratih Wening', kutipan 'Kuahnya gurih, persis soto kampung.', dan '1 ekor (±1 kg)'. Angka konsisten: porsi 4 di kartu statistik sama dengan 'Untuk 4 porsi', dan badge tab '12' sama dengan '3 dari 12 siap'."
+         },
+         {
+          "rep": 3,
+          "skor": 2,
+          "bukti": "Copy spesifik ('oleh Bu Ratih Wening', kutipan 'Kuahnya gurih, persis soto kampung.', '1 ekor (±1 kg)', '8 butir'). Angka konsisten: 'Bahan 12' sama dengan '3 dari 12 siap', 'Langkah 8', dan '4 porsi' sama di kartu metadata dan header daftar."
+         }
+        ]
+       },
+       "R8": {
+        "values": [
+         1,
+         1,
+         1
+        ],
+        "median": 1,
+        "range": 0,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 1,
+          "bukti": "Satu pelanggaran: bidang krem/beige hangat dipakai untuk kartu statistik dan container tab. Keputusan khas tetap ada: tumpukan avatar pengulas dengan kutipan inline, penanda galeri '1/6' di foto, dan tombol keranjang di samping CTA bawah."
+         },
+         {
+          "rep": 2,
+          "skor": 1,
+          "bukti": "Ada satu pelanggaran: kartu statistik dan segmented tab memakai bidang krem/off-white hangat (butir 7). Keputusan komposisi khasnya bisa ditunjuk: tumpukan avatar ulasan dengan kutipan inline, penanda galeri '1/6' pada foto, dan tombol keranjang terpisah di samping CTA."
+         },
+         {
+          "rep": 3,
+          "skor": 1,
+          "bukti": "1 pelanggaran: butir 7, permukaan beige/krem hangat pada kartu metadata dan kontainer tab. Ada langkah khas: tumpukan avatar pengulas dengan kutipan inline di baris rating, serta tombol keranjang sekunder di samping CTA sticky."
+         }
+        ]
+       },
+       "R9": {
+        "values": [
+         1,
+         1,
+         1
+        ],
+        "median": 1,
+        "range": 0,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 1,
+          "bukti": "Ada detail sekunder seperti label 'Waktu masak/Porsi/Kesulitan', kategori daerah, galeri '1/6', avatar pengulas, dan kutipan. Namun daftar bahan seragam (nama dan takaran tanpa catatan) dan ulasan hanya berupa satu ringkasan tanpa distribusi atau ulasan individual. Konteks hanya ada di sebagian bagian."
+         },
+         {
+          "rep": 2,
+          "skor": 1,
+          "bukti": "Sebagian angka sudah diberi konteks: progres '3 dari 12 siap', '±1 kg', jumlah ulasan, dan label di bawah statistik. Namun daftar bahan yang terlihat hanya berisi item tercentang yang seragam tanpa catatan persiapan. Bagian ulasan juga hanya satu baris ringkas tanpa distribusi atau detail."
+         },
+         {
+          "rep": 3,
+          "skor": 1,
+          "bukti": "Ada konteks sebagian: label di bawah metadata, '3 dari 12 siap' dengan progress bar, '1/6' foto, kutipan ulasan, eyebrow kategori 'Sup & Kuah'. Namun item bahan seragam tanpa catatan persiapan, dan ulasan hanya satu baris ringkasan tanpa distribusi atau detail."
+         }
+        ]
+       },
+       "R10": {
+        "values": [
+         1,
+         1,
+         1
+        ],
+        "median": 1,
+        "range": 0,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 1,
+          "bukti": "Permukaan berlapis ada (kartu beige, tombol keranjang ber-tint pink), badge merah '12', dan foto matang yang menyatu dengan desain. Namun tidak ada warna kedua bermakna yang dipakai konsisten di lebih dari satu bagian; kuning hanya muncul di satu bintang."
+         },
+         {
+          "rep": 2,
+          "skor": 1,
+          "bukti": "Ada permukaan berlapis (kartu krem, tombol keranjang ber-tint merah muda) dan badge merah pada tab. Namun tidak ada warna kedua yang bermakna dan dipakai di lebih dari satu bagian; kuning hanya muncul sekali pada bintang rating."
+         },
+         {
+          "rep": 3,
+          "skor": 1,
+          "bukti": "Visual matang (foto hero, avatar), badge merah '12', tombol keranjang ber-tint merah muda. Namun permukaan berlapis berupa beige netral, bukan tint warna utama. Warna kedua bermakna (kuning bintang) hanya muncul di satu tempat, sehingga salah satu unsur kolom 2 tidak ada."
+         }
+        ]
+       }
+      },
+      "total": 12,
+      "slop": {
+       "values": [
+        1,
+        1,
+        1
+       ],
+       "median": 1,
+       "range": 0,
+       "flag": false,
+       "items": [
+        {
+         "rep": 1,
+         "butir": [
+          "7: bidang krem/beige hangat pada kartu statistik 45 mnt/4 porsi/Sedang dan container tab Bahan/Langkah di bagian tengah"
+         ]
+        },
+        {
+         "rep": 2,
+         "butir": [
+          "7: bidang krem/off-white hangat pada kartu statistik (tengah) dan segmented tab Bahan/Langkah"
+         ]
+        },
+        {
+         "rep": 3,
+         "butir": [
+          "7: latar beige/krem hangat pada kartu metadata '45 mnt/4 porsi/Sedang' dan kontainer tab 'Bahan/Langkah' di bagian tengah"
+         ]
+        }
+       ]
+      },
+      "emoji": {
+       "values": [
+        0,
+        0,
+        0
+       ],
+       "median": 0,
+       "range": 0,
+       "flag": false
+      },
+      "focus": [
+       {
+        "rep": 1,
+        "fokus": "Judul 'Soto Ayam Lamongan' tepat di bawah foto hero"
+       },
+       {
+        "rep": 2,
+        "fokus": "Judul 'Soto Ayam Lamongan' di bawah foto hero, kiri atas area konten"
+       },
+       {
+        "rep": 3,
+        "fokus": "Judul 'Soto Ayam Lamongan' di atas sheet putih, tepat di bawah foto hero"
+       }
+      ]
+     }
+    }
+   },
+   "decision": {
+    "decision": "Setara",
+    "why": "lolos gerbang, total 13 vs 12, daya tarik 3 vs 2, tanpa alasan Kalah",
+    "checks": {
+     "total": {
+      "lakar": 13,
+      "pendev": 12
+     },
+     "appeal": {
+      "lakar": 3,
+      "pendev": 2
+     },
+     "appealLoss": [],
+     "otherLoss": [],
+     "zeroVsTwo": [],
+     "pendevBriefViolations": []
+    }
+   },
+   "emoji": {
+    "lakar": {
+     "agent": 0,
+     "glyphs": 0,
+     "lint": 0,
+     "judge": 0
+    },
+    "pendev": {
+     "agent": 0,
+     "glyphs": 0,
+     "judge": 0
+    }
+   },
+   "pngs": {
+    "lakar": "bench/practice/1/P3-lakar.png",
+    "pendev": "bench/runs/practice/1/P3-pendev.png"
+   },
+   "cost": {
+    "lakar": 0.9602911999999998,
+    "pendev": 0.6453966000000001,
+    "pendevCounted": true,
+    "judge": 0.47575340000000005
+   }
+  },
+  {
+   "id": "P4",
+   "name": "Dentara",
+   "kind": "dashboard",
+   "size": {
+    "width": 1440,
+    "height": 900
+   },
+   "judgeTextSha256": "69a553ad4402d4e510e514ce32a465c07936adb4df844770609d1f4f89374161",
+   "runs": {
+    "lakar": {
+     "key": "P4-lakar",
+     "prompt": "P4",
+     "tool": "lakar",
+     "dir": "bench/runs/practice/1/P4-lakar",
+     "record": {
+      "runId": "practice-1-P4-lakar",
+      "prompt": "P4",
+      "attempt": 1,
+      "status": "success",
+      "wallMs": 252097.32147899992,
+      "durationMs": 252156,
+      "durationApiMs": 241776,
+      "costUsd": 1.0168246,
+      "numTurns": 18,
+      "toolCalls": 17,
+      "firstToolUseMs": 1289.8603959998582,
+      "lastToolResultMs": 238040.76737899985,
+      "spawnToFirstEventMs": 1502.891109000193,
+      "frames": [
+       {
+        "id": "eavWoauU",
+        "name": "Dentara / Dasbor · app · Padat",
+        "width": 1440,
+        "height": 900,
+        "png": "bench/runs/practice/1/P4-lakar/png/eavWoauU.png",
+        "pngWidth": 1440,
+        "pngHeight": 900
+       }
+      ],
+      "transcriptBytes": 2821677,
+      "pngScaleMismatch": false,
+      "model": "claude-opus-5-5",
+      "modelUsageKeys": [
+       "claude-opus-5-5"
+      ],
+      "claudeCodeVersion": "2.1.325",
+      "startedAt": "2026-11-18T08:44:12.000Z",
+      "lakar": {
+       "slug": "dentara-dashboard-2611",
+       "opened": [
+        "dentara-dashboard-2611"
+       ],
+       "boards": [
+        {
+         "id": "eavWoauU",
+         "name": "Dentara / Dasbor · app · Padat",
+         "page": "Page 1",
+         "screen": "app",
+         "x": 0,
+         "y": 0,
+         "width": 1440,
+         "height": 900,
+         "wip": false,
+         "childCount": 1
+        }
+       ],
+       "layout": {
+        "rev": 5,
+        "summary": {
+         "error": 0,
+         "warning": 0,
+         "gate": 0
+        },
+        "findings": [],
+        "boards": [
+         {
+          "id": "eavWoauU",
+          "name": "Dentara / Dasbor · app · Padat",
+          "summary": {
+           "error": 0,
+           "warning": 0,
+           "gate": 0
+          }
+         }
+        ]
+       },
+       "docPath": "bench/runs/practice/1/P4-lakar/doc/dentara-dashboard-2611.lakar.json",
+       "historyPath": "bench/runs/practice/1/P4-lakar/doc/dentara-dashboard-2611.history.jsonl",
+       "daemonBefore": {
+        "pid": 1175815,
+        "startedAt": "2026-11-18T08:18:03.772Z",
+        "recreated": 0,
+        "systemd": {
+         "ActiveState": "active",
+         "ActiveEnterTimestamp": "Wed 2026-11-18 08:18:03 UTC",
+         "MainPID": "1175815",
+         "NRestarts": "0"
+        }
+       },
+       "daemonAfter": {
+        "pid": 1175815,
+        "startedAt": "2026-11-18T08:18:03.772Z",
+        "recreated": 0,
+        "systemd": {
+         "ActiveState": "active",
+         "ActiveEnterTimestamp": "Wed 2026-11-18 08:18:03 UTC",
+         "MainPID": "1175815",
+         "NRestarts": "0"
+        }
+       },
+       "docsBefore": 5
+      }
+     },
+     "reconnect": {
+      "count": 0,
+      "affectedMs": 0,
+      "events": [],
+      "toolErrors": []
+     },
+     "agentEmoji": {
+      "emoji": 0,
+      "glyphs": 0,
+      "samples": []
+     },
+     "lintEmoji": {
+      "lc01a": 0,
+      "lc01b": 0
+     },
+     "strip": {
+      "path": "bench/runs/practice/1/P4-lakar.png",
+      "width": 1440,
+      "height": 900,
+      "boards": 1
+     },
+     "previous": []
+    },
+    "pendev": {
+     "key": "P4-pendev",
+     "prompt": "P4",
+     "tool": "pendev",
+     "dir": "bench/runs/practice/1/P4-pendev",
+     "record": {
+      "runId": "practice-1-P4-pendev",
+      "prompt": "P4",
+      "attempt": 1,
+      "status": "failed",
+      "reason": "post: failed to execute tool call. you are probably referencing the wrong .pen file",
+      "uri": "file:///root/.pencil/documents/a7ff5930-f5ca-49b9-9ac4-d6524465d786/untitled.pen",
+      "uriSource": "get_app_state",
+      "wallMs": 191304.02327,
+      "durationMs": 191381,
+      "durationApiMs": 168130,
+      "costUsd": 0.8636820000000001,
+      "numTurns": 17,
+      "toolCalls": 16,
+      "firstToolUseMs": 1533.1176970000379,
+      "lastToolResultMs": 182163.7929740001,
+      "spawnToFirstEventMs": 1721.6279779998586,
+      "frames": [],
+      "transcriptBytes": 682040,
+      "pngScaleMismatch": false,
+      "model": "claude-opus-5-5",
+      "modelUsageKeys": [
+       "claude-opus-5-5"
+      ],
+      "claudeCodeVersion": "2.1.325",
+      "startedAt": "2026-11-18T08:39:55.716Z",
+      "pendevSystemd": {
+       "before": {
+        "ActiveState": "active",
+        "ActiveEnterTimestamp": "Tue 2026-11-17 07:15:37 UTC",
+        "MainPID": "1798021",
+        "NRestarts": "0"
+       },
+       "after": {
+        "ActiveState": "active",
+        "ActiveEnterTimestamp": "Tue 2026-11-17 07:15:37 UTC",
+        "MainPID": "1798021",
+        "NRestarts": "0"
+       }
+      }
+     },
+     "reconnect": {
+      "count": 0,
+      "affectedMs": 0,
+      "events": [],
+      "toolErrors": []
+     },
+     "agentEmoji": {
+      "emoji": 0,
+      "glyphs": 0,
+      "samples": []
+     },
+     "previous": []
+    }
+   },
+   "gate": {
+    "ok": true,
+    "reasons": [],
+    "timeRatio": 1.3177836888626138
+   },
+   "sizeProblems": [],
+   "pendevSizeProblems": [
+    "tidak ada board"
+   ],
+   "decision": {
+    "decision": "tidak dapat dinilai",
+    "why": "run pen.dev gagal"
+   },
+   "emoji": {
+    "lakar": {
+     "agent": 0,
+     "glyphs": 0,
+     "lint": 0
+    },
+    "pendev": {
+     "agent": 0,
+     "glyphs": 0
+    }
+   },
+   "pngs": {
+    "lakar": "bench/practice/1/P4-lakar.png"
+   },
+   "cost": {
+    "lakar": 1.0168246,
+    "pendev": 0.8636820000000001,
+    "pendevCounted": true,
+    "judge": 0
+   }
+  }
+ ],
+ "outcome": {
+  "pass": false,
+  "passCount": 1,
+  "total": 4,
+  "reasons": [
+   "Setara/Lebih baik 1 dari 4 (< 3)",
+   "P4: emoji Lakar (a) 0 / (b) 0 / (c) –"
+  ]
+ },
+ "cost": {
+  "pendev": 3.4718982,
+  "lakar": 4.2904948,
+  "judge": 2.1616642,
+  "iteration": 9.9240572,
+  "previous": {},
+  "cumulative": 9.9240572,
+  "budget": 30
+ },
+ "penGuard": {
+  "files": 33,
+  "changed": [],
+  "removed": [],
+  "added": [
+   "/root/.pencil/documents/249f85ee-2d0b-4080-bae6-cd812868dc0f/untitled.pen",
+   "/root/.pencil/documents/476b2dc2-2389-4e0c-8c1e-372a54420860/untitled.pen",
+   "/root/.pencil/documents/97e1ba2b-1db7-4ad5-8ce3-9dc0bbc1eaf7/untitled.pen",
+   "/root/.pencil/documents/a7ff5930-f5ca-49b9-9ac4-d6524465d786/untitled.pen"
+  ]
+ },
+ "lakardActiveAfter": "active",
+ "notes": [
+  "Sebelum run: dokumen Lakar bench lain dipindah ke `bench/runs/lakar-archive/practice-1-20261118T081803Z` (gerak-beranda-mobile, kasku-landing-umkm), lalu lakard di-restart (pid 1103974 → 1175815)."
+ ]
+}
