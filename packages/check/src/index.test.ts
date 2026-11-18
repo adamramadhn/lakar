@@ -276,6 +276,14 @@ describe('LC-20 konten tertutup bar bawah', () => {
     expect(only(run(clean([wrap, tab()])), 'LC-20')).toEqual([]);
   });
 
+  it('wadah tanpa clip: anak yang melewati bottom wadah tetap terlihat → dievaluasi; wadah clip → terpotong, tidak dievaluasi', () => {
+    const kids = () => [rect('Kartu', [0, 0, 390, 590]), rect('Akhir', [0, 590, 390, 200])];
+    const f = run(clean([frame('Konten', [0, 0, 390, 700], kids()), tab()]));
+    expect(rules(f)).toEqual(['LC-20']);
+    expect(f[0]!.nodeName).toBe('Konten');
+    expect(only(run(clean([frame('Konten', [0, 0, 390, 700], kids(), { clip: true }), tab()])), 'LC-20')).toEqual([]);
+  });
+
   it('tanpa frame → board sebagai wadah; anak absolute dan Status bar diabaikan', () => {
     const f = run(clean([rect('Status bar', [0, 0, 390, 44]), rect('Isi', [0, 44, 390, 760]), tab()]));
     expect(f.map((x) => [x.rule, x.nodeName])).toEqual([['LC-20', 'Home']]);

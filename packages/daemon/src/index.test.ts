@@ -694,6 +694,62 @@ describe.skipIf(!browserInstalled)('check G0 (AD-8): execute + /layout-check', (
     expect((await call('/layout-check', { boardId: awal }, sid)).body.data.findings).toEqual([]);
   }, 60_000);
 
+  it('allowGlyphs per glyph: `❤️ Favorit` + `Suka ❤` di satu board → 422 FONT_MISSING + editId, rev/file tetap; edits hapus ❤ → commit dengan LC-01a', async () => {
+    const sid = await newSession();
+    const slug2 = 'check-campur';
+    await call('/docs/open', { slug: slug2 }, sid);
+    const base = await call('/execute', { code: `add(null, {type:'board', name:'Dasar', x:0, y:0, width:390, height:844, screen:'mobile'})`, description: 'board dasar tanpa isi' }, sid);
+    expect(base.status, JSON.stringify(base.body.error)).toBe(200);
+    const path = join(dataDir, 'docs', `${slug2}.lakar.json`);
+    const before = await readFile(path, 'utf8');
+    const code = `
+      const b = add(null, {type:'board', name:'Campur', x:500, y:0, width:390, height:844, screen:'mobile'});
+      add(b, {type:'text', name:'Favorit', content:'❤️ Favorit', size:16});
+      add(b, {type:'text', name:'Suka', content:'Suka ❤', size:16});
+      b`;
+    const r = await call('/execute', { code, description: 'emoji dan glyph sama di satu board' }, sid);
+    expect(r.status, JSON.stringify(r.body)).toBe(422);
+    expect(r.body.error).toMatchObject({ code: 'FONT_MISSING', editId: expect.stringMatching(/^[A-Za-z0-9]{8}$/) });
+    expect(r.body.error!.message).toContain('U+2764');
+    expect(r.body.error!.hint).toContain('dokumen tidak di-commit');
+    expect(await readFile(path, 'utf8')).toBe(before);
+    const fixed = await call('/execute', { editId: r.body.error!.editId, edits: [{ find: "'Suka ❤'", replace: "'Suka'" }] }, sid);
+    expect(fixed.status, JSON.stringify(fixed.body.error)).toBe(200);
+    expect(fixed.body.data.rev).toBe(base.body.data.rev + 1);
+    expect(fixed.body.data.check.findings.map((f: { rule: string; nodeName: string }) => [f.rule, f.nodeName])).toEqual([['LC-01a', 'Favorit']]);
+  }, 60_000);
+
+  it('LC-20 batas bawah terlihat: wrapper melewati board tanpa scroll akhir → tanpa LC-20; konten tertutup tab bar (wrapper hug / tinggi tetap tanpa clip) → LC-20', async () => {
+    const sid = await newSession();
+    await call('/docs/open', { slug: 'check-lc20' }, sid);
+    const mk = (name: string, x: number, wrap: string, cards: number) => `
+      { const b = add(null, {type:'board', name:'${name}', x:${x}, y:0, width:390, height:844, screen:'mobile'});
+        const c = add(b, {type:'frame', name:'Konten', layout:'column', width:390${wrap}});
+        for (let i = 0; i < ${cards}; i++) add(c, {type:'rect', name:'Kartu ' + i, width:390, height:158, fills:[{type:'solid', color:'#EEEEEE'}]});
+        add(b, {type:'frame', name:'Overlay / Tab bar', position:'absolute', x:0, y:780, width:390, height:64, fills:[{type:'solid', color:'#FFFFFF'}]});
+        out.push(b); }`;
+    const code = `const out = [];
+      ${mk('Panjang', 0, '', 8)}
+      ${mk('Tertutup', 470, '', 5)}
+      ${mk('Tetap', 940, ', height:700', 5)}
+      out`;
+    const r = await call('/execute', { code, description: 'tiga varian wadah LC-20' }, sid);
+    expect(r.status, JSON.stringify(r.body.error)).toBe(200);
+    const [panjang, tertutup, tetap] = r.body.data.value as [string, string, string];
+    const lc20 = async (boardId: string) =>
+      (await call('/layout-check', { boardId }, sid)).body.data.findings.filter((f: { rule: string }) => f.rule === 'LC-20');
+    // 8×158 = 1264 > 844: posisi awal (terpotong board) → tidak dievaluasi.
+    expect(await lc20(panjang)).toEqual([]);
+    // 5×158 = 790 > 772 (y tab bar − 8), terlihat utuh → LC-20 pada Konten.
+    for (const id of [tertutup, tetap]) {
+      const f = await lc20(id);
+      expect(f).toHaveLength(1);
+      expect(f[0]).toMatchObject({ nodeName: 'Konten', level: 'error' });
+      expect(f[0].detail).toMatch(/berakhir di y 790, Overlay \/ Tab bar \(\w+\) mulai di y 780/);
+    }
+    expect(r.body.data.check.findings.filter((f: { rule: string }) => f.rule === 'LC-20')).toHaveLength(2);
+  }, 60_000);
+
   it('latensi: 12 update pada board ±150 node → p50 checkMs ≤ 600 ms (anggaran p50 300 / p95 800)', async () => {
     const sid = await newSession();
     await call('/docs/open', { slug: 'check-latensi' }, sid);

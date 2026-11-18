@@ -12,7 +12,7 @@ review: quick
 review_source: pinned
 lenses_ran: [quick]
 review_loop_iteration: 0
-followup_review_recommended: true
+followup_review_recommended: false
 context:
   - '{project-root}/_bmad-output/initiative-lakar/tickets/epic-g0-inti-minimal/tickets/story-ikon-lucide-dan-simple-icons-lewat-nama-kanonik-plan.md'
 warnings: [oversized]
@@ -167,7 +167,7 @@ deferred: []
 
 - `BoardMeasure`/`NodeBounds`/`TextMeasure` + `MeasureOptions` kini di `@lakar/ports`; `render/src/measure.ts` me-re-export lewat `import type`/`export type`. `uncoveredGlyphs(board, faces, allowGlyphs?)`.
 - `allowGlyphs` per board (code point, sesuai port): code point grapheme temuan LC-01a/LC-01b (grapheme terdepan; bila teks hanya glyph daftar + spasi, semua glyph-nya), DIKURANGI code point yang juga muncul di grapheme bukan temuan di teks mana pun pada board itu. Akibatnya `❤️ Favorit` + `Suka ❤`, `▶️` + `©️`, atau `★★★★★` + `4,9 ★` di satu board → FONT_MISSING + rollback (bukan commit diam-diam); agen menerima FONT_MISSING, bukan temuan LC, untuk kombinasi itu (patch review).
-- LC-20: "batas bawah terlihat C" = min(bottom C, bottom frame clip leluhur, tinggi board) (patch review).
+- LC-20: "batas bawah terlihat C" = min(bottom C bila C board atau frame `clip:true`, bottom frame clip leluhur, tinggi board) (patch review; frame tanpa clip tidak memotong anaknya, patch review lanjutan).
 - LC-12: ukuran dan tabrakan digabung jadi SATU temuan per board (detail/expected dipisah `; `), sesuai "satu temuan per node per aturan".
 - LC-20: nama dicocokkan dengan awalan (`Overlay /`, `Scroll /`, `Crop /`, `Status bar`, `Home indicator`). Wadah fallback = frame anak flow board dengan luas terukur terbesar.
 - Execute: sebelum `runCheck`, ref ikon board tersentuh divalidasi `icons.canonical` (dokumen lama berisi ikon tak dikenal → ICON_UNKNOWN + 3 saran, rollback). Error render saat check → hint ditambah "dokumen tidak di-commit (…)" + hint perbaikan editId. Snippet dengan op sukses tetapi tanpa board tersentuh (mis. hapus board) → `check {boards:[]}` + `bounds {}`.
@@ -187,6 +187,13 @@ deferred: []
   - `[medium]` `[patch]` allowGlyphs per board meloloskan glyph tak tercakup di luar temuan (`❤️` + `Suka ❤`, VS16 `©️`) sehingga commit lalu screenshot FONT_MISSING — terverifikasi di `fonts.ts` (`allow.has(cp)` per board). Fix: `glyphScan` mengurangi code point yang muncul di grapheme bukan temuan; tes unit baru (❤, ©️, 4,9 ★).
   - `[medium]` `[patch]` LC-20 memakai bottom C tak terpotong; wrapper hug yang melewati board (posisi awal) salah dianggap posisi akhir → LC-20 palsu — terverifikasi di `rules.ts` (`bottom(cr)`). Fix: batas bawah terlihat = min(C, frame clip leluhur, board); tes unit baru.
   - `[low]` `[reject]` Tes MCP integrasi menjalankan `daemon/dist/main.js` yang mungkin basi/tidak ada bila `pnpm test` tanpa build — konvensi repo yang sudah ada (`daemon/src/index.test.ts`, `store.test.ts` juga memakai dist; Verification menjalankan build dulu); fix butuh orkestrasi build tambahan, bukan koreksi langsung.
+
+### 2026-11-18 — Review pass (lanjutan)
+- verdicts: 2 findings — high 0, medium 1, low 1, false 0, maybe-false 0
+- findings:
+  - `[medium]` `[patch]` LC-20 memakai bottom C sebagai batas terlihat walau C tidak clip; frame tinggi tetap tanpa clip menampilkan anak yang melewati bottom-nya (`layout.ts` flex `0 0 px`, overflow hanya bila `clip`) sehingga konten di bawah tab bar lolos tanpa LC-20 — terverifikasi di `rules.ts` `lc20`. Fix: bottom C hanya ikut bila C board atau frame `clip:true`; tes unit + integrasi Chromium (board `Tetap`, Konten 700 tanpa clip, kartu berakhir y 790 → LC-20; gagal sebelum patch).
+  - `[low]` `[reject]` Baris sisa `… n temuan lagi (layout_check untuk daftar penuh)` di output `layout_check` merujuk tool itu sendiri — teks diberikan intent-contract untuk kedua batas; jarang (> 60 temuan) dan agen sudah bisa mempersempit lewat `boardId`; mengubahnya menyimpang dari teks kontrak.
+- tes integrasi tambahan (permintaan orkestrator, Chromium asli lewat execute): `❤️ Favorit` + `Suka ❤` satu board → 422 FONT_MISSING (U+2764) + editId, file tetap, edits hapus ❤ → commit dengan tepat LC-01a; LC-20 tiga board: wrapper 8×158 melewati board (scrollY 0) → tanpa LC-20, wrapper hug 5×158 dan Konten tinggi 700 tanpa clip → LC-20 pada Konten.
 
 ## Design Notes
 
@@ -230,3 +237,12 @@ deferred: []
 - **Latensi nyata (1 board 152 node, 12 execute update, Chromium hangat):** p50 56,5–60,6 ms, p95 72,5–78,5 ms (3 run; anggaran p50 ≤ 300 / p95 ≤ 800). Aturan murni 500 node: 7,4 ms (anggaran ≤ 20 ms).
 - **Verifikasi:** `pnpm build` exit 0; check 61, schema 94, render 33, daemon 80, mcp 13 lulus, 0 skip; `pnpm test` 32 file / 544 tes lulus, 0 skip (arah dependensi, browser-pure, C7); tidak ada proses daemon/Chromium Lakar tersisa (`[headless_shell] <defunct>` milik `node app.js` PID 1931892 sejak 17 Nov, bukan Lakar), port 7466: 0; `tools/node26/verify.sh` exit 0; `scripts/tracer-e2e.sh` 1× LULUS ($0,20; execute menampilkan "check board …: 0 error (0 gerbang), 0 warning").
 - **Risiko residual:** emoji diukur dengan font fallback sistem (geometri saja); board campuran glyph kini FONT_MISSING (agen tidak mendapat temuan LC untuk kombinasi itu); tes MCP integrasi butuh `pnpm build` lebih dulu.
+
+### Review lanjutan (2026-11-18)
+
+- **Status:** built.
+- **Temuan:** 2 — 1 patch (medium: LC-20 batas terlihat mengabaikan C tanpa clip), 0 defer, 1 reject (low: baris sisa `layout_check` merujuk dirinya sendiri; teks ditetapkan intent-contract, jarang, ada `boardId`). Patched per verdict: high 0, medium 1, low 0.
+- **File:** `packages/check/src/rules.ts` (batas terlihat LC-20 hanya memakai bottom C bila clip), `packages/check/src/index.test.ts` (tes wadah tanpa clip vs clip), `packages/daemon/src/index.test.ts` (2 tes integrasi Chromium: allowGlyphs campuran → FONT_MISSING + editId + rollback + perbaikan edits; LC-20 wrapper panjang / tertutup / tinggi tetap tanpa clip).
+- **Follow-up review:** `false` (pass lanjutan tanpa patch high). Risiko pass pertama (allowGlyphs campuran, LC-20 batas terlihat) kini teruji lewat execute Chromium asli.
+- **Verifikasi:** `pnpm build` exit 0; check 62, schema 94, render 33, daemon 82, mcp 13 lulus, 0 skip; `pnpm test` 32 file / 547 tes lulus, 0 skip; tes baru LC-20 (unit dan integrasi) gagal pada kode sebelum patch; tidak ada proses daemon/Chromium Lakar tersisa (`headless_shell <defunct>` milik `node app.js` PID 1931892 sejak 17 Nov, bukan Lakar), port 7466: 0; `tools/node26/verify.sh` exit 0.
+- **Risiko residual:** sama dengan pass pertama; baris sisa `layout_check` > 60 temuan tetap merujuk tool yang sama.

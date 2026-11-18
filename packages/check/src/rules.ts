@@ -239,8 +239,9 @@ export function lc20(ctx: BoardContext): Finding[] {
       }
       if (!last) continue;
       const scrollY = c.type === 'frame' ? (c.scrollY ?? 0) : 0;
-      // Batas bawah terlihat C: dipotong oleh frame clip leluhur dan board (selalu clip).
-      let visibleBottom = Math.min(bottom(cr), boardRect.height);
+      // Batas bawah terlihat C: dipotong oleh C sendiri bila clip, frame clip leluhur, dan board (selalu clip).
+      // Frame tanpa clip tetap menampilkan anak yang melewati bottom-nya.
+      let visibleBottom = c.type === 'frame' && c.clip !== true ? boardRect.height : Math.min(bottom(cr), boardRect.height);
       for (let p = ctx.parentOf.get(c.id); p && p.type === 'frame'; p = ctx.parentOf.get(p.id)) {
         const pr = p.clip === true ? ctx.bounds.get(p.id) : undefined;
         if (pr) visibleBottom = Math.min(visibleBottom, bottom(pr));
