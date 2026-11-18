@@ -5,10 +5,17 @@ import type { LakarExtra } from '../lakar/run.js';
 import type { RunRecord } from '../report.js';
 import type { TextEmojiCount } from './emoji.js';
 import type { Reconnect } from './reconnect.js';
-import { TOOL_LABEL, TOOLS, type Agg, type Decision, type GateResult, type PromptScore } from './score.js';
+import { TOOL_LABEL, TOOLS, type Agg, type Decision, type G0Decision, type GateResult, type PromptScore } from './score.js';
 
 export const ROUND_ID = /^(uji-[1-9]\d*|[1-9]\d*)$/;
+/** Putaran resmi (story 16): ID angka polos. */
+export const isOfficialRound = (round: string): boolean => /^[1-9]\d*$/.test(round);
+/** Path kode yang wajib bersih (porcelain kosong) di putaran resmi: produk + harness. */
+export const OFFICIAL_CODE_PATHS: readonly string[] = ['packages', 'tools', 'scripts', 'bench/src', 'bench/protocol', 'bench/mcp', 'bench/package.json', 'package.json', 'pnpm-lock.yaml', '.mcp.json'];
 const PROVISIONAL = 'sementara, menunggu konfirmasi Adam';
+/** Isi sel/baris yang hanya boleh diisi Adam (agen tidak pernah mengisinya). */
+export const AWAITING_ADAM = 'menunggu konfirmasi Adam';
+const C4_LINE = 'C4: G1 tidak dimulai sebelum G0 lolos dan dikonfirmasi Adam.';
 
 export type RoundRun = {
   key: string;
@@ -27,6 +34,8 @@ export type RoundRun = {
 export type RoundPrompt = {
   prompt: string;
   baselineMedianMs: number | undefined;
+  /** Median biaya baseline pen.dev (`bench/baseline-pendev.json`), hanya dilaporkan. */
+  baselineCostUsd?: number | undefined;
   runs: Partial<Record<Tool, RoundRun>>;
   gate: GateResult | undefined;
   sizeProblems: string[];
@@ -36,12 +45,25 @@ export type RoundPrompt = {
 
 export type FrozenVersions = {
   head: string;
+  /** `git status --porcelain -- packages tools .mcp.json` (story 14). */
   porcelain: string;
+  /** Putaran resmi: `git status --porcelain -- <OFFICIAL_CODE_PATHS>` (wajib kosong). */
+  porcelainCode?: string;
+  /** `git status --porcelain` penuh (file plan untracked/terubah boleh ada). */
+  porcelainAll?: string;
   protocolHash: string;
   baselineProtocolHash: string;
   model: string;
   claude: string;
-  lakard: { version?: string; schemaVersion?: number; pid?: number; startedAt?: string; browser?: string };
+  lakard: { version?: string; schemaVersion?: number; pid?: number; startedAt?: string; browser?: string; node?: string };
+  /** Versi `playwright-core` terpasang (packages/daemon). */
+  playwright?: string;
+  /** Font lakard (`/status.fonts`) + versi paket `@fontsource/*` di `packages/daemon/package.json`. */
+  fonts?: { families: string[]; missing: string[]; packages: Record<string, string> };
+  /** sha256 per `packages/<nama>/dist`. */
+  distSha?: Record<string, string>;
+  /** Pembanding `bench/baseline-pendev.json` (putaran resmi wajib sama). */
+  baseline?: { model: string; claude: string; pendevDesktop: string | undefined };
   icons: Record<string, string>;
   skills: Record<string, string>;
   g0Rules: string;
@@ -66,6 +88,10 @@ export type RoundReport = {
   penGuard: { files: number; changed: string[]; removed: string[]; added: string[] } | undefined;
   lakardActiveAfter: string | undefined;
   results: RoundPrompt[];
+  /** Keputusan G0 sementara (`decideG0`), menunggu konfirmasi Adam. */
+  g0: { decision: G0Decision; why: string };
+  /** Strip keempat run untuk Adam, dengan status commit. */
+  pngs: { prompt: string; tool: Tool; path: string | undefined; status: string }[];
   judgeCostUsd: number;
   notes: string[];
 };
@@ -96,6 +122,14 @@ export function renderRoundMarkdown(r: RoundReport): string {
     );
   }
   L.push('');
+  L.push(`## Keputusan G0 (sementara, ${AWAITING_ADAM})`, '');
+  L.push(`Keputusan G0: **${r.g0.decision}** (${PROVISIONAL}). Alasan: ${r.g0.why}.`, '');
+  L.push('| Prompt | Keputusan | Alasan | Median waktu baseline pen.dev (dtk) | Median biaya baseline pen.dev |');
+  L.push('|---|---|---|---|---|');
+  for (const p of r.results) L.push(`| ${p.prompt} | ${p.decision.decision} | ${cell(p.decision.why)} | ${sec(p.baselineMedianMs)} | ${usd(p.baselineCostUsd)} |`);
+  L.push('');
+  L.push('Aturan: putaran dibatalkan → tidak dapat diputuskan; ada prompt Kalah → gagal; A dan B sama-sama Setara/Lebih baik → lolos; selebihnya → tidak dapat diputuskan. Biaya hanya dilaporkan (C8).', '');
+  L.push(`- ${C4_LINE}`, '');
   for (const p of r.results) {
     L.push(`## Prompt ${p.prompt}`, '');
     L.push('### Waktu dan biaya', '');
@@ -154,16 +188,57 @@ export function renderRoundMarkdown(r: RoundReport): string {
     L.push(`Strip: ${TOOLS.map((t) => (p.runs[t]?.strip ? `\`${p.runs[t]!.strip!.path}\` (${p.runs[t]!.strip!.width}×${p.runs[t]!.strip!.height}, ${p.runs[t]!.strip!.boards} board)` : `${TOOL_LABEL[t]} –`)).join(', ')}`, '');
   }
   L.push(`Biaya juri total: ${usd(r.judgeCostUsd)}.`, '');
+  if (r.g0.decision !== 'lolos') {
+    L.push('## Evaluasi arah', '');
+    L.push(`G0 **${r.g0.decision}** (${PROVISIONAL}). Fakta per prompt:`, '');
+    for (const p of r.results) {
+      const sc = p.score?.tools;
+      const zeroVsTwo = sc ? JUDGE_CRITERIA.filter((c) => sc.lakar.criteria[c].median === 0 && sc.pendev.criteria[c].median === 2) : [];
+      L.push(`- **${p.prompt}** — ${p.decision.decision}: ${p.decision.why}.`);
+      L.push(`  - Gerbang: ${p.gate ? (p.gate.ok ? 'lolos' : `gagal (${p.gate.reasons.join('; ')})`) : '–'}.`);
+      L.push(`  - Total: Lakar ${num(sc?.lakar.total)} vs pen.dev ${num(sc?.pendev.total)}.`);
+      L.push(`  - R dengan Lakar 0 vs pen.dev 2: ${sc ? zeroVsTwo.join(', ') || 'tidak ada' : '–'}.`);
+      L.push(`  - Rasio waktu Lakar/median baseline: ${ratio(p.runs.lakar?.record.wallMs, p.baselineMedianMs)}; Lakar/pen.dev putaran ini: ${ratio(p.runs.lakar?.record.wallMs, p.runs.pendev?.record.wallMs)}.`);
+    }
+    L.push('');
+    L.push(`- ${C4_LINE}`);
+    L.push(`- Opsi yang ${AWAITING_ADAM} (agen tidak memilih):`);
+    L.push(`  1. Perbaiki penyebabnya, lalu putaran resmi baru \`--round ${isOfficialRound(r.round) ? Number(r.round) + 1 : '<n+1>'}\` untuk A dan B (putaran baru, bukan mengulang run; C8).`);
+    L.push('  2. Evaluasi ulang arah editor milik Lakar.');
+    L.push('');
+  }
+  L.push('## PNG untuk Adam', '');
+  L.push('| Prompt | Alat | Strip | Status commit |');
+  L.push('|---|---|---|---|');
+  for (const x of r.pngs) L.push(`| ${x.prompt} | ${TOOL_LABEL[x.tool]} | ${x.path ? `\`${x.path}\`` : '–'} | ${cell(x.status)} |`);
+  L.push('');
+  L.push('## Konfirmasi Adam', '');
+  L.push(`Status: **${AWAITING_ADAM}**. Bagian ini hanya diisi Adam; agen tidak pernah mengisinya.`, '');
+  L.push('| Prompt | Keputusan sementara | Kriteria rentang > 1 | Keputusan Adam | Koreksi skor |');
+  L.push('|---|---|---|---|---|');
+  for (const p of r.results) {
+    const flagged = p.score ? JUDGE_CRITERIA.flatMap((c) => TOOLS.filter((t) => p.score!.tools[t].criteria[c].flag).map((t) => `${c} ${TOOL_LABEL[t]}`)) : [];
+    L.push(`| ${p.prompt} | ${p.decision.decision} | ${flagged.join(', ') || 'tidak ada'} | ${AWAITING_ADAM} | ${AWAITING_ADAM} |`);
+  }
+  L.push('');
+  L.push(`Keputusan G0 final: ${AWAITING_ADAM} (sementara: ${r.g0.decision}).`, '');
   L.push('## Versi beku', '');
   const f = r.frozen;
-  L.push(`- git HEAD: \`${f.head}\`; \`git status --porcelain -- packages tools .mcp.json\`: ${f.porcelain ? `**tidak kosong**:\n\n\`\`\`\n${f.porcelain}\n\`\`\`` : 'kosong'}`);
+  const block = (s: string) => `**tidak kosong**:\n\n\`\`\`\n${s}\n\`\`\``;
+  L.push(`- git HEAD: \`${f.head}\`; \`git status --porcelain -- packages tools .mcp.json\`: ${f.porcelain ? block(f.porcelain) : 'kosong'}`);
+  if (f.porcelainCode !== undefined) L.push(`- \`git status --porcelain -- ${OFFICIAL_CODE_PATHS.join(' ')}\`: ${f.porcelainCode ? block(f.porcelainCode) : 'kosong'}`);
+  if (f.porcelainAll !== undefined) L.push(`- \`git status --porcelain\` penuh: ${f.porcelainAll ? `\n\n\`\`\`\n${f.porcelainAll}\n\`\`\`\n` : 'kosong'}`);
   L.push(`- protocolHash: \`${f.protocolHash}\` (baseline: \`${f.baselineProtocolHash}\`, ${f.protocolHash === f.baselineProtocolHash ? 'sama' : '**beda**'})`);
   L.push(`- Model agen dan juri: \`${f.model}\`; Claude Code: ${f.claude}`);
-  L.push(`- lakard: version ${f.lakard.version ?? '–'}, schemaVersion ${f.lakard.schemaVersion ?? '–'}, pid ${f.lakard.pid ?? '–'}, startedAt ${f.lakard.startedAt ?? '–'}, Chromium ${f.lakard.browser ?? '–'}`);
+  if (f.baseline) L.push(`- Baseline pen.dev (\`bench/baseline-pendev.json\`): model \`${f.baseline.model}\`, Claude Code ${f.baseline.claude}, pen.dev desktop ${f.baseline.pendevDesktop ?? '–'}`);
+  L.push(`- lakard: version ${f.lakard.version ?? '–'}, schemaVersion ${f.lakard.schemaVersion ?? '–'}, pid ${f.lakard.pid ?? '–'}, startedAt ${f.lakard.startedAt ?? '–'}, Chromium ${f.lakard.browser ?? '–'}${f.lakard.node ? `, Node ${f.lakard.node}` : ''}`);
+  if (f.playwright) L.push(`- playwright-core: ${f.playwright}`);
+  if (f.fonts) L.push(`- Font (/status): ${f.fonts.families.join(', ') || '–'}; missing: ${f.fonts.missing.length ? f.fonts.missing.join(', ') : '[]'}; paket: ${Object.entries(f.fonts.packages).map(([k, v]) => `${k} ${v}`).join(', ') || '–'}`);
   L.push(`- Ikon (/status): ${Object.entries(f.icons).map(([k, v]) => `${k} ${v}`).join(', ') || '–'}`);
   for (const [k, v] of Object.entries(f.skills)) L.push(`- skill \`${k}\` sha256 \`${v}\``);
   L.push(`- \`G0_RULES\`: \`${f.g0Rules}\``);
   L.push(`- sha256 \`packages/check/dist\`: \`${f.checkDist}\``);
+  if (f.distSha) for (const [k, v] of Object.entries(f.distSha)) L.push(`- sha256 \`packages/${k}/dist\`: \`${v}\``);
   L.push(`- pen.dev desktop: ${f.pendevDesktop ?? '–'}; MCP server: ${f.pendevMcp ?? '–'}`);
   L.push(`- Juri: model \`${f.judge.model}\`; argv \`${f.judge.argv}\``);
   L.push('');

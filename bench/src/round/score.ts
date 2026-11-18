@@ -100,3 +100,27 @@ export function decide(d: DecisionInput): { decision: Decision; why: string } {
     why: zeroVsTwo.length ? `${zeroVsTwo.join(', ')}: Lakar 0 sementara pen.dev 2` : `total ${L.total} < ${P.total} − 1`,
   };
 }
+
+export type G0Decision = 'lolos' | 'gagal' | 'tidak dapat diputuskan';
+/** Prompt yang wajib ada di putaran G0 (Notes epic: hanya A dan B). */
+export const G0_PROMPTS: readonly string[] = ['A', 'B'];
+const G0_PASS: readonly Decision[] = ['Setara', 'Lebih baik'];
+
+/**
+ * Keputusan G0 sementara (murni), sampai Adam mengonfirmasi: putaran `dibatalkan` → tidak dapat diputuskan;
+ * ada prompt Kalah → gagal; A dan B sama-sama Setara/Lebih baik → lolos; selebihnya → tidak dapat diputuskan.
+ */
+export function decideG0(
+  results: readonly { prompt: string; decision: { decision: Decision; why: string } }[],
+  roundStatus: 'lengkap' | 'tidak lengkap' | 'dibatalkan',
+): { decision: G0Decision; why: string } {
+  if (roundStatus === 'dibatalkan') return { decision: 'tidak dapat diputuskan', why: 'putaran dibatalkan' };
+  const lost = results.filter((r) => r.decision.decision === 'Kalah');
+  if (lost.length) return { decision: 'gagal', why: `Kalah di prompt ${lost.map((r) => r.prompt).join(', ')}` };
+  const byPrompt = new Map(results.map((r) => [r.prompt, r.decision.decision]));
+  const missing = G0_PROMPTS.filter((p) => !byPrompt.has(p));
+  if (missing.length) return { decision: 'tidak dapat diputuskan', why: `prompt ${missing.join(', ')} tidak ada di putaran` };
+  const notPass = G0_PROMPTS.filter((p) => !G0_PASS.includes(byPrompt.get(p)!));
+  if (notPass.length === 0) return { decision: 'lolos', why: `${G0_PROMPTS.map((p) => `${p} ${byPrompt.get(p)}`).join(', ')}` };
+  return { decision: 'tidak dapat diputuskan', why: notPass.map((p) => `${p} ${byPrompt.get(p)}`).join(', ') };
+}

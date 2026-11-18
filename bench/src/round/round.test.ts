@@ -1,16 +1,20 @@
+import { mkdtempSync, utimesSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { newestMtimeMs } from '../sys.js';
 import type { JudgeRepRecord } from '../judge/run.js';
 import type { JudgeVerdict } from '../judge/parse.js';
 import { emptyRecord } from '../pendev/run.js';
 import type { TimedLine } from '../stream-metrics.js';
 import { timedLines, toolResultEvent, toolUseEvent } from '../../../tests/support/stream.ts';
 import { countAgentEmoji, countEmojiInText, countLintEmoji } from './emoji.js';
-import { frozenDrift, harnessErrorStatus, isFinalRun, parseRoundArgs, penBaseline, roundOutcome, roundStartProblem } from './main.js';
+import { claudeSemver, copyPngExclusive, frozenDrift, harnessErrorStatus, isFinalRun, officialFreezeProblems, parseRoundArgs, penBaseline, roundOutcome, roundStartProblem, type OfficialFreezeInput } from './main.js';
 import { LAKAR_INIT_RULES } from '../lakar/run.js';
 import { validateInit } from '../stream-metrics.js';
 import { lakarReconnect, pendevReconnect } from './reconnect.js';
-import { renderRoundMarkdown, renderScoreMarkdown, ROUND_ID, type RoundPrompt, type RoundReport } from './report.js';
-import { aggregateScores, decide, lakarGate, type GateResult, type PromptScore } from './score.js';
+import { AWAITING_ADAM, isOfficialRound, renderRoundMarkdown, renderScoreMarkdown, ROUND_ID, type RoundPrompt, type RoundReport } from './report.js';
+import { aggregateScores, decide, decideG0, lakarGate, type Decision, type GateResult, type PromptScore } from './score.js';
 
 const L = (evs: unknown[]): TimedLine[] => timedLines(evs, 1000);
 
@@ -240,6 +244,11 @@ describe('laporan (snapshot)', () => {
     penGuard: { files: 3, changed: [], removed: [], added: ['/x.pen'] },
     lakardActiveAfter: 'active',
     results: [p],
+    g0: decideG0([p], 'lengkap'),
+    pngs: [
+      { prompt: 'B', tool: 'lakar', path: 'bench/runs/rounds/uji-1/B-lakar.png', status: 'lokal (putaran uji, gitignored)' },
+      { prompt: 'B', tool: 'pendev', path: undefined, status: 'strip tidak ada' },
+    ],
     judgeCostUsd: 0.5,
     notes: [],
   };
@@ -248,6 +257,50 @@ describe('laporan (snapshot)', () => {
     const md = renderRoundMarkdown(report);
     for (const s of ['Lakar/pen.dev', 'Lakar/baseline', 'Gerbang G0 Lakar', '### Emoji', '### Reconnect', 'Total (jumlah median)', 'sementara, menunggu konfirmasi Adam', '## Versi beku', 'R3/R7 tidak dihitung']) expect(md).toContain(s);
     expect(md).toMatchSnapshot();
+  });
+
+  it('putaran resmi: Keputusan G0 setelah Ringkasan; Evaluasi arah/PNG/Konfirmasi Adam sebelum Versi beku; Konfirmasi tidak diisi', () => {
+    const official: RoundReport = {
+      ...report,
+      round: '1',
+      frozen: {
+        ...report.frozen,
+        porcelainCode: '',
+        porcelainAll: '?? plan.md',
+        lakard: { ...report.frozen.lakard, node: 'v26.13.1' },
+        playwright: '1.65.1',
+        fonts: { families: ['Inter'], missing: [], packages: { '@fontsource/inter': '5.3.0' } },
+        distSha: { check: 'c1', daemon: 'd1' },
+        baseline: { model: 'claude-opus-5-5', claude: '2.1.325', pendevDesktop: '1.2.23' },
+      },
+      results: [{ ...p, prompt: 'A', baselineCostUsd: 0.84 }, { ...p, decision: { decision: 'Kalah', why: 'total 6 < 9 − 1' } }],
+      g0: { decision: 'gagal', why: 'Kalah di prompt B' },
+      pngs: [{ prompt: 'A', tool: 'lakar', path: 'bench/round-1/A-lakar.png', status: 'tracked, di-commit bersama laporan' }],
+    };
+    const md = renderRoundMarkdown(official);
+    const at = (h: string) => {
+      const i = md.indexOf(h);
+      expect(i, h).toBeGreaterThan(-1);
+      return i;
+    };
+    expect(at('## Ringkasan')).toBeLessThan(at('## Keputusan G0 (sementara, menunggu konfirmasi Adam)'));
+    expect(at('## Keputusan G0')).toBeLessThan(at('## Prompt A'));
+    expect(at('## Prompt B')).toBeLessThan(at('## Evaluasi arah'));
+    expect(at('## Evaluasi arah')).toBeLessThan(at('## PNG untuk Adam'));
+    expect(at('## PNG untuk Adam')).toBeLessThan(at('## Konfirmasi Adam'));
+    expect(at('## Konfirmasi Adam')).toBeLessThan(at('## Versi beku'));
+    expect(md).toContain('G1 tidak dimulai sebelum G0 lolos dan dikonfirmasi Adam');
+    expect(md).toContain('`--round 2`');
+    expect(md).toContain('$0.84');
+    const konf = md.slice(at('## Konfirmasi Adam'), at('## Versi beku'));
+    expect(konf).toContain(`Status: **${AWAITING_ADAM}**`);
+    expect(konf).toContain(`Keputusan G0 final: ${AWAITING_ADAM}`);
+    for (const row of konf.split('\n').filter((l) => /^\| [AB] \|/.test(l))) expect(row.endsWith(`| ${AWAITING_ADAM} | ${AWAITING_ADAM} |`), row).toBe(true);
+    expect(konf).toContain('R1 Lakar'); // rentang > 1 (fixture: R1 Lakar 2 dan 0)
+    for (const s of ['playwright-core: 1.65.1', 'missing: []', '@fontsource/inter 5.3.0', 'packages/daemon/dist', 'Node v26.13.1', 'Baseline pen.dev', '?? plan.md']) expect(md).toContain(s);
+    expect(md).toMatchSnapshot();
+    // G0 lolos → tanpa Evaluasi arah.
+    expect(renderRoundMarkdown({ ...official, g0: { decision: 'lolos', why: 'A Lebih baik, B Setara' } })).not.toContain('## Evaluasi arah');
   });
 
   it('score md: 6 kriteria × 2 alat, bukti per ulangan, pemetaan X/Y setelah penilaian, ulangan failed dicatat', () => {
@@ -319,5 +372,74 @@ describe('resume (C8) dan baseline .pen', () => {
     };
     expect(frozenDrift(f, { ...f, lakard: { ...f.lakard, pid: 2, startedAt: 's2' } })).toEqual([]);
     expect(frozenDrift(f, { ...f, head: 'bbb', skills: { 'core.md': 'y' } })).toEqual(['head: aaa → bbb', 'skills: {"core.md":"x"} → {"core.md":"y"}']);
+  });
+});
+
+describe('keputusan G0 (sementara)', () => {
+  const r = (prompt: string, decision: Decision) => ({ prompt, decision: { decision, why: 'x' } });
+  it('lolos / gagal / tidak dapat diputuskan', () => {
+    expect(decideG0([r('A', 'Lebih baik'), r('B', 'Setara')], 'lengkap').decision).toBe('lolos');
+    expect(decideG0([r('A', 'Lebih baik'), r('B', 'Kalah')], 'lengkap')).toEqual({ decision: 'gagal', why: 'Kalah di prompt B' });
+    expect(decideG0([r('A', 'Setara'), r('B', 'tidak dapat dinilai')], 'lengkap').decision).toBe('tidak dapat diputuskan');
+    expect(decideG0([r('A', 'Setara'), r('B', 'Setara')], 'dibatalkan')).toEqual({ decision: 'tidak dapat diputuskan', why: 'putaran dibatalkan' });
+    expect(decideG0([r('A', 'Kalah'), r('B', 'Setara')], 'dibatalkan').decision).toBe('tidak dapat diputuskan');
+    expect(decideG0([r('A', 'Setara')], 'tidak lengkap').decision).toBe('tidak dapat diputuskan');
+  });
+});
+
+describe('pembekuan putaran resmi', () => {
+  const base: OfficialFreezeInput = {
+    porcelainCode: '',
+    protocolHash: 'h',
+    model: 'claude-opus-5-5',
+    claude: '2.1.325 (Claude Code)',
+    pendevDesktop: '1.2.23',
+    baseline: { protocolHash: 'h', model: 'claude-opus-5-5', claude: '2.1.325', pendevDesktop: '1.2.23' },
+    lakard: { startedAt: '2026-11-18T06:00:00.000Z', fonts: { families: ['Inter'], missing: [] }, pool: { size: 2, ready: 2, recreated: 0 } },
+    newestDistMtimeMs: Date.parse('2026-11-18T05:00:00.000Z'),
+    checkLakardFresh: true,
+  };
+  it('ID angka = resmi; uji-<k> bukan', () => {
+    expect(isOfficialRound('1')).toBe(true);
+    expect(isOfficialRound('uji-2')).toBe(false);
+    expect(claudeSemver('2.1.325 (Claude Code)')).toBe('2.1.325');
+  });
+  it('bersih → tanpa masalah', () => expect(officialFreezeProblems(base)).toEqual([]));
+  it('kode kotor / claude / pen / model / hash berubah → masalah', () => {
+    expect(officialFreezeProblems({ ...base, porcelainCode: ' M bench/src/x.ts' })[0]).toContain('kode tidak beku');
+    expect(officialFreezeProblems({ ...base, claude: '2.1.326 (Claude Code)' })[0]).toContain('claude 2.1.326 ≠ baseline 2.1.325');
+    expect(officialFreezeProblems({ ...base, pendevDesktop: '1.2.24' })[0]).toContain('pen.dev desktop');
+    expect(officialFreezeProblems({ ...base, pendevDesktop: undefined })[0]).toContain('pen.dev desktop');
+    expect(officialFreezeProblems({ ...base, model: 'm' })[0]).toContain('model');
+    expect(officialFreezeProblems({ ...base, protocolHash: 'x' })[0]).toContain('protocolHash');
+  });
+  it('lakard basi (startedAt ≤ mtime dist) → masalah hanya bila dicek sesudah restart', () => {
+    const stale = { ...base, newestDistMtimeMs: Date.parse('2026-11-18T07:00:00.000Z') };
+    expect(officialFreezeProblems(stale)[0]).toContain('lakard basi');
+    expect(officialFreezeProblems({ ...stale, checkLakardFresh: false })).toEqual([]);
+    expect(officialFreezeProblems({ ...base, newestDistMtimeMs: undefined })[0]).toContain('dist tidak ada');
+  });
+  it('font hilang / pool belum siap → masalah', () => {
+    expect(officialFreezeProblems({ ...base, lakard: { ...base.lakard!, fonts: { families: [], missing: ['Inter'] } } })).toEqual(['font hilang: Inter']);
+    expect(officialFreezeProblems({ ...base, lakard: { ...base.lakard!, pool: { size: 2, ready: 0, recreated: 0 } } })[0]).toContain('pool');
+    expect(officialFreezeProblems({ ...base, lakard: undefined })[0]).toContain('lakard');
+  });
+  it('mtime terbaru dir (rekursif)', () => {
+    const d = mkdtempSync(join(tmpdir(), 'mtime-'));
+    expect(newestMtimeMs(d)).toBeUndefined();
+    writeFileSync(join(d, 'a.js'), 'a');
+    utimesSync(join(d, 'a.js'), 1000, 1000);
+    writeFileSync(join(d, 'b.js'), 'b');
+    utimesSync(join(d, 'b.js'), 3000, 3000);
+    expect(newestMtimeMs(d)).toBe(3_000_000);
+  });
+  it('salin PNG Lakar eksklusif: baru → disalin; identik → dilewati; beda → error tanpa menimpa', () => {
+    const d = mkdtempSync(join(tmpdir(), 'png-'));
+    writeFileSync(join(d, 'src.png'), 'A');
+    const dest = join(d, 'round-1', 'A-lakar.png');
+    expect(copyPngExclusive(join(d, 'src.png'), dest)).toBe('disalin');
+    expect(copyPngExclusive(join(d, 'src.png'), dest)).toBe('identik');
+    writeFileSync(join(d, 'src2.png'), 'B');
+    expect(() => copyPngExclusive(join(d, 'src2.png'), dest)).toThrow('tidak ditimpa');
   });
 });

@@ -11,6 +11,7 @@ export type LakardStatus = {
   pool: { size: number; ready: number; recreated: number; browserVersion?: string } | null;
   icons: Record<string, string>;
   fonts?: { families: string[]; missing: string[] };
+  node?: string;
 };
 
 export type LakardBoard = { id: string; name: string; page: string; width: number; height: number; x: number; y: number; screen?: string; expectedSize?: unknown; wip: boolean };

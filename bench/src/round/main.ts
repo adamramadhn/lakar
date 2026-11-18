@@ -1,6 +1,6 @@
 // Perintah `round --round <uji-k|n> [--dry-run] [--resume]`: satu putaran A dan B, Lakar vs pen.dev, lalu juri buta 3×
 // per prompt, lalu `bench/round-<round>.md|json` dan `bench/score-<id>.md|json`.
-import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { constants, copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { G0_RULES, LAKAR_VERSION, SCHEMA_VERSION, errorMessage } from '@lakar/schema';
 import { buildArgs, buildEnv, shellQuote } from '../claude-runner.js';
@@ -15,12 +15,12 @@ import { buildStrip, judgeImages } from '../png/strip.js';
 import { BENCH_ROOT, GOLDEN_SET_PATH, PROTOCOL_DIR, PROTOCOL_FILES, REPO_ROOT, renderPrompt, type PromptId, type Protocol } from '../protocol.js';
 import type { RunRecord } from '../report.js';
 import type { TimedLine } from '../stream-metrics.js';
-import { comparePenHashes, git, isActive, md5PenFiles, restartUserUnit, sha256, sha256Dir, systemdShow, type SystemdInfo } from '../sys.js';
+import { comparePenHashes, git, gitPorcelain, isActive, md5PenFiles, newestMtimeMs, restartUserUnit, sha256, sha256Dir, systemdShow, type SystemdInfo } from '../sys.js';
 import { applyLakarArchive, benchLakarSlugs, planLakarArchive } from '../lakar/archive.js';
 import { countAgentEmoji, countLintEmoji } from './emoji.js';
 import { lakarReconnect, pendevReconnect } from './reconnect.js';
-import { renderRoundJson, renderRoundMarkdown, renderScoreJson, renderScoreMarkdown, ROUND_ID, type FrozenVersions, type RoundPrompt, type RoundReport, type RoundRun } from './report.js';
-import { aggregateScores, decide, lakarGate, NO_VALID_REPS } from './score.js';
+import { isOfficialRound, OFFICIAL_CODE_PATHS, renderRoundJson, renderRoundMarkdown, renderScoreJson, renderScoreMarkdown, ROUND_ID, type FrozenVersions, type RoundPrompt, type RoundReport, type RoundRun } from './report.js';
+import { aggregateScores, decide, decideG0, lakarGate, NO_VALID_REPS } from './score.js';
 
 const ROUND_ORDER: readonly [PromptId, Tool][] = [
   ['A', 'pendev'],
@@ -32,6 +32,86 @@ const BASELINE_JSON = join(BENCH_ROOT, 'baseline-pendev.json');
 const SKILLS_DIR = join(REPO_ROOT, 'packages/skills/skills');
 const MCP_SERVER_TS = join(REPO_ROOT, 'packages/mcp/src/server.ts');
 const CHECK_DIST = join(REPO_ROOT, 'packages/check/dist');
+const PACKAGES_DIR = join(REPO_ROOT, 'packages');
+const DAEMON_PKG = join(PACKAGES_DIR, 'daemon/package.json');
+const PLAYWRIGHT_PKG = join(PACKAGES_DIR, 'daemon/node_modules/playwright-core/package.json');
+
+/** Versi awal `claude --version` ("2.1.325 (Claude Code)" → "2.1.325"). */
+export const claudeSemver = (v: string): string => v.trim().split(/\s+/)[0] ?? '';
+
+export type OfficialFreezeInput = {
+  /** `git status --porcelain -- <OFFICIAL_CODE_PATHS>`. */
+  porcelainCode: string;
+  protocolHash: string;
+  model: string;
+  claude: string;
+  pendevDesktop: string | undefined;
+  baseline: { protocolHash: string; model: string; claude: string; pendevDesktop: string | undefined };
+  /** `/status` lakard: startedAt, fonts, pool. */
+  lakard: Pick<LakardStatus, 'startedAt' | 'fonts' | 'pool'> | undefined;
+  /** mtime (ms) file terbaru di `packages/*\/dist`. */
+  newestDistMtimeMs: number | undefined;
+  /** (c) dicek hanya sesudah restart wajib (sebelum restart / dry-run: lakard memang boleh lebih tua dari build). */
+  checkLakardFresh: boolean;
+};
+
+/**
+ * Cek pembekuan putaran resmi (murni). Setiap masalah → Abort sebelum run apa pun.
+ * (a) kode bersih, (b) protokol/model/claude/pen.dev = baseline (C9: tidak di-upgrade/downgrade),
+ * (c) lakard startedAt > mtime dist terbaru (sesudah restart), (d) font lengkap dan pool siap.
+ */
+export function officialFreezeProblems(i: OfficialFreezeInput): string[] {
+  const out: string[] = [];
+  if (i.porcelainCode) out.push(`kode tidak beku: git status --porcelain -- ${OFFICIAL_CODE_PATHS.join(' ')} tidak kosong:\n${i.porcelainCode}`);
+  const b = i.baseline;
+  const cmp = (name: string, now: string | undefined, base: string | undefined) => {
+    if (now !== base) out.push(`${name} ${now ?? '(tidak terbaca)'} ≠ baseline ${base ?? '(tidak ada)'}: baseline pen.dev tidak sebanding`);
+  };
+  cmp('protocolHash', i.protocolHash, b.protocolHash);
+  cmp('model', i.model, b.model);
+  cmp('claude', claudeSemver(i.claude), b.claude);
+  cmp('pen.dev desktop', i.pendevDesktop, b.pendevDesktop);
+  if (!i.lakard) out.push('lakard /status tidak terbaca');
+  else {
+    if (i.checkLakardFresh) {
+      const started = Date.parse(i.lakard.startedAt);
+      if (i.newestDistMtimeMs === undefined) out.push('packages/*/dist tidak ada: build belum dijalankan');
+      else if (!(started > i.newestDistMtimeMs))
+        out.push(`lakard basi: startedAt ${i.lakard.startedAt} tidak lebih baru dari file dist terbaru ${new Date(i.newestDistMtimeMs).toISOString()}`);
+    }
+    if (!i.lakard.fonts) out.push('fonts tidak ada di /status');
+    else if (i.lakard.fonts.missing.length) out.push(`font hilang: ${i.lakard.fonts.missing.join(', ')}`);
+    if (!((i.lakard.pool?.ready ?? 0) >= 1)) out.push(`pool render belum siap (ready=${i.lakard.pool?.ready ?? '?'})`);
+  }
+  return out;
+}
+
+/** Dir `packages/<nama>/dist` yang ada (nama terurut). */
+function distDirs(): [string, string][] {
+  return readdirSync(PACKAGES_DIR)
+    .sort()
+    .map((n) => [n, join(PACKAGES_DIR, n, 'dist')] as [string, string])
+    .filter(([, d]) => existsSync(d));
+}
+
+function newestDistMtime(): number | undefined {
+  const ms = distDirs().map(([, d]) => newestMtimeMs(d)).filter((x): x is number => x !== undefined);
+  return ms.length ? Math.max(...ms) : undefined;
+}
+
+/**
+ * Salin strip Lakar ke `bench/round-<n>/` secara eksklusif: tujuan sudah ada dengan isi sama → dilewati (resume);
+ * isi beda → error (tidak pernah menimpa).
+ */
+export function copyPngExclusive(src: string, dest: string): 'disalin' | 'identik' {
+  if (existsSync(dest)) {
+    if (sha256(readFileSync(dest)) === sha256(readFileSync(src))) return 'identik';
+    throw new Error(`${dest} sudah ada dengan isi berbeda; tidak ditimpa`);
+  }
+  mkdirSync(join(dest, '..'), { recursive: true });
+  copyFileSync(src, dest, constants.COPYFILE_EXCL);
+  return 'disalin';
+}
 
 export type RoundArgs = { round: string; dryRun: boolean; resume: boolean };
 
@@ -139,13 +219,24 @@ export function loadTimedLines(dir: string): TimedLine[] {
   return raw.map((line, i) => ({ t: timing[i]?.t ?? 0, line: line.replace(/\r$/, '') }));
 }
 
-type Baseline = { protocolHash: string; medians: Record<string, number | undefined> };
+type Baseline = {
+  protocolHash: string;
+  model: string;
+  claude: string;
+  pendevDesktop: string | undefined;
+  medians: Record<string, number | undefined>;
+  costMedians: Record<string, number | undefined>;
+};
 
 function loadBaseline(): Baseline {
   const b = JSON.parse(readFileSync(BASELINE_JSON, 'utf8'));
   const medians: Record<string, number | undefined> = {};
-  for (const s of b.summary ?? []) medians[s.prompt] = s.wallMs?.median;
-  return { protocolHash: b.protocolHash, medians };
+  const costMedians: Record<string, number | undefined> = {};
+  for (const s of b.summary ?? []) {
+    medians[s.prompt] = s.wallMs?.median;
+    costMedians[s.prompt] = s.costUsd?.median;
+  }
+  return { protocolHash: b.protocolHash, model: b.model, claude: b.claudeVersion, pendevDesktop: b.toolVersions?.['pen.dev desktop (X-AppImage-Version)'], medians, costMedians };
 }
 
 const CONVENTION = [
@@ -155,6 +246,7 @@ const CONVENTION = [
   'Sebelum run, dokumen Lakar yang dibuat/dibuka agen di putaran bench lain (`run.json` → `lakar.slug`/`lakar.opened`) dipindah dari dataDir lakard ke `bench/runs/lakar-archive/<round>-<stamp>/`, lalu lakard di-restart (salinan dokumen di memori), agar slug pilihan agen tidak bentrok (`dokumen lama`). Dokumen non-bench tidak disentuh; pembungkus dan prompt tidak berubah.',
   'Versi beku dicatat sekali di awal putaran (`frozen.json`); `--resume` memakainya dan melaporkan perbedaan.',
   'Artefak di `bench/runs/rounds/<round>/` (gitignored): dir run per `<prompt>-<alat>`, strip `<prompt>-<alat>.png`, dan `judge/<prompt>/rep-<k>/` (pemetaan X/Y, transkrip juri).',
+  'Putaran resmi (ID angka) dibekukan ketat sebelum run: `git status --porcelain` kode produk + harness kosong; protocolHash, model, Claude Code, dan pen.dev desktop = `bench/baseline-pendev.json`; lakard selalu di-restart dan `startedAt` harus lebih baru dari file `packages/*/dist` terbaru; font lengkap dan pool siap. Strip Lakar disalin ke `bench/round-<n>/` (tracked); strip dan `.pen` pen.dev tetap lokal di `bench/runs/` (EULA).',
 ];
 
 const DEFINITIONS = [
@@ -182,6 +274,11 @@ export function frozenDrift(first: FrozenVersions, now: FrozenVersions): string[
     checkDist: f.checkDist,
     pendevDesktop: f.pendevDesktop,
     judge: JSON.stringify(f.judge),
+    porcelainCode: f.porcelainCode,
+    lakardNode: f.lakard.node,
+    playwright: f.playwright,
+    fonts: JSON.stringify(f.fonts),
+    distSha: JSON.stringify(f.distSha),
   });
   const a = pick(first);
   const b = pick(now);
@@ -287,7 +384,21 @@ export async function roundMain(argv: string[]): Promise<number> {
   const judgeTexts = prepareJudgeTexts(protocol);
   log('teks juri: tanpa nama alat/path; C7 juri lulus (protokol, skill, server MCP, prompt agen)');
   const head = git(REPO_ROOT, ['rev-parse', 'HEAD']);
-  const porcelain = git(REPO_ROOT, ['status', '--porcelain', '--', 'packages', 'tools', '.mcp.json']);
+  const porcelain = gitPorcelain(REPO_ROOT, ['packages', 'tools', '.mcp.json']);
+  const official = isOfficialRound(round);
+  const porcelainCode = official ? gitPorcelain(REPO_ROOT, OFFICIAL_CODE_PATHS) : undefined;
+  const porcelainAll = official ? gitPorcelain(REPO_ROOT) : undefined;
+  const freezeInput = (st: LakardStatus, checkLakardFresh: boolean): OfficialFreezeInput => ({
+    porcelainCode: porcelainCode ?? '',
+    protocolHash: protocol.hash,
+    model: protocol.config.model,
+    claude: pre.claudeVersion,
+    pendevDesktop: penDesktopVersion(),
+    baseline: { protocolHash: baseline.protocolHash, model: baseline.model, claude: baseline.claude, pendevDesktop: baseline.pendevDesktop },
+    lakard: st,
+    newestDistMtimeMs: newestDistMtime(),
+    checkLakardFresh,
+  });
 
   const cfg = protocol.config;
   const emptyMcpPath = join(RUNS_ROOT, 'rounds', round, 'judge', 'mcp-empty.json');
@@ -308,19 +419,44 @@ export async function roundMain(argv: string[]): Promise<number> {
   const archiveDir = join(RUNS_ROOT, 'lakar-archive', `${round}-${stamp()}`);
   const archivePlan = planLakarArchive(status.dataDir, benchLakarSlugs(join(RUNS_ROOT, 'rounds'), round), archiveDir);
   console.log(`\narsip dokumen Lakar bench lama (sebelum run, lalu restart lakard): ${archivePlan.length ? archivePlan.map((x) => relative(status!.dataDir, x.from)).join(', ') : '-'}`);
+  const preFreeze = official ? officialFreezeProblems(freezeInput(status, false)) : [];
+  if (official) {
+    const distMs = newestDistMtime();
+    const fresh = distMs !== undefined && Date.parse(status.startedAt) > distMs;
+    console.log(
+      `\nputaran resmi: cek pembekuan\n` +
+        `- git status --porcelain -- ${OFFICIAL_CODE_PATHS.join(' ')}: ${porcelainCode ? `TIDAK KOSONG\n${porcelainCode}` : 'kosong'}\n` +
+        `- claude ${claudeSemver(pre.claudeVersion)} (baseline ${baseline.claude}); pen.dev desktop ${penDesktopVersion() ?? '?'} (baseline ${baseline.pendevDesktop ?? '?'}); model ${cfg.model} (baseline ${baseline.model}); protocolHash ${protocol.hash === baseline.protocolHash ? '= baseline' : '≠ baseline'}\n` +
+        `- font missing: ${JSON.stringify(status.fonts?.missing ?? null)}; pool ready ${status.pool?.ready ?? '?'}\n` +
+        `- rencana: restart lakard (wajib untuk putaran resmi${archivePlan.length ? ', sesudah arsip' : ''}), lalu startedAt harus > mtime dist terbaru ${distMs === undefined ? '(dist tidak ada)' : new Date(distMs).toISOString()} (lakard sekarang: startedAt ${status.startedAt}, ${fresh ? 'sudah lebih baru' : 'lebih tua; restart akan memuat build ini'})\n` +
+        `- masalah: ${preFreeze.length ? `\n  ${preFreeze.join('\n  ')}` : 'tidak ada'}`,
+    );
+  }
   if (dryRun) return 0;
+  if (preFreeze.length) throw new Abort(`putaran resmi tidak beku:\n  ${preFreeze.join('\n  ')}`);
   if (porcelain) throw new Abort(`produk tidak beku: git status --porcelain -- packages tools .mcp.json tidak kosong:\n${porcelain}`);
   const archiveNotes: string[] = [];
-  if (archivePlan.length) {
-    applyLakarArchive(archivePlan);
-    log(`arsip: ${archivePlan.length} entri dokumen bench lama dipindah ke ${relative(REPO_ROOT, archiveDir)}; restart lakard`);
+  // Putaran resmi: restart lakard wajib (juga saat rencana arsip kosong), agar lakard memuat build saat ini. Satu restart saja.
+  if (archivePlan.length || official) {
+    if (archivePlan.length) {
+      applyLakarArchive(archivePlan);
+      log(`arsip: ${archivePlan.length} entri dokumen bench lama dipindah ke ${relative(REPO_ROOT, archiveDir)}`);
+    }
+    log('restart lakard');
     const oldPid = status.pid;
     restartUserUnit(LAKARD_UNIT);
     status = await waitLakard(client, oldPid);
     const lp2 = lakarPreflightProblems(status, mcpServerNames());
     if (lp2.length) throw new Abort(`preflight Lakar sesudah restart: ${lp2.join('; ')}`);
+    if (official) {
+      const post = officialFreezeProblems(freezeInput(status, true));
+      if (post.length) throw new Abort(`putaran resmi tidak beku sesudah restart lakard:\n  ${post.join('\n  ')}`);
+      log(`lakard di-restart dari build saat ini (startedAt ${status.startedAt}); cek pembekuan resmi lulus`);
+    }
     archiveNotes.push(
-      `Sebelum run: dokumen Lakar buatan putaran bench lain dipindah ke \`${relative(REPO_ROOT, archiveDir)}\` (${[...new Set(archivePlan.map((x) => x.slug))].join(', ')}), lalu lakard di-restart (pid ${oldPid} → ${status.pid}) agar slug agen tidak bentrok dengan dokumen lama. Restart ini sebelum run, jadi bukan reconnect.`,
+      archivePlan.length
+        ? `Sebelum run: dokumen Lakar buatan putaran bench lain dipindah ke \`${relative(REPO_ROOT, archiveDir)}\` (${[...new Set(archivePlan.map((x) => x.slug))].join(', ')}), lalu lakard di-restart (pid ${oldPid} → ${status.pid}) agar slug agen tidak bentrok dengan dokumen lama. Restart ini sebelum run, jadi bukan reconnect.`
+        : `Sebelum run: lakard di-restart (pid ${oldPid} → ${status.pid}, wajib untuk putaran resmi) agar memuat build saat ini; arsip dokumen kosong. Restart ini sebelum run, jadi bukan reconnect.`,
     );
   }
 
@@ -345,7 +481,16 @@ export async function roundMain(argv: string[]): Promise<number> {
     baselineProtocolHash: baseline.protocolHash,
     model: cfg.model,
     claude: pre.claudeVersion,
-    lakard: { version: status.version, schemaVersion: status.schemaVersion, pid: status.pid, startedAt: status.startedAt, browser: status.pool?.browserVersion },
+    ...(official ? { porcelainCode: porcelainCode ?? '', porcelainAll: porcelainAll ?? '' } : {}),
+    lakard: { version: status.version, schemaVersion: status.schemaVersion, pid: status.pid, startedAt: status.startedAt, browser: status.pool?.browserVersion, node: status.node },
+    playwright: existsSync(PLAYWRIGHT_PKG) ? JSON.parse(readFileSync(PLAYWRIGHT_PKG, 'utf8')).version : undefined,
+    fonts: {
+      families: status.fonts?.families ?? [],
+      missing: status.fonts?.missing ?? [],
+      packages: Object.fromEntries(Object.entries((JSON.parse(readFileSync(DAEMON_PKG, 'utf8')).dependencies ?? {}) as Record<string, string>).filter(([k]) => k.startsWith('@fontsource/')).sort(([a], [b]) => a.localeCompare(b))),
+    },
+    distSha: Object.fromEntries(distDirs().map(([n, d]) => [n, sha256Dir(d)])),
+    baseline: { model: baseline.model, claude: baseline.claude, pendevDesktop: baseline.pendevDesktop },
     icons: status.icons ?? {},
     skills: Object.fromEntries(readdirSync(SKILLS_DIR).filter((f) => f.endsWith('.md')).sort().map((f) => [f, sha256(readFileSync(join(SKILLS_DIR, f)))])),
     g0Rules: JSON.stringify(G0_RULES),
@@ -430,6 +575,7 @@ export async function roundMain(argv: string[]): Promise<number> {
   // ---------- strip + juri ----------
   const results: RoundPrompt[] = [];
   const judgeablePrompts = new Set<string>();
+  const pngCopies = new Map<string, string>();
   let judgeCost = 0;
   for (const p of cfg.promptIds) {
     const r: Partial<Record<Tool, RoundRun>> = { lakar: runs.get(`${p}-lakar`), pendev: runs.get(`${p}-pendev`) };
@@ -442,6 +588,19 @@ export async function roundMain(argv: string[]): Promise<number> {
         if (im) images[t] = im;
       } catch (e) {
         notes.push(`strip ${run.key} gagal: ${errorMessage(e)}`);
+      }
+      // Putaran resmi: strip Lakar disalin ke bench/round-<n>/ (tracked). Strip/.pen pen.dev tetap lokal (EULA).
+      if (official && t === 'lakar' && run.strip) {
+        const dest = join(BENCH_ROOT, `round-${round}`, `${run.key}.png`);
+        try {
+          const how = copyPngExclusive(join(REPO_ROOT, run.strip.path), dest);
+          log(`PNG ${relative(REPO_ROOT, dest)}: ${how}`);
+          pngCopies.set(run.key, relative(REPO_ROOT, dest));
+        } catch (e) {
+          // Tidak menimpa: putaran dibatalkan (juri tidak dijalankan), laporan dan penjaga .pen tetap ditulis.
+          fatal ??= `PNG Lakar ${run.key}: ${errorMessage(e)}`;
+          log(`putaran berhenti: ${fatal}`);
+        }
       }
     }
     const lakarRec = r.lakar?.record;
@@ -507,7 +666,7 @@ export async function roundMain(argv: string[]): Promise<number> {
         });
     // Juri dilewati karena putaran berhenti: alasannya itu, bukan "tidak ada ulangan juri yang valid".
     const decision = judgeSkipped && !reps.length && decided.why === NO_VALID_REPS ? { ...decided, why: `juri tidak dijalankan: putaran dihentikan (${fatal})` } : decided;
-    results.push({ prompt: p, baselineMedianMs: baseline.medians[p], runs: r, gate, sizeProblems, score, decision });
+    results.push({ prompt: p, baselineMedianMs: baseline.medians[p], baselineCostUsd: baseline.costMedians[p], runs: r, gate, sizeProblems, score, decision });
   }
 
   // ---------- penjaga .pen + status ----------
@@ -539,6 +698,19 @@ export async function roundMain(argv: string[]): Promise<number> {
     penGuard: { files: Object.keys(penBefore).length, changed: cmp.changed, removed: cmp.removed, added: cmp.added },
     lakardActiveAfter: isActive(LAKARD_UNIT, true),
     results,
+    g0: decideG0(results, roundStatus),
+    pngs: results.flatMap((x) =>
+      (['lakar', 'pendev'] as const).map((t) => {
+        const run = x.runs[t];
+        const key = `${x.prompt}-${t}`;
+        if (!run?.strip) return { prompt: x.prompt, tool: t, path: undefined, status: run ? 'strip tidak ada' : 'run tidak dijalankan' };
+        if (t === 'pendev') return { prompt: x.prompt, tool: t, path: run.strip.path, status: `lokal, tidak di-commit (EULA); \`.pen\` di \`${run.dir}/\`` };
+        const copy = pngCopies.get(key);
+        return copy
+          ? { prompt: x.prompt, tool: t, path: copy, status: `tracked, di-commit bersama laporan (salinan \`${run.strip.path}\`)` }
+          : { prompt: x.prompt, tool: t, path: run.strip.path, status: official ? 'lokal; salinan ke bench/round-<n>/ gagal' : 'lokal (putaran uji, gitignored)' };
+      }),
+    ),
     judgeCostUsd: judgeCost,
     notes,
   };

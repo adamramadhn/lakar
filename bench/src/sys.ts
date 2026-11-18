@@ -1,5 +1,5 @@
 // Bacaan sistem untuk putaran: systemd show, hash file/direktori, md5 .pen lama, git HEAD/status (hanya baca),
-// ditambah restart lakard (user service) setelah arsip dokumen bench lama.
+// ditambah restart lakard (user service) sebelum putaran dan mtime terbaru dist (bukti lakard memuat build saat ini).
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
@@ -62,6 +62,16 @@ export function sha256Dir(dir: string): string {
   return sha256(files.map((f) => `${sha256(readFileSync(f))}  ${relative(dir, f)}`).join('\n'));
 }
 
+/** mtime (ms) file terbaru di `dir` (rekursif); undefined bila tidak ada file. */
+export function newestMtimeMs(dir: string): number | undefined {
+  let max: number | undefined;
+  for (const f of walk(dir, () => true)) {
+    const m = statSync(f).mtimeMs;
+    if (max === undefined || m > max) max = m;
+  }
+  return max;
+}
+
 /** Direktori .pen yang dijaga (md5 sebelum/sesudah putaran). Isi .pen hanya dibaca sebagai byte untuk hash. */
 const PEN_GUARD_DIRS = ['/root/.pencil/documents', join(REPO_ROOT, 'design'), '/root/comprice', '/opt/pen'];
 
@@ -88,4 +98,9 @@ export function comparePenHashes(before: Record<string, string>, after: Record<s
 
 export function git(repo: string, args: string[]): string {
   return execFileSync('git', ['-C', repo, ...args], { encoding: 'utf8' }).trim();
+}
+
+/** `git status --porcelain [-- paths]` apa adanya (spasi awal kolom status dipertahankan; hanya newline akhir dibuang). */
+export function gitPorcelain(repo: string, paths: readonly string[] = []): string {
+  return execFileSync('git', ['-C', repo, 'status', '--porcelain', ...(paths.length ? ['--', ...paths] : [])], { encoding: 'utf8' }).trimEnd();
 }
