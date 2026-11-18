@@ -7,7 +7,7 @@ Board `1440 × bebas` (`screen:'landing'`). Mulai dengan tinggi besar (mis. 2000
 - Wrapper `Halaman` (kolom, `width:'fill'`) langsung di board; setiap seksi `Seksi / …` lebar fill dengan padding horizontal 80 (konten maks 1280, gutter 24). Ritme: padding vertikal seksi 96–128; judul seksi ↔ isi 32–48; antar-kartu 24; dalam grup 12–16; ikon ↔ teks 4–8.
 - **Navbar 72:** logo kiri (wadah 32 aksen + ikon + wordmark), 3–5 tautan `Link /` body-sm, kanan satu tombol sekunder + satu primer (tinggi 40). Garis bawah satu sisi.
 - **Hero ≥ 640** di bidang merek (`C.field`) atau putih: headline display ≤ 3 baris berupa klaim hasil, bukan nama fitur; subjudul body-lg ≤ 2 baris; satu CTA primer + satu sekunder; baris penguat kecil di bawah CTA (mis. "Gratis ongkir 3 kali pertama"). Visual hero adalah anak frame hero dan menyatu dengan latarnya: foto suasana nyata (`Image /` ≥ 520 lebar, radius 16–24) dengan 1–2 kartu data kecil `Overlay /` di atasnya (wajib bila permintaan menyebut foto), atau mockup produk di `Crop / …` terpotong tepi bawah. Bukan kartu berbingkai di kolom terpisah.
-- **Bidang efek** (bila permintaan atau merek meminta suasana ekspresif): latar hero/sampul = `fills` berlapis: netral (gelap/terang) → `mesh` 3×2–5×4 dari aksen, maks satu pendamping, dan netral (titik paling terang menjauhi blok teks) → `noise` opacity 0.04–0.08. Teks dan tombol berada di zona tenang medan atau di atas panel solid/scrim; kontras dihitung terhadap warna terburuk di bawah teks. Satu bidang per halaman; bila permintaan juga meminta efek di seksi lain, pakai palet yang sama dengan intensitas lebih rendah, bukan efek baru. Cuplikan produk di atas efek = panel solid (surface/raised) agar data terbaca. Ring/donut progres boleh `conic` bergradasi. Tanpa glow, kecuali satu cahaya lembut merek di belakang objek fokus pada latar gelap (blur ≥ 40, opacity ≤ 35%).
+- **Bidang efek** (bila permintaan/merek meminta suasana ekspresif; satu per halaman), empat lapis: (1) `fills` netral → `mesh` dari aksen, ≤ 1 pendamping, netral; (2) **struktur** yang bermakna bagi merek dan berulang: 12–24 garis aliran/gelombang `path` dibuat dengan loop (aksen ber-alpha bertingkat ±6–50%, 1–2 garis lebih tegas), cincin/kontur konsentris, atau kisi/partikel, di `Crop /` absolut seukuran bidang (`clip:true`) sebagai anak pertamanya, melintasi ≥ ⅔ lebarnya; sapuan kecil di pojok terbaca datar; (3) `noise` 0.04–0.08; (4) latar gelap: boleh satu cahaya lembut merek di belakang fokus (blur ≥ 40, opacity ≤ 35%). Teks/tombol di zona tenang (struktur merunduk/menipis di sana, atau elips gelap ber-blur sebagai peredam), kontras ≥ 4.5:1 terhadap warna terburuk di bawahnya; cuplikan produk = panel solid. Seksi lain yang diminta berefek: gema palet yang sama, jauh lebih tipis, bukan bidang kedua. Ring/donut progres boleh `conic`.
 - **Header seksi:** overline aksen → h2 → body-lg secondary, lebar ≤ 720. Rata kiri atau tengah, konsisten.
 - **Ritme:** dua seksi bersebelahan tidak boleh berstruktur sama (variasikan: bento, dua kolom teks + visual, daftar langkah, tabel banding, seksi bidang merek). Latar seksi bergantian putih → `C.field` → putih → `C.deep` (teks `C.on`/terang, satu seksi saja), bukan abu polos. Dalam grid ≥ 3 kartu, minimal satu kartu berbeda lebar, ditekankan (bidang/solid), atau memuat elemen non-teks.
 - **Kartu fitur/langkah:** ikon 24 di wadah 48 (tint; solid aksen untuk butir yang ditekankan), judul h4, deskripsi body-sm, dan satu detail konkret berpembanding (angka, durasi, harga) atau `Badge`. Alur bertahap: nomor/penanda tahap + garis penghubung, tahap kini disorot.
@@ -43,9 +43,13 @@ for(const l of ['Cara kerja','Asal biji','Harga','Untuk kafe']) T(links,'Link / 
 const act=Row(nav,'Aksi',{gap:12});
 Btn(act,'Masuk','secondary',{height:40,padding:[0,16]});
 Btn(act,'Coba sampel','primary',{height:40,padding:[0,16]});
-// Hero = satu bidang efek: tint merek + mesh lembut (aksen + pendamping, terang di tepi, tenang di tengah) + grain tipis
-const hero=F(page,'Seksi / Hero',{width:'fill',padding:[96,80,0,80],gap:64,align:'center',fills:[...fill(C.field),
+// Hero = satu bidang efek: tint merek + mesh lembut (aksen + pendamping) + struktur + grain tipis
+const hero=F(page,'Seksi / Hero',{width:'fill',padding:[96,80,0,80],gap:64,align:'center',clip:true,fills:[...fill(C.field),
  {type:'mesh',columns:3,rows:2,colors:['#CDE8E4',C.field,'#F4E7C8',C.field,C.field,'#D3EBE7']},{type:'noise',opacity:0.05,seed:11}]});
+// Struktur: kontur kebun, 16 garis melintasi lebar penuh, merunduk di tengah (zona teks tenang)
+const fx=F(hero,'Crop / Kontur',{position:'absolute',x:0,y:0,width:1440,height:756,layout:'none',clip:true});
+for(let i=0;i<16;i++){const y=60+i*26,k=i%5===2;
+ add(fx,{type:'path',name:'Kontur / '+(i+1),d:`M0 ${y} C 420 ${y+40} 300 ${y+420} 720 ${y+430} S 1020 ${y+40} 1440 ${y}`,viewBox:[0,0,1440,756],width:1440,height:756,stroke:{color:C.acc+(k?'80':(16+i*2).toString(16).padStart(2,'0')),width:k?1.5:1,align:'center'}});}
 const copy=F(hero,'Hero / Teks',{width:800,gap:24,align:'center'});
 T(copy,'Overline','LANGGANAN BIJI KOPI UNTUK KAFE','overline',{color:C.acc});
 T(copy,'Headline','Biji segar tiba tiap Senin, disangrai 72 jam sebelumnya','display-lg',{width:'fill',align:'center'});
@@ -55,7 +59,7 @@ Btn(cta,'Coba sampel');
 Btn(cta,'Lihat jadwal sangrai','secondary');
 T(copy,'Penguat','Gratis ongkir untuk 3 pengiriman pertama · berhenti kapan saja','body-sm',{color:C.t3});
 // Visual hero: mockup dasbor dipotong tepi bawah
-const crop=F(hero,'Crop / Dasbor',{width:1040,height:320,clip:true});
+const crop=F(hero,'Crop / Dasbor',{width:1040,height:240,clip:true});
 const app=F(crop,'Mockup / Dasbor',{width:'fill',height:'hug',padding:24,gap:20,radius:[16,16,0,0],fills:fill(C.bg),stroke:line(),shadows:[{x:0,y:4,blur:16,color:'#10182814'}]});
 const top=Row(app,'Header',{width:'fill',justify:'space-between'});
 T(top,'Judul','Pengiriman minggu ini','h4');
@@ -63,8 +67,8 @@ const meta=Row(top,'Meta',{gap:8});
 Badge(meta,'36,5 kg · +4 kg vs minggu lalu','success','trending-up');
 Badge(meta,'Disangrai Jumat','accent','flame');
 const rows=F(app,'Daftar',{width:'fill'});
-// Daftar memperlihatkan keadaan: tiba (selesai), dikemas (berikutnya, disorot), stok tipis (peringatan)
-for(const [n,k,q,st,tone,ic,hot] of [['Kafe Teras, Bandung','Gayo · medium','12 kg','Tiba Senin','success','circle-check',0],['Ruang Seduh, Jakarta','Kintamani · light','8 kg','Dikemas','accent','package',1],['Pojok Arang, Bogor','Toraja · medium-dark','6,5 kg','Stok 2 hari','warning','triangle-exclamation-point',0],['Kopi Lantai Dua, Malang','Gayo · espresso','10 kg','Terjadwal','neutral','calendar',0]]){
+// Daftar memperlihatkan keadaan: selesai, berikutnya (disorot), peringatan
+for(const [n,k,q,st,tone,ic,hot] of [['Kafe Teras, Bandung','Gayo · medium','12 kg','Tiba Senin','success','circle-check',0],['Ruang Seduh, Jakarta','Kintamani · light','8 kg','Dikemas','accent','package',1],['Pojok Arang, Bogor','Toraja · medium-dark','6,5 kg','Stok 2 hari','warning','triangle-exclamation-point',0]]){
  const r=Row(rows,'Baris / '+n,{width:'fill',height:56,gap:16,padding:[0,12],radius:8,fills:fill(hot?C.tint:C.bg)});
  const w=Row(r,'Ikon',{width:32,height:32,radius:8,justify:'center',fills:fill(hot?C.acc:C.sub)}); I(w,ic,16,hot?C.on:C.t2);
  T(r,'Cabang',n,'body-sm',{width:'fill',weight:500});
@@ -80,7 +84,6 @@ Seksi fitur bento: satu kartu lebar berisi stok berpembanding + linimasa, dua ka
 
 ```js
 // pakai prelude
-// Seksi fitur: header kiri + bento (1 kartu lebar dengan visual, 2 kartu sempit)
 const s=F(keep.page,'Seksi / Fitur',{width:'fill',padding:[128,80],gap:48});
 const head=F(s,'Header seksi',{width:720,gap:16});
 T(head,'Overline','CARA KERJA','overline',{color:C.acc});
@@ -112,8 +115,8 @@ for(const [ic,j,dsc,det,tone,hot] of [['flame','Profil sangrai per menu','Espres
 }
 ```
 
-Execute penutup setelah screenshot: tinggi dari `bounds` seksi terakhir (y 908 + tinggi 880), lalu lepas `[WIP] `:
+Execute penutup setelah screenshot: tinggi dari `bounds` seksi terakhir (y 828 + tinggi 880), lalu lepas `[WIP] `:
 
 ```js
-update(keep.board, {height:1788, name:'Biji Pagi / Beranda · landing · Jernih'});
+update(keep.board, {height:1708, name:'Biji Pagi / Beranda · landing · Jernih'});
 ```

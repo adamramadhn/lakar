@@ -488,3 +488,77 @@ Run `practice --series effects --iter 2 --reuse-pendev 1` (pen.dev iterasi 1 dip
 ## Status seri efek: lulus di iterasi 2 — menunggu done_checkpoint (Adam melihat PNG)
 
 PNG Lakar: `bench/practice/effects/{1,2}/P{5,6}-lakar.png` (tracked); PNG pen.dev lokal: `bench/runs/practice-effects/1/P{5,6}-pendev.png` (EULA).
+
+## Seri efek iterasi 3: skill v9 — bidang efek berstruktur (keputusan Adam sesudah melihat PNG iterasi 2)
+
+Alasan (Plan Change Log story 22): iterasi 2 lulus angka juri, tetapi hero P5 terlalu datar (mesh hijau lembut di pojok),
+sedangkan iterasi 1 (garis aliran melintasi hero) hampir setara pen.dev. Mesin, juri v2.1, aturan keputusan, dan prompt
+beku (sha `5f0c23a7…`) tidak diubah.
+
+Perubahan skill v9 (prinsip umum, kata sendiri, berlaku untuk jenis layar apa pun):
+
+- **`landing.md`:** bidang efek = empat lapis: (1) netral → `mesh` dari aksen + ≤ 1 pendamping; (2) **struktur** yang
+  bermakna bagi merek dan berulang (12–24 garis aliran/gelombang `path` dari loop dengan alpha bertingkat, 1–2 garis
+  tegas; atau cincin/kontur konsentris; atau kisi/partikel) di `Crop /` absolut seukuran bidang (bidang `clip:true`),
+  melintasi ≥ ⅔ lebar; sapuan kecil di pojok terbaca datar; (3) `noise` 0.04–0.08; (4) di latar gelap satu cahaya lembut
+  merek. Teks di zona tenang (struktur merunduk/menipis, atau elips gelap ber-blur sebagai peredam), kontras ≥ 4.5:1;
+  seksi lain berefek = palet dan struktur sama, intensitas lebih rendah. Contoh teruji hero kini memperagakan struktur
+  (16 garis kontur dari loop, merunduk di tengah agar zona teks tenang); baris mockup ke-4 dan satu komentar dihapus agar
+  total ≤ 3500.
+- **`mobile.md`:** bidang efek = `mesh` dasar → struktur bermakna berulang melintasi bidang (gelombang `path`, cincin/kontur
+  `ellipse`, partikel; alpha bertingkat) → `noise` ≤ 0.08 → di gelap satu cahaya merek; teks di zona tenang/panel solid,
+  kontras ≥ 4.5:1. Contoh teruji: kartu sorotan diberi kontur gema dari ring (9 `ellipse` stroke, alpha menurun) di
+  `Crop /` + `clip:true`. Prosa dipadatkan (tile kategori merujuk palet `core`, anggaran tinggi, tanpa duplikasi, alur execute); koreksi
+  review: pemadatan ini MENGHAPUS "kesatuan dari bentuk/ikon/tipografi" (tile), mengubah langkah 2 alur execute dari
+  "Error `check`" ke "Semua temuan `check`", dan kalimat efek `core.md` tidak lagi menyebut `conic` hiasan/gradien luas
+  dan "tidak di teks" — belum diukur pada P1–P4.
+- **`core.md`:** kalimat efek ekspresif: "≤ 1 bidang per board (fokus merek) = `mesh`/gradien + pola berulang bermakna
+  (aliran, kontur, kisi) + `noise`; teks di zona tenang/scrim".
+- Stroke Lakar hanya warna solid (tanpa gradien stroke), jadi "opacity bertingkat" diwujudkan dengan alpha warna stroke
+  per garis.
+- Skill: `core.md` ef90b5bd1e8c5801 (4000/4000 token), `landing.md` 2052748bd339c612 (total 3492, prosa 1459),
+  `mobile.md` a58df31c071230f3 (total 3141, prosa 1495). Contoh teruji lulus 0 error/warning/gate (dicek mata: garis
+  kontur melintasi lebar hero dan merunduk di belakang mockup; zona teks tenang). `pnpm build` exit 0, `pnpm test`
+  852/852 (termasuk C7 P1–P6, batas token, contoh skill).
+
+Run `practice --series effects --iter 3 --reuse-pendev 1` (pen.dev iterasi 1 dipakai ulang; pen-desktop tidak dijalankan,
+tidak di-restart, tidak disentuh). HEAD `7588a9a` + skill v9 di porcelain `frozen.json`; prompt sha = `5f0c23a7…` (beku).
+
+| Prompt | Waktu Lakar / pen.dev | Rasio | T L–P | D L–P | Gate | Emoji (a/b/c) | Keputusan |
+|---|---|---|---|---|---|---|---|
+| P5 | 214,4 / 195,6 dtk | 1,10 | 15–10 | 4–2 | 0 | 0/0/0 | Lebih baik |
+| P6 | 81,2 / 133,3 dtk | 0,61 | 14–14 | 2–2 | 0 | 0/0/0 | Setara |
+
+- **Lulus** (P5 Lebih baik, P6 Setara, waktu ≤ 1,10×, emoji 0, gate 0).
+- Penilaian PNG sendiri (jujur): **P5** hero iterasi 3 kembali ekspresif: pita 20 garis gelombang (loop, alpha bertingkat, beberapa
+  garis tegas) melintasi seluruh lebar hero (dari tepi kiri ke kanan, menebal di bawah CTA dan di belakang panel status) + cahaya hijau lembut di belakang
+  panel + mesh gelap; teks di zona tenang atas. Dibanding iterasi 2 (mesh di pojok kanan atas saja) jelas lebih hidup;
+  dibanding iterasi 1 (garis aliran tegak di kedua sisi judul) setara, kini lebih mirip komposisi pen.dev (gelombang
+  melintang + cahaya merek). pen.dev masih punya gelombang yang lebih tegas dan menyilang di belakang judul. Kekurangan:
+  garis aliran lewat di belakang baris penguat kecil di bawah CTA (teks muted di atas garis, masih terbaca) dan efek seksi
+  ajakan akhir (14 garis, palet sama) sangat redup. **P6** iterasi 3: langit senja marun→oranye, matahari dengan cincin kontur konsentris,
+  siluet bukit berlapis, bintang, grain, cahaya pada tombol; teks dan indikator di zona tenang bawah. Setara dengan
+  pen.dev (pen.dev lebih ungu dan punya chip "Lewati"; Lakar punya label "Langkah 1 dari 3"). Juri: R9/R10 sama 1–1.
+- Skor pen.dev pada strip yang sama bergeser lagi (P5 11 → 12 → 10), jadi selisih T antariterasi sebagian derau juri.
+- Agen memakai `mesh` (P5 6×, P6 4×), `noise` (8×, 4×), `path` (10×, 6×), `ellipse` (18×, 34×); `conic` tidak dipakai.
+- Catatan proses: P5 8 execute (3 gagal: SCHEMA_INVALID `x/y` pada `ellipse` di frame `layout:'none'` tanpa
+  `position:'absolute'`, FONT_MISSING "→", ICON_UNKNOWN `linkedin`), melebihi batas skill landing 4; P6 4 execute (1 gagal,
+  SCHEMA_INVALID yang sama), melebihi batas mobile 3. Waktu tetap ≤ 1,10×. Galat `x/y` tanpa `position` muncul di kedua
+  prompt (anak frame `layout:'none'` dianggap absolut oleh agen); kandidat perbaikan mesin/API di luar story ini.
+- Penjaga `.pen`: 43 file, berubah 0, hilang 0, baru 0. lakard active; pen-desktop active; `bash tools/node26/verify.sh`
+  exit 0 sesudah run.
+- Biaya iterasi 3: $3,00 (Lakar $1,71, juri $1,29); kumulatif seri **$10,99** dari $15. Tidak ada iterasi ke-4.
+- Penilaian orkestrator (Read sendiri hero P5 iterasi 1, 2, 3 dan pen.dev): iterasi 3 jelas lebih hidup dari iterasi 2,
+  tetapi gelombangnya terkumpul di pita bawah hero (di bawah CTA, di belakang panel status), tipis dan redup; iterasi 1 dan
+  pen.dev punya sapuan cahaya yang lebih terang dan tegas melintasi area judul. Jadi iterasi 3 belum "setara iterasi 1";
+  arah benar, intensitas/penempatan struktur masih kurang. P6 setara pen.dev.
+- Review quick sesudah run (patch kata/batas, bukan prinsip; skill yang di-commit berbeda tipis dari yang diukur):
+  `mobile.md` cahaya merek kini "di balik fokus (blur ≥ 40, opacity ≤ 35%), bukan di tombol" (juri P6 mencatat glow pada
+  tombol); `landing.md` seksi lain berefek = "gema palet yang sama, jauh lebih tipis, bukan bidang kedua"; rentang alpha
+  prosa ±6–50%; contoh memakai `.padStart(2,'0')` untuk akhiran alpha. sha16 sesudah patch: core ef90b5bd1e8c5801,
+  landing cc9ec3fa06c9116b (total 3500/3500, prosa 1462), mobile e3605b6c5babec32 (prosa 1500/1500).
+
+## Status seri efek: lulus di iterasi 3 (skill v9) — menunggu done_checkpoint (Adam melihat PNG)
+
+PNG Lakar: `bench/practice/effects/{1,2,3}/P{5,6}-lakar.png` (tracked); PNG pen.dev lokal:
+`bench/runs/practice-effects/1/P{5,6}-pendev.png` (EULA). Iterasi 2 tetap tercatat lulus.

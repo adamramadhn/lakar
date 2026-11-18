@@ -51,6 +51,24 @@ deferred:
     location: >-
       packages/skills/skills/landing.md, packages/skills/skills/mobile.md (contoh teruji)
     severity: medium (unverified)
+  - summary: >-
+      Contoh teruji efek kini lebih berat (mesh + 16 garis kontur / 9 cincin + noise) sehingga risiko efek bocor ke prompt non-efek bertambah.
+    evidence: |-
+      Contoh landing (langganan kopi, mode terang) dan kartu sorotan mobile tidak meminta suasana ekspresif, tetapi selalu
+      memperagakan bidang efek berstruktur; prosa berkata "bila permintaan/merek meminta". Yang menuntaskan: run P1–P4 /
+      putaran 2 dengan skill v9 dan hitung bidang efek per board.
+    location: >-
+      packages/skills/skills/landing.md, packages/skills/skills/mobile.md (contoh teruji)
+    severity: medium (unverified)
+  - summary: >-
+      Agen melampaui batas execute skill di iterasi 3 (P5 8 vs maks 4, P6 4 vs maks 3) karena x/y tanpa position pada anak frame layout:'none'.
+    evidence: |-
+      LOG iterasi 3 dan stream run: galat SCHEMA_INVALID berulang di kedua prompt (juga muncul saat menulis contoh skill).
+      Kandidat perbaikan: anak frame layout:'none' otomatis absolut, atau pesan galat yang menyarankan position:'absolute'.
+      Rasio waktu P5 naik 0,91× → 1,10× (masih ≤ 1,5×).
+    location: >-
+      packages/exec (validasi anak frame layout:'none'), packages/schema/src/nodes.ts
+    severity: medium
 ---
 
 <intent-contract>
@@ -165,7 +183,30 @@ Shader fill WebGL tidak dibangun. Tapi kalau baseline menunjukkan pen.dev benar-
 - Latensi: render (renderBoard + 1 frame) mesh 5×4 + noise vs polos +16,6 ms (batas 150). Encode PNG screenshot TIDAK masuk batas: grain di atas gradien membuat PNG 1440×900 ±1 MB, screenshot ±515 ms vs ±85 ms polos (dicatat di output tes). Risiko waktu agen pada screenshot/export.
 - Iterasi 2 (`--reuse-pendev 1`) lulus: P5 Setara 13–12 (0,91×), P6 Setara 13–14 (0,86×), emoji 0, gate 0. Kumulatif seri $7,99 dari $15. Iterasi 3 tidak dijalankan.
 
+Catatan orkestrator lanjutan 2026-11-18 (iterasi 3; menggantikan "Iterasi 3 tidak dijalankan" dan syarat "Kalau belum lulus" untuk iterasi 3, lihat Plan Change Log):
+- Satu iterasi tambahan saja: `practice --series effects --iter 3 --reuse-pendev 1` (P5 dan P6; pen.dev TIDAK dijalankan, di-restart, atau disentuh). Masih dalam batas plan: maks 3 iterasi, kumulatif ≤ $15 ($7,99 terpakai). Tidak ada iterasi ke-4.
+- Skill v9 (prinsip umum, kata sendiri, C7; tanpa rubrik/prompt A/B/teks prompt latihan/nama produk latihan): bidang efek ekspresif di hero/area merek punya STRUKTUR bermakna untuk merek (pola garis/aliran/gelombang berulang — path dengan gradien stroke dan opacity bertingkat —, cincin/kontur, kisi/partikel) dilapis di atas mesh/gradien dasar + grain halus + satu cahaya lembut merek; efek melintasi area cukup luas (bukan sapuan kecil di pojok); teks tetap di zona tenang/scrim dengan kontras ≥ 4.5:1; tetap ≤ 1 bidang efek ekspresif per board. Pola/contoh teruji dijalankan terhadap API, 0 error gerbang. core.md ≤ 4000 dan mobile.md prosa ≤ 1500 token (ganti/padatkan; detail landing di landing.md).
+- Juri v2.1, aturan keputusan, dan prompt beku (sha 5f0c23a7…) tidak diubah. Intent-contract tidak diubah. LOG.md satu entri iterasi 3.
+- Semua tugas Execution lain sudah selesai di iterasi 1–2 (lihat Auto Run Result) — jangan diulang. Yang tersisa: revisi skill v9 (+ contoh teruji, tes skill/C7/token lulus), build, `systemctl --user restart lakard` (pastikan active), `practice --series effects --iter 3 --dry-run` lalu `--iter 3 --reuse-pendev 1` (log ke file, polling foreground sampai selesai di giliran yang sama; tes/vitest tidak paralel dengan run), entri LOG iterasi 3 (Read sendiri PNG hero P5 iterasi 1, 2, 3 dan pen.dev, serta P6 iterasi 3 vs pen.dev; nilai jujur), perbarui Implementation Notes. Jangan commit (orkestrator yang commit).
+- Iterasi 3 lulus → `built` (menunggu done_checkpoint). Iterasi 3 gagal kriteria → HALT `blocked`, dilaporkan jujur; iterasi 2 tetap tercatat lulus.
+
+Hasil iterasi 3 (2026-11-18):
+- Skill v9: `landing.md` bidang efek empat lapis (mesh dasar → struktur bermakna berulang 12–24 garis/kontur/kisi dari loop, alpha bertingkat, di `Crop /` absolut seukuran bidang `clip:true`, melintasi ≥ ⅔ lebar → noise 0.04–0.08 → satu cahaya merek di gelap; teks di zona tenang/peredam, kontras ≥ 4.5:1); contoh hero memperagakan 16 garis kontur yang merunduk di tengah. `mobile.md` prinsip sama ringkas + contoh kartu sorotan dengan kontur gema ring (9 ellipse). `core.md` kalimat efek diganti (≤ 1 bidang, mesh/gradien + pola berulang bermakna + noise). Stroke Lakar hanya warna solid, jadi "gradien stroke" diwujudkan sebagai alpha warna stroke bertingkat per garis.
+- Token: core 4000/4000; landing total 3492 (prosa 1459); mobile total 3141 (prosa 1495). sha16: core ef90b5bd1e8c5801, landing 2052748bd339c612, mobile a58df31c071230f3. `pnpm build` exit 0, `pnpm test` 852/852, contoh skill 0 error/warning/gate (PNG contoh dicek mata).
+- `systemctl --user restart lakard` → active; `practice --series effects --iter 3 --dry-run` (dan dengan `--reuse-pendev 1`) lulus preflight, sha beku, $15 cukup, tanpa restart pen-desktop.
+- `--iter 3 --reuse-pendev 1` **lulus**: P5 Lebih baik 15–10 (D 4–2, 1,10×), P6 Setara 14–14 (D 2–2, 0,61×), emoji 0, gate 0. Biaya $3,00; kumulatif seri $10,99 dari $15. Penjaga `.pen` 43 file tak berubah. pen.dev tidak dijalankan/di-restart. `tools/node26/verify.sh` exit 0 sesudahnya.
+- PNG dilihat sendiri: hero P5 kembali ekspresif (20 garis gelombang melintasi lebar hero + cahaya hijau di belakang panel), lebih hidup daripada iterasi 2 dan mendekati komposisi pen.dev; P6 setara pen.dev. Kekurangan: garis lewat di belakang baris penguat kecil di bawah CTA; efek seksi ajakan akhir sangat redup.
+- Catatan proses: P5 8 execute (3 gagal), P6 4 execute (1 gagal) — melebihi batas skill (landing 4, mobile 3). Galat berulang di kedua prompt: `x/y` pada `ellipse` anak frame `layout:'none'` tanpa `position:'absolute'` (SCHEMA_INVALID); kandidat perbaikan mesin/API (anak `layout:'none'` otomatis absolut) di luar story ini.
+
 ## Plan Change Log
+
+- 2026-11-18 — Keputusan Adam sesudah melihat PNG iterasi 2 (done_checkpoint): hero landing iterasi 2 terlalu datar
+  (hanya mesh hijau di pojok), sedangkan iterasi 1 (skill lama: garis aliran ekspresif melintasi hero) hampir setara
+  pen.dev (garis aliran energi melintasi hero + cahaya merek). Walau iterasi 2 lulus angka juri, mutu visual hero
+  dianggap turun. Diputuskan: revisi skill (bidang efek ekspresif berstruktur — garis/aliran/gelombang, kontur, kisi —
+  di atas mesh/gradien dasar + grain + satu cahaya merek, melintasi area luas, teks di zona tenang) lalu jalankan
+  iterasi 3 seri efek (P5, P6; `--reuse-pendev 1`, tanpa run pen.dev). Masih dalam batas plan (maks 3 iterasi, ≤ $15).
+  Status `built` → `in-progress`. Intent-contract tidak diubah.
 
 ## Review Triage Log
 
@@ -181,6 +222,21 @@ Shader fill WebGL tidak dibangun. Tapi kalau baseline menunjukkan pen.dev benar-
   - `[low]` `[patch]` Laporan seri efek dengan `--only` menyebut "semua 1 prompt" padahal keputusan memakai 2 — `renderPracticeMarkdown` kini memakai jumlah prompt beku seri (2), bukan jumlah hasil.
   - `[maybe-false]` `[defer]` Pemadatan core/mobile menghapus instruksi skill v7 tanpa run ulang P1–P4 — alur akhir lengkap masih di core langkah 6; dampak hanya terukur dengan run P1–P4.
   - `[maybe-false]` `[defer]` Contoh teruji selalu memakai mesh+noise → efek bocor ke prompt non-efek — contoh dimandatkan plan; dampak belum diukur.
+
+### 2026-11-18 — Review pass (iterasi 3, skill v9)
+- Diff review: perubahan sejak `7588a9ab3c1bd7605c1fb54635c0566af289425c` (b8821fa..7588a9a sudah direview di pass sebelumnya; `bench/effects-3.json` mentah dikecualikan dari diff).
+- verdicts: 10 findings — high 0, medium 2, low 6, false 0, maybe-false 1 (+1 plan-only)
+- findings:
+  - `[low]` `[patch]` landing.md: "seksi lain berefek: palet dan struktur sama" mendorong bidang efek kedua (DESIGN.md cabang A: ≤ 1) — diganti "gema palet yang sama, jauh lebih tipis, bukan bidang kedua".
+  - `[medium]` `[patch]` mobile.md: izin satu cahaya merek tanpa batas DESIGN.md (blur ≥ 40, opacity ≤ 35%, di balik fokus, bukan komponen); juri P6 mencatat glow pada tombol — ditambah "di balik fokus (blur ≥ 40, opacity ≤ 35%), bukan di tombol"; prosa dipadatkan agar tetap 1500/1500.
+  - `[low]` `[reject]` Urutan lapis contoh (noise di fills induk, garis kontur anak di atasnya) beda dengan prosa (noise di atas struktur) — benar, tetapi garis 1 px ber-alpha rendah membuat beda visual dapat diabaikan; memindah noise ke lapis anak menambah node.
+  - `[low]` `[patch]` Rentang alpha prosa 10–60% tak cocok dengan contoh (±6–18%, tegas 50%) — prosa jadi "±6–50%".
+  - `[low]` `[patch]` Akhiran alpha `.toString(16)` tanpa padding menghasilkan hex 7 digit bila agen mengubah loop — `.padStart(2,'0')` di contoh landing dan mobile (contoh tetap lulus 0 error gerbang).
+  - `[low]` `[reject]` Geometri kurva contoh melintasi rentang vertikal teks di kiri/kanan blok salinan — benar secara geometri; garis ber-alpha ≤ 18% di mode terang, contoh lulus dan dicek mata; mengubah geometri perlu iterasi render ulang, bukan koreksi langsung. Output P5 serupa (baris penguat kecil masih terbaca) dicatat di risiko sisa.
+  - `[low]` `[patch]` LOG mengklaim pemadatan "tanpa membuang aturan" padahal "kesatuan dari bentuk/ikon/tipografi", "Error `check`" → "Semua temuan `check`", dan `conic` hiasan/"tidak di teks" di core berubah — klaim LOG dikoreksi; dampak P1–P4 tetap di deferred (pemadatan belum diukur).
+  - `[maybe-false]` `[defer]` Contoh efek lebih berat → risiko efek bocor ke prompt non-efek bertambah — perlu run P1–P4 dan hitung bidang efek per board; ditambah ke `deferred`.
+  - `[low]` `[reject]` Dokumen plan tidak konsisten (deferred[0] usang, "mobile prosa 1500/1500" vs 1495, status in-review vs built, lenses/loop) — perbaikannya mengedit plan build ini; dirapikan di finalisasi tanpa dihitung patch.
+  - `[medium]` `[defer]` Agen melampaui batas execute (P5 8/4, P6 4/3) karena galat `x/y` tanpa `position` pada anak `layout:'none'` — perilaku validasi API sudah ada sebelum perubahan ini; ditambah ke `deferred`.
 
 ## Design Notes
 
@@ -266,9 +322,9 @@ Cabang B (tanpa persetujuan): skill hanya memakai satu efek gradien per board, t
 
 ## Auto Run Result
 
-Status: **built** (menunggu done_checkpoint: Adam melihat PNG).
+Status: **built** (menunggu done_checkpoint: Adam melihat PNG iterasi 3).
 
-**Ringkasan:** skema v2 (fill `conic`, `noise` ber-seed, `mesh` canvas 2D) + migrasi identitas 1→2; render efek deterministik; dokumentasi API/MCP; panduan efek di skill core/landing/mobile; DESIGN.md cabang A (snapshot sebelum/sesudah tracked); harness `practice --series effects` (maks 3 iterasi, $15, semua prompt wajib lulus) + restart pen-desktop sesudah seri pen.dev. Prompt P5/P6 dibekukan di commit `dd66120` sebelum perubahan mesin/skill/DESIGN.md. Baseline pen.dev: shader 0 (mesh_gradient 5, blur, 1 Generate("ai")) → tidak HALT. Seri efek lulus di iterasi 2 (P5 Setara 13–12, 0,91×; P6 Setara 13–14, 0,86×; emoji 0, gate 0); kumulatif $7,99 dari $15. Baseline iterasi 1 (skill lama) juga sudah lulus (P5 Lebih baik 16–11, P6 Setara 14–14).
+**Ringkasan:** skema v2 (fill `conic`, `noise` ber-seed, `mesh` canvas 2D) + migrasi identitas 1→2; render efek deterministik; dokumentasi API/MCP; panduan efek di skill core/landing/mobile; DESIGN.md cabang A (snapshot sebelum/sesudah tracked); harness `practice --series effects` (maks 3 iterasi, $15, semua prompt wajib lulus) + restart pen-desktop sesudah seri pen.dev. Prompt P5/P6 dibekukan di commit `dd66120` sebelum perubahan mesin/skill/DESIGN.md. Baseline pen.dev: shader 0 (mesh_gradient 5, blur, 1 Generate("ai")) → tidak HALT. Seri efek lulus di iterasi 2 (P5 Setara 13–12, 0,91×; P6 Setara 13–14, 0,86×; emoji 0, gate 0); kumulatif $7,99 dari $15. Baseline iterasi 1 (skill lama) juga sudah lulus (P5 Lebih baik 16–11, P6 Setara 14–14). Sesudah done_checkpoint iterasi 2 (hero P5 dinilai Adam terlalu datar), skill v9 (bidang efek berstruktur) diuji di iterasi 3: lulus, P5 Lebih baik 15–10 (1,10×), P6 Setara 14–14 (0,61×); kumulatif $10,99 dari $15.
 
 **File:**
 - `packages/schema/src/nodes.ts` (+`v2.test.ts`, fixture): SCHEMA_VERSION 2, tiga fill baru dengan batas.
@@ -276,15 +332,21 @@ Status: **built** (menunggu done_checkpoint: Adam melihat PNG).
 - `packages/render/src/effects.ts` (baru), `paint.ts`, `layout.ts`, `shape.ts`: conic/noise/mesh, blend per lapisan, mesh ikut mask bentuk.
 - `packages/render/test/visual.test.ts` + 4 golden `efek-*`: golden, determinisme byte-identik, seed, latensi.
 - `packages/exec/src/api.ts`, `packages/skills/skills/api.md`, `packages/mcp/src/server.ts`: dokumentasi fill efek + contoh teruji.
-- `packages/skills/skills/{core,landing,mobile}.md`: panduan efek (core 4000/4000, mobile prosa 1500/1500).
+- `packages/skills/skills/{core,landing,mobile}.md`: panduan efek; v9 bidang efek berstruktur (core 4000/4000, landing total 3500/3500 prosa 1462, mobile prosa 1500/1500 setelah patch review).
 - `bench/src/practice/main.ts`, `cli.ts`, `sys.ts`, `prompts.ts`, `round/main.ts`, README, tes: config seri, restart pen-desktop, arsip slug practice-effects.
-- `bench/practice/effects/` (prompts beku, PNG Lakar iter 1–2, snapshot DESIGN.md), `bench/effects-{1,2}.{md,json}`, `bench/practice/LOG.md`.
+- `bench/practice/effects/` (prompts beku, PNG Lakar iter 1–3, snapshot DESIGN.md), `bench/effects-{1,2,3}.{md,json}`, `bench/practice/LOG.md`.
 - `tests/practice-prompts.test.ts`, `tests/skills-c7.test.ts`: sha P5/P6, n-gram, C7 mencakup P5/P6.
 
 **Review (quick):** 9 temuan → 3 patch (mesh premultiplied alpha [medium], bukti verify.sh di LOG [low], jumlah prompt di laporan `--only` [low]); 4 defer (lihat frontmatter `deferred`); 2 ditolak (latensi encode PNG di luar batas — dampak kecil, dicatat sebagai risiko; timeout probe restart pen-desktop — jarang, perbaikan menambah guard).
 
 **Rekomendasi review lanjutan:** `false` (patch: 1 medium, 2 low; tidak ada high).
 
+**Review iterasi 3 (quick):** 10 temuan → 5 patch (izin cahaya merek mobile tanpa batas DESIGN.md [medium]; "struktur sama" di seksi lain → gema tipis bukan bidang kedua [low]; rentang alpha prosa [low]; `.padStart` akhiran alpha di contoh [low]; klaim LOG pemadatan dikoreksi [low]); 2 defer (contoh efek lebih berat → bocor ke prompt non-efek [medium unverified]; batas execute dilampaui karena `x/y` tanpa `position` di `layout:'none'` [medium]); 3 ditolak (urutan lapis noise di contoh — beda visual dapat diabaikan; geometri kurva contoh — perlu iterasi render, contoh dicek mata; inkonsistensi plan — perbaikannya mengedit plan). Rekomendasi review lanjutan: `false` (patch 1 medium, 4 low). Patch skill dilakukan SESUDAH run iterasi 3: skill yang di-commit (sha16 core ef90b5bd1e8c5801, landing cc9ec3fa06c9116b, mobile e3605b6c5babec32) berbeda tipis dari yang diukur (landing 2052748bd339c612, mobile a58df31c071230f3); perubahan hanya kata/batas, bukan prinsip.
+
+**Verifikasi sesudah patch iterasi 3:** `pnpm build` exit 0; `pnpm test` 852/852; `gen-skill-api` stabil; protocolHash `907cb36f…edb85d`; `bench/protocol`, `bench/rubric`, `bench/practice/prompts.json` tak berubah sejak baseline, `effects/prompts.json` sha `5f0c23a7…` (= frozen.json iterasi 3); `round --round uji-9 --dry-run` rubrik 2.1, A/B = `rubric.json`; `practice --iter 9 --dry-run` Abort MAX_ITER 8; `practice --series effects --iter 4 --dry-run` Abort maks 3; `systemctl --user restart lakard` → active; `tools/node26/verify.sh` exit 0.
+
+**Kesan visual orkestrator (iterasi 3, Read sendiri):** hero P5 iterasi 3 jelas lebih hidup dari iterasi 2 (garis aliran melintasi lebar hero, bukan mesh di pojok), tetapi masih kalah ekspresif dari iterasi 1 dan pen.dev: gelombang terkumpul di pita bawah hero (di bawah CTA, di belakang panel), tipis dan redup; iterasi 1 dan pen.dev punya sapuan cahaya yang lebih terang dan tegas melintasi area judul. P6 setara pen.dev (matahari + cincin + bukit + grain; pen.dev sedikit lebih halus pada gradasi langit dan tipografi serif).
+
 **Verifikasi:** `pnpm build` exit 0; `pnpm test` 852/852 lulus (setelah patch); `pnpm --filter @lakar/render test` 39/39 (latensi: selisih render +6,6 ms, screenshot 84 → 514 ms di luar batas); `gen-skill-api` stabil; protocolHash `907cb36f…edb85d`; `bench/protocol`, `bench/rubric`, `bench/practice/prompts.json` tak berubah; `round --round uji-9 --dry-run` rubrik 2.1, sha A/B = `rubric.json`; `practice --iter 9 --dry-run` tetap Abort MAX_ITER 8; `practice --series effects --iter 1 --dry-run` P5/P6 sha beku, $15, rencana restart; `systemctl --user restart lakard` → active; `tools/node26/verify.sh` exit 0; pen-desktop active. PNG kedua alat P5/P6 dilihat orkestrator.
 
-**Risiko sisa:** P5 sesudah perubahan kurang ekspresif dibanding baseline (perbaikan skill belum terbukti menaikkan mutu); encode PNG board ber-grain ±5× lebih lambat; core.md dan mobile.md di batas token penuh; pemadatan skill dan contoh efek belum diukur pada P1–P4; kontras teks di atas efek hanya dijaga skill (LC-04 milik G1); AD-15/schemaVersion 2 belum dicatat di dokumen arsitektur (tawarkan `bmad-architecture`).
+**Risiko sisa:** satu run per iterasi (C8) dan skor pen.dev pada strip yang sama bergeser 11 → 12 → 10, jadi kenaikan P5 di iterasi 3 sebagian derau juri; agen melampaui batas execute skill (P5 8, P6 4) karena galat `x/y` tanpa `position` pada anak `layout:'none'`; encode PNG board ber-grain ±5× lebih lambat; core.md 4000/4000, landing total 3500/3500, mobile prosa 1500/1500 (tanpa ruang); skill di-commit berbeda tipis dari yang diukur (patch review sesudah run); hero P5 iterasi 3 masih kurang tegas dibanding iterasi 1/pen.dev; pemadatan skill dan contoh efek belum diukur pada P1–P4; kontras teks di atas efek hanya dijaga skill (LC-04 milik G1); AD-15/schemaVersion 2 belum dicatat di dokumen arsitektur (tawarkan `bmad-architecture`).

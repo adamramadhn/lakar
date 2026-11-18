@@ -1,0 +1,2376 @@
+{
+ "series": "effects",
+ "iter": 3,
+ "date": "2026-11-18T16:52:26.330Z",
+ "status": "lengkap",
+ "statusReasons": [],
+ "frozen": {
+  "head": "7588a9ab3c1bd7605c1fb54635c0566af289425c",
+  "porcelain": " M packages/skills/skills/core.md\n M packages/skills/skills/landing.md\n M packages/skills/skills/mobile.md",
+  "protocolHash": "907cb36f4674d422feded4506851b6391082b40b918dd46841edae607bedb85d",
+  "wrapperSha256": "0c496eecb409832e5a87f2dbe3960312457e3b26b472cc2d5d9673a4eeccab97",
+  "promptsSha256": "5f0c23a7fb411f4fcf15e3f88f2e2f7b0f0f6b64f54d955e15fe22ecc834e441",
+  "model": "claude-opus-5-5",
+  "claude": "2.1.325 (Claude Code)",
+  "pendevDesktop": "1.2.23",
+  "lakard": {
+   "version": "0.1.0",
+   "schemaVersion": 2,
+   "pid": 1624498,
+   "startedAt": "2026-11-18T16:52:25.445Z",
+   "browser": "159.0.8154.6",
+   "node": "v26.13.1"
+  },
+  "skills": {
+   "api.md": "b246fa78c8e90f25cc7d4d5e8ba1f80f88f623c70277bc4d9d9f72b358cdace0",
+   "core.md": "ef90b5bd1e8c58010444b64dabf90bf22aa247eb6aa10a0eb9914310c7d090d2",
+   "icons.md": "967827ad79ef4be54169daf303506fb97cd73d9e848c5d6d0943dbda7af5a4c2",
+   "landing.md": "2052748bd339c61223fb0a88644dca65f74c9aa49cc037bce5730867a2bc7735",
+   "mobile.md": "a58df31c071230f3625a4e1e7dec87f1e664d4368f7d34c2bd8c967e68c44e8a"
+  },
+  "distSha": {
+   "check": "1737671e66afdafaf7160dcce1df9cd12273930b0b276a641122c2f1e1cc5609",
+   "core": "362ba86a2376b655ca19507a6a6d23191f2727182b1c3efcf51a43a027a4c3b5",
+   "daemon": "382d74606475cc78990a5892d835df5ad76f3e04dbfa93d0d6ab10a32cc2a3a0",
+   "exec": "32f28d9118253813f30e3cee623071a1c088f081a3f3cb3a1aacff2b23558c28",
+   "icons": "d04386eeeb4daf282c0b0787ec1a8bc07abd927bccabbb4f92f03312686cc303",
+   "mcp": "46ac5757ed3b593f586b8a42f2613d399663d6fd108fa4dfd837bc9cc0116a50",
+   "ports": "bee2b68950ff0c819d5714c8d5149d5107d76df5f53233e18da643f025d66882",
+   "render": "bc5ba4ed470eabaed88cde238d90d9b7bde025fb9f1da1682573bac3a8630623",
+   "schema": "dab15a2563993f103e7969f140e0ec07bcbecec1c400cb33bcb65543564e8cbb",
+   "skills": "4bac99f55ffb6c64d8640f856146563424d172e2fac427c14e7a2649f77b8c15"
+  },
+  "rubric": {
+   "version": "2.1",
+   "lampiranBSha256": "cdba3dde5fccaaabbccdf8e0e4060c4cb2c9b4534bcae1fb67eee2fd26e387be"
+  },
+  "judge": {
+   "model": "claude-opus-5-5",
+   "argv": "claude -p --input-format stream-json --output-format stream-json --verbose --model claude-opus-5-5 --tools \"\" --strict-mcp-config --mcp-config bench/runs/practice-effects/3/judge/mcp-empty.json --disable-slash-commands --no-session-persistence",
+   "textSha256": {
+    "P5": "46b4faa7c84007bad5a59fe406cd06b27b7212fe382ab6c41b98e7230cc73cee",
+    "P6": "b6e4bf80abcde61321c5d8b633f948f5573ce6ea6a1c60b94fa92c32a7b2497e"
+   }
+  },
+  "reusePendev": 1
+ },
+ "wrapper": "Mode benchmark tanpa interaksi: tidak ada pengguna yang bisa menjawab pertanyaan atau memberi konfirmasi. Jangan bertanya; ambil keputusan sendiri dan kerjakan tugas sampai tuntas.\nKerjakan di dokumen baru yang kosong dengan tool desain yang tersedia.\nSetelah tugas tuntas, akhiri jawabanmu dengan satu kata: selesai.\n\nTugas:\n{{PROMPT}}\n",
+ "argv": {
+  "lakar": "claude -p '<prompt hasil render>' --model claude-opus-5-5 --strict-mcp-config --tools \"\" --output-format stream-json --verbose --disable-slash-commands --no-session-persistence --mcp-config .mcp.json --allowedTools mcp__lakar",
+  "pendev": "claude -p '<prompt hasil render>' --model claude-opus-5-5 --strict-mcp-config --tools \"\" --output-format stream-json --verbose --disable-slash-commands --no-session-persistence --mcp-config bench/mcp/pencil.json --allowedTools mcp__pencil",
+  "judge": "claude -p --input-format stream-json --output-format stream-json --verbose --model claude-opus-5-5 --tools \"\" --strict-mcp-config --mcp-config bench/runs/practice-effects/3/judge/mcp-empty.json --disable-slash-commands --no-session-persistence"
+ },
+ "results": [
+  {
+   "id": "P5",
+   "name": "Lintas Arus",
+   "kind": "landing",
+   "size": {
+    "width": 1440,
+    "height": null
+   },
+   "judgeTextSha256": "46b4faa7c84007bad5a59fe406cd06b27b7212fe382ab6c41b98e7230cc73cee",
+   "runs": {
+    "lakar": {
+     "key": "P5-lakar",
+     "prompt": "P5",
+     "tool": "lakar",
+     "dir": "bench/runs/practice-effects/3/P5-lakar",
+     "record": {
+      "runId": "effects-3-P5-lakar",
+      "prompt": "P5",
+      "attempt": 1,
+      "status": "success",
+      "wallMs": 214394.30602599998,
+      "durationMs": 214437,
+      "durationApiMs": 209612,
+      "costUsd": 1.2819315999999998,
+      "numTurns": 15,
+      "toolCalls": 14,
+      "firstToolUseMs": 1749.320792,
+      "lastToolResultMs": 193359.99493999998,
+      "spawnToFirstEventMs": 923.2828530000002,
+      "frames": [
+       {
+        "id": "qeN8KlD8",
+        "name": "Lintas Arus / Beranda · landing · Jernih (gelap)",
+        "width": 1440,
+        "height": 4672,
+        "png": "bench/runs/practice-effects/3/P5-lakar/png/qeN8KlD8.png",
+        "pngWidth": 1440,
+        "pngHeight": 4672
+       }
+      ],
+      "transcriptBytes": 1642128,
+      "pngScaleMismatch": false,
+      "model": "claude-opus-5-5",
+      "modelUsageKeys": [
+       "claude-opus-5-5"
+      ],
+      "claudeCodeVersion": "2.1.325",
+      "startedAt": "2026-11-18T16:52:26.453Z",
+      "lakar": {
+       "slug": "lintas-arus-landing",
+       "opened": [
+        "lintas-arus-landing"
+       ],
+       "boards": [
+        {
+         "id": "qeN8KlD8",
+         "name": "Lintas Arus / Beranda · landing · Jernih (gelap)",
+         "page": "Page 1",
+         "screen": "landing",
+         "x": 0,
+         "y": 0,
+         "width": 1440,
+         "height": 4672,
+         "wip": false,
+         "childCount": 1
+        }
+       ],
+       "layout": {
+        "rev": 5,
+        "summary": {
+         "error": 0,
+         "warning": 0,
+         "gate": 0
+        },
+        "findings": [],
+        "boards": [
+         {
+          "id": "qeN8KlD8",
+          "name": "Lintas Arus / Beranda · landing · Jernih (gelap)",
+          "summary": {
+           "error": 0,
+           "warning": 0,
+           "gate": 0
+          }
+         }
+        ]
+       },
+       "docPath": "bench/runs/practice-effects/3/P5-lakar/doc/lintas-arus-landing.lakar.json",
+       "historyPath": "bench/runs/practice-effects/3/P5-lakar/doc/lintas-arus-landing.history.jsonl",
+       "daemonBefore": {
+        "pid": 1624498,
+        "startedAt": "2026-11-18T16:52:25.445Z",
+        "recreated": 0,
+        "systemd": {
+         "ActiveState": "active",
+         "ActiveEnterTimestamp": "Wed 2026-11-18 16:52:25 UTC",
+         "MainPID": "1624498",
+         "NRestarts": "0"
+        }
+       },
+       "daemonAfter": {
+        "pid": 1624498,
+        "startedAt": "2026-11-18T16:52:25.445Z",
+        "recreated": 0,
+        "systemd": {
+         "ActiveState": "active",
+         "ActiveEnterTimestamp": "Wed 2026-11-18 16:52:25 UTC",
+         "MainPID": "1624498",
+         "NRestarts": "0"
+        }
+       },
+       "docsBefore": 2
+      }
+     },
+     "reconnect": {
+      "count": 0,
+      "affectedMs": 0,
+      "events": [],
+      "toolErrors": []
+     },
+     "agentEmoji": {
+      "emoji": 0,
+      "glyphs": 6,
+      "samples": []
+     },
+     "lintEmoji": {
+      "lc01a": 0,
+      "lc01b": 0
+     },
+     "strip": {
+      "path": "bench/runs/practice-effects/3/P5-lakar.png",
+      "width": 1440,
+      "height": 4672,
+      "boards": 1
+     },
+     "previous": []
+    },
+    "pendev": {
+     "key": "P5-pendev",
+     "prompt": "P5",
+     "tool": "pendev",
+     "dir": "bench/runs/practice-effects/1/P5-pendev",
+     "record": {
+      "runId": "effects-1-P5-pendev",
+      "prompt": "P5",
+      "attempt": 1,
+      "status": "success",
+      "uri": "file:///root/.pencil/documents/876628c6-602d-4ac6-9161-4453284ecc5c/untitled.pen",
+      "uriSource": "get_app_state",
+      "wallMs": 195626.808144,
+      "durationMs": 195703,
+      "durationApiMs": 169143,
+      "costUsd": 0.9483022000000001,
+      "numTurns": 20,
+      "toolCalls": 19,
+      "firstToolUseMs": 1566.2068040000004,
+      "lastToolResultMs": 183990.907413,
+      "spawnToFirstEventMs": 781.1338500000002,
+      "frames": [
+       {
+        "id": "sCqFB",
+        "name": "Lintas Arus — Landing",
+        "width": 1440,
+        "height": 4406,
+        "png": "bench/runs/practice-effects/1/P5-pendev/png/sCqFB.png",
+        "pngWidth": 1440,
+        "pngHeight": 4406
+       }
+      ],
+      "transcriptBytes": 2554041,
+      "penPath": "bench/runs/practice-effects/1/P5-pendev/design.pen",
+      "pngScaleMismatch": false,
+      "model": "claude-opus-5-5",
+      "modelUsageKeys": [
+       "claude-opus-5-5"
+      ],
+      "claudeCodeVersion": "2.1.325",
+      "startedAt": "2026-11-18T15:53:48.373Z",
+      "pendevSystemd": {
+       "before": {
+        "ActiveState": "active",
+        "ActiveEnterTimestamp": "Wed 2026-11-18 09:44:33 UTC",
+        "MainPID": "1284311",
+        "NRestarts": "0"
+       },
+       "after": {
+        "ActiveState": "active",
+        "ActiveEnterTimestamp": "Wed 2026-11-18 09:44:33 UTC",
+        "MainPID": "1284311",
+        "NRestarts": "0"
+       }
+      }
+     },
+     "reconnect": {
+      "count": 0,
+      "affectedMs": 0,
+      "events": [],
+      "toolErrors": []
+     },
+     "agentEmoji": {
+      "emoji": 0,
+      "glyphs": 0,
+      "samples": []
+     },
+     "strip": {
+      "path": "bench/runs/practice-effects/1/P5-pendev.png",
+      "width": 1440,
+      "height": 4406,
+      "boards": 1
+     },
+     "previous": []
+    }
+   },
+   "pendevReusedFrom": 1,
+   "gate": {
+    "ok": true,
+    "reasons": [],
+    "timeRatio": 1.0959352046892534
+   },
+   "sizeProblems": [],
+   "pendevSizeProblems": [],
+   "score": {
+    "prompt": "P5",
+    "validReps": 3,
+    "reps": [
+     {
+      "prompt": "P5",
+      "rep": 1,
+      "mapping": {
+       "X": "pendev",
+       "Y": "lakar"
+      },
+      "status": "ok",
+      "verdict": {
+       "X": {
+        "R1": {
+         "skor": 2,
+         "bukti": "Semua bagian yang diminta ada, berurutan, dalam artboard 1440px: menu atas (bagian 1 atas); hero berlatar garis aliran cahaya hijau dengan judul, subjudul, dua tombol ('Mulai Uji Coba Gratis', 'Tonton Demo 2 Menit') dan panel 'Ruang Kendali · Regional Jawa–Bali' (bagian 1–2); tiga kemampuan (bagian 2); angka kinerja (bagian 3 atas); testimoni (bagian 3–4); CTA berlatar garis aliran yang senada (bagian 4); footer (bagian 5). Mode gelap, aksen hijau elektrik, Bahasa Indonesia."
+        },
+        "R2": {
+         "skor": 2,
+         "bukti": "Judul hero 'Lihat setiap arus. Cegah setiap padam.' (bagian 1 tengah, sekitar 70px) menjadi fokus tunggal. Lompatan skala tegas ke H2 seksi (~44px, bagian 2), lalu judul kartu (~22px) dan isi (~16px). Kutipan besar testimoni (bagian 3 bawah) jelas lebih kecil dari hero. Tidak ada judul yatim."
+        },
+        "R4": {
+         "skor": 1,
+         "bukti": "Hijau dipakai konsisten untuk tombol, label eyebrow, '-62%' dan status LIVE. Amber bermakna peringatan ('7 dalam perawatan', ikon alert). Namun ada beberapa teks abu sangat redup yang lemah: 'RATA-RATA 40+ OPERATOR · 2025' (bagian 3 kanan atas), metadata jabatan testimoni (bagian 3–4), dan copyright footer. Ada juga tint biru tanpa makna di kiri bawah CTA (bagian 4)."
+        },
+        "R5": {
+         "skor": 1,
+         "bukti": "Ikon garis seragam di kotak hijau (bagian 2) dan di daftar peringatan (bagian 1–2). Visual hero berupa aliran cahaya yang relevan, tanpa emoji. Namun avatar 'Rizal Pratama' (bagian 4 kiri atas) adalah foto suasana jalan, bukan potret, sehingga tidak konsisten dengan avatar potret lain."
+        },
+        "R6": {
+         "skor": 1,
+         "bukti": "Copy umumnya spesifik dan angkanya konsisten: '< 3 detik' di kartu sejalan dengan '3 dtk' di statistik; FLISR, MAPE 1,8%, GI Cibinong · Feeder 07. Satu frasa generik: judul CTA 'Siap membuat jaringan Anda lebih tangguh?' (bagian 4)."
+        },
+        "R8": {
+         "skor": 1,
+         "bukti": "Satu pelanggaran: tiga kartu kemampuan identik dengan ikon di kotak menjadi pola seksi (bagian 2). Ada langkah khas yang bisa ditunjuk: panel ruang kendali menumpuk di bawah hero (bagian 1–2), serta testimoni dengan kutipan besar di kiri dan dua kartu bertumpuk di kanan (bagian 3–4)."
+        },
+        "R9": {
+         "skor": 2,
+         "bukti": "Panel hero memberi angka dengan konteks ('+2,1% vs kemarin', 'Stabil · ±0,02', '7 dalam perawatan'). Peringatan bervariasi (ikon, lokasi, waktu 2m/9m/14m/1j). Kartu kemampuan punya metrik footer ('Latensi deteksi < 3 detik', 'MAPE 1,8%'). Statistik diberi deskripsi dan periode ('12 bulan pertama', '2025'). CTA memuat badge sertifikasi."
+        },
+        "R10": {
+         "skor": 1,
+         "bukti": "Ada permukaan berlapis (pita statistik ber-tint di bagian 3, kartu pertama ber-tint hijau di bagian 2) dan badge seperti BARU, LIVE, dan hitungan '3'. Namun warna kedua yang bermakna (amber) hanya muncul di panel hero, tidak di bagian lain. Seksi lain didominasi hijau di atas netral."
+        },
+        "slop": {
+         "jumlah": 1,
+         "butir": [
+          "2: tiga kartu kemampuan identik dengan ikon dalam kotak sebagai pola seksi (bagian 2 bawah)"
+         ]
+        },
+        "emoji": 0,
+        "fokus": "Judul hero 'Lihat setiap arus. Cegah setiap padam.' di tengah bagian 1"
+       },
+       "Y": {
+        "R1": {
+         "skor": 2,
+         "bukti": "Semua bagian yang diminta ada dalam artboard 1440px: menu atas dengan Masuk/Jadwalkan demo (bagian 1); hero dengan medan garis aliran hijau, judul, subjudul, dua tombol, dan panel 'Status jaringan · Subsistem Jawa Barat' (bagian 1–2); 'TIGA KEMAMPUAN UTAMA' (bagian 2–3); 'ANGKA KINERJA' (bagian 3); testimoni (bagian 3–4); CTA berlatar garis aliran senada (bagian 4–5); footer (bagian 5). Mode gelap, aksen hijau, Bahasa Indonesia."
+        },
+        "R2": {
+         "skor": 2,
+         "bukti": "Judul hero 'Lihat gangguan jaringan 14 menit sebelum terjadi' (bagian 1, sekitar 72px) adalah fokus tunggal. Skala turun tegas ke H2 seksi (~34px), judul kartu (~26px), lalu isi. Angka statistik besar berada di seksi terpisah dan tidak menyaingi hero. Tidak ada judul yatim."
+        },
+        "R4": {
+         "skor": 2,
+         "bukti": "Warna punya peran yang jelas. Hijau untuk aksi, aktual, dan status normal. Biru untuk prediksi, konsisten di grafik beban (bagian 1), garis 'Prediksi 15 menit' (bagian 2), dan chip 'Rata-rata 14 mnt lebih awal'. Merah untuk risiko ('Risiko 14 mnt', 'Batas 95 °C'). Amber untuk 'Ditangani' dan '27 dari 1.146 unit'. Teks pada chip dan metadata tetap terbaca."
+        },
+        "R5": {
+         "skor": 2,
+         "bukti": "Ikon bergaya garis seragam di seluruh desain: kartu statistik hero, ikon kemampuan, ikon tren di statistik, ikon trust di CTA, dan ikon sosial di footer. Avatar inisial seragam (DW/RS/YM). Visual hero relevan (aliran garis dan grafik beban). Tidak ada emoji."
+        },
+        "R6": {
+         "skor": 2,
+         "bukti": "Angka saling konsisten di seluruh halaman: '14 menit' di hero, kartu, statistik, dan testimoni; '418 gardu' di '412 / 418' dan 'di 418 gardu induk'; '27 trafo' di kartu aset dan testimoni Yohanes; '99,982%' di statistik dan footer. SAIDI 412→254 menit sesuai dengan -38,4%. Copy spesifik (LBS Cibatu-07B, tie PNY-05, DGA)."
+        },
+        "R8": {
+         "skor": 2,
+         "bukti": "Tidak ada pelanggaran checklist slop. Langkah khas yang bisa ditunjuk: tata letak bento kemampuan dengan kartu besar berisi grafik suhu trafo live, didampingi kartu langkah manuver bernomor dengan status 'Menunggu setuju' (bagian 2). Statistik juga disusun asimetris, dengan judul di kiri dan grid 2×2 di kanan (bagian 3)."
+        },
+        "R9": {
+         "skor": 2,
+         "bukti": "Hampir setiap angka punya konteks: 'Target 50,00 ± 0,20', '87,4% dari kapasitas 7.830 MW', '-5 vs kemarin', 'Dari 412 jadi 254 menit/tahun', 'Target SLA 99,95%', 'Turun dari 22,4% di bulan pertama'. Daftar gardu menunjukkan variasi status (Risiko/Ditangani/Normal). Chip hasil ada di setiap testimoni, dan footer memuat status sistem."
+        },
+        "R10": {
+         "skor": 2,
+         "bukti": "Permukaan berlapis jelas: kartu deteksi dan kartu testimoni utama ber-tint hijau, seksi statistik dan CTA berlatar hijau gelap. Warna kedua yang bermakna (biru = prediksi) dipakai di hero, kemampuan, dan testimoni. Badge dan chip berwarna terdefinisi (Risiko 14 mnt, Ditangani, Normal, Menunggu setuju). Grafik dan progress bar tampak matang."
+        },
+        "slop": {
+         "jumlah": 0,
+         "butir": []
+        },
+        "emoji": 0,
+        "fokus": "Judul hero 'Lihat gangguan jaringan 14 menit sebelum terjadi' di tengah bagian 1"
+       }
+      },
+      "attempts": [
+       {
+        "dir": "/root/lakar/bench/runs/practice-effects/3/judge/P5/rep-1/attempt-1",
+        "status": "ok",
+        "problems": [],
+        "costUsd": 0.30042979999999997,
+        "wallMs": 47120.62794799998
+       }
+      ],
+      "retried": false,
+      "costUsd": 0.30042979999999997
+     },
+     {
+      "prompt": "P5",
+      "rep": 2,
+      "mapping": {
+       "X": "lakar",
+       "Y": "pendev"
+      },
+      "status": "ok",
+      "verdict": {
+       "X": {
+        "R1": {
+         "skor": 2,
+         "bukti": "Semua bagian ada berurutan: menu atas (bagian 1, atas: logo, 5 tautan, Masuk/Jadwalkan demo); hero berlatar aliran garis cahaya hijau bergelombang (bagian 1, y≈450–650) dengan judul, subjudul, dua tombol (Jadwalkan demo / Lihat peta langsung) dan panel 'Status jaringan · Subsistem Jawa Barat'; 'Tiga kemampuan utama' (bagian 2); 'Angka kinerja' (bagian 3); testimoni operator (bagian 4); ajakan akhir dengan efek gelombang senada (bagian 4 bawah–5 atas); footer (bagian 5). Mode gelap, aksen hijau elektrik, Bahasa Indonesia, lebar 1440px."
+        },
+        "R2": {
+         "skor": 2,
+         "bukti": "Fokus tunggal pada judul hero ±72px 'Lihat gangguan jaringan 14 menit sebelum terjadi' (bagian 1, tengah). Lompatan skala tegas ke judul seksi ±32px ('Dari sinyal sensor ke keputusan dispatcher…', bagian 2), lalu body ±18px dan label eyebrow kecil hijau. Angka kinerja mono besar (bagian 3) tetap di bawah judul hero. Tidak ada judul yatim."
+        },
+        "R4": {
+         "skor": 1,
+         "bukti": "Hijau dipakai konsisten untuk CTA, status aktif dan seri 'Aktual'; biru bermakna untuk 'Prediksi' (legenda grafik bagian 1–2); kuning untuk 'Ditangani' dan '27 dari 1.146 unit'; merah untuk 'Risiko 14 mnt' dan 'Batas 95 °C'. Satu pemakaian warna tanpa makna: chip biru di testimoni ('19 dari 23 penyulang diselamatkan', 'Rp 4,8 M dialokasikan ulang', bagian 4) bersebelahan dengan chip hijau sejenis tanpa pembeda arti. Kontras teks secara umum baik."
+        },
+        "R5": {
+         "skor": 2,
+         "bukti": "Ikon garis satu gaya dengan ukuran seragam: ikon metrik di panel hero, ikon fitur dalam kotak bersudut 48px (bagian 2), ikon centang/perisai di CTA (bagian 5), ikon sosial di footer. Visual utama relevan: gelombang cahaya hijau di hero dan CTA, grafik batang beban 24 jam, grafik suhu trafo. Tanpa emoji."
+        },
+        "R6": {
+         "skor": 2,
+         "bukti": "Copy spesifik domain (SCADA, IEC 61850, DNP3, SAIDI, LBS, DGA). Angka saling konsisten: 14 menit muncul di judul hero, chip 'Risiko 14 mnt', 'Batas tercapai 14:46' vs jam 14:32, stat '14 mnt' dan testimoni. 418 gardu konsisten (412/418, 'di 418 gardu induk'). 37 peringatan = 31 terbukti + 6 dibatalkan. '27 trafo' di testimoni cocok dengan '27 dari 1.146 unit'. SAIDI 412→254 ≈ −38,4%. 99,982% sama di stat dan footer."
+        },
+        "R8": {
+         "skor": 2,
+         "bukti": "0 pelanggaran checklist. Ada keputusan komposisi khas yang terlihat di PNG: bento kemampuan asimetris dengan kartu besar berisi grafik suhu trafo hidup, berdampingan dengan kartu langkah manuver switching bernomor (bagian 2); blok angka kinerja dengan judul kiri dan grid 2×2 bergaris pemisah (bagian 3); testimoni utama besar disertai chip metrik hasil (bagian 4)."
+        },
+        "R9": {
+         "skor": 2,
+         "bukti": "Angka diberi konteks: 'Target 50,00 ± 0,20', '87,4% dari kapasitas 7.830 MW', '−5 vs kemarin', 'Dari 412 jadi 254 menit/tahun', 'Target SLA 99,95%', 'Turun dari 22,4% di bulan pertama', periode 'Okt 2025–Sep 2026'. Daftar memuat variasi status (Risiko / Ditangani / Normal; langkah selesai / Menunggu setuju / antre). Metadata ada di hampir semua bagian (timestamp, 'diperbarui 2 dtk lalu', jabatan dan kota pemberi testimoni, ukuran PDF 2,4 MB). Padat tetapi tetap terbaca."
+        },
+        "R10": {
+         "skor": 2,
+         "bukti": "Permukaan berlapis: kartu fitur dan testimoni ber-tint hijau, seksi kinerja berlatar hijau gelap, kartu netral di atasnya. Warna kedua bermakna (biru = prediksi) dipakai di grafik hero, grafik suhu dan chip '14 mnt lebih awal'; kuning/merah untuk status. Badge/chip berwarna terdefinisi (Risiko, Ditangani, Normal, Menunggu setuju). Grafik dan ikon matang dan menyatu."
+        },
+        "slop": {
+         "jumlah": 0,
+         "butir": []
+        },
+        "emoji": 0,
+        "fokus": "Judul hero 'Lihat gangguan jaringan 14 menit sebelum terjadi', bagian 1, tengah atas"
+       },
+       "Y": {
+        "R1": {
+         "skor": 2,
+         "bukti": "Semua bagian ada: menu atas (bagian 1); hero dengan medan cahaya hijau dan garis aliran ekspresif, judul, subjudul, dua tombol (Mulai Uji Coba Gratis / Tonton Demo 2 Menit) dan panel 'Ruang Kendali · Regional Jawa–Bali'; tiga kemampuan (bagian 2); kinerja (bagian 3); testimoni (bagian 3–4); CTA akhir berlatar gelombang dan glow senada (bagian 4); footer (bagian 5). Mode gelap, aksen hijau, Bahasa Indonesia, lebar 1440px."
+        },
+        "R2": {
+         "skor": 2,
+         "bukti": "Fokus tunggal pada judul hero ±80px 'Lihat setiap arus. Cegah setiap padam.' (bagian 1). Lompatan tegas ke judul seksi ±44px ('Satu platform dari pembangkit…'), lalu judul kartu dan body. Kutipan testimoni besar (bagian 3) jelas berada di bawah skala hero. Tidak ada judul yatim."
+        },
+        "R4": {
+         "skor": 1,
+         "bukti": "Hijau konsisten untuk CTA, LIVE, bar beban puncak dan −62%; kuning bermakna untuk peringatan dan '7 dalam perawatan'. Satu teks lemah: label mono 'RATA-RATA 40+ OPERATOR · 2025' (bagian 3, kanan atas) abu sangat redup di atas latar gelap. Subjudul hero juga tertimpa garis gelombang terang (bagian 1, y≈480–540)."
+        },
+        "R5": {
+         "skor": 1,
+         "bukti": "Ikon garis seragam di kartu fitur (kotak 48px, bagian 2) dan di daftar peringatan; visual hero dan CTA kuat. Satu aset lemah: avatar 'Rizal Pratama' (bagian 4, kiri atas) berupa foto suasana jalan, bukan potret orang, sehingga tidak konsisten dengan avatar potret Dewi dan Andreas."
+        },
+        "R6": {
+         "skor": 1,
+         "bukti": "Copy umumnya spesifik (FLISR, MAPE 1,8%, GITET Ungaran T2, 1.284/1.291 dengan 7 dalam perawatan; '< 3 detik' konsisten dengan stat '3 dtk'). Satu frasa generik: judul CTA 'Siap membuat jaringan Anda lebih tangguh?' (bagian 4)."
+        },
+        "R8": {
+         "skor": 1,
+         "bukti": "2 pelanggaran: tiga kartu identik dengan ikon dalam bingkai sebagai pola fitur (bagian 2), dan statistik bulat yang tidak diberikan prompt ('99,99%', '40+ operator', bagian 3). Langkah khas tetap ada: testimoni editorial berkutipan besar di kiri dengan dua kartu kecil di kanan (bagian 3–4)."
+        },
+        "R9": {
+         "skor": 1,
+         "bukti": "Hero kaya konteks ('+2,1% vs kemarin', 'Stabil · ±0,02', peringatan dengan umur 2m/9m/14m/1j dan lokasi), dan kartu fitur punya metrik footer. Namun angka kinerja minim pembanding: −62% tanpa nilai awal, 18 jt tanpa tren (bagian 3), dan testimoni hanya teks tanpa metrik. Konteks hanya ada di sebagian bagian."
+        },
+        "R10": {
+         "skor": 1,
+         "bukti": "Permukaan berlapis ada (kartu fitur pertama ber-tint hijau, CTA bergradien hijau, seksi kinerja lebih terang). Badge terdefinisi (BARU, LIVE, hitungan '3'). Tetapi warna kedua bermakna (kuning peringatan) hanya muncul di panel hero, tidak dipakai di bagian lain; seksi selanjutnya hanya hijau di atas netral."
+        },
+        "slop": {
+         "jumlah": 2,
+         "butir": [
+          "2: tiga kartu kemampuan identik (ikon dalam kotak, nomor 01/02/03, metrik footer) sebagai pola utama seksi fitur, bagian 2",
+          "5: statistik bulat yang tidak diberikan prompt, '99,99%' Uptime dan 'RATA-RATA 40+ OPERATOR', bagian 3"
+         ]
+        },
+        "emoji": 0,
+        "fokus": "Judul hero 'Lihat setiap arus. Cegah setiap padam.', bagian 1, tengah"
+       }
+      },
+      "attempts": [
+       {
+        "dir": "/root/lakar/bench/runs/practice-effects/3/judge/P5/rep-2/attempt-1",
+        "status": "ok",
+        "problems": [],
+        "costUsd": 0.3276738,
+        "wallMs": 59915.825580999954
+       }
+      ],
+      "retried": false,
+      "costUsd": 0.3276738
+     },
+     {
+      "prompt": "P5",
+      "rep": 3,
+      "mapping": {
+       "X": "lakar",
+       "Y": "pendev"
+      },
+      "status": "ok",
+      "verdict": {
+       "X": {
+        "R1": {
+         "skor": 2,
+         "bukti": "Semua bagian ada dan berurutan: menu atas (logo, 5 tautan, Masuk/Jadwalkan demo); hero berlatar garis gelombang hijau dengan judul, subjudul, dua tombol, dan panel 'Status jaringan · Subsistem Jawa Barat'; 'TIGA KEMAMPUAN UTAMA' (bagian 2); 'ANGKA KINERJA' (bagian 3); testimoni 'DARI RUANG KENDALI' (bagian 3–4); CTA 'Hubungkan satu gardu induk minggu ini' berlatar gelombang yang sama (bagian 4–5); footer. Mode gelap, aksen hijau elektrik, bahasa Indonesia, lebar 1440."
+        },
+        "R2": {
+         "skor": 2,
+         "bukti": "Judul hero 'Lihat gangguan jaringan 14 menit sebelum terjadi' (bagian 1, tengah atas) jauh lebih besar dari judul seksi (~32px) dan isi (~16px). Lompatan skala tegas, dan tiap eyebrow hijau selalu diikuti judul seksinya, jadi tidak ada judul yatim."
+        },
+        "R4": {
+         "skor": 1,
+         "bukti": "Hijau dipakai konsisten untuk tombol, seri 'Aktual', dan status normal. Kuning (perhatian/pemeliharaan), merah ('Risiko 14 mnt', 'Batas 95 °C'), dan cyan (seri 'Prediksi') bermakna. Namun chip cyan di testimoni ('19 dari 23 penyulang diselamatkan', 'Rp 4,8 M dialokasikan ulang', bagian 4) memakai cyan tanpa makna prediksi. Tidak ada teks yang jelas gagal kontras."
+        },
+        "R5": {
+         "skor": 2,
+         "bukti": "Ikon garis seragam di metrik panel, kartu kemampuan (radar, cabang, hati-pulsa), dan trust row CTA. Visual hero berupa gelombang energi dan grafik batang beban 24 jam relevan dengan tema. Tanpa emoji."
+        },
+        "R6": {
+         "skor": 2,
+         "bukti": "Angka saling konsisten: '14 menit' di judul hero, kartu deteksi, metrik, dan testimoni; '412 / 418' gardu dengan '6 dalam pemeliharaan'; presisi 92,3% cocok dengan alarm palsu 7,7%; '27 dari 1.146 unit' cocok dengan '27 trafo' di testimoni; 99,982% muncul di metrik dan footer. Copy spesifik (SCADA, IEC 61850, DNP3, LBS, tie PNY-05)."
+        },
+        "R8": {
+         "skor": 2,
+         "bukti": "Tidak ada pelanggaran checklist. Komposisi khas: kemampuan disusun bento asimetris, dengan kartu besar 'Deteksi dini gangguan' berisi grafik suhu trafo dan dua kartu bertumpuk di kanan (bagian 2). Angka kinerja memakai grid 2×2 bergaris dengan intro kiri dan numerik monospace (bagian 3)."
+        },
+        "R9": {
+         "skor": 2,
+         "bukti": "Angka diberi konteks: 'Target 50,00 ± 0,20', '87,4% dari kapasitas 7.830 MW', '−5 vs kemarin', 'Dari 412 jadi 254 menit/tahun', 'Target SLA 99,95%', periode 'Okt 2025–Sep 2026'. Daftar gardu menunjukkan variasi status (Risiko/Ditangani/Normal), langkah switching punya status, dan testimoni punya chip hasil."
+        },
+        "R10": {
+         "skor": 2,
+         "bukti": "Permukaan berlapis ber-tint hijau: band angka kinerja, kartu besar testimoni, kartu deteksi. Warna kedua bermakna (cyan = prediksi) dipakai di grafik hero, legenda grafik suhu, dan chip 'Rata-rata 14 mnt lebih awal'. Badge status berwarna terdefinisi (merah/kuning/hijau). Visual gelombang dan grafik matang serta menyatu."
+        },
+        "slop": {
+         "jumlah": 0,
+         "butir": []
+        },
+        "emoji": 0,
+        "fokus": "Judul hero 'Lihat gangguan jaringan 14 menit sebelum terjadi', bagian 1 tengah atas"
+       },
+       "Y": {
+        "R1": {
+         "skor": 2,
+         "bukti": "Semua bagian ada: menu atas; hero berlatar medan hijau dengan garis gelombang, judul, subjudul, tombol 'Mulai Uji Coba Gratis' dan 'Tonton Demo 2 Menit', panel 'Ruang Kendali · Regional Jawa–Bali'; tiga kemampuan (bagian 2); 'Kinerja yang terukur' (bagian 3); testimoni (bagian 3–4); CTA berlatar gelombang senada (bagian 4); footer (bagian 5). Mode gelap, aksen hijau, bahasa Indonesia, lebar 1440."
+        },
+        "R2": {
+         "skor": 2,
+         "bukti": "Judul hero dua baris 'Lihat setiap arus. Cegah setiap padam.' (bagian 1, tengah) adalah elemen terbesar dan menjadi fokus tunggal. Judul seksi dan isi jelas lebih kecil, dan tiap eyebrow diikuti judulnya."
+        },
+        "R4": {
+         "skor": 1,
+         "bukti": "Hijau konsisten untuk aksi, LIVE, dan bar puncak; kuning untuk peringatan/perawatan bermakna. Namun subjudul hero abu-abu (bagian 1, y≈480–540) ditimpa garis gelombang terang di atas medan hijau cerah, sehingga keterbacaannya lemah."
+        },
+        "R5": {
+         "skor": 2,
+         "bukti": "Ikon garis seragam di daftar peringatan, kartu kemampuan dalam kotak bulat sama ukuran, dan trust row CTA. Foto avatar dipakai di semua testimoni. Visual hero (medan cahaya + gelombang) relevan. Tanpa emoji."
+        },
+        "R6": {
+         "skor": 2,
+         "bukti": "Copy spesifik (FLISR, MAPE 1,8%, GITET Ungaran · T2, Penyulang Kuta 3 · 312 pelanggan). Angka konsisten: '< 3 detik' di kartu deteksi sama dengan '3 dtk' di kinerja; '1.284/1.291' dengan '7 dalam perawatan'."
+        },
+        "R8": {
+         "skor": 1,
+         "bukti": "Ada dua pelanggaran (lihat slop): tiga kartu kemampuan identik berikon sebagai pola seksi, dan headline CTA generik. Ada langkah khas berupa label monospace bernomor 01/02/03 dan CTA sebagai kartu bergelombang, tetapi karena pelanggaran itu skor tetap 1."
+        },
+        "R9": {
+         "skor": 1,
+         "bukti": "Panel hero kaya ('+2,1% vs kemarin', 'Stabil · ±0,02', peringatan bertimestamp) dan kartu kemampuan punya metrik footer. Namun angka kinerja minim pembanding: '99,99%' tanpa target, '18 jt' tanpa interval, '-62%' tanpa nilai awal. Testimoni hanya kutipan dan nama, tanpa data hasil."
+        },
+        "R10": {
+         "skor": 1,
+         "bukti": "Ada permukaan ber-tint hijau (kartu kemampuan pertama, kartu CTA) dan badge 'BARU'/'LIVE'. Tetapi warna kedua bermakna (kuning peringatan) hanya muncul di panel hero (bagian 1–2), tidak dipakai di bagian lain. Komponen seksi kinerja dan testimoni sebagian besar polos netral."
+        },
+        "slop": {
+         "jumlah": 2,
+         "butir": [
+          "2: tiga kartu identik 'Deteksi gangguan real-time', 'Isolasi & pemulihan otomatis', 'Prediksi beban berbasis AI', masing-masing dengan ikon dalam bingkai bulat, sebagai pola seksi kemampuan (bagian 2)",
+          "4: headline CTA generik 'Siap membuat jaringan Anda lebih tangguh?' (bagian 4, tengah kartu CTA)"
+         ]
+        },
+        "emoji": 0,
+        "fokus": "Judul hero 'Lihat setiap arus. Cegah setiap padam.', bagian 1 tengah"
+       }
+      },
+      "attempts": [
+       {
+        "dir": "/root/lakar/bench/runs/practice-effects/3/judge/P5/rep-3/attempt-1",
+        "status": "ok",
+        "problems": [],
+        "costUsd": 0.29826980000000003,
+        "wallMs": 70905.276236
+       }
+      ],
+      "retried": false,
+      "costUsd": 0.29826980000000003
+     }
+    ],
+    "tools": {
+     "lakar": {
+      "criteria": {
+       "R1": {
+        "values": [
+         2,
+         2,
+         2
+        ],
+        "median": 2,
+        "range": 0,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 2,
+          "bukti": "Semua bagian yang diminta ada dalam artboard 1440px: menu atas dengan Masuk/Jadwalkan demo (bagian 1); hero dengan medan garis aliran hijau, judul, subjudul, dua tombol, dan panel 'Status jaringan · Subsistem Jawa Barat' (bagian 1–2); 'TIGA KEMAMPUAN UTAMA' (bagian 2–3); 'ANGKA KINERJA' (bagian 3); testimoni (bagian 3–4); CTA berlatar garis aliran senada (bagian 4–5); footer (bagian 5). Mode gelap, aksen hijau, Bahasa Indonesia."
+         },
+         {
+          "rep": 2,
+          "skor": 2,
+          "bukti": "Semua bagian ada berurutan: menu atas (bagian 1, atas: logo, 5 tautan, Masuk/Jadwalkan demo); hero berlatar aliran garis cahaya hijau bergelombang (bagian 1, y≈450–650) dengan judul, subjudul, dua tombol (Jadwalkan demo / Lihat peta langsung) dan panel 'Status jaringan · Subsistem Jawa Barat'; 'Tiga kemampuan utama' (bagian 2); 'Angka kinerja' (bagian 3); testimoni operator (bagian 4); ajakan akhir dengan efek gelombang senada (bagian 4 bawah–5 atas); footer (bagian 5). Mode gelap, aksen hijau elektrik, Bahasa Indonesia, lebar 1440px."
+         },
+         {
+          "rep": 3,
+          "skor": 2,
+          "bukti": "Semua bagian ada dan berurutan: menu atas (logo, 5 tautan, Masuk/Jadwalkan demo); hero berlatar garis gelombang hijau dengan judul, subjudul, dua tombol, dan panel 'Status jaringan · Subsistem Jawa Barat'; 'TIGA KEMAMPUAN UTAMA' (bagian 2); 'ANGKA KINERJA' (bagian 3); testimoni 'DARI RUANG KENDALI' (bagian 3–4); CTA 'Hubungkan satu gardu induk minggu ini' berlatar gelombang yang sama (bagian 4–5); footer. Mode gelap, aksen hijau elektrik, bahasa Indonesia, lebar 1440."
+         }
+        ]
+       },
+       "R2": {
+        "values": [
+         2,
+         2,
+         2
+        ],
+        "median": 2,
+        "range": 0,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 2,
+          "bukti": "Judul hero 'Lihat gangguan jaringan 14 menit sebelum terjadi' (bagian 1, sekitar 72px) adalah fokus tunggal. Skala turun tegas ke H2 seksi (~34px), judul kartu (~26px), lalu isi. Angka statistik besar berada di seksi terpisah dan tidak menyaingi hero. Tidak ada judul yatim."
+         },
+         {
+          "rep": 2,
+          "skor": 2,
+          "bukti": "Fokus tunggal pada judul hero ±72px 'Lihat gangguan jaringan 14 menit sebelum terjadi' (bagian 1, tengah). Lompatan skala tegas ke judul seksi ±32px ('Dari sinyal sensor ke keputusan dispatcher…', bagian 2), lalu body ±18px dan label eyebrow kecil hijau. Angka kinerja mono besar (bagian 3) tetap di bawah judul hero. Tidak ada judul yatim."
+         },
+         {
+          "rep": 3,
+          "skor": 2,
+          "bukti": "Judul hero 'Lihat gangguan jaringan 14 menit sebelum terjadi' (bagian 1, tengah atas) jauh lebih besar dari judul seksi (~32px) dan isi (~16px). Lompatan skala tegas, dan tiap eyebrow hijau selalu diikuti judul seksinya, jadi tidak ada judul yatim."
+         }
+        ]
+       },
+       "R4": {
+        "values": [
+         2,
+         1,
+         1
+        ],
+        "median": 1,
+        "range": 1,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 2,
+          "bukti": "Warna punya peran yang jelas. Hijau untuk aksi, aktual, dan status normal. Biru untuk prediksi, konsisten di grafik beban (bagian 1), garis 'Prediksi 15 menit' (bagian 2), dan chip 'Rata-rata 14 mnt lebih awal'. Merah untuk risiko ('Risiko 14 mnt', 'Batas 95 °C'). Amber untuk 'Ditangani' dan '27 dari 1.146 unit'. Teks pada chip dan metadata tetap terbaca."
+         },
+         {
+          "rep": 2,
+          "skor": 1,
+          "bukti": "Hijau dipakai konsisten untuk CTA, status aktif dan seri 'Aktual'; biru bermakna untuk 'Prediksi' (legenda grafik bagian 1–2); kuning untuk 'Ditangani' dan '27 dari 1.146 unit'; merah untuk 'Risiko 14 mnt' dan 'Batas 95 °C'. Satu pemakaian warna tanpa makna: chip biru di testimoni ('19 dari 23 penyulang diselamatkan', 'Rp 4,8 M dialokasikan ulang', bagian 4) bersebelahan dengan chip hijau sejenis tanpa pembeda arti. Kontras teks secara umum baik."
+         },
+         {
+          "rep": 3,
+          "skor": 1,
+          "bukti": "Hijau dipakai konsisten untuk tombol, seri 'Aktual', dan status normal. Kuning (perhatian/pemeliharaan), merah ('Risiko 14 mnt', 'Batas 95 °C'), dan cyan (seri 'Prediksi') bermakna. Namun chip cyan di testimoni ('19 dari 23 penyulang diselamatkan', 'Rp 4,8 M dialokasikan ulang', bagian 4) memakai cyan tanpa makna prediksi. Tidak ada teks yang jelas gagal kontras."
+         }
+        ]
+       },
+       "R5": {
+        "values": [
+         2,
+         2,
+         2
+        ],
+        "median": 2,
+        "range": 0,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 2,
+          "bukti": "Ikon bergaya garis seragam di seluruh desain: kartu statistik hero, ikon kemampuan, ikon tren di statistik, ikon trust di CTA, dan ikon sosial di footer. Avatar inisial seragam (DW/RS/YM). Visual hero relevan (aliran garis dan grafik beban). Tidak ada emoji."
+         },
+         {
+          "rep": 2,
+          "skor": 2,
+          "bukti": "Ikon garis satu gaya dengan ukuran seragam: ikon metrik di panel hero, ikon fitur dalam kotak bersudut 48px (bagian 2), ikon centang/perisai di CTA (bagian 5), ikon sosial di footer. Visual utama relevan: gelombang cahaya hijau di hero dan CTA, grafik batang beban 24 jam, grafik suhu trafo. Tanpa emoji."
+         },
+         {
+          "rep": 3,
+          "skor": 2,
+          "bukti": "Ikon garis seragam di metrik panel, kartu kemampuan (radar, cabang, hati-pulsa), dan trust row CTA. Visual hero berupa gelombang energi dan grafik batang beban 24 jam relevan dengan tema. Tanpa emoji."
+         }
+        ]
+       },
+       "R6": {
+        "values": [
+         2,
+         2,
+         2
+        ],
+        "median": 2,
+        "range": 0,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 2,
+          "bukti": "Angka saling konsisten di seluruh halaman: '14 menit' di hero, kartu, statistik, dan testimoni; '418 gardu' di '412 / 418' dan 'di 418 gardu induk'; '27 trafo' di kartu aset dan testimoni Yohanes; '99,982%' di statistik dan footer. SAIDI 412→254 menit sesuai dengan -38,4%. Copy spesifik (LBS Cibatu-07B, tie PNY-05, DGA)."
+         },
+         {
+          "rep": 2,
+          "skor": 2,
+          "bukti": "Copy spesifik domain (SCADA, IEC 61850, DNP3, SAIDI, LBS, DGA). Angka saling konsisten: 14 menit muncul di judul hero, chip 'Risiko 14 mnt', 'Batas tercapai 14:46' vs jam 14:32, stat '14 mnt' dan testimoni. 418 gardu konsisten (412/418, 'di 418 gardu induk'). 37 peringatan = 31 terbukti + 6 dibatalkan. '27 trafo' di testimoni cocok dengan '27 dari 1.146 unit'. SAIDI 412→254 ≈ −38,4%. 99,982% sama di stat dan footer."
+         },
+         {
+          "rep": 3,
+          "skor": 2,
+          "bukti": "Angka saling konsisten: '14 menit' di judul hero, kartu deteksi, metrik, dan testimoni; '412 / 418' gardu dengan '6 dalam pemeliharaan'; presisi 92,3% cocok dengan alarm palsu 7,7%; '27 dari 1.146 unit' cocok dengan '27 trafo' di testimoni; 99,982% muncul di metrik dan footer. Copy spesifik (SCADA, IEC 61850, DNP3, LBS, tie PNY-05)."
+         }
+        ]
+       },
+       "R8": {
+        "values": [
+         2,
+         2,
+         2
+        ],
+        "median": 2,
+        "range": 0,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 2,
+          "bukti": "Tidak ada pelanggaran checklist slop. Langkah khas yang bisa ditunjuk: tata letak bento kemampuan dengan kartu besar berisi grafik suhu trafo live, didampingi kartu langkah manuver bernomor dengan status 'Menunggu setuju' (bagian 2). Statistik juga disusun asimetris, dengan judul di kiri dan grid 2×2 di kanan (bagian 3)."
+         },
+         {
+          "rep": 2,
+          "skor": 2,
+          "bukti": "0 pelanggaran checklist. Ada keputusan komposisi khas yang terlihat di PNG: bento kemampuan asimetris dengan kartu besar berisi grafik suhu trafo hidup, berdampingan dengan kartu langkah manuver switching bernomor (bagian 2); blok angka kinerja dengan judul kiri dan grid 2×2 bergaris pemisah (bagian 3); testimoni utama besar disertai chip metrik hasil (bagian 4)."
+         },
+         {
+          "rep": 3,
+          "skor": 2,
+          "bukti": "Tidak ada pelanggaran checklist. Komposisi khas: kemampuan disusun bento asimetris, dengan kartu besar 'Deteksi dini gangguan' berisi grafik suhu trafo dan dua kartu bertumpuk di kanan (bagian 2). Angka kinerja memakai grid 2×2 bergaris dengan intro kiri dan numerik monospace (bagian 3)."
+         }
+        ]
+       },
+       "R9": {
+        "values": [
+         2,
+         2,
+         2
+        ],
+        "median": 2,
+        "range": 0,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 2,
+          "bukti": "Hampir setiap angka punya konteks: 'Target 50,00 ± 0,20', '87,4% dari kapasitas 7.830 MW', '-5 vs kemarin', 'Dari 412 jadi 254 menit/tahun', 'Target SLA 99,95%', 'Turun dari 22,4% di bulan pertama'. Daftar gardu menunjukkan variasi status (Risiko/Ditangani/Normal). Chip hasil ada di setiap testimoni, dan footer memuat status sistem."
+         },
+         {
+          "rep": 2,
+          "skor": 2,
+          "bukti": "Angka diberi konteks: 'Target 50,00 ± 0,20', '87,4% dari kapasitas 7.830 MW', '−5 vs kemarin', 'Dari 412 jadi 254 menit/tahun', 'Target SLA 99,95%', 'Turun dari 22,4% di bulan pertama', periode 'Okt 2025–Sep 2026'. Daftar memuat variasi status (Risiko / Ditangani / Normal; langkah selesai / Menunggu setuju / antre). Metadata ada di hampir semua bagian (timestamp, 'diperbarui 2 dtk lalu', jabatan dan kota pemberi testimoni, ukuran PDF 2,4 MB). Padat tetapi tetap terbaca."
+         },
+         {
+          "rep": 3,
+          "skor": 2,
+          "bukti": "Angka diberi konteks: 'Target 50,00 ± 0,20', '87,4% dari kapasitas 7.830 MW', '−5 vs kemarin', 'Dari 412 jadi 254 menit/tahun', 'Target SLA 99,95%', periode 'Okt 2025–Sep 2026'. Daftar gardu menunjukkan variasi status (Risiko/Ditangani/Normal), langkah switching punya status, dan testimoni punya chip hasil."
+         }
+        ]
+       },
+       "R10": {
+        "values": [
+         2,
+         2,
+         2
+        ],
+        "median": 2,
+        "range": 0,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 2,
+          "bukti": "Permukaan berlapis jelas: kartu deteksi dan kartu testimoni utama ber-tint hijau, seksi statistik dan CTA berlatar hijau gelap. Warna kedua yang bermakna (biru = prediksi) dipakai di hero, kemampuan, dan testimoni. Badge dan chip berwarna terdefinisi (Risiko 14 mnt, Ditangani, Normal, Menunggu setuju). Grafik dan progress bar tampak matang."
+         },
+         {
+          "rep": 2,
+          "skor": 2,
+          "bukti": "Permukaan berlapis: kartu fitur dan testimoni ber-tint hijau, seksi kinerja berlatar hijau gelap, kartu netral di atasnya. Warna kedua bermakna (biru = prediksi) dipakai di grafik hero, grafik suhu dan chip '14 mnt lebih awal'; kuning/merah untuk status. Badge/chip berwarna terdefinisi (Risiko, Ditangani, Normal, Menunggu setuju). Grafik dan ikon matang dan menyatu."
+         },
+         {
+          "rep": 3,
+          "skor": 2,
+          "bukti": "Permukaan berlapis ber-tint hijau: band angka kinerja, kartu besar testimoni, kartu deteksi. Warna kedua bermakna (cyan = prediksi) dipakai di grafik hero, legenda grafik suhu, dan chip 'Rata-rata 14 mnt lebih awal'. Badge status berwarna terdefinisi (merah/kuning/hijau). Visual gelombang dan grafik matang serta menyatu."
+         }
+        ]
+       }
+      },
+      "total": 15,
+      "slop": {
+       "values": [
+        0,
+        0,
+        0
+       ],
+       "median": 0,
+       "range": 0,
+       "flag": false,
+       "items": [
+        {
+         "rep": 1,
+         "butir": []
+        },
+        {
+         "rep": 2,
+         "butir": []
+        },
+        {
+         "rep": 3,
+         "butir": []
+        }
+       ]
+      },
+      "emoji": {
+       "values": [
+        0,
+        0,
+        0
+       ],
+       "median": 0,
+       "range": 0,
+       "flag": false
+      },
+      "focus": [
+       {
+        "rep": 1,
+        "fokus": "Judul hero 'Lihat gangguan jaringan 14 menit sebelum terjadi' di tengah bagian 1"
+       },
+       {
+        "rep": 2,
+        "fokus": "Judul hero 'Lihat gangguan jaringan 14 menit sebelum terjadi', bagian 1, tengah atas"
+       },
+       {
+        "rep": 3,
+        "fokus": "Judul hero 'Lihat gangguan jaringan 14 menit sebelum terjadi', bagian 1 tengah atas"
+       }
+      ]
+     },
+     "pendev": {
+      "criteria": {
+       "R1": {
+        "values": [
+         2,
+         2,
+         2
+        ],
+        "median": 2,
+        "range": 0,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 2,
+          "bukti": "Semua bagian yang diminta ada, berurutan, dalam artboard 1440px: menu atas (bagian 1 atas); hero berlatar garis aliran cahaya hijau dengan judul, subjudul, dua tombol ('Mulai Uji Coba Gratis', 'Tonton Demo 2 Menit') dan panel 'Ruang Kendali · Regional Jawa–Bali' (bagian 1–2); tiga kemampuan (bagian 2); angka kinerja (bagian 3 atas); testimoni (bagian 3–4); CTA berlatar garis aliran yang senada (bagian 4); footer (bagian 5). Mode gelap, aksen hijau elektrik, Bahasa Indonesia."
+         },
+         {
+          "rep": 2,
+          "skor": 2,
+          "bukti": "Semua bagian ada: menu atas (bagian 1); hero dengan medan cahaya hijau dan garis aliran ekspresif, judul, subjudul, dua tombol (Mulai Uji Coba Gratis / Tonton Demo 2 Menit) dan panel 'Ruang Kendali · Regional Jawa–Bali'; tiga kemampuan (bagian 2); kinerja (bagian 3); testimoni (bagian 3–4); CTA akhir berlatar gelombang dan glow senada (bagian 4); footer (bagian 5). Mode gelap, aksen hijau, Bahasa Indonesia, lebar 1440px."
+         },
+         {
+          "rep": 3,
+          "skor": 2,
+          "bukti": "Semua bagian ada: menu atas; hero berlatar medan hijau dengan garis gelombang, judul, subjudul, tombol 'Mulai Uji Coba Gratis' dan 'Tonton Demo 2 Menit', panel 'Ruang Kendali · Regional Jawa–Bali'; tiga kemampuan (bagian 2); 'Kinerja yang terukur' (bagian 3); testimoni (bagian 3–4); CTA berlatar gelombang senada (bagian 4); footer (bagian 5). Mode gelap, aksen hijau, bahasa Indonesia, lebar 1440."
+         }
+        ]
+       },
+       "R2": {
+        "values": [
+         2,
+         2,
+         2
+        ],
+        "median": 2,
+        "range": 0,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 2,
+          "bukti": "Judul hero 'Lihat setiap arus. Cegah setiap padam.' (bagian 1 tengah, sekitar 70px) menjadi fokus tunggal. Lompatan skala tegas ke H2 seksi (~44px, bagian 2), lalu judul kartu (~22px) dan isi (~16px). Kutipan besar testimoni (bagian 3 bawah) jelas lebih kecil dari hero. Tidak ada judul yatim."
+         },
+         {
+          "rep": 2,
+          "skor": 2,
+          "bukti": "Fokus tunggal pada judul hero ±80px 'Lihat setiap arus. Cegah setiap padam.' (bagian 1). Lompatan tegas ke judul seksi ±44px ('Satu platform dari pembangkit…'), lalu judul kartu dan body. Kutipan testimoni besar (bagian 3) jelas berada di bawah skala hero. Tidak ada judul yatim."
+         },
+         {
+          "rep": 3,
+          "skor": 2,
+          "bukti": "Judul hero dua baris 'Lihat setiap arus. Cegah setiap padam.' (bagian 1, tengah) adalah elemen terbesar dan menjadi fokus tunggal. Judul seksi dan isi jelas lebih kecil, dan tiap eyebrow diikuti judulnya."
+         }
+        ]
+       },
+       "R4": {
+        "values": [
+         1,
+         1,
+         1
+        ],
+        "median": 1,
+        "range": 0,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 1,
+          "bukti": "Hijau dipakai konsisten untuk tombol, label eyebrow, '-62%' dan status LIVE. Amber bermakna peringatan ('7 dalam perawatan', ikon alert). Namun ada beberapa teks abu sangat redup yang lemah: 'RATA-RATA 40+ OPERATOR · 2025' (bagian 3 kanan atas), metadata jabatan testimoni (bagian 3–4), dan copyright footer. Ada juga tint biru tanpa makna di kiri bawah CTA (bagian 4)."
+         },
+         {
+          "rep": 2,
+          "skor": 1,
+          "bukti": "Hijau konsisten untuk CTA, LIVE, bar beban puncak dan −62%; kuning bermakna untuk peringatan dan '7 dalam perawatan'. Satu teks lemah: label mono 'RATA-RATA 40+ OPERATOR · 2025' (bagian 3, kanan atas) abu sangat redup di atas latar gelap. Subjudul hero juga tertimpa garis gelombang terang (bagian 1, y≈480–540)."
+         },
+         {
+          "rep": 3,
+          "skor": 1,
+          "bukti": "Hijau konsisten untuk aksi, LIVE, dan bar puncak; kuning untuk peringatan/perawatan bermakna. Namun subjudul hero abu-abu (bagian 1, y≈480–540) ditimpa garis gelombang terang di atas medan hijau cerah, sehingga keterbacaannya lemah."
+         }
+        ]
+       },
+       "R5": {
+        "values": [
+         1,
+         1,
+         2
+        ],
+        "median": 1,
+        "range": 1,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 1,
+          "bukti": "Ikon garis seragam di kotak hijau (bagian 2) dan di daftar peringatan (bagian 1–2). Visual hero berupa aliran cahaya yang relevan, tanpa emoji. Namun avatar 'Rizal Pratama' (bagian 4 kiri atas) adalah foto suasana jalan, bukan potret, sehingga tidak konsisten dengan avatar potret lain."
+         },
+         {
+          "rep": 2,
+          "skor": 1,
+          "bukti": "Ikon garis seragam di kartu fitur (kotak 48px, bagian 2) dan di daftar peringatan; visual hero dan CTA kuat. Satu aset lemah: avatar 'Rizal Pratama' (bagian 4, kiri atas) berupa foto suasana jalan, bukan potret orang, sehingga tidak konsisten dengan avatar potret Dewi dan Andreas."
+         },
+         {
+          "rep": 3,
+          "skor": 2,
+          "bukti": "Ikon garis seragam di daftar peringatan, kartu kemampuan dalam kotak bulat sama ukuran, dan trust row CTA. Foto avatar dipakai di semua testimoni. Visual hero (medan cahaya + gelombang) relevan. Tanpa emoji."
+         }
+        ]
+       },
+       "R6": {
+        "values": [
+         1,
+         1,
+         2
+        ],
+        "median": 1,
+        "range": 1,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 1,
+          "bukti": "Copy umumnya spesifik dan angkanya konsisten: '< 3 detik' di kartu sejalan dengan '3 dtk' di statistik; FLISR, MAPE 1,8%, GI Cibinong · Feeder 07. Satu frasa generik: judul CTA 'Siap membuat jaringan Anda lebih tangguh?' (bagian 4)."
+         },
+         {
+          "rep": 2,
+          "skor": 1,
+          "bukti": "Copy umumnya spesifik (FLISR, MAPE 1,8%, GITET Ungaran T2, 1.284/1.291 dengan 7 dalam perawatan; '< 3 detik' konsisten dengan stat '3 dtk'). Satu frasa generik: judul CTA 'Siap membuat jaringan Anda lebih tangguh?' (bagian 4)."
+         },
+         {
+          "rep": 3,
+          "skor": 2,
+          "bukti": "Copy spesifik (FLISR, MAPE 1,8%, GITET Ungaran · T2, Penyulang Kuta 3 · 312 pelanggan). Angka konsisten: '< 3 detik' di kartu deteksi sama dengan '3 dtk' di kinerja; '1.284/1.291' dengan '7 dalam perawatan'."
+         }
+        ]
+       },
+       "R8": {
+        "values": [
+         1,
+         1,
+         1
+        ],
+        "median": 1,
+        "range": 0,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 1,
+          "bukti": "Satu pelanggaran: tiga kartu kemampuan identik dengan ikon di kotak menjadi pola seksi (bagian 2). Ada langkah khas yang bisa ditunjuk: panel ruang kendali menumpuk di bawah hero (bagian 1–2), serta testimoni dengan kutipan besar di kiri dan dua kartu bertumpuk di kanan (bagian 3–4)."
+         },
+         {
+          "rep": 2,
+          "skor": 1,
+          "bukti": "2 pelanggaran: tiga kartu identik dengan ikon dalam bingkai sebagai pola fitur (bagian 2), dan statistik bulat yang tidak diberikan prompt ('99,99%', '40+ operator', bagian 3). Langkah khas tetap ada: testimoni editorial berkutipan besar di kiri dengan dua kartu kecil di kanan (bagian 3–4)."
+         },
+         {
+          "rep": 3,
+          "skor": 1,
+          "bukti": "Ada dua pelanggaran (lihat slop): tiga kartu kemampuan identik berikon sebagai pola seksi, dan headline CTA generik. Ada langkah khas berupa label monospace bernomor 01/02/03 dan CTA sebagai kartu bergelombang, tetapi karena pelanggaran itu skor tetap 1."
+         }
+        ]
+       },
+       "R9": {
+        "values": [
+         2,
+         1,
+         1
+        ],
+        "median": 1,
+        "range": 1,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 2,
+          "bukti": "Panel hero memberi angka dengan konteks ('+2,1% vs kemarin', 'Stabil · ±0,02', '7 dalam perawatan'). Peringatan bervariasi (ikon, lokasi, waktu 2m/9m/14m/1j). Kartu kemampuan punya metrik footer ('Latensi deteksi < 3 detik', 'MAPE 1,8%'). Statistik diberi deskripsi dan periode ('12 bulan pertama', '2025'). CTA memuat badge sertifikasi."
+         },
+         {
+          "rep": 2,
+          "skor": 1,
+          "bukti": "Hero kaya konteks ('+2,1% vs kemarin', 'Stabil · ±0,02', peringatan dengan umur 2m/9m/14m/1j dan lokasi), dan kartu fitur punya metrik footer. Namun angka kinerja minim pembanding: −62% tanpa nilai awal, 18 jt tanpa tren (bagian 3), dan testimoni hanya teks tanpa metrik. Konteks hanya ada di sebagian bagian."
+         },
+         {
+          "rep": 3,
+          "skor": 1,
+          "bukti": "Panel hero kaya ('+2,1% vs kemarin', 'Stabil · ±0,02', peringatan bertimestamp) dan kartu kemampuan punya metrik footer. Namun angka kinerja minim pembanding: '99,99%' tanpa target, '18 jt' tanpa interval, '-62%' tanpa nilai awal. Testimoni hanya kutipan dan nama, tanpa data hasil."
+         }
+        ]
+       },
+       "R10": {
+        "values": [
+         1,
+         1,
+         1
+        ],
+        "median": 1,
+        "range": 0,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 1,
+          "bukti": "Ada permukaan berlapis (pita statistik ber-tint di bagian 3, kartu pertama ber-tint hijau di bagian 2) dan badge seperti BARU, LIVE, dan hitungan '3'. Namun warna kedua yang bermakna (amber) hanya muncul di panel hero, tidak di bagian lain. Seksi lain didominasi hijau di atas netral."
+         },
+         {
+          "rep": 2,
+          "skor": 1,
+          "bukti": "Permukaan berlapis ada (kartu fitur pertama ber-tint hijau, CTA bergradien hijau, seksi kinerja lebih terang). Badge terdefinisi (BARU, LIVE, hitungan '3'). Tetapi warna kedua bermakna (kuning peringatan) hanya muncul di panel hero, tidak dipakai di bagian lain; seksi selanjutnya hanya hijau di atas netral."
+         },
+         {
+          "rep": 3,
+          "skor": 1,
+          "bukti": "Ada permukaan ber-tint hijau (kartu kemampuan pertama, kartu CTA) dan badge 'BARU'/'LIVE'. Tetapi warna kedua bermakna (kuning peringatan) hanya muncul di panel hero (bagian 1–2), tidak dipakai di bagian lain. Komponen seksi kinerja dan testimoni sebagian besar polos netral."
+         }
+        ]
+       }
+      },
+      "total": 10,
+      "slop": {
+       "values": [
+        1,
+        2,
+        2
+       ],
+       "median": 2,
+       "range": 1,
+       "flag": false,
+       "items": [
+        {
+         "rep": 1,
+         "butir": [
+          "2: tiga kartu kemampuan identik dengan ikon dalam kotak sebagai pola seksi (bagian 2 bawah)"
+         ]
+        },
+        {
+         "rep": 2,
+         "butir": [
+          "2: tiga kartu kemampuan identik (ikon dalam kotak, nomor 01/02/03, metrik footer) sebagai pola utama seksi fitur, bagian 2",
+          "5: statistik bulat yang tidak diberikan prompt, '99,99%' Uptime dan 'RATA-RATA 40+ OPERATOR', bagian 3"
+         ]
+        },
+        {
+         "rep": 3,
+         "butir": [
+          "2: tiga kartu identik 'Deteksi gangguan real-time', 'Isolasi & pemulihan otomatis', 'Prediksi beban berbasis AI', masing-masing dengan ikon dalam bingkai bulat, sebagai pola seksi kemampuan (bagian 2)",
+          "4: headline CTA generik 'Siap membuat jaringan Anda lebih tangguh?' (bagian 4, tengah kartu CTA)"
+         ]
+        }
+       ]
+      },
+      "emoji": {
+       "values": [
+        0,
+        0,
+        0
+       ],
+       "median": 0,
+       "range": 0,
+       "flag": false
+      },
+      "focus": [
+       {
+        "rep": 1,
+        "fokus": "Judul hero 'Lihat setiap arus. Cegah setiap padam.' di tengah bagian 1"
+       },
+       {
+        "rep": 2,
+        "fokus": "Judul hero 'Lihat setiap arus. Cegah setiap padam.', bagian 1, tengah"
+       },
+       {
+        "rep": 3,
+        "fokus": "Judul hero 'Lihat setiap arus. Cegah setiap padam.', bagian 1 tengah"
+       }
+      ]
+     }
+    }
+   },
+   "decision": {
+    "decision": "Lebih baik",
+    "why": "lolos gerbang, total 15 ≥ 10 + 3, daya tarik 4 ≥ 2",
+    "checks": {
+     "total": {
+      "lakar": 15,
+      "pendev": 10
+     },
+     "appeal": {
+      "lakar": 4,
+      "pendev": 2
+     },
+     "appealLoss": [],
+     "otherLoss": [],
+     "zeroVsTwo": [],
+     "pendevBriefViolations": []
+    }
+   },
+   "emoji": {
+    "lakar": {
+     "agent": 0,
+     "glyphs": 6,
+     "lint": 0,
+     "judge": 0
+    },
+    "pendev": {
+     "agent": 0,
+     "glyphs": 0,
+     "judge": 0
+    }
+   },
+   "pngs": {
+    "lakar": "bench/practice/effects/3/P5-lakar.png",
+    "pendev": "bench/runs/practice-effects/1/P5-pendev.png"
+   },
+   "cost": {
+    "lakar": 1.2819315999999998,
+    "pendev": 0.9483022000000001,
+    "pendevCounted": false,
+    "judge": 0.9263734
+   }
+  },
+  {
+   "id": "P6",
+   "name": "Senyap",
+   "kind": "mobile",
+   "size": {
+    "width": 390,
+    "height": 844
+   },
+   "judgeTextSha256": "b6e4bf80abcde61321c5d8b633f948f5573ce6ea6a1c60b94fa92c32a7b2497e",
+   "runs": {
+    "lakar": {
+     "key": "P6-lakar",
+     "prompt": "P6",
+     "tool": "lakar",
+     "dir": "bench/runs/practice-effects/3/P6-lakar",
+     "record": {
+      "runId": "effects-3-P6-lakar",
+      "prompt": "P6",
+      "attempt": 1,
+      "status": "success",
+      "wallMs": 81173.68423600003,
+      "durationMs": 81213,
+      "durationApiMs": 79566,
+      "costUsd": 0.4284836,
+      "numTurns": 10,
+      "toolCalls": 9,
+      "firstToolUseMs": 1701.8588220000092,
+      "lastToolResultMs": 70270.66367000001,
+      "spawnToFirstEventMs": 876.3522859999794,
+      "frames": [
+       {
+        "id": "A11UVbVf",
+        "name": "Senyap / Onboarding 1 · mobile · Malam",
+        "width": 390,
+        "height": 844,
+        "png": "bench/runs/practice-effects/3/P6-lakar/png/A11UVbVf.png",
+        "pngWidth": 390,
+        "pngHeight": 844
+       }
+      ],
+      "transcriptBytes": 970100,
+      "pngScaleMismatch": false,
+      "model": "claude-opus-5-5",
+      "modelUsageKeys": [
+       "claude-opus-5-5"
+      ],
+      "claudeCodeVersion": "2.1.325",
+      "startedAt": "2026-11-18T16:56:03.705Z",
+      "lakar": {
+       "slug": "senyap-onboarding",
+       "opened": [
+        "senyap-onboarding"
+       ],
+       "boards": [
+        {
+         "id": "A11UVbVf",
+         "name": "Senyap / Onboarding 1 · mobile · Malam",
+         "page": "Page 1",
+         "screen": "mobile",
+         "x": 0,
+         "y": 0,
+         "width": 390,
+         "height": 844,
+         "wip": false,
+         "childCount": 4
+        }
+       ],
+       "layout": {
+        "rev": 3,
+        "summary": {
+         "error": 0,
+         "warning": 0,
+         "gate": 0
+        },
+        "findings": [],
+        "boards": [
+         {
+          "id": "A11UVbVf",
+          "name": "Senyap / Onboarding 1 · mobile · Malam",
+          "summary": {
+           "error": 0,
+           "warning": 0,
+           "gate": 0
+          }
+         }
+        ]
+       },
+       "docPath": "bench/runs/practice-effects/3/P6-lakar/doc/senyap-onboarding.lakar.json",
+       "historyPath": "bench/runs/practice-effects/3/P6-lakar/doc/senyap-onboarding.history.jsonl",
+       "daemonBefore": {
+        "pid": 1624498,
+        "startedAt": "2026-11-18T16:52:25.445Z",
+        "recreated": 0,
+        "systemd": {
+         "ActiveState": "active",
+         "ActiveEnterTimestamp": "Wed 2026-11-18 16:52:25 UTC",
+         "MainPID": "1624498",
+         "NRestarts": "0"
+        }
+       },
+       "daemonAfter": {
+        "pid": 1624498,
+        "startedAt": "2026-11-18T16:52:25.445Z",
+        "recreated": 0,
+        "systemd": {
+         "ActiveState": "active",
+         "ActiveEnterTimestamp": "Wed 2026-11-18 16:52:25 UTC",
+         "MainPID": "1624498",
+         "NRestarts": "0"
+        }
+       },
+       "docsBefore": 3
+      }
+     },
+     "reconnect": {
+      "count": 0,
+      "affectedMs": 0,
+      "events": [],
+      "toolErrors": []
+     },
+     "agentEmoji": {
+      "emoji": 0,
+      "glyphs": 0,
+      "samples": []
+     },
+     "lintEmoji": {
+      "lc01a": 0,
+      "lc01b": 0
+     },
+     "strip": {
+      "path": "bench/runs/practice-effects/3/P6-lakar.png",
+      "width": 390,
+      "height": 844,
+      "boards": 1
+     },
+     "previous": []
+    },
+    "pendev": {
+     "key": "P6-pendev",
+     "prompt": "P6",
+     "tool": "pendev",
+     "dir": "bench/runs/practice-effects/1/P6-pendev",
+     "record": {
+      "runId": "effects-1-P6-pendev",
+      "prompt": "P6",
+      "attempt": 1,
+      "status": "success",
+      "uri": "file:///root/.pencil/documents/8cdebf12-6270-4760-a822-7732c73c93b8/untitled.pen",
+      "uriSource": "get_app_state",
+      "wallMs": 133267.341082,
+      "durationMs": 133343,
+      "durationApiMs": 107677,
+      "costUsd": 0.6033894000000001,
+      "numTurns": 16,
+      "toolCalls": 15,
+      "firstToolUseMs": 1193.3628870000248,
+      "lastToolResultMs": 123335.08723300003,
+      "spawnToFirstEventMs": 806.5156050000223,
+      "frames": [
+       {
+        "id": "IyBtr",
+        "name": "Onboarding 01 — Selamat Datang",
+        "width": 390,
+        "height": 844,
+        "png": "bench/runs/practice-effects/1/P6-pendev/png/IyBtr.png",
+        "pngWidth": 390,
+        "pngHeight": 844
+       }
+      ],
+      "transcriptBytes": 1771353,
+      "penPath": "bench/runs/practice-effects/1/P6-pendev/design.pen",
+      "pngScaleMismatch": false,
+      "model": "claude-opus-5-5",
+      "modelUsageKeys": [
+       "claude-opus-5-5"
+      ],
+      "claudeCodeVersion": "2.1.325",
+      "startedAt": "2026-11-18T16:01:49.352Z",
+      "pendevSystemd": {
+       "before": {
+        "ActiveState": "active",
+        "ActiveEnterTimestamp": "Wed 2026-11-18 09:44:33 UTC",
+        "MainPID": "1284311",
+        "NRestarts": "0"
+       },
+       "after": {
+        "ActiveState": "active",
+        "ActiveEnterTimestamp": "Wed 2026-11-18 09:44:33 UTC",
+        "MainPID": "1284311",
+        "NRestarts": "0"
+       }
+      }
+     },
+     "reconnect": {
+      "count": 0,
+      "affectedMs": 0,
+      "events": [],
+      "toolErrors": []
+     },
+     "agentEmoji": {
+      "emoji": 0,
+      "glyphs": 0,
+      "samples": []
+     },
+     "strip": {
+      "path": "bench/runs/practice-effects/1/P6-pendev.png",
+      "width": 390,
+      "height": 844,
+      "boards": 1
+     },
+     "previous": []
+    }
+   },
+   "pendevReusedFrom": 1,
+   "gate": {
+    "ok": true,
+    "reasons": [],
+    "timeRatio": 0.6091041029028522
+   },
+   "sizeProblems": [],
+   "pendevSizeProblems": [],
+   "score": {
+    "prompt": "P6",
+    "validReps": 3,
+    "reps": [
+     {
+      "prompt": "P6",
+      "rep": 1,
+      "mapping": {
+       "X": "pendev",
+       "Y": "lakar"
+      },
+      "status": "ok",
+      "verdict": {
+       "X": {
+        "R1": {
+         "skor": 2,
+         "bukti": "Artboard 390x844 berisi semua bagian yang diminta. Latar gradasi senja ungu ke oranye dengan tekstur grain halus di seluruh artboard. Bentuk cahaya berupa matahari dan cincin konsentris di atas (y≈150–350). Judul 'Tenang dimulai dari satu tarikan napas.' ada di tengah. Kalimat penjelas ada di bawah judul. Indikator 3 langkah (pill + 2 titik, '1 dari 3') di y≈647. Tombol 'Mulai Sekarang' di y≈722 dan tautan 'Sudah punya akun? Masuk' di y≈785. Mode gelap, aksen oranye, bahasa Indonesia. Tombol 'Lewati' di kanan atas adalah elemen onboarding wajar, bukan seksi tambahan."
+        },
+        "R2": {
+         "skor": 2,
+         "bukti": "Fokus tunggal pada headline serif besar (±34px) di tengah layar. Lompatan skala tegas: eyebrow kecil oranye 'SELAMAT DATANG', lalu headline, lalu body abu terang ±15px. Tidak ada judul yatim."
+        },
+        "R4": {
+         "skor": 2,
+         "bukti": "Oranye dipakai konsisten untuk aksi dan status aktif: ikon bulan logo, eyebrow, pill indikator aktif, tombol utama, dan tautan 'Masuk'. Ungu hanya muncul di langit sebagai bagian dari tema senja. Teks putih dan abu terang di atas latar gelap terbaca, termasuk '1 dari 3' dan 'Sudah punya akun?'."
+        },
+        "R5": {
+         "skor": 2,
+         "bukti": "Ikon bergaris seragam: bulan di logo kiri atas, panah di tombol, ikon status bar. Visual utama matahari senja dengan cincin dan bintang relevan dengan tema tidur. Tidak ada emoji."
+        },
+        "R6": {
+         "skor": 2,
+         "bukti": "Copy spesifik untuk produk: 'Meditasi terpandu, suara alam, dan cerita pengantar tidur untuk menemani malammu hingga terlelap.' Indikator '1 dari 3' konsisten dengan 3 titik. Tidak ada frasa generik."
+        },
+        "R8": {
+         "skor": 2,
+         "bukti": "Tidak ada pelanggaran checklist slop. Gradasi ungu-oranye punya alasan tema senja. Teks rata kiri. Keputusan khas yang terlihat: headline serif berkarakter, pita cahaya horizon oranye yang memotong matahari di y≈330, dan grain bertekstur di seluruh latar."
+        },
+        "R9": {
+         "skor": 1,
+         "bukti": "Ada detail sekunder: eyebrow, label '1 dari 3' di kanan indikator, tombol 'Lewati'. Namun isi selebihnya hanya minimum yang diminta, tanpa konteks tambahan seperti durasi atau manfaat terukur."
+        },
+        "R10": {
+         "skor": 1,
+         "bukti": "Latar berlapis dengan tint, grain, dan glow horizon, ditambah chip 'Lewati' semi-transparan dan tombol bergradasi dengan glow. Namun tidak ada warna kedua bermakna di komponen; ungu hanya ada di langit. Komponen selebihnya teks polos."
+        },
+        "slop": {
+         "jumlah": 0,
+         "butir": []
+        },
+        "emoji": 0,
+        "fokus": "Headline serif 'Tenang dimulai dari satu tarikan napas.' di tengah layar (y≈430–510)"
+       },
+       "Y": {
+        "R1": {
+         "skor": 1,
+         "bukti": "Semua bagian ada dalam 390x844: gradasi senja marun-ungu, matahari dengan cincin konsentris dan siluet bukit di atas (y≈80–400), indikator 'Langkah 1 dari 3' di y≈412, judul, penjelas, tombol 'Mulai sekarang' di y≈706, dan tautan 'Masuk' di y≈772. Mode gelap, aksen oranye, bahasa Indonesia. Kekurangan minor: tekstur halus pada gradasi nyaris tidak terlihat dan latar tampak mulus."
+        },
+        "R2": {
+         "skor": 2,
+         "bukti": "Fokus tunggal pada headline sans tebal 3 baris (±32px) 'Selamat datang. Saatnya pikiranmu beristirahat.' Lompatan skala tegas ke body ±15px dan label indikator kecil. Tidak ada judul yatim."
+        },
+        "R4": {
+         "skor": 2,
+         "bukti": "Oranye konsisten untuk aksi dan status aktif: isi ikon logo, pill indikator aktif, tombol utama, dan tautan 'Masuk'. Gradasi marun-ungu bermakna sebagai langit senja. Teks putih dan abu terang di atas latar gelap memiliki kontras cukup."
+        },
+        "R5": {
+         "skor": 2,
+         "bukti": "Ikon seragam: bulan sabit oranye di lingkaran logo kiri atas, panah di tombol. Visual utama matahari terbenam di balik bukit dengan cincin dan bintang relevan dengan tema tidur. Tidak ada emoji."
+        },
+        "R6": {
+         "skor": 2,
+         "bukti": "Copy spesifik: 'Meditasi terpandu, suara alam, dan cerita pengantar tidur. Cukup 10 menit sebelum lampu dimatikan.' Angka 10 menit memberi konteks penggunaan. 'Langkah 1 dari 3' konsisten dengan 3 titik."
+        },
+        "R8": {
+         "skor": 2,
+         "bukti": "Tidak ada pelanggaran checklist slop. Teks rata kiri dan gradasi sesuai tema. Keputusan khas yang terlihat: siluet bukit berlapis yang menelan matahari (y≈300–400) sebagai pemisah alami ke area konten, indikator langkah ditempatkan di atas headline, dan jam status 21:47 yang selaras dengan konteks malam."
+        },
+        "R9": {
+         "skor": 1,
+         "bukti": "Ada konteks tambahan: 'Langkah 1 dari 3' dan 'Cukup 10 menit sebelum lampu dimatikan'. Selebihnya hanya isi minimum: logo, tombol, dan tautan."
+        },
+        "R10": {
+         "skor": 1,
+         "bukti": "Latar berlapis dengan tint marun, bukit, cincin, dan glow, ditambah tombol oranye dengan shadow glow dan logo dalam lingkaran ber-tint. Namun tidak ada warna kedua bermakna di komponen dan tidak ada chip atau badge selain indikator titik. Komponen sebagian besar polos."
+        },
+        "slop": {
+         "jumlah": 0,
+         "butir": []
+        },
+        "emoji": 0,
+        "fokus": "Headline 'Selamat datang. Saatnya pikiranmu beristirahat.' di tengah-bawah layar (y≈445–555)"
+       }
+      },
+      "attempts": [
+       {
+        "dir": "/root/lakar/bench/runs/practice-effects/3/judge/P6/rep-1/attempt-1",
+        "status": "ok",
+        "problems": [],
+        "costUsd": 0.1236978,
+        "wallMs": 30807.75641500001
+       }
+      ],
+      "retried": false,
+      "costUsd": 0.1236978
+     },
+     {
+      "prompt": "P6",
+      "rep": 2,
+      "mapping": {
+       "X": "lakar",
+       "Y": "pendev"
+      },
+      "status": "ok",
+      "verdict": {
+       "X": {
+        "R1": {
+         "skor": 2,
+         "bukti": "Semua bagian ada dalam artboard 390x844: latar gradasi senja ungu ke oranye dengan bintang dan siluet bukit, bentuk cahaya abstrak (matahari dengan cincin konsentris) di atas, judul 'Selamat datang. Saatnya pikiranmu beristirahat.' di tengah, kalimat penjelas di bawahnya, indikator 3 langkah ('Langkah 1 dari 3') di atas judul, tombol 'Mulai sekarang' oranye, dan tautan 'Sudah punya akun? Masuk' di bawah. Mode gelap, aksen oranye, bahasa Indonesia."
+        },
+        "R2": {
+         "skor": 2,
+         "bukti": "Fokus tunggal pada judul tebal tiga baris 'Selamat datang. Saatnya pikiranmu beristirahat.' (y≈440–560). Lompatan skala tegas terhadap body ±16px dan label langkah kecil. Tidak ada judul yatim."
+        },
+        "R4": {
+         "skor": 2,
+         "bukti": "Oranye konsisten untuk aksi dan status aktif: tombol 'Mulai sekarang', tautan 'Masuk', dot aktif indikator, ikon logo. Ungu-merah di latar bermakna sebagai langit senja. Teks putih dan abu terang di latar gelap terbaca. Label 'Langkah 1 dari 3' kecil tapi masih cukup kontras."
+        },
+        "R5": {
+         "skor": 2,
+         "bukti": "Tanpa emoji. Satu gaya ikon: logo bulan sabit dalam lingkaran (kiri atas), panah garis di tombol, ikon status bar. Visual utama matahari dengan cincin dan bukit relevan untuk tema senja dan tidur."
+        },
+        "R6": {
+         "skor": 2,
+         "bukti": "Copy spesifik: 'Meditasi terpandu, suara alam, dan cerita pengantar tidur. Cukup 10 menit sebelum lampu dimatikan.' Angka konsisten: 'Langkah 1 dari 3' cocok dengan 3 dot."
+        },
+        "R8": {
+         "skor": 2,
+         "bukti": "Tidak ada pelanggaran slop: teks rata kiri, tanpa glassmorphism, tanpa kartu. Keputusan komposisi khas yang bisa ditunjuk: cincin konsentris yang berpusat pada matahari terbenam di balik siluet bukit berlapis (y≈90–400), dengan teks dijangkarkan rata kiri di bawah horizon."
+        },
+        "R9": {
+         "skor": 1,
+         "bukti": "Ada detail sekunder: label 'Langkah 1 dari 3' memberi konteks indikator, angka '10 menit' diberi konteks waktu ('sebelum lampu dimatikan'), bintang-bintang kecil di langit. Namun selain itu hanya isi minimum yang diminta."
+        },
+        "R10": {
+         "skor": 1,
+         "bukti": "Permukaan berlapis ada: gradasi ungu ke merah ke oranye, bukit berlapis, glow pada tombol. Visual matang. Tetapi tidak ada badge atau chip berwarna, dan tidak ada warna kedua bermakna yang dipakai pada komponen selain aksen oranye. Komponen sebagian besar polos."
+        },
+        "slop": {
+         "jumlah": 0,
+         "butir": []
+        },
+        "emoji": 0,
+        "fokus": "Judul tebal tiga baris 'Selamat datang. Saatnya pikiranmu beristirahat.' di tengah-bawah layar (y≈440–560)"
+       },
+       "Y": {
+        "R1": {
+         "skor": 1,
+         "bukti": "Semua bagian yang diminta ada: gradasi ungu-oranye dengan tekstur noise, matahari dengan cincin di atas, judul serif, penjelas, indikator 3 dot dengan '1 dari 3', tombol 'Mulai Sekarang', dan tautan 'Masuk'. Mode gelap, aksen oranye, bahasa Indonesia, 390x844. Ada satu elemen ekstra di luar prompt: tombol pil 'Lewati' di kanan atas."
+        },
+        "R2": {
+         "skor": 2,
+         "bukti": "Fokus tunggal pada judul serif besar 'Tenang dimulai dari satu tarikan napas.' (y≈435–505). Didahului eyebrow oranye kecil 'SELAMAT DATANG' sebagai label, bukan judul yatim. Lompatan skala tegas ke body teks."
+        },
+        "R4": {
+         "skor": 2,
+         "bukti": "Oranye konsisten untuk eyebrow 'SELAMAT DATANG', dot aktif, tombol gradasi oranye, tautan 'Masuk', dan logo bulan sabit. Ungu di langit bermakna sebagai suasana senja. Kontras teks memadai; '1 dari 3' abu kecil tapi masih terbaca."
+        },
+        "R5": {
+         "skor": 2,
+         "bukti": "Tanpa emoji. Ikon garis konsisten: bulan sabit oranye di samping wordmark, panah di tombol. Visual utama matahari bertekstur noise dengan cincin, bintang, dan bulan kecil di kanan atas relevan dengan tema."
+        },
+        "R6": {
+         "skor": 2,
+         "bukti": "Copy spesifik dan bernada: 'Tenang dimulai dari satu tarikan napas.', 'Meditasi terpandu, suara alam, dan cerita pengantar tidur untuk menemani malammu hingga terlelap.' Indikator '1 dari 3' konsisten dengan 3 dot."
+        },
+        "R8": {
+         "skor": 2,
+         "bukti": "Tidak ada pelanggaran slop: teks rata kiri, blur hanya pada pil 'Lewati' kecil, tanpa kartu. Keputusan khas yang bisa ditunjuk: judul serif kontras dengan body sans, dan matahari bertekstur grain yang tenggelam ke pita horizon oranye kabur (y≈220–360)."
+        },
+        "R9": {
+         "skor": 1,
+         "bukti": "Detail sekunder ada di sebagian bagian: eyebrow 'SELAMAT DATANG', penghitung '1 dari 3' di kanan indikator, opsi 'Lewati', bintang, dan bulan kecil. Namun konten tetap mendekati minimum onboarding; tidak ada angka atau metadata lain."
+        },
+        "R10": {
+         "skor": 1,
+         "bukti": "Permukaan berlapis ada: gradasi ungu-oranye dengan grain, glow tombol, pil 'Lewati' ber-tint. Visual matang. Tetapi tidak ada warna kedua bermakna pada komponen selain aksen oranye, dan tidak ada badge atau chip berwarna. Komponen sebagian besar polos."
+        },
+        "slop": {
+         "jumlah": 0,
+         "butir": []
+        },
+        "emoji": 0,
+        "fokus": "Judul serif besar 'Tenang dimulai dari satu tarikan napas.' di bawah horizon (y≈435–505)"
+       }
+      },
+      "attempts": [
+       {
+        "dir": "/root/lakar/bench/runs/practice-effects/3/judge/P6/rep-2/attempt-1",
+        "status": "ok",
+        "problems": [],
+        "costUsd": 0.1068338,
+        "wallMs": 22099.48804800003
+       }
+      ],
+      "retried": false,
+      "costUsd": 0.1068338
+     },
+     {
+      "prompt": "P6",
+      "rep": 3,
+      "mapping": {
+       "X": "pendev",
+       "Y": "lakar"
+      },
+      "status": "ok",
+      "verdict": {
+       "X": {
+        "R1": {
+         "skor": 2,
+         "bukti": "Semua bagian yang diminta ada. Latar gradasi ungu ke oranye senja dengan tekstur grain halus mengisi seluruh layar. Bentuk cahaya abstrak berupa matahari bulat dan cincin konsentris tipis ada di area atas (y≈60–350). Judul 'Tenang dimulai dari satu tarikan napas.' ada di tengah. Kalimat penjelas ada di bawah judul. Indikator 3 langkah (pil oranye dan 2 titik, plus '1 dari 3') ada di y≈647. Tombol 'Mulai Sekarang' ada di y≈722 dan tautan 'Sudah punya akun? Masuk' di y≈785. Mode gelap, aksen oranye, bahasa Indonesia, dan ukuran 390x844 sesuai. Tombol 'Lewati' di kanan atas adalah tambahan yang wajar untuk onboarding."
+        },
+        "R2": {
+         "skor": 2,
+         "bukti": "Titik fokusnya judul serif besar 'Tenang dimulai dari satu tarikan napas.' (y≈430–510). Lompatan skala tegas: eyebrow 'SELAMAT DATANG' kecil berhuruf kapital renggang, lalu judul display serif, lalu body abu-abu kecil, lalu label '1 dari 3'. Tidak ada judul yatim. Matahari mendukung judul, tidak bersaing dengannya."
+        },
+        "R4": {
+         "skor": 2,
+         "bukti": "Oranye senja dipakai konsisten untuk elemen aksi dan aktif: ikon bulan di logo kiri atas, eyebrow 'SELAMAT DATANG', pil aktif indikator, tombol 'Mulai Sekarang', dan tautan 'Masuk'. Ungu hanya muncul di gradasi langit sebagai suasana senja. Teks body abu-abu terang dan '1 dari 3' masih terbaca di atas latar gelap."
+        },
+        "R5": {
+         "skor": 2,
+         "bukti": "Ikonnya satu gaya garis: bulan sabit di logo kiri atas dan panah → di tombol, dengan ikon status bar standar. Visual utama berupa matahari terbenam bertekstur dengan cincin cahaya dan bintang (y≈100–350), relevan dengan tema tidur. Tidak ada emoji."
+        },
+        "R6": {
+         "skor": 2,
+         "bukti": "Copy spesifik dan selaras tema. Judul 'Tenang dimulai dari satu tarikan napas.' dan penjelas 'Meditasi terpandu, suara alam, dan cerita pengantar tidur untuk menemani malammu hingga terlelap.' sama-sama spesifik. Angka '1 dari 3' konsisten dengan indikator 3 titik."
+        },
+        "R8": {
+         "skor": 2,
+         "bukti": "Tidak ada pelanggaran checklist slop. Gradasi ungu punya alasan brand karena memang langit senja. Teks rata kiri. Keputusan khas yang bisa ditunjuk ada dua: judul display serif yang kontras dengan body sans, dan matahari bertekstur grain yang tenggelam ke kabut horizon oranye dengan cincin konsentris (y≈220–350)."
+        },
+        "R9": {
+         "skor": 1,
+         "bukti": "Ada beberapa detail sekunder: eyebrow 'SELAMAT DATANG', penghitung '1 dari 3' di kanan indikator, chip 'Lewati', dan bintang kecil. Selebihnya hanya isi minimum yang diminta, tanpa konteks tambahan seperti durasi atau manfaat terukur."
+        },
+        "R10": {
+         "skor": 1,
+         "bukti": "Permukaan sudah berlapis: gradasi ungu-oranye, kabut horizon, dan tombol oranye bergradasi dengan glow. Chip 'Lewati' semi-transparan sudah terdefinisi. Namun tidak ada warna kedua yang bermakna dan dipakai konsisten di lebih dari satu bagian, karena ungu hanya suasana latar. Komponen bawah juga relatif polos."
+        },
+        "slop": {
+         "jumlah": 0,
+         "butir": []
+        },
+        "emoji": 0,
+        "fokus": "Judul serif 'Tenang dimulai dari satu tarikan napas.' di tengah layar (y≈430–510)"
+       },
+       "Y": {
+        "R1": {
+         "skor": 2,
+         "bukti": "Semua bagian yang diminta ada. Latar gradasi ungu-merah ke oranye senja ada di seluruh layar. Bentuk cahaya abstrak berupa matahari, cincin konsentris, dan siluet bukit ada di bagian atas (y≈60–400). Judul 'Selamat datang. Saatnya pikiranmu beristirahat.' ada di y≈440–550, diikuti kalimat penjelas. Indikator 3 langkah dengan label 'Langkah 1 dari 3' ada di y≈412. Tombol 'Mulai sekarang' ada di y≈706 dan tautan 'Sudah punya akun? Masuk' di y≈772. Mode gelap, aksen oranye, bahasa Indonesia, dan ukuran 390x844 sesuai. Tekstur halus terlihat samar pada gradasi."
+        },
+        "R2": {
+         "skor": 2,
+         "bukti": "Titik fokusnya judul sans tebal tiga baris 'Selamat datang. Saatnya pikiranmu beristirahat.' (y≈440–550). Skalanya jauh di atas body abu-abu dan label indikator kecil. Tidak ada judul yatim. Matahari di atasnya mengarahkan mata turun ke judul."
+        },
+        "R4": {
+         "skor": 2,
+         "bukti": "Oranye dipakai konsisten untuk elemen aksi dan aktif: ikon logo bulan oranye kiri atas, pil aktif indikator (y≈412), tombol 'Mulai sekarang', dan tautan 'Masuk'. Warna lain hanya bagian dari gradasi senja. Body teks terang dan label 'Langkah 1 dari 3' masih terbaca."
+        },
+        "R5": {
+         "skor": 2,
+         "bukti": "Ikon konsisten dan sederhana: logo bulan dalam lingkaran di kiri atas, panah → di tombol, dan ikon status bar. Visual utama berupa matahari terbenam di balik bukit bergelombang dengan cincin cahaya dan bintang (y≈90–400), matang dan relevan. Tidak ada emoji."
+        },
+        "R6": {
+         "skor": 2,
+         "bukti": "Copy spesifik: 'Meditasi terpandu, suara alam, dan cerita pengantar tidur. Cukup 10 menit sebelum lampu dimatikan.' memberi konteks durasi yang konkret. 'Langkah 1 dari 3' konsisten dengan indikator 3 titik. Jam status 21:47 juga sesuai suasana malam."
+        },
+        "R8": {
+         "skor": 2,
+         "bukti": "Tidak ada pelanggaran checklist slop. Gradasi punya alasan tema senja. Teks rata kiri. Tidak ada kartu atau glassmorphism. Keputusan khas yang bisa ditunjuk: siluet bukit berlapis memotong matahari di y≈330–400 sehingga membentuk horizon yang menyambung langsung ke area konten, plus cincin konsentris yang menyerupai ritme napas."
+        },
+        "R9": {
+         "skor": 1,
+         "bukti": "Ada beberapa konteks dan detail: 'Cukup 10 menit sebelum lampu dimatikan' memberi satuan dan situasi, dan label 'Langkah 1 dari 3' melengkapi indikator. Selebihnya isi minimum, tanpa tombol lewati atau metadata lain."
+        },
+        "R10": {
+         "skor": 1,
+         "bukti": "Permukaan sudah berlapis: lapisan bukit bernuansa ungu gelap-terang, glow matahari, dan tombol oranye dengan bayangan glow. Namun tidak ada warna kedua yang bermakna dan dipakai konsisten. Komponen di luar tombol dan indikator juga polos, hanya teks."
+        },
+        "slop": {
+         "jumlah": 0,
+         "butir": []
+        },
+        "emoji": 0,
+        "fokus": "Judul tebal 'Selamat datang. Saatnya pikiranmu beristirahat.' di tengah layar (y≈440–550)"
+       }
+      },
+      "attempts": [
+       {
+        "dir": "/root/lakar/bench/runs/practice-effects/3/judge/P6/rep-3/attempt-1",
+        "status": "ok",
+        "problems": [],
+        "costUsd": 0.1316738,
+        "wallMs": 33962.44125200005
+       }
+      ],
+      "retried": false,
+      "costUsd": 0.1316738
+     }
+    ],
+    "tools": {
+     "lakar": {
+      "criteria": {
+       "R1": {
+        "values": [
+         1,
+         2,
+         2
+        ],
+        "median": 2,
+        "range": 1,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 1,
+          "bukti": "Semua bagian ada dalam 390x844: gradasi senja marun-ungu, matahari dengan cincin konsentris dan siluet bukit di atas (y≈80–400), indikator 'Langkah 1 dari 3' di y≈412, judul, penjelas, tombol 'Mulai sekarang' di y≈706, dan tautan 'Masuk' di y≈772. Mode gelap, aksen oranye, bahasa Indonesia. Kekurangan minor: tekstur halus pada gradasi nyaris tidak terlihat dan latar tampak mulus."
+         },
+         {
+          "rep": 2,
+          "skor": 2,
+          "bukti": "Semua bagian ada dalam artboard 390x844: latar gradasi senja ungu ke oranye dengan bintang dan siluet bukit, bentuk cahaya abstrak (matahari dengan cincin konsentris) di atas, judul 'Selamat datang. Saatnya pikiranmu beristirahat.' di tengah, kalimat penjelas di bawahnya, indikator 3 langkah ('Langkah 1 dari 3') di atas judul, tombol 'Mulai sekarang' oranye, dan tautan 'Sudah punya akun? Masuk' di bawah. Mode gelap, aksen oranye, bahasa Indonesia."
+         },
+         {
+          "rep": 3,
+          "skor": 2,
+          "bukti": "Semua bagian yang diminta ada. Latar gradasi ungu-merah ke oranye senja ada di seluruh layar. Bentuk cahaya abstrak berupa matahari, cincin konsentris, dan siluet bukit ada di bagian atas (y≈60–400). Judul 'Selamat datang. Saatnya pikiranmu beristirahat.' ada di y≈440–550, diikuti kalimat penjelas. Indikator 3 langkah dengan label 'Langkah 1 dari 3' ada di y≈412. Tombol 'Mulai sekarang' ada di y≈706 dan tautan 'Sudah punya akun? Masuk' di y≈772. Mode gelap, aksen oranye, bahasa Indonesia, dan ukuran 390x844 sesuai. Tekstur halus terlihat samar pada gradasi."
+         }
+        ]
+       },
+       "R2": {
+        "values": [
+         2,
+         2,
+         2
+        ],
+        "median": 2,
+        "range": 0,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 2,
+          "bukti": "Fokus tunggal pada headline sans tebal 3 baris (±32px) 'Selamat datang. Saatnya pikiranmu beristirahat.' Lompatan skala tegas ke body ±15px dan label indikator kecil. Tidak ada judul yatim."
+         },
+         {
+          "rep": 2,
+          "skor": 2,
+          "bukti": "Fokus tunggal pada judul tebal tiga baris 'Selamat datang. Saatnya pikiranmu beristirahat.' (y≈440–560). Lompatan skala tegas terhadap body ±16px dan label langkah kecil. Tidak ada judul yatim."
+         },
+         {
+          "rep": 3,
+          "skor": 2,
+          "bukti": "Titik fokusnya judul sans tebal tiga baris 'Selamat datang. Saatnya pikiranmu beristirahat.' (y≈440–550). Skalanya jauh di atas body abu-abu dan label indikator kecil. Tidak ada judul yatim. Matahari di atasnya mengarahkan mata turun ke judul."
+         }
+        ]
+       },
+       "R4": {
+        "values": [
+         2,
+         2,
+         2
+        ],
+        "median": 2,
+        "range": 0,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 2,
+          "bukti": "Oranye konsisten untuk aksi dan status aktif: isi ikon logo, pill indikator aktif, tombol utama, dan tautan 'Masuk'. Gradasi marun-ungu bermakna sebagai langit senja. Teks putih dan abu terang di atas latar gelap memiliki kontras cukup."
+         },
+         {
+          "rep": 2,
+          "skor": 2,
+          "bukti": "Oranye konsisten untuk aksi dan status aktif: tombol 'Mulai sekarang', tautan 'Masuk', dot aktif indikator, ikon logo. Ungu-merah di latar bermakna sebagai langit senja. Teks putih dan abu terang di latar gelap terbaca. Label 'Langkah 1 dari 3' kecil tapi masih cukup kontras."
+         },
+         {
+          "rep": 3,
+          "skor": 2,
+          "bukti": "Oranye dipakai konsisten untuk elemen aksi dan aktif: ikon logo bulan oranye kiri atas, pil aktif indikator (y≈412), tombol 'Mulai sekarang', dan tautan 'Masuk'. Warna lain hanya bagian dari gradasi senja. Body teks terang dan label 'Langkah 1 dari 3' masih terbaca."
+         }
+        ]
+       },
+       "R5": {
+        "values": [
+         2,
+         2,
+         2
+        ],
+        "median": 2,
+        "range": 0,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 2,
+          "bukti": "Ikon seragam: bulan sabit oranye di lingkaran logo kiri atas, panah di tombol. Visual utama matahari terbenam di balik bukit dengan cincin dan bintang relevan dengan tema tidur. Tidak ada emoji."
+         },
+         {
+          "rep": 2,
+          "skor": 2,
+          "bukti": "Tanpa emoji. Satu gaya ikon: logo bulan sabit dalam lingkaran (kiri atas), panah garis di tombol, ikon status bar. Visual utama matahari dengan cincin dan bukit relevan untuk tema senja dan tidur."
+         },
+         {
+          "rep": 3,
+          "skor": 2,
+          "bukti": "Ikon konsisten dan sederhana: logo bulan dalam lingkaran di kiri atas, panah → di tombol, dan ikon status bar. Visual utama berupa matahari terbenam di balik bukit bergelombang dengan cincin cahaya dan bintang (y≈90–400), matang dan relevan. Tidak ada emoji."
+         }
+        ]
+       },
+       "R6": {
+        "values": [
+         2,
+         2,
+         2
+        ],
+        "median": 2,
+        "range": 0,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 2,
+          "bukti": "Copy spesifik: 'Meditasi terpandu, suara alam, dan cerita pengantar tidur. Cukup 10 menit sebelum lampu dimatikan.' Angka 10 menit memberi konteks penggunaan. 'Langkah 1 dari 3' konsisten dengan 3 titik."
+         },
+         {
+          "rep": 2,
+          "skor": 2,
+          "bukti": "Copy spesifik: 'Meditasi terpandu, suara alam, dan cerita pengantar tidur. Cukup 10 menit sebelum lampu dimatikan.' Angka konsisten: 'Langkah 1 dari 3' cocok dengan 3 dot."
+         },
+         {
+          "rep": 3,
+          "skor": 2,
+          "bukti": "Copy spesifik: 'Meditasi terpandu, suara alam, dan cerita pengantar tidur. Cukup 10 menit sebelum lampu dimatikan.' memberi konteks durasi yang konkret. 'Langkah 1 dari 3' konsisten dengan indikator 3 titik. Jam status 21:47 juga sesuai suasana malam."
+         }
+        ]
+       },
+       "R8": {
+        "values": [
+         2,
+         2,
+         2
+        ],
+        "median": 2,
+        "range": 0,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 2,
+          "bukti": "Tidak ada pelanggaran checklist slop. Teks rata kiri dan gradasi sesuai tema. Keputusan khas yang terlihat: siluet bukit berlapis yang menelan matahari (y≈300–400) sebagai pemisah alami ke area konten, indikator langkah ditempatkan di atas headline, dan jam status 21:47 yang selaras dengan konteks malam."
+         },
+         {
+          "rep": 2,
+          "skor": 2,
+          "bukti": "Tidak ada pelanggaran slop: teks rata kiri, tanpa glassmorphism, tanpa kartu. Keputusan komposisi khas yang bisa ditunjuk: cincin konsentris yang berpusat pada matahari terbenam di balik siluet bukit berlapis (y≈90–400), dengan teks dijangkarkan rata kiri di bawah horizon."
+         },
+         {
+          "rep": 3,
+          "skor": 2,
+          "bukti": "Tidak ada pelanggaran checklist slop. Gradasi punya alasan tema senja. Teks rata kiri. Tidak ada kartu atau glassmorphism. Keputusan khas yang bisa ditunjuk: siluet bukit berlapis memotong matahari di y≈330–400 sehingga membentuk horizon yang menyambung langsung ke area konten, plus cincin konsentris yang menyerupai ritme napas."
+         }
+        ]
+       },
+       "R9": {
+        "values": [
+         1,
+         1,
+         1
+        ],
+        "median": 1,
+        "range": 0,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 1,
+          "bukti": "Ada konteks tambahan: 'Langkah 1 dari 3' dan 'Cukup 10 menit sebelum lampu dimatikan'. Selebihnya hanya isi minimum: logo, tombol, dan tautan."
+         },
+         {
+          "rep": 2,
+          "skor": 1,
+          "bukti": "Ada detail sekunder: label 'Langkah 1 dari 3' memberi konteks indikator, angka '10 menit' diberi konteks waktu ('sebelum lampu dimatikan'), bintang-bintang kecil di langit. Namun selain itu hanya isi minimum yang diminta."
+         },
+         {
+          "rep": 3,
+          "skor": 1,
+          "bukti": "Ada beberapa konteks dan detail: 'Cukup 10 menit sebelum lampu dimatikan' memberi satuan dan situasi, dan label 'Langkah 1 dari 3' melengkapi indikator. Selebihnya isi minimum, tanpa tombol lewati atau metadata lain."
+         }
+        ]
+       },
+       "R10": {
+        "values": [
+         1,
+         1,
+         1
+        ],
+        "median": 1,
+        "range": 0,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 1,
+          "bukti": "Latar berlapis dengan tint marun, bukit, cincin, dan glow, ditambah tombol oranye dengan shadow glow dan logo dalam lingkaran ber-tint. Namun tidak ada warna kedua bermakna di komponen dan tidak ada chip atau badge selain indikator titik. Komponen sebagian besar polos."
+         },
+         {
+          "rep": 2,
+          "skor": 1,
+          "bukti": "Permukaan berlapis ada: gradasi ungu ke merah ke oranye, bukit berlapis, glow pada tombol. Visual matang. Tetapi tidak ada badge atau chip berwarna, dan tidak ada warna kedua bermakna yang dipakai pada komponen selain aksen oranye. Komponen sebagian besar polos."
+         },
+         {
+          "rep": 3,
+          "skor": 1,
+          "bukti": "Permukaan sudah berlapis: lapisan bukit bernuansa ungu gelap-terang, glow matahari, dan tombol oranye dengan bayangan glow. Namun tidak ada warna kedua yang bermakna dan dipakai konsisten. Komponen di luar tombol dan indikator juga polos, hanya teks."
+         }
+        ]
+       }
+      },
+      "total": 14,
+      "slop": {
+       "values": [
+        0,
+        0,
+        0
+       ],
+       "median": 0,
+       "range": 0,
+       "flag": false,
+       "items": [
+        {
+         "rep": 1,
+         "butir": []
+        },
+        {
+         "rep": 2,
+         "butir": []
+        },
+        {
+         "rep": 3,
+         "butir": []
+        }
+       ]
+      },
+      "emoji": {
+       "values": [
+        0,
+        0,
+        0
+       ],
+       "median": 0,
+       "range": 0,
+       "flag": false
+      },
+      "focus": [
+       {
+        "rep": 1,
+        "fokus": "Headline 'Selamat datang. Saatnya pikiranmu beristirahat.' di tengah-bawah layar (y≈445–555)"
+       },
+       {
+        "rep": 2,
+        "fokus": "Judul tebal tiga baris 'Selamat datang. Saatnya pikiranmu beristirahat.' di tengah-bawah layar (y≈440–560)"
+       },
+       {
+        "rep": 3,
+        "fokus": "Judul tebal 'Selamat datang. Saatnya pikiranmu beristirahat.' di tengah layar (y≈440–550)"
+       }
+      ]
+     },
+     "pendev": {
+      "criteria": {
+       "R1": {
+        "values": [
+         2,
+         1,
+         2
+        ],
+        "median": 2,
+        "range": 1,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 2,
+          "bukti": "Artboard 390x844 berisi semua bagian yang diminta. Latar gradasi senja ungu ke oranye dengan tekstur grain halus di seluruh artboard. Bentuk cahaya berupa matahari dan cincin konsentris di atas (y≈150–350). Judul 'Tenang dimulai dari satu tarikan napas.' ada di tengah. Kalimat penjelas ada di bawah judul. Indikator 3 langkah (pill + 2 titik, '1 dari 3') di y≈647. Tombol 'Mulai Sekarang' di y≈722 dan tautan 'Sudah punya akun? Masuk' di y≈785. Mode gelap, aksen oranye, bahasa Indonesia. Tombol 'Lewati' di kanan atas adalah elemen onboarding wajar, bukan seksi tambahan."
+         },
+         {
+          "rep": 2,
+          "skor": 1,
+          "bukti": "Semua bagian yang diminta ada: gradasi ungu-oranye dengan tekstur noise, matahari dengan cincin di atas, judul serif, penjelas, indikator 3 dot dengan '1 dari 3', tombol 'Mulai Sekarang', dan tautan 'Masuk'. Mode gelap, aksen oranye, bahasa Indonesia, 390x844. Ada satu elemen ekstra di luar prompt: tombol pil 'Lewati' di kanan atas."
+         },
+         {
+          "rep": 3,
+          "skor": 2,
+          "bukti": "Semua bagian yang diminta ada. Latar gradasi ungu ke oranye senja dengan tekstur grain halus mengisi seluruh layar. Bentuk cahaya abstrak berupa matahari bulat dan cincin konsentris tipis ada di area atas (y≈60–350). Judul 'Tenang dimulai dari satu tarikan napas.' ada di tengah. Kalimat penjelas ada di bawah judul. Indikator 3 langkah (pil oranye dan 2 titik, plus '1 dari 3') ada di y≈647. Tombol 'Mulai Sekarang' ada di y≈722 dan tautan 'Sudah punya akun? Masuk' di y≈785. Mode gelap, aksen oranye, bahasa Indonesia, dan ukuran 390x844 sesuai. Tombol 'Lewati' di kanan atas adalah tambahan yang wajar untuk onboarding."
+         }
+        ]
+       },
+       "R2": {
+        "values": [
+         2,
+         2,
+         2
+        ],
+        "median": 2,
+        "range": 0,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 2,
+          "bukti": "Fokus tunggal pada headline serif besar (±34px) di tengah layar. Lompatan skala tegas: eyebrow kecil oranye 'SELAMAT DATANG', lalu headline, lalu body abu terang ±15px. Tidak ada judul yatim."
+         },
+         {
+          "rep": 2,
+          "skor": 2,
+          "bukti": "Fokus tunggal pada judul serif besar 'Tenang dimulai dari satu tarikan napas.' (y≈435–505). Didahului eyebrow oranye kecil 'SELAMAT DATANG' sebagai label, bukan judul yatim. Lompatan skala tegas ke body teks."
+         },
+         {
+          "rep": 3,
+          "skor": 2,
+          "bukti": "Titik fokusnya judul serif besar 'Tenang dimulai dari satu tarikan napas.' (y≈430–510). Lompatan skala tegas: eyebrow 'SELAMAT DATANG' kecil berhuruf kapital renggang, lalu judul display serif, lalu body abu-abu kecil, lalu label '1 dari 3'. Tidak ada judul yatim. Matahari mendukung judul, tidak bersaing dengannya."
+         }
+        ]
+       },
+       "R4": {
+        "values": [
+         2,
+         2,
+         2
+        ],
+        "median": 2,
+        "range": 0,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 2,
+          "bukti": "Oranye dipakai konsisten untuk aksi dan status aktif: ikon bulan logo, eyebrow, pill indikator aktif, tombol utama, dan tautan 'Masuk'. Ungu hanya muncul di langit sebagai bagian dari tema senja. Teks putih dan abu terang di atas latar gelap terbaca, termasuk '1 dari 3' dan 'Sudah punya akun?'."
+         },
+         {
+          "rep": 2,
+          "skor": 2,
+          "bukti": "Oranye konsisten untuk eyebrow 'SELAMAT DATANG', dot aktif, tombol gradasi oranye, tautan 'Masuk', dan logo bulan sabit. Ungu di langit bermakna sebagai suasana senja. Kontras teks memadai; '1 dari 3' abu kecil tapi masih terbaca."
+         },
+         {
+          "rep": 3,
+          "skor": 2,
+          "bukti": "Oranye senja dipakai konsisten untuk elemen aksi dan aktif: ikon bulan di logo kiri atas, eyebrow 'SELAMAT DATANG', pil aktif indikator, tombol 'Mulai Sekarang', dan tautan 'Masuk'. Ungu hanya muncul di gradasi langit sebagai suasana senja. Teks body abu-abu terang dan '1 dari 3' masih terbaca di atas latar gelap."
+         }
+        ]
+       },
+       "R5": {
+        "values": [
+         2,
+         2,
+         2
+        ],
+        "median": 2,
+        "range": 0,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 2,
+          "bukti": "Ikon bergaris seragam: bulan di logo kiri atas, panah di tombol, ikon status bar. Visual utama matahari senja dengan cincin dan bintang relevan dengan tema tidur. Tidak ada emoji."
+         },
+         {
+          "rep": 2,
+          "skor": 2,
+          "bukti": "Tanpa emoji. Ikon garis konsisten: bulan sabit oranye di samping wordmark, panah di tombol. Visual utama matahari bertekstur noise dengan cincin, bintang, dan bulan kecil di kanan atas relevan dengan tema."
+         },
+         {
+          "rep": 3,
+          "skor": 2,
+          "bukti": "Ikonnya satu gaya garis: bulan sabit di logo kiri atas dan panah → di tombol, dengan ikon status bar standar. Visual utama berupa matahari terbenam bertekstur dengan cincin cahaya dan bintang (y≈100–350), relevan dengan tema tidur. Tidak ada emoji."
+         }
+        ]
+       },
+       "R6": {
+        "values": [
+         2,
+         2,
+         2
+        ],
+        "median": 2,
+        "range": 0,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 2,
+          "bukti": "Copy spesifik untuk produk: 'Meditasi terpandu, suara alam, dan cerita pengantar tidur untuk menemani malammu hingga terlelap.' Indikator '1 dari 3' konsisten dengan 3 titik. Tidak ada frasa generik."
+         },
+         {
+          "rep": 2,
+          "skor": 2,
+          "bukti": "Copy spesifik dan bernada: 'Tenang dimulai dari satu tarikan napas.', 'Meditasi terpandu, suara alam, dan cerita pengantar tidur untuk menemani malammu hingga terlelap.' Indikator '1 dari 3' konsisten dengan 3 dot."
+         },
+         {
+          "rep": 3,
+          "skor": 2,
+          "bukti": "Copy spesifik dan selaras tema. Judul 'Tenang dimulai dari satu tarikan napas.' dan penjelas 'Meditasi terpandu, suara alam, dan cerita pengantar tidur untuk menemani malammu hingga terlelap.' sama-sama spesifik. Angka '1 dari 3' konsisten dengan indikator 3 titik."
+         }
+        ]
+       },
+       "R8": {
+        "values": [
+         2,
+         2,
+         2
+        ],
+        "median": 2,
+        "range": 0,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 2,
+          "bukti": "Tidak ada pelanggaran checklist slop. Gradasi ungu-oranye punya alasan tema senja. Teks rata kiri. Keputusan khas yang terlihat: headline serif berkarakter, pita cahaya horizon oranye yang memotong matahari di y≈330, dan grain bertekstur di seluruh latar."
+         },
+         {
+          "rep": 2,
+          "skor": 2,
+          "bukti": "Tidak ada pelanggaran slop: teks rata kiri, blur hanya pada pil 'Lewati' kecil, tanpa kartu. Keputusan khas yang bisa ditunjuk: judul serif kontras dengan body sans, dan matahari bertekstur grain yang tenggelam ke pita horizon oranye kabur (y≈220–360)."
+         },
+         {
+          "rep": 3,
+          "skor": 2,
+          "bukti": "Tidak ada pelanggaran checklist slop. Gradasi ungu punya alasan brand karena memang langit senja. Teks rata kiri. Keputusan khas yang bisa ditunjuk ada dua: judul display serif yang kontras dengan body sans, dan matahari bertekstur grain yang tenggelam ke kabut horizon oranye dengan cincin konsentris (y≈220–350)."
+         }
+        ]
+       },
+       "R9": {
+        "values": [
+         1,
+         1,
+         1
+        ],
+        "median": 1,
+        "range": 0,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 1,
+          "bukti": "Ada detail sekunder: eyebrow, label '1 dari 3' di kanan indikator, tombol 'Lewati'. Namun isi selebihnya hanya minimum yang diminta, tanpa konteks tambahan seperti durasi atau manfaat terukur."
+         },
+         {
+          "rep": 2,
+          "skor": 1,
+          "bukti": "Detail sekunder ada di sebagian bagian: eyebrow 'SELAMAT DATANG', penghitung '1 dari 3' di kanan indikator, opsi 'Lewati', bintang, dan bulan kecil. Namun konten tetap mendekati minimum onboarding; tidak ada angka atau metadata lain."
+         },
+         {
+          "rep": 3,
+          "skor": 1,
+          "bukti": "Ada beberapa detail sekunder: eyebrow 'SELAMAT DATANG', penghitung '1 dari 3' di kanan indikator, chip 'Lewati', dan bintang kecil. Selebihnya hanya isi minimum yang diminta, tanpa konteks tambahan seperti durasi atau manfaat terukur."
+         }
+        ]
+       },
+       "R10": {
+        "values": [
+         1,
+         1,
+         1
+        ],
+        "median": 1,
+        "range": 0,
+        "flag": false,
+        "evidence": [
+         {
+          "rep": 1,
+          "skor": 1,
+          "bukti": "Latar berlapis dengan tint, grain, dan glow horizon, ditambah chip 'Lewati' semi-transparan dan tombol bergradasi dengan glow. Namun tidak ada warna kedua bermakna di komponen; ungu hanya ada di langit. Komponen selebihnya teks polos."
+         },
+         {
+          "rep": 2,
+          "skor": 1,
+          "bukti": "Permukaan berlapis ada: gradasi ungu-oranye dengan grain, glow tombol, pil 'Lewati' ber-tint. Visual matang. Tetapi tidak ada warna kedua bermakna pada komponen selain aksen oranye, dan tidak ada badge atau chip berwarna. Komponen sebagian besar polos."
+         },
+         {
+          "rep": 3,
+          "skor": 1,
+          "bukti": "Permukaan sudah berlapis: gradasi ungu-oranye, kabut horizon, dan tombol oranye bergradasi dengan glow. Chip 'Lewati' semi-transparan sudah terdefinisi. Namun tidak ada warna kedua yang bermakna dan dipakai konsisten di lebih dari satu bagian, karena ungu hanya suasana latar. Komponen bawah juga relatif polos."
+         }
+        ]
+       }
+      },
+      "total": 14,
+      "slop": {
+       "values": [
+        0,
+        0,
+        0
+       ],
+       "median": 0,
+       "range": 0,
+       "flag": false,
+       "items": [
+        {
+         "rep": 1,
+         "butir": []
+        },
+        {
+         "rep": 2,
+         "butir": []
+        },
+        {
+         "rep": 3,
+         "butir": []
+        }
+       ]
+      },
+      "emoji": {
+       "values": [
+        0,
+        0,
+        0
+       ],
+       "median": 0,
+       "range": 0,
+       "flag": false
+      },
+      "focus": [
+       {
+        "rep": 1,
+        "fokus": "Headline serif 'Tenang dimulai dari satu tarikan napas.' di tengah layar (y≈430–510)"
+       },
+       {
+        "rep": 2,
+        "fokus": "Judul serif besar 'Tenang dimulai dari satu tarikan napas.' di bawah horizon (y≈435–505)"
+       },
+       {
+        "rep": 3,
+        "fokus": "Judul serif 'Tenang dimulai dari satu tarikan napas.' di tengah layar (y≈430–510)"
+       }
+      ]
+     }
+    }
+   },
+   "decision": {
+    "decision": "Setara",
+    "why": "lolos gerbang, total 14 vs 14, daya tarik 2 vs 2, tanpa alasan Kalah",
+    "checks": {
+     "total": {
+      "lakar": 14,
+      "pendev": 14
+     },
+     "appeal": {
+      "lakar": 2,
+      "pendev": 2
+     },
+     "appealLoss": [],
+     "otherLoss": [],
+     "zeroVsTwo": [],
+     "pendevBriefViolations": []
+    }
+   },
+   "emoji": {
+    "lakar": {
+     "agent": 0,
+     "glyphs": 0,
+     "lint": 0,
+     "judge": 0
+    },
+    "pendev": {
+     "agent": 0,
+     "glyphs": 0,
+     "judge": 0
+    }
+   },
+   "pngs": {
+    "lakar": "bench/practice/effects/3/P6-lakar.png",
+    "pendev": "bench/runs/practice-effects/1/P6-pendev.png"
+   },
+   "cost": {
+    "lakar": 0.4284836,
+    "pendev": 0.6033894000000001,
+    "pendevCounted": false,
+    "judge": 0.3622054
+   }
+  }
+ ],
+ "outcome": {
+  "pass": true,
+  "passCount": 2,
+  "total": 2,
+  "reasons": []
+ },
+ "cost": {
+  "pendev": 0,
+  "lakar": 1.7104152,
+  "judge": 1.2885788,
+  "iteration": 2.9989939999999997,
+  "previous": {
+   "1": 5.015962,
+   "2": 2.9747161999999996
+  },
+  "cumulative": 10.9896722,
+  "budget": 15
+ },
+ "penGuard": {
+  "files": 43,
+  "changed": [],
+  "removed": [],
+  "added": []
+ },
+ "lakardActiveAfter": "active",
+ "notes": [
+  "Sebelum run: dokumen Lakar bench lain dipindah ke `bench/runs/lakar-archive/effects-3-20261118T165224Z` (lintas-arus-landing, senyap-onboarding), lalu lakard di-restart (pid 1624254 → 1624498)."
+ ],
+ "penDesktopRestart": "pen.dev dipakai ulang dari iterasi 1",
+ "comparison": [
+  {
+   "id": "P5",
+   "before": {
+    "decision": "Lebih baik",
+    "t": 16,
+    "d": 4,
+    "wallMs": 273579.05913899996,
+    "ratio": 1.3984742772964922
+   },
+   "after": {
+    "decision": "Lebih baik",
+    "t": 15,
+    "d": 4,
+    "wallMs": 214394.30602599998,
+    "ratio": 1.0959352046892534
+   }
+  },
+  {
+   "id": "P6",
+   "before": {
+    "decision": "Setara",
+    "t": 14,
+    "d": 3,
+    "wallMs": 104305.924597,
+    "ratio": 0.7826818164911094
+   },
+   "after": {
+    "decision": "Setara",
+    "t": 14,
+    "d": 2,
+    "wallMs": 81173.68423600003,
+    "ratio": 0.6091041029028522
+   }
+  }
+ ]
+}
