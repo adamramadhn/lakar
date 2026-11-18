@@ -339,3 +339,40 @@ api.md sama, protocolHash 907cb36f…edb85d, bench/protocol & bench/rubric tidak
   (`#B45309`), sehingga badge `extra` = `warning`. Diganti `#CA8A04` (prinsip: pendamping dan status = peran berbeda, warna
   berbeda). core.md sha 6ce0eace7c3f255c; belum diuji di run latihan (tidak ada iterasi lagi).
 - Ditunda: arsip dokumen run tanpa `run.json` (penyebab pembatalan iterasi 7); celah LC-20 di bawah tab bar mengambang.
+
+## Iterasi 8: ulang penuh iterasi 7 dengan skill v7 — layar pertama tanpa duplikasi, thumbnail berfoto, disiplin execute
+
+Dibuka Adam 2026-11-18 setelah HALT iterasi 7. Iterasi 7 batal karena **cacat harness** (dokumen sisa run P3 iterasi 4 yang
+dihentikan tidak diarsip → P3 `invalid`, juri tidak berjalan, P4 tidak dijalankan), bukan karena hasil desain. Pengecualian
+C8 atas keputusan Adam: iterasi 7 diulang **penuh** sebagai iterasi 8 (keempat prompt + juri), `--reuse-pendev 2`
+(pen.dev tidak dijalankan). Tidak ada pemilihan hasil: semua run iterasi 7 tetap tercatat di `bench/practice-7.*`.
+
+Harness: `MAX_ITER` 8, `BUDGET_USD` 58,09 ($48,09 terpakai iterasi 1–7 + $10 iterasi 8) + tes; README diperbarui. Arsip
+run terhenti (commit cb88e3e): `--dry-run` iterasi 8 menunjukkan `dapur-wening-resep` ← `practice/4/P3-lakar (terhenti)`
+ikut diarsip sebelum run. LC-20 kini juga menandai konten di celah di bawah tab bar mengambang (cb88e3e).
+
+Perubahan skill v7 (prinsip umum, berlaku untuk layar apa pun):
+
+- **Tanpa duplikasi di satu layar** (`mobile.md`). Alasan: PNG P2 iterasi 7 menampilkan butir yang sama di kartu sorotan
+  dan di bilah yang menempel, sehingga ruang layar pertama terbuang. Prinsip: satu butir konten tampil sekali per layar;
+  bila bilah yang menempel memuat butir yang sedang berjalan, kartu sorotan memuat hal lain (butir berikutnya, ringkasan,
+  rekomendasi) dan daftar tidak mengulanginya.
+- **Thumbnail konten nyata = foto** (`mobile.md` "Foto untuk isi nyata", `core.md` Komponen Foto: + thumbnail daftar).
+  Alasan: thumbnail daftar iterasi 7 berupa bidang warna berteks, padahal foto tersedia. Prinsip: sampul dan thumbnail yang
+  mewakili konten (media, produk, makanan, tempat, orang) memakai foto dari pencarian `limit:12`; bidang warna berlabel
+  hanya bila pencarian gagal atau untuk tile kategori abstrak (tetap satu hue per kategori). Wadah ikon 40 hanya untuk
+  baris aksi/pengaturan.
+- **Layar pertama hidup** (`mobile.md`). Alasan: layar pertama iterasi 7 hanya memuat satu butir daftar. Prinsip: daftar
+  menampilkan ≥ 3 butir utuh; bila tidak muat, rapatkan header, visual puncak, dan sorotan lebih dulu, baru kurangi butir;
+  baris list ringkas 56–72.
+- **Disiplin execute** (`core.md` langkah 3 dan 6, `mobile.md` §Alur execute (maks 3)). Alasan: iterasi 7 P1 memakai
+  `inspect` + 5 execute, P2 3 execute perapatan berurutan. Prinsip: total execute termasuk perbaikan mobile/app maks 3,
+  landing maks 4; tanpa `inspect`; satu screenshot per board → satu execute perbaikan semua temuan → `export`; sisa
+  non-error disebut di ringkasan, bukan execute tambahan.
+- Penghematan token: prosa `mobile.md` dipadatkan (ring, tab bar, bilah bawah, anggaran tinggi) agar muat (1481/1500);
+  `core.md` 3999/4000 (kalimat alur dipadatkan).
+
+Skill: `core.md` 56f70449dbed0f12, `landing.md` b953c1b2bae4a8d4 (tidak berubah), `mobile.md` 49ae74fcd2dd37b4.
+Verifikasi sebelum run: build OK, 801/801 tes (48 file; termasuk C7, batas token, contoh skill 0 error/warning/gate),
+api.md sama, `practice --iter 8 --reuse-pendev 2 --dry-run` OK (prompt sha 582c5d11… beku, rubrik 2.1, C7 lulus,
+perkiraan $7,60, anggaran cukup), lakard di-restart dan active.

@@ -74,7 +74,8 @@ runner, pembungkus (`bench/protocol/wrapper.txt`, read-only), dan juri rubrik v2
 - **`--reuse-pendev <j>`:** run pen.dev iterasi j dipakai apa adanya (tercatat di laporan, biayanya tidak dihitung ulang);
   iterasi sumber tidak lengkap → Abort sebelum spawn. Mode ini tidak menjalankan pen.dev, jadi preflight tidak mewajibkan
   service pen-desktop aktif (penjaga md5 `.pen` tetap berjalan). `--resume` hanya mengulang run `aborted`/`invalid`.
-- **Anggaran:** iterasi maks 7 (iterasi 4–6 lalu iterasi konfirmasi 7 dibuka Adam 2026-11-18); biaya kumulatif (dari `bench/practice-<j>.json`) + perkiraan sisa > $55,18 → Abort.
+- **Anggaran:** iterasi maks 8 (iterasi 4–6, iterasi konfirmasi 7, lalu iterasi 8 = ulang penuh iterasi 7 yang batal karena
+  cacat harness; dibuka Adam 2026-11-18); biaya kumulatif (dari `bench/practice-<j>.json`) + perkiraan sisa > $58,09 → Abort.
 - **Keluaran:** `bench/practice-<k>.md|json` (tracked), strip Lakar `bench/practice/<k>/<P>-lakar.png` (tracked,
   eksklusif), artefak mentah dan strip/`.pen` pen.dev lokal di `bench/runs/practice/<k>/` (EULA). Log iterasi skill:
   `bench/practice/LOG.md`.
