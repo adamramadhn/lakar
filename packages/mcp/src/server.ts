@@ -1,7 +1,7 @@
-// Server MCP Lakar (v2): tool open_doc, execute, screenshot, icon_search → HTTP lakard.
+// Server MCP Lakar (v2): tool open_doc, execute, screenshot, icon_search, layout_check → HTTP lakard.
 import { McpServer, type CallToolResult } from '@modelcontextprotocol/server';
 import { z } from 'zod';
-import type { ApiResult } from '@lakar/schema';
+import { findingLine, summaryText, type ApiResult, type Finding, type FindingSummary } from '@lakar/schema';
 import { DaemonClient, formatError } from './client.js';
 
 export const SERVER_NAME = 'lakar';
@@ -21,6 +21,48 @@ function asText<T>(r: ApiResult<T>): CallToolResult {
   if (!r.ok) return errorResult(formatError(r.error));
   return { content: [{ type: 'text', text: JSON.stringify(r.data) }] };
 }
+
+/** Batas baris temuan di output MCP. */
+export const EXECUTE_FINDING_LINES = 20;
+export const LAYOUT_CHECK_FINDING_LINES = 60;
+
+/** Baris temuan (format ringkas) dengan batas `max` + baris sisa. */
+export function findingLines(findings: readonly Finding[], max: number): string[] {
+  const lines = findings.slice(0, max).map(findingLine);
+  if (findings.length > max) lines.push(`… ${findings.length - max} temuan lagi (layout_check untuk daftar penuh)`);
+  return lines;
+}
+
+type ExecuteData = { check?: { boards: string[]; summary: FindingSummary; findings: Finding[] } } & Record<string, unknown>;
+
+/** Output execute: field lain sebagai JSON, lalu ringkasan check + baris temuan (maks 20). */
+export function formatExecute(data: ExecuteData): string {
+  const { check, ...rest } = data;
+  if (!check) return JSON.stringify(data);
+  const head = check.boards.length ? `check board ${check.boards.join(', ')}: ${summaryText(check.summary)}` : 'check: tidak ada board tersentuh';
+  return [JSON.stringify(rest), head, ...findingLines(check.findings, EXECUTE_FINDING_LINES)].join('\n');
+}
+
+type LayoutCheckData = { docId: string; rev: number; boards: { id: string; name: string; summary: FindingSummary }[]; summary: FindingSummary; findings: Finding[] };
+
+/** Output layout_check: satu baris ringkasan lalu baris temuan (maks 60). */
+export function formatLayoutCheck(data: LayoutCheckData): string {
+  const ids = data.boards.map((b) => b.id).join(', ');
+  const head = `layout_check rev ${data.rev}, ${data.boards.length} board${ids ? ` (${ids})` : ''}: ${summaryText(data.summary)}`;
+  return [head, ...findingLines(data.findings, LAYOUT_CHECK_FINDING_LINES)].join('\n');
+}
+
+/** Deskripsi tool `layout_check` (aturan gerbang G0). */
+export const LAYOUT_CHECK_DESCRIPTION =
+  'Check gerbang G0 pada board dokumen aktif (tanpa boardId = semua board). Board dirender lalu diperiksa: ' +
+  'LC-01a emoji di teks; LC-01b glyph Unicode sebagai ikon (★☆✓✔✗→←↑↓↗↘▶◀• di awal teks; pakai node icon); ' +
+  "LC-02a node terpotong clip board/frame (pengecualian: isi frame 'Crop / …' maks 2 per board, sumbu vertikal frame 'Scroll / …', node berotasi); " +
+  'LC-05 teks lebih kecil dari 12px; ' +
+  "LC-20 konten terakhir tertutup bar bawah 'Overlay / …' (berakhir ≤ y bar − 8; dicek pada posisi akhir scroll); " +
+  'LC-12 (warning) ukuran board (mobile 390×844, app 1440×900 atau 1440×1024, landing lebar 1440, atau expectedSize) dan tabrakan antarboard (pakai place). ' +
+  'Selesai bila 0 error gerbang. Output: satu baris ringkasan lalu satu baris per temuan ' +
+  "'<level>[·gerbang] · <aturan> · <nama node> (<id>) · <terukur> · <seharusnya>' (maks 60 baris). " +
+  'Board tidak ada → NOT_FOUND; dokumen yang tidak bisa dirender → error yang sama dengan screenshot.';
 
 /** Deskripsi tool `execute`: harus menyebut setiap fungsi API exec (dites di tests/execute-description.test.ts). */
 export const EXECUTE_DESCRIPTION =
@@ -54,15 +96,20 @@ export const EXECUTE_DESCRIPTION =
   "stroke {color, width, align:'inside'|'center'|'outside', sides?}, radius (n atau [tl,tr,br,bl]). " +
   "Warna: '#RRGGBB' atau '#RRGGBBAA'. Nilai boleh referensi token {$token:'colors.nama'} (token harus ada di dokumen). " +
   "x/y hanya untuk board atau node anak dengan position:'absolute'. Kunci di luar skema ditolak (SCHEMA_INVALID). " +
-  'Mengembalikan {docId, rev, created:[{id,name,path}], value?, valueTruncated?, logs?}: path = list nama dari board ke node (mis. [\'Home\',\'Hero / Card\',\'Judul\']), hanya untuk dibaca; alamati node lewat id. ' +
-  'Snippet tanpa op yang sukses tidak menambah rev. ' +
+  'Mengembalikan {docId, rev, created:[{id,name,path}], value?, valueTruncated?, logs?, check?, bounds?}: path = list nama dari board ke node (mis. [\'Home\',\'Hero / Card\',\'Judul\']), hanya untuk dibaca; alamati node lewat id. ' +
+  'Snippet tanpa op yang sukses tidak menambah rev (tanpa check/bounds). ' +
+  'Setelah snippet sukses, board yang tersentuh dirender dan dicek gerbang G0 sebelum commit (aturan: lihat tool layout_check): ' +
+  'check {boards, summary:{error, warning, gate}, findings:[{level, rule, nodeId, nodeName, detail, expected}]} ditampilkan sebagai baris ringkas (maks 20), ' +
+  'bounds {id:[x,y,w,h]} dibulatkan relatif board (board tersentuh, node baru, node berubah; maks 60, sisanya boundsTruncated). ' +
+  'Temuan tidak membatalkan commit; perbaiki lalu execute lagi (daftar penuh: layout_check). ' +
+  'Board tersentuh yang tidak bisa dirender (FONT_MISSING: keluarga tak terdaftar atau karakter di luar font; aset NOT_FOUND; ICON_UNKNOWN) → dokumen tidak di-commit, error membawa editId. ' +
   'Error menyebut baris:kolom snippet dan membawa editId: perbaiki tanpa mengirim ulang kode dengan execute({editId, edits:[{find, replace}]}) ' +
   '(find harus muncul tepat sekali; description diwarisi; edits kosong = jalankan ulang; editId hilang saat daemon restart → kirim code lengkap).';
 
 /** Deskripsi tool `icon_search` (AD-9). */
 export const ICON_SEARCH_DESCRIPTION =
   'Cari ikon untuk node icon di execute. Pustaka: lucide (ikon UI) dan simple-icons (KHUSUS logo brand, mis. github, whatsapp). ' +
-  'Mengembalikan {query, results:[{lib, icon, tags?, title?, aliasOf?}]} urut skor: nama persis > awalan nama/alias > token nama > tag persis > tag sebagian (default 10, maks 50). ' +
+  'Mengembalikan {query, results:[{lib, icon, tags?, title?, aliasOf?}]} urut relevansi: nama persis > awalan nama/alias > token nama > tag persis > tag sebagian (default 10, maks 50). ' +
   "Pakai lib + icon hasilnya apa adanya: add(b, {type:'icon', lib, icon, size}). icon = nama kanonik; alias (aliasOf ada) juga diterima dan otomatis disimpan sebagai nama kanonik. " +
   'Di dalam snippet execute, fungsi yang sama tersedia sebagai iconSearch(query, {lib?, limit?}).';
 
@@ -102,7 +149,9 @@ export function createLakarMcpServer(daemonUrl: string): McpServer {
         if (description !== undefined) body.description = description;
         if (editId !== undefined) body.editId = editId;
         if (edits !== undefined) body.edits = edits;
-        return asText(await client.call('/execute', body));
+        const r = await client.call<ExecuteData>('/execute', body);
+        if (!r.ok) return errorResult(formatError(r.error));
+        return { content: [{ type: 'text', text: formatExecute(r.data) }] };
       }),
   );
 
@@ -145,6 +194,20 @@ export function createLakarMcpServer(daemonUrl: string): McpServer {
         if (lib !== undefined) body.lib = lib;
         if (limit !== undefined) body.limit = limit;
         return asText(await client.call('/icons/search', body));
+      }),
+  );
+
+  server.registerTool(
+    'layout_check',
+    {
+      description: LAYOUT_CHECK_DESCRIPTION,
+      inputSchema: z.object({ boardId: z.string().optional().describe('ID board; kosongkan untuk semua board dokumen aktif') }),
+    },
+    ({ boardId }) =>
+      guarded(async () => {
+        const r = await client.call<LayoutCheckData>('/layout-check', boardId ? { boardId } : {});
+        if (!r.ok) return errorResult(formatError(r.error));
+        return { content: [{ type: 'text', text: formatLayoutCheck(r.data) }] };
       }),
   );
 

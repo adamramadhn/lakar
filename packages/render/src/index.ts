@@ -71,7 +71,7 @@ const nextFrame = (w: Window) => new Promise<void>((r) => w.requestAnimationFram
 
 /**
  * Render + ukur board. Alur: cek glyph setiap node icon (`opts.icons`, tidak lengkap → ICON_UNKNOWN)
- * → cek face untuk setiap varian teks → cek cakupan glyph (`unicode-range`)
+ * → cek face untuk setiap varian teks → cek cakupan glyph (`unicode-range`, kecuali `allowGlyphs`)
  * → muat face → muat + decode aset gambar (gagal → NOT_FOUND) → mount →
  * `fonts.ready` + 2 rAF → verifikasi ulang status `loaded` → ukur.
  * Board tidak ada → exception (bukan FONT_MISSING).
@@ -80,7 +80,13 @@ export async function renderBoard(
   doc: LakarDocument,
   boardId: string,
   root: HTMLElement,
-  opts: { fonts: readonly FontFaceSource[]; assetBase?: string | undefined; icons?: readonly IconGlyph[] | undefined },
+  opts: {
+    fonts: readonly FontFaceSource[];
+    assetBase?: string | undefined;
+    icons?: readonly IconGlyph[] | undefined;
+    /** Code point yang boleh di luar cakupan font (langkah 1b). Hanya untuk ukur check; PNG tidak memakainya. */
+    allowGlyphs?: readonly number[] | undefined;
+  },
 ): Promise<RenderResult> {
   const board = findBoard(doc, boardId);
   if (!board) throw new Error(`board ${boardId} tidak ada`);
@@ -96,7 +102,7 @@ export async function renderBoard(
   const absent = missingFaces(requests, opts.fonts);
   if (absent.length) return fontMissing(absent, 'font tidak diberikan');
   // 1b. Karakter di luar unicode-range face akan dirender Chromium dengan font sistem → tolak.
-  const uncovered = uncoveredGlyphs(board, opts.fonts);
+  const uncovered = uncoveredGlyphs(board, opts.fonts, opts.allowGlyphs ?? []);
   if (uncovered.length) {
     const missing = [...new Map(uncovered.map((u) => [fontKey(u.request), u.request])).values()];
     const chars = uncovered.map((u) => `${JSON.stringify(u.char)} ${codePointLabel(u.codePoint)} di teks ${u.nodeId} (${describe(u.request)})`);

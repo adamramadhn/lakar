@@ -121,9 +121,11 @@ export const codePointLabel = (cp: number): string => `U+${cp.toString(16).toUpp
  * Periksa setiap code point `content` setiap teks: harus berada di `unicodeRange` salah satu face
  * `{family, weight, style}` teks itu. Face tanpa `unicodeRange` mencakup semua.
  * Mengembalikan karakter unik tak tercakup per node (urut kemunculan). Request tanpa face dilewati
- * (sudah ditangani `missingFaces`).
+ * (sudah ditangani `missingFaces`). `allowGlyphs` = code point yang dilewati (temuan LC-01a/b yang sudah
+ * dilaporkan check; hanya untuk mengukur geometri, AD-8).
  */
-export function uncoveredGlyphs(board: BoardNode, faces: readonly FontFaceSource[]): UncoveredGlyph[] {
+export function uncoveredGlyphs(board: BoardNode, faces: readonly FontFaceSource[], allowGlyphs: readonly number[] = []): UncoveredGlyph[] {
+  const allow = new Set(allowGlyphs);
   const ranges = new Map<string, [number, number][] | 'all'>();
   for (const f of faces) {
     const k = fontKey(f);
@@ -147,7 +149,7 @@ export function uncoveredGlyphs(board: BoardNode, faces: readonly FontFaceSource
       const seen = new Set<number>();
       for (const ch of n.content) {
         const cp = ch.codePointAt(0)!;
-        if (seen.has(cp)) continue;
+        if (seen.has(cp) || allow.has(cp)) continue;
         seen.add(cp);
         if (!r.some(([lo, hi]) => cp >= lo && cp <= hi)) out.push({ nodeId: n.id, char: ch, codePoint: cp, request });
       }

@@ -2,10 +2,10 @@
 // Pengukuran DOM hasil render (AD-5): satu-satunya sumber bounds dan baris teks.
 import { NODE_ATTR } from './layout.js';
 
-export type NodeBounds = { id: string; x: number; y: number; width: number; height: number };
-export type TextMeasure = { id: string; lines: number; lineHeight: number };
-/** Bounds relatif border-box board (float, px CSS). */
-export type BoardMeasure = { width: number; height: number; nodes: NodeBounds[]; texts: TextMeasure[] };
+import type { BoardMeasure, NodeBounds, TextMeasure } from '@lakar/ports';
+
+// Tipe hasil ukur didefinisikan di ports (dipakai bersama check dan daemon).
+export type { BoardMeasure, NodeBounds, TextMeasure };
 
 const half = (v: number) => Math.round(v * 2) / 2;
 

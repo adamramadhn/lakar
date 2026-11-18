@@ -1,7 +1,7 @@
 // Sesi (AD-17): POST /sessions → sessionId, dikirim di header X-Lakar-Session.
 // Per sesi daemon menyimpan `keep` snippet, snippet gagal (editId, LRU), dan log panggilan execute.
 import { randomBytes, randomUUID } from 'node:crypto';
-import { LakarError, type ErrorCode } from '@lakar/schema';
+import { LakarError, type ErrorCode, type FindingSummary } from '@lakar/schema';
 
 export const SESSION_HEADER = 'x-lakar-session';
 /** Jumlah snippet gagal yang diingat per sesi (LRU). */
@@ -13,7 +13,17 @@ export const SESSION_LOG_MAX = 200;
 export class UnknownSessionError extends LakarError {}
 
 export type FailedSnippet = { code: string; description?: string };
-export type ExecuteLogEntry = { at: string; description: string; ok: boolean; code?: ErrorCode; rev: number };
+export type ExecuteLogEntry = {
+  at: string;
+  description: string;
+  ok: boolean;
+  code?: ErrorCode;
+  rev: number;
+  /** Durasi render + check board tersentuh (ms); tidak ada bila tidak ada check. */
+  checkMs?: number;
+  /** Ringkasan temuan check execute ini. */
+  summary?: FindingSummary;
+};
 
 export type Session = {
   id: string;

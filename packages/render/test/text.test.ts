@@ -86,6 +86,21 @@ describe.skipIf(!browserInstalled)('render teks dan font (Chromium, tanpa daemon
     ]);
   });
 
+  it('allowGlyphs: emoji yang di-allow terukur; yang tidak di-allow tetap FONT_MISSING', async () => {
+    const wave = text('Halo 👋');
+    const heart = text('Suka ❤');
+    const { doc, boardId } = boardDoc([wave, heart]);
+    const allowed = await render(doc, boardId, interFaces(400), undefined, { allowGlyphs: [0x1f44b, 0x2764] });
+    expect(allowed.result.ok, JSON.stringify(allowed.result)).toBe(true);
+    if (!allowed.result.ok) return;
+    expect(allowed.result.measure.nodes.find((n) => n.id === wave.id)!.width).toBeGreaterThan(20);
+    const partial = await render(doc, boardId, interFaces(400), undefined, { allowGlyphs: [0x1f44b] });
+    expect(partial.result).toMatchObject({ ok: false, code: 'FONT_MISSING' });
+    if (partial.result.ok || partial.result.code !== 'FONT_MISSING') return;
+    expect(partial.result.message).toContain('U+2764');
+    expect(partial.result.message).not.toContain('U+1F44B');
+  });
+
   it('cakupan glyph: Łódź (latin-ext) → ok; face tanpa unicodeRange mencakup semua', async () => {
     const pl = text('Łódź');
     const b1 = boardDoc([pl]);

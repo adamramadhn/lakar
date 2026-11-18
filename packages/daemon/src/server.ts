@@ -1,5 +1,6 @@
 // HTTP API lakard (fastify, 127.0.0.1). Bentuk respons AD-11: {ok:true,data} | {ok:false,error}.
 import Fastify, { type FastifyInstance, type FastifyReply } from 'fastify';
+import { changedNodeIds, touchedBoards, boundsOf } from '@lakar/check';
 import { DocumentLocks, createDocument, transact } from '@lakar/core';
 import { runSnippet } from '@lakar/exec';
 import { IconCatalog } from '@lakar/icons';
@@ -10,6 +11,7 @@ import {
   LakarError,
   SLUG_PATTERN,
   resolveTokens,
+  summarizeFindings,
   type ApiErrorBody,
   type ErrorCode,
   type IconGlyph,
@@ -19,6 +21,7 @@ import {
 import { z } from 'zod';
 import { readFile } from 'node:fs/promises';
 import { readAsset } from './assets.js';
+import { runCheck } from './check.js';
 import { readRenderModule, RENDER_PAGE_HTML } from './chromium.js';
 import type { DaemonConfig } from './config.js';
 import { FontRegistry } from './fonts.js';
@@ -90,6 +93,10 @@ function applyEdits(code: string, edits: { find: string; replace: string }[]): s
   return out;
 }
 const ScreenshotBody = z.object({ boardId: z.string().optional() }).optional();
+const LayoutCheckBody = z.object({ boardId: z.string().optional() }).strict().optional();
+/** Batas entri `bounds` di respons execute. */
+export const BOUNDS_MAX = 60;
+const NOT_COMMITTED = 'dokumen tidak di-commit (board tersentuh gagal dirender untuk check)';
 const IconSearchBody = z
   .object({
     query: z.string().trim().min(1, 'query wajib (string tidak kosong)'),
@@ -249,19 +256,55 @@ export function buildServer({ config, render, fonts = FontRegistry.load(), icons
       }
       const run = committed.value;
       let result = { docId: doc.id, rev: doc.rev, created: committed.created };
-      // Tanpa op sukses (snippet baca-saja): tidak ada revisi baru, file dan riwayat tidak disentuh.
+      let checked: { check: unknown; bounds: unknown; boundsTruncated?: number; checkMs: number; summary: ReturnType<typeof summarizeFindings> } | undefined;
+      // Tanpa op sukses (snippet baca-saja): tidak ada revisi baru, file dan riwayat tidak disentuh, tanpa check.
       if (committed.entry !== null) {
+        // AD-8: render board tersentuh pada salinan kerja + check sekali, LALU commit. Temuan tidak
+        // menolak commit; error render (dokumen tidak bisa dirender) → rollback (belum ditulis).
+        const t0 = performance.now();
+        const before = resolveTokens(doc);
+        const after = resolveTokens(committed.doc);
+        const touched = touchedBoards(before, after);
+        let ran;
+        try {
+          for (const id of touched) for (const r of iconRefs(findBoard(after, id)!)) icons.canonical(r.lib, r.icon);
+          ran = await runCheck(render, after, touched);
+        } catch (e) {
+          if (e instanceof LakarError) {
+            throw failWith(new LakarError(e.code, e.message, { hint: [e.hint, NOT_COMMITTED].filter(Boolean).join('; '), retryable: e.retryable }), doc.rev);
+          }
+          throw e;
+        }
+        const ids = [...touched, ...committed.created.map((c) => c.id), ...changedNodeIds(before, after, touched)];
+        const { bounds, truncated } = boundsOf(ran.measures, ids, BOUNDS_MAX);
+        const summary = summarizeFindings(ran.findings);
+        checked = {
+          check: { boards: touched, summary, findings: ran.findings },
+          bounds,
+          ...(truncated > 0 ? { boundsTruncated: truncated } : {}),
+          checkMs: Math.round((performance.now() - t0) * 10) / 10,
+          summary,
+        };
         await store.commit(slug, committed.doc, committed.entry);
         docs.set(slug, committed.doc);
         result = { docId: committed.doc.id, rev: committed.doc.rev, created: committed.created };
       }
       session.keep = run.keep;
-      logExecute(session, { at: new Date().toISOString(), description: label, ok: true, rev: result.rev });
+      logExecute(session, {
+        at: new Date().toISOString(),
+        description: label,
+        ok: true,
+        rev: result.rev,
+        ...(checked ? { checkMs: checked.checkMs, summary: checked.summary } : {}),
+      });
       return {
         ...result,
         ...(run.value !== undefined ? { value: run.value } : {}),
         ...(run.valueTruncated ? { valueTruncated: true } : {}),
         ...(run.logs.length ? { logs: run.logs.join('\n') } : {}),
+        ...(checked
+          ? { check: checked.check, bounds: checked.bounds, ...(checked.boundsTruncated !== undefined ? { boundsTruncated: checked.boundsTruncated } : {}) }
+          : {}),
       };
     });
     return ok(reply, data);
@@ -283,6 +326,26 @@ export function buildServer({ config, render, fonts = FontRegistry.load(), icons
     for (const r of iconRefs(board)) icons.canonical(r.lib, r.icon);
     const png = await render.screenshot(doc, board.id);
     return ok(reply, { boardId: board.id, width: board.width, height: board.height, mimeType: 'image/png', png: Buffer.from(png).toString('base64') });
+  });
+
+  // Check G0 penuh (AD-8) pada board dokumen aktif. Dokumen immutable: dibaca tanpa kunci.
+  app.post('/layout-check', async (req, reply) => {
+    const { slug } = activeDoc(req.headers[SESSION_HEADER]);
+    const body = parse(LayoutCheckBody, req.body ?? undefined, 'kirim {boardId?} (tanpa boardId = semua board dokumen aktif)');
+    const stored = docs.get(slug)!;
+    const doc = resolveTokens(stored);
+    let boardIds: string[];
+    if (body?.boardId !== undefined) {
+      if (!findBoard(doc, body.boardId)) {
+        throw new LakarError('NOT_FOUND', `board ${body.boardId} tidak ada di dokumen ${slug}`, {
+          hint: 'pakai ID board dari created[] execute, atau panggil layout_check tanpa boardId untuk semua board',
+        });
+      }
+      boardIds = [body.boardId];
+    } else boardIds = doc.pages.flatMap((p) => p.children.map((b) => b.id));
+    for (const id of boardIds) for (const r of iconRefs(findBoard(doc, id)!)) icons.canonical(r.lib, r.icon);
+    const ran = await runCheck(render, doc, boardIds);
+    return ok(reply, { docId: stored.id, rev: stored.rev, boards: ran.boards, summary: summarizeFindings(ran.findings), findings: ran.findings });
   });
 
   // Pencarian ikon (AD-9): tanpa dokumen aktif, sesi wajib seperti endpoint lain.

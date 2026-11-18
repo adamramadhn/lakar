@@ -19,4 +19,10 @@ describe('deskripsi tool execute', () => {
     }
     expect(ICON_SEARCH_DESCRIPTION).toContain('iconSearch(');
   });
+
+  it('menyebut check/bounds: temuan tidak membatalkan commit, layout_check, render gagal tidak di-commit', () => {
+    for (const s of ['check {boards, summary:{error, warning, gate}', 'bounds {id:[x,y,w,h]}', 'boundsTruncated', 'Temuan tidak membatalkan commit; perbaiki lalu execute lagi', 'layout_check', 'tidak di-commit']) {
+      expect(EXECUTE_DESCRIPTION).toContain(s);
+    }
+  });
 });

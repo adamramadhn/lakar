@@ -106,9 +106,9 @@ export async function freshPage(): Promise<Page> {
 }
 
 // Kode yang dievaluasi di halaman ditulis sebagai string: transform vitest tidak boleh menyentuh `import()`.
-const RENDER_IN_PAGE = `async ([doc, boardId, fonts, assetBase, icons]) => {
+const RENDER_IN_PAGE = `async ([doc, boardId, fonts, assetBase, icons, allowGlyphs]) => {
   const m = await import('/render/index.js');
-  return m.renderBoard(doc, boardId, document.getElementById('root'), { fonts, assetBase, icons });
+  return m.renderBoard(doc, boardId, document.getElementById('root'), { fonts, assetBase, icons, allowGlyphs });
 }`;
 
 /**
@@ -125,11 +125,11 @@ export async function render(
   boardId: string,
   fonts: readonly FontFaceSource[],
   p: Page = currentPage(),
-  opts: { assetBase?: string; icons?: readonly IconGlyph[] } = {},
+  opts: { assetBase?: string; icons?: readonly IconGlyph[]; allowGlyphs?: readonly number[] } = {},
 ): Promise<{ result: RenderResult; png: Buffer | undefined }> {
   const board = doc.pages.flatMap((pg) => pg.children).find((b) => b.id === boardId);
   if (board) await p.setViewportSize({ width: Math.max(1, Math.ceil(board.width)), height: Math.max(1, Math.ceil(board.height)) });
-  const args = [doc, boardId, fonts, opts.assetBase ?? ASSET_BASE, opts.icons ?? ICON_GLYPHS];
+  const args = [doc, boardId, fonts, opts.assetBase ?? ASSET_BASE, opts.icons ?? ICON_GLYPHS, opts.allowGlyphs ?? []];
   const result = (await p.evaluate(`(${RENDER_IN_PAGE})(${JSON.stringify(args)})`)) as RenderResult;
   if (!result.ok) return { result, png: undefined };
   const png = await p.locator(`[data-lakar-id="${boardId}"]`).screenshot({ type: 'png', scale: 'css', animations: 'disabled', caret: 'hide' });

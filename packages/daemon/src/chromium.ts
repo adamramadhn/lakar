@@ -3,7 +3,7 @@
 import { readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { IconCatalogPort, RenderPort } from '@lakar/ports';
+import type { BoardMeasure, IconCatalogPort, MeasureOptions, RenderPort } from '@lakar/ports';
 import { CHROMIUM_ARGS, findBoard, fontRequests, iconRefs, type FontFaceSource, type RenderResult } from '@lakar/render';
 import { LakarError, type IconGlyph, type ResolvedDocument } from '@lakar/schema';
 import type { Browser, Page } from 'playwright-core';
@@ -25,7 +25,9 @@ import { renderBoard } from '/render/index.js';
 // AD-5/AD-6: render memuat face yang diberikan, ukur setelah fonts.ready + dua rAF.
 // Aset gambar disajikan daemon di /assets/<sha256> (store aset <dataDir>/assets).
 // Glyph ikon (AD-9) di-resolve daemon dari katalog @lakar/icons dan dikirim sebagai data JSON.
-window.__lakarRender = (doc, boardId, fonts, icons) => renderBoard(doc, boardId, document.getElementById('root'), { fonts, icons, assetBase: '/assets/' });
+// allowGlyphs (AD-8): code point temuan LC-01a/b yang boleh di luar cakupan font, hanya untuk ukur check.
+window.__lakarRender = (doc, boardId, fonts, icons, allowGlyphs) =>
+  renderBoard(doc, boardId, document.getElementById('root'), { fonts, icons, allowGlyphs, assetBase: '/assets/' });
 window.__lakarReady = true;
 </script></body></html>
 `;
@@ -74,50 +76,57 @@ export class ChromiumRenderer implements RenderPort<ResolvedDocument> {
     return page;
   }
 
+  /**
+   * Render board di halaman bersama (dipanggil di dalam mutex). Error dokumen → LakarError non-retryable
+   * (FONT_MISSING / NOT_FOUND / ICON_UNKNOWN); kerusakan halaman → RENDER_FAILED retryable.
+   */
+  async #renderOnPage(doc: ResolvedDocument, boardId: string, allowGlyphs: readonly number[]): Promise<{ page: Page; measure: BoardMeasure }> {
+    // FONT_MISSING di luar pembungkus RENDER_FAILED: kesalahan dokumen, bukan kerusakan halaman.
+    const board = findBoard(doc, boardId);
+    const fonts: FontFaceSource[] = board ? this.#opts.fonts.resolveFaces(fontRequests(board)) : [];
+    const icons: IconGlyph[] = board ? iconRefs(board).flatMap((r) => this.#opts.icons.glyph(r.lib, r.icon) ?? []) : [];
+    let result: RenderResult;
+    let page: Page;
+    try {
+      page = await this.#ensurePage();
+      // Viewport = ukuran board SEBELUM mount (stabilitas layout dan golden).
+      if (board) await page.setViewportSize({ width: Math.max(1, Math.ceil(board.width)), height: Math.max(1, Math.ceil(board.height)) });
+      // Fungsi ini berjalan di halaman Chromium (lihat RENDER_PAGE_HTML), bukan di Node.
+      result = await page.evaluate(
+        ({ doc, boardId, fonts, icons, allowGlyphs }) =>
+          (
+            globalThis as unknown as { __lakarRender(d: unknown, id: string, f: unknown, i: unknown, a: unknown): Promise<RenderResult> }
+          ).__lakarRender(doc, boardId, fonts, icons, allowGlyphs),
+        { doc, boardId, fonts, icons, allowGlyphs: [...allowGlyphs] },
+      );
+    } catch (e) {
+      throw await this.#failed(e);
+    }
+    // Halaman tetap dipakai: hanya dokumen yang salah.
+    if (!result.ok && result.code === 'NOT_FOUND') {
+      throw new LakarError('NOT_FOUND', result.message, { hint: ASSET_HINT, retryable: false });
+    }
+    if (!result.ok && result.code === 'ICON_UNKNOWN') {
+      throw new LakarError('ICON_UNKNOWN', result.message, {
+        hint: 'perbaiki node icon lewat execute (update(id, {icon})) dengan nama kanonik; cari dengan iconSearch / icon_search',
+        retryable: false,
+      });
+    }
+    if (!result.ok) {
+      throw new LakarError('FONT_MISSING', result.message, {
+        hint:
+          `keluarga terdaftar: ${this.#opts.fonts.families().join(', ')}. ` +
+          'Font hanya mencakup subset latin + latin-ext; untuk simbol/panah/emoji pakai node icon (AD-9).',
+        retryable: false,
+      });
+    }
+    return { page, measure: result.measure };
+  }
+
   screenshot(doc: ResolvedDocument, boardId: string): Promise<Uint8Array> {
     return this.#mutex.run(async () => {
-      // FONT_MISSING di luar pembungkus RENDER_FAILED: kesalahan dokumen, bukan kerusakan halaman.
-      const board = findBoard(doc, boardId);
-      const fonts: FontFaceSource[] = board ? this.#opts.fonts.resolveFaces(fontRequests(board)) : [];
-      const icons: IconGlyph[] = board ? iconRefs(board).flatMap((r) => this.#opts.icons.glyph(r.lib, r.icon) ?? []) : [];
-      let result: RenderResult;
-      let page: Page;
-      try {
-        page = await this.#ensurePage();
-        // Viewport = ukuran board SEBELUM mount (stabilitas layout dan golden).
-        if (board) await page.setViewportSize({ width: Math.max(1, Math.ceil(board.width)), height: Math.max(1, Math.ceil(board.height)) });
-        // Fungsi ini berjalan di halaman Chromium (lihat RENDER_PAGE_HTML), bukan di Node.
-        result = await page.evaluate(
-          ({ doc, boardId, fonts, icons }) =>
-            (globalThis as unknown as { __lakarRender(d: unknown, id: string, f: unknown, i: unknown): Promise<RenderResult> }).__lakarRender(
-              doc,
-              boardId,
-              fonts,
-              icons,
-            ),
-          { doc, boardId, fonts, icons },
-        );
-      } catch (e) {
-        throw await this.#failed(e);
-      }
-      // Halaman tetap dipakai: hanya dokumen yang salah.
-      if (!result.ok && result.code === 'NOT_FOUND') {
-        throw new LakarError('NOT_FOUND', result.message, { hint: ASSET_HINT, retryable: false });
-      }
-      if (!result.ok && result.code === 'ICON_UNKNOWN') {
-        throw new LakarError('ICON_UNKNOWN', result.message, {
-          hint: 'perbaiki node icon lewat execute (update(id, {icon})) dengan nama kanonik; cari dengan iconSearch / icon_search',
-          retryable: false,
-        });
-      }
-      if (!result.ok) {
-        throw new LakarError('FONT_MISSING', result.message, {
-          hint:
-            `keluarga terdaftar: ${this.#opts.fonts.families().join(', ')}. ` +
-            'Font hanya mencakup subset latin + latin-ext; untuk simbol/panah/emoji pakai node icon (AD-9).',
-          retryable: false,
-        });
-      }
+      // Screenshot tidak pernah memakai allowGlyphs: glyph di luar font tetap FONT_MISSING (AD-6).
+      const { page } = await this.#renderOnPage(doc, boardId, []);
       try {
         const buf = await page.locator(`[data-lakar-id="${boardId}"]`).screenshot({ type: 'png', scale: 'css', animations: 'disabled', caret: 'hide' });
         return new Uint8Array(buf);
@@ -125,6 +134,10 @@ export class ChromiumRenderer implements RenderPort<ResolvedDocument> {
         throw await this.#failed(e);
       }
     });
+  }
+
+  measure(doc: ResolvedDocument, boardId: string, opts: MeasureOptions = {}): Promise<BoardMeasure> {
+    return this.#mutex.run(async () => (await this.#renderOnPage(doc, boardId, opts.allowGlyphs ?? [])).measure);
   }
 
   /** Halaman/browser mungkin rusak: buang, permintaan berikutnya membuat ulang. */

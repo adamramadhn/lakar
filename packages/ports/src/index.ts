@@ -2,10 +2,25 @@
 // jadi tipe dokumen diberikan sebagai parameter generik oleh pemakai.
 export const PACKAGE = '@lakar/ports';
 
-/** Render dokumen (sudah di-resolve) → PNG board. Adaptor: Chromium headless di daemon. */
+/** Bounds satu node hasil render, relatif border-box board (float, px CSS). */
+export type NodeBounds = { id: string; x: number; y: number; width: number; height: number };
+/** Baris teks terukur. */
+export type TextMeasure = { id: string; lines: number; lineHeight: number };
+/** Hasil ukur board (AD-5): ukuran board + bounds setiap node anak (urutan DOM = urutan dokumen). */
+export type BoardMeasure = { width: number; height: number; nodes: NodeBounds[]; texts: TextMeasure[] };
+
+/** Opsi ukur: `allowGlyphs` = code point yang boleh di luar cakupan font (hanya untuk geometri, AD-8). */
+export type MeasureOptions = { allowGlyphs?: readonly number[] };
+
+/** Render dokumen (sudah di-resolve) → PNG / ukuran board. Adaptor: Chromium headless di daemon. */
 export interface RenderPort<Doc = unknown> {
   /** PNG skala 1 (CSS px) dari board `boardId`. Gagal → LakarError `RENDER_FAILED` (retryable). */
   screenshot(doc: Doc, boardId: string): Promise<Uint8Array>;
+  /**
+   * Render + ukur board `boardId` (bahan check). Error sama dengan `screenshot`
+   * (FONT_MISSING / NOT_FOUND / ICON_UNKNOWN / RENDER_FAILED).
+   */
+  measure(doc: Doc, boardId: string, opts?: MeasureOptions): Promise<BoardMeasure>;
 }
 
 /** Satu hasil pencarian ikon (struktural; sama dengan `IconMatch` @lakar/schema). */

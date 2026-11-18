@@ -24,6 +24,12 @@ if (!browserInstalled) {
   console.warn(`[@lakar/daemon] SKIP tes Chromium: chromium-headless-shell belum terpasang di ${browsersPath}. Jalankan: bash scripts/install-browser.sh`);
 }
 
+/** Ukuran sintetis untuk RenderPort tiruan (tanpa Chromium): ukuran board, tanpa node. */
+const fakeMeasure = async (doc: any, boardId: string) => {
+  const b = doc.pages.flatMap((p: any) => p.children).find((x: any) => x.id === boardId);
+  return { width: b.width, height: b.height, nodes: [], texts: [] };
+};
+
 type Res = { status: number; body: { ok: boolean; data?: any; error?: { code: string; message: string; hint: string; retryable: boolean; editId?: string } } };
 
 let d: RunningDaemon;
@@ -526,7 +532,7 @@ describe('ikon (AD-9): kanonik, ICON_UNKNOWN, /icons/search, render', () => {
   it('screenshot dokumen lama berisi ikon tak dikenal → 422 ICON_UNKNOWN + 3 saran sebelum render; setelah diperbaiki → 200', async () => {
     const tmp = await mkdtemp(join(tmpdir(), 'lakar-icon-old-'));
     const seen: unknown[] = [];
-    const capture = { screenshot: async (doc: unknown) => (seen.push(doc), new Uint8Array([1])) };
+    const capture = { screenshot: async (doc: unknown) => (seen.push(doc), new Uint8Array([1])), measure: fakeMeasure };
     const { app } = buildServer({ config: { ...baseConfig, port: 0, dataDir: tmp }, render: capture });
     try {
       const { mkdir } = await import('node:fs/promises');
@@ -571,11 +577,162 @@ describe('ikon (AD-9): kanonik, ICON_UNKNOWN, /icons/search, render', () => {
   });
 });
 
+describe.skipIf(!browserInstalled)('check G0 (AD-8): execute + /layout-check', () => {
+  let s: string;
+  const slug = 'check-g0';
+  const file = () => join(dataDir, 'docs', `${slug}.lakar.json`);
+  const FIXTURE = `
+    const b = add(null, {type:'board', name:'Home · mobile', x:0, y:0, width:390, height:800, screen:'mobile'});
+    add(b, {type:'text', name:'Sapaan', content:'Halo 👋', size:16});
+    add(b, {type:'text', name:'Rating', content:'★★★★★', size:16});
+    add(b, {type:'text', name:'Caption', content:'Catatan kecil', size:11});
+    add(b, {type:'text', name:'Hak cipta', content:'© 2026 Kopi', size:12});
+    const k = add(b, {type:'frame', name:'Kartu', width:200, height:40, clip:true});
+    add(k, {type:'rect', name:'Lebar', width:260, height:20, fills:[{type:'solid', color:'#DDDDDD'}]});
+    const c = add(b, {type:'frame', name:'Konten', layout:'column', width:390});
+    add(c, {type:'rect', name:'Isi', width:390, height:640, fills:[{type:'solid', color:'#F0F0F0'}]});
+    add(b, {type:'frame', name:'Overlay / Tab bar', position:'absolute', x:0, y:736, width:390, height:64, fills:[{type:'solid', color:'#FFFFFF'}]});
+    b`;
+  const SIX = ['LC-01a', 'LC-01b', 'LC-05', 'LC-02a', 'LC-20', 'LC-12'];
+
+  beforeAll(async () => {
+    s = await newSession();
+    await call('/docs/open', { slug }, s);
+  });
+
+  it('fixture enam aturan: commit (rev +1) dengan tepat 6 temuan, gate 5, © bukan temuan; /layout-check sama', async () => {
+    const r = await call('/execute', { code: FIXTURE, description: 'fixture enam aturan check' }, s);
+    expect(r.status, JSON.stringify(r.body.error)).toBe(200);
+    expect(r.body.data.rev).toBe(1);
+    const boardId = r.body.data.value as string;
+    const byName = Object.fromEntries(r.body.data.created.map((c: { id: string; name: string }) => [c.name, c.id]));
+    const { check } = r.body.data;
+    expect(check.boards).toEqual([boardId]);
+    expect(check.findings.map((f: { rule: string }) => f.rule)).toEqual(SIX);
+    expect(check.findings.map((f: { nodeName: string }) => f.nodeName)).toEqual(['Sapaan', 'Rating', 'Caption', 'Lebar', 'Konten', 'Home · mobile']);
+    expect(check.summary).toEqual({ error: 5, warning: 1, gate: 5 });
+    expect(check.findings.some((f: { nodeId: string }) => f.nodeId === byName['Hak cipta'])).toBe(false);
+    expect(check.findings[0]).toMatchObject({ level: 'error', rule: 'LC-01a', nodeId: byName.Sapaan, detail: 'emoji "👋" U+1F44B di "Halo 👋"' });
+    expect(check.findings[3].detail).toMatch(/^keluar 60px di kanan dari clip Kartu/);
+    expect(check.findings[5]).toMatchObject({ level: 'warning', detail: 'ukuran 390×800', expected: '390×844' });
+    // bounds: board + node baru, dibulatkan, relatif board
+    expect(r.body.data.bounds[boardId]).toEqual([0, 0, 390, 800]);
+    expect(r.body.data.bounds[byName['Overlay / Tab bar']]).toEqual([0, 736, 390, 64]);
+    expect(Object.keys(r.body.data.bounds).sort()).toEqual(r.body.data.created.map((c: { id: string }) => c.id).sort());
+    expect(r.body.data).not.toHaveProperty('boundsTruncated');
+    expect(JSON.parse(await readFile(file(), 'utf8')).rev).toBe(1);
+
+    const lc = await call('/layout-check', {}, s);
+    expect(lc.status, JSON.stringify(lc.body.error)).toBe(200);
+    expect(lc.body.data).toMatchObject({ docId: r.body.data.docId, rev: 1, boards: [{ id: boardId, name: 'Home · mobile', summary: { error: 5, warning: 1, gate: 5 } }], summary: { error: 5, warning: 1, gate: 5 } });
+    expect(lc.body.data.findings).toEqual(check.findings);
+    const one = await call('/layout-check', { boardId }, s);
+    expect(one.body.data.findings).toEqual(check.findings);
+    // screenshot tetap FONT_MISSING untuk emoji (allowGlyphs hanya untuk ukur)
+    const shot = await call('/screenshot', { boardId }, s);
+    expect(shot.status).toBe(422);
+    expect(shot.body.error!.code).toBe('FONT_MISSING');
+  }, 60_000);
+
+  it('/layout-check: board tak ada → 404 NOT_FOUND + hint; body asing → 400; tanpa dokumen aktif → NO_ACTIVE_DOC', async () => {
+    const r = await call('/layout-check', { boardId: 'Zzzzzzzz' }, s);
+    expect(r.status).toBe(404);
+    expect(r.body.error).toMatchObject({ code: 'NOT_FOUND' });
+    expect(r.body.error!.hint).toMatch(/created\[\]/);
+    expect((await call('/layout-check', { boardId: 'x', extra: 1 }, s)).status).toBe(400);
+    expect((await call('/layout-check', {}, await newSession())).body.error!.code).toBe('NO_ACTIVE_DOC');
+  });
+
+  it('board bersih: summary 0, findings [], bounds = board + node baru; get() saja → tanpa check/bounds', async () => {
+    const r = await call(
+      '/execute',
+      { code: `const b = add(null, {type:'board', name:'Bersih', x:500, y:0, width:390, height:844, screen:'mobile'}); add(b, {type:'text', name:'Judul', content:'Kopi pagi', size:24}); b`, description: 'board bersih tanpa temuan' },
+      s,
+    );
+    expect(r.status, JSON.stringify(r.body.error)).toBe(200);
+    expect(r.body.data.check).toEqual({ boards: [r.body.data.value], summary: { error: 0, warning: 0, gate: 0 }, findings: [] });
+    expect(Object.keys(r.body.data.bounds).sort()).toEqual(r.body.data.created.map((c: { id: string }) => c.id).sort());
+    const ro = await call('/execute', { code: `get('${r.body.data.value}').name`, description: 'baca nama board saja' }, s);
+    expect(ro.body.data).toEqual({ docId: r.body.data.docId, rev: r.body.data.rev, created: [], value: 'Bersih' });
+    // update satu node → bounds memuat board + node yang berubah
+    const judul = r.body.data.created[1].id;
+    const u = await call('/execute', { code: `update('${judul}', {size: 28})`, description: 'perbesar judul board bersih' }, s);
+    expect(Object.keys(u.body.data.bounds)).toEqual([r.body.data.value, judul]);
+  }, 60_000);
+
+  it('setTokens yang dipakai 2 board → kedua board dirender dan diperiksa', async () => {
+    const sid = await newSession();
+    await call('/docs/open', { slug: 'check-token' }, sid);
+    const mk = (name: string, x: number) =>
+      `{ const b = add(null, {type:'board', name:'${name}', x:${x}, y:0, width:390, height:844, screen:'mobile'}); add(b, {type:'rect', name:'Blok', width:100, height:40, fills:[{type:'solid', color:{$token:'colors.brand'}}]}); }`;
+    const r = await call('/execute', { code: `setTokens({'colors.brand':'#111111'}); ${mk('A', 0)} ${mk('B', 500)} add(null, {type:'board', name:'C', x:1000, y:0, width:390, height:844, screen:'mobile'})`, description: 'dua board pakai token' }, sid);
+    expect(r.status, JSON.stringify(r.body.error)).toBe(200);
+    expect(r.body.data.check.boards).toHaveLength(3);
+    const t = await call('/execute', { code: `setTokens({'colors.brand':'#222222'})`, description: 'ganti warna token brand' }, sid);
+    expect(t.status, JSON.stringify(t.body.error)).toBe(200);
+    expect(t.body.data.check.boards).toEqual(r.body.data.check.boards.slice(0, 2));
+  }, 60_000);
+
+  it('scroll akhir: board akhir (scrollY > 0) → LC-20; board awal (terpotong, scrollY 0) tidak', async () => {
+    const sid = await newSession();
+    await call('/docs/open', { slug: 'check-scroll' }, sid);
+    const code = `
+      const b = add(null, {type:'board', name:'Feed awal', x:0, y:0, width:390, height:844, screen:'mobile'});
+      const s = add(b, {type:'frame', name:'Scroll / Feed', layout:'column', gap:16, width:390, height:844, clip:true});
+      for (let i = 0; i < 8; i++) add(s, {type:'rect', name:'Kartu ' + i, width:390, height:150, fills:[{type:'solid', color:'#EEEEEE'}]});
+      add(b, {type:'frame', name:'Overlay / Tab bar', position:'absolute', x:0, y:780, width:390, height:64, fills:[{type:'solid', color:'#FFFFFF'}]});
+      const b2 = duplicate(b, {name:'Feed akhir', x:470});
+      update(children(b2)[0].id, {scrollY: 500});
+      [b, b2]`;
+    const r = await call('/execute', { code, description: 'feed awal dan akhir scroll' }, sid);
+    expect(r.status, JSON.stringify(r.body.error)).toBe(200);
+    const [awal, akhir] = r.body.data.value as string[];
+    expect(r.body.data.check.boards).toEqual([awal, akhir]);
+    expect(r.body.data.check.findings.map((f: { rule: string; nodeName: string }) => [f.rule, f.nodeName])).toEqual([['LC-20', 'Scroll / Feed']]);
+    const lc = await call('/layout-check', { boardId: akhir }, sid);
+    expect(lc.body.data.findings).toHaveLength(1);
+    expect((await call('/layout-check', { boardId: awal }, sid)).body.data.findings).toEqual([]);
+  }, 60_000);
+
+  it('latensi: 12 update pada board ±150 node → p50 checkMs ≤ 600 ms (anggaran p50 300 / p95 800)', async () => {
+    const sid = await newSession();
+    await call('/docs/open', { slug: 'check-latensi' }, sid);
+    const build = `
+      const b = add(null, {type:'board', name:'Daftar', x:0, y:0, width:390, height:844, screen:'mobile'});
+      const list = add(b, {type:'frame', name:'Scroll / Daftar', layout:'column', gap:4, width:390, height:844, clip:true});
+      keep.items = [];
+      for (let i = 0; i < 30; i++) {
+        const row = add(list, {type:'frame', name:'Baris ' + i, layout:'row', gap:8, padding:[4, 16], width:'fill', align:'center'});
+        add(row, {type:'icon', lib:'lucide', icon:'coffee', size:20});
+        keep.items.push(add(row, {type:'text', name:'Nama', content:'Kopi susu ' + i, size:14}));
+        add(row, {type:'text', name:'Harga', content:'Rp 25.000', size:13, color:'#555555'});
+        add(row, {type:'rect', name:'Garis', width:40, height:1, fills:[{type:'solid', color:'#E5E5E5'}]});
+      }
+      b`;
+    const r = await call('/execute', { code: build, description: 'daftar seratus lima puluh node' }, sid);
+    expect(r.status, JSON.stringify(r.body.error)).toBe(200);
+    expect(r.body.data.created).toHaveLength(152);
+    for (let i = 0; i < 12; i++) {
+      const u = await call('/execute', { code: `update(keep.items[${i}], {content:'Kopi gula aren ${i}'})`, description: `ubah nama item ${i}` }, sid);
+      expect(u.status, JSON.stringify(u.body.error)).toBe(200);
+      expect(u.body.data.check.boards).toEqual([r.body.data.value]);
+    }
+    const times = d.sessions.require(sid).log.slice(-12).map((e) => e.checkMs!);
+    expect(times.every((t) => typeof t === 'number')).toBe(true);
+    const sorted = [...times].sort((a, b) => a - b);
+    const p50 = sorted[Math.floor((sorted.length - 1) * 0.5)]!;
+    const p95 = sorted[Math.ceil((sorted.length - 1) * 0.95)]!;
+    console.log(`[check] latensi render + check (1 board, 152 node, 12 execute): p50 ${p50} ms, p95 ${p95} ms`);
+    expect(d.sessions.require(sid).log.at(-1)!.summary).toEqual({ error: 0, warning: 0, gate: 0 });
+    expect(p50).toBeLessThanOrEqual(600);
+  }, 120_000);
+});
+
 describe('screenshot menerima dokumen ter-resolve', () => {
   it('ref token diganti nilai sebelum RenderPort dipanggil', async () => {
     const tmp = await mkdtemp(join(tmpdir(), 'lakar-tokens-'));
     const seen: unknown[] = [];
-    const capture = { screenshot: async (doc: unknown) => (seen.push(doc), new Uint8Array([1])) };
+    const capture = { screenshot: async (doc: unknown) => (seen.push(doc), new Uint8Array([1])), measure: fakeMeasure };
     const { app } = buildServer({ config: { ...baseConfig, port: 0, dataDir: tmp }, render: capture });
     try {
       const { mkdir } = await import('node:fs/promises');
@@ -626,6 +783,7 @@ describe('RENDER_FAILED', () => {
       screenshot: async () => {
         throw new LakarError('RENDER_FAILED', 'render Chromium gagal: tiruan', { hint: 'coba lagi', retryable: true });
       },
+      measure: fakeMeasure,
     };
     const { app } = buildServer({ config: { ...baseConfig, port: 0, dataDir: tmp }, render: failing });
     try {
@@ -639,6 +797,38 @@ describe('RENDER_FAILED', () => {
       expect(r.statusCode).toBe(503);
       expect(r.json().error).toMatchObject({ code: 'RENDER_FAILED', retryable: true });
       expect(await readFile(join(tmp, 'docs', 'rf.lakar.json'), 'utf8')).toBe(before);
+    } finally {
+      await app.close();
+      await rm(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it('render gagal saat check execute → 503 RENDER_FAILED retryable + editId, rollback (file dan rev tetap)', async () => {
+    const tmp = await mkdtemp(join(tmpdir(), 'lakar-check-fail-'));
+    let broken = true;
+    const render = {
+      screenshot: async () => new Uint8Array([1]),
+      measure: async (doc: any, id: string) => {
+        if (broken) throw new LakarError('RENDER_FAILED', 'render Chromium gagal: tiruan', { hint: 'coba lagi', retryable: true });
+        return fakeMeasure(doc, id);
+      },
+    };
+    const { app } = buildServer({ config: { ...baseConfig, port: 0, dataDir: tmp }, render });
+    try {
+      const post = (url: string, payload: unknown, session?: string) =>
+        app.inject({ method: 'POST', url, payload: payload as object, headers: session ? { 'x-lakar-session': session } : {} });
+      const s = (await post('/sessions', {})).json().data.sessionId as string;
+      await post('/docs/open', { slug: 'cf' }, s);
+      const before = await readFile(join(tmp, 'docs', 'cf.lakar.json'), 'utf8');
+      const r = await post('/execute', { code: TRACER, description: DESC }, s);
+      expect(r.statusCode).toBe(503);
+      expect(r.json().error).toMatchObject({ code: 'RENDER_FAILED', retryable: true, editId: expect.stringMatching(/^[A-Za-z0-9]{8}$/) });
+      expect(r.json().error.hint).toContain('dokumen tidak di-commit');
+      expect(await readFile(join(tmp, 'docs', 'cf.lakar.json'), 'utf8')).toBe(before);
+      broken = false;
+      const again = await post('/execute', { editId: r.json().error.editId }, s);
+      expect(again.statusCode, again.body).toBe(200);
+      expect(again.json().data).toMatchObject({ rev: 1, check: { summary: { error: 0, warning: 0, gate: 0 } } });
     } finally {
       await app.close();
       await rm(tmp, { recursive: true, force: true });
@@ -670,12 +860,7 @@ describe('font lokal (registry + FONT_MISSING)', () => {
   let s: string;
   const board = (body: string, name: string) =>
     `const b=add(null,{type:'board',name:'${name}',x:0,y:0,width:200,height:60,screen:'app'}); ${body}; b`;
-  /** Buat board baru lewat execute, kembalikan ID-nya. */
-  const makeBoard = async (body: string, name: string) => {
-    const r = await call('/execute', { code: board(body, name) }, s);
-    expect(r.status, JSON.stringify(r.body.error)).toBe(200);
-    return r.body.data.created[0].id as string;
-  };
+  const file = () => join(dataDir, 'docs', 'font-lokal.lakar.json');
 
   beforeAll(async () => {
     s = await newSession();
@@ -691,44 +876,53 @@ describe('font lokal (registry + FONT_MISSING)', () => {
     expect(faces[0]!.unicodeRange).toMatch(/^U\+0000-00FF/);
   });
 
-  it.each([
+  /** Execute yang harus gagal render saat check: 422 FONT_MISSING + editId, rev dan file tidak berubah. */
+  const expectFontMissing = async (body: string, name: string) => {
+    const before = await readFile(file(), 'utf8');
+    const r = await call('/execute', { code: board(body, name) }, s);
+    expect(r.status, JSON.stringify(r.body)).toBe(422);
+    expect(r.body).toMatchObject({ ok: false, error: { code: 'FONT_MISSING', retryable: false, editId: expect.stringMatching(/^[A-Za-z0-9]{8}$/) } });
+    expect(r.body.error!.hint).toContain('dokumen tidak di-commit');
+    expect(await readFile(file(), 'utf8')).toBe(before);
+    return r.body.error!;
+  };
+
+  it.skipIf(!browserInstalled).each([
     ['Manrope italic', `add(b,{type:'text',name:'T',content:'a',size:12,family:'Manrope',style:'italic'})`, /Manrope 400 italic/, /Manrope tersedia weight 200\/300\/400\/500\/600\/700\/800 style normal/],
     ['DM Mono 700', `add(b,{type:'text',name:'T',content:'a',size:12,family:'DM Mono',weight:700})`, /DM Mono 700 normal/, /DM Mono tersedia weight 300\/400\/500/],
-  ])('varian hilang %s → 422 FONT_MISSING + varian tersedia', async (_l, body, msg, hint) => {
-    const id = await makeBoard(body, 'Varian');
-    const r = await call('/screenshot', { boardId: id }, s);
-    expect(r.status).toBe(422);
-    expect(r.body).toMatchObject({ ok: false, error: { code: 'FONT_MISSING', retryable: false } });
-    expect(r.body.error!.message).toMatch(msg);
-    expect(r.body.error!.hint).toMatch(hint);
+  ])('varian hilang %s → execute 422 FONT_MISSING + varian tersedia, tidak di-commit', async (_l, body, msg, hint) => {
+    const e = await expectFontMissing(body, 'Varian');
+    expect(e.message).toMatch(msg);
+    expect(e.hint).toMatch(hint);
   });
 
-  it.skipIf(!browserInstalled)('family tak terdaftar → 422 FONT_MISSING (hint memuat Inter); screenshot valid berikutnya tetap berhasil', async () => {
-    const bad = await makeBoard(`add(b,{type:'text',name:'T',content:'Halo',size:16,family:'Roboto'})`, 'Roboto');
-    const r = await call('/screenshot', { boardId: bad }, s);
-    expect(r.status).toBe(422);
-    expect(r.body).toMatchObject({ ok: false, error: { code: 'FONT_MISSING', retryable: false } });
-    expect(r.body.error!.message).toContain('Roboto');
-    expect(r.body.error!.hint).toContain('Inter');
-    const good = await makeBoard(`add(b,{type:'text',name:'T',content:'Tebal',size:24,weight:700})`, 'Inter700');
-    const r2 = await call('/screenshot', { boardId: good }, s);
+  it.skipIf(!browserInstalled)('family tak terdaftar → execute 422 FONT_MISSING (hint memuat Inter); perbaikan lewat edits langsung commit + screenshot 200', async () => {
+    const e = await expectFontMissing(`add(b,{type:'text',name:'T',content:'Halo',size:16,family:'Roboto'})`, 'Roboto');
+    expect(e.message).toContain('Roboto');
+    expect(e.hint).toContain('Inter');
+    const fixed = await call('/execute', { editId: e.editId, edits: [{ find: "family:'Roboto'", replace: 'weight:700' }] }, s);
+    expect(fixed.status, JSON.stringify(fixed.body.error)).toBe(200);
+    const r2 = await call('/screenshot', { boardId: fixed.body.data.created[0].id }, s);
     expect(r2.status, JSON.stringify(r2.body.error)).toBe(200);
     const img = decodePng(Buffer.from(r2.body.data.png, 'base64'));
     expect(img.width).toBe(200);
     expect(countDarkPixels(img, 0, 0, 200, 60)).toBeGreaterThan(50);
   }, 60_000);
 
-  it.skipIf(!browserInstalled)('cakupan glyph: teks "Lihat →" → 422 FONT_MISSING U+2192 (hint: node icon); screenshot valid berikutnya 200', async () => {
-    const bad = await makeBoard(`add(b,{type:'text',name:'T',content:'Lihat →',size:16})`, 'Panah');
-    const r = await call('/screenshot', { boardId: bad }, s);
-    expect(r.status).toBe(422);
-    expect(r.body).toMatchObject({ ok: false, error: { code: 'FONT_MISSING', retryable: false } });
-    expect(r.body.error!.message).toContain('U+2192');
-    expect(r.body.error!.hint).toContain('Inter');
-    expect(r.body.error!.hint).toMatch(/node icon/);
-    const good = await makeBoard(`add(b,{type:'text',name:'T',content:'Lihat',size:16})`, 'TanpaPanah');
-    const r2 = await call('/screenshot', { boardId: good }, s);
-    expect(r2.status, JSON.stringify(r2.body.error)).toBe(200);
+  it.skipIf(!browserInstalled)('cakupan glyph: "Lihat →", "⌘K cari", "Suka ❤" → execute 422 FONT_MISSING (hint: node icon); perbaikan edits commit', async () => {
+    const arrow = await expectFontMissing(`add(b,{type:'text',name:'T',content:'Lihat →',size:16})`, 'Panah');
+    expect(arrow.message).toContain('U+2192');
+    expect(arrow.hint).toContain('Inter');
+    expect(arrow.hint).toMatch(/node icon/);
+    const cmd = await expectFontMissing(`add(b,{type:'text',name:'Pintasan',content:'⌘K cari',size:14})`, 'Pintasan');
+    expect(cmd.message).toContain('U+2318');
+    const heart = await expectFontMissing(`add(b,{type:'text',name:'Suka',content:'Suka ❤',size:14})`, 'Suka');
+    expect(heart.message).toContain('U+2764');
+    const rev = (await call('/docs/open', { slug: 'font-lokal' }, await newSession())).body.data.rev;
+    const fixed = await call('/execute', { editId: cmd.editId, edits: [{ find: '⌘K cari', replace: 'Ctrl K cari' }] }, s);
+    expect(fixed.status, JSON.stringify(fixed.body.error)).toBe(200);
+    expect(fixed.body.data.rev).toBe(rev + 1);
+    expect(fixed.body.data.check.summary).toEqual({ error: 0, warning: 1, gate: 0 });
   }, 60_000);
 
   it.skipIf(!browserInstalled)('face gagal dimuat (URL 404) → LakarError FONT_MISSING non-retryable, renderer tetap bisa dipakai', async () => {
@@ -862,12 +1056,15 @@ describe('aset gambar (/assets + fill image)', () => {
     expect(at(80, 60)).toEqual([0xff, 0xff, 0xff]);
 
     const missing = 'a'.repeat(64);
-    const bad = await imageBoard(missing, 'Hilang');
-    const r2 = await call('/screenshot', { boardId: bad }, s);
+    const before = await readFile(join(dataDir, 'docs', 'aset-gambar.lakar.json'), 'utf8');
+    const code = `const b=add(null,{type:'board',name:'Hilang',x:200,y:0,width:100,height:80,screen:'app'}); add(b,{type:'frame',name:'Gambar',width:60,height:40,fills:[{type:'image',assetId:'${missing}',fit:'cover'}]}); b`;
+    const r2 = await call('/execute', { code }, s);
     expect(r2.status).toBe(404);
-    expect(r2.body).toMatchObject({ ok: false, error: { code: 'NOT_FOUND', retryable: false } });
+    expect(r2.body).toMatchObject({ ok: false, error: { code: 'NOT_FOUND', retryable: false, editId: expect.any(String) } });
     expect(r2.body.error!.message).toContain(missing);
     expect(r2.body.error!.hint).toMatch(/sha256/);
+    expect(r2.body.error!.hint).toContain('dokumen tidak di-commit');
+    expect(await readFile(join(dataDir, 'docs', 'aset-gambar.lakar.json'), 'utf8')).toBe(before);
 
     const r3 = await call('/screenshot', { boardId: good }, s);
     expect(r3.status, JSON.stringify(r3.body.error)).toBe(200);

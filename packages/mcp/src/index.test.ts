@@ -1,5 +1,10 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { createServer, type IncomingMessage, type Server } from 'node:http';
+import { createServer, request, type IncomingMessage, type Server } from 'node:http';
+import { spawn, type ChildProcess } from 'node:child_process';
+import { existsSync, readdirSync } from 'node:fs';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { homedir, tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Client, InMemoryTransport } from '@modelcontextprotocol/client';
 import { StdioClientTransport } from '@modelcontextprotocol/client/stdio';
@@ -8,6 +13,9 @@ import { PACKAGE, createLakarMcpServer } from './index.js';
 const PNG_B64 = Buffer.from('fake-png').toString('base64');
 
 type Seen = { path: string; session?: string; body: any };
+
+const manyFindings = (n: number) =>
+  Array.from({ length: n }, (_, i) => ({ level: 'error', rule: 'LC-05', nodeId: `Tttt${String(i).padStart(4, '0')}`, nodeName: `Caption ${i}`, detail: 'size 11px', expected: '≥ 12' }));
 
 /** Daemon tiruan: meniru bentuk respons AD-11 lakard. */
 function fakeDaemon() {
@@ -34,8 +42,24 @@ function fakeDaemon() {
       if (body.code === 'boom') {
         return send(422, { ok: false, error: { code: 'EXEC_ERROR', message: 'baris 1:1: error tak tertangkap', hint: 'perbaiki', retryable: false, editId: 'Eeeeeeee' } });
       }
+      if (body.code === 'check') {
+        return send(200, {
+          ok: true,
+          data: {
+            docId: 'Dddddddd',
+            rev: 4,
+            created: [],
+            check: { boards: ['Bbbbbbbb'], summary: { error: 25, warning: 0, gate: 25 }, findings: manyFindings(25) },
+            bounds: { Bbbbbbbb: [0, 0, 390, 844] },
+          },
+        });
+      }
       if (body.editId === 'Eeeeeeee') return send(200, { ok: true, data: { docId: 'Dddddddd', rev: 2, created: [], value: 1, logs: 'halo' } });
       return send(200, { ok: true, data: { docId: 'Dddddddd', rev: 1, created: [{ id: 'Bbbbbbbb', name: 'Tracer', path: ['Tracer'] }] } });
+    }
+    if (req.url === '/layout-check') {
+      if (body.boardId === 'Zzzzzzzz') return send(404, { ok: false, error: { code: 'NOT_FOUND', message: 'board Zzzzzzzz tidak ada', hint: 'pakai ID board', retryable: false } });
+      return send(200, { ok: true, data: { docId: 'Dddddddd', rev: 3, boards: [{ id: 'Bbbbbbbb', name: 'Home', summary: { error: 70, warning: 0, gate: 70 } }], summary: { error: 70, warning: 0, gate: 70 }, findings: manyFindings(70) } });
     }
     if (req.url === '/icons/search') {
       if (!body.query) return send(400, { ok: false, error: { code: 'SCHEMA_INVALID', message: 'query: wajib', hint: 'kirim {query}', retryable: false } });
@@ -79,10 +103,40 @@ describe('@lakar/mcp', () => {
     expect(PACKAGE).toBe('@lakar/mcp');
   });
 
-  it('daftar tool: open_doc, execute, screenshot, icon_search', async () => {
+  it('daftar tool: open_doc, execute, screenshot, icon_search, layout_check', async () => {
     const c = await connect(url);
     const { tools } = await c.listTools();
-    expect(tools.map((t) => t.name).sort()).toEqual(['execute', 'icon_search', 'open_doc', 'screenshot']);
+    expect(tools.map((t) => t.name).sort()).toEqual(['execute', 'icon_search', 'layout_check', 'open_doc', 'screenshot']);
+  });
+
+  it('execute dengan check → JSON field lain + ringkasan + maks 20 baris temuan + baris sisa', async () => {
+    const c = await connect(url);
+    const r = await c.callTool({ name: 'execute', arguments: { code: 'check', description: 'uji baris temuan check' } });
+    expect(r.isError).toBeFalsy();
+    const lines = ((r.content as any)[0].text as string).split('\n');
+    expect(JSON.parse(lines[0]!)).toEqual({ docId: 'Dddddddd', rev: 4, created: [], bounds: { Bbbbbbbb: [0, 0, 390, 844] } });
+    expect(lines[1]).toBe('check board Bbbbbbbb: 25 error (25 gerbang), 0 warning');
+    expect(lines[2]).toBe('error·gerbang · LC-05 · Caption 0 (Tttt0000) · size 11px · ≥ 12');
+    expect(lines).toHaveLength(2 + 20 + 1);
+    expect(lines.at(-1)).toBe('… 5 temuan lagi (layout_check untuk daftar penuh)');
+  });
+
+  it('layout_check → POST /layout-check {boardId?}; satu ringkasan + maks 60 baris; board tak ada → NOT_FOUND', async () => {
+    fake.seen.length = 0;
+    const c = await connect(url);
+    const r = await c.callTool({ name: 'layout_check', arguments: {} });
+    expect(r.isError).toBeFalsy();
+    expect(fake.seen.at(-1)).toMatchObject({ path: '/layout-check', body: {} });
+    const lines = ((r.content as any)[0].text as string).split('\n');
+    expect(lines[0]).toBe('layout_check rev 3, 1 board (Bbbbbbbb): 70 error (70 gerbang), 0 warning');
+    expect(lines).toHaveLength(1 + 60 + 1);
+    expect(lines.at(-1)).toBe('… 10 temuan lagi (layout_check untuk daftar penuh)');
+    const bad = await c.callTool({ name: 'layout_check', arguments: { boardId: 'Zzzzzzzz' } });
+    expect(fake.seen.at(-1)!.body).toEqual({ boardId: 'Zzzzzzzz' });
+    expect(bad.isError).toBe(true);
+    expect((bad.content as any)[0].text).toMatch(/^NOT_FOUND: .*\nhint: pakai ID board/);
+    const tool = (await c.listTools()).tools.find((t) => t.name === 'layout_check')!;
+    for (const id of ['LC-01a', 'LC-01b', 'LC-02a', 'LC-05', 'LC-12', 'LC-20']) expect(tool.description).toContain(id);
   });
 
   it('icon_search → POST /icons/search {query, lib?, limit?}; hasil pertama dumbbell; deskripsi menyebut kanonik/alias/brand', async () => {
@@ -201,9 +255,106 @@ describe('@lakar/mcp', () => {
       const r = await c2.callTool({ name: 'execute', arguments: { code: '1' } });
       expect(r.isError).toBe(true);
       expect((r.content as any)[0].text).toContain('http://127.0.0.1:1');
-      expect((await c2.listTools()).tools).toHaveLength(4);
+      expect((await c2.listTools()).tools).toHaveLength(5);
     } finally {
       await c2.close();
     }
   });
 });
+
+// ---------------------------------------------------------------------------
+// Integrasi: lakard asli (proses terpisah, Chromium Lakar) di balik daemon tiruan yang meneruskan respons apa adanya.
+// ---------------------------------------------------------------------------
+
+const browsersPath = process.env.LAKAR_BROWSERS_PATH || join(homedir(), '.cache', 'lakar', 'ms-playwright');
+const browserInstalled =
+  existsSync(browsersPath) &&
+  readdirSync(browsersPath).some((d) => d.startsWith('chromium_headless_shell-') && existsSync(join(browsersPath, d, 'INSTALLATION_COMPLETE')));
+
+const FIXTURE = `
+  const b = add(null, {type:'board', name:'Home · mobile', x:0, y:0, width:390, height:800, screen:'mobile'});
+  add(b, {type:'text', name:'Sapaan', content:'Halo 👋', size:16});
+  add(b, {type:'text', name:'Rating', content:'★★★★★', size:16});
+  add(b, {type:'text', name:'Caption', content:'Catatan kecil', size:11});
+  add(b, {type:'text', name:'Hak cipta', content:'© 2026 Kopi', size:12});
+  const k = add(b, {type:'frame', name:'Kartu', width:200, height:40, clip:true});
+  add(k, {type:'rect', name:'Lebar', width:260, height:20});
+  const c = add(b, {type:'frame', name:'Konten', layout:'column', width:390});
+  add(c, {type:'rect', name:'Isi', width:390, height:640});
+  add(b, {type:'frame', name:'Overlay / Tab bar', position:'absolute', x:0, y:736, width:390, height:64});`;
+
+describe.skipIf(!browserInstalled)('layout_check dengan respons lakard asli', () => {
+  let child: ChildProcess;
+  let tmp: string;
+  let proxy: Server;
+  let proxyUrl: string;
+  const forwarded: { path: string; status: number; body: string }[] = [];
+
+  beforeAll(async () => {
+    tmp = await mkdtemp(join(tmpdir(), 'lakar-mcp-check-'));
+    const mainJs = fileURLToPath(new URL('../../daemon/dist/main.js', import.meta.url));
+    child = spawn(process.execPath, [mainJs], { env: { ...process.env, LAKAR_PORT: '0', LAKAR_DATA_DIR: tmp, LAKAR_BROWSERS_PATH: browsersPath } });
+    const realUrl = await new Promise<string>((resolve, reject) => {
+      let out = '';
+      child.stdout!.on('data', (c: Buffer) => {
+        out += c.toString();
+        const m = /mendengarkan (http:\/\/127\.0\.0\.1:\d+)/.exec(out);
+        if (m) resolve(m[1]!);
+      });
+      child.on('exit', () => reject(new Error(`lakard keluar sebelum listen: ${out}`)));
+    });
+    const real = new URL(realUrl);
+    // Daemon tiruan: meneruskan setiap permintaan ke lakard asli, respons dikembalikan apa adanya.
+    proxy = createServer((req, res) => {
+      const up = request({ host: real.hostname, port: real.port, path: req.url, method: req.method, headers: req.headers }, (r) => {
+        let body = '';
+        r.on('data', (c) => (body += c));
+        r.on('end', () => {
+          forwarded.push({ path: req.url!, status: r.statusCode!, body });
+          res.writeHead(r.statusCode!, r.headers);
+          res.end(body);
+        });
+      });
+      req.pipe(up);
+    });
+    await new Promise<void>((r) => proxy.listen(0, '127.0.0.1', r));
+    proxyUrl = `http://127.0.0.1:${(proxy.address() as { port: number }).port}`;
+  }, 60_000);
+
+  afterAll(async () => {
+    await new Promise<void>((r) => (proxy ? proxy.close(() => r()) : r()));
+    if (child && child.exitCode === null) {
+      const exited = new Promise((r) => child.on('exit', r));
+      child.kill('SIGTERM');
+      await exited;
+    }
+    await rm(tmp, { recursive: true, force: true });
+  });
+
+  it('execute fixture → ringkasan + 6 baris; layout_check → 1 ringkasan + 6 baris dengan ID sama, bahasa aturan produk', async () => {
+    const c = await connect(proxyUrl);
+    expect((await c.callTool({ name: 'open_doc', arguments: { slug: 'mcp-check' } })).isError).toBeFalsy();
+    const e = await c.callTool({ name: 'execute', arguments: { code: FIXTURE, description: 'fixture enam aturan check' } });
+    expect(e.isError, (e.content as any)[0].text).toBeFalsy();
+    const eLines = ((e.content as any)[0].text as string).split('\n');
+    expect(JSON.parse(eLines[0]!)).toMatchObject({ rev: 1, bounds: expect.any(Object) });
+    expect(eLines[1]).toMatch(/^check board [A-Za-z0-9]{8}: 5 error \(5 gerbang\), 1 warning$/);
+    expect(eLines.slice(2)).toHaveLength(6);
+
+    const r = await c.callTool({ name: 'layout_check', arguments: {} });
+    expect(r.isError).toBeFalsy();
+    const text = (r.content as any)[0].text as string;
+    const lines = text.split('\n');
+    const real = JSON.parse(forwarded.filter((f) => f.path === '/layout-check').at(-1)!.body);
+    expect(real.data.findings).toHaveLength(6);
+    expect(lines[0]).toBe(`layout_check rev 1, 1 board (${real.data.boards[0].id}): 5 error (5 gerbang), 1 warning`);
+    expect(lines.slice(1)).toHaveLength(6);
+    expect(lines.slice(1).map((l) => l.split(' · ')[1])).toEqual(['LC-01a', 'LC-01b', 'LC-05', 'LC-02a', 'LC-20', 'LC-12']);
+    expect(lines.slice(1)).toEqual(eLines.slice(2));
+    expect(lines[1]).toMatch(/^error·gerbang · LC-01a · Sapaan \([A-Za-z0-9]{8}\) · emoji "👋" U\+1F44B di "Halo 👋" · hapus emoji; ikon pakai node icon \(icon_search\)$/);
+    expect(lines[6]).toMatch(/^warning · LC-12 · Home · mobile \([A-Za-z0-9]{8}\) · ukuran 390×800 · 390×844$/);
+    expect(text).not.toMatch(/golden|juri|rubrik|Lampiran B|skor|pen\.dev|benchmark/i);
+    console.log(`[mcp] layout_check:\n${text}`);
+  }, 60_000);
+});
+
