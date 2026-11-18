@@ -402,3 +402,26 @@ perkiraan $7,60, anggaran cukup), lakard di-restart dan active.
 ## Status: lulus di iterasi 8 — menunggu done_checkpoint (Adam melihat PNG)
 
 PNG Lakar: `bench/practice/8/P{1..4}-lakar.png` (tracked); PNG pen.dev lokal: `bench/runs/practice/2/P{1..4}-pendev.png` (EULA).
+
+---
+
+# Seri efek (story 22): efek visual gradien dan shader
+
+Seri latihan tersendiri untuk efek visual (P5 landing gelap berlatar efek, P6 onboarding mobile gelap bergradasi), dengan
+runner, pembungkus, dan juri rubrik v2.1 yang sama. Anggaran seri ≤ $15, maks 3 iterasi; lulus bila P5 **dan** P6
+Setara/Lebih baik, waktu ≤ 1,5× pen.dev, emoji 0, gate 0. Laporan `bench/effects-<k>.md|json`.
+
+## Seri efek: prompt beku (2026-11-18, sebelum mesin, skill, atau DESIGN.md diubah)
+
+- `bench/practice/effects/prompts.json` sha256 `5f0c23a7fb411f4fcf15e3f88f2e2f7b0f0f6b64f54d955e15fe22ecc834e441`
+  (= `EFFECT_PROMPTS_SHA256` di `bench/src/practice/prompts.ts`). Loader yang sama menolak isi lain.
+- Teks dari plan story 22 (Design Notes), dengan dua perubahan kata (bukan makna) yang diizinkan plan sebelum run pertama,
+  karena penjaga n-gram 6 kata menemukan tumpang tindih dengan P1:
+  - P5: "Desain halaman landing desktop selebar 1440px untuk" → "Desain landing page desktop dengan lebar 1440px untuk"
+    (n-gram "desain halaman landing desktop selebar 1440px" dan "halaman landing desktop selebar 1440px untuk").
+  - P5: "dengan judul besar, subjudul, dua tombol aksi, dan cuplikan" → "… subjudul, sepasang tombol aksi, serta cuplikan"
+    (n-gram "dengan judul besar subjudul dua tombol", "judul besar subjudul dua tombol aksi", "besar subjudul dua tombol aksi dan").
+- Sesudah perubahan: 0 n-gram 6 kata sama dengan prompt A–E maupun P1–P4 (kalimat penutup baku dibuang), 0 frasa
+  Kriteria/Prosedur/Risiko golden, 0 token terlarang, nama produk tidak ada di golden-set (`tests/practice-prompts.test.ts`).
+  Penjaga C7 skill (`tests/skills-c7.test.ts`) kini juga memakai teks dan nama produk P5/P6.
+- Mulai sekarang prompt efek tidak diubah. Setiap iterasi seri efek mencatat sha `prompts.json` di `frozen.json`.

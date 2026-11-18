@@ -16,6 +16,14 @@ export const CLOSING_SENTENCE =
   'Bahasa Indonesia. Kualitas setara desainer produk senior: hierarki tipografi jelas, spacing konsisten (grid 8px), kontras baik, auto/flex layout.';
 export const PRACTICE_ID = /^P[1-9]$/;
 
+// Seri efek (story 22): dua prompt efek visual (P5 landing, P6 mobile), dibekukan dengan commit tersendiri sebelum mesin,
+// skill, atau DESIGN.md diubah. Loader yang sama (`loadPracticePrompts(path, sha)`) menolak isi lain.
+export const EFFECT_PROMPTS_PATH = join(PRACTICE_DIR, 'effects', 'prompts.json');
+/** sha256 `bench/practice/effects/prompts.json` yang dibekukan (jangan diubah setelah iterasi 1 seri efek dimulai). */
+export const EFFECT_PROMPTS_SHA256 = '5f0c23a7fb411f4fcf15e3f88f2e2f7b0f0f6b64f54d955e15fe22ecc834e441';
+/** Id prompt seri efek. */
+export const EFFECT_ID = /^P[56]$/;
+
 export type PracticeKind = 'landing' | 'mobile' | 'dashboard';
 export type PracticePrompt = { id: string; name: string; kind: PracticeKind; text: string; size: BoardSpec };
 

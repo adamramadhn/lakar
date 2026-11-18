@@ -5,7 +5,7 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { GOLDEN_SET_PATH, PROTOCOL_DIR, forbiddenPhrases, forbiddenSources, loadProtocol, words } from '../bench/src/protocol.ts';
-import { loadPracticePrompts } from '../bench/src/practice/prompts.ts';
+import { EFFECT_PROMPTS_PATH, EFFECT_PROMPTS_SHA256, loadPracticePrompts } from '../bench/src/practice/prompts.ts';
 
 const ROOT = join(import.meta.dirname, '..');
 const SKILLS = join(ROOT, 'packages/skills/skills');
@@ -13,8 +13,8 @@ const DESIGN_PATH = join(ROOT, '_bmad-output/initiative-lakar/ux-lakar/DESIGN.md
 const ALLOW_MISSING = process.env.LAKAR_C7_ALLOW_MISSING_SOURCES === '1';
 
 const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-/** Prompt latihan beku (story 19): teksnya sumber terlarang, nama produknya token terlarang. */
-const practice = loadPracticePrompts().prompts;
+/** Prompt latihan beku (story 19: P1–P4; story 22: seri efek P5/P6): teksnya sumber terlarang, nama produknya token terlarang. */
+const practice = [...loadPracticePrompts().prompts, ...loadPracticePrompts(EFFECT_PROMPTS_PATH, EFFECT_PROMPTS_SHA256).prompts];
 
 /** Token terlarang di skill (bahasa penilaian, nama produk prompt golden dan latihan, label rubrik R1–R10). */
 export const SKILL_FORBIDDEN_TOKENS: readonly RegExp[] = [
@@ -87,8 +87,11 @@ describe('C7: isi skill bebas sumber terlarang', () => {
       expect(skillC7Problems(synthetic, phrases)).toContain(`frasa sumber terlarang: "${sample}"`);
     } else expect(ALLOW_MISSING).toBe(true);
     expect(skillC7Problems('teks netral tentang kopi', phrases)).toEqual([]);
-    const practicePhrase = words(practice[0]!.text).slice(4, 10).join(' ');
-    expect(skillC7Problems(`Catatan: ${practicePhrase}.`, phrases)).toContain(`frasa sumber terlarang: "${practicePhrase}"`);
+    for (const p of practice) {
+      const practicePhrase = words(p.text).slice(4, 10).join(' ');
+      expect(skillC7Problems(`Catatan: ${practicePhrase}.`, phrases), p.id).toContain(`frasa sumber terlarang: "${practicePhrase}"`);
+    }
+    expect(practice.map((p) => p.id)).toEqual(['P1', 'P2', 'P3', 'P4', 'P5', 'P6']);
     for (const t of ['skor akhir', 'lolos R3', 'naik di R9', 'R10 penuh', 'nilai juri', 'Kasku', 'lihat pen.dev', ...practice.map((p) => `contoh ${p.name}`)]) expect(skillC7Problems(t, phrases).length, t).toBeGreaterThan(0);
   });
 });
