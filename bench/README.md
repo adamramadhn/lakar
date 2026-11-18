@@ -72,8 +72,9 @@ runner, pembungkus (`bench/protocol/wrapper.txt`, read-only), dan juri rubrik v2
   Lakar Setara/Lebih baik di ≥ 3 dari 4 prompt dan di setiap prompt waktu ≤ 1,5 × pen.dev, emoji Lakar (a)/(b)/(c) = 0,
   layout_check gate = 0.
 - **`--reuse-pendev <j>`:** run pen.dev iterasi j dipakai apa adanya (tercatat di laporan, biayanya tidak dihitung ulang);
-  iterasi sumber tidak lengkap → Abort sebelum spawn. `--resume` hanya mengulang run `aborted`/`invalid`.
-- **Anggaran:** iterasi maks 3; biaya kumulatif (dari `bench/practice-<j>.json`) + perkiraan sisa > $30 → Abort.
+  iterasi sumber tidak lengkap → Abort sebelum spawn. Mode ini tidak menjalankan pen.dev, jadi preflight tidak mewajibkan
+  service pen-desktop aktif (penjaga md5 `.pen` tetap berjalan). `--resume` hanya mengulang run `aborted`/`invalid`.
+- **Anggaran:** iterasi maks 6 (iterasi 4–6 dibuka Adam 2026-11-18); biaya kumulatif (dari `bench/practice-<j>.json`) + perkiraan sisa > $57,80 → Abort.
 - **Keluaran:** `bench/practice-<k>.md|json` (tracked), strip Lakar `bench/practice/<k>/<P>-lakar.png` (tracked,
   eksklusif), artefak mentah dan strip/`.pen` pen.dev lokal di `bench/runs/practice/<k>/` (EULA). Log iterasi skill:
   `bench/practice/LOG.md`.

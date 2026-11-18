@@ -9,6 +9,7 @@ import {
   budgetProblem,
   emojiOf,
   estimateCost,
+  BUDGET_USD,
   MAX_ITER,
   parsePracticeArgs,
   pendevReuseProblems,
@@ -74,12 +75,18 @@ describe('practice: pakai ulang pen.dev, biaya, anggaran', () => {
     expect(estimateCost({ prompts: ids, reusePendev: false, doneRuns: new Set(['P1-pendev', 'P1-lakar']), doneJudge: new Set(['P1']) })).toBe(8.4);
   });
 
-  it('biaya kumulatif dari laporan sebelumnya; anggaran $30', () => {
+  it('biaya kumulatif dari laporan sebelumnya; anggaran $57,80 (iterasi maks 6)', () => {
+    expect(MAX_ITER).toBe(6);
+    expect(BUDGET_USD).toBe(57.8);
+    expect(parsePracticeArgs(['--iter', '6', '--reuse-pendev', '2'])).toMatchObject({ ok: true, value: { iter: 6, reusePendev: 2 } });
+    expect(parsePracticeArgs(['--iter', '7'])).toMatchObject({ ok: false });
     const reports: Record<number, { cost: { iteration: number } }> = { 1: { cost: { iteration: 9.5 } }, 2: { cost: { iteration: 6.25 } } };
     expect(previousCosts(3, (j) => reports[j])).toEqual({ byIter: { 1: 9.5, 2: 6.25 }, total: 15.75 });
     expect(previousCosts(1, () => undefined)).toEqual({ byIter: {}, total: 0 });
     expect(budgetProblem(15.75, 7.6)).toBeUndefined();
-    expect(budgetProblem(23, 7.6)).toMatch(/anggaran: terpakai \$23\.00 \+ perkiraan sisa \$7\.60 > \$30/);
+    expect(budgetProblem(23, 7.6)).toBeUndefined();
+    expect(budgetProblem(50.5, 7.6)).toMatch(/anggaran: terpakai \$50\.50 \+ perkiraan sisa \$7\.60 > \$57\.8/);
+    expect(budgetProblem(23, 7.6, 30)).toMatch(/anggaran: terpakai \$23\.00 \+ perkiraan sisa \$7\.60 > \$30/);
   });
 });
 

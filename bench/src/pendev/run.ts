@@ -44,8 +44,11 @@ export function penDesktopVersion(): string | undefined {
 
 export type Preflight = { protocol: Protocol; claudeVersion: string; server: StdioServerConfig };
 
-/** Preflight pen.dev (story 4): C7 protokol, pencil.json = ~/.claude.json, claude di PATH, pen-desktop aktif. */
-export function preflight(): Preflight {
+/**
+ * Preflight pen.dev (story 4): C7 protokol, pencil.json = ~/.claude.json, claude di PATH, pen-desktop aktif.
+ * `requirePenDesktop: false` (latihan `--reuse-pendev`): pen.dev tidak dijalankan, jadi service pen-desktop tidak dicek.
+ */
+export function preflight(opts: { requirePenDesktop?: boolean } = {}): Preflight {
   const protocol = loadProtocol();
   if (!existsSync(GOLDEN_SET_PATH)) throw new Abort(`golden-set.md tidak ada (${GOLDEN_SET_PATH}); C7 tidak bisa dicek`);
   const c7 = checkProtocolC7(protocol, readFileSync(GOLDEN_SET_PATH, 'utf8'));
@@ -67,6 +70,10 @@ export function preflight(): Preflight {
     log(`claude: ${path} (${claudeVersion})`);
   } catch {
     throw new Abort('claude tidak ada di PATH');
+  }
+  if (opts.requirePenDesktop === false) {
+    log('service pen-desktop tidak dicek (pen.dev tidak dijalankan)');
+    return { protocol, claudeVersion, server };
   }
   let active = '';
   try {
