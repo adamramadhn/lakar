@@ -1,4 +1,5 @@
-// Laporan putaran: `bench/round-<round>.md|json` dan `bench/score-<id>.md|json`. Render murni (tes snapshot).
+// Laporan putaran: `bench/round-<round>.md|json` dan laporan skor (`bench/score-<id>.md|json`; putaran resmi ≥ 2:
+// `bench/round-<n>/score-<id>.md|json`). Render murni (tes snapshot).
 import type { JudgeRepRecord, Tool } from '../judge/run.js';
 import { JUDGE_CRITERIA } from '../judge/prompt.js';
 import type { LakarExtra } from '../lakar/run.js';
