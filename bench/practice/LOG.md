@@ -82,3 +82,30 @@ lintas prompt, bukan per prompt):
 - Teks core dipadatkan agar tetap ≤ 4000 token (tanpa mengubah aturan lain).
 
 Skill: `core.md` `5bee1a4981adba9f`, `landing.md` `3daa5de39ffc37ac`, `mobile.md` `d3c210ef78fab03d`.
+
+### Hasil iterasi 2 (`bench/practice-2.md`, HEAD `6057545`)
+
+| Prompt | Waktu Lakar / pen.dev | T L–P | D L–P | Keputusan | Kelemahan Lakar menurut bukti juri |
+|---|---|---|---|---|---|
+| P1 | 265.7 / 219.5 dtk (1,21) | 12–12 | 3–4 | Setara | foto hero/mentor yang diminta tidak ada (R1 0–1); satu judul yatim |
+| P2 | 142.9 / 147.7 dtk (0,97) | 11–12 | 3–2 | Setara | skala tipografi agak datar; tanpa artwork (R5/R10 1) |
+| P3 | 238.9 / 129.9 dtk (**1,84**) | 11–16 | 3–4 | Kalah (gerbang waktu) | 4 screenshot +  + 5 execute (alur akhir dilanggar), 3 `photo_search` gagal; hero dirakit dari ikon (slop "ilustrasi dari path"); angka rating 4,7 bersaing dengan judul |
+| P4 | 187.6 / 231.5 dtk (0,81) | 16–12 | 4–4 | Lebih baik | – |
+
+- 3 dari 4 Setara/Lebih baik, emoji 0, gate 0, tetapi P3 waktu 1,84× → **belum lulus**.
+- Openverse masih tidak tersedia (semua `photo_search` timeout 8 dtk / NOT_FOUND).
+- Biaya iterasi 2: $10,55; kumulatif $20,48.
+
+## Iterasi 3: skill v3
+
+Perkiraan iterasi 3 dengan `--reuse-pendev 2`: $7,60 → $28,08 ≤ $30 (boleh). Perubahan (prinsip umum):
+
+- **Alur akhir tepat:** satu screenshot → satu execute perbaikan → export, tanpa screenshot atau `layout_check`
+  tambahan. Alasan: putaran kritik diri berulang membuat P3 1,84× (gerbang waktu).
+- **Visual pengganti tanpa ilustrasi rakitan:** sampul/thumbnail/hero isi = bidang bernada + tipografi tebal (judul,
+  angka); tidak merakit ilustrasi dari ikon/bentuk (dibaca juri sebagai maskot dari path, R8) dan tanpa ikon besar
+  transparan (dicabut dari v2).
+- **Satu elemen terbesar:** angka sekunder (rating, nilai ringkas) tidak lebih besar dari judul layar (R2 P3; skala
+  datar P2).
+
+Skill: `core.md` `c74a5de318365869`, `landing.md` `3daa5de39ffc37ac`, `mobile.md` `d3c210ef78fab03d`.
