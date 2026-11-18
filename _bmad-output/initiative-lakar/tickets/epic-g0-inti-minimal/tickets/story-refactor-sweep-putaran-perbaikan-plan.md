@@ -12,7 +12,7 @@ review: quick
 review_source: pinned
 lenses_ran: [quick]
 review_loop_iteration: 0
-followup_review_recommended: true
+followup_review_recommended: false
 context:
   - '{project-root}/_bmad-output/initiative-lakar/plan-1-19-arsip-run-terhenti-dan-lc20-tab-bar-mengambang.md'
 warnings: [multiple-goals, oversized]
@@ -51,6 +51,25 @@ deferred:
     location: >-
       packages/skills/skills/core.md, landing.md, mobile.md
     severity: medium (unverified)
+  - summary: >-
+      LC-20 sub-cek 2 (cut) memicu gerbang pada konten yang diredupkan scrim di belakang bottom sheet modal (desain benar).
+    evidence: |-
+      Fixture realistis m4 (scrim #000000AA layar penuh + "Sheet / Opsi episode" y444–844 di atas tab bar): baris daftar
+      y438–444 dilaporkan "terpotong zona bawah". Sudah terjadi di baseline cacfc29 (bukan dari sub-cek 5). Prompt beku
+      putaran 2 tidak menyebut sheet/modal. Perbaikan: abaikan unit yang tertutup penuh node scrim (fill, ≥ 90% board,
+      z-order sesudah unit). Fixture: scratchpad fx20/gen.mjs.
+    location: >-
+      packages/check/src/rules.ts lc20 cut/walk
+    severity: medium
+  - summary: >-
+      LC-20 sub-cek 1 menganggap seksi ber-fill (footer gelap, hero) yang latarnya berlanjut di belakang sticky CTA bar landing sebagai "konten terakhir" (desain benar).
+    evidence: |-
+      Fixture l3 (footer gelap padding bawah 140 di belakang bilah CTA lengket y2120–2200) dan l4 (hero ber-fill di belakang
+      bilah CTA y812–900): "konten terakhir Footer/Hero berakhir di y …". Sudah terjadi di baseline cacfc29. Prompt beku
+      putaran 2 tidak meminta sticky bar. Perbaikan: turun ke isi frame ber-fill (tanpa padding) bila latarnya selebar zona.
+    location: >-
+      packages/check/src/rules.ts lc20 sub-cek 1
+    severity: medium
 ---
 
 <intent-contract>
@@ -188,6 +207,19 @@ Setiap butir yang tidak bisa diselesaikan dicatat di `deferred` beserta alasanny
   - `[low]` `[patch]` practice/main.ts: komentar masih "seri efek" — diperbarui ke seri practice dan efek.
   - `[medium]` `[patch]` server.ts executeCountLine: pada N = 3 "selesaikan sisa dalam satu execute" mengundang execute ke-4 di mobile — teks N = 3 "batas skill tercapai untuk mobile/app …; landing maks 4 — lanjut screenshot/export", N ≥ 4 "melewati batas skill … hentikan perbaikan kecil"; tes diperbarui (menggantikan contoh Design Notes, dicatat di Implementation Notes).
 
+### 2026-11-18 — Review pass (follow-up, putaran 2)
+- verdicts: 9 findings — high 0, medium 2, low 4, false 2, maybe-false 0 (lens quick 4 + fokus orkestrator 5)
+- findings:
+  - `[low]` `[patch]` server.ts `EXECUTE_DESCRIPTION` masih "x/y hanya untuk board atau node anak dengan position:'absolute'" — bertentangan dengan api.md/normalisasi butir 2 — kalimat diganti: "x/y hanya untuk board, node anak dengan position:'absolute', atau anak frame layout:'none' (position:'absolute' ditambahkan otomatis)"; tes execute-description lulus.
+  - `[low]` `[reject]` landing.md komentar Kontur dipendekkan di luar gating — carried: perlu agar landing tetap ≤ 3500 token (Always); makna sama, tidak ada aturan/prosa yang berubah.
+  - `[low]` `[reject]` plan: matriks E2 / Design Notes masih memuat teks pengingat lama — perbaikannya mengedit plan build ini; perubahan teks sudah dicatat di Implementation Notes (review pass 1), substansi E2 (saran lanjut screenshot/export, tidak memblokir) terpenuhi.
+  - `[low]` `[reject]` plan: angka di Implementation Notes (863 vs 865 tes, 3177 vs 3179 token, status) tidak konsisten — perbaikannya mengedit plan; Auto Run Result memuat angka terakhir yang diverifikasi ulang (865 tes).
+  - `[false]` `[reject]` (fokus 1) sub-cek 5 `between` pada desain benar — 20 fixture realistis (FAB, FAB lebar, snackbar, bottom sheet, home indicator, Crop, gulir akhir, kapsul berbayang, mini player menempel/celah rapi/panel latar/kaca, pembungkus Overlay transparan, landing footer gelap, sticky CTA, cookie+sticky): satu-satunya temuan baru vs baseline cacfc29 adalah m3b (snackbar 8 px di atas tab bar dengan daftar mengalir di belakang) — PNG menunjukkan potongan teks baris terlihat di celah 8 px, mengintip nyata, konsisten dengan sub-cek 4; bukan positif palsu.
+  - `[false]` `[reject]` (fokus 1) arsip — 80 dokumen (bench/runs practice 1–8, practice-effects 1–3, rounds 1/uji-1, lakar-archive, dataDir lakar): perbedaan vs baseline hanya sub-cek 5 di 8/P2 (+ salinan arsip effects-1) dan 2/P2 `siaru-beranda-mobile` (+ salinan arsip practice-3): teks "Pamungkas, Sal P." / "Ardhito, Rendy P." / "Indra Lesmana" terpotong di celah y738–746 antara mini player dan tab bar, diverifikasi di png/3wR6R1XL.png — cacat nyata. Contoh skill 0 temuan (tes).
+  - `[medium]` `[defer]` (fokus 1, pra-ada) bottom sheet + scrim: sub-cek 2 melaporkan baris daftar redup di tepi atas sheet — sudah ada di baseline; dicatat di deferred.
+  - `[medium]` `[defer]` (fokus 1, pra-ada) landing sticky CTA bar di atas footer/hero ber-fill: sub-cek 1 melaporkan "konten terakhir" — sudah ada di baseline; dicatat di deferred.
+  - `[low]` `[reject]` (fokus 3) `deps.restart` (`execFileSync systemctl restart pen-desktop`) tanpa batas waktu sendiri — dibatasi timeout start/stop systemd dan durasinya ikut dihitung `elapsed` (hasil ok:false bila > 120 dtk); kode dari 1.22, tidak mungkin menggantung tanpa batas; perbaikan butuh opsi baru.
+
 ## Design Notes
 
 **Sub-cek 5 (celah antar-bar):**
@@ -231,3 +263,14 @@ Status: built
 - **Follow-up review:** true — 3 medium dipatch; risiko belum terverifikasi: perluasan keanggotaan `bottomZone` (kandidat di dalam anggota tak ber-fill) mengubah zona untuk semua sub-cek LC-20; hanya dicek pada arsip latihan 5–8 + efek 1–3 (identik), belum pada pola pembungkus lain.
 - **Verifikasi:** `pnpm build` exit 0; `pnpm test` 49 file / 865 tes lulus (0 skip); gen-skill-api stabil; archcheck practice 5–8 + efek 1–3: satu-satunya perubahan 8/P2 `zsVQi7E1` gate 0 → 3 (sampul "Kopi Pagi", teks "Kopi Pagi · Hari ini", ikon unduh di celah y738–746; dicek di PNG), lainnya identik; dry-run `round --round uji-9` dan `practice --iter 8` exit 0, protocolHash `907cb36f…edb85d`, sha teks juri A/B = rubric.json, rencana restart tercetak; `git diff cacfc29 -- bench/protocol bench/rubric bench/practice` kosong; `scripts/tracer-e2e.sh` LULUS (1 run, $0,21); lakard di-restart → active; `tools/node26/verify.sh` exit 0. pen-desktop tidak di-restart nyata (unit test).
 - **Risiko sisa:** decode efek belum terbukti di halaman dingin; screenshot grain ±5× lebih lambat (encode PNG); perluasan zona LC-20 heuristik; satu baris mengintip menghasilkan beberapa temuan (baris transparan bukan unit); pengingat execute hanya teks (agen bisa tetap melewati batas); skill v9 + gating belum diukur pada P1–P4/A–B (putaran 2); restart pen-desktop di round belum diuji nyata; landing.md tepat 3500/3500 token.
+
+### Follow-up review pass (2026-11-18, putaran 2)
+
+- **Ringkasan:** review lanjutan quick + tiga fokus orkestrator. Satu patch: deskripsi tool `execute` (`packages/mcp/src/server.ts`) kini menyebut anak frame `layout:'none'` menerima x/y (position ditambahkan otomatis), selaras api.md dan core.
+- **Fokus 1 (LC-20):** 20 fixture realistis (desain benar) + 80 dokumen arsip/dataDir, dibanding baseline cacfc29 lewat hook resolve ke `rules.js` baseline. Sub-cek 5 tidak menghasilkan positif palsu; temuan baru di arsip (8/P2 dan 2/P2 `siaru-beranda-mobile`, beserta salinan arsipnya) semuanya cacat nyata di PNG. Dua positif palsu PRA-ADA (bukan dari story ini) di-defer: bottom sheet + scrim (sub-cek 2) dan sticky CTA landing di atas seksi ber-fill (sub-cek 1); prompt beku putaran 2 tidak memintanya.
+- **Fokus 2 (x/y):** `implicitAbsolute` hanya dipanggil dari op transaksi add/update/replace/duplicate (satu-satunya pemanggil: exec api); buka/migrasi dokumen tidak lewat jalur itu → dokumen lama tidak berubah (archcheck 80 dokumen identik selain sub-cek 5). Parent row/column dan board tidak dinormalisasi (tes X3 lulus).
+- **Fokus 3 (restart pen-desktop di round):** `pendevRan` naik hanya saat run pen.dev benar-benar dimulai; restart sekali sesudah loop (juga sesudah `fatal`/break), sebelum strip/juri dan sebelum pen guard md5 (urutan sama dengan practice/efek yang sudah terbukti); tidak di tengah run; dry-run hanya mencetak rencana; probe dibatasi sisa 120 dtk; hasil ke `pen-desktop-restart.json` dan laporan. Tes `penDesktopRestartStep`/P4/laporan lulus. pen-desktop tidak di-restart nyata.
+- **Review:** 9 temuan → 1 patch (low), 2 defer (medium, pra-ada), 6 ditolak (Kontur carried; 2 edit-plan; 2 fokus tanpa positif palsu; restart systemctl tanpa timeout sendiri — dibatasi systemd).
+- **Follow-up review:** false — pass lanjutan tanpa patch high (patched: high 0, medium 0, low 1).
+- **Verifikasi:** `pnpm build` exit 0; `pnpm test` 49 file / 865 tes lulus; gen-skill-api tanpa perubahan; dry-run `round --round uji-9` dan `practice --iter 8` exit 0, protocolHash `907cb36f…edb85d` sama, sha teks juri = rubric.json ("sama"), rencana restart tercetak; `git diff cacfc29 -- bench/protocol bench/rubric bench/practice/prompts*.json` kosong; `systemctl --user restart lakard` → active; `tools/node26/verify.sh` exit 0. Tracer berbayar tidak dijalankan (larangan orkestrator).
+- **Risiko sisa:** dua positif palsu LC-20 pra-ada (sheet+scrim, sticky CTA landing) bila agen membuat pola itu di putaran 2; snackbar 8 px di atas tab bar dengan daftar di belakang kini ditolak gerbang (konsisten dengan sub-cek 4, tetapi bisa terasa ketat).

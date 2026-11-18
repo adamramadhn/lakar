@@ -203,7 +203,7 @@ export const EXECUTE_DESCRIPTION =
   "Cat (frame/rect/ellipse/path; radius hanya frame/rect): fills[] ({type:'solid',color} | {type:'linear',angle,stops} | {type:'radial',center?,radius?,stops} | {type:'conic',angle?,center?,stops} | {type:'noise',opacity,size?,seed?,blend?,mono?} | {type:'mesh',columns,rows,colors (= columns×rows),points?} | {type:'image',assetId,fit}), " +
   "stroke {color, width, align:'inside'|'center'|'outside', sides?}, radius (n atau [tl,tr,br,bl]). " +
   "Warna: '#RRGGBB' atau '#RRGGBBAA'. Nilai boleh referensi token {$token:'colors.nama'} (token harus ada di dokumen). " +
-  "x/y hanya untuk board atau node anak dengan position:'absolute'. Kunci di luar skema ditolak (SCHEMA_INVALID). " +
+  "x/y hanya untuk board, node anak dengan position:'absolute', atau anak frame layout:'none' (position:'absolute' ditambahkan otomatis). Kunci di luar skema ditolak (SCHEMA_INVALID). " +
   'Mengembalikan {docId, rev, created:[{id,name,path}], value?, valueTruncated?, logs?, check?, bounds?}: path = list nama dari board ke node (mis. [\'Home\',\'Hero / Card\',\'Judul\']), hanya untuk dibaca; alamati node lewat id. ' +
   'Snippet tanpa op yang sukses tidak menambah rev (tanpa check/bounds). ' +
   'Setelah snippet sukses, board yang tersentuh dirender dan dicek gerbang G0 sebelum commit (aturan: lihat tool layout_check): ' +
