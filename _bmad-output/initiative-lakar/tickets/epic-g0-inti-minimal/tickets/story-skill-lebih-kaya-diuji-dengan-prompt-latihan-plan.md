@@ -3,7 +3,7 @@ title: 'Skill lebih kaya diuji dengan prompt latihan'
 type: feature
 ticket: '19'
 created: '2026-11-18'
-status: blocked
+status: in-progress
 baseline_revision: '97ec58176a5e8d7abf19dddc6f7d6ac79266cc85'
 route: full
 route_source: auto
@@ -120,7 +120,26 @@ Catatan orkestrator (berlaku untuk seluruh run, tambahan atas Boundaries):
 - C9: Node via `/opt/node-26/bin` path absolut; tanpa apt; jangan sentuh konfigurasi Claude global, service lain, port, Docker, npm global, Penpot; `systemctl --user restart lakard` setelah build skill dan pastikan active. Folder di .git/info/exclude jangan diubah. Jangan push/merge.
 - Jangan menunggu proses background lalu mengakhiri giliran: jalankan perintah panjang (practice) di foreground dengan timeout maksimal, atau background + polling sampai selesai, dalam giliran yang sama.
 
+Catatan orkestrator lanjutan 2026-11-18 (iterasi 4–6; menggantikan butir "Iterasi maks 3; anggaran ≤ $30 … Jangan iterasi ke-4" di atas, lihat Plan Change Log):
+- Iterasi maks **6**; anggaran kumulatif ≤ **$57,80** ($27,80 iter 1–3 + $30 baru). Sesuaikan `MAX_ITER`/`BUDGET_USD` di `bench/src/practice/main.ts` + tes. Jangan iterasi ke-7, jangan melewati anggaran (harness Abort sebelum spawn bila perkiraan melewati sisa).
+- Iterasi 4, 5, 6 semuanya `practice --iter <k> --reuse-pendev 2`. pen.dev TIDAK dijalankan, di-restart, atau disentuh (RAM VPS terbatas). Bila preflight practice menuntut pen.dev hidup walau reuse, perbaiki harness agar mode reuse tidak memerlukannya (penjaga md5 `.pen` tetap berjalan).
+- Aturan keputusan/juri v2.1 dan prompt beku (sha 582c5d11…) tidak diubah. LOG.md satu entri per iterasi (sha skill, perubahan sebagai prinsip, alasan, hasil per prompt, biaya). Commit per iterasi seperti iter 1–3.
+- Arah perbaikan skill (dari pengamatan iterasi 3; prinsip umum, bukan tambalan per prompt): foto kini andal (Wikimedia Commons, `wikimedia:<pageid>`) — skill harus membuat agen benar-benar memakai foto di tempat yang pantas (hero, kartu konten, sampul, makanan/tempat/produk); kueri konkret dan visual dalam bahasa Inggris; hindari subjek yang hasilnya buruk (potret orang spesifik/rapat kantor → pilih tempat/objek/suasana, atau visual pengganti yang selesai, bukan inisial di area foto besar); maksimal ~2 pencarian, tidak mengulang pencarian gagal; warna tile/komponen lebih cerah dan bermakna (bukan kusam); cegah cacat konten terpotong/meluber (kritik diri via screenshot sebelum selesai, tetap dalam alur akhir yang ringkas). `core.md` sudah 3996/4000 token: pindahkan detail ke landing.md/mobile.md atau padatkan. C7: skill tidak memuat rubrik, prompt A/B, atau teks prompt latihan; tes penjaga harus lulus.
+- RAM terbatas: jangan jalankan vitest/Chromium bersamaan dengan run practice; matikan proses sementara segera. Node selalu `/opt/node-26/bin` absolut. `systemctl --user restart lakard` setelah build skill dan pastikan active. `bash tools/node26/verify.sh` exit 0 (PATH bawaan).
+- Run practice panjang: jalankan foreground dengan timeout maksimal atau background + polling sampai selesai dalam giliran yang sama; jangan pernah mengakhiri giliran untuk menunggu.
+- Iterasi 6 belum lulus → berhenti, tulis status di LOG, laporkan (orkestrator HALT `blocked`).
+
 ## Plan Change Log
+
+- 2026-11-18 — Blokir dibuka atas keputusan Adam (setelah HALT `blocked` iterasi 3, $27,80 terpakai):
+  (1) penyedia foto diganti: Wikimedia Commons kini penyedia utama (commit da36b22; plan
+  `plan-1-18-wikimedia-commons-penyedia-foto-utama.md`: ref `wikimedia:<pageid>`, pencarian ~2 dtk, relevansi baik
+  untuk makanan/tempat/produk, lemah untuk orang/kantor, rate limit rendah bila banyak pencarian beruntun);
+  (2) anggaran tambahan ≤ $30 untuk maksimal 3 iterasi lagi (iterasi 4, 5, 6) → batas iterasi menjadi 6 dan anggaran
+  kumulatif menjadi ≤ $57,80 ($27,80 terpakai + $30); konstanta harness `MAX_ITER`/`BUDGET_USD` disesuaikan;
+  (3) pen.dev TIDAK dijalankan ulang: iterasi 4–6 semua memakai `--reuse-pendev 2` (RAM VPS terbatas).
+  Intent-contract, prompt latihan (sha 582c5d11…), dan aturan keputusan/juri v2.1 tidak diubah. Bila iterasi 6 belum
+  lulus → HALT `blocked` dengan LOG; tidak ada iterasi ke-7.
 
 ## Review Triage Log
 
