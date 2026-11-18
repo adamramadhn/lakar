@@ -83,6 +83,8 @@ describe('practice: pakai ulang pen.dev, biaya, anggaran', () => {
     const reports: Record<number, { cost: { iteration: number } }> = { 1: { cost: { iteration: 9.5 } }, 2: { cost: { iteration: 6.25 } } };
     expect(previousCosts(3, (j) => reports[j])).toEqual({ byIter: { 1: 9.5, 2: 6.25 }, total: 15.75 });
     expect(previousCosts(1, () => undefined)).toEqual({ byIter: {}, total: 0 });
+    // iterasi tanpa laporan (dihentikan) memakai biaya run tersimpan; laporan tetap didahulukan
+    expect(previousCosts(4, (j) => reports[j], (j) => (j === 3 ? 2.66 : j === 1 ? 99 : undefined))).toEqual({ byIter: { 1: 9.5, 2: 6.25, 3: 2.66 }, total: 18.41 });
     expect(budgetProblem(15.75, 7.6)).toBeUndefined();
     expect(budgetProblem(23, 7.6)).toBeUndefined();
     expect(budgetProblem(50.5, 7.6)).toMatch(/anggaran: terpakai \$50\.50 \+ perkiraan sisa \$7\.60 > \$57\.8/);

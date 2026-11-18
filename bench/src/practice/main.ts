@@ -132,11 +132,18 @@ export function estimateCost(i: { prompts: readonly string[]; reusePendev: boole
   return Math.round(usd * 100) / 100;
 }
 
-/** Biaya iterasi sebelumnya dari `bench/practice-<j>.json` (j < k); laporan yang tidak ada dilewati. */
-export function previousCosts(iter: number, read: (j: number) => { cost?: { iteration?: number } } | undefined): { byIter: Record<number, number>; total: number } {
+/**
+ * Biaya iterasi sebelumnya dari `bench/practice-<j>.json` (j < k). Iterasi tanpa laporan (mis. dihentikan sebelum juri)
+ * memakai `fallback(j)` = jumlah biaya run/juri yang tersimpan; tanpa keduanya iterasi dilewati.
+ */
+export function previousCosts(
+  iter: number,
+  read: (j: number) => { cost?: { iteration?: number } } | undefined,
+  fallback: (j: number) => number | undefined = () => undefined,
+): { byIter: Record<number, number>; total: number } {
   const byIter: Record<number, number> = {};
   for (let j = 1; j < iter; j++) {
-    const c = read(j)?.cost?.iteration;
+    const c = read(j)?.cost?.iteration ?? fallback(j);
     if (typeof c === 'number') byIter[j] = c;
   }
   return { byIter, total: Object.values(byIter).reduce((s, x) => s + x, 0) };
@@ -402,6 +409,25 @@ export function preparePracticeJudgeTexts(protocol: Protocol, prompts: readonly 
   return out;
 }
 
+/** Jumlah biaya run (`<P>-<alat>/run.json`) + juri (`judge/<P>/rep-k/rep.json`) yang tersimpan di satu iterasi; tanpa apa pun → undefined. */
+function storedIterationCost(dir: string): number | undefined {
+  if (!existsSync(dir)) return undefined;
+  let usd = 0;
+  let found = false;
+  for (const d of readdirSync(dir)) {
+    const rec = readJson<StoredRun>(runRecordPath(join(dir, d)));
+    if (typeof rec?.costUsd === 'number') ((usd += rec.costUsd), (found = true));
+  }
+  const judgeDir = join(dir, 'judge');
+  if (existsSync(judgeDir))
+    for (const p of readdirSync(judgeDir))
+      for (const k of [1, 2, 3]) {
+        const rep = readJson<JudgeRepRecord>(join(judgeDir, p, `rep-${k}`, 'rep.json'));
+        if (typeof rep?.costUsd === 'number') ((usd += rep.costUsd), (found = true));
+      }
+  return found ? Math.round(usd * 100) / 100 : undefined;
+}
+
 function readJson<T>(f: string): T | undefined {
   return existsSync(f) ? (JSON.parse(readFileSync(f, 'utf8')) as T) : undefined;
 }
@@ -472,7 +498,7 @@ export async function practiceMain(argv: string[]): Promise<number> {
   }
 
   // Biaya: iterasi sebelumnya + yang sudah terpakai di iterasi ini (resume) + perkiraan sisa ≤ anggaran.
-  const prev = previousCosts(iter, (j) => readJson(join(BENCH_ROOT, `practice-${j}.json`)));
+  const prev = previousCosts(iter, (j) => readJson(join(BENCH_ROOT, `practice-${j}.json`)), (j) => storedIterationCost(join(PRACTICE_RUNS, String(j))));
   const doneRuns = new Set<string>();
   let spentHere = 0;
   for (const p of prompts)
