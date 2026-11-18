@@ -68,3 +68,24 @@ export interface IconCatalogPort<Lib extends string = string, Glyph = unknown> {
   /** Data gambar ikon, atau undefined bila tidak dikenal. */
   glyph(lib: Lib, icon: string): Glyph | undefined;
 }
+
+/** Foto stok yang sudah diimpor ke store aset (AD-10): dipakai fungsi snippet `photo(ref)`. */
+export type PhotoInfo = {
+  /** sha256 aset di store (dipakai di fill `{type:'image', assetId, fit}`). */
+  assetId: string;
+  width: number;
+  height: number;
+  /** Baris kredit siap pakai. */
+  credit: string;
+  license: string;
+  creator: string;
+  sourcePageUrl: string;
+};
+
+/**
+ * Pustaka foto terimpor (sinkron; AD-7). Adaptor: `PhotoService` daemon, yang mengimpor ref literal snippet
+ * sebelum snippet berjalan. Ref belum diimpor → undefined.
+ */
+export interface PhotoLibraryPort {
+  resolve(ref: string): PhotoInfo | undefined;
+}

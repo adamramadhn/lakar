@@ -1,5 +1,5 @@
-// Server MCP Lakar: 10 tool v1 (AD-11) → HTTP lakard: status, read_skill, open_doc, list_boards, execute,
-// inspect, layout_check, screenshot, export, icon_search.
+// Server MCP Lakar: 11 tool (AD-11 + photo_search) → HTTP lakard: status, read_skill, open_doc, list_boards, execute,
+// inspect, layout_check, screenshot, export, icon_search, photo_search.
 import { McpServer, type CallToolResult } from '@modelcontextprotocol/server';
 import { z } from 'zod';
 import { LAKAR_VERSION, SCHEMA_VERSION, VERSION_HINT, errorMessage, findingLine, summaryText, type ApiResult, type Finding, type FindingSummary } from '@lakar/schema';
@@ -69,6 +69,7 @@ export type StatusData = {
   pool?: { size: number; ready: number; busy: number; waiting: number; recreated: number; browserVersion?: string; lastError?: string } | null;
   fonts?: { families: string[]; missing: string[] };
   icons?: Record<string, string>;
+  photos?: { provider: string; keyFile: string; imported: number };
   sessions?: { count: number; active: { id: string; activeSlug?: string; executes: number }[] };
 };
 
@@ -87,16 +88,18 @@ export function formatStatus(st: StatusData): string {
     : 'pool: -';
   const fonts = st.fonts ? `font: ${st.fonts.families.length} keluarga, hilang: ${st.fonts.missing.length ? st.fonts.missing.join(', ') : '-'}` : 'font: -';
   const icons = st.icons ? `ikon: ${Object.entries(st.icons).map(([lib, v]) => `${lib} ${v}`).join(', ')}` : 'ikon: -';
+  const photos = st.photos ? `foto: ${st.photos.provider} (file key ${st.photos.keyFile}), terimpor ${st.photos.imported}` : 'foto: -';
   const ss = st.sessions;
   const sessions = ss
     ? `sesi: ${ss.count}${ss.active.length ? ` (${ss.active.map((a) => `${a.id} ${a.activeSlug ?? '-'}, ${a.executes} execute`).join('; ')})` : ''}`
     : 'sesi: -';
-  return [head, pool, fonts, icons, sessions].join('\n');
+  return [head, pool, fonts, icons, photos, sessions].join('\n');
 }
 
 /** Deskripsi tool `status`. */
 export const STATUS_DESCRIPTION =
-  'Status lakard: versi daemon dan mcp (cocok/tidak), pool render (halaman siap/sibuk/antre, dibuat ulang), font hilang, versi ikon, sesi aktif. ' +
+  'Status lakard: versi daemon dan mcp (cocok/tidak), pool render (halaman siap/sibuk/antre, dibuat ulang), font hilang, versi ikon, ' +
+  'penyedia foto stok (pexels/openverse, status file key, jumlah foto terimpor), sesi aktif. ' +
   'Tetap bekerja walau versi tidak cocok. Daemon mati → error berisi cara menjalankan service (systemctl --user start lakard).';
 
 /** Deskripsi tool `read_skill`. */
@@ -157,6 +160,8 @@ export const EXECUTE_DESCRIPTION =
   'NodeView = properti tersimpan (token apa adanya) + parentId, path, childIds (hanya-baca: jangan kirim balik ke update/add); ' +
   'place(w, h, {near?, gap?}) → {x,y} posisi board baru yang tidak tumpang tindih (gap default 80); ' +
   "iconSearch(query, {lib?:'lucide'|'simple-icons', limit?}) → [{lib, icon, tags?, title?, aliasOf?}] cari ikon (default 10, maks 50; sama dengan tool icon_search). " +
+  "photo('<ref>') → {assetId, width, height, credit, license, creator, sourcePageUrl} foto stok untuk ref dari tool photo_search; tulis ref sebagai literal string " +
+  "(daemon mengunduhnya sekali ke aset lokal sebelum snippet berjalan; ref dari variabel → NOT_FOUND), pakai di fills [{type:'image', assetId:p.assetId, fit:'cover'}]. " +
   'keep: objek JSON per sesi yang bertahan antar-execute bila sukses (mis. keep.hero = add(...); lalu get(keep.hero)). ' +
   'console.log(...) → data.logs. Nilai ekspresi terakhir → data.value (JSON; dipotong di 32 KB dengan valueTruncated). ' +
   "Katalog node v1 (tertutup): board (parent null) {type:'board', name, x, y, width, height, screen:'landing'|'app'|'mobile', expectedSize?:{width,height}, fills?}; " +
@@ -189,6 +194,21 @@ export const ICON_SEARCH_DESCRIPTION =
   'Mengembalikan {query, results:[{lib, icon, tags?, title?, aliasOf?}]} urut relevansi: nama persis > awalan nama/alias > token nama > tag persis > tag sebagian (default 10, maks 50). ' +
   "Pakai lib + icon hasilnya apa adanya: add(b, {type:'icon', lib, icon, size}). icon = nama kanonik; alias (aliasOf ada) juga diterima dan otomatis disimpan sebagai nama kanonik. " +
   'Di dalam snippet execute, fungsi yang sama tersedia sebagai iconSearch(query, {lib?, limit?}).';
+
+/** Maks thumbnail (image content) di hasil `photo_search`. */
+export const PHOTO_THUMBNAILS_MAX = 6;
+
+/** Deskripsi tool `photo_search`. */
+export const PHOTO_SEARCH_DESCRIPTION =
+  'Cari foto stok nyata untuk gambar di desain (sampul, kartu, hero, avatar tempat). Photos provided by Pexels; tanpa key Pexels, ' +
+  'cadangan Openverse (hanya CC0, Public Domain Mark, CC BY dari Flickr/Wikimedia). ' +
+  'Mengembalikan teks JSON {provider, fallbackReason?, query, results:[{ref, width, height, alt, avgColor?, creator, license, sourcePageUrl, credit}], previews} ' +
+  `lalu thumbnail pratinjau (maks ${PHOTO_THUMBNAILS_MAX} gambar; previews:[ref] di JSON = urutan gambar). ` +
+  "Pakai di execute: const p = photo('<ref>'); lalu fills:[{type:'image', assetId:p.assetId, fit:'cover'}] pada frame/rect bernama 'Image / …'. " +
+  'Ref ditulis literal di kode; foto diunduh sekali ke aset lokal saat execute (maks 6 foto baru per execute), render tidak memakai jaringan. ' +
+  'credit = baris kredit siap pakai (wajib dicantumkan untuk CC BY; untuk Pexels dianjurkan bila ada tempat). ' +
+  'Kata kunci boleh Indonesia atau Inggris; Openverse lebih cocok dengan kata kunci Inggris. orientation: landscape | portrait | square. ' +
+  'Tidak ada hasil → NOT_FOUND; penyedia sibuk/gagal → EXEC_ERROR (retryable) dengan hint.';
 
 export function createLakarMcpServer(daemonUrl: string): McpServer {
   const client = new DaemonClient(daemonUrl);
@@ -325,6 +345,33 @@ export function createLakarMcpServer(daemonUrl: string): McpServer {
         if (lib !== undefined) body.lib = lib;
         if (limit !== undefined) body.limit = limit;
         return asText(await client.call('/icons/search', body));
+      }),
+  );
+
+  server.registerTool(
+    'photo_search',
+    {
+      description: PHOTO_SEARCH_DESCRIPTION,
+      inputSchema: z.object({
+        query: z.string().describe('kata kunci foto, mis. "kamar hotel" atau "hotel room"'),
+        orientation: z.enum(['landscape', 'portrait', 'square']).optional().describe('orientasi foto'),
+        limit: z.number().int().optional().describe('jumlah hasil 1–12 (default 6)'),
+      }),
+    },
+    ({ query, orientation, limit }) =>
+      guarded(async () => {
+        const body: Record<string, unknown> = { query };
+        if (orientation !== undefined) body.orientation = orientation;
+        if (limit !== undefined) body.limit = limit;
+        type Thumb = { ref: string; mimeType: string; data: string };
+        const r = await client.call<{ thumbnails?: Thumb[] } & Record<string, unknown>>('/photos/search', body);
+        return asResult(r, ({ thumbnails = [], ...rest }) => {
+          const shown = thumbnails.slice(0, PHOTO_THUMBNAILS_MAX);
+          return [
+            { type: 'text', text: JSON.stringify({ ...rest, previews: shown.map((t) => t.ref) }) },
+            ...shown.map((t) => ({ type: 'image' as const, data: t.data, mimeType: t.mimeType })),
+          ];
+        });
       }),
   );
 

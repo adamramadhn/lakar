@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { Client, InMemoryTransport } from '@modelcontextprotocol/client';
 import { StdioClientTransport } from '@modelcontextprotocol/client/stdio';
 import { LAKAR_VERSION, SCHEMA_VERSION } from '@lakar/schema';
-import { PACKAGE, READ_SKILL_DESCRIPTION, SERVER_INSTRUCTIONS, SERVER_VERSION, createLakarMcpServer, formatStatus } from './index.js';
+import { PACKAGE, PHOTO_SEARCH_DESCRIPTION, READ_SKILL_DESCRIPTION, SERVER_INSTRUCTIONS, SERVER_VERSION, createLakarMcpServer, formatStatus } from './index.js';
 import { readFile } from 'node:fs/promises';
 import { chromiumInstalled, DEFAULT_BROWSERS_PATH } from '../../../tests/support/browser.ts';
 import { testLog } from '../../../tests/support/log.ts';
@@ -57,6 +57,7 @@ function fakeDaemon() {
           pool: { size: 2, ready: 2, idle: 2, busy: 0, waiting: 0, recreated: 0, peakBusy: 1, browserVersion: '140.0' },
           fonts: { families: ['Inter', 'Manrope'], missing: [] },
           icons: { lucide: '1.74.0', 'simple-icons': '16.38.0' },
+          photos: { provider: 'openverse', keyFile: 'absent', imported: 2 },
           sessions: { count: 1, active: [{ id: 'a1b2c3d4', activeSlug: 'landing-kopi', createdAt: 'x', executes: 3 }] },
         },
       });
@@ -100,6 +101,11 @@ function fakeDaemon() {
       if (!body.query) return send(400, { ok: false, error: { code: 'SCHEMA_INVALID', message: 'query: wajib', hint: 'kirim {query}', retryable: false } });
       const results = body.query === 'dumbbell' ? [{ lib: 'lucide', icon: 'dumbbell', tags: ['gym'] }] : [];
       return send(200, { ok: true, data: { query: body.query, results } });
+    }
+    if (req.url === '/photos/search') {
+      if (body.query === 'kosong') return send(404, { ok: false, error: { code: 'NOT_FOUND', message: 'tidak ada foto', hint: 'coba kata kunci lain', retryable: false } });
+      const results = Array.from({ length: 8 }, (_, i) => ({ ref: `openverse:${i}`, width: 40, height: 30, alt: 'kamar', creator: 'Budi', license: 'CC BY 2.0', sourcePageUrl: 'https://x', credit: 'kredit' }));
+      return send(200, { ok: true, data: { provider: 'openverse', fallbackReason: 'no-key', query: body.query, results, thumbnails: results.map((r) => ({ ref: r.ref, mimeType: 'image/png', data: PNG_B64 })) } });
     }
     if (req.url === '/boards') return send(200, { ok: true, data: { docId: 'Dddddddd', slug: 'a', rev: 1, boards: [{ id: 'Bbbbbbbb', name: '[WIP] Home', wip: true }] } });
     if (req.url === '/inspect') {
@@ -153,14 +159,36 @@ describe('@lakar/mcp', () => {
     expect(PACKAGE).toBe('@lakar/mcp');
   });
 
-  it('daftar tool v1 lengkap (10, AD-11); SERVER_VERSION = LAKAR_VERSION', async () => {
+  it('daftar tool lengkap (10 AD-11 + photo_search); SERVER_VERSION = LAKAR_VERSION', async () => {
     const c = await connect(url);
     const { tools } = await c.listTools();
     expect(tools.map((t) => t.name).sort()).toEqual(
-      ['execute', 'export', 'icon_search', 'inspect', 'layout_check', 'list_boards', 'open_doc', 'read_skill', 'screenshot', 'status'].sort(),
+      ['execute', 'export', 'icon_search', 'inspect', 'layout_check', 'list_boards', 'open_doc', 'photo_search', 'read_skill', 'screenshot', 'status'].sort(),
     );
     expect(SERVER_VERSION).toBe(LAKAR_VERSION);
     expect(c.getServerVersion()?.version).toBe(LAKAR_VERSION);
+  });
+
+  it('photo_search → teks JSON (tanpa data thumbnail) + maks 6 image content; argumen diteruskan; error terformat', async () => {
+    fake.seen.length = 0;
+    const c = await connect(url);
+    const r = await c.callTool({ name: 'photo_search', arguments: { query: 'kamar hotel', orientation: 'landscape', limit: 8 } });
+    expect(r.isError).toBeFalsy();
+    const content = r.content as any[];
+    expect(content[0].type).toBe('text');
+    const data = JSON.parse(content[0].text);
+    expect(data).toMatchObject({ provider: 'openverse', fallbackReason: 'no-key', query: 'kamar hotel' });
+    expect(data.results).toHaveLength(8);
+    expect(data.thumbnails).toBeUndefined();
+    expect(data.previews).toEqual(['openverse:0', 'openverse:1', 'openverse:2', 'openverse:3', 'openverse:4', 'openverse:5']);
+    expect(content.slice(1)).toHaveLength(6);
+    expect(content[1]).toEqual({ type: 'image', data: PNG_B64, mimeType: 'image/png' });
+    expect(fake.seen.find((x) => x.path === '/photos/search')!.body).toEqual({ query: 'kamar hotel', orientation: 'landscape', limit: 8 });
+    const none = await c.callTool({ name: 'photo_search', arguments: { query: 'kosong' } });
+    expect(none.isError).toBe(true);
+    expect((none.content as any)[0].text).toMatch(/^NOT_FOUND: tidak ada foto/);
+    expect(PHOTO_SEARCH_DESCRIPTION).toContain('Photos provided by Pexels');
+    expect(PHOTO_SEARCH_DESCRIPTION).toContain("photo('<ref>')");
   });
 
   it('instructions server: read_skill core lalu skill jenis layar, sedikit execute besar; deskripsi read_skill menyarankan urutan', async () => {
@@ -191,6 +219,7 @@ describe('@lakar/mcp', () => {
       'pool: 2 halaman · 2 siap · 0 sibuk · 0 antre · dibuat ulang 0× · chromium 140.0',
       'font: 2 keluarga, hilang: -',
       'ikon: lucide 1.74.0, simple-icons 16.38.0',
+      'foto: openverse (file key absent), terimpor 2',
       'sesi: 1 (a1b2c3d4 landing-kopi, 3 execute)',
     ]);
     expect(fake.seen.map((x) => x.path)).toEqual(['/status']);
@@ -446,7 +475,7 @@ describe('@lakar/mcp', () => {
       const r = await c2.callTool({ name: 'execute', arguments: { code: '1' } });
       expect(r.isError).toBe(true);
       expect((r.content as any)[0].text).toContain('http://127.0.0.1:1');
-      expect((await c2.listTools()).tools).toHaveLength(10);
+      expect((await c2.listTools()).tools).toHaveLength(11);
     } finally {
       await c2.close();
       await deadTransport.close();

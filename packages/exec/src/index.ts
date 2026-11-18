@@ -10,7 +10,7 @@ import {
   type QuickJSWASMModule,
 } from 'quickjs-emscripten';
 import type { Transaction } from '@lakar/core';
-import type { IconCatalogPort } from '@lakar/ports';
+import type { IconCatalogPort, PhotoLibraryPort } from '@lakar/ports';
 import { LakarError, errorMessage } from '@lakar/schema';
 import { API, DEFAULT_TIMEOUT_MS, KEEP_MAX_BYTES, LOG_MAX_BYTES, LOG_MAX_LINES, MAX_OPS, SNIPPET_GLOBALS, VALUE_MAX_BYTES, type ApiContext } from './api.js';
 
@@ -26,6 +26,8 @@ export type RunOptions = {
   keep?: Record<string, unknown>;
   /** Katalog ikon (wajib): kanonikalisasi node icon dan `iconSearch` (AD-9). */
   icons: IconCatalogPort;
+  /** Foto terimpor untuk `photo(ref)` (daemon mengimpor ref literal sebelum snippet). Tidak ada → `photo()` NOT_FOUND. */
+  photos?: PhotoLibraryPort;
 };
 export type RunSuccess = {
   ok: true;
@@ -238,6 +240,7 @@ export async function runSnippet(code: string, tx: Transaction, opts: RunOptions
     tx,
     view: () => tx.view(),
     icons: opts.icons,
+    ...(opts.photos ? { photos: opts.photos } : {}),
     countOp() {
       ops++;
       if (ops > MAX_OPS) {

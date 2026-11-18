@@ -39,6 +39,14 @@ export async function readRenderModule(file: string): Promise<string | undefined
   return readFile(join(RENDER_DIST_DIR, file), 'utf8').catch(() => undefined);
 }
 
+/**
+ * Arg khusus browser daemon (di luar `CHROMIUM_ARGS` render): resolver Chromium hanya mengenal loopback, jadi nama host
+ * luar tidak pernah ter-resolve dari halaman render (foto, font, dll. hanya dari daemon di 127.0.0.1, AD-10). URL ber-IP
+ * literal tidak melewati resolver; isolasi untuk itu datang dari skema dokumen (fill gambar hanya `assetId` sha256 lokal,
+ * tanpa field URL), bukan dari arg ini.
+ */
+export const DAEMON_BROWSER_ARGS = ['--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE 127.0.0.1, EXCLUDE localhost'] as const;
+
 const ASSET_HINT = 'assetId adalah sha256 file gambar di store aset daemon; impor gambar dulu (aset harus ada di store)';
 
 export type ChromiumOptions = {
@@ -70,7 +78,7 @@ export class ChromiumRenderer implements RenderPort<ResolvedDocument> {
         // C9 (a): browser Lakar di cache khusus Lakar. Wajib di-set sebelum playwright-core dimuat.
         process.env.PLAYWRIGHT_BROWSERS_PATH = this.#opts.browsersPath;
         const { chromium } = await import('playwright-core');
-        return chromium.launch({ headless: true, timeout: this.#opts.timeoutMs, args: [...CHROMIUM_ARGS] });
+        return chromium.launch({ headless: true, timeout: this.#opts.timeoutMs, args: [...CHROMIUM_ARGS, ...DAEMON_BROWSER_ARGS] });
       },
       openPage: async (browser: Browser, dpr) => {
         const page = await browser.newPage({ deviceScaleFactor: dpr });

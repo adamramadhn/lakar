@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { existsSync, readdirSync } from 'node:fs';
-import { mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
+import { chmod, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createServer } from 'node:net';
@@ -8,13 +8,14 @@ import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { crc32, deflateSync } from 'node:zlib';
 import { fileURLToPath } from 'node:url';
-import { ChromiumRenderer, FontRegistry, IconCatalog, PACKAGE, RENDER_DIST_DIR, buildServer, loadConfig, startDaemon, type RunningDaemon } from './index.js';
+import { ChromiumRenderer, FontRegistry, IconCatalog, PACKAGE, PhotoService, RENDER_DIST_DIR, SafeNet, buildServer, loadConfig, startDaemon, type RunningDaemon } from './index.js';
 import { API } from '@lakar/exec';
 import { LakarError } from '@lakar/schema';
 import { countDarkPixels, decodePng, readPngSize } from './png.js';
 import { chromiumInstalled } from '../../../tests/support/browser.ts';
 import { postJson } from '../../../tests/support/http.ts';
 import { testLog } from '../../../tests/support/log.ts';
+import { startFakeProviders, type FakeProviders } from '../../../tests/support/photos.ts';
 
 const TRACER = `const b=add(null,{type:'board',name:'Tracer',x:0,y:0,width:390,height:844,screen:'mobile'}); add(b,{type:'text',name:'Judul',content:'Halo dari Lakar',size:32})`;
 
@@ -35,6 +36,8 @@ type Res = { status: number; body: { ok: boolean; data?: any; error?: { code: st
 
 let d: RunningDaemon;
 let dataDir: string;
+/** Penyedia foto palsu lokal: contoh API `photo` tanpa jaringan. */
+let fakePhotos: FakeProviders;
 
 /** Label riwayat default untuk /execute di tes yang tidak menguji description (kunci `description` ada → tidak diisi). */
 const DESC = 'langkah uji daemon lakar';
@@ -46,10 +49,16 @@ const newSession = async () => (await call('/sessions', {})).body.data.sessionId
 
 beforeAll(async () => {
   dataDir = await mkdtemp(join(tmpdir(), 'lakar-daemon-test-'));
-  d = await startDaemon({ ...baseConfig, port: 0, dataDir, browsersPath });
+  fakePhotos = await startFakeProviders();
+  const keyFile = join(dataDir, 'pexels-api-key');
+  await writeFile(keyFile, 'TESTKEYdaemon0000000000\n');
+  await chmod(keyFile, 0o600);
+  const photos = new PhotoService({ dataDir, keyFile, net: new SafeNet(fakePhotos.netOptions()) });
+  d = await startDaemon({ ...baseConfig, port: 0, dataDir, browsersPath, pexelsKeyFile: keyFile }, { photos });
 });
 afterAll(async () => {
   await d?.close();
+  await fakePhotos?.close();
   await rm(dataDir, { recursive: true, force: true });
 });
 

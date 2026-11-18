@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { beginTransaction, createDocument } from '@lakar/core';
-import type { IconCatalogPort } from '@lakar/ports';
+import type { IconCatalogPort, PhotoInfo, PhotoLibraryPort } from '@lakar/ports';
 import { LakarDocument, LakarError, resolveTokens, type LakarDocument as Doc } from '@lakar/schema';
-import { API, API_GLOBALS, MAX_OPS, PACKAGE, runSnippet as runSnippetRaw, type RunOptions, type RunResult } from './index.js';
+import { API, API_GLOBALS, MAX_OPS, PACKAGE, photoRefsInCode, runSnippet as runSnippetRaw, type RunOptions, type RunResult } from './index.js';
 
 /** Katalog ikon palsu kecil (struktural); katalog asli dites di @lakar/icons dan daemon. */
 const FAKE_LIBS: Record<string, { version: string; icons: Record<string, string[]>; aliases: Record<string, string> }> = {
@@ -36,7 +36,25 @@ const fakeIcons: IconCatalogPort & { searches: unknown[] } = {
   },
   glyph: () => undefined,
 };
-const runSnippet = (code: string, tx: Parameters<typeof runSnippetRaw>[1], opts: Partial<RunOptions> = {}) => runSnippetRaw(code, tx, { icons: fakeIcons, ...opts });
+/** Pustaka foto palsu: satu foto terimpor (ref contoh api.md). */
+const FAKE_PHOTO: PhotoInfo = {
+  assetId: 'a'.repeat(64),
+  width: 2880,
+  height: 1920,
+  credit: 'Foto: Contoh Fotografer / Pexels',
+  license: 'Pexels License',
+  creator: 'Contoh Fotografer',
+  sourcePageUrl: 'https://www.pexels.com/photo/2014422/',
+};
+const fakePhotos: PhotoLibraryPort & { asked: string[] } = {
+  asked: [],
+  resolve(ref) {
+    this.asked.push(ref);
+    return ref === 'pexels:2014422' ? { ...FAKE_PHOTO } : undefined;
+  },
+};
+const runSnippet = (code: string, tx: Parameters<typeof runSnippetRaw>[1], opts: Partial<RunOptions> = {}) =>
+  runSnippetRaw(code, tx, { icons: fakeIcons, photos: fakePhotos, ...opts });
 
 const tracer = `const b=add(null,{type:'board',name:'Tracer',x:0,y:0,width:390,height:844,screen:'mobile'}); add(b,{type:'text',name:'Judul',content:'Halo dari Lakar',size:32})`;
 const BOARD = (name = 'B', x = 0, w = 390, h = 844) => `add(null,{type:'board',name:'${name}',x:${x},y:0,width:${w},height:${h},screen:'mobile'})`;
@@ -60,7 +78,7 @@ async function commitRun(code: string, doc: Doc = createDocument()) {
 describe('@lakar/exec', () => {
   it('mengekspor nama paket dan permukaan API lengkap (AD-7)', () => {
     expect(PACKAGE).toBe('@lakar/exec');
-    expect(Object.keys(API)).toEqual(['add', 'update', 'replace', 'move', 'duplicate', 'remove', 'setTokens', 'get', 'find', 'children', 'place', 'iconSearch']);
+    expect(Object.keys(API)).toEqual(['add', 'update', 'replace', 'move', 'duplicate', 'remove', 'setTokens', 'get', 'find', 'children', 'place', 'iconSearch', 'photo']);
     for (const [name, fn] of Object.entries(API)) {
       expect(fn.signature.startsWith(`${name}(`), name).toBe(true);
       expect(fn.doc.length, name).toBeGreaterThan(20);
@@ -278,7 +296,7 @@ describe('@lakar/exec', () => {
       const ts = errRun(await runSnippet('const a = 1;\nconst b: number = 2', txFor()));
       expect(ts.message).toMatch(/^baris 2:\d+: SyntaxError/);
       const ref = errRun(await runSnippet('fetch("x")', txFor()));
-      expect(ref.hint).toContain('add, update, replace, move, duplicate, remove, setTokens, get, find, children, place, iconSearch, keep, console.log');
+      expect(ref.hint).toContain('add, update, replace, move, duplicate, remove, setTokens, get, find, children, place, iconSearch, photo, keep, console.log');
     });
 
     it('error host yang ditangkap snippet tidak membatalkan transaksi; e.code tersedia', async () => {
@@ -405,5 +423,30 @@ describe('@lakar/exec', () => {
       }
     });
   });
-});
 
+  describe('photo (foto stok terimpor)', () => {
+    it('ref terimpor → info foto; dipakai di fill image', async () => {
+      const { r, c } = await commitRun(`const b=${BOARD()}; const p = photo('pexels:2014422'); add(b, {type:'rect', name:'Image / Kamar', width:200, height:120, fills:[{type:'image', assetId:p.assetId, fit:'cover'}]}); p`);
+      expect(r.value).toEqual(FAKE_PHOTO);
+      const rect = c.doc.pages[0]!.children[0]!.children[0] as { fills: unknown[] };
+      expect(rect.fills).toEqual([{ type: 'image', assetId: FAKE_PHOTO.assetId, fit: 'cover' }]);
+    });
+
+    it('ref belum diimpor → NOT_FOUND + hint literal; format salah → SCHEMA_INVALID; tanpa port → NOT_FOUND', async () => {
+      const e = errRun(await runSnippet(`const x = 'pexels:' + '99'; photo(x)`, txFor()));
+      expect(e.code).toBe('NOT_FOUND');
+      expect(e.hint).toMatch(/literal/);
+      for (const bad of [`photo('foo')`, `photo(42)`, `photo('https://images.pexels.com/x.jpg')`, `photo('unsplash:abc')`, `photo()`]) {
+        expect(errRun(await runSnippet(bad, txFor())).code, bad).toBe('SCHEMA_INVALID');
+      }
+      expect(errRun(await runSnippetRaw(`photo('pexels:2014422')`, txFor(), { icons: fakeIcons })).code).toBe('NOT_FOUND');
+    });
+
+    it('photoRefsInCode: hanya literal pexels/openverse, unik, urutan muncul', () => {
+      const uuid = '0a1b2c3d-4e5f-6789-abcd-ef0123456789';
+      const code = `const a = photo('pexels:2014422');\nconst b = photo( "openverse:${uuid}" );\nphoto('pexels:2014422'); photo(x); photo('foo'); photo(\`pexels:1\`); photo('pexels:12")`;
+      expect(photoRefsInCode(code)).toEqual(['pexels:2014422', `openverse:${uuid}`]);
+      expect(photoRefsInCode('add(b, {})')).toEqual([]);
+    });
+  });
+});

@@ -3,13 +3,14 @@
 // blok `// pakai prelude` didahului blok prelude core.md; blok api.md masing-masing di dokumen kosong baru.
 // LAKAR_SKILL_PNG_DIR=<dir> → PNG setiap board contoh ditulis ke sana untuk pemeriksaan visual.
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { SKILL_NAMES, SKILLS_DIR, splitCode, type SkillName } from '@lakar/skills';
-import { loadConfig, startDaemon, type RunningDaemon } from './index.js';
+import { PhotoService, SafeNet, loadConfig, startDaemon, type RunningDaemon } from './index.js';
 import { chromiumInstalled } from '../../../tests/support/browser.ts';
 import { postJson } from '../../../tests/support/http.ts';
+import { startFakeProviders, type FakeProviders } from '../../../tests/support/photos.ts';
 
 const baseConfig = loadConfig({});
 const browsersPath = process.env.LAKAR_BROWSERS_PATH || baseConfig.browsersPath;
@@ -26,6 +27,8 @@ type Body = { ok: boolean; data?: any; error?: { code: string; message: string; 
 
 let d: RunningDaemon;
 let dataDir: string;
+/** Contoh `photo('<ref>')` di skill diimpor dari penyedia palsu lokal (tes tanpa jaringan). */
+let fake: FakeProviders;
 
 const call = async (path: string, body: unknown, session?: string): Promise<Body> => (await postJson(d.url, path, body, session)).body;
 
@@ -69,7 +72,12 @@ describe.skipIf(!browserInstalled)('contoh skill dijalankan terhadap daemon nyat
 
   beforeAll(async () => {
     dataDir = await mkdtemp(join(tmpdir(), 'lakar-skills-examples-'));
-    d = await startDaemon({ ...baseConfig, port: 0, dataDir, browsersPath });
+    fake = await startFakeProviders();
+    const keyFile = join(dataDir, 'pexels-api-key');
+    await writeFile(keyFile, 'TESTKEYskillexamples000\n');
+    await chmod(keyFile, 0o600);
+    const photos = new PhotoService({ dataDir, keyFile, net: new SafeNet(fake.netOptions()) });
+    d = await startDaemon({ ...baseConfig, port: 0, dataDir, browsersPath, pexelsKeyFile: keyFile }, { photos });
     await d.warmed;
     const preludes = (await jsBlocks('core')).filter((c) => c.startsWith(PRELUDE_MARK));
     expect(preludes).toHaveLength(1);
@@ -78,6 +86,7 @@ describe.skipIf(!browserInstalled)('contoh skill dijalankan terhadap daemon nyat
 
   afterAll(async () => {
     await d?.close();
+    await fake?.close();
     if (dataDir) await rm(dataDir, { recursive: true, force: true });
   });
 

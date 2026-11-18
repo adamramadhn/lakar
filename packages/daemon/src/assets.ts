@@ -1,6 +1,7 @@
 // Store aset gambar daemon: `<dataDir>/assets/<sha256>` (tanpa ekstensi). Hanya raster PNG/JPEG/WebP/GIF
 // (dikenali dari magic bytes) yang disajikan; SVG/HTML/lainnya tidak pernah disajikan sebagai aset.
-import { readFile } from 'node:fs/promises';
+import { createHash, randomBytes } from 'node:crypto';
+import { chmod, mkdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { ASSET_ID_PATTERN } from '@lakar/schema';
 
@@ -22,4 +23,124 @@ export async function readAsset(dataDir: string, hash: string): Promise<{ type: 
   if (!body) return undefined;
   const type = rasterType(body);
   return type ? { type, body } : undefined;
+}
+
+/** Tulis file secara atomik (tmp di direktori yang sama + rename), mode 644. */
+export async function writeFileAtomic(path: string, data: Uint8Array | string): Promise<void> {
+  const tmp = `${path}.${randomBytes(4).toString('hex')}.tmp`;
+  try {
+    await writeFile(tmp, data, { mode: 0o644 });
+    await chmod(tmp, 0o644);
+    await rename(tmp, path);
+  } catch (e) {
+    await rm(tmp, { force: true }).catch(() => {});
+    throw e;
+  }
+}
+
+/**
+ * Simpan raster `bytes` ke `<dataDir>/assets/<sha256>` (atomik, mode 644). Bukan raster → Error. sha yang sudah
+ * ada tidak ditulis ulang. Mengembalikan sha + MIME.
+ */
+export async function writeAsset(dataDir: string, bytes: Uint8Array): Promise<{ sha: string; mime: string }> {
+  const mime = rasterType(bytes);
+  if (!mime) throw new Error('bukan gambar raster PNG/JPEG/WebP/GIF');
+  const sha = createHash('sha256').update(bytes).digest('hex');
+  const dir = join(dataDir, 'assets');
+  const path = join(dir, sha);
+  const exists = await stat(path).then(
+    (s) => s.isFile() && s.size === bytes.byteLength,
+    () => false,
+  );
+  if (!exists) {
+    await mkdir(dir, { recursive: true });
+    await writeFileAtomic(path, bytes);
+  }
+  return { sha, mime };
+}
+
+/** Metadata sidecar aset foto `<dataDir>/assets/meta/<sha>.json`. */
+export type AssetMeta = {
+  ref: string;
+  provider: string;
+  sourcePageUrl: string;
+  downloadUrl: string;
+  creator: string;
+  creatorUrl?: string;
+  license: string;
+  licenseUrl?: string;
+  attribution: string;
+  width: number;
+  height: number;
+  bytes: number;
+  mime: string;
+  importedAt: string;
+};
+
+export const assetMetaPath = (dataDir: string, sha: string) => join(dataDir, 'assets', 'meta', `${sha}.json`);
+
+/** Tulis metadata sidecar (atomik). */
+export async function writeAssetMeta(dataDir: string, sha: string, meta: AssetMeta): Promise<string> {
+  if (!ASSET_ID_PATTERN.test(sha)) throw new Error('sha aset tidak valid');
+  await mkdir(join(dataDir, 'assets', 'meta'), { recursive: true });
+  const path = assetMetaPath(dataDir, sha);
+  await writeFileAtomic(path, `${JSON.stringify(meta, null, 2)}\n`);
+  return path;
+}
+
+/** Baca metadata sidecar aset, atau undefined (hash tidak valid / tidak ada / rusak). */
+export async function readAssetMeta(dataDir: string, sha: string): Promise<AssetMeta | undefined> {
+  if (!ASSET_ID_PATTERN.test(sha)) return undefined;
+  try {
+    return JSON.parse(await readFile(assetMetaPath(dataDir, sha), 'utf8')) as AssetMeta;
+  } catch {
+    return undefined;
+  }
+}
+
+/** Ukuran piksel raster dari header (PNG/GIF/JPEG/WebP), atau undefined. */
+export function imageSize(buf: Uint8Array): { width: number; height: number } | undefined {
+  const type = rasterType(buf);
+  const dv = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
+  const ok = (w: number, h: number) => (w > 0 && h > 0 ? { width: w, height: h } : undefined);
+  try {
+    if (type === 'image/png') return buf.length >= 24 ? ok(dv.getUint32(16), dv.getUint32(20)) : undefined;
+    if (type === 'image/gif') return buf.length >= 10 ? ok(dv.getUint16(6, true), dv.getUint16(8, true)) : undefined;
+    if (type === 'image/webp') {
+      const chunk = String.fromCharCode(...buf.subarray(12, 16));
+      if (chunk === 'VP8X' && buf.length >= 30) return ok(1 + (buf[24]! | (buf[25]! << 8) | (buf[26]! << 16)), 1 + (buf[27]! | (buf[28]! << 8) | (buf[29]! << 16)));
+      if (chunk === 'VP8 ' && buf.length >= 30) return ok(dv.getUint16(26, true) & 0x3fff, dv.getUint16(28, true) & 0x3fff);
+      if (chunk === 'VP8L' && buf.length >= 25) {
+        const b = dv.getUint32(21, true);
+        return ok((b & 0x3fff) + 1, ((b >> 14) & 0x3fff) + 1);
+      }
+      return undefined;
+    }
+    if (type === 'image/jpeg') {
+      let i = 2;
+      while (i + 9 < buf.length) {
+        if (buf[i] !== 0xff) {
+          i++;
+          continue;
+        }
+        const marker = buf[i + 1]!;
+        if (marker === 0xff) {
+          i++;
+          continue;
+        }
+        if (marker === 0xd8 || marker === 0x01 || (marker >= 0xd0 && marker <= 0xd7)) {
+          i += 2;
+          continue;
+        }
+        const len = dv.getUint16(i + 2);
+        // SOF0..SOF15 kecuali DHT (C4), JPG (C8), DAC (CC).
+        if (marker >= 0xc0 && marker <= 0xcf && marker !== 0xc4 && marker !== 0xc8 && marker !== 0xcc) return ok(dv.getUint16(i + 7), dv.getUint16(i + 5));
+        if (marker === 0xda || marker === 0xd9) return undefined;
+        i += 2 + len;
+      }
+    }
+  } catch {
+    return undefined;
+  }
+  return undefined;
 }

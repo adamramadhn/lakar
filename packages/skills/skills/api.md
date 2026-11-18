@@ -185,6 +185,23 @@ const [m] = iconSearch('dumbbell', {lib:'lucide', limit:3});
 add(b, {type:'icon', lib:m.lib, icon:m.icon, size:24});
 ```
 
+### photo
+
+`photo(ref: string): {assetId, width, height, credit, license, creator, sourcePageUrl}`
+
+Foto stok untuk ref dari tool photo_search (mis. 'pexels:2014422' atau 'openverse:<uuid>'). Tulis ref sebagai literal string di kode (photo('pexels:2014422')), bukan variabel: daemon mengunduhnya sekali ke store aset lokal sebelum snippet berjalan, lalu render hanya memakai file lokal. Pakai assetId di fill {type:'image', assetId, fit:'cover'} pada frame/rect bernama 'Image / …'; width/height = ukuran piksel asli; credit = baris kredit siap pakai (cantumkan bila lisensi meminta atribusi, mis. CC BY).
+
+- Mengembalikan: {assetId, width, height, credit, license, creator, sourcePageUrl}
+- Error: NOT_FOUND, SCHEMA_INVALID
+
+```js
+const b = add(null, {type:'board', name:'Beranda', x:0, y:0, width:390, height:844, screen:'mobile'});
+const p = photo('pexels:2014422');
+const k = add(b, {type:'frame', name:'Kartu', layout:'column', gap:8, padding:16, width:'fill'});
+add(k, {type:'rect', name:'Image / Kamar', width:'fill', height:200, radius:12, fills:[{type:'image', assetId:p.assetId, fit:'cover'}]});
+add(k, {type:'text', name:'Kredit', content:p.credit, size:12, lineHeight:16, color:'#667085'});
+```
+
 ## Global lain
 
 - `keep: Record<string, any>`: Objek JSON per sesi yang bertahan antar-execute (mis. keep.hero = add(...); lalu get(keep.hero) di panggilan berikutnya). Disimpan hanya bila execute sukses; maks 64 KB.
@@ -268,7 +285,7 @@ add(b, {type:'frame', name:'Kartu terangkat', width:200, height:120, radius:12, 
 
 ## Kode error
 
-- SCHEMA_INVALID: properti/kunci/nilai salah (pesan menyebut path). NOT_FOUND: ID/dokumen/aset/skill tidak ada. CONFLICT: perubahan bersamaan (dicadangkan).
+- SCHEMA_INVALID: properti/kunci/nilai salah (pesan menyebut path). NOT_FOUND: ID/dokumen/aset/skill/foto tidak ada. CONFLICT: perubahan bersamaan (dicadangkan).
 - NO_ACTIVE_DOC: panggil open_doc dulu. EXEC_TIMEOUT: snippet > 2 detik. EXEC_ERROR: error JavaScript atau > 5000 op.
 - ICON_UNKNOWN: nama ikon tidak ada (+3 saran). TOKEN_UNKNOWN: token belum di-setTokens. FONT_MISSING: keluarga/weight tidak terdaftar atau karakter di luar latin/latin-ext (ganti dengan node icon).
 - RENDER_FAILED (retryable): render gagal, coba lagi. EXPORT_FAILED: PNG gagal ditulis. VERSION_MISMATCH: versi mcp ≠ lakard (restart service).

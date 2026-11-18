@@ -2,7 +2,7 @@
 import Fastify, { type FastifyInstance, type FastifyReply } from 'fastify';
 import { changedNodeIds, touchedBoards, boundsOf, glyphScan } from '@lakar/check';
 import { DocumentLocks, createDocument, transact } from '@lakar/core';
-import { runSnippet } from '@lakar/exec';
+import { photoRefsInCode, runSnippet } from '@lakar/exec';
 import { IconCatalog } from '@lakar/icons';
 import type { IconCatalogPort, RenderPort } from '@lakar/ports';
 import { iconRefs } from '@lakar/render';
@@ -31,6 +31,7 @@ import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { randomBytes } from 'node:crypto';
 import { readAsset } from './assets.js';
+import { PhotoService, SEARCH_LIMIT_MAX } from './photos/service.js';
 import { notFound } from './errors.js';
 import { runCheck } from './check.js';
 import { readRenderModule, RENDER_PAGE_HTML } from './chromium.js';
@@ -129,6 +130,15 @@ const IconSearchBody = z
     limit: z.number().int().min(1).max(ICON_SEARCH_MAX_LIMIT).optional(),
   })
   .strict();
+const PhotoSearchBody = z
+  .object({
+    query: z.string().trim().min(1, 'query wajib (string tidak kosong)').max(100, 'query maks 100 karakter'),
+    orientation: z.enum(['landscape', 'portrait', 'square']).optional(),
+    limit: z.number().int().min(1).max(SEARCH_LIMIT_MAX).optional(),
+    preview: z.boolean().optional(),
+  })
+  .strict();
+const PHOTO_SEARCH_HINT = `kirim {query, orientation?, limit?, preview?}, mis. {query:'kamar hotel', orientation:'landscape'}; limit 1–${SEARCH_LIMIT_MAX} (default 6)`;
 const ICON_SEARCH_HINT = "kirim {query, lib?, limit?}, mis. {query:'dumbbell'} atau {query:'github', lib:'simple-icons'}; limit 1–50 (default 10)";
 
 export type BuildOptions = {
@@ -140,6 +150,8 @@ export type BuildOptions = {
   icons?: IconCatalogPort<string, IconGlyph>;
   /** Direktori file skill (default `SKILLS_DIR` @lakar/skills). */
   skillsDir?: string;
+  /** Layanan foto stok (default: Pexels/Openverse dengan key dari `config.pexelsKeyFile`). */
+  photos?: PhotoService;
 };
 
 export type Daemon = {
@@ -148,10 +160,18 @@ export type Daemon = {
   sessions: Sessions;
   fonts: FontRegistry;
   icons: IconCatalogPort<string, IconGlyph>;
+  photos: PhotoService;
   startedAt: string;
 };
 
-export function buildServer({ config, render, fonts = FontRegistry.load(), icons = IconCatalog.load(), skillsDir = SKILLS_DIR }: BuildOptions): Daemon {
+export function buildServer({
+  config,
+  render,
+  fonts = FontRegistry.load(),
+  icons = IconCatalog.load(),
+  skillsDir = SKILLS_DIR,
+  photos = new PhotoService({ dataDir: config.dataDir, keyFile: config.pexelsKeyFile }),
+}: BuildOptions): Daemon {
   const app = Fastify({ logger: false, bodyLimit: 1024 * 1024 });
   const startedAt = new Date();
   const store = new DocStore(config.dataDir);
@@ -222,6 +242,7 @@ export function buildServer({ config, render, fonts = FontRegistry.load(), icons
       pool: render.status?.() ?? null,
       fonts: { families: fonts.families(), missing: [...fonts.missing] },
       icons: { ...icons.versions },
+      photos: photos.status(),
       sessions: {
         count: sessions.count,
         active: sessions.recent(STATUS_SESSIONS_MAX).map((x) => ({
@@ -326,14 +347,25 @@ export function buildServer({ config, render, fonts = FontRegistry.load(), icons
     }
     const label = description!.trim();
 
-    // 3. Transaksi + snippet → commit → simpan → keep.
+    // 3. Pre-impor foto literal `photo('<ref>')` (AD-7/AD-10): jaringan hanya di sini, di luar kunci dokumen.
+    const refs = photoRefsInCode(code);
+    if (refs.length) {
+      try {
+        await photos.importRefs(refs);
+      } catch (e) {
+        if (e instanceof LakarError) throw failWith(e, docs.get(slug)!.rev);
+        throw e;
+      }
+    }
+
+    // 4. Transaksi + snippet → commit → simpan → keep.
     const data = await docLocks.run(slug, async () => {
       const doc = docs.get(slug)!;
       let committed;
       try {
         // AD-4: error tak tertangkap di snippet → lempar di dalam body → rollback penuh oleh `transact`.
         committed = await transact(doc, { sessionId: session.id, description: label }, async (tx) => {
-          const run = await runSnippet(code, tx, { timeoutMs: config.execTimeoutMs, memoryBytes: config.execMemoryBytes, keep: session.keep, icons });
+          const run = await runSnippet(code, tx, { timeoutMs: config.execTimeoutMs, memoryBytes: config.execMemoryBytes, keep: session.keep, icons, photos });
           if (!run.ok) throw run.error;
           return run;
         });
@@ -543,6 +575,19 @@ export function buildServer({ config, render, fonts = FontRegistry.load(), icons
     return ok(reply, { query: body.query, results });
   });
 
+  // Pencarian foto stok: kandidat beratribusi + thumbnail pratinjau (base64). Pakai lewat photo('<ref>') di execute.
+  app.post('/photos/search', async (req, reply) => {
+    sessions.require(req.headers[SESSION_HEADER]);
+    const body = parse(PhotoSearchBody, req.body, PHOTO_SEARCH_HINT);
+    const res = await photos.search({
+      query: body.query,
+      ...(body.orientation ? { orientation: body.orientation } : {}),
+      ...(body.limit !== undefined ? { limit: body.limit } : {}),
+      ...(body.preview !== undefined ? { preview: body.preview } : {}),
+    });
+    return ok(reply, res);
+  });
+
   // Halaman render untuk Chromium (dimuat oleh adaptor ChromiumRenderer).
   app.get('/render/page', async (_req, reply) => reply.type('text/html; charset=utf-8').send(RENDER_PAGE_HTML));
   app.get<{ Params: { file: string } }>('/render/:file', async (req, reply) => {
@@ -564,5 +609,5 @@ export function buildServer({ config, render, fonts = FontRegistry.load(), icons
     return reply.type(asset.type).header('cache-control', 'public, max-age=31536000, immutable').send(asset.body);
   });
 
-  return { app, store, sessions, fonts, icons, startedAt: startedAt.toISOString() };
+  return { app, store, sessions, fonts, icons, photos, startedAt: startedAt.toISOString() };
 }

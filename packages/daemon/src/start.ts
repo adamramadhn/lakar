@@ -5,6 +5,7 @@ import type { Page } from 'playwright-core';
 import { ChromiumRenderer } from './chromium.js';
 import type { DaemonConfig } from './config.js';
 import { FontRegistry } from './fonts.js';
+import { PhotoService } from './photos/service.js';
 import { buildServer, type Daemon } from './server.js';
 
 export type RunningDaemon = Daemon & {
@@ -19,6 +20,8 @@ export type StartOptions = {
   fonts?: FontRegistry;
   icons?: IconCatalogPort<string, IconGlyph>;
   skillsDir?: string;
+  /** Layanan foto stok (default: key dari `config.pexelsKeyFile`; tes menginjeksi jaringan palsu). */
+  photos?: PhotoService;
   /** Hook tes pool render (crash/macet deterministik). */
   onLease?: (page: Page) => Promise<void> | void;
 };
@@ -37,7 +40,8 @@ export async function startDaemon(config: DaemonConfig, opts: StartOptions = {})
     icons,
     ...(opts.onLease ? { onLease: opts.onLease } : {}),
   });
-  const daemon = buildServer({ config, render: renderer, fonts, icons, ...(opts.skillsDir ? { skillsDir: opts.skillsDir } : {}) });
+  const photos = opts.photos ?? new PhotoService({ dataDir: config.dataDir, keyFile: config.pexelsKeyFile });
+  const daemon = buildServer({ config, render: renderer, fonts, icons, photos, ...(opts.skillsDir ? { skillsDir: opts.skillsDir } : {}) });
   await daemon.app.listen({ host: config.host, port: config.port });
   const addr = daemon.app.server.address();
   if (!addr || typeof addr === 'string') throw new Error('alamat listen tidak diketahui');

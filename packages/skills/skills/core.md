@@ -99,7 +99,8 @@ Font terpasang (weight): Inter 100–900, DM Sans 100–900, Plus Jakarta Sans 2
 - IconButton 44 (desktop 40), ikon 20, radius full. Input 48, label di atas (gap 8), error = garis danger 1,5 + ikon + pesan spesifik.
 - Kartu: padding 24 (mobile 16), radius 12, border garis. Badge 24: tint aksen (alpha `1A`) + teks warna sama yang gelap, atau titik + teks. Chip 32 radius full.
 - Avatar 32/40/48 inisial di tint. Logo placeholder: wadah 32 aksen + ikon relevan + wordmark h4; tidak digambar dari path.
-- Gambar belum ada (foto, sampul, produk): blok tint aksen/netral + ikon relevan muted, bernama `Image / …`; bukan blok warna-warni.
+- Foto (sampul, kartu, hero, produk): cari dengan tool `photo_search` (kata kunci konkret; Inggris sering lebih banyak hasil), pilih dari thumbnail, lalu di execute `const p = photo('<ref>')` dengan ref ditulis literal, dan pasang `fills:[{type:'image', assetId:p.assetId, fit:'cover'}]` pada frame/rect `Image / …` berukuran tetap (radius ikut kartu). Satu `photo_search` per jenis gambar; maks 6 foto baru per execute. `p.credit` adalah baris kredit: wajib tampil untuk lisensi CC BY (teks kecil `caption` di dekat foto atau di footer), dianjurkan untuk lainnya bila ada tempat. Kredit dengan karakter di luar latin → tulis ringkas sendiri (nama + lisensi).
+- Foto tidak tersedia (tanpa hasil atau penyedia gagal setelah satu percobaan ulang): blok tint aksen/netral + ikon relevan muted, bernama `Image / …`; bukan blok warna-warni.
 
 ## Iterasi
 

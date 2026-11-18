@@ -2,7 +2,7 @@
 // (`LakarApi`) dan tabel runtime `API` (signature, doc, contoh yang dites, implementasi host).
 // Tanpa IO. Semua op baca bekerja di salinan kerja transaksi dan mengembalikan salinan.
 import { isPlainObject, type Transaction } from '@lakar/core';
-import type { IconCatalogMatch, IconCatalogPort } from '@lakar/ports';
+import type { IconCatalogMatch, IconCatalogPort, PhotoInfo, PhotoLibraryPort } from '@lakar/ports';
 import { ICON_SEARCH_DEFAULT_LIMIT, ICON_SEARCH_MAX_LIMIT, ID_PATTERN, LakarError, NODE_TYPES, type AnyNode, type ErrorCode, type LakarDocument as Doc, type NodeInput, type NodeType } from '@lakar/schema';
 
 // ---------------------------------------------------------------------------
@@ -119,6 +119,12 @@ export interface LakarApi {
    * awalan nama/alias > token nama > tag persis > tag sebagian. Pakai `lib` + `icon` hasilnya di node icon.
    */
   iconSearch(query: string, opts?: IconSearchOptions): IconSearchMatch[];
+  /**
+   * Foto stok terimpor untuk ref `photo_search` (mis. `'pexels:2014422'`). Ref harus ditulis literal di kode
+   * (`photo('pexels:2014422')`): daemon mengimpornya ke store aset sebelum snippet berjalan. Pakai `assetId` di fill
+   * `{type:'image', assetId, fit:'cover'}`; `credit` = baris kredit siap pakai.
+   */
+  photo(ref: string): PhotoInfo;
 }
 
 /** Konteks host untuk satu snippet. */
@@ -130,7 +136,23 @@ export type ApiContext = {
   countOp(): void;
   /** Katalog ikon (kanonikalisasi node icon, `iconSearch`). */
   icons: IconCatalogPort;
+  /** Foto terimpor (`photo`); tidak ada → setiap `photo()` NOT_FOUND. */
+  photos?: PhotoLibraryPort;
 };
+
+/** Format ref foto (`photo_search`): `pexels:<id>` atau `openverse:<uuid>`. */
+export const PHOTO_REF_PATTERN = /^(pexels|openverse):[A-Za-z0-9-]{1,64}$/;
+const PHOTO_REF_LITERAL = /photo\(\s*(['"])((?:pexels|openverse):[A-Za-z0-9-]{1,64})\1/g;
+
+/**
+ * Ref foto literal di kode snippet (`photo('pexels:123')` / `photo("openverse:<uuid>")`), unik, urutan muncul.
+ * Daemon mengimpornya sebelum snippet berjalan (snippet sinkron, tanpa jaringan).
+ */
+export function photoRefsInCode(code: string): string[] {
+  const out = new Set<string>();
+  for (const m of code.matchAll(PHOTO_REF_LITERAL)) out.add(m[2]!);
+  return [...out];
+}
 
 export type ApiFunction = {
   kind: 'op' | 'read';
@@ -537,6 +559,36 @@ export const API: { readonly [K in keyof LakarApi]: ApiFunction } = {
       return JSON.parse(JSON.stringify(res)) as unknown;
     },
   },
+  photo: {
+    kind: 'read',
+    signature: 'photo(ref: string): {assetId, width, height, credit, license, creator, sourcePageUrl}',
+    doc:
+      "Foto stok untuk ref dari tool photo_search (mis. 'pexels:2014422' atau 'openverse:<uuid>'). Tulis ref sebagai literal string di kode " +
+      "(photo('pexels:2014422')), bukan variabel: daemon mengunduhnya sekali ke store aset lokal sebelum snippet berjalan, lalu render hanya memakai file lokal. " +
+      "Pakai assetId di fill {type:'image', assetId, fit:'cover'} pada frame/rect bernama 'Image / …'; width/height = ukuran piksel asli; " +
+      'credit = baris kredit siap pakai (cantumkan bila lisensi meminta atribusi, mis. CC BY).',
+    returns: '{assetId, width, height, credit, license, creator, sourcePageUrl}',
+    errors: ['NOT_FOUND', 'SCHEMA_INVALID'],
+    example:
+      `${BOARD}\nconst p = photo('pexels:2014422');\n` +
+      "const k = add(b, {type:'frame', name:'Kartu', layout:'column', gap:8, padding:16, width:'fill'});\n" +
+      "add(k, {type:'rect', name:'Image / Kamar', width:'fill', height:200, radius:12, fills:[{type:'image', assetId:p.assetId, fit:'cover'}]});\n" +
+      "add(k, {type:'text', name:'Kredit', content:p.credit, size:12, lineHeight:16, color:'#667085'});",
+    call(ctx, [ref]) {
+      if (typeof ref !== 'string' || !PHOTO_REF_PATTERN.test(ref)) {
+        throw new LakarError('SCHEMA_INVALID', `photo: ref harus 'pexels:<id>' atau 'openverse:<uuid>', bukan ${show(ref)}`, {
+          hint: "pakai ref dari hasil photo_search apa adanya, mis. photo('pexels:2014422')",
+        });
+      }
+      const info = ctx.photos?.resolve(ref);
+      if (!info) {
+        throw new LakarError('NOT_FOUND', `photo: foto ${ref} belum diimpor`, {
+          hint: "pakai ref literal dari photo_search langsung di kode, mis. photo('pexels:2014422') (bukan variabel atau string rakitan), agar daemon mengimpornya sebelum snippet berjalan",
+        });
+      }
+      return JSON.parse(JSON.stringify(info)) as unknown;
+    },
+  },
 };
 
 function isUnder(parents: ReadonlyMap<string, string | null>, e: Entry, ancestorId: string): boolean {
@@ -638,7 +690,7 @@ export const API_REFERENCE: readonly ApiReferenceSection[] = [
   {
     title: 'Kode error',
     items: [
-      'SCHEMA_INVALID: properti/kunci/nilai salah (pesan menyebut path). NOT_FOUND: ID/dokumen/aset/skill tidak ada. CONFLICT: perubahan bersamaan (dicadangkan).',
+      'SCHEMA_INVALID: properti/kunci/nilai salah (pesan menyebut path). NOT_FOUND: ID/dokumen/aset/skill/foto tidak ada. CONFLICT: perubahan bersamaan (dicadangkan).',
       `NO_ACTIVE_DOC: panggil open_doc dulu. EXEC_TIMEOUT: snippet > ${DEFAULT_TIMEOUT_MS / 1000} detik. EXEC_ERROR: error JavaScript atau > ${MAX_OPS} op.`,
       'ICON_UNKNOWN: nama ikon tidak ada (+3 saran). TOKEN_UNKNOWN: token belum di-setTokens. FONT_MISSING: keluarga/weight tidak terdaftar atau karakter di luar latin/latin-ext (ganti dengan node icon).',
       'RENDER_FAILED (retryable): render gagal, coba lagi. EXPORT_FAILED: PNG gagal ditulis. VERSION_MISMATCH: versi mcp ≠ lakard (restart service).',

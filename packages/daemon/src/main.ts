@@ -5,6 +5,7 @@ import { IconCatalog } from '@lakar/icons';
 import { errorMessage } from '@lakar/schema';
 import { loadConfig } from './config.js';
 import { FontRegistry } from './fonts.js';
+import { PhotoService } from './photos/service.js';
 import { startDaemon } from './start.js';
 
 let config;
@@ -20,7 +21,9 @@ try {
   if (fonts.missing.length) console.warn(`lakard: paket font tidak ditemukan: ${fonts.missing.join(', ')}`);
   // Katalog ikon dimuat saat start (bukan di permintaan pertama); paket hilang → gagal start yang jelas.
   const icons = IconCatalog.load();
-  const daemon = await startDaemon(config, { fonts, icons });
+  // Foto stok: key Pexels dibaca dari file (bukan env) saat dibutuhkan; tanpa key → Openverse.
+  const photos = new PhotoService({ dataDir: config.dataDir, keyFile: config.pexelsKeyFile });
+  const daemon = await startDaemon(config, { fonts, icons, photos });
   let closing = false;
   const shutdown = (signal: string) => {
     if (closing) return;
@@ -39,6 +42,8 @@ try {
   // langsung mengirim SIGTERM begitu membaca baris ini tanpa membunuh proses lewat aksi default.
   console.log(`lakard: mendengarkan ${daemon.url} (data: ${config.dataDir})`);
   if (config.configPath) console.log(`lakard: config ${config.configPath}`);
+  const ph = photos.status();
+  console.log(`lakard: foto stok ${ph.provider} (file key: ${ph.keyFile}, terimpor: ${ph.imported})`);
   void daemon.warmed.then(() => {
     const st = daemon.renderer.status();
     if (st.ready === st.size) console.log(`lakard: pool render siap (${st.ready} halaman, chromium ${st.browserVersion ?? '?'})`);

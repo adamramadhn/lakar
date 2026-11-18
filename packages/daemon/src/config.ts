@@ -26,6 +26,8 @@ export type DaemonConfig = {
   renderTimeoutMs: number;
   /** Jumlah halaman pool render (2..8). */
   renderPages: number;
+  /** File key Pexels (satu baris key; mode 600, milik uid daemon). Tidak ada → penyedia foto Openverse. */
+  pexelsKeyFile: string;
   /** File config yang dibaca (undefined bila tidak ada). */
   configPath?: string;
 };
@@ -37,10 +39,13 @@ const KEYS = {
   browsers_path: 'LAKAR_BROWSERS_PATH',
   render_pages: 'LAKAR_RENDER_PAGES',
   render_timeout_ms: 'LAKAR_RENDER_TIMEOUT_MS',
+  pexels_key_file: 'LAKAR_PEXELS_KEY_FILE',
 } as const;
 type Key = keyof typeof KEYS;
 
 export const defaultConfigPath = (home = homedir()) => join(home, '.config', 'lakar', 'config.toml');
+/** Default file key Pexels. Key hanya dibaca dari file (bukan env), agar tidak tampil di environment proses. */
+export const defaultPexelsKeyFile = (home = homedir()) => join(home, '.config', 'lakar', 'pexels-api-key');
 
 /** Parser TOML datar: `kunci = "str" | 'str' | 123`. Bagian `[x]`, kunci tak dikenal, atau nilai lain → Error. */
 export function parseFlatToml(text: string, file: string): Partial<Record<Key, string>> {
@@ -108,6 +113,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): DaemonConfig {
     execMemoryBytes: EXEC_MEMORY_DEFAULT_BYTES,
     renderTimeoutMs: timeout ? intIn(timeout.name, timeout.raw, 100, 600_000) : RENDER_TIMEOUT_DEFAULT_MS,
     renderPages: pages ? intIn(pages.name, pages.raw, RENDER_PAGES_MIN, RENDER_PAGES_MAX) : RENDER_PAGES_DEFAULT,
+    pexelsKeyFile: pick('pexels_key_file')?.raw || defaultPexelsKeyFile(home),
     ...(configPath ? { configPath } : {}),
   };
 }
