@@ -1,0 +1,462 @@
+// Perintah `round --round <uji-k|n> [--dry-run] [--resume]`: satu putaran A dan B, Lakar vs pen.dev, lalu juri buta 3×
+// per prompt, lalu `bench/round-<round>.md|json` dan `bench/score-<id>.md|json`.
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { join, relative } from 'node:path';
+import { G0_RULES, LAKAR_VERSION, SCHEMA_VERSION } from '@lakar/schema';
+import { buildArgs, buildEnv, shellQuote } from '../claude-runner.js';
+import { assignLabels, buildJudgeArgs, buildJudgeBlocks, EMPTY_MCP, JUDGE_REPS, runJudgeRep, type Assignment, type DesignImages, type JudgeRepRecord, type Tool } from '../judge/run.js';
+import { buildJudgeText, DESIGN_MD_PATH, judgeC7Problems, judgeLeaks } from '../judge/prompt.js';
+import { boardSizeProblems, LAKAR_ALLOWED_TOOLS, LAKAR_MCP_CONFIG, LAKARD_UNIT, lakarPreflightProblems, mcpServerNames, runLakar } from '../lakar/run.js';
+import { LakardClient, type LakardStatus } from '../lakar/lakard-client.js';
+import { Abort, log, stamp } from '../log.js';
+import { emptyRecord, PENDEV_ALLOWED_TOOLS, PENDEV_MCP_CONFIG, penDesktopVersion, preflight, runOne, RUNS_ROOT, type Preflight } from '../pendev/run.js';
+import { encodePngRgb } from '../png/codec.js';
+import { buildStrip, judgeImages } from '../png/strip.js';
+import { BENCH_ROOT, GOLDEN_SET_PATH, PROTOCOL_DIR, PROTOCOL_FILES, REPO_ROOT, renderPrompt, type PromptId, type Protocol } from '../protocol.js';
+import type { RunRecord } from '../report.js';
+import type { TimedLine } from '../stream-metrics.js';
+import { comparePenHashes, git, isActive, md5PenFiles, sha256, sha256Dir, systemdShow, type SystemdInfo } from '../sys.js';
+import { countAgentEmoji, countLintEmoji } from './emoji.js';
+import { lakarReconnect, pendevReconnect } from './reconnect.js';
+import { renderRoundJson, renderRoundMarkdown, renderScoreJson, renderScoreMarkdown, ROUND_ID, type FrozenVersions, type RoundPrompt, type RoundReport, type RoundRun } from './report.js';
+import { aggregateScores, decide, lakarGate } from './score.js';
+
+const ROUND_ORDER: readonly [PromptId, Tool][] = [
+  ['A', 'pendev'],
+  ['A', 'lakar'],
+  ['B', 'pendev'],
+  ['B', 'lakar'],
+];
+const BASELINE_JSON = join(BENCH_ROOT, 'baseline-pendev.json');
+const SKILLS_DIR = join(REPO_ROOT, 'packages/skills/skills');
+const MCP_SERVER_TS = join(REPO_ROOT, 'packages/mcp/src/server.ts');
+const CHECK_DIST = join(REPO_ROOT, 'packages/check/dist');
+
+export type RoundArgs = { round: string; dryRun: boolean; resume: boolean };
+
+/** Argumen CLI (murni). `undefined` + pesan = pemakaian salah (exit 64). */
+export function parseRoundArgs(args: readonly string[]): { ok: true; value: RoundArgs } | { ok: false; error: string } {
+  let round: string | undefined;
+  let dryRun = false;
+  let resume = false;
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i]!;
+    if (a === '--') continue; // `pnpm bench:round -- --round …` meneruskan `--` apa adanya
+    if (a === '--round') round = args[++i];
+    else if (a.startsWith('--round=')) round = a.slice('--round='.length);
+    else if (a === '--dry-run') dryRun = true;
+    else if (a === '--resume') resume = true;
+    else return { ok: false, error: `argumen tidak dikenal: ${a}` };
+  }
+  if (round === undefined) return { ok: false, error: '--round wajib (uji-<k> untuk putaran uji, angka untuk putaran resmi)' };
+  if (!ROUND_ID.test(round)) return { ok: false, error: `ID putaran ${JSON.stringify(round)} tidak cocok ${ROUND_ID.source}` };
+  return { ok: true, value: { round, dryRun, resume } };
+}
+
+/** Penjaga awal putaran (murni): round md sudah ada tanpa --resume → 64; hash protokol ≠ baseline → 1. */
+export function roundStartProblem(i: { mdExists: boolean; resume: boolean; dryRun: boolean; protocolHash?: string; baselineHash?: string }): { exitCode: 64 | 1; message: string } | undefined {
+  if (i.mdExists && !i.resume && !i.dryRun) return { exitCode: 64, message: 'round md sudah ada; pakai --resume untuk melanjutkan putaran ini' };
+  if (i.protocolHash !== undefined && i.protocolHash !== i.baselineHash)
+    return { exitCode: 1, message: `protocolHash ${i.protocolHash} ≠ baseline ${i.baselineHash}: protokol berubah, butuh baseline/putaran baru` };
+  return undefined;
+}
+
+/** Status akhir putaran (murni): fatal (run/juri invalid/aborted) atau .pen lama berubah/hilang → dibatalkan (exit 1). */
+export function roundOutcome(i: {
+  fatal: string | undefined;
+  pen: { changed: string[]; removed: string[] };
+  allRuns: boolean;
+  allReps: boolean;
+  /** Run dengan PNG ≠ ukuran board/frame (bukan skala 1) → exit 3 seperti seri baseline. */
+  pngScaleMismatch?: string[];
+}): { status: RoundReport['status']; reasons: string[]; exitCode: number } {
+  const reasons: string[] = [];
+  if (i.fatal) reasons.push(`dihentikan: ${i.fatal}`);
+  if (i.pen.changed.length || i.pen.removed.length) reasons.push(`.pen lama berubah/hilang: ${[...i.pen.changed, ...i.pen.removed].join(', ')}`);
+  if (reasons.length) return { status: 'dibatalkan', reasons, exitCode: 1 };
+  const mm = i.pngScaleMismatch ?? [];
+  if (i.allRuns && i.allReps) return mm.length ? { status: 'lengkap', reasons: [`png_scale_mismatch: ${mm.join(', ')}`], exitCode: 3 } : { status: 'lengkap', reasons, exitCode: 0 };
+  return { status: 'tidak lengkap', reasons: ['run atau ulangan juri belum lengkap'], exitCode: 2 };
+}
+
+/**
+ * Run tersimpan yang dipakai apa adanya (C8): `success`/`failed`, dan `invalid` karena `dokumen lama`
+ * (agen sudah bekerja penuh; tidak diulang untuk memilih hasil). Hanya gagal-setup sebelum agen bekerja
+ * (`aborted`, init tidak valid) yang boleh dijalankan lagi lewat `--resume`.
+ */
+export function isFinalRun(rec: Pick<RunRecord, 'status' | 'reason'>): boolean {
+  return rec.status === 'success' || rec.status === 'failed' || (rec.status === 'invalid' && /^dokumen lama/.test(rec.reason ?? ''));
+}
+
+/** Baseline md5 `.pen` putaran: snapshot `pen-before-*.json` paling awal (nama ber-stamp terurut), atau `current`. */
+export function penBaseline(files: readonly string[], read: (f: string) => Record<string, string>, current: Record<string, string>): { baseline: Record<string, string>; from: string | undefined } {
+  const first = [...files].filter((f) => /^pen-before-.*\.json$/.test(f)).sort()[0];
+  return first ? { baseline: read(first), from: first } : { baseline: current, from: undefined };
+}
+
+/** Teks yang tidak boleh memuat frasa juri (C7): protokol, skill, server MCP, prompt agen hasil render. */
+export function c7Targets(protocol: Protocol): { name: string; text: string }[] {
+  const out: { name: string; text: string }[] = [];
+  for (const f of PROTOCOL_FILES) out.push({ name: `bench/protocol/${f}`, text: readFileSync(join(PROTOCOL_DIR, f), 'utf8') });
+  if (existsSync(SKILLS_DIR)) for (const f of readdirSync(SKILLS_DIR).filter((x) => x.endsWith('.md')).sort()) out.push({ name: `packages/skills/skills/${f}`, text: readFileSync(join(SKILLS_DIR, f), 'utf8') });
+  out.push({ name: 'packages/mcp/src/server.ts', text: readFileSync(MCP_SERVER_TS, 'utf8') });
+  for (const id of protocol.config.promptIds) out.push({ name: `prompt agen ${id} (hasil render)`, text: renderPrompt(id, protocol) });
+  return out;
+}
+
+export type JudgeTexts = Record<string, { text: string; secret: string }>;
+
+/** Teks juri per prompt + penjaga kebocoran dan C7. Gagal → Abort sebelum spawn apa pun. */
+export function prepareJudgeTexts(protocol: Protocol): JudgeTexts {
+  if (!existsSync(DESIGN_MD_PATH)) throw new Abort(`DESIGN.md tidak ada (${DESIGN_MD_PATH}); teks juri tidak bisa dibangun`);
+  if (!existsSync(GOLDEN_SET_PATH)) throw new Abort(`golden-set.md tidak ada (${GOLDEN_SET_PATH})`);
+  const design = readFileSync(DESIGN_MD_PATH, 'utf8');
+  const golden = readFileSync(GOLDEN_SET_PATH, 'utf8');
+  const out: JudgeTexts = {};
+  const targets = c7Targets(protocol);
+  for (const id of protocol.config.promptIds) {
+    const t = buildJudgeText(design, golden, id, protocol.prompts[id]);
+    const leaks = judgeLeaks(t.text);
+    if (leaks.length) throw new Abort(`teks juri ${id} bocor: ${leaks.join('; ')}`);
+    const c7 = judgeC7Problems(t.secret, targets);
+    if (c7.length) throw new Abort(`C7 juri ${id} gagal:\n  ${c7.join('\n  ')}`);
+    out[id] = t;
+  }
+  return out;
+}
+
+/** Transkrip + cap waktu dari dir run (stream.jsonl + timing.json). */
+export function loadTimedLines(dir: string): TimedLine[] {
+  const sf = join(dir, 'stream.jsonl');
+  const tf = join(dir, 'timing.json');
+  if (!existsSync(sf) || !existsSync(tf)) return [];
+  const raw = readFileSync(sf, 'utf8').split('\n');
+  if (raw.at(-1) === '') raw.pop();
+  const timing = JSON.parse(readFileSync(tf, 'utf8')).lines as { i: number; t: number }[];
+  return raw.map((line, i) => ({ t: timing[i]?.t ?? 0, line: line.replace(/\r$/, '') }));
+}
+
+type Baseline = { protocolHash: string; medians: Record<string, number | undefined> };
+
+function loadBaseline(): Baseline {
+  const b = JSON.parse(readFileSync(BASELINE_JSON, 'utf8'));
+  const medians: Record<string, number | undefined> = {};
+  for (const s of b.summary ?? []) medians[s.prompt] = s.wallMs?.median;
+  return { protocolHash: b.protocolHash, medians };
+}
+
+const CONVENTION = [
+  'ID putaran dicek dengan `^(uji-[1-9]\\d*|[1-9]\\d*)$`: `uji-<k>` = putaran uji, angka polos = putaran resmi (story 16).',
+  'Satu putaran = A dan B, urutan run A-pen.dev, A-Lakar, B-pen.dev, B-Lakar, lalu juri 3× per prompt. Satu run per alat per prompt; run tidak diulang untuk memilih hasil (C8).',
+  'Putaran yang md-nya sudah ada ditolak kecuali `--resume`. `--resume` memakai ulang run `success`/`failed` dan ulangan juri yang sudah selesai; run `aborted`/`invalid` (gagal-setup) dipindah ke `<key>.prev-<stamp>` dan dijalankan lagi, dan dicatat sebagai percobaan sebelumnya.',
+  'Artefak di `bench/runs/rounds/<round>/` (gitignored): dir run per `<prompt>-<alat>`, strip `<prompt>-<alat>.png`, dan `judge/<prompt>/rep-<k>/` (pemetaan X/Y, transkrip juri).',
+];
+
+const DEFINITIONS = [
+  'Waktu (AD-13): `wall` = cap waktu monotonic saat baris event `result` diterima − cap waktu event stdout pertama, sama untuk kedua alat. Offset tool_use/tool_result dan spawn → event pertama hanya diagnostik.',
+  'Gerbang waktu memakai median baseline pen.dev (`bench/baseline-pendev.json`): Lakar ≤ 1,5 × median baseline. Rasio Lakar/pen.dev putaran ini dilaporkan saja.',
+  'Operasi harness setelah `result` di luar waktu: pen.dev `save` + salin `.pen` + Export `{scale:1}`; Lakar sesi HTTP sendiri → `/docs/open` → `/boards` → `/layout-check` → `/export {scale:1}` per board. Agen yang memanggil save/export sendiri ikut terhitung (alur normal alat).',
+  'Reconnect Lakar: lakard restart (pid/startedAt/`NRestarts` systemd user berubah), halaman Chromium dibuat ulang (`pool.recreated` naik), atau tool_result `is_error` berisi `RENDER_FAILED`, `VERSION_MISMATCH`, "lakard tidak menjawab", atau pola putus transport. Reconnect pen.dev: `NRestarts`/`ActiveEnterTimestamp` pen-desktop berubah, atau tool_result `is_error` berpola putus transport (not connected, disconnect, connection closed, ECONNREFUSED/ECONNRESET/EPIPE, socket hang up, MCP error -32000). Error snippet biasa bukan reconnect. Dilaporkan terpisah, tidak dikurangkan dari waktu.',
+  'Emoji: (a) di nilai string input tool_use agen (Emoji_Presentation, atau pictographic + VS16; © ® ™ dikecualikan; glyph LC-01b dihitung terpisah), (b) temuan LC-01a/LC-01b layout_check (Lakar saja; pen.dev tidak dilint, EULA), (c) emoji terlihat menurut juri (median).',
+  'Normalisasi PNG: board/frame top-level (urutan dokumen) dikomposit di atas #808080, ditumpuk vertikal berjarak 48 px #808080, di-encode ulang RGB hanya IHDR/IDAT/IEND. Juri menerima tile lebar penuh (tinggi ≤ 1000 untuk lebar > 600, ≤ 1568 untuk lebih sempit) + satu overview sisi panjang ≤ 1568.',
+  'Juri: `claude -p --input-format stream-json` tanpa tool/MCP (init wajib `tools=[]`, `mcp_servers=[]`), satu pesan berisi teks juri + gambar berlabel netral; label X/Y diacak per ulangan dengan `crypto` dan kedua penugasan wajib muncul. Jawaban JSON divalidasi ketat; tidak valid → 1 percobaan ulang, lalu `failed`.',
+];
+
+function runRecordPath(dir: string): string {
+  return join(dir, 'run.json');
+}
+
+type StoredRun = RunRecord & { lakar?: RoundRun['record']['lakar']; pendevSystemd?: { before: SystemdInfo; after: SystemdInfo } };
+
+/** Bangun RoundRun dari dir run (dipakai juga saat --resume). */
+function roundRunFrom(roundDir: string, key: string, prompt: string, tool: Tool, rec: StoredRun, previous: string[]): RoundRun {
+  const dir = join(roundDir, key);
+  const lines = loadTimedLines(dir);
+  const lakar = rec.lakar;
+  return {
+    key,
+    prompt,
+    tool,
+    dir: relative(REPO_ROOT, dir),
+    record: rec,
+    reconnect: lines.length || lakar || rec.pendevSystemd
+      ? tool === 'lakar'
+        ? lakarReconnect(lakar?.daemonBefore, lakar?.daemonAfter, lines)
+        : pendevReconnect(rec.pendevSystemd?.before, rec.pendevSystemd?.after, lines)
+      : undefined,
+    agentEmoji: lines.length ? countAgentEmoji(lines) : undefined,
+    lintEmoji: lakar?.layout ? countLintEmoji(lakar.layout.findings) : undefined,
+    strip: undefined,
+    previous,
+  };
+}
+
+/** Strip PNG dari frame/board run (urutan dokumen). Ditulis ke `<roundDir>/<key>.png`. */
+function writeStrip(roundDir: string, run: RoundRun): DesignImages | undefined {
+  const pngs = run.record.frames.flatMap((f) => (f.png ? [join(REPO_ROOT, f.png)] : []));
+  if (!pngs.length || pngs.length !== run.record.frames.length) return undefined;
+  const strip = buildStrip(pngs.map((p) => readFileSync(p)));
+  const path = join(roundDir, `${run.key}.png`);
+  writeFileSync(path, encodePngRgb(strip));
+  run.strip = { path: relative(REPO_ROOT, path), width: strip.width, height: strip.height, boards: pngs.length };
+  return judgeImages(strip);
+}
+
+export async function roundMain(argv: string[]): Promise<number> {
+  const parsed = parseRoundArgs(argv);
+  if (!parsed.ok) {
+    console.error(`round: ${parsed.error}\npakai: node bench/dist/cli.js round --round <uji-k|n> [--dry-run] [--resume]`);
+    return 64;
+  }
+  const { round, dryRun, resume } = parsed.value;
+  const mdPath = join(BENCH_ROOT, `round-${round}.md`);
+  const early = roundStartProblem({ mdExists: existsSync(mdPath), resume, dryRun });
+  if (early) {
+    console.error(`round: ${relative(REPO_ROOT, mdPath)}: ${early.message}`);
+    return early.exitCode;
+  }
+
+  // ---------- preflight gabungan ----------
+  const pre: Preflight = preflight();
+  const { protocol } = pre;
+  const baseline = loadBaseline();
+  const hashProblem = roundStartProblem({ mdExists: false, resume, dryRun, protocolHash: protocol.hash, baselineHash: baseline.protocolHash });
+  if (hashProblem) throw new Abort(hashProblem.message);
+  log(`protocolHash = baseline (${protocol.hash.slice(0, 12)}…)`);
+  const client = new LakardClient();
+  let status: LakardStatus | undefined;
+  try {
+    status = await client.status();
+  } catch (e) {
+    throw new Abort(`lakard: ${(e as Error).message}`);
+  }
+  const lp = lakarPreflightProblems(status, mcpServerNames());
+  if (lp.length) throw new Abort(`preflight Lakar: ${lp.join('; ')}`);
+  log(`lakard ${status.version} (schema ${status.schemaVersion}), pool ready ${status.pool?.ready}; .mcp.json = [lakar]`);
+  const judgeTexts = prepareJudgeTexts(protocol);
+  log('teks juri: tanpa nama alat/path; C7 juri lulus (protokol, skill, server MCP, prompt agen)');
+  const head = git(REPO_ROOT, ['rev-parse', 'HEAD']);
+  const porcelain = git(REPO_ROOT, ['status', '--porcelain', '--', 'packages', 'tools', '.mcp.json']);
+
+  const cfg = protocol.config;
+  const emptyMcpPath = join(RUNS_ROOT, 'rounds', round, 'judge', 'mcp-empty.json');
+  const argvFor = (mcp: string, allowed: string, prompt = '<prompt hasil render>') => shellQuote(['claude', ...buildArgs({ prompt, config: cfg, mcpConfig: mcp, allowedTools: allowed })]);
+  const judgeArgv = shellQuote(['claude', ...buildJudgeArgs(cfg.model, relative(REPO_ROOT, emptyMcpPath))]);
+  console.log(`round ${round}\nprotocolHash ${protocol.hash} (baseline ${baseline.protocolHash}: sama)`);
+  console.log(`C7 agen: lulus; C7 juri: lulus\ngit HEAD ${head}; porcelain packages/tools/.mcp.json: ${porcelain ? `TIDAK KOSONG\n${porcelain}` : 'kosong'}`);
+  for (const p of cfg.promptIds) {
+    const rendered = renderPrompt(p, protocol);
+    console.log(`\n=== ${p}: argv Lakar ===\n${argvFor(LAKAR_MCP_CONFIG, LAKAR_ALLOWED_TOOLS, rendered)}`);
+    console.log(`=== ${p}: argv pen.dev ===\n${argvFor(PENDEV_MCP_CONFIG, PENDEV_ALLOWED_TOOLS, rendered)}`);
+  }
+  console.log(`\n=== argv juri (stdin: satu pesan stream-json teks + gambar) ===\n${judgeArgv}`);
+  console.log(`\nenv tambahan: ${JSON.stringify(cfg.env)}; dibuang: ${buildEnv(process.env, cfg).scrubbed.join(', ') || '-'}`);
+  console.log(`\nkonvensi putaran:\n${CONVENTION.map((c) => `- ${c}`).join('\n')}`);
+  if (dryRun) return 0;
+  if (porcelain) throw new Abort(`produk tidak beku: git status --porcelain -- packages tools .mcp.json tidak kosong:\n${porcelain}`);
+
+  // ---------- putaran ----------
+  const roundDir = join(RUNS_ROOT, 'rounds', round);
+  mkdirSync(join(roundDir, 'judge'), { recursive: true });
+  if (!existsSync(emptyMcpPath)) writeFileSync(emptyMcpPath, EMPTY_MCP);
+  // Resume: baseline .pen = snapshot paling awal putaran ini, agar perubahan di pemanggilan sebelumnya tetap terdeteksi.
+  const penNow = md5PenFiles();
+  const pb = penBaseline(readdirSync(roundDir), (f) => JSON.parse(readFileSync(join(roundDir, f), 'utf8')), penNow);
+  const penBefore = pb.baseline;
+  writeFileSync(join(roundDir, `pen-before-${stamp()}.json`), `${JSON.stringify(penNow, null, 1)}\n`);
+  log(`md5 ${Object.keys(penBefore).length} file .pen lama dicatat${pb.from ? ` (baseline dari ${pb.from})` : ''}`);
+  const notes: string[] = [];
+  const mcpVersionFile = join(roundDir, 'pendev-mcp-version.txt');
+  const serverVersion: { v?: string } = existsSync(mcpVersionFile) ? { v: readFileSync(mcpVersionFile, 'utf8').trim() } : {};
+  const prevUris: string[] = [];
+  const runs = new Map<string, RoundRun>();
+  let fatal: string | undefined;
+
+  for (const [p, tool] of ROUND_ORDER) {
+    const key = `${p}-${tool}`;
+    const dir = join(roundDir, key);
+    const previous: string[] = readdirSync(roundDir)
+      .filter((x) => x.startsWith(`${key}.prev-`))
+      .sort()
+      .map((d) => relative(REPO_ROOT, join(roundDir, d)));
+    if (existsSync(runRecordPath(dir))) {
+      const rec = JSON.parse(readFileSync(runRecordPath(dir), 'utf8')) as StoredRun;
+      if (isFinalRun(rec)) {
+        log(`${key}: dipakai ulang (${rec.status})`);
+        if (rec.uri) prevUris.push(rec.uri);
+        runs.set(key, roundRunFrom(roundDir, key, p, tool, rec, previous));
+        if (rec.status === 'invalid') {
+          fatal = `${key} ${rec.status}: ${rec.reason}`;
+          break;
+        }
+        continue;
+      }
+    }
+    if (existsSync(dir)) {
+      if (!resume) throw new Abort(`${relative(REPO_ROOT, dir)} sudah ada tanpa hasil selesai; pakai --resume`);
+      const moved = `${dir}.prev-${stamp()}`;
+      renameSync(dir, moved);
+      previous.push(relative(REPO_ROOT, moved));
+      log(`${key}: percobaan sebelumnya dipindah ke ${relative(REPO_ROOT, moved)}`);
+    }
+    const runId = `${round}-${key}`;
+    const prompt = renderPrompt(p, protocol);
+    let rec: StoredRun;
+    log(`${key}: mulai`);
+    if (tool === 'pendev') {
+      const before = systemdShow('pen-desktop', false);
+      try {
+        rec = await runOne({ pre, runId, prompt, promptId: p, attempt: 1, outDir: dir, prevUris }, serverVersion);
+      } catch (e) {
+        mkdirSync(dir, { recursive: true });
+        rec = { ...emptyRecord({ runId, promptId: p, attempt: 1 }), reason: `harness: ${(e as Error).message}` };
+      }
+      rec.pendevSystemd = { before, after: systemdShow('pen-desktop', false) };
+      if (serverVersion.v) writeFileSync(mcpVersionFile, `${serverVersion.v}\n`);
+    } else {
+      try {
+        rec = await runLakar({ runId, prompt, promptId: p, outDir: dir, config: cfg, client });
+      } catch (e) {
+        mkdirSync(dir, { recursive: true });
+        rec = { ...emptyRecord({ runId, promptId: p, attempt: 1 }), reason: `harness: ${(e as Error).message}` };
+      }
+    }
+    writeFileSync(runRecordPath(dir), `${JSON.stringify(rec, null, 1)}\n`);
+    runs.set(key, roundRunFrom(roundDir, key, p, tool, rec, previous));
+    if (rec.status === 'aborted' || rec.status === 'invalid') {
+      fatal = `${key} ${rec.status}: ${rec.reason}`;
+      log(`putaran berhenti: ${fatal}`);
+      break;
+    }
+  }
+
+  // ---------- strip + juri ----------
+  const results: RoundPrompt[] = [];
+  let judgeCost = 0;
+  for (const p of cfg.promptIds) {
+    const r: Partial<Record<Tool, RoundRun>> = { lakar: runs.get(`${p}-lakar`), pendev: runs.get(`${p}-pendev`) };
+    const images: Partial<Record<Tool, DesignImages>> = {};
+    for (const t of ['lakar', 'pendev'] as const) {
+      const run = r[t];
+      if (!run) continue;
+      try {
+        const im = writeStrip(roundDir, run);
+        if (im) images[t] = im;
+      } catch (e) {
+        notes.push(`strip ${run.key} gagal: ${(e as Error).message}`);
+      }
+    }
+    const lakarRec = r.lakar?.record;
+    const sizeProblems = lakarRec?.lakar ? boardSizeProblems(p, lakarRec.lakar.boards) : [];
+    const gate = lakarRec
+      ? lakarGate({ promptId: p, layoutGate: lakarRec.lakar?.layout?.summary.gate, sizeProblems, wallMs: lakarRec.wallMs, baselineMedianMs: baseline.medians[p] })
+      : undefined;
+
+    const reps: JudgeRepRecord[] = [];
+    if (!fatal && images.lakar && images.pendev) try {
+      const jdir = join(roundDir, 'judge', p);
+      mkdirSync(jdir, { recursive: true });
+      const assignFile = join(jdir, 'assignments.json');
+      let assignments: Assignment[];
+      if (existsSync(assignFile)) assignments = JSON.parse(readFileSync(assignFile, 'utf8'));
+      else {
+        assignments = assignLabels(JUDGE_REPS);
+        writeFileSync(assignFile, `${JSON.stringify(assignments, null, 1)}\n`, { flag: 'wx' });
+      }
+      for (let k = 1; k <= JUDGE_REPS; k++) {
+        const repDir = join(jdir, `rep-${k}`);
+        const repFile = join(repDir, 'rep.json');
+        if (existsSync(repFile)) {
+          const old = JSON.parse(readFileSync(repFile, 'utf8')) as JudgeRepRecord;
+          if (old.status !== 'invalid') {
+            reps.push(old);
+            continue;
+          }
+          renameSync(repDir, `${repDir}.prev-${stamp()}`);
+        } else if (existsSync(repDir)) renameSync(repDir, `${repDir}.prev-${stamp()}`);
+        const mapping = assignments[k - 1]!;
+        const blocks = buildJudgeBlocks(judgeTexts[p]!.text, { X: images[mapping.X]!, Y: images[mapping.Y]! });
+        log(`juri ${p} ulangan ${k}: mulai`);
+        const rep = await runJudgeRep({ prompt: p, rep: k, mapping, blocks, dir: repDir, emptyMcpConfig: emptyMcpPath, config: cfg, forbiddenCwdRoot: REPO_ROOT });
+        log(`juri ${p} ulangan ${k}: ${rep.status}${rep.retried ? ' (diulang 1×)' : ''}, $${rep.costUsd.toFixed(3)}`);
+        reps.push(rep);
+        if (rep.status === 'invalid') {
+          fatal = `juri ${p} ulangan ${k} invalid: ${rep.attempts.at(-1)?.problems.join('; ')}`;
+          break;
+        }
+      }
+    } catch (e) {
+      // Laporan dan penjaga .pen tetap jalan walau tahap juri gagal (run desain berbayar sudah selesai).
+      fatal = `juri ${p}: harness: ${(e as Error).message}`;
+      log(`putaran berhenti: ${fatal}`);
+    }
+    judgeCost += reps.reduce((s, x) => s + x.costUsd, 0);
+    const score = reps.length ? aggregateScores(p, reps) : undefined;
+    const decision = !r.lakar
+      ? { decision: 'tidak dapat dinilai' as const, why: 'run Lakar tidak dijalankan (putaran berhenti lebih awal)' }
+      : decide({
+      gate: gate ?? { ok: false, reasons: ['run Lakar tidak ada'], timeRatio: undefined },
+      lakarRunOk: lakarRec?.status === 'success',
+      pendevRunOk: r.pendev?.record.status === 'success',
+      score,
+    });
+    results.push({ prompt: p, baselineMedianMs: baseline.medians[p], runs: r, gate, sizeProblems, score, decision });
+  }
+
+  // ---------- penjaga .pen + status ----------
+  const penAfter = md5PenFiles();
+  const cmp = comparePenHashes(penBefore, penAfter);
+  const allRuns = ROUND_ORDER.every(([p, t]) => runs.has(`${p}-${t}`));
+  const allReps = results.every((x) => x.score && x.score.reps.length === JUDGE_REPS);
+  const mismatch = [...runs.values()].filter((x) => x.record.pngScaleMismatch).map((x) => x.key);
+  const outcome = roundOutcome({ fatal, pen: cmp, allRuns, allReps, pngScaleMismatch: mismatch });
+  const roundStatus = outcome.status;
+  const statusReasons = outcome.reasons;
+  const failedReps = results.flatMap((x) => x.score?.reps.filter((y) => y.status !== 'ok').map((y) => `${x.prompt} ulangan ${y.rep} ${y.status}`) ?? []);
+  if (failedReps.length) notes.push(`Ulangan juri tidak valid (tidak diganti): ${failedReps.join(', ')}.`);
+
+  const frozen: FrozenVersions = {
+    head,
+    porcelain,
+    protocolHash: protocol.hash,
+    baselineProtocolHash: baseline.protocolHash,
+    model: cfg.model,
+    claude: pre.claudeVersion,
+    lakard: { version: status.version, schemaVersion: status.schemaVersion, pid: status.pid, startedAt: status.startedAt, browser: status.pool?.browserVersion },
+    icons: status.icons ?? {},
+    skills: Object.fromEntries(readdirSync(SKILLS_DIR).filter((f) => f.endsWith('.md')).sort().map((f) => [f, sha256(readFileSync(join(SKILLS_DIR, f)))])),
+    g0Rules: JSON.stringify(G0_RULES),
+    checkDist: existsSync(CHECK_DIST) ? sha256Dir(CHECK_DIST) : 'tidak ada',
+    pendevDesktop: penDesktopVersion(),
+    pendevMcp: serverVersion.v,
+    judge: { model: cfg.model, argv: judgeArgv },
+  };
+  if (status.version !== LAKAR_VERSION || status.schemaVersion !== SCHEMA_VERSION) notes.push(`lakard ${status.version}/${status.schemaVersion} ≠ bench ${LAKAR_VERSION}/${SCHEMA_VERSION}`);
+  const report: RoundReport = {
+    round,
+    date: new Date().toISOString(),
+    status: roundStatus,
+    statusReasons,
+    frozen,
+    wrapper: protocol.wrapper,
+    prompts: Object.fromEntries(cfg.promptIds.map((p) => [p, protocol.prompts[p]])),
+    argv: { lakar: argvFor(relative(REPO_ROOT, LAKAR_MCP_CONFIG), LAKAR_ALLOWED_TOOLS), pendev: argvFor(relative(REPO_ROOT, PENDEV_MCP_CONFIG), PENDEV_ALLOWED_TOOLS), judge: judgeArgv },
+    env: { set: cfg.env, scrubbed: buildEnv(process.env, cfg).scrubbed },
+    convention: CONVENTION,
+    definitions: DEFINITIONS,
+    penGuard: { files: Object.keys(penBefore).length, changed: cmp.changed, removed: cmp.removed, added: cmp.added },
+    lakardActiveAfter: isActive(LAKARD_UNIT, true),
+    results,
+    judgeCostUsd: judgeCost,
+    notes,
+  };
+  writeFileSync(mdPath, renderRoundMarkdown(report));
+  writeFileSync(join(BENCH_ROOT, `round-${round}.json`), renderRoundJson(report));
+  for (const p of results) {
+    writeFileSync(join(BENCH_ROOT, `score-${p.prompt}.md`), renderScoreMarkdown(round, p));
+    writeFileSync(join(BENCH_ROOT, `score-${p.prompt}.json`), renderScoreJson(round, p));
+    log(`${p.prompt}: ${p.decision.decision} (${p.decision.why})`);
+  }
+  log(`laporan: ${relative(REPO_ROOT, mdPath)} (${roundStatus})`);
+  return outcome.exitCode;
+}

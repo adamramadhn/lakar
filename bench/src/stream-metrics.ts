@@ -41,8 +41,8 @@ export type RunMetrics = {
 };
 
 export type InitRules = {
-  /** Satu-satunya server MCP yang boleh ada (status `connected`). */
-  server: string;
+  /** Satu-satunya server MCP yang boleh ada (status `connected`). `null` = tanpa server MCP dan tanpa tool (juri). */
+  server: string | null;
   /** Tool wajib di init (mis. `mcp__pencil__execute`). */
   requiredTools: string[];
   /** cwd tidak boleh berada di bawah path ini. */
@@ -64,12 +64,17 @@ export function validateInit(init: InitInfo | undefined, rules: InitRules): stri
   if (!init) return ['event system/init tidak ada'];
   const out: string[] = [];
   const s = init.mcpServers;
-  if (s.length !== 1 || s[0]!.name !== rules.server || s[0]!.status !== 'connected') {
-    out.push(`mcp_servers harus tepat [${rules.server} connected], dapat [${s.map((x) => `${x.name} ${x.status}`).join(', ')}]`);
+  if (rules.server === null) {
+    if (s.length) out.push(`mcp_servers harus [], dapat [${s.map((x) => `${x.name} ${x.status}`).join(', ')}]`);
+    if (init.tools.length) out.push(`tools harus [], dapat [${init.tools.join(', ')}]`);
+  } else {
+    if (s.length !== 1 || s[0]!.name !== rules.server || s[0]!.status !== 'connected') {
+      out.push(`mcp_servers harus tepat [${rules.server} connected], dapat [${s.map((x) => `${x.name} ${x.status}`).join(', ')}]`);
+    }
+    const prefix = `mcp__${rules.server}__`;
+    const foreign = init.tools.filter((t) => !t.startsWith(prefix));
+    if (foreign.length) out.push(`tool di luar ${prefix}*: ${foreign.join(', ')}`);
   }
-  const prefix = `mcp__${rules.server}__`;
-  const foreign = init.tools.filter((t) => !t.startsWith(prefix));
-  if (foreign.length) out.push(`tool di luar ${prefix}*: ${foreign.join(', ')}`);
   for (const t of rules.requiredTools) if (!init.tools.includes(t)) out.push(`tool wajib tidak ada di init: ${t}`);
   const root = rules.forbiddenCwdRoot.replace(/\/+$/, '');
   if (!init.cwd) out.push('cwd tidak ada di init');

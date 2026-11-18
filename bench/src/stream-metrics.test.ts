@@ -90,6 +90,29 @@ describe('computeMetrics', () => {
     expect(computeMetrics(timed([[1, result()]]), RULES)).toMatchObject({ status: 'invalid', reason: 'no_init' });
   });
 
+  it('server null (juri): wajib mcp_servers=[] dan tools=[]', () => {
+    const J: InitRules = { server: null, requiredTools: [], forbiddenCwdRoot: '/root/lakar' };
+    const ok = init({ mcp_servers: [], tools: [] });
+    expect(validateInit(computeMetrics(timed([[1, ok]]), J).init, J)).toEqual([]);
+    expect(computeMetrics(timed([[1, ok], [2, result()]]), J).status).toBe('success');
+    for (const bad of [init({ mcp_servers: [], tools: ['Read'] }), init({ tools: [] }), init({ mcp_servers: [], tools: [], cwd: '/root/lakar/x' })]) {
+      expect(computeMetrics(timed([[1, bad], [2, result()]]), J).status, JSON.stringify(bad)).toBe('invalid');
+    }
+  });
+
+  it('server lakar: init berisi server pencil atau tool Read → invalid', () => {
+    const L: InitRules = { server: 'lakar', requiredTools: ['mcp__lakar__execute'], forbiddenCwdRoot: '/root/lakar' };
+    const good = init({ mcp_servers: [{ name: 'lakar', status: 'connected' }], tools: ['mcp__lakar__execute', 'mcp__lakar__open_doc'] });
+    expect(computeMetrics(timed([[1, good], [2, result()]]), L).status).toBe('success');
+    for (const bad of [
+      init({ mcp_servers: [{ name: 'pencil', status: 'connected' }], tools: ['mcp__lakar__execute'] }),
+      init({ mcp_servers: [{ name: 'lakar', status: 'connected' }], tools: ['mcp__lakar__execute', 'Read'] }),
+      init({ mcp_servers: [{ name: 'lakar', status: 'connected' }], tools: ['mcp__lakar__open_doc'] }),
+    ]) {
+      expect(computeMetrics(timed([[1, bad], [2, result()]]), L).status, JSON.stringify(bad)).toBe('invalid');
+    }
+  });
+
   it('cwd mirip tapi di luar root tetap sah', () => {
     expect(validateInit(computeMetrics(timed([[1, init({ cwd: '/root/lakar-x' })]]), RULES).init, RULES)).toEqual([]);
   });

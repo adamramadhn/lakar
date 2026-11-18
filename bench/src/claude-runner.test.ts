@@ -82,4 +82,29 @@ setTimeout(()=>{w('ult","subtype":"success"}\\n');process.stderr.write('err');},
       rmSync(dir, { recursive: true, force: true });
     }
   });
+  it('rawArgs menggantikan buildArgs dan stdin terkirim lalu ditutup (juri stream-json)', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'bench-runner-test-'));
+    try {
+      const fake = join(dir, 'fake.mjs');
+      writeFileSync(
+        fake,
+        `let s='';process.stdin.on('data',(d)=>s+=d);process.stdin.on('end',()=>{process.stdout.write(JSON.stringify({type:'echo',argv:process.argv.slice(2),stdin:s})+'\\n');});`,
+      );
+      const out = join(dir, 'out');
+      mkdirSync(out);
+      const raw = ['-p', '--input-format', 'stream-json', '--tools', ''];
+      const r = await runClaude({ rawArgs: raw, stdin: '{"type":"user"}\n', config: { ...protocol.config, timeoutMs: 10_000 }, outDir: out, command: process.execPath, prefixArgs: [fake] });
+      expect(r.argv).toEqual(raw);
+      const ev = JSON.parse(r.lines[0]!.line);
+      expect(ev.argv).toEqual(raw);
+      expect(ev.argv).not.toContain('--allowedTools');
+      expect(ev.stdin).toBe('{"type":"user"}\n');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('tanpa rawArgs, prompt/mcpConfig/allowedTools wajib', async () => {
+    await expect(runClaude({ config: protocol.config, outDir: '/nonexistent' })).rejects.toThrow(/wajib/);
+  });
 });

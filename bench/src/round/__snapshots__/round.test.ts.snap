@@ -1,0 +1,266 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`laporan (snapshot) > round md memuat semua bagian AC 1`] = `
+"# Putaran uji-1: Lakar vs pen.dev
+
+Status: **lengkap**. Tanggal: 2026-11-18T00:00:00.000Z.
+
+Keputusan di laporan ini **sementara, menunggu konfirmasi Adam**.
+
+## Ringkasan
+
+| Prompt | Waktu Lakar (dtk) | Waktu pen.dev (dtk) | Lakar/pen.dev | Lakar/baseline | Biaya Lakar | Biaya pen.dev | Gerbang Lakar | Total Lakar | Total pen.dev | Keputusan |
+|---|---|---|---|---|---|---|---|---|---|---|
+| B | 120.0 | 130.0 | 0.92 | 0.91 | $0.70 | $0.60 | lolos | 6 | 9 | Kalah (sementara, menunggu konfirmasi Adam) |
+
+## Prompt B
+
+### Waktu dan biaya
+
+| Alat | Status | Wall (dtk) | duration_ms | Biaya | Turns | Tool call | Board/frame | Run |
+|---|---|---|---|---|---|---|---|---|
+| Lakar | success | 120.0 | – | $0.70 | 9 | 8 | 390×844 | \`bench/runs/rounds/uji-1/B-lakar\` |
+| pen.dev | success | 130.0 | – | $0.60 | – | – | 390×844 | \`bench/runs/rounds/uji-1/B-pendev\` |
+
+- Rasio Lakar/pen.dev (putaran ini): 0.92
+- Rasio Lakar/median baseline pen.dev (131.3 dtk): 0.91
+
+### Gerbang G0 Lakar (otomatis)
+
+- layout_check harness: gate = 0, error 0, warning 1 (rev 4)
+- Ukuran board: Beranda 390×844 → sesuai
+- Waktu ≤ 1,5 × median baseline: rasio 0.91
+- Hasil: **lolos**
+- R3/R7 tidak dihitung di G0 (keputusan epic): aturan LC-03/06/07/11/13/14/17/18/21 belum ada di \`G0_RULES\`.
+- Dokumen Lakar: slug \`gerak-beranda\` (dibuka agen: gerak-beranda), salinan \`bench/runs/rounds/uji-1/B-lakar/doc/gerak-beranda.lakar.json\`
+
+### Emoji
+
+| Alat | (a) di input tool_use agen | glyph LC-01b di input (terpisah) | (b) LC-01a / LC-01b layout_check | (c) juri (median, rentang) |
+|---|---|---|---|---|
+| Lakar | 0 | 1 | 0 / 0 | 0 (rentang 0) |
+| pen.dev | 2 (🔥) | 0 | tidak dilint (EULA) | 0 (rentang 0) |
+
+### Reconnect (dilaporkan terpisah, tidak dikurangkan dari waktu)
+
+| Alat | Jumlah | ms tool_use→tool_result terdampak | Kejadian |
+|---|---|---|---|
+| Lakar | 0 | 0 | – |
+| pen.dev | 1 | 900 | mcp__pencil__execute (900 ms): error |
+
+### Skor juri (median 3 ulangan)
+
+Ulangan valid: 2 dari 3. Detail dan bukti: \`bench/score-B.md\`.
+
+| Kriteria | Lakar | pen.dev |
+|---|---|---|
+| R1 | 1 (rentang 2) **periksa Adam** | 1.5 (rentang 1) |
+| R2 | 1 (rentang 2) **periksa Adam** | 1.5 (rentang 1) |
+| R4 | 1 (rentang 2) **periksa Adam** | 1.5 (rentang 1) |
+| R5 | 1 (rentang 2) **periksa Adam** | 1.5 (rentang 1) |
+| R6 | 1 (rentang 2) **periksa Adam** | 1.5 (rentang 1) |
+| R8 | 1 (rentang 2) **periksa Adam** | 1.5 (rentang 1) |
+| **Total (jumlah median)** | **6** | **9** |
+| Slop (juri) | 1 (rentang 2) **periksa Adam** | 1.5 (rentang 1) |
+
+### Keputusan: **Kalah** (sementara, menunggu konfirmasi Adam)
+
+Alasan: total 6 < 9 − 1.
+
+Strip: \`bench/runs/rounds/uji-1/B-lakar.png\` (390×844, 1 board), pen.dev –
+
+Biaya juri total: $0.50.
+
+## Versi beku
+
+- git HEAD: \`abc\`; \`git status --porcelain -- packages tools .mcp.json\`: kosong
+- protocolHash: \`h\` (baseline: \`h\`, sama)
+- Model agen dan juri: \`claude-opus-5-5\`; Claude Code: 2.1.325
+- lakard: version 0.1.0, schemaVersion 1, pid –, startedAt –, Chromium –
+- Ikon (/status): lucide 1.74.0
+- skill \`core.md\` sha256 \`aa\`
+- \`G0_RULES\`: \`{}\`
+- sha256 \`packages/check/dist\`: \`cc\`
+- pen.dev desktop: 1.2.23; MCP server: pencil 1.0.0
+- Juri: model \`claude-opus-5-5\`; argv \`claude -p\`
+
+## Protokol
+
+### Pembungkus (bench/protocol/wrapper.txt, kata per kata)
+
+\`\`\`
+W {{PROMPT}}
+\`\`\`
+
+### Prompt B
+
+\`\`\`
+prompt B
+\`\`\`
+
+### Argumen claude
+
+Lakar:
+
+\`\`\`
+a
+\`\`\`
+
+pen.dev:
+
+\`\`\`
+b
+\`\`\`
+
+Juri:
+
+\`\`\`
+c
+\`\`\`
+
+Env proses claude (agen dan juri): \`ENABLE_TOOL_SEARCH=false\`; dibuang dari env pemanggil: \`CLAUDE_EFFORT\`
+
+### Konvensi putaran
+
+- k
+
+### Definisi waktu dan reconnect
+
+- d
+
+## Penjaga .pen lama
+
+- 3 file \`.pen\` di-md5 sebelum putaran (\`~/.pencil/documents\`, \`/root/lakar/design\`, \`/root/comprice\`, \`/opt/pen\`).
+- Berubah: tidak ada; hilang: tidak ada; baru: 1.
+- \`systemctl --user is-active lakard\` sesudah putaran: active
+"
+`;
+
+exports[`laporan (snapshot) > score md: 6 kriteria × 2 alat, bukti per ulangan, pemetaan X/Y setelah penilaian, ulangan failed dicatat 1`] = `
+"# Skor juri prompt B (putaran uji-1)
+
+Juri LLM buta, 3 ulangan dengan label X/Y diacak. Keputusan **Kalah** (sementara, menunggu konfirmasi Adam): total 6 < 9 − 1.
+
+Ulangan valid: 2 dari 3.
+
+## Skor per kriteria
+
+| Kriteria | Alat | Ulangan 1 | Ulangan 2 | Ulangan 3 | Median | Rentang | Periksa |
+|---|---|---|---|---|---|---|---|
+| R1 | Lakar | 2 | 0 | – | 1 | 2 | **periksa Adam** |
+| R1 | pen.dev | 1 | 2 | – | 1.5 | 1 |  |
+| R2 | Lakar | 2 | 0 | – | 1 | 2 | **periksa Adam** |
+| R2 | pen.dev | 1 | 2 | – | 1.5 | 1 |  |
+| R4 | Lakar | 2 | 0 | – | 1 | 2 | **periksa Adam** |
+| R4 | pen.dev | 1 | 2 | – | 1.5 | 1 |  |
+| R5 | Lakar | 2 | 0 | – | 1 | 2 | **periksa Adam** |
+| R5 | pen.dev | 1 | 2 | – | 1.5 | 1 |  |
+| R6 | Lakar | 2 | 0 | – | 1 | 2 | **periksa Adam** |
+| R6 | pen.dev | 1 | 2 | – | 1.5 | 1 |  |
+| R8 | Lakar | 2 | 0 | – | 1 | 2 | **periksa Adam** |
+| R8 | pen.dev | 1 | 2 | – | 1.5 | 1 |  |
+| **Total** | Lakar |  |  |  | **6** | | |
+| **Total** | pen.dev |  |  |  | **9** | | |
+
+## Slop dan emoji menurut juri
+
+| Alat | Slop (median, rentang) | Emoji terlihat (median, rentang) |
+|---|---|---|
+| Lakar | 1 (rentang 2) **periksa Adam** | 0 (rentang 0) |
+| pen.dev | 1.5 (rentang 1) | 0 (rentang 0) |
+
+## Bukti per ulangan
+
+### Lakar
+
+**R1**
+
+- Ulangan 1 (skor 2): R1 2
+- Ulangan 2 (skor 0): R1 0
+
+**R2**
+
+- Ulangan 1 (skor 2): b
+- Ulangan 2 (skor 0): b
+
+**R4**
+
+- Ulangan 1 (skor 2): b
+- Ulangan 2 (skor 0): b
+
+**R5**
+
+- Ulangan 1 (skor 2): b
+- Ulangan 2 (skor 0): b
+
+**R6**
+
+- Ulangan 1 (skor 2): b
+- Ulangan 2 (skor 0): b
+
+**R8**
+
+- Ulangan 1 (skor 2): b
+- Ulangan 2 (skor 0): b
+
+**Titik fokus (R2)**
+
+- Ulangan 1: hero
+- Ulangan 2: hero
+
+**Slop**
+
+- Ulangan 1: 1: x · 2: x
+- Ulangan 2: tidak ada
+
+### pen.dev
+
+**R1**
+
+- Ulangan 1 (skor 1): R1 1
+- Ulangan 2 (skor 2): R1 2
+
+**R2**
+
+- Ulangan 1 (skor 1): b
+- Ulangan 2 (skor 2): b
+
+**R4**
+
+- Ulangan 1 (skor 1): b
+- Ulangan 2 (skor 2): b
+
+**R5**
+
+- Ulangan 1 (skor 1): b
+- Ulangan 2 (skor 2): b
+
+**R6**
+
+- Ulangan 1 (skor 1): b
+- Ulangan 2 (skor 2): b
+
+**R8**
+
+- Ulangan 1 (skor 1): b
+- Ulangan 2 (skor 2): b
+
+**Titik fokus (R2)**
+
+- Ulangan 1: hero
+- Ulangan 2: hero
+
+**Slop**
+
+- Ulangan 1: 1: x
+- Ulangan 2: 1: x · 2: x
+
+## Pemetaan X/Y per ulangan (dibuka setelah penilaian)
+
+| Ulangan | Desain X | Desain Y | Status | Biaya |
+|---|---|---|---|---|
+| 1 | Lakar | pen.dev | ok | $0.10 |
+| 2 | pen.dev | Lakar | ok | $0.10 |
+| 3 | Lakar | pen.dev | failed (1 percobaan ulang): percobaan 1 invalid_output [bukan JSON]; percobaan 2 invalid_output [X.R1.skor harus 0, 1, atau 2 (dapat 3)] | $0.10 |
+"
+`;

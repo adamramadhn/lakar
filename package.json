@@ -12,7 +12,8 @@
     "clean": "tsc -b --clean",
     "lakard": "node packages/daemon/dist/main.js",
     "install-browser": "bash scripts/install-browser.sh",
-    "bench:pendev": "node scripts/assert-node.mjs && node bench/dist/cli.js pendev-baseline"
+    "bench:pendev": "node scripts/assert-node.mjs && node bench/dist/cli.js pendev-baseline",
+    "bench:round": "node scripts/assert-node.mjs && node bench/dist/cli.js round"
   },
   "devDependencies": {
     "@types/node": "26.6.6",

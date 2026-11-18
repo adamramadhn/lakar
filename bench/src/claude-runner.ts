@@ -38,9 +38,14 @@ export function shellQuote(args: readonly string[]): string {
 }
 
 export type RunClaudeOptions = {
-  prompt: string;
-  mcpConfig: string;
-  allowedTools: string;
+  /** Agen desain: argv dibangun `buildArgs` dari tiga field ini (wajib bila `rawArgs` tidak diberikan). */
+  prompt?: string;
+  mcpConfig?: string;
+  allowedTools?: string;
+  /** argv mentah (tanpa nama program) menggantikan `buildArgs`, mis. juri dengan `--input-format stream-json`. */
+  rawArgs?: string[];
+  /** Ditulis ke stdin proses lalu stdin ditutup (stream-json input). Tanpa ini stdin = 'ignore'. */
+  stdin?: string | Buffer;
   config: ProtocolConfig;
   outDir: string;
   /** Dipanggil saat event init tiba; masalah ≠ [] → proses dihentikan segera. */
@@ -68,7 +73,12 @@ export type RunClaudeResult = {
 const KILL_GRACE_MS = 5_000;
 
 export async function runClaude(opts: RunClaudeOptions): Promise<RunClaudeResult> {
-  const argv = buildArgs({ prompt: opts.prompt, config: opts.config, mcpConfig: opts.mcpConfig, allowedTools: opts.allowedTools });
+  let argv: string[];
+  if (opts.rawArgs) argv = [...opts.rawArgs];
+  else {
+    if (opts.prompt === undefined || opts.mcpConfig === undefined || opts.allowedTools === undefined) throw new Error('runClaude: prompt, mcpConfig, dan allowedTools wajib tanpa rawArgs');
+    argv = buildArgs({ prompt: opts.prompt, config: opts.config, mcpConfig: opts.mcpConfig, allowedTools: opts.allowedTools });
+  }
   const cwd = mkdtempSync(join(tmpdir(), 'lakar-bench-'));
   if (opts.forbiddenCwdRoot) {
     const root = resolve(opts.forbiddenCwdRoot);
@@ -89,7 +99,12 @@ export async function runClaude(opts: RunClaudeOptions): Promise<RunClaudeResult
   const startedAt = new Date().toISOString();
 
   const t0 = performance.now();
-  const child = spawn(opts.command ?? 'claude', [...(opts.prefixArgs ?? []), ...argv], { cwd, env, stdio: ['ignore', 'pipe', 'pipe'] });
+  const child = spawn(opts.command ?? 'claude', [...(opts.prefixArgs ?? []), ...argv], { cwd, env, stdio: [opts.stdin === undefined ? 'ignore' : 'pipe', 'pipe', 'pipe'] });
+  if (opts.stdin !== undefined) {
+    // EPIPE bila proses keluar lebih dulu: diabaikan (hasilnya terlihat dari exit/transkrip).
+    child.stdin!.on('error', () => {});
+    child.stdin!.end(opts.stdin);
+  }
 
   const kill = () => {
     if (child.exitCode !== null || child.signalCode !== null) return;
@@ -118,7 +133,7 @@ export async function runClaude(opts: RunClaudeOptions): Promise<RunClaudeResult
     }
   };
 
-  child.stdout.on('data', (chunk: Buffer) => {
+  child.stdout!.on('data', (chunk: Buffer) => {
     const t = performance.now() - t0;
     stdoutFile.write(chunk);
     stdoutBytes += chunk.length;
@@ -131,7 +146,7 @@ export async function runClaude(opts: RunClaudeOptions): Promise<RunClaudeResult
     }
     if (start < chunk.length) pending.push(chunk.subarray(start));
   });
-  child.stderr.on('data', (chunk: Buffer) => stderrFile.write(chunk));
+  child.stderr!.on('data', (chunk: Buffer) => stderrFile.write(chunk));
 
   const timer = setTimeout(() => {
     timedOut = true;

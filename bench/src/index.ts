@@ -5,6 +5,7 @@ export * from './claude-runner.js';
 export * from './stats.js';
 export * from './report.js';
 export * from './series.js';
+export * from './log.js';
 export * from './pendev/pencil-client.js';
 export * from './pendev/newdoc.js';
 export * from './pendev/artifacts.js';
