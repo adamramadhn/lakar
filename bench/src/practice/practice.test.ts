@@ -32,7 +32,7 @@ const HAVE_SOURCES = existsSync(DESIGN_MD_PATH) && existsSync(GOLDEN_SET_PATH);
 const { prompts } = loadPracticePrompts();
 
 describe('practice: argumen', () => {
-  it('iter wajib, maks 6; only, reuse-pendev (< iter), resume, dry-run', () => {
+  it('iter wajib, maks 7; only, reuse-pendev (< iter), resume, dry-run', () => {
     expect(parsePracticeArgs(['--iter', '1'])).toEqual({ ok: true, value: { iter: 1, only: undefined, reusePendev: undefined, resume: false, dryRun: false } });
     expect(parsePracticeArgs(['--', '--iter=2', '--only', 'P1,P3,P1', '--reuse-pendev', '1', '--resume', '--dry-run'])).toEqual({
       ok: true,
@@ -75,11 +75,11 @@ describe('practice: pakai ulang pen.dev, biaya, anggaran', () => {
     expect(estimateCost({ prompts: ids, reusePendev: false, doneRuns: new Set(['P1-pendev', 'P1-lakar']), doneJudge: new Set(['P1']) })).toBe(8.4);
   });
 
-  it('biaya kumulatif dari laporan sebelumnya; anggaran $57,80 (iterasi maks 6)', () => {
-    expect(MAX_ITER).toBe(6);
-    expect(BUDGET_USD).toBe(57.8);
-    expect(parsePracticeArgs(['--iter', '6', '--reuse-pendev', '2'])).toMatchObject({ ok: true, value: { iter: 6, reusePendev: 2 } });
-    expect(parsePracticeArgs(['--iter', '7'])).toMatchObject({ ok: false });
+  it('biaya kumulatif dari laporan sebelumnya; anggaran $55,18 (iterasi maks 7)', () => {
+    expect(MAX_ITER).toBe(7);
+    expect(BUDGET_USD).toBe(55.18);
+    expect(parsePracticeArgs(['--iter', '7', '--reuse-pendev', '2'])).toMatchObject({ ok: true, value: { iter: 7, reusePendev: 2 } });
+    expect(parsePracticeArgs(['--iter', '8'])).toMatchObject({ ok: false });
     const reports: Record<number, { cost: { iteration: number } }> = { 1: { cost: { iteration: 9.5 } }, 2: { cost: { iteration: 6.25 } } };
     expect(previousCosts(3, (j) => reports[j])).toEqual({ byIter: { 1: 9.5, 2: 6.25 }, total: 15.75 });
     expect(previousCosts(1, () => undefined)).toEqual({ byIter: {}, total: 0 });
@@ -87,7 +87,8 @@ describe('practice: pakai ulang pen.dev, biaya, anggaran', () => {
     expect(previousCosts(4, (j) => reports[j], (j) => (j === 3 ? 2.66 : j === 1 ? 99 : undefined))).toEqual({ byIter: { 1: 9.5, 2: 6.25, 3: 2.66 }, total: 18.41 });
     expect(budgetProblem(15.75, 7.6)).toBeUndefined();
     expect(budgetProblem(23, 7.6)).toBeUndefined();
-    expect(budgetProblem(50.5, 7.6)).toMatch(/anggaran: terpakai \$50\.50 \+ perkiraan sisa \$7\.60 > \$57\.8/);
+    expect(budgetProblem(45.18, 7.6)).toBeUndefined();
+    expect(budgetProblem(50.5, 7.6)).toMatch(/anggaran: terpakai \$50\.50 \+ perkiraan sisa \$7\.60 > \$55\.18/);
     expect(budgetProblem(23, 7.6, 30)).toMatch(/anggaran: terpakai \$23\.00 \+ perkiraan sisa \$7\.60 > \$30/);
   });
 });

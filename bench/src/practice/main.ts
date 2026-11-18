@@ -37,10 +37,10 @@ import { loadPracticePrompts, PRACTICE_DIR, PRACTICE_ID, PRACTICE_PROMPTS_SHA256
 
 export const PRACTICE_RUNS = join(RUNS_ROOT, 'practice');
 export const ROUNDS_RUNS = join(RUNS_ROOT, 'rounds');
-/** Iterasi maksimal (plan story 19, Plan Change Log 2026-11-18: iterasi 4–6 dibuka Adam): tidak ada iterasi ke-7. */
-export const MAX_ITER = 6;
-/** Anggaran run berbayar kumulatif semua iterasi latihan (USD): $27,80 iterasi 1–3 + $30 tambahan. */
-export const BUDGET_USD = 57.8;
+/** Iterasi maksimal (plan story 19, Plan Change Log 2026-11-18: iterasi 4–6, lalu iterasi konfirmasi 7 dibuka Adam): tidak ada iterasi ke-8. */
+export const MAX_ITER = 7;
+/** Anggaran run berbayar kumulatif semua iterasi latihan (USD): $45,18 terpakai iterasi 1–6 + $10 iterasi 7. */
+export const BUDGET_USD = 55.18;
 /** Perkiraan biaya atas per prompt (USD, dari putaran 1 + kalibrasi juri): run pen.dev, run Lakar, juri 3×. */
 export const COST_ESTIMATE = { pendev: 0.9, lakar: 1.1, judge: 0.8 } as const;
 /** Versi rubrik juri yang wajib (rubrik v2.1, `bench/rubric/rubric.json`). */

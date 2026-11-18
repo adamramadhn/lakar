@@ -1,6 +1,6 @@
 # Lakar: mobile app
 
-Board `390 × 844` (`screen:'mobile'`), ukuran tidak pernah diubah. Biasanya cukup 1–2 execute.
+Board `390 × 844` (`screen:'mobile'`), ukuran tidak pernah diubah. Board sudah menyusun anak sebagai kolom (tanpa `layout`).
 
 Mode gelap (Malam): `Object.assign(C,{bg,sub:surface,line,line2,t1,t2,t3` dari netral gelap bernuansa aksen`, acc` varian gelap`, tint, field:raised, deep, on:'#0B0C0F', ok:'#4ADE80', warn:'#FBBF24', bad:'#F87171', acc2, data})`; kartu = surface, sorotan = raised, latar besar tidak pernah abu murni.
 
@@ -8,17 +8,23 @@ Mode gelap (Malam): `Object.assign(C,{bg,sub:surface,line,line2,t1,t2,t3` dari n
 
 - **Status bar** 54 (nama layer persis `Status bar`): jam kiri, ikon `signal`/`wifi`/`battery-full` 16 kanan, padding horizontal 24.
 - **Satu wrapper** `Konten` (kolom, `width:'fill'`, padding horizontal 20). Anak tidak menambah padding horizontal sendiri. Jarak: antar-seksi 24–32, judul seksi ↔ isi 12–16, antar-kartu 12–16, ikon ↔ teks 4–8.
-- **Header:** avatar foto 40–48 (bila ada pengguna; foto potret, bukan inisial) + sapaan peran `title` (atau judul layar `title-lg`) + maks dua `IconButton /` 44–48. Gaya judul sama di semua layar satu alur.
+- **Header hemat ruang:** satu blok ≤ 64: avatar foto 40 (bila ada pengguna; foto potret, bukan inisial) + sapaan peran `title` (atau judul layar `title-lg`) + maks dua `IconButton /` 44. Baris konteks (tanggal, lokasi) hanya bila ruang tersisa. Gaya judul sama di semua layar satu alur.
 - **Header seksi:** judul h4 + tautan aksen `Link /` di kanan.
 - **Kartu/list:** kartu padding 16–20, radius sesuai arketipe; kartu sorotan di bidang merek (terang: `C.field` + bayangan md; gelap: lapis raised + garis aksen) dengan `Badge` metrik di header. Baris list: wadah ikon 40 atau thumbnail foto 48–56, judul label + meta body-sm muted (durasi, waktu, jumlah), lalu keadaan di kanan: selesai `circle-check` success, berikutnya `Badge` aksen + baris disorot, mendatang chevron, terkunci `lock` muted. Target sentuh minimal 44 × 44, jarak antar-target ≥ 8.
-- **Sampul, tile, thumbnail:** foto dari satu pencarian bertema (`limit:12`, foto berbeda per butir; teks di atas foto diberi lapisan gelap). Tile koleksi tanpa foto: bidang cerah `C.data` per kategori + label kontras; tile tetap terbaca sebagai satu keluarga.
+- **Sampul, tile, thumbnail:** foto dari satu pencarian bertema (`limit:12`, foto berbeda per butir; teks di atas foto diberi lapisan gelap). Tile koleksi tanpa foto: tiap tile hue sendiri dari palet kategori (aksen, pendamping, lalu hue serasi lain; terang/jenuh setara) + label kontras; kesatuan dijaga bentuk, ikon, dan tipografi yang seragam, bukan gradasi satu hue. Visual besar di puncak layar (foto, sampul) maks ±280 tinggi.
 - **Ring/grafik** dari `ellipse` busur: jalur (`inner`, tint) + progres (`startDeg`, `sweepDeg` = persen × 360) ditumpuk di frame `layout:'none'`. Beberapa seri = beberapa busur/ring bernada `C.data`, legenda titik bernada sama + nilai / sasaran; tengahnya angka kunci (`KPI / Nilai`) atau kosong.
-- **Tab bar** 3–5 item: ikon 24 + label peran `tab`; aktif = aksen + pil tint, lainnya muted. Bilah yang menempel di atasnya (keranjang, proses berjalan) = `Overlay /` di lapis raised dengan progres tipis aksen. Mengambang = frame `Overlay / Tab bar` absolut (lebar 350, x 20, di atas home indicator). Konten terakhir harus selesai di atasnya; `check` memberi tahu bila tertutup.
+- **Tab bar** 3–5 item: ikon 24 + label peran `tab`; aktif = aksen + pil tint, lainnya muted. Bilah yang menempel di atasnya (keranjang, proses berjalan) = `Overlay /` di lapis raised dengan progres tipis aksen. Mengambang = frame `Overlay / Tab bar` absolut (lebar 350, x 20, di atas home indicator).
 - **Bilah bawah tetap** untuk aksi menetap (checkout, booking): `Overlay / Bilah bawah` padding 16 20 34, total + tombol 56 lebar fill.
-- **Bagian yang diminta tampil utuh:** tidak ada bagian yang hanya terlihat sebagian atau tertutup overlay/tab bar di board pertama; bila tidak muat, ringkas isi (lebih sedikit butir, tile lebih kecil) atau pakai pola layar panjang di bawah.
-- **Anggaran tinggi:** dengan tab bar mengambang di y 746, wrapper (mulai y 54) punya ±680 untuk header + seksi; jumlahkan tinggi seksi sebelum menulis dan pangkas isi, bukan memperkecil font.
+- **Layar pertama padat dan selesai rapi:** board pertama memuat inti permintaan (aksi utama, isi kunci, awal tiap bagian penting) di atas zona bawah (tab bar, bilah yang menempel, bilah aksi tetap). Butir terakhir yang terlihat berakhir ≥ 8 di atas zona; tidak ada judul seksi yang isinya tertutup, tidak ada kartu/baris setengah terlihat. Seksi yang tidak muat mulai utuh di balik zona (tertutup penuh) atau di board posisi akhir. LC-20 = error.
+- **Anggaran tinggi (hitung dulu):** tab bar mengambang mulai y 746; bilah menempel di atasnya ±64 lagi; bilah aksi tetap mulai ±734. Kurangi 54 status bar, lalu jumlahkan header + tiap seksi (judul 28 + jarak + isi). Lebih → kurangi butir, rapatkan kartu, atau pindahkan seksi utuh ke bawah; font tidak dikecilkan.
 - **Home indicator** 34 (nama layer persis `Home indicator`), garis 134 × 5 di tengah.
-- **Layar lebih panjang dari 844:** status bar → header tetap → `Scroll / Konten` (`clip:true`) → bilah bawah tetap. Sajikan dua board 390 × 844: posisi awal dan posisi akhir (`const p=place(390,844,{near:b}); const b2=duplicate(b,{name:'… (akhir) …', x:p.x, y:p.y});` lalu `update(find({name:'Scroll / Konten', within:b2})[0].id, {scrollY:…})`). Font dan jarak tidak dikecilkan.
+- **Layar lebih panjang dari 844:** putuskan saat merencanakan. Status bar → header tetap → `Scroll / Konten` (`clip:true`) → bilah bawah tetap. Sajikan dua board 390 × 844, keduanya dibangun di execute pertama: posisi awal dan posisi akhir (`const p=place(390,844,{near:b}); const b2=duplicate(b,{name:'… (akhir) …', x:p.x, y:p.y});` lalu `update(find({name:'Scroll / Konten', within:b2})[0].id, {scrollY:…})`). `scrollY` dipilih agar tepi atas area gulir jatuh di awal seksi/butir dan butir terakhir selesai bersih di atas zona bawah.
+
+## Alur execute
+
+1. Execute 1: semua board lengkap (termasuk posisi akhir).
+2. Error `check`: kumpulkan semua temuan, perbaiki dalam satu execute (`update`/`editId`), bukan satu per satu.
+3. Akhir sesuai `core`: satu screenshot per board → satu execute perbaikan → `export`. Total biasanya 2, maks 3 execute.
 
 ## Contoh teruji
 

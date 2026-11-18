@@ -269,3 +269,34 @@ Skill: `core.md` 8f2fe336bcb1c7dc, `landing.md` b953c1b2bae4a8d4, `mobile.md` 38
 - Butuh keputusan Adam: (a) menerima hasil iterasi 5 sebagai bukti lulus walau skill akhir v5 hanya teruji di iterasi 6
   (gagal hanya karena waktu P3), atau (b) dana/iterasi tambahan untuk mengukur ulang v5 dan/atau mengencangkan disiplin
   alur akhir mobile; serta (c) tinjauan PNG.
+
+## Iterasi 7 (konfirmasi): skill v6 — prinsip mobile, keragaman hue koleksi, disiplin alur akhir
+
+Dibuka Adam 2026-11-18 setelah HALT iterasi 6: satu iterasi konfirmasi, `--reuse-pendev 2` (pen.dev tidak dijalankan),
+anggaran iterasi ≤ $10 (batas kumulatif $55,18; `MAX_ITER` 7). Check LC-20 kini menandai konten terpotong/tertutup zona
+bawah dan judul seksi yatim sebagai error gerbang (commit db1df37).
+
+Harness: `MAX_ITER` 7, `BUDGET_USD` 55,18 (+ tes); README diperbarui.
+
+Perubahan skill v6 (prinsip umum, berlaku untuk layar apa pun):
+
+- **Layar pertama mobile padat dan selesai rapi** (`mobile.md`). Alasan: di iterasi 6 layar pertama berakhir dengan judul
+  seksi yang isinya tertutup bilah bawah dan kartu terpotong (kini LC-20). Prinsip: header satu blok ≤ 64 (baris konteks
+  hanya bila ruang tersisa), visual puncak ≤ ±280, anggaran tinggi dihitung sebelum menulis kode terhadap y atas zona
+  bawah, butir terakhir berakhir ≥ 8 di atas zona, seksi yang tidak muat mulai utuh di balik zona atau di board posisi
+  akhir; layar panjang diputuskan saat merencanakan, `scrollY` posisi akhir jatuh di awal seksi/butir.
+- **Keragaman hue koleksi** (`core.md` Prinsip 5, peran warna; `mobile.md` tile). Alasan: tile koleksi tanpa foto di
+  iterasi 6 menjadi gradasi satu hue (aturan lama "satu keluarga"). Prinsip: satu hue per kategori (4–6 hue serasi,
+  terang/jenuh setara), kesatuan dari bentuk/ikon/tipografi; palet kategori dihitung sebagai satu peran sehingga batas
+  "maks 2 hue non-status" berlaku di luar palet itu.
+- **Disiplin alur akhir** (`core.md` langkah 6, `mobile.md` §Alur execute). Alasan: P3 iterasi 6 = 1,71× karena galat
+  skema (`layout` pada board), board posisi akhir dibangun setelah screenshot, `inspect` dan screenshot tambahan
+  (6 execute). Prinsip: semua board (termasuk posisi akhir) di execute pertama; temuan `check` diperbaiki sekaligus dalam
+  satu execute; satu screenshot per board → satu execute perbaikan semua temuan → export; tanpa `inspect`/screenshot
+  tambahan; board sudah kolom (tanpa `layout`). Biasanya 2, maks 3 execute.
+- Penghematan token `core.md` (3994/4000): kalimat yang mengulang prelude dihapus (`F`/`Row`, padding/radius tombol,
+  `place` pada revisi), kalimat pengganti foto dipadatkan.
+
+Skill: `core.md` 38e5bdecbeb86cfd, `landing.md` b953c1b2bae4a8d4 (tidak berubah), `mobile.md` 292380fd57fe8f8a.
+Verifikasi sebelum run: build OK, 793/793 tes (48 file; termasuk C7, batas token, contoh skill 0 error/warning/gate),
+api.md sama, protocolHash 907cb36f…edb85d, bench/protocol & bench/rubric tidak berubah sejak 97ec581, lakard active.
