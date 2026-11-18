@@ -198,3 +198,10 @@ Blocking condition: 3 iterasi latihan selesai tanpa lulus (aturan Design Notes �
 - Verifikasi orkestrator: build OK, 763/763 tes (48 file), api.md tanpa beda, protocolHash 907cb36f…edb85d, bench/protocol & bench/rubric tidak berubah, practice --dry-run OK, lakard active setelah restart, verify.sh exit 0.
 - Review step-04 tidak dijalankan: HALT wajib setelah 3 iterasi gagal; kode harness sudah di-commit dan perlu review di follow-up bila diteruskan.
 - Laporan: bench/practice-1..3.md, bench/practice/LOG.md; PNG Lakar bench/practice/<k>/; PNG pen.dev lokal bench/runs/practice/<k>/.
+
+### Lanjutan iterasi 4–6 (2026-11-18): **blocked** lagi di iterasi 4
+
+- Harness: `MAX_ITER` 6, `BUDGET_USD` 57,8 (+ tes), preflight mode `--reuse-pendev` tidak mewajibkan pen-desktop aktif; README diperbarui (commit bdd7d04).
+- Skill v4 (prinsip umum): foto dipakai untuk isi nyata dengan satu pencarian `limit:12` per jenis slot dan kueri visual Inggris (orang = kueri potret stok); koleksi cerah bermakna dari `C.data` (aturan "nada redup" dicabut); pendamping/status muncul di ≥ 2 bagian; tanpa potongan/luberan (kartu `hug`, bar = persen × induk, kritik diri memeriksa). `core.md` 3999/4000 token. Build OK, 781/781 tes (48 file), C7 lulus, api.md sama.
+- Iterasi 4 (`--reuse-pendev 2`) dihentikan setelah P1/P2 Lakar (P3 parsial, tanpa juri; ≈ $2,7, kumulatif ≈ $30,5–30,8): setiap unduhan `upload.wikimedia.org` dari daemon dijawab HTTP 429 (HTTP/1.1 + User-Agent tanpa kontak; UA berkontak atau HTTP/2 → 200). Tidak diakali (kontak palsu/ganti protokol = mengakali rate limit; kontak asli = data Adam). Detail: `bench/practice/LOG.md`.
+- Butuh keputusan Adam: info kontak User-Agent untuk Wikimedia (atau penyedia lain), lalu iterasi 5 baru (`practice --iter 5 --reuse-pendev 2`). Verifikasi: protocolHash 907cb36f…, bench/protocol & bench/rubric bersih, `round --dry-run` sha = rubric.json, lakard active, verify.sh exit 0.
