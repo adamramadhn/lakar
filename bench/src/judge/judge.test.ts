@@ -1,9 +1,12 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { encodePngRgb, encodePngRgbaWithChunks } from '../png/codec.js';
-import { GOLDEN_SET_PATH, loadProtocol } from '../protocol.js';
+import { BENCH_ROOT, GOLDEN_SET_PATH, loadProtocol } from '../protocol.js';
+import { c7Targets } from '../round/main.js';
+import { sha256 } from '../sys.js';
+import { lampiranB, planSnapshot, readRubricJson, rubricShaProblems, rubricVersionOf, writeSnapshot } from './rubric.js';
 import { parseJudgeOutput } from './parse.js';
 import { buildJudgeText, DESIGN_MD_PATH, extractCriteria, judgeC7Problems, judgeLeaks, neutralizeInternalTerms, parseDesignTokens, scrubToolNames, tokenLeaks } from './prompt.js';
 import { assignLabels, buildJudgeArgs, buildJudgeBlocks, judgeMessageLine, runJudgeRep } from './run.js';
@@ -65,7 +68,7 @@ describe('teks juri', () => {
     expect(tokenLeaks('pakai accent-green', tokens)).toEqual(['accent-green']);
   });
 
-  it.skipIf(!HAVE_SOURCES && process.env.LAKAR_C7_ALLOW_MISSING_SOURCES === '1')('teks juri nyata: rubrik 6 kriteria, slop 12, prompt tanpa pembungkus, tanpa [G], tanpa nama alat', () => {
+  it.skipIf(!HAVE_SOURCES && process.env.LAKAR_C7_ALLOW_MISSING_SOURCES === '1')('teks juri nyata: rubrik 8 kriteria, slop 12, prompt tanpa pembungkus, tanpa [G], tanpa nama alat', () => {
     const design = readFileSync(DESIGN_MD_PATH, 'utf8');
     const golden = readFileSync(GOLDEN_SET_PATH, 'utf8');
     for (const id of ['A', 'B'] as const) {
@@ -74,7 +77,11 @@ describe('teks juri', () => {
       expect(t.text).toContain(protocol.prompts[id]);
       expect(t.text).not.toContain('Mode benchmark');
       expect(t.text).not.toMatch(/\[G\]|\[T\]|\| R3 \||\| R7 \|/);
-      for (const r of ['R1', 'R2', 'R4', 'R5', 'R6', 'R8']) expect(t.text).toContain(`| ${r} |`);
+      for (const r of ['R1', 'R2', 'R4', 'R5', 'R6', 'R8', 'R9', 'R10']) expect(t.text).toContain(`| ${r} |`);
+      expect(t.text).toContain('"R10": {"skor": 0|1|2');
+      expect(t.rubricVersion).toBe(readRubricJson()!.version);
+      // Juri tidak melihat aturan keputusan per prompt ("setara" kecil di prompt = "setara desainer produk senior").
+      expect(t.text).not.toMatch(/daya tarik|Lebih baik|Kalah|Setara|melanggar brief|D_L|D_P/);
       expect(t.text).toMatch(/^12\. /m);
       expect(t.text).toContain('Setiap pelanggaran hanya dihitung di');
       expect(t.text).toContain('Setiap skor wajib disertai bukti');
@@ -99,6 +106,8 @@ const design = (skor = 2) => ({
   R5: { skor, bukti: 'ikon fitur' },
   R6: { skor, bukti: 'angka mockup' },
   R8: { skor, bukti: 'pricing' },
+  R9: { skor, bukti: 'delta KPI berwarna di mockup' },
+  R10: { skor, bukti: 'bidang hero ber-tint' },
   slop: { jumlah: 1, butir: ['9: semua teks rata tengah di footer'] },
   emoji: 0,
   fokus: 'headline hero kiri atas',
@@ -123,6 +132,10 @@ describe('parseJudgeOutput', () => {
     expect(bad((v) => (v.Y.R6.bukti = ' '))).toMatchObject({ ok: false, problems: [expect.stringMatching(/Y\.R6\.bukti kosong/)] });
     expect(bad((v) => (v.X.R3 = { skor: 1, bukti: 'x' }))).toMatchObject({ ok: false });
     expect(bad((v) => delete v.Y.R8)).toMatchObject({ ok: false });
+    // (e) rubrik v2: jawaban tanpa R9/R10 ditolak.
+    expect(bad((v) => delete v.X.R9)).toMatchObject({ ok: false, problems: [expect.stringMatching(/X: kunci hilang R9/)] });
+    expect(bad((v) => delete v.Y.R10)).toMatchObject({ ok: false, problems: [expect.stringMatching(/Y: kunci hilang R10/)] });
+    expect(bad((v) => (v.X.R10.bukti = ''))).toMatchObject({ ok: false, problems: [expect.stringMatching(/X\.R10\.bukti kosong/)] });
     expect(bad((v) => (v.X.slop.jumlah = 2))).toMatchObject({ ok: false });
     expect(bad((v) => (v.X.emoji = -1))).toMatchObject({ ok: false });
     expect(bad((v) => (v.Z = {}))).toMatchObject({ ok: false });
@@ -231,5 +244,97 @@ else w({type:'result',subtype:'success',is_error:false,result:${JSON.stringify(v
         expect(rec.attempts).toHaveLength(1);
       },
     );
+  });
+});
+
+// ---------- rubrik v2 dan snapshot tracked (story 17) ----------
+
+const RUBRIC = readRubricJson();
+const RUBRIC_V = RUBRIC ? join(BENCH_ROOT, 'rubric', `v${RUBRIC.version}`) : '';
+/** Kata yang menyebut isi prompt A/B: tidak boleh ada di teks R4/R9/R10 (kriteria umum). */
+const FORBIDDEN_IN_GENERAL = ['streak', 'target harian', 'Kasku', 'Gerak', 'invoice', 'avatar foto', 'avatar', 'langkah', 'kalori', 'UMKM', 'pembukuan', 'kebugaran', 'hijau', 'oranye'];
+/** Bagian rahasia (rubrik + kriteria + bukti) dari teks juri: dari "## Aturan skor" sampai "## Checklist slop". */
+const secretOf = (text: string) => text.slice(text.indexOf('## Aturan skor'), text.indexOf('## Checklist slop')).trim();
+
+describe('rubrik v2 (snapshot tracked bench/rubric/)', () => {
+  it('rubric.json ada, versi ≥ 2, dan snapshot v1 tetap ada', () => {
+    expect(RUBRIC).toBeDefined();
+    expect(Number(RUBRIC!.version.split('.')[0])).toBeGreaterThanOrEqual(2);
+    expect(readdirSync(join(BENCH_ROOT, 'rubric', 'v1')).sort()).toEqual(['golden-kriteria.md', 'judge-text-A.md', 'judge-text-B.md', 'lampiran-b.md']);
+  });
+
+  it('(b) teks R4/R9/R10 di lampiran-b.md tanpa kata isi prompt A/B', () => {
+    const lb = readFileSync(join(RUBRIC_V, 'lampiran-b.md'), 'utf8');
+    expect(rubricVersionOf(lb)?.version).toBe(RUBRIC!.version);
+    const rows = ['R4', 'R9', 'R10'].map((r) => {
+      const row = lb.split('\n').find((l) => l.startsWith(`| ${r} |`));
+      expect(row, r).toBeDefined();
+      return row!;
+    });
+    const extra = lb.split('\n').filter((l) => /R9 dan R10/.test(l));
+    expect(extra.length).toBeGreaterThanOrEqual(2);
+    for (const t of [...rows, ...extra])
+      for (const w of FORBIDDEN_IN_GENERAL) expect(new RegExp(`(^|[^\\p{L}])${w}($|[^\\p{L}])`, 'iu').test(t), `"${w}" di: ${t.slice(0, 60)}`).toBe(false);
+  });
+
+  it('(c) C7: frasa rubrik/kriteria v2 tidak ada di skill, pembungkus, prompt render, server MCP', () => {
+    const targets = c7Targets(protocol);
+    for (const n of ['packages/mcp/src/server.ts', 'bench/protocol/wrapper.txt', 'prompt agen A (hasil render)', 'prompt agen B (hasil render)']) expect(targets.map((t) => t.name)).toContain(n);
+    expect(targets.some((t) => t.name.startsWith('packages/skills/skills/'))).toBe(true);
+    for (const id of ['A', 'B']) {
+      const secret = secretOf(readFileSync(join(RUBRIC_V, `judge-text-${id}.md`), 'utf8'));
+      expect(secret).toContain('| R9 |');
+      expect(judgeC7Problems(secret, targets)).toEqual([]);
+    }
+  });
+
+  it('(d) sha256 judge-text-*.md snapshot = rubric.json; teks juri saat ini = snapshot', () => {
+    for (const id of ['A', 'B']) {
+      const text = readFileSync(join(RUBRIC_V, `judge-text-${id}.md`), 'utf8');
+      expect(sha256(text), id).toBe(RUBRIC!.judgeTextSha256[id]);
+      expect(judgeLeaks(text)).toEqual([]);
+    }
+    for (const f of ['lampiran-b.md', 'golden-kriteria.md']) expect(sha256(readFileSync(join(RUBRIC_V, f), 'utf8')), f).toBe(RUBRIC!.sourceSha256[f]);
+    if (HAVE_SOURCES) {
+      const design = readFileSync(DESIGN_MD_PATH, 'utf8');
+      const golden = readFileSync(GOLDEN_SET_PATH, 'utf8');
+      for (const id of ['A', 'B'] as const) {
+        const t = buildJudgeText(design, golden, id, protocol.prompts[id]);
+        expect(t.text, `teks juri ${id} berubah tanpa rubric-snapshot`).toBe(readFileSync(join(RUBRIC_V, `judge-text-${id}.md`), 'utf8'));
+        expect(t.text).toContain(t.secret);
+      }
+      expect(lampiranB(design)).toBe(readFileSync(join(RUBRIC_V, 'lampiran-b.md'), 'utf8'));
+    }
+  });
+
+  it('snapshot eksklusif: baru → ditulis; identik → no-op; berbeda → error; versi wajib/cocok', () => {
+    const root = mkdtempSync(join(tmpdir(), 'bench-rubric-'));
+    try {
+      const design = '## Lampiran B — Rubrik\n\nVersi rubrik: 3 (2026-12-01)\n\nisi\n\n## Lain\n';
+      const golden = '## A — x\n\n**Kriteria target:**\n1. [R1] a\n\n---\n';
+      const plan = planSnapshot({ designMd: design, goldenMd: golden, judgeTexts: { A: 'teks A' }, today: '2026-11-18' }, root);
+      expect(plan.version).toBe('3');
+      expect(plan.json).toMatchObject({ version: '3', date: '2026-12-01', judgeTextSha256: { A: sha256('teks A') } });
+      expect(plan.files['lampiran-b.md']).toBe('## Lampiran B — Rubrik\n\nVersi rubrik: 3 (2026-12-01)\n\nisi\n');
+      expect(writeSnapshot(plan, root)).toBe('ditulis');
+      expect(writeSnapshot(plan, root)).toBe('identik');
+      const changed = planSnapshot({ designMd: design, goldenMd: golden, judgeTexts: { A: 'teks A berubah' }, today: '2026-11-18' }, root);
+      expect(() => writeSnapshot(changed, root)).toThrow(/naikkan versi/);
+      expect(JSON.parse(readFileSync(join(root, 'rubric.json'), 'utf8')).judgeTextSha256.A).toBe(sha256('teks A'));
+      const v1 = '## Lampiran B — Rubrik\n\nisi\n';
+      expect(() => planSnapshot({ designMd: v1, goldenMd: golden, judgeTexts: { A: 'a' }, today: '2026-11-18' }, root)).toThrow(/--version/);
+      expect(planSnapshot({ designMd: v1, goldenMd: golden, judgeTexts: { A: 'a' }, version: '1', today: '2026-11-18' }, root).json.date).toBe('2026-11-18');
+      expect(() => planSnapshot({ designMd: design, goldenMd: golden, judgeTexts: { A: 'a' }, version: '2', today: '2026-11-18' }, root)).toThrow(/≠/);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('penjaga sha: versi atau sha berbeda dari rubric.json → masalah', () => {
+    const rj = { version: '2', date: 'd', judgeTextSha256: { A: 'aa', B: 'bb' }, sourceSha256: {} };
+    expect(rubricShaProblems({ version: '2', sha: { A: 'aa', B: 'bb' } }, rj)).toEqual([]);
+    expect(rubricShaProblems({ version: '2', sha: { A: 'aa', B: 'xx' } }, rj)[0]).toContain('sha256 teks juri B xx ≠ rubric.json bb');
+    expect(rubricShaProblems({ version: undefined, sha: { A: 'aa' } }, rj)[0]).toContain('versi rubrik');
+    expect(rubricShaProblems({ version: '2', sha: {} }, undefined)[0]).toContain('rubric.json tidak ada');
   });
 });

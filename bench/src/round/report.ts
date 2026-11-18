@@ -5,7 +5,7 @@ import type { LakarExtra } from '../lakar/run.js';
 import type { RunRecord } from '../report.js';
 import type { TextEmojiCount } from './emoji.js';
 import type { Reconnect } from './reconnect.js';
-import { TOOL_LABEL, TOOLS, type Agg, type Decision, type G0Decision, type GateResult, type PromptScore } from './score.js';
+import { appealAxis, TOOL_LABEL, TOOLS, type Agg, type DecisionResult, type G0Decision, type GateResult, type PromptScore } from './score.js';
 
 export const ROUND_ID = /^(uji-[1-9]\d*|[1-9]\d*)$/;
 /** Putaran resmi (story 16): ID angka polos. */
@@ -40,8 +40,13 @@ export type RoundPrompt = {
   gate: GateResult | undefined;
   sizeProblems: string[];
   score: PromptScore | undefined;
-  decision: { decision: Decision; why: string };
+  decision: DecisionResult;
+  /** Masalah ukuran frame pen.dev terhadap ukuran mengikat (`boardSizeProblems`); kosong = sesuai. */
+  pendevSizeProblems?: string[];
 };
+
+/** Versi rubrik + sha256 teks juri per prompt (sama dengan `bench/rubric/rubric.json`). */
+export type JudgeTextInfo = { rubricVersion: string | undefined; textSha256: Record<string, string> };
 
 export type FrozenVersions = {
   head: string;
@@ -70,7 +75,7 @@ export type FrozenVersions = {
   checkDist: string;
   pendevDesktop: string | undefined;
   pendevMcp: string | undefined;
-  judge: { model: string; argv: string };
+  judge: { model: string; argv: string; rubricVersion?: string | undefined; textSha256?: Record<string, string> };
 };
 
 export type RoundReport = {
@@ -93,6 +98,8 @@ export type RoundReport = {
   /** Strip keempat run untuk Adam, dengan status commit. */
   pngs: { prompt: string; tool: Tool; path: string | undefined; status: string }[];
   judgeCostUsd: number;
+  /** Versi rubrik dan sha256 teks juri (story 17). */
+  judge?: JudgeTextInfo;
   notes: string[];
 };
 
@@ -102,6 +109,12 @@ const ratio = (a: number | undefined, b: number | undefined) => (a === undefined
 const cell = (s: string) => s.replace(/\|/g, '\\|').replace(/\n/g, ' ');
 const num = (x: number | undefined) => (x === undefined ? '–' : Number.isInteger(x) ? String(x) : x.toFixed(1));
 const aggText = (a: Agg | undefined) => (a ? `${num(a.median)} (rentang ${num(a.range)})${a.flag ? ' **periksa Adam**' : ''}` : '–');
+/** Skor maks juri = 2 × jumlah kriteria juri. */
+export const MAX_TOTAL = 2 * JUDGE_CRITERIA.length;
+export const judgeInfoLines = (j: JudgeTextInfo | undefined): string[] =>
+  j
+    ? [`Versi rubrik: ${j.rubricVersion ?? '1 (tanpa baris versi)'}`, ...Object.entries(j.textSha256).map(([id, s]) => `sha256 teks juri ${id}: \`${s}\``)]
+    : ['Versi rubrik: tidak tercatat (laporan sebelum story 17)'];
 const runStatus = (r: RoundRun | undefined) => (r ? `${r.record.status}${r.record.reason ? ` (${r.record.reason})` : ''}` : 'tidak dijalankan');
 
 export function renderRoundMarkdown(r: RoundReport): string {
@@ -110,15 +123,15 @@ export function renderRoundMarkdown(r: RoundReport): string {
   L.push(`Status: **${r.status}**${r.statusReasons.length ? ` (${r.statusReasons.join('; ')})` : ''}. Tanggal: ${r.date}.`, '');
   L.push(`Keputusan di laporan ini **${PROVISIONAL}**.`, '');
   L.push('## Ringkasan', '');
-  L.push('| Prompt | Waktu Lakar (dtk) | Waktu pen.dev (dtk) | Lakar/pen.dev | Lakar/baseline | Biaya Lakar | Biaya pen.dev | Gerbang Lakar | Total Lakar | Total pen.dev | Keputusan |');
-  L.push('|---|---|---|---|---|---|---|---|---|---|---|');
+  L.push(`| Prompt | Waktu Lakar (dtk) | Waktu pen.dev (dtk) | Lakar/pen.dev | Lakar/baseline | Biaya Lakar | Biaya pen.dev | Gerbang Lakar | Total Lakar (maks ${MAX_TOTAL}) | Total pen.dev | Daya tarik Lakar | Daya tarik pen.dev | Keputusan |`);
+  L.push('|---|---|---|---|---|---|---|---|---|---|---|---|---|');
   for (const p of r.results) {
     const l = p.runs.lakar?.record;
     const d = p.runs.pendev?.record;
     const tl = p.score?.tools.lakar;
     const tp = p.score?.tools.pendev;
     L.push(
-      `| ${p.prompt} | ${sec(l?.wallMs)} | ${sec(d?.wallMs)} | ${ratio(l?.wallMs, d?.wallMs)} | ${ratio(l?.wallMs, p.baselineMedianMs)} | ${usd(l?.costUsd)} | ${usd(d?.costUsd)} | ${p.gate ? (p.gate.ok ? 'lolos' : 'gagal') : '–'} | ${num(tl?.total)} | ${num(tp?.total)} | ${p.decision.decision} (${PROVISIONAL}) |`,
+      `| ${p.prompt} | ${sec(l?.wallMs)} | ${sec(d?.wallMs)} | ${ratio(l?.wallMs, d?.wallMs)} | ${ratio(l?.wallMs, p.baselineMedianMs)} | ${usd(l?.costUsd)} | ${usd(d?.costUsd)} | ${p.gate ? (p.gate.ok ? 'lolos' : 'gagal') : '–'} | ${num(tl?.total)} | ${num(tp?.total)} | ${num(tl && appealAxis(tl))} | ${num(tp && appealAxis(tp))} | ${p.decision.decision} (${PROVISIONAL}) |`,
     );
   }
   L.push('');
@@ -180,10 +193,12 @@ export function renderRoundMarkdown(r: RoundReport): string {
       L.push('| Kriteria | Lakar | pen.dev |');
       L.push('|---|---|---|');
       for (const c of JUDGE_CRITERIA) L.push(`| ${c} | ${aggText(p.score.tools.lakar.criteria[c])} | ${aggText(p.score.tools.pendev.criteria[c])} |`);
-      L.push(`| **Total (jumlah median)** | **${num(p.score.tools.lakar.total)}** | **${num(p.score.tools.pendev.total)}** |`);
+      L.push(`| **Total (jumlah median, maks ${MAX_TOTAL})** | **${num(p.score.tools.lakar.total)}** | **${num(p.score.tools.pendev.total)}** |`);
+      L.push(`| **Daya tarik D = R9 + R10 (maks 4)** | **${num(appealAxis(p.score.tools.lakar))}** | **${num(appealAxis(p.score.tools.pendev))}** |`);
       L.push(`| Slop (juri) | ${aggText(p.score.tools.lakar.slop)} | ${aggText(p.score.tools.pendev.slop)} |`);
     } else L.push('Juri tidak dijalankan (strip salah satu alat tidak ada atau putaran berhenti).');
     L.push('');
+    if (p.pendevSizeProblems) L.push(`Brief mengikat pen.dev (ukuran frame): ${p.pendevSizeProblems.length ? p.pendevSizeProblems.join('; ') : 'sesuai'}.`, '');
     L.push(`### Keputusan: **${p.decision.decision}** (${PROVISIONAL})`, '', `Alasan: ${p.decision.why}.`, '');
     L.push(`Strip: ${TOOLS.map((t) => (p.runs[t]?.strip ? `\`${p.runs[t]!.strip!.path}\` (${p.runs[t]!.strip!.width}×${p.runs[t]!.strip!.height}, ${p.runs[t]!.strip!.boards} board)` : `${TOOL_LABEL[t]} –`)).join(', ')}`, '');
   }
@@ -193,11 +208,12 @@ export function renderRoundMarkdown(r: RoundReport): string {
     L.push(`G0 **${r.g0.decision}** (${PROVISIONAL}). Fakta per prompt:`, '');
     for (const p of r.results) {
       const sc = p.score?.tools;
-      const zeroVsTwo = sc ? JUDGE_CRITERIA.filter((c) => sc.lakar.criteria[c].median === 0 && sc.pendev.criteria[c].median === 2) : [];
+      const ch = p.decision.checks;
       L.push(`- **${p.prompt}** — ${p.decision.decision}: ${p.decision.why}.`);
       L.push(`  - Gerbang: ${p.gate ? (p.gate.ok ? 'lolos' : `gagal (${p.gate.reasons.join('; ')})`) : '–'}.`);
-      L.push(`  - Total: Lakar ${num(sc?.lakar.total)} vs pen.dev ${num(sc?.pendev.total)}.`);
-      L.push(`  - R dengan Lakar 0 vs pen.dev 2: ${sc ? zeroVsTwo.join(', ') || 'tidak ada' : '–'}.`);
+      L.push(`  - Total: Lakar ${num(sc?.lakar.total)} vs pen.dev ${num(sc?.pendev.total)}; daya tarik: Lakar ${num(ch?.appeal.lakar)} vs pen.dev ${num(ch?.appeal.pendev)}.`);
+      L.push(`  - R dengan Lakar 0 vs pen.dev 2: ${ch ? ch.zeroVsTwo.join(', ') || 'tidak ada' : '–'}.`);
+      L.push(`  - Pelanggaran brief pen.dev: ${ch ? ch.pendevBriefViolations.join('; ') || 'tidak ada' : '–'}.`);
       L.push(`  - Rasio waktu Lakar/median baseline: ${ratio(p.runs.lakar?.record.wallMs, p.baselineMedianMs)}; Lakar/pen.dev putaran ini: ${ratio(p.runs.lakar?.record.wallMs, p.runs.pendev?.record.wallMs)}.`);
     }
     L.push('');
@@ -242,6 +258,7 @@ export function renderRoundMarkdown(r: RoundReport): string {
   if (f.distSha) for (const [k, v] of Object.entries(f.distSha)) if (k !== 'check') L.push(`- sha256 \`packages/${k}/dist\`: \`${v}\``);
   L.push(`- pen.dev desktop: ${f.pendevDesktop ?? '–'}; MCP server: ${f.pendevMcp ?? '–'}`);
   L.push(`- Juri: model \`${f.judge.model}\`; argv \`${f.judge.argv}\``);
+  for (const x of judgeInfoLines(r.judge)) L.push(`- ${x}`);
   L.push('');
   L.push('## Protokol', '');
   L.push('### Pembungkus (bench/protocol/wrapper.txt, kata per kata)', '', '```', r.wrapper.trimEnd(), '```', '');
@@ -295,6 +312,7 @@ export function renderScoreMarkdown(round: string, p: RoundPrompt): string {
   }
   L.push(`| **Total** | Lakar | ${reps.map(() => '').join(' | ')} | **${num(s.tools.lakar.total)}** | | |`);
   L.push(`| **Total** | pen.dev | ${reps.map(() => '').join(' | ')} | **${num(s.tools.pendev.total)}** | | |`);
+  for (const t of TOOLS) L.push(`| **Daya tarik (R9 + R10)** | ${TOOL_LABEL[t]} | ${reps.map(() => '').join(' | ')} | **${num(appealAxis(s.tools[t]))}** | | |`);
   L.push('');
   L.push('## Slop dan emoji menurut juri', '');
   L.push('| Alat | Slop (median, rentang) | Emoji terlihat (median, rentang) |');

@@ -2,11 +2,14 @@
 // Hanya modul juri yang memakai ini; modul agen (claude-runner, lakar/*, pendev/*) tidak mengimpor judge/* (C7).
 import { join } from 'node:path';
 import { REPO_ROOT, forbiddenPhrases, words } from '../protocol.js';
+import { rubricVersionOf } from './rubric.js';
 
 export const DESIGN_MD_PATH = join(REPO_ROOT, '_bmad-output/initiative-lakar/ux-lakar/DESIGN.md');
 
-/** Kriteria yang dinilai juri (R3/R7 dicek mekanis, bukan oleh juri). */
-export const JUDGE_CRITERIA = ['R1', 'R2', 'R4', 'R5', 'R6', 'R8'] as const;
+/** Kriteria yang dinilai juri (R3/R7 dicek mekanis, bukan oleh juri). R9/R10 = sumbu daya tarik (rubrik v2). */
+export const JUDGE_CRITERIA = ['R1', 'R2', 'R4', 'R5', 'R6', 'R8', 'R9', 'R10'] as const;
+/** Sumbu daya tarik D = R9 + R10 (rubrik v2). */
+export const APPEAL_CRITERIA = ['R9', 'R10'] as const satisfies readonly JudgeCriterion[];
 export type JudgeCriterion = (typeof JUDGE_CRITERIA)[number];
 
 /** Nama alat / produk yang tidak boleh sampai ke juri. */
@@ -119,9 +122,11 @@ function section(text: string, startsWith: string): string[] {
 }
 
 export type RubricParts = {
+  /** Baris `Versi rubrik: <v> (<tanggal>)` di Lampiran B; undefined untuk rubrik v1 (belum ada baris versi). */
+  version: string | undefined;
   /** Paragraf aturan skor Rn = 2/1/0. */
   scoreRule: string;
-  /** Header tabel + baris R1, R2, R4, R5, R6, R8. */
+  /** Header tabel + baris R1, R2, R4, R5, R6, R8, R9, R10. */
   table: string[];
   /** "Setiap pelanggaran hanya dihitung di satu R." */
   oneR: string;
@@ -139,7 +144,9 @@ export function extractRubric(designMd: string): RubricParts {
   if (!scoreRule) throw new Error('teks juri: paragraf aturan skor Rn tidak ditemukan');
   const tableStart = crit.findIndex((l) => l.startsWith('| # |'));
   if (tableStart < 0) throw new Error('teks juri: tabel kriteria tidak ditemukan');
-  const rows = crit.filter((l) => /^\| R\d \|/.test(l));
+  const rows = crit.filter((l) => /^\| R\d+ \|/.test(l));
+  if (rows.length !== JUDGE_CRITERIA.length)
+    throw new Error(`teks juri: tabel kriteria harus ${JUDGE_CRITERIA.length} baris (${JUDGE_CRITERIA.join(', ')}), dapat ${rows.length}`);
   const table = [crit[tableStart]!, crit[tableStart + 1]!, ...JUDGE_CRITERIA.map((r) => {
     const row = rows.find((l) => l.startsWith(`| ${r} |`));
     if (!row) throw new Error(`teks juri: baris ${r} tidak ditemukan`);
@@ -160,7 +167,7 @@ export function extractRubric(designMd: string): RubricParts {
   const proc = section(designMd, '### Prosedur juri');
   const evidence = proc.find((l) => /^- Setiap skor wajib disertai bukti/.test(l));
   if (!evidence) throw new Error('teks juri: butir Prosedur juri tentang bukti tidak ditemukan');
-  return { scoreRule, table, oneR, slop, phrases, evidence: evidence.replace(/^- /, '') };
+  return { version: rubricVersionOf(designMd)?.version, scoreRule, table, oneR, slop, phrases, evidence: evidence.replace(/^- /, '') };
 }
 
 const DROP_TAGS = new Set(['G', 'T']);
@@ -199,6 +206,8 @@ export type JudgeTextParts = {
   text: string;
   /** Bagian rubrik + kriteria saja (sumber penjaga C7; prompt dan checklist slop bersama produk tidak termasuk). */
   secret: string;
+  /** Versi rubrik (Lampiran B); undefined untuk v1. */
+  rubricVersion: string | undefined;
 };
 
 export const JUDGE_JSON_SHAPE = `{
@@ -209,6 +218,8 @@ export const JUDGE_JSON_SHAPE = `{
     "R5": {"skor": 0|1|2, "bukti": "..."},
     "R6": {"skor": 0|1|2, "bukti": "..."},
     "R8": {"skor": 0|1|2, "bukti": "..."},
+    "R9": {"skor": 0|1|2, "bukti": "..."},
+    "R10": {"skor": 0|1|2, "bukti": "..."},
     "slop": {"jumlah": <bilangan bulat ≥ 0>, "butir": ["<nomor checklist>: <bukti elemen + lokasi>", ...]},
     "emoji": <jumlah emoji yang terlihat, bilangan bulat ≥ 0>,
     "fokus": "<titik fokus yang Anda tunjuk: elemen + lokasi>"
@@ -266,7 +277,7 @@ export function buildJudgeText(designMd: string, goldenMd: string, promptId: str
   ].join('\n');
   const tokens = parseDesignTokens(designMd);
   const clean = (t: string) => neutralizeInternalTerms(scrubToolNames(t), tokens);
-  const out = { text: clean(text), secret: clean(secretParts.join('\n')) };
+  const out = { text: clean(text), secret: clean(secretParts.join('\n')), rubricVersion: r.version };
   const leftover = tokenLeaks(out.text, tokens);
   if (leftover.length) throw new Error(`teks juri: istilah token internal tersisa: ${leftover.join(', ')}`);
   return out;

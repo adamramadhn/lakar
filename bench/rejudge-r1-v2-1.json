@@ -1,0 +1,1847 @@
+{
+  "label": "r1-v2-1",
+  "from": "1",
+  "date": "2026-11-18T06:51:59.340Z",
+  "status": "lengkap",
+  "statusReasons": [],
+  "source": {
+    "roundJson": "bench/round-1.json",
+    "roundMd": "bench/round-1.md"
+  },
+  "model": "claude-opus-5-5",
+  "claude": "2.1.325 (Claude Code)",
+  "head": "9ee43d45187cefdceb74865cb7c301ccd53e1387",
+  "judge": {
+    "rubricVersion": "2",
+    "textSha256": {
+      "A": "cd273805584f3f3627efadfdf88e47b6b9299a8c021a9c133bf3f94179b09925",
+      "B": "6d9049502db51cd1a7829dd835aeccb07b3d7123eb3da8db9196c6e19eef01df"
+    },
+    "rubricJsonVersion": "2",
+    "matchesRubricJson": true,
+    "argv": "claude -p --input-format stream-json --output-format stream-json --verbose --model claude-opus-5-5 --tools \"\" --strict-mcp-config --mcp-config bench/runs/rejudge/r1-v2-1/mcp-empty.json --disable-slash-commands --no-session-persistence"
+  },
+  "prompts": [
+    {
+      "prompt": "A",
+      "strips": {
+        "lakar": "bench/runs/rounds/1/A-lakar.png",
+        "pendev": "bench/runs/rounds/1/A-pendev.png"
+      },
+      "gate": {
+        "ok": true,
+        "reasons": [],
+        "timeRatio": 0.957483617656783
+      },
+      "pendevSizeProblems": [],
+      "score": {
+        "prompt": "A",
+        "validReps": 3,
+        "reps": [
+          {
+            "prompt": "A",
+            "rep": 1,
+            "mapping": {
+              "X": "pendev",
+              "Y": "lakar"
+            },
+            "status": "ok",
+            "verdict": {
+              "X": {
+                "R1": {
+                  "skor": 2,
+                  "bukti": "Bagian lengkap dan berurutan: navbar (bagian 1 atas), hero dengan headline, subjudul, 2 CTA dan mockup dashboard (bagian 1–2), 3 kartu fitur 'FITUR UTAMA' (bagian 2), testimoni dark (bagian 3), pricing 3 tier dengan tengah 'Bisnis' ditonjolkan (bagian 4), CTA penutup opsional dan footer (bagian 5). Lebar 1440px, aksen hijau, seluruh copy berbahasa Indonesia."
+                },
+                "R2": {
+                  "skor": 2,
+                  "bukti": "Headline hero 'Pembukuan rapi, usaha makin tenang.' berukuran display, 2 baris, berisi klaim hasil, tanpa kata yatim (bagian 1 tengah). Lompatan skala tegas ke subjudul abu-abu. CTA primer hijau 'Mulai Gratis 30 Hari' dan sekunder outline 'Lihat Demo'. Judul seksi ('Semua yang dibutuhkan…', 'Harga jujur…') jelas lebih kecil dari headline."
+                },
+                "R4": {
+                  "skor": 1,
+                  "bukti": "Ritme terang/gelap ada: hero ber-tint terang, fitur putih, testimoni hijau gelap, pricing terang, footer gelap. Teks putih di atas tombol hijau. Namun hijau aksen tampak lebih kebiruan (sekitar #0F7B4A), bukan #15803D, di tombol 'Coba Gratis', ikon fitur, dan kartu kutipan (bagian 3). Satu teks lemah: metadata 'Pemilik Dapur Sari, Yogyakarta' hijau muda kecil di atas kartu hijau (bagian 3 kiri bawah)."
+                },
+                "R5": {
+                  "skor": 1,
+                  "bukti": "Ikon bergaya line seragam: sidebar mockup, ikon fitur zap/file-check/chart dalam wadah persegi hijau 48px (bagian 2), check di daftar, star outline di testimoni, ikon sosial di footer. Visual hero berupa mockup dashboard yang relevan. Ada 1 emoji dekoratif tangan melambai di sapaan mockup 'Halo, Toko Bu Sari 👋' (bagian 1), padahal golden melarang emoji termasuk di sapaan."
+                },
+                "R6": {
+                  "skor": 1,
+                  "bukti": "Kriteria golden mockup gagal: kartu menampilkan Saldo Kas, Pemasukan Rp32.180.000, Pengeluaran Rp14.900.000 dan Piutang, tanpa kartu Laba, sehingga persamaan Pemasukan − Pengeluaran = Laba tidak ditunjukkan (bagian 1). Testimoni lolos: nama, usaha, kota (Sari Wulandari – Dapur Sari, Yogyakarta; Budi Santoso – Surabaya; Rina Hapsari – Bandung) dengan ikon star (bagian 3). Copy lain spesifik (SAK EMKM, KUR, QRIS)."
+                },
+                "R8": {
+                  "skor": 1,
+                  "bukti": "Kriteria golden pricing gagal: harga tier tengah 'Rp99rb /bulan' (bagian 4), bukan Rp 79rb/bulan. Bagian lain dari kriteria itu terpenuhi: tier tengah ditonjolkan dengan kartu gelap terangkat plus badge 'Paling Populer', CTA tengah primer hijau, tier lain outline, fitur memakai check. Ada 1 pelanggaran slop non-emoji: statistik bulat '12.000+ UMKM aktif' dan 'Rp2,1T' (bagian 3). Langkah khas yang bisa ditunjuk: komposisi testimoni asimetris dengan satu kutipan besar berkartu hijau plus dua kartu bertumpuk."
+                },
+                "R9": {
+                  "skor": 2,
+                  "bukti": "Angka di mockup diberi tren berupa chip +12,4%/+8,1%/-3,2% dan '4 invoice', rentang tanggal '1–18 Nov 2026'. Transaksi memiliki metadata (Tunai · 09:12, QRIS · Kemarin). Grafik memakai legenda Masuk/Keluar per minggu M1–M8. Kartu fitur punya sub-poin centang. Stat testimoni berlabel, pricing memiliki deskripsi tier. Padat tetapi tetap terbaca."
+                },
+                "R10": {
+                  "skor": 2,
+                  "bukti": "Permukaan berlapis: hero ber-tint hijau, testimoni hijau gelap dengan kartu kutipan hijau solid, kartu tier tengah gelap, CTA penutup hijau di atas footer gelap. Chip berwarna bermakna di mockup (hijau tren, oranye piutang), badge 'Baru' dan 'Paling Populer'. Avatar berupa foto. Bar chart dua nada terintegrasi."
+                },
+                "slop": {
+                  "jumlah": 2,
+                  "butir": [
+                    "5: Statistik bulat '12.000+ UMKM aktif', 'Rp2,1T Transaksi tercatat' dan '2.000+ pemilik warung' yang tidak diberikan prompt (bagian 3 kanan atas, bagian 2 kanan)",
+                    "6: Emoji tangan melambai sebagai dekorasi di sapaan mockup 'Halo, Toko Bu Sari' (bagian 1, mockup kiri atas; dihitung di R5)"
+                  ]
+                },
+                "emoji": 1,
+                "fokus": "Headline hero 'Pembukuan rapi, usaha makin tenang.' di tengah bagian 1"
+              },
+              "Y": {
+                "R1": {
+                  "skor": 2,
+                  "bukti": "Bagian lengkap dan berurutan: navbar (bagian 1), hero dengan headline, subjudul, 2 CTA dan mockup dashboard (bagian 1–2), fitur 3 kartu bento (bagian 2), testimoni dark (bagian 3), pricing 3 tier dengan tengah 'Tumbuh' ditonjolkan (bagian 3–4), footer (bagian 4–5). Tanpa CTA penutup, yang memang opsional. Lebar 1440px, aksen hijau, berbahasa Indonesia."
+                },
+                "R2": {
+                  "skor": 2,
+                  "bukti": "Headline 'Tutup buku 5 menit tiap malam, laba rugi langsung siap' berukuran display, 2 baris, berisi klaim hasil terukur, tanpa yatim (bagian 1). Skala turun tegas ke subjudul dan judul seksi. CTA primer hijau 'Coba gratis 14 hari' dan sekunder outline 'Lihat demo 3 menit'."
+                },
+                "R4": {
+                  "skor": 2,
+                  "bukti": "Hijau sekitar #15803D dipakai konsisten untuk tombol, ikon, nilai positif, dan bar aktif grafik (bagian 1). Teks putih di atas tombol hijau dan badge 'Paling dipilih'. Ritme seksi: hero tint terang, fitur putih, testimoni gelap, pricing putih, footer abu terang. Kuning hanya dipakai untuk rating bintang. Tidak ada teks yang terlihat gagal kontras."
+                },
+                "R5": {
+                  "skor": 2,
+                  "bukti": "Ikon Lucide-style seragam: fitur file-chart/smartphone/bell-ring dalam wadah persegi ber-tint hijau berukuran sama (bagian 2), timer/clock di metrik fitur, ikon check di pricing, star terisi untuk rating (bagian 3), sparkles di badge, shield-check di catatan pembayaran. Tanpa emoji. Mockup hero relevan dan dibangun dari shape/teks."
+                },
+                "R6": {
+                  "skor": 1,
+                  "bukti": "Kriteria golden lolos. Mockup: Pemasukan Rp 48,2 jt − Pengeluaran Rp 31,6 jt = Laba bersih Rp 16,6 jt, margin 34,4% konsisten (bagian 1). Tabel laba rugi juga tepat: 42.870.000 − 23.150.000 − 4.910.000 = 14.810.000 (bagian 2). Testimoni lengkap dengan nama, usaha, dan kota (Rina Anggraini – Yogyakarta, Hendra Wijaya – Medan, Dewi Lestari – Surabaya) plus ikon star. Ada 1 inkonsistensi: kartu Pengeluaran memakai ikon tren turun tetapi teksnya '+3,1% dari Oktober' (bagian 1)."
+                },
+                "R8": {
+                  "skor": 2,
+                  "bukti": "Tier tengah 'Tumbuh' ditonjolkan dengan satu cara utama (latar tint hijau dan border hijau) plus badge 'Paling dipilih'. CTA tengah primer hijau, tier lain outline. Harga Rp 79.000 / bulan, setara nilai Rp 79rb/bulan. Fitur memakai check (bagian 4). Tidak ada pelanggaran slop. Langkah khas: fitur bento asimetris dengan kartu besar berisi tabel laba rugi nyata, dan kartu testimoni utama dengan metrik hasil '4 jam hemat waktu tiap minggu'."
+                },
+                "R9": {
+                  "skor": 2,
+                  "bukti": "Angka diberi konteks pembanding/periode ('+12,4% dari Oktober', 'Margin 34,4%', '1–18 November · semua cabang', 'Tersinkron 2 menit lalu'). Transaksi punya arah masuk/keluar dan waktu. Fitur punya metrik ('Rata-rata 6 detik per transaksi', 'Pengingat terjadwal 08.00 WIB'). Testimoni memuat hasil terukur. Pricing ditutup catatan PPN, opsi tahunan, dan metode bayar. Padat namun terbaca."
+                },
+                "R10": {
+                  "skor": 2,
+                  "bukti": "Permukaan berlapis: hero ber-tint hijau, kartu fitur utama abu terang berisi tabel putih, testimoni gelap dengan avatar inisial ber-tint hijau, kartu tier tengah ber-tint hijau. Chip/badge berwarna terdefinisi ('Tersinkron', 'Paling dipilih', label 'PEMBUKUAN UNTUK UMKM INDONESIA'). Bar chart dengan bar aktif yang ditonjolkan. Ikon dalam wadah tint seragam."
+                },
+                "slop": {
+                  "jumlah": 0,
+                  "butir": []
+                },
+                "emoji": 0,
+                "fokus": "Headline hero 'Tutup buku 5 menit tiap malam, laba rugi langsung siap' di tengah bagian 1"
+              }
+            },
+            "attempts": [
+              {
+                "dir": "/root/lakar/bench/runs/rejudge/r1-v2-1/A/rep-1/attempt-1",
+                "status": "ok",
+                "problems": [],
+                "costUsd": 0.3390938,
+                "wallMs": 64839.136247
+              }
+            ],
+            "retried": false,
+            "costUsd": 0.3390938
+          },
+          {
+            "prompt": "A",
+            "rep": 2,
+            "mapping": {
+              "X": "pendev",
+              "Y": "lakar"
+            },
+            "status": "ok",
+            "verdict": {
+              "X": {
+                "R1": {
+                  "skor": 2,
+                  "bukti": "Semua bagian hadir dan urut: navbar (logo Kasku, menu, Masuk/Coba Gratis) di bagian 1 atas; hero dengan headline, subjudul, 2 CTA, dan mockup dashboard di bagian 1–2; 3 kartu fitur di bagian 2; testimoni berlatar gelap di bagian 3; pricing 3 tier di bagian 4; CTA penutup (opsional) dan footer di bagian 5. Lebar 1440px, aksen hijau, seluruh copy berbahasa Indonesia."
+                },
+                "R2": {
+                  "skor": 2,
+                  "bukti": "Headline 'Pembukuan rapi, usaha makin tenang.' (bagian 1 tengah) berukuran display, 2 baris, berisi klaim hasil, dan baris kedua dua kata sehingga tidak yatim. Skalanya jauh di atas H2 seksi seperti 'Semua yang dibutuhkan…' (bagian 2). CTA primer hijau 'Mulai Gratis 30 Hari' dan CTA sekunder outline 'Lihat Demo'."
+                },
+                "R4": {
+                  "skor": 1,
+                  "bukti": "Ritme terang/gelap antar-seksi baik: hero mint, fitur putih, testimoni hijau sangat gelap, harga terang, footer gelap. Teks di atas hijau putih (tombol, kartu testimoni besar, CTA penutup). Namun hijau aksen tombol dan ikon cenderung emerald kebiruan (sekitar #0F7B4A), bukan #15803D, sehingga satu kriteria golden gagal. Label legenda 'Keluar' mint pucat pada chart mockup (bagian 1 kanan bawah) juga lemah."
+                },
+                "R5": {
+                  "skor": 1,
+                  "bukti": "Ikon bergaya Lucide outline konsisten di sidebar mockup, check list, dan sosial footer. Ikon fitur (zap, file-check, chart) berada dalam kotak hijau solid yang seragam. Namun ada emoji tangan melambai di sapaan mockup 'Halo, Toko Bu Sari 👋' (bagian 1, mockup kiri atas), sehingga kriteria golden 'tanpa emoji di sapaan' gagal. Bintang rating berupa ikon star outline kuning."
+                },
+                "R6": {
+                  "skor": 1,
+                  "bukti": "Mockup (bagian 1) menampilkan Pemasukan Rp32.180.000 dan Pengeluaran Rp14.900.000, tetapi tidak ada nilai Laba. Kartu yang ada adalah Saldo Kas Rp48.250.000 dan Piutang, jadi relasi Pemasukan − Pengeluaran = Laba tidak ditunjukkan: kriteria golden gagal. Testimoni memenuhi syarat: nama, peran/usaha, kota (Sari Wulandari, Dapur Sari, Yogyakarta; Budi Santoso, Surabaya; Rina Hapsari, Bandung) dan bintang ikon. Copy lainnya spesifik (KUR, SAK EMKM, QRIS)."
+                },
+                "R8": {
+                  "skor": 1,
+                  "bukti": "Tier tengah 'Bisnis' (bagian 4) ditonjolkan dengan satu cara utama (kartu gelap, sedikit lebih tinggi), memakai badge 'Paling Populer' dan CTA primer hijau, sementara tier lain memakai tombol outline. Fitur ditandai ikon check. Namun harganya 'Rp99rb/bulan', bukan Rp 79rb/bulan, sehingga satu kriteria golden gagal. Ada 1 pelanggaran slop (statistik bulat). Langkah khas yang bisa ditunjuk: testimoni bento dengan kartu kutipan hijau besar plus deret statistik (bagian 3)."
+                },
+                "R9": {
+                  "skor": 2,
+                  "bukti": "Mockup kaya konteks: rentang tanggal '1–18 Nov 2026', badge tren +12,4%/+8,1%/-3,2%, badge status oranye '4 invoice', dan metadata transaksi 'Tunai · 09:12' / 'QRIS · Kemarin'. Kartu fitur memiliki sub-daftar check. Pricing punya deskripsi target per tier. Testimoni disertai metrik '4,9/5 Rating Play Store'. Tetap terbaca."
+                },
+                "R10": {
+                  "skor": 2,
+                  "bukti": "Permukaan berlapis: hero ber-tint mint, kartu fitur abu kehijauan, seksi testimoni hijau gelap dengan kartu hijau solid, kartu harga tengah gelap, dan CTA penutup hijau bergradasi halus. Badge terdefinisi ('Baru', 'Paling Populer', chip tren, chip oranye piutang). Foto avatar asli dan chart batang dua seri yang matang."
+                },
+                "slop": {
+                  "jumlah": 1,
+                  "butir": [
+                    "5: Statistik bulat yang tidak diberikan prompt, yaitu '12.000+ UMKM aktif' dan 'Rp2,1T Transaksi tercatat' di header testimoni (bagian 3 kanan atas), ditambah '2.000+ pemilik warung' di seksi fitur (bagian 2)"
+                  ]
+                },
+                "emoji": 1,
+                "fokus": "Headline hero 'Pembukuan rapi, usaha makin tenang.' di tengah bagian 1"
+              },
+              "Y": {
+                "R1": {
+                  "skor": 2,
+                  "bukti": "Semua bagian hadir dan urut: navbar (bagian 1 atas); hero dengan badge, headline, subjudul, 2 CTA, dan mockup dashboard (bagian 1–2); 3 kartu fitur dalam layout bento (bagian 2); testimoni berlatar gelap (bagian 3); pricing 3 tier (bagian 4); footer (bagian 4–5). Lebar 1440px, aksen hijau, seluruh copy berbahasa Indonesia."
+                },
+                "R2": {
+                  "skor": 2,
+                  "bukti": "Headline 'Tutup buku 5 menit tiap malam, laba rugi langsung siap' (bagian 1 tengah) berukuran display, 2 baris, berisi klaim hasil terukur, tanpa kata yatim. Skalanya tegas dibanding H2 seksi (bagian 2 'Semua angka usaha…'). CTA primer hijau 'Coba gratis 14 hari' dan CTA sekunder outline 'Lihat demo 3 menit'."
+                },
+                "R4": {
+                  "skor": 2,
+                  "bukti": "Hijau aksen tampak sekitar #15803D dan dipakai konsisten untuk tombol primer, ikon check, nilai positif (+Rp 1.284.000, Laba bersih Rp 14.810.000), serta border tier tengah. Teks di atas aksen putih. Ritme seksi: hero mint, fitur putih, testimoni hampir hitam, harga putih, footer abu terang. Bintang kuning bermakna rating. Tidak ada teks yang terlihat gagal kontras."
+                },
+                "R5": {
+                  "skor": 2,
+                  "bukti": "Satu gaya ikon Lucide outline. Ikon fitur (file-chart, smartphone, bell-ring) berada dalam kotak tint hijau berukuran seragam (bagian 2). Ikon lain konsisten: arah transaksi di mockup, timer/clock pada catatan fitur, sparkles di badge harga, shield-check di catatan harga, ikon sosial footer. Bintang rating berupa ikon star terisi (bagian 3 kiri). Tanpa emoji, termasuk di mockup. Visual utama, yaitu mockup dashboard, relevan."
+                },
+                "R6": {
+                  "skor": 1,
+                  "bukti": "Angka kriteria golden terpenuhi: mockup menampilkan Pemasukan Rp 48,2 jt − Pengeluaran Rp 31,6 jt = Laba bersih Rp 16,6 jt, margin 34,4% konsisten, dan tabel laba rugi Oktober 42.870.000 − 23.150.000 − 4.910.000 = 14.810.000 benar. Testimoni lengkap dengan nama, usaha, dan kota (Yogyakarta, Medan, Surabaya). Satu inkonsistensi: kartu Pengeluaran memakai ikon tren menurun tetapi labelnya '+3,1% dari Oktober' (bagian 1 mockup tengah)."
+                },
+                "R8": {
+                  "skor": 2,
+                  "bukti": "Tier tengah 'Tumbuh' (bagian 4) ditonjolkan dengan kartu ber-tint dan border hijau, memakai badge 'Paling dipilih', CTA primer hijau, sementara tier lain memakai tombol outline. Harga Rp 79.000/bulan (setara Rp 79rb/bulan) dan fitur ditandai check. Tidak ada pelanggaran slop. Langkah khas yang bisa ditunjuk: bento fitur dengan kartu besar yang memuat tabel laba rugi nyata (bagian 2 kiri), dan testimoni utama dengan metrik '4 jam hemat waktu tiap minggu' (bagian 3)."
+                },
+                "R9": {
+                  "skor": 2,
+                  "bukti": "Angka diberi konteks: '+12,4% dari Oktober', 'Margin 34,4%', 'Tersinkron 2 menit lalu', '1–18 November · semua cabang', 'Rata-rata 6 detik per transaksi', 'Pengingat terjadwal 08.00 WIB', '4,8 dari 1.127 ulasan'. Daftar transaksi memiliki variasi masuk/keluar beserta waktu. Catatan pembayaran tahunan dan QRIS ada di bawah pricing. Padat tetapi terbaca."
+                },
+                "R10": {
+                  "skor": 2,
+                  "bukti": "Permukaan berlapis: hero mint, kartu fitur besar abu dengan tabel putih di dalamnya, seksi testimoni gelap dengan kartu bernuansa, dan tier tengah ber-tint hijau. Komponen berwarna terdefinisi: chip 'Tersinkron', badge 'Paling dipilih', avatar inisial hijau. Chart menyorot satu batang hijau tua di antara batang mint. Hijau terang dipakai bermakna pada metrik testimoni."
+                },
+                "slop": {
+                  "jumlah": 0,
+                  "butir": []
+                },
+                "emoji": 0,
+                "fokus": "Headline hero 'Tutup buku 5 menit tiap malam, laba rugi langsung siap' di tengah bagian 1"
+              }
+            },
+            "attempts": [
+              {
+                "dir": "/root/lakar/bench/runs/rejudge/r1-v2-1/A/rep-2/attempt-1",
+                "status": "ok",
+                "problems": [],
+                "costUsd": 0.33263380000000004,
+                "wallMs": 64103.768096000014
+              }
+            ],
+            "retried": false,
+            "costUsd": 0.33263380000000004
+          },
+          {
+            "prompt": "A",
+            "rep": 3,
+            "mapping": {
+              "X": "lakar",
+              "Y": "pendev"
+            },
+            "status": "ok",
+            "verdict": {
+              "X": {
+                "R1": {
+                  "skor": 2,
+                  "bukti": "Ketujuh bagian hadir dan berurutan: navbar (bagian 1, atas), hero dengan headline, subjudul, 2 CTA, dan mockup dashboard (bagian 1–2), 3 kartu fitur dalam pola bento (bagian 2), testimoni (bagian 3), pricing 3 tier dengan tier tengah 'Tumbuh' ditonjolkan (bagian 4), footer (bagian 4–5). Lebar 1440px, berbahasa Indonesia, aksen hijau, mode terang dengan seksi testimoni gelap."
+                },
+                "R2": {
+                  "skor": 2,
+                  "bukti": "Headline display 'Tutup buku 5 menit tiap malam, laba rugi langsung siap' terdiri dari 2 baris, berisi klaim hasil, dan tidak menyisakan kata yatim (bagian 1, tengah). Lompatan skala tegas: headline ±64px, subjudul ±18px, judul seksi ±32px. CTA primer hijau 'Coba gratis 14 hari' dan sekunder outline 'Lihat demo 3 menit'. Judul seksi fitur, testimoni, dan harga juga tanpa kata yatim."
+                },
+                "R4": {
+                  "skor": 2,
+                  "bukti": "Hijau tua dipakai konsisten untuk tombol primer (navbar, hero, tier tengah), angka positif mockup, link 'Unduh PDF', dan ikon check. Tombol hijau berteks putih. Warna tambahan hanya kuning untuk bintang rating (bagian 3, kiri), dan pemakaiannya bermakna. Ritme terang→gelap (testimoni)→terang→abu (footer). Tidak ada teks yang tampak gagal kontras."
+                },
+                "R5": {
+                  "skor": 2,
+                  "bukti": "Ikon fitur bergaya Lucide outline (file-chart, smartphone, bell-ring) berada dalam wadah persegi membulat ber-tint hijau yang seragam (bagian 2). Ikon sidebar mockup, check, star, dan sosial footer memakai satu gaya garis. Mockup hero dibangun dari teks dan shape nyata. Tidak ada emoji, termasuk di mockup."
+                },
+                "R6": {
+                  "skor": 1,
+                  "bukti": "Angka mockup konsisten: Pemasukan 48,2jt − Pengeluaran 31,6jt = Laba bersih 16,6jt, margin 34,4% benar (bagian 1). Tabel laba rugi juga konsisten: 42.870.000 − 23.150.000 − 4.910.000 = 14.810.000 (bagian 2). Testimoni lengkap dengan nama, usaha, dan kota (Yogyakarta, Medan, Surabaya), rating memakai ikon star. Ada 1 inkonsistensi: kartu Pengeluaran menulis '+3,1% dari Oktober' tetapi memakai ikon tren turun (bagian 1, kartu tengah mockup)."
+                },
+                "R8": {
+                  "skor": 2,
+                  "bukti": "Tier tengah 'Tumbuh' ditonjolkan dengan border hijau + tint, ditambah badge 'Paling dipilih'. CTA tengah primer, dua tier lain outline. Harga Rp 79.000/bulan, fitur memakai check (bagian 4). Tidak ada pelanggaran checklist slop. Keputusan komposisi khas yang bisa ditunjuk: grid fitur bento dengan kartu besar berisi tabel laba rugi nyata (bagian 2), serta testimoni asimetris dengan kutipan besar dan metrik '4 jam hemat waktu tiap minggu' (bagian 3)."
+                },
+                "R9": {
+                  "skor": 2,
+                  "bukti": "Angka diberi konteks: '+12,4% dari Oktober', 'Margin 34,4%', periode '1–18 November · semua cabang', status 'Tersinkron 2 menit lalu' (bagian 1). Transaksi memakai metadata waktu dan arah. Fitur memiliki penanda 'Rata-rata 6 detik per transaksi' dan 'Pengingat terjadwal 08.00 WIB'. Rating '4,8 dari 1.127 ulasan', catatan PPN dan pembayaran di bagian harga. Padat tetapi tetap terbaca."
+                },
+                "R10": {
+                  "skor": 1,
+                  "bukti": "Ada permukaan berlapis: hero ber-tint hijau, seksi testimoni gelap, wadah ikon ber-tint, chip status sinkron, dan badge 'Paling dipilih'. Namun warna kedua bermakna hampir tidak ada, hanya kuning bintang. Pengeluaran tidak dibedakan warnanya, avatar testimoni hanya inisial polos, dan footer serta kartu harga samping polos netral. Polesan hanya di sebagian elemen."
+                },
+                "slop": {
+                  "jumlah": 0,
+                  "butir": []
+                },
+                "emoji": 0,
+                "fokus": "Headline hero 'Tutup buku 5 menit tiap malam, laba rugi langsung siap' di tengah bagian 1"
+              },
+              "Y": {
+                "R1": {
+                  "skor": 2,
+                  "bukti": "Semua bagian hadir dan berurutan: navbar (bagian 1), hero dengan headline, subjudul, 2 CTA, dan mockup (bagian 1–2), 3 kartu fitur (bagian 2), testimoni (bagian 3), pricing 3 tier dengan tengah 'Bisnis' ditonjolkan (bagian 4), CTA penutup yang opsional, footer (bagian 5). Lebar 1440px, berbahasa Indonesia, aksen hijau, ada ritme terang/gelap."
+                },
+                "R2": {
+                  "skor": 2,
+                  "bukti": "Headline display 'Pembukuan rapi, usaha makin tenang.' terdiri dari 2 baris, berisi klaim hasil, dan tidak menyisakan kata yatim (bagian 1, tengah). Skala tegas: headline ±72px tebal, subjudul ±18px. CTA primer hijau 'Mulai Gratis 30 Hari' dan sekunder outline 'Lihat Demo'. Judul seksi tanpa kata yatim."
+                },
+                "R4": {
+                  "skor": 2,
+                  "bukti": "Hijau konsisten pada tombol primer, bar 'Masuk' di grafik, ikon fitur, dan tombol tier tengah. Teks putih di atas hijau. Warna tambahan bermakna: chip oranye '4 invoice' untuk status piutang (bagian 1, kartu Piutang) dan kuning untuk bintang rating. Ritme terang→gelap hijau (testimoni)→terang→gelap (CTA/footer). Tidak ada teks yang tampak gagal kontras."
+                },
+                "R5": {
+                  "skor": 1,
+                  "bukti": "Ikon fitur bergaya Lucide (zap, file-check, chart) berada dalam wadah hijau solid yang seragam (bagian 2), dan foto avatar testimoni relevan (bagian 3). Namun ada 1 emoji dekoratif 👋 di sapaan mockup 'Halo, Toko Bu Sari' (bagian 1, area utama mockup). Ini melanggar kriteria golden 4."
+                },
+                "R6": {
+                  "skor": 1,
+                  "bukti": "Kriteria golden 3 gagal: mockup hanya menampilkan Saldo Kas, Pemasukan Rp32.180.000, Pengeluaran Rp14.900.000, dan Piutang, tanpa angka Laba sehingga persamaan Pemasukan − Pengeluaran = Laba tidak ditampilkan (bagian 1). Testimoni lengkap dengan nama, peran, dan kota (Yogyakarta, Surabaya, Bandung), rating memakai ikon star (bagian 3)."
+                },
+                "R8": {
+                  "skor": 1,
+                  "bukti": "Tier tengah ditonjolkan dengan kartu gelap terangkat + badge 'Paling Populer'. CTA tengah primer, dua tier lain outline, fitur memakai check (bagian 4). Namun harga tengah 'Rp99rb/bulan' tidak sesuai Rp 79rb/bulan, jadi 1 kriteria golden gagal. Ada 1 pelanggaran slop di luar emoji: statistik bulat '12.000+ UMKM aktif', 'Rp2,1T', '2.000+ pemilik'. Langkah khas yang bisa ditunjuk: kartu testimoni utama hijau solid yang asimetris (bagian 3)."
+                },
+                "R9": {
+                  "skor": 2,
+                  "bukti": "Kartu ringkasan mockup memakai chip tren '+12,4%', '+8,1%', '-3,2%' dan status '4 invoice'. Legenda grafik Masuk/Keluar per minggu M1–M8. Transaksi memiliki metadata metode dan waktu ('Tunai · 09:12', 'QRIS · Kemarin'). Kartu fitur memiliki sub-daftar check. Statistik testimoni berlabel, dan pricing menyebut detail seperti watermark, SPT, dan 24/7. Padat tetapi terbaca."
+                },
+                "R10": {
+                  "skor": 2,
+                  "bukti": "Permukaan berlapis: hero ber-tint hijau, mockup dalam bingkai ber-tint dengan bayangan, seksi testimoni hijau gelap dengan kartu hijau solid, kartu harga tengah gelap, banner CTA hijau di atas footer gelap. Chip tren hijau dan chip oranye piutang terdefinisi, grafik dua seri, foto avatar menyatu."
+                },
+                "slop": {
+                  "jumlah": 2,
+                  "butir": [
+                    "5: statistik bulat yang tidak diberikan prompt, '12.000+ UMKM aktif' dan 'Rp2,1T Transaksi tercatat' (bagian 3, kanan atas) serta 'Dibuat bersama 2.000+ pemilik warung' (bagian 2, kanan atas)",
+                    "6: emoji 👋 di sapaan mockup 'Halo, Toko Bu Sari' (bagian 1); skornya dihitung di R5"
+                  ]
+                },
+                "emoji": 1,
+                "fokus": "Headline hero 'Pembukuan rapi, usaha makin tenang.' di tengah bagian 1"
+              }
+            },
+            "attempts": [
+              {
+                "dir": "/root/lakar/bench/runs/rejudge/r1-v2-1/A/rep-3/attempt-1",
+                "status": "ok",
+                "problems": [],
+                "costUsd": 0.33618580000000003,
+                "wallMs": 63047.453638000006
+              }
+            ],
+            "retried": false,
+            "costUsd": 0.33618580000000003
+          }
+        ],
+        "tools": {
+          "lakar": {
+            "criteria": {
+              "R1": {
+                "values": [
+                  2,
+                  2,
+                  2
+                ],
+                "median": 2,
+                "range": 0,
+                "flag": false,
+                "evidence": [
+                  {
+                    "rep": 1,
+                    "skor": 2,
+                    "bukti": "Bagian lengkap dan berurutan: navbar (bagian 1), hero dengan headline, subjudul, 2 CTA dan mockup dashboard (bagian 1–2), fitur 3 kartu bento (bagian 2), testimoni dark (bagian 3), pricing 3 tier dengan tengah 'Tumbuh' ditonjolkan (bagian 3–4), footer (bagian 4–5). Tanpa CTA penutup, yang memang opsional. Lebar 1440px, aksen hijau, berbahasa Indonesia."
+                  },
+                  {
+                    "rep": 2,
+                    "skor": 2,
+                    "bukti": "Semua bagian hadir dan urut: navbar (bagian 1 atas); hero dengan badge, headline, subjudul, 2 CTA, dan mockup dashboard (bagian 1–2); 3 kartu fitur dalam layout bento (bagian 2); testimoni berlatar gelap (bagian 3); pricing 3 tier (bagian 4); footer (bagian 4–5). Lebar 1440px, aksen hijau, seluruh copy berbahasa Indonesia."
+                  },
+                  {
+                    "rep": 3,
+                    "skor": 2,
+                    "bukti": "Ketujuh bagian hadir dan berurutan: navbar (bagian 1, atas), hero dengan headline, subjudul, 2 CTA, dan mockup dashboard (bagian 1–2), 3 kartu fitur dalam pola bento (bagian 2), testimoni (bagian 3), pricing 3 tier dengan tier tengah 'Tumbuh' ditonjolkan (bagian 4), footer (bagian 4–5). Lebar 1440px, berbahasa Indonesia, aksen hijau, mode terang dengan seksi testimoni gelap."
+                  }
+                ]
+              },
+              "R2": {
+                "values": [
+                  2,
+                  2,
+                  2
+                ],
+                "median": 2,
+                "range": 0,
+                "flag": false,
+                "evidence": [
+                  {
+                    "rep": 1,
+                    "skor": 2,
+                    "bukti": "Headline 'Tutup buku 5 menit tiap malam, laba rugi langsung siap' berukuran display, 2 baris, berisi klaim hasil terukur, tanpa yatim (bagian 1). Skala turun tegas ke subjudul dan judul seksi. CTA primer hijau 'Coba gratis 14 hari' dan sekunder outline 'Lihat demo 3 menit'."
+                  },
+                  {
+                    "rep": 2,
+                    "skor": 2,
+                    "bukti": "Headline 'Tutup buku 5 menit tiap malam, laba rugi langsung siap' (bagian 1 tengah) berukuran display, 2 baris, berisi klaim hasil terukur, tanpa kata yatim. Skalanya tegas dibanding H2 seksi (bagian 2 'Semua angka usaha…'). CTA primer hijau 'Coba gratis 14 hari' dan CTA sekunder outline 'Lihat demo 3 menit'."
+                  },
+                  {
+                    "rep": 3,
+                    "skor": 2,
+                    "bukti": "Headline display 'Tutup buku 5 menit tiap malam, laba rugi langsung siap' terdiri dari 2 baris, berisi klaim hasil, dan tidak menyisakan kata yatim (bagian 1, tengah). Lompatan skala tegas: headline ±64px, subjudul ±18px, judul seksi ±32px. CTA primer hijau 'Coba gratis 14 hari' dan sekunder outline 'Lihat demo 3 menit'. Judul seksi fitur, testimoni, dan harga juga tanpa kata yatim."
+                  }
+                ]
+              },
+              "R4": {
+                "values": [
+                  2,
+                  2,
+                  2
+                ],
+                "median": 2,
+                "range": 0,
+                "flag": false,
+                "evidence": [
+                  {
+                    "rep": 1,
+                    "skor": 2,
+                    "bukti": "Hijau sekitar #15803D dipakai konsisten untuk tombol, ikon, nilai positif, dan bar aktif grafik (bagian 1). Teks putih di atas tombol hijau dan badge 'Paling dipilih'. Ritme seksi: hero tint terang, fitur putih, testimoni gelap, pricing putih, footer abu terang. Kuning hanya dipakai untuk rating bintang. Tidak ada teks yang terlihat gagal kontras."
+                  },
+                  {
+                    "rep": 2,
+                    "skor": 2,
+                    "bukti": "Hijau aksen tampak sekitar #15803D dan dipakai konsisten untuk tombol primer, ikon check, nilai positif (+Rp 1.284.000, Laba bersih Rp 14.810.000), serta border tier tengah. Teks di atas aksen putih. Ritme seksi: hero mint, fitur putih, testimoni hampir hitam, harga putih, footer abu terang. Bintang kuning bermakna rating. Tidak ada teks yang terlihat gagal kontras."
+                  },
+                  {
+                    "rep": 3,
+                    "skor": 2,
+                    "bukti": "Hijau tua dipakai konsisten untuk tombol primer (navbar, hero, tier tengah), angka positif mockup, link 'Unduh PDF', dan ikon check. Tombol hijau berteks putih. Warna tambahan hanya kuning untuk bintang rating (bagian 3, kiri), dan pemakaiannya bermakna. Ritme terang→gelap (testimoni)→terang→abu (footer). Tidak ada teks yang tampak gagal kontras."
+                  }
+                ]
+              },
+              "R5": {
+                "values": [
+                  2,
+                  2,
+                  2
+                ],
+                "median": 2,
+                "range": 0,
+                "flag": false,
+                "evidence": [
+                  {
+                    "rep": 1,
+                    "skor": 2,
+                    "bukti": "Ikon Lucide-style seragam: fitur file-chart/smartphone/bell-ring dalam wadah persegi ber-tint hijau berukuran sama (bagian 2), timer/clock di metrik fitur, ikon check di pricing, star terisi untuk rating (bagian 3), sparkles di badge, shield-check di catatan pembayaran. Tanpa emoji. Mockup hero relevan dan dibangun dari shape/teks."
+                  },
+                  {
+                    "rep": 2,
+                    "skor": 2,
+                    "bukti": "Satu gaya ikon Lucide outline. Ikon fitur (file-chart, smartphone, bell-ring) berada dalam kotak tint hijau berukuran seragam (bagian 2). Ikon lain konsisten: arah transaksi di mockup, timer/clock pada catatan fitur, sparkles di badge harga, shield-check di catatan harga, ikon sosial footer. Bintang rating berupa ikon star terisi (bagian 3 kiri). Tanpa emoji, termasuk di mockup. Visual utama, yaitu mockup dashboard, relevan."
+                  },
+                  {
+                    "rep": 3,
+                    "skor": 2,
+                    "bukti": "Ikon fitur bergaya Lucide outline (file-chart, smartphone, bell-ring) berada dalam wadah persegi membulat ber-tint hijau yang seragam (bagian 2). Ikon sidebar mockup, check, star, dan sosial footer memakai satu gaya garis. Mockup hero dibangun dari teks dan shape nyata. Tidak ada emoji, termasuk di mockup."
+                  }
+                ]
+              },
+              "R6": {
+                "values": [
+                  1,
+                  1,
+                  1
+                ],
+                "median": 1,
+                "range": 0,
+                "flag": false,
+                "evidence": [
+                  {
+                    "rep": 1,
+                    "skor": 1,
+                    "bukti": "Kriteria golden lolos. Mockup: Pemasukan Rp 48,2 jt − Pengeluaran Rp 31,6 jt = Laba bersih Rp 16,6 jt, margin 34,4% konsisten (bagian 1). Tabel laba rugi juga tepat: 42.870.000 − 23.150.000 − 4.910.000 = 14.810.000 (bagian 2). Testimoni lengkap dengan nama, usaha, dan kota (Rina Anggraini – Yogyakarta, Hendra Wijaya – Medan, Dewi Lestari – Surabaya) plus ikon star. Ada 1 inkonsistensi: kartu Pengeluaran memakai ikon tren turun tetapi teksnya '+3,1% dari Oktober' (bagian 1)."
+                  },
+                  {
+                    "rep": 2,
+                    "skor": 1,
+                    "bukti": "Angka kriteria golden terpenuhi: mockup menampilkan Pemasukan Rp 48,2 jt − Pengeluaran Rp 31,6 jt = Laba bersih Rp 16,6 jt, margin 34,4% konsisten, dan tabel laba rugi Oktober 42.870.000 − 23.150.000 − 4.910.000 = 14.810.000 benar. Testimoni lengkap dengan nama, usaha, dan kota (Yogyakarta, Medan, Surabaya). Satu inkonsistensi: kartu Pengeluaran memakai ikon tren menurun tetapi labelnya '+3,1% dari Oktober' (bagian 1 mockup tengah)."
+                  },
+                  {
+                    "rep": 3,
+                    "skor": 1,
+                    "bukti": "Angka mockup konsisten: Pemasukan 48,2jt − Pengeluaran 31,6jt = Laba bersih 16,6jt, margin 34,4% benar (bagian 1). Tabel laba rugi juga konsisten: 42.870.000 − 23.150.000 − 4.910.000 = 14.810.000 (bagian 2). Testimoni lengkap dengan nama, usaha, dan kota (Yogyakarta, Medan, Surabaya), rating memakai ikon star. Ada 1 inkonsistensi: kartu Pengeluaran menulis '+3,1% dari Oktober' tetapi memakai ikon tren turun (bagian 1, kartu tengah mockup)."
+                  }
+                ]
+              },
+              "R8": {
+                "values": [
+                  2,
+                  2,
+                  2
+                ],
+                "median": 2,
+                "range": 0,
+                "flag": false,
+                "evidence": [
+                  {
+                    "rep": 1,
+                    "skor": 2,
+                    "bukti": "Tier tengah 'Tumbuh' ditonjolkan dengan satu cara utama (latar tint hijau dan border hijau) plus badge 'Paling dipilih'. CTA tengah primer hijau, tier lain outline. Harga Rp 79.000 / bulan, setara nilai Rp 79rb/bulan. Fitur memakai check (bagian 4). Tidak ada pelanggaran slop. Langkah khas: fitur bento asimetris dengan kartu besar berisi tabel laba rugi nyata, dan kartu testimoni utama dengan metrik hasil '4 jam hemat waktu tiap minggu'."
+                  },
+                  {
+                    "rep": 2,
+                    "skor": 2,
+                    "bukti": "Tier tengah 'Tumbuh' (bagian 4) ditonjolkan dengan kartu ber-tint dan border hijau, memakai badge 'Paling dipilih', CTA primer hijau, sementara tier lain memakai tombol outline. Harga Rp 79.000/bulan (setara Rp 79rb/bulan) dan fitur ditandai check. Tidak ada pelanggaran slop. Langkah khas yang bisa ditunjuk: bento fitur dengan kartu besar yang memuat tabel laba rugi nyata (bagian 2 kiri), dan testimoni utama dengan metrik '4 jam hemat waktu tiap minggu' (bagian 3)."
+                  },
+                  {
+                    "rep": 3,
+                    "skor": 2,
+                    "bukti": "Tier tengah 'Tumbuh' ditonjolkan dengan border hijau + tint, ditambah badge 'Paling dipilih'. CTA tengah primer, dua tier lain outline. Harga Rp 79.000/bulan, fitur memakai check (bagian 4). Tidak ada pelanggaran checklist slop. Keputusan komposisi khas yang bisa ditunjuk: grid fitur bento dengan kartu besar berisi tabel laba rugi nyata (bagian 2), serta testimoni asimetris dengan kutipan besar dan metrik '4 jam hemat waktu tiap minggu' (bagian 3)."
+                  }
+                ]
+              },
+              "R9": {
+                "values": [
+                  2,
+                  2,
+                  2
+                ],
+                "median": 2,
+                "range": 0,
+                "flag": false,
+                "evidence": [
+                  {
+                    "rep": 1,
+                    "skor": 2,
+                    "bukti": "Angka diberi konteks pembanding/periode ('+12,4% dari Oktober', 'Margin 34,4%', '1–18 November · semua cabang', 'Tersinkron 2 menit lalu'). Transaksi punya arah masuk/keluar dan waktu. Fitur punya metrik ('Rata-rata 6 detik per transaksi', 'Pengingat terjadwal 08.00 WIB'). Testimoni memuat hasil terukur. Pricing ditutup catatan PPN, opsi tahunan, dan metode bayar. Padat namun terbaca."
+                  },
+                  {
+                    "rep": 2,
+                    "skor": 2,
+                    "bukti": "Angka diberi konteks: '+12,4% dari Oktober', 'Margin 34,4%', 'Tersinkron 2 menit lalu', '1–18 November · semua cabang', 'Rata-rata 6 detik per transaksi', 'Pengingat terjadwal 08.00 WIB', '4,8 dari 1.127 ulasan'. Daftar transaksi memiliki variasi masuk/keluar beserta waktu. Catatan pembayaran tahunan dan QRIS ada di bawah pricing. Padat tetapi terbaca."
+                  },
+                  {
+                    "rep": 3,
+                    "skor": 2,
+                    "bukti": "Angka diberi konteks: '+12,4% dari Oktober', 'Margin 34,4%', periode '1–18 November · semua cabang', status 'Tersinkron 2 menit lalu' (bagian 1). Transaksi memakai metadata waktu dan arah. Fitur memiliki penanda 'Rata-rata 6 detik per transaksi' dan 'Pengingat terjadwal 08.00 WIB'. Rating '4,8 dari 1.127 ulasan', catatan PPN dan pembayaran di bagian harga. Padat tetapi tetap terbaca."
+                  }
+                ]
+              },
+              "R10": {
+                "values": [
+                  2,
+                  2,
+                  1
+                ],
+                "median": 2,
+                "range": 1,
+                "flag": false,
+                "evidence": [
+                  {
+                    "rep": 1,
+                    "skor": 2,
+                    "bukti": "Permukaan berlapis: hero ber-tint hijau, kartu fitur utama abu terang berisi tabel putih, testimoni gelap dengan avatar inisial ber-tint hijau, kartu tier tengah ber-tint hijau. Chip/badge berwarna terdefinisi ('Tersinkron', 'Paling dipilih', label 'PEMBUKUAN UNTUK UMKM INDONESIA'). Bar chart dengan bar aktif yang ditonjolkan. Ikon dalam wadah tint seragam."
+                  },
+                  {
+                    "rep": 2,
+                    "skor": 2,
+                    "bukti": "Permukaan berlapis: hero mint, kartu fitur besar abu dengan tabel putih di dalamnya, seksi testimoni gelap dengan kartu bernuansa, dan tier tengah ber-tint hijau. Komponen berwarna terdefinisi: chip 'Tersinkron', badge 'Paling dipilih', avatar inisial hijau. Chart menyorot satu batang hijau tua di antara batang mint. Hijau terang dipakai bermakna pada metrik testimoni."
+                  },
+                  {
+                    "rep": 3,
+                    "skor": 1,
+                    "bukti": "Ada permukaan berlapis: hero ber-tint hijau, seksi testimoni gelap, wadah ikon ber-tint, chip status sinkron, dan badge 'Paling dipilih'. Namun warna kedua bermakna hampir tidak ada, hanya kuning bintang. Pengeluaran tidak dibedakan warnanya, avatar testimoni hanya inisial polos, dan footer serta kartu harga samping polos netral. Polesan hanya di sebagian elemen."
+                  }
+                ]
+              }
+            },
+            "total": 15,
+            "slop": {
+              "values": [
+                0,
+                0,
+                0
+              ],
+              "median": 0,
+              "range": 0,
+              "flag": false,
+              "items": [
+                {
+                  "rep": 1,
+                  "butir": []
+                },
+                {
+                  "rep": 2,
+                  "butir": []
+                },
+                {
+                  "rep": 3,
+                  "butir": []
+                }
+              ]
+            },
+            "emoji": {
+              "values": [
+                0,
+                0,
+                0
+              ],
+              "median": 0,
+              "range": 0,
+              "flag": false
+            },
+            "focus": [
+              {
+                "rep": 1,
+                "fokus": "Headline hero 'Tutup buku 5 menit tiap malam, laba rugi langsung siap' di tengah bagian 1"
+              },
+              {
+                "rep": 2,
+                "fokus": "Headline hero 'Tutup buku 5 menit tiap malam, laba rugi langsung siap' di tengah bagian 1"
+              },
+              {
+                "rep": 3,
+                "fokus": "Headline hero 'Tutup buku 5 menit tiap malam, laba rugi langsung siap' di tengah bagian 1"
+              }
+            ]
+          },
+          "pendev": {
+            "criteria": {
+              "R1": {
+                "values": [
+                  2,
+                  2,
+                  2
+                ],
+                "median": 2,
+                "range": 0,
+                "flag": false,
+                "evidence": [
+                  {
+                    "rep": 1,
+                    "skor": 2,
+                    "bukti": "Bagian lengkap dan berurutan: navbar (bagian 1 atas), hero dengan headline, subjudul, 2 CTA dan mockup dashboard (bagian 1–2), 3 kartu fitur 'FITUR UTAMA' (bagian 2), testimoni dark (bagian 3), pricing 3 tier dengan tengah 'Bisnis' ditonjolkan (bagian 4), CTA penutup opsional dan footer (bagian 5). Lebar 1440px, aksen hijau, seluruh copy berbahasa Indonesia."
+                  },
+                  {
+                    "rep": 2,
+                    "skor": 2,
+                    "bukti": "Semua bagian hadir dan urut: navbar (logo Kasku, menu, Masuk/Coba Gratis) di bagian 1 atas; hero dengan headline, subjudul, 2 CTA, dan mockup dashboard di bagian 1–2; 3 kartu fitur di bagian 2; testimoni berlatar gelap di bagian 3; pricing 3 tier di bagian 4; CTA penutup (opsional) dan footer di bagian 5. Lebar 1440px, aksen hijau, seluruh copy berbahasa Indonesia."
+                  },
+                  {
+                    "rep": 3,
+                    "skor": 2,
+                    "bukti": "Semua bagian hadir dan berurutan: navbar (bagian 1), hero dengan headline, subjudul, 2 CTA, dan mockup (bagian 1–2), 3 kartu fitur (bagian 2), testimoni (bagian 3), pricing 3 tier dengan tengah 'Bisnis' ditonjolkan (bagian 4), CTA penutup yang opsional, footer (bagian 5). Lebar 1440px, berbahasa Indonesia, aksen hijau, ada ritme terang/gelap."
+                  }
+                ]
+              },
+              "R2": {
+                "values": [
+                  2,
+                  2,
+                  2
+                ],
+                "median": 2,
+                "range": 0,
+                "flag": false,
+                "evidence": [
+                  {
+                    "rep": 1,
+                    "skor": 2,
+                    "bukti": "Headline hero 'Pembukuan rapi, usaha makin tenang.' berukuran display, 2 baris, berisi klaim hasil, tanpa kata yatim (bagian 1 tengah). Lompatan skala tegas ke subjudul abu-abu. CTA primer hijau 'Mulai Gratis 30 Hari' dan sekunder outline 'Lihat Demo'. Judul seksi ('Semua yang dibutuhkan…', 'Harga jujur…') jelas lebih kecil dari headline."
+                  },
+                  {
+                    "rep": 2,
+                    "skor": 2,
+                    "bukti": "Headline 'Pembukuan rapi, usaha makin tenang.' (bagian 1 tengah) berukuran display, 2 baris, berisi klaim hasil, dan baris kedua dua kata sehingga tidak yatim. Skalanya jauh di atas H2 seksi seperti 'Semua yang dibutuhkan…' (bagian 2). CTA primer hijau 'Mulai Gratis 30 Hari' dan CTA sekunder outline 'Lihat Demo'."
+                  },
+                  {
+                    "rep": 3,
+                    "skor": 2,
+                    "bukti": "Headline display 'Pembukuan rapi, usaha makin tenang.' terdiri dari 2 baris, berisi klaim hasil, dan tidak menyisakan kata yatim (bagian 1, tengah). Skala tegas: headline ±72px tebal, subjudul ±18px. CTA primer hijau 'Mulai Gratis 30 Hari' dan sekunder outline 'Lihat Demo'. Judul seksi tanpa kata yatim."
+                  }
+                ]
+              },
+              "R4": {
+                "values": [
+                  1,
+                  1,
+                  2
+                ],
+                "median": 1,
+                "range": 1,
+                "flag": false,
+                "evidence": [
+                  {
+                    "rep": 1,
+                    "skor": 1,
+                    "bukti": "Ritme terang/gelap ada: hero ber-tint terang, fitur putih, testimoni hijau gelap, pricing terang, footer gelap. Teks putih di atas tombol hijau. Namun hijau aksen tampak lebih kebiruan (sekitar #0F7B4A), bukan #15803D, di tombol 'Coba Gratis', ikon fitur, dan kartu kutipan (bagian 3). Satu teks lemah: metadata 'Pemilik Dapur Sari, Yogyakarta' hijau muda kecil di atas kartu hijau (bagian 3 kiri bawah)."
+                  },
+                  {
+                    "rep": 2,
+                    "skor": 1,
+                    "bukti": "Ritme terang/gelap antar-seksi baik: hero mint, fitur putih, testimoni hijau sangat gelap, harga terang, footer gelap. Teks di atas hijau putih (tombol, kartu testimoni besar, CTA penutup). Namun hijau aksen tombol dan ikon cenderung emerald kebiruan (sekitar #0F7B4A), bukan #15803D, sehingga satu kriteria golden gagal. Label legenda 'Keluar' mint pucat pada chart mockup (bagian 1 kanan bawah) juga lemah."
+                  },
+                  {
+                    "rep": 3,
+                    "skor": 2,
+                    "bukti": "Hijau konsisten pada tombol primer, bar 'Masuk' di grafik, ikon fitur, dan tombol tier tengah. Teks putih di atas hijau. Warna tambahan bermakna: chip oranye '4 invoice' untuk status piutang (bagian 1, kartu Piutang) dan kuning untuk bintang rating. Ritme terang→gelap hijau (testimoni)→terang→gelap (CTA/footer). Tidak ada teks yang tampak gagal kontras."
+                  }
+                ]
+              },
+              "R5": {
+                "values": [
+                  1,
+                  1,
+                  1
+                ],
+                "median": 1,
+                "range": 0,
+                "flag": false,
+                "evidence": [
+                  {
+                    "rep": 1,
+                    "skor": 1,
+                    "bukti": "Ikon bergaya line seragam: sidebar mockup, ikon fitur zap/file-check/chart dalam wadah persegi hijau 48px (bagian 2), check di daftar, star outline di testimoni, ikon sosial di footer. Visual hero berupa mockup dashboard yang relevan. Ada 1 emoji dekoratif tangan melambai di sapaan mockup 'Halo, Toko Bu Sari 👋' (bagian 1), padahal golden melarang emoji termasuk di sapaan."
+                  },
+                  {
+                    "rep": 2,
+                    "skor": 1,
+                    "bukti": "Ikon bergaya Lucide outline konsisten di sidebar mockup, check list, dan sosial footer. Ikon fitur (zap, file-check, chart) berada dalam kotak hijau solid yang seragam. Namun ada emoji tangan melambai di sapaan mockup 'Halo, Toko Bu Sari 👋' (bagian 1, mockup kiri atas), sehingga kriteria golden 'tanpa emoji di sapaan' gagal. Bintang rating berupa ikon star outline kuning."
+                  },
+                  {
+                    "rep": 3,
+                    "skor": 1,
+                    "bukti": "Ikon fitur bergaya Lucide (zap, file-check, chart) berada dalam wadah hijau solid yang seragam (bagian 2), dan foto avatar testimoni relevan (bagian 3). Namun ada 1 emoji dekoratif 👋 di sapaan mockup 'Halo, Toko Bu Sari' (bagian 1, area utama mockup). Ini melanggar kriteria golden 4."
+                  }
+                ]
+              },
+              "R6": {
+                "values": [
+                  1,
+                  1,
+                  1
+                ],
+                "median": 1,
+                "range": 0,
+                "flag": false,
+                "evidence": [
+                  {
+                    "rep": 1,
+                    "skor": 1,
+                    "bukti": "Kriteria golden mockup gagal: kartu menampilkan Saldo Kas, Pemasukan Rp32.180.000, Pengeluaran Rp14.900.000 dan Piutang, tanpa kartu Laba, sehingga persamaan Pemasukan − Pengeluaran = Laba tidak ditunjukkan (bagian 1). Testimoni lolos: nama, usaha, kota (Sari Wulandari – Dapur Sari, Yogyakarta; Budi Santoso – Surabaya; Rina Hapsari – Bandung) dengan ikon star (bagian 3). Copy lain spesifik (SAK EMKM, KUR, QRIS)."
+                  },
+                  {
+                    "rep": 2,
+                    "skor": 1,
+                    "bukti": "Mockup (bagian 1) menampilkan Pemasukan Rp32.180.000 dan Pengeluaran Rp14.900.000, tetapi tidak ada nilai Laba. Kartu yang ada adalah Saldo Kas Rp48.250.000 dan Piutang, jadi relasi Pemasukan − Pengeluaran = Laba tidak ditunjukkan: kriteria golden gagal. Testimoni memenuhi syarat: nama, peran/usaha, kota (Sari Wulandari, Dapur Sari, Yogyakarta; Budi Santoso, Surabaya; Rina Hapsari, Bandung) dan bintang ikon. Copy lainnya spesifik (KUR, SAK EMKM, QRIS)."
+                  },
+                  {
+                    "rep": 3,
+                    "skor": 1,
+                    "bukti": "Kriteria golden 3 gagal: mockup hanya menampilkan Saldo Kas, Pemasukan Rp32.180.000, Pengeluaran Rp14.900.000, dan Piutang, tanpa angka Laba sehingga persamaan Pemasukan − Pengeluaran = Laba tidak ditampilkan (bagian 1). Testimoni lengkap dengan nama, peran, dan kota (Yogyakarta, Surabaya, Bandung), rating memakai ikon star (bagian 3)."
+                  }
+                ]
+              },
+              "R8": {
+                "values": [
+                  1,
+                  1,
+                  1
+                ],
+                "median": 1,
+                "range": 0,
+                "flag": false,
+                "evidence": [
+                  {
+                    "rep": 1,
+                    "skor": 1,
+                    "bukti": "Kriteria golden pricing gagal: harga tier tengah 'Rp99rb /bulan' (bagian 4), bukan Rp 79rb/bulan. Bagian lain dari kriteria itu terpenuhi: tier tengah ditonjolkan dengan kartu gelap terangkat plus badge 'Paling Populer', CTA tengah primer hijau, tier lain outline, fitur memakai check. Ada 1 pelanggaran slop non-emoji: statistik bulat '12.000+ UMKM aktif' dan 'Rp2,1T' (bagian 3). Langkah khas yang bisa ditunjuk: komposisi testimoni asimetris dengan satu kutipan besar berkartu hijau plus dua kartu bertumpuk."
+                  },
+                  {
+                    "rep": 2,
+                    "skor": 1,
+                    "bukti": "Tier tengah 'Bisnis' (bagian 4) ditonjolkan dengan satu cara utama (kartu gelap, sedikit lebih tinggi), memakai badge 'Paling Populer' dan CTA primer hijau, sementara tier lain memakai tombol outline. Fitur ditandai ikon check. Namun harganya 'Rp99rb/bulan', bukan Rp 79rb/bulan, sehingga satu kriteria golden gagal. Ada 1 pelanggaran slop (statistik bulat). Langkah khas yang bisa ditunjuk: testimoni bento dengan kartu kutipan hijau besar plus deret statistik (bagian 3)."
+                  },
+                  {
+                    "rep": 3,
+                    "skor": 1,
+                    "bukti": "Tier tengah ditonjolkan dengan kartu gelap terangkat + badge 'Paling Populer'. CTA tengah primer, dua tier lain outline, fitur memakai check (bagian 4). Namun harga tengah 'Rp99rb/bulan' tidak sesuai Rp 79rb/bulan, jadi 1 kriteria golden gagal. Ada 1 pelanggaran slop di luar emoji: statistik bulat '12.000+ UMKM aktif', 'Rp2,1T', '2.000+ pemilik'. Langkah khas yang bisa ditunjuk: kartu testimoni utama hijau solid yang asimetris (bagian 3)."
+                  }
+                ]
+              },
+              "R9": {
+                "values": [
+                  2,
+                  2,
+                  2
+                ],
+                "median": 2,
+                "range": 0,
+                "flag": false,
+                "evidence": [
+                  {
+                    "rep": 1,
+                    "skor": 2,
+                    "bukti": "Angka di mockup diberi tren berupa chip +12,4%/+8,1%/-3,2% dan '4 invoice', rentang tanggal '1–18 Nov 2026'. Transaksi memiliki metadata (Tunai · 09:12, QRIS · Kemarin). Grafik memakai legenda Masuk/Keluar per minggu M1–M8. Kartu fitur punya sub-poin centang. Stat testimoni berlabel, pricing memiliki deskripsi tier. Padat tetapi tetap terbaca."
+                  },
+                  {
+                    "rep": 2,
+                    "skor": 2,
+                    "bukti": "Mockup kaya konteks: rentang tanggal '1–18 Nov 2026', badge tren +12,4%/+8,1%/-3,2%, badge status oranye '4 invoice', dan metadata transaksi 'Tunai · 09:12' / 'QRIS · Kemarin'. Kartu fitur memiliki sub-daftar check. Pricing punya deskripsi target per tier. Testimoni disertai metrik '4,9/5 Rating Play Store'. Tetap terbaca."
+                  },
+                  {
+                    "rep": 3,
+                    "skor": 2,
+                    "bukti": "Kartu ringkasan mockup memakai chip tren '+12,4%', '+8,1%', '-3,2%' dan status '4 invoice'. Legenda grafik Masuk/Keluar per minggu M1–M8. Transaksi memiliki metadata metode dan waktu ('Tunai · 09:12', 'QRIS · Kemarin'). Kartu fitur memiliki sub-daftar check. Statistik testimoni berlabel, dan pricing menyebut detail seperti watermark, SPT, dan 24/7. Padat tetapi terbaca."
+                  }
+                ]
+              },
+              "R10": {
+                "values": [
+                  2,
+                  2,
+                  2
+                ],
+                "median": 2,
+                "range": 0,
+                "flag": false,
+                "evidence": [
+                  {
+                    "rep": 1,
+                    "skor": 2,
+                    "bukti": "Permukaan berlapis: hero ber-tint hijau, testimoni hijau gelap dengan kartu kutipan hijau solid, kartu tier tengah gelap, CTA penutup hijau di atas footer gelap. Chip berwarna bermakna di mockup (hijau tren, oranye piutang), badge 'Baru' dan 'Paling Populer'. Avatar berupa foto. Bar chart dua nada terintegrasi."
+                  },
+                  {
+                    "rep": 2,
+                    "skor": 2,
+                    "bukti": "Permukaan berlapis: hero ber-tint mint, kartu fitur abu kehijauan, seksi testimoni hijau gelap dengan kartu hijau solid, kartu harga tengah gelap, dan CTA penutup hijau bergradasi halus. Badge terdefinisi ('Baru', 'Paling Populer', chip tren, chip oranye piutang). Foto avatar asli dan chart batang dua seri yang matang."
+                  },
+                  {
+                    "rep": 3,
+                    "skor": 2,
+                    "bukti": "Permukaan berlapis: hero ber-tint hijau, mockup dalam bingkai ber-tint dengan bayangan, seksi testimoni hijau gelap dengan kartu hijau solid, kartu harga tengah gelap, banner CTA hijau di atas footer gelap. Chip tren hijau dan chip oranye piutang terdefinisi, grafik dua seri, foto avatar menyatu."
+                  }
+                ]
+              }
+            },
+            "total": 12,
+            "slop": {
+              "values": [
+                2,
+                1,
+                2
+              ],
+              "median": 2,
+              "range": 1,
+              "flag": false,
+              "items": [
+                {
+                  "rep": 1,
+                  "butir": [
+                    "5: Statistik bulat '12.000+ UMKM aktif', 'Rp2,1T Transaksi tercatat' dan '2.000+ pemilik warung' yang tidak diberikan prompt (bagian 3 kanan atas, bagian 2 kanan)",
+                    "6: Emoji tangan melambai sebagai dekorasi di sapaan mockup 'Halo, Toko Bu Sari' (bagian 1, mockup kiri atas; dihitung di R5)"
+                  ]
+                },
+                {
+                  "rep": 2,
+                  "butir": [
+                    "5: Statistik bulat yang tidak diberikan prompt, yaitu '12.000+ UMKM aktif' dan 'Rp2,1T Transaksi tercatat' di header testimoni (bagian 3 kanan atas), ditambah '2.000+ pemilik warung' di seksi fitur (bagian 2)"
+                  ]
+                },
+                {
+                  "rep": 3,
+                  "butir": [
+                    "5: statistik bulat yang tidak diberikan prompt, '12.000+ UMKM aktif' dan 'Rp2,1T Transaksi tercatat' (bagian 3, kanan atas) serta 'Dibuat bersama 2.000+ pemilik warung' (bagian 2, kanan atas)",
+                    "6: emoji 👋 di sapaan mockup 'Halo, Toko Bu Sari' (bagian 1); skornya dihitung di R5"
+                  ]
+                }
+              ]
+            },
+            "emoji": {
+              "values": [
+                1,
+                1,
+                1
+              ],
+              "median": 1,
+              "range": 0,
+              "flag": false
+            },
+            "focus": [
+              {
+                "rep": 1,
+                "fokus": "Headline hero 'Pembukuan rapi, usaha makin tenang.' di tengah bagian 1"
+              },
+              {
+                "rep": 2,
+                "fokus": "Headline hero 'Pembukuan rapi, usaha makin tenang.' di tengah bagian 1"
+              },
+              {
+                "rep": 3,
+                "fokus": "Headline hero 'Pembukuan rapi, usaha makin tenang.' di tengah bagian 1"
+              }
+            ]
+          }
+        }
+      },
+      "decision": {
+        "decision": "Lebih baik",
+        "why": "lolos gerbang, total 15 ≥ 12 + 3, daya tarik 4 ≥ 4",
+        "checks": {
+          "total": {
+            "lakar": 15,
+            "pendev": 12
+          },
+          "appeal": {
+            "lakar": 4,
+            "pendev": 4
+          },
+          "appealLoss": [],
+          "otherLoss": [],
+          "zeroVsTwo": [],
+          "pendevBriefViolations": []
+        }
+      },
+      "sourceDecision": {
+        "decision": "Lebih baik",
+        "why": "lolos gerbang, total 9 ≥ 6 + 2"
+      },
+      "sourceTotals": {
+        "lakar": 9,
+        "pendev": 6
+      },
+      "adamDecision": "Kalah",
+      "costUsd": 1.0079134
+    },
+    {
+      "prompt": "B",
+      "strips": {
+        "lakar": "bench/runs/rounds/1/B-lakar.png",
+        "pendev": "bench/runs/rounds/1/B-pendev.png"
+      },
+      "gate": {
+        "ok": true,
+        "reasons": [],
+        "timeRatio": 0.726916562790726
+      },
+      "pendevSizeProblems": [
+        "board z57aTa 390×1109 ≠ 390×844"
+      ],
+      "score": {
+        "prompt": "B",
+        "validReps": 3,
+        "reps": [
+          {
+            "prompt": "B",
+            "rep": 1,
+            "mapping": {
+              "X": "pendev",
+              "Y": "lakar"
+            },
+            "status": "ok",
+            "verdict": {
+              "X": {
+                "R1": {
+                  "skor": 0,
+                  "bukti": "Artboard memanjang sekitar 390×1109 px, bukan 844 (ukuran mengikat salah), dan home indicator tidak terlihat di bawah tab bar. Seksi lain lengkap: status bar 09:41 di atas, sapaan + avatar, kartu ringkasan dengan ring, jadwal 3 item (Lari pagi santai dengan circle-check, Upper body strength dengan tombol play, Yoga peregangan), 2 kartu rekomendasi, dan tab bar 4 item (Beranda aktif dalam pill oranye gelap). Judul 'Upper body strength' juga berbahasa Inggris."
+                },
+                "R2": {
+                  "skor": 1,
+                  "bukti": "Fokus ada pada kartu 'Ringkasan hari ini' (ring konsentris di kiri-tengah atas), tetapi bersaing dengan sapaan 'Selamat pagi, Rani' (tebal, kiri atas) yang ukurannya hampir sama dengan angka '6.842'. Lompatan skala ke judul seksi dan metadata cukup tegas, dan tidak ada judul yatim."
+                },
+                "R4": {
+                  "skor": 1,
+                  "bukti": "Oranye dipakai konsisten untuk aksi dan status aktif: 'Lihat semua', 'Jelajahi', border kartu 'BERIKUTNYA', tombol play, tab Beranda. Ikon gelap di atas oranye (ikon dumbbell, play). Warna ring oranye/kuning/merah bermakna per metrik. Ada satu teks lemah: item selesai 'Lari pagi santai / 07:00 / 5 km · 32 mnt' (kartu jadwal pertama) diredupkan sehingga kontrasnya tampak di bawah 4.5:1."
+                },
+                "R5": {
+                  "skor": 2,
+                  "bukti": "Tanggal 'Rabu, 18 November' di atas sapaan tebal, avatar foto di kiri atas, tanpa emoji tangan. Ikon garis satu gaya dengan ukuran seragam: lonceng, sepatu, dumbbell, bunga, chevron, ikon tab, api di badge '12 hari'. Foto kartu program relevan (lari malam, latihan kekuatan)."
+                },
+                "R6": {
+                  "skor": 2,
+                  "bukti": "Legenda nilai/target: 6.842/10.000, 412/600 kkal, 38/45 mnt. Rata-rata (68%+69%+84%)/3 ≈ 74% cocok dengan subjudul '74% dari target harian'. Panjang busur ring kira-kira proporsional. Copy spesifik: 'Bakar Lemak 21 Hari', '5 km · 32 mnt', 'Menengah'."
+                },
+                "R8": {
+                  "skor": 2,
+                  "bukti": "Dua kartu program jelas berbeda: foto berwarna jalanan vs foto hitam-putih, dengan level berbeda. Langkah khas yang bisa ditunjuk: item jadwal berikutnya disorot dengan border oranye dan badge 'BERIKUTNYA' di tengah daftar, serta ring tiga lapis dengan ikon petir di pusat. Tidak ada pelanggaran checklist slop."
+                },
+                "R9": {
+                  "skor": 2,
+                  "bukti": "Angka diberi sasaran dan persen harian, badge streak '12 hari', rating bintang 4.8/4.9 di kartu, level (Pemula/Menengah), dan durasi. Jadwal memperlihatkan variasi status (selesai / berikutnya / mendatang) dengan jam dan metadata. Tampilan padat tetapi tetap terbaca."
+                },
+                "R10": {
+                  "skor": 2,
+                  "bukti": "Permukaan berlapis: kartu jadwal berikutnya ber-tint oranye, badge '12 hari' dan chip 'BERIKUTNYA' ber-tint, pill tab aktif ber-tint. Warna seri ring terdefinisi, titik legenda berwarna, foto matang, dan badge rating mengambang di atas foto."
+                },
+                "slop": {
+                  "jumlah": 0,
+                  "butir": []
+                },
+                "emoji": 0,
+                "fokus": "Kartu 'Ringkasan hari ini' dengan ring konsentris tiga lapis di kiri-tengah atas (y≈150–410)"
+              },
+              "Y": {
+                "R1": {
+                  "skor": 2,
+                  "bukti": "Artboard 390×844 dengan status bar 09:41 dan home indicator di bawah tab bar. Semua seksi ada: sapaan + avatar inisial 'DA', ringkasan dengan ring, jadwal 2 item (Lari pagi 5 km dengan circle-check 'Selesai', Kekuatan tubuh atas dengan tombol 'Mulai latihan' berikon play), 2 kartu program, dan tab bar 4 item (Beranda aktif oranye). Mode gelap, aksen oranye, seluruh teks berbahasa Indonesia."
+                },
+                "R2": {
+                  "skor": 1,
+                  "bukti": "Fokus pada kartu ring ringkasan di atas, tetapi sapaan 'Selamat pagi, Dimas' setara ukurannya dengan judul seksi 'Jadwal latihan hari ini' dan 'Program untukmu' (skala datar). Tombol oranye penuh 'Mulai latihan' di tengah layar ikut bersaing merebut perhatian."
+                },
+                "R4": {
+                  "skor": 2,
+                  "bukti": "Oranye dipakai konsisten untuk aksi/aktif/seri utama: 'Kalender', 'Lihat semua', tombol 'Mulai latihan' dengan teks gelap, border kartu berikutnya, tab Beranda, ring luar. Nuansa oranye-peach di ring membedakan seri. Teks muted abu (metadata, tab tidak aktif) tampak terbaca di surface gelap."
+                },
+                "R5": {
+                  "skor": 2,
+                  "bukti": "Tanggal 'Rabu, 18 November' di atas sapaan tebal, avatar inisial 'DA' di kiri atas, tanpa emoji. Ikon garis satu gaya dan berukuran seragam (sepatu, dumbbell, api, figur yoga, ikon tab). Visual utama berupa ring progres yang relevan."
+                },
+                "R6": {
+                  "skor": 1,
+                  "bukti": "Legenda nilai/target ada: 6.842/10.000, 384/600 kkal, 27/45 mnt. Namun busur ring tengah dan dalam (peach) tampak hampir penuh (~85%), padahal kalori 64% dan menit aktif 60%. Ada satu inkonsistensi busur vs angka."
+                },
+                "R8": {
+                  "skor": 1,
+                  "bukti": "Dua kartu program 'HIIT Bakar Lemak' dan 'Yoga Mobilitas' (bawah) berpola identik: ikon abu dalam kotak + judul + meta, sehingga tidak berbeda secara visual (kriteria golden 5 gagal). Langkah khas tetap ada: CTA lebar penuh tertanam di kartu jadwal berikutnya. Tidak ada pelanggaran slop."
+                },
+                "R9": {
+                  "skor": 1,
+                  "bukti": "Angka ringkasan punya sasaran, dan jadwal punya status 'Selesai'/'Berikutnya' plus '6 gerakan'. Namun tidak ada persen, tren, atau streak. Kartu program hanya berisi durasi dan level tanpa rating atau visual, sehingga konteks hanya ada di sebagian bagian."
+                },
+                "R10": {
+                  "skor": 1,
+                  "bukti": "Polesan hanya di sebagian elemen: kartu jadwal berikutnya ber-tint dengan chip 'Berikutnya' dan tombol oranye. Kartu program dan kartu selesai berupa netral polos dengan ikon abu, tanpa foto atau ilustrasi."
+                },
+                "slop": {
+                  "jumlah": 0,
+                  "butir": []
+                },
+                "emoji": 0,
+                "fokus": "Kartu ring ringkasan hari ini di atas (y≈137–287), ring oranye di kiri dengan angka di kanan"
+              }
+            },
+            "attempts": [
+              {
+                "dir": "/root/lakar/bench/runs/rejudge/r1-v2-1/B/rep-1/attempt-1",
+                "status": "ok",
+                "problems": [],
+                "costUsd": 0.1567858,
+                "wallMs": 44340.787251
+              }
+            ],
+            "retried": false,
+            "costUsd": 0.1567858
+          },
+          {
+            "prompt": "B",
+            "rep": 2,
+            "mapping": {
+              "X": "lakar",
+              "Y": "pendev"
+            },
+            "status": "ok",
+            "verdict": {
+              "X": {
+                "R1": {
+                  "skor": 2,
+                  "bukti": "Artboard 390×844 dengan status bar 09:41 (±54px) di atas dan home indicator di bawah. Semua seksi ada: sapaan + avatar 'DA', kartu ringkasan dengan ring, jadwal 2 item ('Lari pagi 5 km' selesai dengan ikon circle-check; 'Kekuatan tubuh atas' dengan tombol 'Mulai latihan' ber-ikon play), 2 kartu program, tab bar 4 item (Beranda/Latihan/Statistik/Profil) dengan Beranda aktif berwarna oranye. Mode gelap, aksen oranye, seluruh copy Bahasa Indonesia."
+                },
+                "R2": {
+                  "skor": 1,
+                  "bukti": "Sapaan 'Selamat pagi, Dimas' (atas kiri) cukup tebal, tetapi skalanya hampir sama dengan angka ring '6.842' dan judul seksi 'Jadwal latihan hari ini' / 'Program untukmu' (~20px). Tombol oranye penuh 'Mulai latihan' ikut bersaing sebagai fokus. Fokus ada, tetapi lompatan skala kurang tegas."
+                },
+                "R4": {
+                  "skor": 2,
+                  "bukti": "Oranye dipakai konsisten untuk ring utama, CTA 'Mulai latihan' (teks/ikon gelap di atas oranye), link 'Kalender'/'Lihat semua', centang selesai, chip 'Berikutnya', dan tab aktif. Seri ring memakai nuansa oranye-peach saja, tanpa warna liar. Teks muted ('06:30 · 32 menit · Selesai', '/ 10.000', label tab) tampak terbaca di surface gelap."
+                },
+                "R5": {
+                  "skor": 2,
+                  "bukti": "Ikon satu gaya outline dengan ukuran seragam: jejak kaki, dumbbell, api, figur yoga, bel, dan ikon tab. Visual utama berupa ring progres di kartu ringkasan, relevan. Avatar inisial 'DA' di kiri atas. Tidak ada emoji."
+                },
+                "R6": {
+                  "skor": 2,
+                  "bukti": "Legenda nilai/target spesifik: 6.842/10.000, 384/600 kkal, 27/45 mnt. Busur ring (luar ±70%, dalam lebih pendek) kira-kira cocok dengan rasio 68/64/60%. Copy spesifik ('HIIT Bakar Lemak · 4 minggu · Menengah', '18:30 · 45 menit · 6 gerakan'), tanpa kontradiksi."
+                },
+                "R8": {
+                  "skor": 1,
+                  "bukti": "Kriteria golden 5 gagal: dua kartu program (bawah) berstruktur identik (tile ikon + judul + meta) dan hanya berbeda ikon, sehingga nyaris tidak bisa dibedakan secara visual. Tidak ada pelanggaran slop. Langkah khas yang ada: kartu sesi berikutnya ber-border oranye dengan CTA lebar penuh tertanam, dan tab bar mengambang."
+                },
+                "R9": {
+                  "skor": 1,
+                  "bukti": "Ring punya target dan satuan, jadwal punya waktu/durasi/status ('Selesai', chip 'Berikutnya'), program punya durasi dan level. Namun tidak ada persen, tren, atau streak, dan kartu program tipis (tanpa rating atau visual), sehingga konteks hanya di sebagian bagian."
+                },
+                "R10": {
+                  "skor": 1,
+                  "bukti": "Polesan hanya di sebagian elemen: kartu 'Kekuatan tubuh atas' ber-tint dengan border oranye, tile ikon oranye, chip 'Berikutnya', tab bar mengambang. Kartu ringkasan, jadwal pertama, dan kedua kartu program sebagian besar netral abu polos tanpa visual pendukung."
+                },
+                "slop": {
+                  "jumlah": 0,
+                  "butir": []
+                },
+                "emoji": 0,
+                "fokus": "Kartu ringkasan hari ini dengan ring progres oranye (sepertiga atas, di bawah sapaan)"
+              },
+              "Y": {
+                "R1": {
+                  "skor": 0,
+                  "bukti": "Ukuran mengikat salah: artboard memanjang jauh melewati 844px (tab bar berada di sekitar y≈1075 pada strip ±1109px). Ada juga copy berbahasa Inggris 'Upper body strength' pada item jadwal kedua, melanggar ketentuan Bahasa Indonesia. Seksi lain lengkap: 3 item jadwal dengan check dan play, 2 kartu rekomendasi, tab bar 4 item dengan Beranda aktif."
+                },
+                "R2": {
+                  "skor": 2,
+                  "bukti": "Kartu ringkasan dengan ring tiga lapis besar (±140px) menjadi fokus tunggal di sepertiga atas. Angka 6.842/412/38 tebal dan lebih besar dari label, dan judul seksi jelas di atas isi. Setiap judul seksi diikuti kontennya (tidak ada judul yatim)."
+                },
+                "R4": {
+                  "skor": 1,
+                  "bukti": "Aksen oranye konsisten untuk CTA play, tile ikon aktif, link 'Lihat semua'/'Jelajahi', level 'Pemula'/'Menengah', dan pill tab aktif. Kuning dan merah ring bermakna sebagai seri kategori. Satu teks lemah: label tab tidak aktif 'Latihan'/'Progres'/'Profil' (bawah) kecil dan abu redup, tampak di bawah 4.5:1."
+                },
+                "R5": {
+                  "skor": 2,
+                  "bukti": "Ikon outline seragam: jejak kaki, dumbbell, bunga, play, chevron, bintang rating, api streak, ikon tab. Visual utama relevan: ring progres dan dua foto program (pelari di jalan, pria latihan B/W). Avatar foto di kiri atas. Tanpa emoji."
+                },
+                "R6": {
+                  "skor": 2,
+                  "bukti": "'74% dari target harian' konsisten dengan rata-rata 6.842/10.000 (68%), 412/600 (69%), dan 38/45 (84%). Panjang busur kira-kira sesuai. Copy spesifik ('Bakar Lemak 21 Hari · 3 minggu · Pemula', '20:30 Yoga peregangan · 20 mnt'). Masalah bahasa sudah dihitung di R1."
+                },
+                "R8": {
+                  "skor": 2,
+                  "bukti": "Tidak ada pelanggaran slop. Dua kartu rekomendasi jelas berbeda: foto berwarna di kiri, foto hitam-putih di kanan. Langkah khas: timeline jadwal dengan item selesai diredupkan, item berikutnya ber-border oranye dengan tombol play bulat, serta chip streak '12 hari' di kartu ringkasan."
+                },
+                "R9": {
+                  "skor": 2,
+                  "bukti": "Angka diberi konteks: target per metrik, persen agregat 74%, streak 12 hari. Jadwal menunjukkan variasi status (selesai, BERIKUTNYA, akan datang) beserta jam, durasi, dan level. Kartu program punya rating 4.8/4.9, durasi, dan level berwarna. Padat tetapi tetap terbaca."
+                },
+                "R10": {
+                  "skor": 2,
+                  "bukti": "Permukaan berlapis: kartu berikutnya ber-tint oranye, pill tab aktif ber-tint, chip streak ber-tint. Warna seri ring (oranye/kuning/merah) konsisten dengan dot legenda. Chip 'BERIKUTNYA', badge rating di atas foto, dot notifikasi pada bel. Foto dan ikon matang dan menyatu."
+                },
+                "slop": {
+                  "jumlah": 0,
+                  "butir": []
+                },
+                "emoji": 0,
+                "fokus": "Ring progres tiga lapis oranye-kuning-merah di kartu 'Ringkasan hari ini' (kiri, sepertiga atas)"
+              }
+            },
+            "attempts": [
+              {
+                "dir": "/root/lakar/bench/runs/rejudge/r1-v2-1/B/rep-2/attempt-1",
+                "status": "ok",
+                "problems": [],
+                "costUsd": 0.1517938,
+                "wallMs": 45167.175526000006
+              }
+            ],
+            "retried": false,
+            "costUsd": 0.1517938
+          },
+          {
+            "prompt": "B",
+            "rep": 3,
+            "mapping": {
+              "X": "pendev",
+              "Y": "lakar"
+            },
+            "status": "ok",
+            "verdict": {
+              "X": {
+                "R1": {
+                  "skor": 0,
+                  "bukti": "Ukuran mengikat salah: artboard memanjang sekitar 390×1109 (tab bar berada di y≈1040–1100), bukan 844. Home indicator tidak terlihat di bawah tab bar. Ada copy berbahasa Inggris 'Upper body strength' pada kartu jadwal kedua (y≈617). Bagian konten sendiri lengkap: sapaan+avatar, ring, 3 jadwal, 2 kartu program, dan tab bar 4 item."
+                },
+                "R2": {
+                  "skor": 2,
+                  "bukti": "Titik fokus tunggal ada di kartu Ringkasan (y≈150–415): tiga ring besar dengan angka 6.842/412/38 berukuran tebal ±20px. Skalanya melompat tegas: sapaan ±22 bold, judul seksi ±17 semibold, metadata ±12 abu. Setiap judul seksi diikuti kontennya, tidak ada judul yatim."
+                },
+                "R4": {
+                  "skor": 1,
+                  "bukti": "Oranye dipakai konsisten untuk aksi dan status aktif: 'Lihat semua', 'Jelajahi', tombol play, kartu 'BERIKUTNYA', dan tab Beranda. Kuning dan merah di ring bermakna sebagai seri kategori (kalori, menit aktif). Ikon di atas oranye berwarna gelap. Satu teks lemah: metadata item selesai '07:00' dan '5 km · 32 mnt' (y≈503–545) diredupkan hingga kontrasnya tampak di bawah 4.5:1."
+                },
+                "R5": {
+                  "skor": 2,
+                  "bukti": "Avatar foto di kiri atas (x≈20–68, y≈70–118). Tanggal 'Rabu, 18 November' di atas sapaan 'Selamat pagi, Rani' yang tebal, tanpa emoji tangan. Ikon bergaya garis seragam: lonceng, sepatu, dumbbell, bunga yoga, chevron, dan tab. Foto atlet di kedua kartu program relevan. Tidak ada emoji."
+                },
+                "R6": {
+                  "skor": 2,
+                  "bukti": "Legenda nilai/target ditulis spesifik: 6.842/10.000, 412/600 kkal, 38/45 mnt. '74% dari target harian' konsisten dengan rata-rata 68%, 69%, dan 84%. Panjang busur sebanding dengan angkanya: ring dalam (merah) yang terpanjang. Copy spesifik: 'Bakar Lemak 21 Hari', '3 minggu · Pemula', rating 4.8/4.9."
+                },
+                "R8": {
+                  "skor": 2,
+                  "bukti": "Tidak ada pelanggaran slop. Kedua kartu program jelas berbeda: foto berwarna (lari malam) dan foto monokrom (kekuatan), dengan level berbeda. Keputusan khas yang bisa ditunjuk: jadwal bertiga status (selesai diredupkan, 'BERIKUTNYA' bertepi dan ber-tint oranye dengan tombol play bulat, mendatang dengan chevron), ditambah badge streak '12 hari' di kartu ringkasan."
+                },
+                "R9": {
+                  "skor": 2,
+                  "bukti": "Angka diberi target dan satuan, ditambah persentase harian dan streak 12 hari. Jadwal memperlihatkan tiga status berbeda dengan jam, durasi/jarak, dan level. Kartu program memuat durasi, level berwarna, dan rating bintang. Notifikasi diberi dot. Padat tetapi tetap terbaca."
+                },
+                "R10": {
+                  "skor": 2,
+                  "bukti": "Permukaan berlapis: kartu 'BERIKUTNYA' ber-tint oranye, badge streak dan pill tab aktif bernuansa oranye gelap, chip 'BERIKUTNYA' terdefinisi. Ring tiga warna rapi. Foto program matang dengan overlay rating. Tab bar mengambang dengan sudut membulat."
+                },
+                "slop": {
+                  "jumlah": 0,
+                  "butir": []
+                },
+                "emoji": 0,
+                "fokus": "Ring progres tiga lapis beserta angka 6.842/412/38 di kartu 'Ringkasan hari ini' (y≈150–415)"
+              },
+              "Y": {
+                "R1": {
+                  "skor": 2,
+                  "bukti": "Artboard 390×844, status bar 09:41 di atas, dan home indicator di bawah tab bar (y≈827). Semua bagian ada: sapaan+avatar, ringkasan dengan ring, jadwal 2 item, 2 kartu program, dan tab bar 4 item (Beranda aktif berwarna oranye). Mode gelap, aksen oranye, seluruh copy berbahasa Indonesia."
+                },
+                "R2": {
+                  "skor": 1,
+                  "bukti": "Ring dan angka di kartu ringkasan (y≈137–287) menjadi fokus, tetapi bersaing dengan tombol oranye penuh lebar 'Mulai latihan' (y≈492–536). Judul seksi 'Jadwal latihan hari ini' dan 'Program untukmu' (±18–20px) juga hampir setara dengan sapaan, sehingga lompatan skalanya kurang tegas."
+                },
+                "R4": {
+                  "skor": 2,
+                  "bukti": "Oranye dipakai untuk aksi dan status aktif: tombol 'Mulai latihan' dengan teks/ikon gelap di atasnya, 'Kalender', 'Lihat semua', centang selesai, dan tab Beranda. Ring memakai gradasi oranye–peach–krem sebagai seri. Teks muted seperti '06:30 · 32 menit · Selesai' dan label tab terbaca di atas surface gelap."
+                },
+                "R5": {
+                  "skor": 2,
+                  "bukti": "Avatar inisial 'DA' di kiri atas (y≈50–95). Tanggal di atas sapaan tebal 'Selamat pagi, Dimas', tanpa emoji. Ikon bergaya garis seragam: sepatu, dumbbell, api, figur yoga, dan tab. Visual utama berupa ring progres yang relevan. Tidak ada emoji."
+                },
+                "R6": {
+                  "skor": 2,
+                  "bukti": "Legenda nilai/target konsisten: 6.842/10.000, 384/600 kkal, 27/45 mnt. Busur ring sebanding (luar ±68%, dalam lebih pendek). Copy spesifik: 'Lari pagi 5 km', 'Kekuatan tubuh atas · 6 gerakan', 'HIIT Bakar Lemak · 4 minggu · Menengah'."
+                },
+                "R8": {
+                  "skor": 1,
+                  "bukti": "Kriteria golden 5 gagal: kedua kartu program (y≈612–705) identik secara visual, sama-sama berupa kotak ikon abu ditambah judul dan metadata, hanya ikonnya yang berbeda. Tidak ada pelanggaran checklist slop. Langkah khas tetap ada: kartu 'Berikutnya' dengan tombol CTA penuh lebar di dalamnya."
+                },
+                "R9": {
+                  "skor": 1,
+                  "bukti": "Angka ringkasan diberi target dan satuan. Jadwal menunjukkan status 'Selesai' dan chip 'Berikutnya' beserta jumlah gerakan. Namun kartu program hanya memuat durasi dan level tanpa rating atau penanda lain, tidak ada persentase total atau streak, dan hanya ada 2 item jadwal."
+                },
+                "R10": {
+                  "skor": 1,
+                  "bukti": "Polesan hanya ada di sebagian elemen: kartu 'Berikutnya' ber-tint dan bertepi oranye, chip 'Berikutnya', serta avatar ber-tint. Kartu program dan kartu jadwal selesai berupa surface netral polos dengan ikon kecil, tanpa foto atau visual pendukung."
+                },
+                "slop": {
+                  "jumlah": 0,
+                  "butir": []
+                },
+                "emoji": 0,
+                "fokus": "Ring progres tiga lapis di kiri kartu ringkasan (y≈137–287), bersaing dengan tombol 'Mulai latihan'"
+              }
+            },
+            "attempts": [
+              {
+                "dir": "/root/lakar/bench/runs/rejudge/r1-v2-1/B/rep-3/attempt-1",
+                "status": "ok",
+                "problems": [],
+                "costUsd": 0.15643379999999998,
+                "wallMs": 45322.323845999956
+              }
+            ],
+            "retried": false,
+            "costUsd": 0.15643379999999998
+          }
+        ],
+        "tools": {
+          "lakar": {
+            "criteria": {
+              "R1": {
+                "values": [
+                  2,
+                  2,
+                  2
+                ],
+                "median": 2,
+                "range": 0,
+                "flag": false,
+                "evidence": [
+                  {
+                    "rep": 1,
+                    "skor": 2,
+                    "bukti": "Artboard 390×844 dengan status bar 09:41 dan home indicator di bawah tab bar. Semua seksi ada: sapaan + avatar inisial 'DA', ringkasan dengan ring, jadwal 2 item (Lari pagi 5 km dengan circle-check 'Selesai', Kekuatan tubuh atas dengan tombol 'Mulai latihan' berikon play), 2 kartu program, dan tab bar 4 item (Beranda aktif oranye). Mode gelap, aksen oranye, seluruh teks berbahasa Indonesia."
+                  },
+                  {
+                    "rep": 2,
+                    "skor": 2,
+                    "bukti": "Artboard 390×844 dengan status bar 09:41 (±54px) di atas dan home indicator di bawah. Semua seksi ada: sapaan + avatar 'DA', kartu ringkasan dengan ring, jadwal 2 item ('Lari pagi 5 km' selesai dengan ikon circle-check; 'Kekuatan tubuh atas' dengan tombol 'Mulai latihan' ber-ikon play), 2 kartu program, tab bar 4 item (Beranda/Latihan/Statistik/Profil) dengan Beranda aktif berwarna oranye. Mode gelap, aksen oranye, seluruh copy Bahasa Indonesia."
+                  },
+                  {
+                    "rep": 3,
+                    "skor": 2,
+                    "bukti": "Artboard 390×844, status bar 09:41 di atas, dan home indicator di bawah tab bar (y≈827). Semua bagian ada: sapaan+avatar, ringkasan dengan ring, jadwal 2 item, 2 kartu program, dan tab bar 4 item (Beranda aktif berwarna oranye). Mode gelap, aksen oranye, seluruh copy berbahasa Indonesia."
+                  }
+                ]
+              },
+              "R2": {
+                "values": [
+                  1,
+                  1,
+                  1
+                ],
+                "median": 1,
+                "range": 0,
+                "flag": false,
+                "evidence": [
+                  {
+                    "rep": 1,
+                    "skor": 1,
+                    "bukti": "Fokus pada kartu ring ringkasan di atas, tetapi sapaan 'Selamat pagi, Dimas' setara ukurannya dengan judul seksi 'Jadwal latihan hari ini' dan 'Program untukmu' (skala datar). Tombol oranye penuh 'Mulai latihan' di tengah layar ikut bersaing merebut perhatian."
+                  },
+                  {
+                    "rep": 2,
+                    "skor": 1,
+                    "bukti": "Sapaan 'Selamat pagi, Dimas' (atas kiri) cukup tebal, tetapi skalanya hampir sama dengan angka ring '6.842' dan judul seksi 'Jadwal latihan hari ini' / 'Program untukmu' (~20px). Tombol oranye penuh 'Mulai latihan' ikut bersaing sebagai fokus. Fokus ada, tetapi lompatan skala kurang tegas."
+                  },
+                  {
+                    "rep": 3,
+                    "skor": 1,
+                    "bukti": "Ring dan angka di kartu ringkasan (y≈137–287) menjadi fokus, tetapi bersaing dengan tombol oranye penuh lebar 'Mulai latihan' (y≈492–536). Judul seksi 'Jadwal latihan hari ini' dan 'Program untukmu' (±18–20px) juga hampir setara dengan sapaan, sehingga lompatan skalanya kurang tegas."
+                  }
+                ]
+              },
+              "R4": {
+                "values": [
+                  2,
+                  2,
+                  2
+                ],
+                "median": 2,
+                "range": 0,
+                "flag": false,
+                "evidence": [
+                  {
+                    "rep": 1,
+                    "skor": 2,
+                    "bukti": "Oranye dipakai konsisten untuk aksi/aktif/seri utama: 'Kalender', 'Lihat semua', tombol 'Mulai latihan' dengan teks gelap, border kartu berikutnya, tab Beranda, ring luar. Nuansa oranye-peach di ring membedakan seri. Teks muted abu (metadata, tab tidak aktif) tampak terbaca di surface gelap."
+                  },
+                  {
+                    "rep": 2,
+                    "skor": 2,
+                    "bukti": "Oranye dipakai konsisten untuk ring utama, CTA 'Mulai latihan' (teks/ikon gelap di atas oranye), link 'Kalender'/'Lihat semua', centang selesai, chip 'Berikutnya', dan tab aktif. Seri ring memakai nuansa oranye-peach saja, tanpa warna liar. Teks muted ('06:30 · 32 menit · Selesai', '/ 10.000', label tab) tampak terbaca di surface gelap."
+                  },
+                  {
+                    "rep": 3,
+                    "skor": 2,
+                    "bukti": "Oranye dipakai untuk aksi dan status aktif: tombol 'Mulai latihan' dengan teks/ikon gelap di atasnya, 'Kalender', 'Lihat semua', centang selesai, dan tab Beranda. Ring memakai gradasi oranye–peach–krem sebagai seri. Teks muted seperti '06:30 · 32 menit · Selesai' dan label tab terbaca di atas surface gelap."
+                  }
+                ]
+              },
+              "R5": {
+                "values": [
+                  2,
+                  2,
+                  2
+                ],
+                "median": 2,
+                "range": 0,
+                "flag": false,
+                "evidence": [
+                  {
+                    "rep": 1,
+                    "skor": 2,
+                    "bukti": "Tanggal 'Rabu, 18 November' di atas sapaan tebal, avatar inisial 'DA' di kiri atas, tanpa emoji. Ikon garis satu gaya dan berukuran seragam (sepatu, dumbbell, api, figur yoga, ikon tab). Visual utama berupa ring progres yang relevan."
+                  },
+                  {
+                    "rep": 2,
+                    "skor": 2,
+                    "bukti": "Ikon satu gaya outline dengan ukuran seragam: jejak kaki, dumbbell, api, figur yoga, bel, dan ikon tab. Visual utama berupa ring progres di kartu ringkasan, relevan. Avatar inisial 'DA' di kiri atas. Tidak ada emoji."
+                  },
+                  {
+                    "rep": 3,
+                    "skor": 2,
+                    "bukti": "Avatar inisial 'DA' di kiri atas (y≈50–95). Tanggal di atas sapaan tebal 'Selamat pagi, Dimas', tanpa emoji. Ikon bergaya garis seragam: sepatu, dumbbell, api, figur yoga, dan tab. Visual utama berupa ring progres yang relevan. Tidak ada emoji."
+                  }
+                ]
+              },
+              "R6": {
+                "values": [
+                  1,
+                  2,
+                  2
+                ],
+                "median": 2,
+                "range": 1,
+                "flag": false,
+                "evidence": [
+                  {
+                    "rep": 1,
+                    "skor": 1,
+                    "bukti": "Legenda nilai/target ada: 6.842/10.000, 384/600 kkal, 27/45 mnt. Namun busur ring tengah dan dalam (peach) tampak hampir penuh (~85%), padahal kalori 64% dan menit aktif 60%. Ada satu inkonsistensi busur vs angka."
+                  },
+                  {
+                    "rep": 2,
+                    "skor": 2,
+                    "bukti": "Legenda nilai/target spesifik: 6.842/10.000, 384/600 kkal, 27/45 mnt. Busur ring (luar ±70%, dalam lebih pendek) kira-kira cocok dengan rasio 68/64/60%. Copy spesifik ('HIIT Bakar Lemak · 4 minggu · Menengah', '18:30 · 45 menit · 6 gerakan'), tanpa kontradiksi."
+                  },
+                  {
+                    "rep": 3,
+                    "skor": 2,
+                    "bukti": "Legenda nilai/target konsisten: 6.842/10.000, 384/600 kkal, 27/45 mnt. Busur ring sebanding (luar ±68%, dalam lebih pendek). Copy spesifik: 'Lari pagi 5 km', 'Kekuatan tubuh atas · 6 gerakan', 'HIIT Bakar Lemak · 4 minggu · Menengah'."
+                  }
+                ]
+              },
+              "R8": {
+                "values": [
+                  1,
+                  1,
+                  1
+                ],
+                "median": 1,
+                "range": 0,
+                "flag": false,
+                "evidence": [
+                  {
+                    "rep": 1,
+                    "skor": 1,
+                    "bukti": "Dua kartu program 'HIIT Bakar Lemak' dan 'Yoga Mobilitas' (bawah) berpola identik: ikon abu dalam kotak + judul + meta, sehingga tidak berbeda secara visual (kriteria golden 5 gagal). Langkah khas tetap ada: CTA lebar penuh tertanam di kartu jadwal berikutnya. Tidak ada pelanggaran slop."
+                  },
+                  {
+                    "rep": 2,
+                    "skor": 1,
+                    "bukti": "Kriteria golden 5 gagal: dua kartu program (bawah) berstruktur identik (tile ikon + judul + meta) dan hanya berbeda ikon, sehingga nyaris tidak bisa dibedakan secara visual. Tidak ada pelanggaran slop. Langkah khas yang ada: kartu sesi berikutnya ber-border oranye dengan CTA lebar penuh tertanam, dan tab bar mengambang."
+                  },
+                  {
+                    "rep": 3,
+                    "skor": 1,
+                    "bukti": "Kriteria golden 5 gagal: kedua kartu program (y≈612–705) identik secara visual, sama-sama berupa kotak ikon abu ditambah judul dan metadata, hanya ikonnya yang berbeda. Tidak ada pelanggaran checklist slop. Langkah khas tetap ada: kartu 'Berikutnya' dengan tombol CTA penuh lebar di dalamnya."
+                  }
+                ]
+              },
+              "R9": {
+                "values": [
+                  1,
+                  1,
+                  1
+                ],
+                "median": 1,
+                "range": 0,
+                "flag": false,
+                "evidence": [
+                  {
+                    "rep": 1,
+                    "skor": 1,
+                    "bukti": "Angka ringkasan punya sasaran, dan jadwal punya status 'Selesai'/'Berikutnya' plus '6 gerakan'. Namun tidak ada persen, tren, atau streak. Kartu program hanya berisi durasi dan level tanpa rating atau visual, sehingga konteks hanya ada di sebagian bagian."
+                  },
+                  {
+                    "rep": 2,
+                    "skor": 1,
+                    "bukti": "Ring punya target dan satuan, jadwal punya waktu/durasi/status ('Selesai', chip 'Berikutnya'), program punya durasi dan level. Namun tidak ada persen, tren, atau streak, dan kartu program tipis (tanpa rating atau visual), sehingga konteks hanya di sebagian bagian."
+                  },
+                  {
+                    "rep": 3,
+                    "skor": 1,
+                    "bukti": "Angka ringkasan diberi target dan satuan. Jadwal menunjukkan status 'Selesai' dan chip 'Berikutnya' beserta jumlah gerakan. Namun kartu program hanya memuat durasi dan level tanpa rating atau penanda lain, tidak ada persentase total atau streak, dan hanya ada 2 item jadwal."
+                  }
+                ]
+              },
+              "R10": {
+                "values": [
+                  1,
+                  1,
+                  1
+                ],
+                "median": 1,
+                "range": 0,
+                "flag": false,
+                "evidence": [
+                  {
+                    "rep": 1,
+                    "skor": 1,
+                    "bukti": "Polesan hanya di sebagian elemen: kartu jadwal berikutnya ber-tint dengan chip 'Berikutnya' dan tombol oranye. Kartu program dan kartu selesai berupa netral polos dengan ikon abu, tanpa foto atau ilustrasi."
+                  },
+                  {
+                    "rep": 2,
+                    "skor": 1,
+                    "bukti": "Polesan hanya di sebagian elemen: kartu 'Kekuatan tubuh atas' ber-tint dengan border oranye, tile ikon oranye, chip 'Berikutnya', tab bar mengambang. Kartu ringkasan, jadwal pertama, dan kedua kartu program sebagian besar netral abu polos tanpa visual pendukung."
+                  },
+                  {
+                    "rep": 3,
+                    "skor": 1,
+                    "bukti": "Polesan hanya ada di sebagian elemen: kartu 'Berikutnya' ber-tint dan bertepi oranye, chip 'Berikutnya', serta avatar ber-tint. Kartu program dan kartu jadwal selesai berupa surface netral polos dengan ikon kecil, tanpa foto atau visual pendukung."
+                  }
+                ]
+              }
+            },
+            "total": 12,
+            "slop": {
+              "values": [
+                0,
+                0,
+                0
+              ],
+              "median": 0,
+              "range": 0,
+              "flag": false,
+              "items": [
+                {
+                  "rep": 1,
+                  "butir": []
+                },
+                {
+                  "rep": 2,
+                  "butir": []
+                },
+                {
+                  "rep": 3,
+                  "butir": []
+                }
+              ]
+            },
+            "emoji": {
+              "values": [
+                0,
+                0,
+                0
+              ],
+              "median": 0,
+              "range": 0,
+              "flag": false
+            },
+            "focus": [
+              {
+                "rep": 1,
+                "fokus": "Kartu ring ringkasan hari ini di atas (y≈137–287), ring oranye di kiri dengan angka di kanan"
+              },
+              {
+                "rep": 2,
+                "fokus": "Kartu ringkasan hari ini dengan ring progres oranye (sepertiga atas, di bawah sapaan)"
+              },
+              {
+                "rep": 3,
+                "fokus": "Ring progres tiga lapis di kiri kartu ringkasan (y≈137–287), bersaing dengan tombol 'Mulai latihan'"
+              }
+            ]
+          },
+          "pendev": {
+            "criteria": {
+              "R1": {
+                "values": [
+                  0,
+                  0,
+                  0
+                ],
+                "median": 0,
+                "range": 0,
+                "flag": false,
+                "evidence": [
+                  {
+                    "rep": 1,
+                    "skor": 0,
+                    "bukti": "Artboard memanjang sekitar 390×1109 px, bukan 844 (ukuran mengikat salah), dan home indicator tidak terlihat di bawah tab bar. Seksi lain lengkap: status bar 09:41 di atas, sapaan + avatar, kartu ringkasan dengan ring, jadwal 3 item (Lari pagi santai dengan circle-check, Upper body strength dengan tombol play, Yoga peregangan), 2 kartu rekomendasi, dan tab bar 4 item (Beranda aktif dalam pill oranye gelap). Judul 'Upper body strength' juga berbahasa Inggris."
+                  },
+                  {
+                    "rep": 2,
+                    "skor": 0,
+                    "bukti": "Ukuran mengikat salah: artboard memanjang jauh melewati 844px (tab bar berada di sekitar y≈1075 pada strip ±1109px). Ada juga copy berbahasa Inggris 'Upper body strength' pada item jadwal kedua, melanggar ketentuan Bahasa Indonesia. Seksi lain lengkap: 3 item jadwal dengan check dan play, 2 kartu rekomendasi, tab bar 4 item dengan Beranda aktif."
+                  },
+                  {
+                    "rep": 3,
+                    "skor": 0,
+                    "bukti": "Ukuran mengikat salah: artboard memanjang sekitar 390×1109 (tab bar berada di y≈1040–1100), bukan 844. Home indicator tidak terlihat di bawah tab bar. Ada copy berbahasa Inggris 'Upper body strength' pada kartu jadwal kedua (y≈617). Bagian konten sendiri lengkap: sapaan+avatar, ring, 3 jadwal, 2 kartu program, dan tab bar 4 item."
+                  }
+                ]
+              },
+              "R2": {
+                "values": [
+                  1,
+                  2,
+                  2
+                ],
+                "median": 2,
+                "range": 1,
+                "flag": false,
+                "evidence": [
+                  {
+                    "rep": 1,
+                    "skor": 1,
+                    "bukti": "Fokus ada pada kartu 'Ringkasan hari ini' (ring konsentris di kiri-tengah atas), tetapi bersaing dengan sapaan 'Selamat pagi, Rani' (tebal, kiri atas) yang ukurannya hampir sama dengan angka '6.842'. Lompatan skala ke judul seksi dan metadata cukup tegas, dan tidak ada judul yatim."
+                  },
+                  {
+                    "rep": 2,
+                    "skor": 2,
+                    "bukti": "Kartu ringkasan dengan ring tiga lapis besar (±140px) menjadi fokus tunggal di sepertiga atas. Angka 6.842/412/38 tebal dan lebih besar dari label, dan judul seksi jelas di atas isi. Setiap judul seksi diikuti kontennya (tidak ada judul yatim)."
+                  },
+                  {
+                    "rep": 3,
+                    "skor": 2,
+                    "bukti": "Titik fokus tunggal ada di kartu Ringkasan (y≈150–415): tiga ring besar dengan angka 6.842/412/38 berukuran tebal ±20px. Skalanya melompat tegas: sapaan ±22 bold, judul seksi ±17 semibold, metadata ±12 abu. Setiap judul seksi diikuti kontennya, tidak ada judul yatim."
+                  }
+                ]
+              },
+              "R4": {
+                "values": [
+                  1,
+                  1,
+                  1
+                ],
+                "median": 1,
+                "range": 0,
+                "flag": false,
+                "evidence": [
+                  {
+                    "rep": 1,
+                    "skor": 1,
+                    "bukti": "Oranye dipakai konsisten untuk aksi dan status aktif: 'Lihat semua', 'Jelajahi', border kartu 'BERIKUTNYA', tombol play, tab Beranda. Ikon gelap di atas oranye (ikon dumbbell, play). Warna ring oranye/kuning/merah bermakna per metrik. Ada satu teks lemah: item selesai 'Lari pagi santai / 07:00 / 5 km · 32 mnt' (kartu jadwal pertama) diredupkan sehingga kontrasnya tampak di bawah 4.5:1."
+                  },
+                  {
+                    "rep": 2,
+                    "skor": 1,
+                    "bukti": "Aksen oranye konsisten untuk CTA play, tile ikon aktif, link 'Lihat semua'/'Jelajahi', level 'Pemula'/'Menengah', dan pill tab aktif. Kuning dan merah ring bermakna sebagai seri kategori. Satu teks lemah: label tab tidak aktif 'Latihan'/'Progres'/'Profil' (bawah) kecil dan abu redup, tampak di bawah 4.5:1."
+                  },
+                  {
+                    "rep": 3,
+                    "skor": 1,
+                    "bukti": "Oranye dipakai konsisten untuk aksi dan status aktif: 'Lihat semua', 'Jelajahi', tombol play, kartu 'BERIKUTNYA', dan tab Beranda. Kuning dan merah di ring bermakna sebagai seri kategori (kalori, menit aktif). Ikon di atas oranye berwarna gelap. Satu teks lemah: metadata item selesai '07:00' dan '5 km · 32 mnt' (y≈503–545) diredupkan hingga kontrasnya tampak di bawah 4.5:1."
+                  }
+                ]
+              },
+              "R5": {
+                "values": [
+                  2,
+                  2,
+                  2
+                ],
+                "median": 2,
+                "range": 0,
+                "flag": false,
+                "evidence": [
+                  {
+                    "rep": 1,
+                    "skor": 2,
+                    "bukti": "Tanggal 'Rabu, 18 November' di atas sapaan tebal, avatar foto di kiri atas, tanpa emoji tangan. Ikon garis satu gaya dengan ukuran seragam: lonceng, sepatu, dumbbell, bunga, chevron, ikon tab, api di badge '12 hari'. Foto kartu program relevan (lari malam, latihan kekuatan)."
+                  },
+                  {
+                    "rep": 2,
+                    "skor": 2,
+                    "bukti": "Ikon outline seragam: jejak kaki, dumbbell, bunga, play, chevron, bintang rating, api streak, ikon tab. Visual utama relevan: ring progres dan dua foto program (pelari di jalan, pria latihan B/W). Avatar foto di kiri atas. Tanpa emoji."
+                  },
+                  {
+                    "rep": 3,
+                    "skor": 2,
+                    "bukti": "Avatar foto di kiri atas (x≈20–68, y≈70–118). Tanggal 'Rabu, 18 November' di atas sapaan 'Selamat pagi, Rani' yang tebal, tanpa emoji tangan. Ikon bergaya garis seragam: lonceng, sepatu, dumbbell, bunga yoga, chevron, dan tab. Foto atlet di kedua kartu program relevan. Tidak ada emoji."
+                  }
+                ]
+              },
+              "R6": {
+                "values": [
+                  2,
+                  2,
+                  2
+                ],
+                "median": 2,
+                "range": 0,
+                "flag": false,
+                "evidence": [
+                  {
+                    "rep": 1,
+                    "skor": 2,
+                    "bukti": "Legenda nilai/target: 6.842/10.000, 412/600 kkal, 38/45 mnt. Rata-rata (68%+69%+84%)/3 ≈ 74% cocok dengan subjudul '74% dari target harian'. Panjang busur ring kira-kira proporsional. Copy spesifik: 'Bakar Lemak 21 Hari', '5 km · 32 mnt', 'Menengah'."
+                  },
+                  {
+                    "rep": 2,
+                    "skor": 2,
+                    "bukti": "'74% dari target harian' konsisten dengan rata-rata 6.842/10.000 (68%), 412/600 (69%), dan 38/45 (84%). Panjang busur kira-kira sesuai. Copy spesifik ('Bakar Lemak 21 Hari · 3 minggu · Pemula', '20:30 Yoga peregangan · 20 mnt'). Masalah bahasa sudah dihitung di R1."
+                  },
+                  {
+                    "rep": 3,
+                    "skor": 2,
+                    "bukti": "Legenda nilai/target ditulis spesifik: 6.842/10.000, 412/600 kkal, 38/45 mnt. '74% dari target harian' konsisten dengan rata-rata 68%, 69%, dan 84%. Panjang busur sebanding dengan angkanya: ring dalam (merah) yang terpanjang. Copy spesifik: 'Bakar Lemak 21 Hari', '3 minggu · Pemula', rating 4.8/4.9."
+                  }
+                ]
+              },
+              "R8": {
+                "values": [
+                  2,
+                  2,
+                  2
+                ],
+                "median": 2,
+                "range": 0,
+                "flag": false,
+                "evidence": [
+                  {
+                    "rep": 1,
+                    "skor": 2,
+                    "bukti": "Dua kartu program jelas berbeda: foto berwarna jalanan vs foto hitam-putih, dengan level berbeda. Langkah khas yang bisa ditunjuk: item jadwal berikutnya disorot dengan border oranye dan badge 'BERIKUTNYA' di tengah daftar, serta ring tiga lapis dengan ikon petir di pusat. Tidak ada pelanggaran checklist slop."
+                  },
+                  {
+                    "rep": 2,
+                    "skor": 2,
+                    "bukti": "Tidak ada pelanggaran slop. Dua kartu rekomendasi jelas berbeda: foto berwarna di kiri, foto hitam-putih di kanan. Langkah khas: timeline jadwal dengan item selesai diredupkan, item berikutnya ber-border oranye dengan tombol play bulat, serta chip streak '12 hari' di kartu ringkasan."
+                  },
+                  {
+                    "rep": 3,
+                    "skor": 2,
+                    "bukti": "Tidak ada pelanggaran slop. Kedua kartu program jelas berbeda: foto berwarna (lari malam) dan foto monokrom (kekuatan), dengan level berbeda. Keputusan khas yang bisa ditunjuk: jadwal bertiga status (selesai diredupkan, 'BERIKUTNYA' bertepi dan ber-tint oranye dengan tombol play bulat, mendatang dengan chevron), ditambah badge streak '12 hari' di kartu ringkasan."
+                  }
+                ]
+              },
+              "R9": {
+                "values": [
+                  2,
+                  2,
+                  2
+                ],
+                "median": 2,
+                "range": 0,
+                "flag": false,
+                "evidence": [
+                  {
+                    "rep": 1,
+                    "skor": 2,
+                    "bukti": "Angka diberi sasaran dan persen harian, badge streak '12 hari', rating bintang 4.8/4.9 di kartu, level (Pemula/Menengah), dan durasi. Jadwal memperlihatkan variasi status (selesai / berikutnya / mendatang) dengan jam dan metadata. Tampilan padat tetapi tetap terbaca."
+                  },
+                  {
+                    "rep": 2,
+                    "skor": 2,
+                    "bukti": "Angka diberi konteks: target per metrik, persen agregat 74%, streak 12 hari. Jadwal menunjukkan variasi status (selesai, BERIKUTNYA, akan datang) beserta jam, durasi, dan level. Kartu program punya rating 4.8/4.9, durasi, dan level berwarna. Padat tetapi tetap terbaca."
+                  },
+                  {
+                    "rep": 3,
+                    "skor": 2,
+                    "bukti": "Angka diberi target dan satuan, ditambah persentase harian dan streak 12 hari. Jadwal memperlihatkan tiga status berbeda dengan jam, durasi/jarak, dan level. Kartu program memuat durasi, level berwarna, dan rating bintang. Notifikasi diberi dot. Padat tetapi tetap terbaca."
+                  }
+                ]
+              },
+              "R10": {
+                "values": [
+                  2,
+                  2,
+                  2
+                ],
+                "median": 2,
+                "range": 0,
+                "flag": false,
+                "evidence": [
+                  {
+                    "rep": 1,
+                    "skor": 2,
+                    "bukti": "Permukaan berlapis: kartu jadwal berikutnya ber-tint oranye, badge '12 hari' dan chip 'BERIKUTNYA' ber-tint, pill tab aktif ber-tint. Warna seri ring terdefinisi, titik legenda berwarna, foto matang, dan badge rating mengambang di atas foto."
+                  },
+                  {
+                    "rep": 2,
+                    "skor": 2,
+                    "bukti": "Permukaan berlapis: kartu berikutnya ber-tint oranye, pill tab aktif ber-tint, chip streak ber-tint. Warna seri ring (oranye/kuning/merah) konsisten dengan dot legenda. Chip 'BERIKUTNYA', badge rating di atas foto, dot notifikasi pada bel. Foto dan ikon matang dan menyatu."
+                  },
+                  {
+                    "rep": 3,
+                    "skor": 2,
+                    "bukti": "Permukaan berlapis: kartu 'BERIKUTNYA' ber-tint oranye, badge streak dan pill tab aktif bernuansa oranye gelap, chip 'BERIKUTNYA' terdefinisi. Ring tiga warna rapi. Foto program matang dengan overlay rating. Tab bar mengambang dengan sudut membulat."
+                  }
+                ]
+              }
+            },
+            "total": 13,
+            "slop": {
+              "values": [
+                0,
+                0,
+                0
+              ],
+              "median": 0,
+              "range": 0,
+              "flag": false,
+              "items": [
+                {
+                  "rep": 1,
+                  "butir": []
+                },
+                {
+                  "rep": 2,
+                  "butir": []
+                },
+                {
+                  "rep": 3,
+                  "butir": []
+                }
+              ]
+            },
+            "emoji": {
+              "values": [
+                0,
+                0,
+                0
+              ],
+              "median": 0,
+              "range": 0,
+              "flag": false
+            },
+            "focus": [
+              {
+                "rep": 1,
+                "fokus": "Kartu 'Ringkasan hari ini' dengan ring konsentris tiga lapis di kiri-tengah atas (y≈150–410)"
+              },
+              {
+                "rep": 2,
+                "fokus": "Ring progres tiga lapis oranye-kuning-merah di kartu 'Ringkasan hari ini' (kiri, sepertiga atas)"
+              },
+              {
+                "rep": 3,
+                "fokus": "Ring progres tiga lapis beserta angka 6.842/412/38 di kartu 'Ringkasan hari ini' (y≈150–415)"
+              }
+            ]
+          }
+        }
+      },
+      "decision": {
+        "decision": "Setara",
+        "why": "daya tarik D 2 ≤ 4 − 2, tetapi pen.dev melanggar brief mengikat (ukuran: board z57aTa 390×1109 ≠ 390×844; median R1 pen.dev = 0); veto daya tarik dinetralkan, tidak naik ke Lebih baik",
+        "checks": {
+          "total": {
+            "lakar": 12,
+            "pendev": 13
+          },
+          "appeal": {
+            "lakar": 2,
+            "pendev": 4
+          },
+          "appealLoss": [
+            "daya tarik D 2 ≤ 4 − 2"
+          ],
+          "otherLoss": [],
+          "zeroVsTwo": [],
+          "pendevBriefViolations": [
+            "ukuran: board z57aTa 390×1109 ≠ 390×844",
+            "median R1 pen.dev = 0"
+          ]
+        }
+      },
+      "sourceDecision": {
+        "decision": "Lebih baik",
+        "why": "lolos gerbang, total 10 ≥ 6 + 2"
+      },
+      "sourceTotals": {
+        "lakar": 10,
+        "pendev": 6
+      },
+      "adamDecision": "Setara",
+      "costUsd": 0.4650134
+    }
+  ],
+  "calibration": {
+    "applies": true,
+    "pass": false,
+    "reasons": [
+      "A: keputusan Lebih baik ∉ {Kalah, Setara}",
+      "A: D pen.dev 4 tidak > D Lakar 4"
+    ],
+    "flags": []
+  },
+  "judgeCostUsd": 1.4729268000000002,
+  "outDir": "bench/runs/rejudge/r1-v2-1",
+  "notes": []
+}

@@ -103,3 +103,8 @@ export function downscaleBox(img: RgbImage, maxSide = MAX_SIDE): RgbImage {
 export function judgeImages(strip: RgbImage): { tiles: Buffer[]; overview: Buffer } {
   return { tiles: tiles(strip).map(encodePngRgb), overview: encodePngRgb(downscaleBox(strip)) };
 }
+
+/** Gambar juri dari strip PNG yang sudah ada (`<round>/<prompt>-<alat>.png`, RGB): dekode → komposit → tile + overview. */
+export function judgeImagesFromStripPng(png: Uint8Array): { tiles: Buffer[]; overview: Buffer } {
+  return judgeImages(compositeOver(decodePng(png)));
+}

@@ -1,0 +1,12 @@
+{
+  "version": "2.1",
+  "date": "2026-11-18",
+  "judgeTextSha256": {
+    "A": "f6d68640c1d174c57b4604087d7bd495cceb538236aa22a074f8033466d6faad",
+    "B": "7c1727857d1061128aa17673ce7a751093860f2009fe3867c276708b6ba2545e"
+  },
+  "sourceSha256": {
+    "lampiran-b.md": "cdba3dde5fccaaabbccdf8e0e4060c4cb2c9b4534bcae1fb67eee2fd26e387be",
+    "golden-kriteria.md": "46de49e3a77602a39cf33bf45dbade5da155c73544c9e92b8ae1d90211cb7d5b"
+  }
+}

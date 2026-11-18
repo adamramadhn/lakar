@@ -6,6 +6,9 @@
   "engines": {
     "node": ">=26"
   },
+  "scripts": {
+    "test": "vitest run --root .. bench/"
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",

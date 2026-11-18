@@ -1,7 +1,7 @@
 // Agregasi skor juri, gerbang G0 Lakar, dan keputusan sementara per prompt (DESIGN.md Lampiran B). Murni.
 import { median } from '../stats.js';
 import type { JudgeRepRecord, Tool } from '../judge/run.js';
-import { JUDGE_CRITERIA, type JudgeCriterion } from '../judge/prompt.js';
+import { APPEAL_CRITERIA, JUDGE_CRITERIA, type JudgeCriterion } from '../judge/prompt.js';
 
 export const TOOLS: readonly Tool[] = ['lakar', 'pendev'];
 export const TOOL_LABEL: Record<Tool, string> = { lakar: 'Lakar', pendev: 'pen.dev' };
@@ -13,7 +13,7 @@ export type Agg = { values: number[]; median: number | undefined; range: number 
 export type CriterionAgg = Agg & { evidence: { rep: number; skor: number; bukti: string }[] };
 export type ToolScore = {
   criteria: Record<JudgeCriterion, CriterionAgg>;
-  /** Jumlah median 6 kriteria (undefined bila tidak ada ulangan valid). */
+  /** T: jumlah median semua kriteria juri (8 di rubrik v2, maks 16; undefined bila tidak ada ulangan valid). */
   total: number | undefined;
   slop: Agg & { items: { rep: number; butir: string[] }[] };
   emoji: Agg;
@@ -75,15 +75,49 @@ export const NO_VALID_REPS = 'tidak ada ulangan juri yang valid';
 
 export type Decision = 'Setara' | 'Lebih baik' | 'Kalah' | 'tidak dapat dinilai';
 
+/** Ambang aturan keputusan v2 (Lampiran B §Keputusan per prompt; dibekukan, tidak disetel setelah melihat skor). */
+export const BETTER_MARGIN = 3;
+export const EQUAL_TOLERANCE = 1;
+export const APPEAL_VETO_GAP = 2;
+
 export type DecisionInput = {
   gate: GateResult;
   lakarRunOk: boolean;
   pendevRunOk: boolean;
   score: Pick<PromptScore, 'validReps' | 'tools'> | undefined;
+  /** Kepatuhan brief mengikat pen.dev: `boardSizeProblems` frame pen.dev (kosong = sesuai). */
+  pendevBrief: { sizeProblems: string[] };
 };
 
-/** Keputusan sementara (Lampiran B). Run Lakar gagal → Kalah; run pen.dev gagal → tidak dapat dinilai. */
-export function decide(d: DecisionInput): { decision: Decision; why: string } {
+/** Hasil cek terstruktur di balik keputusan (dipakai laporan; tidak dihitung ulang di sana). */
+export type DecisionChecks = {
+  total: { lakar: number; pendev: number };
+  /** D = R9 + R10 (median). */
+  appeal: { lakar: number | undefined; pendev: number | undefined };
+  /** Alasan Kalah-daya-tarik (D_L ≤ D_P − 2, atau R9/R10 Lakar 0 vs pen.dev 2). */
+  appealLoss: string[];
+  /** Alasan Kalah-lain (T_L < T_P − 1, atau R1–R8 Lakar 0 vs pen.dev 2). */
+  otherLoss: string[];
+  /** Semua kriteria dengan median Lakar 0 sementara pen.dev 2. */
+  zeroVsTwo: JudgeCriterion[];
+  /** Pelanggaran brief mengikat pen.dev (ukuran frame, median R1 = 0). */
+  pendevBriefViolations: string[];
+};
+
+export type DecisionResult = { decision: Decision; why: string; checks?: DecisionChecks };
+
+/** D = R9 + R10 (median); undefined bila salah satu median tidak ada. */
+export function appealAxis(t: Pick<ToolScore, 'criteria'>): number | undefined {
+  const m = APPEAL_CRITERIA.map((c) => t.criteria[c]?.median);
+  return m.every((x) => x !== undefined) ? m.reduce((s, x) => s! + x!, 0) : undefined;
+}
+
+/**
+ * Keputusan sementara, aturan v2 (Lampiran B): run/gerbang Lakar gagal → Kalah; run pen.dev gagal → tidak dapat dinilai;
+ * alasan Kalah → Kalah, kecuali hanya Kalah-daya-tarik dan pen.dev melanggar brief → Setara;
+ * T_L ≥ T_P + 3 dan D_L ≥ D_P → Lebih baik; selebihnya Setara.
+ */
+export function decide(d: DecisionInput): DecisionResult {
   if (!d.lakarRunOk) return { decision: 'Kalah', why: 'run Lakar gagal' };
   // Gerbang Lakar tidak bergantung pada pen.dev: gerbang gagal → Kalah walau run pen.dev juga gagal.
   if (!d.gate.ok) return { decision: 'Kalah', why: `gerbang gagal: ${d.gate.reasons.join('; ')}` };
@@ -91,14 +125,31 @@ export function decide(d: DecisionInput): { decision: Decision; why: string } {
   if (!d.score || d.score.validReps === 0) return { decision: 'tidak dapat dinilai', why: NO_VALID_REPS };
   const L = d.score.tools.lakar;
   const P = d.score.tools.pendev;
-  if (L.total === undefined || P.total === undefined) return { decision: 'tidak dapat dinilai', why: 'total skor tidak lengkap' };
+  const DL = appealAxis(L);
+  const DP = appealAxis(P);
+  if (L.total === undefined || P.total === undefined || DL === undefined || DP === undefined) return { decision: 'tidak dapat dinilai', why: 'total skor tidak lengkap' };
   const zeroVsTwo = JUDGE_CRITERIA.filter((c) => L.criteria[c].median === 0 && P.criteria[c].median === 2);
-  if (L.total >= P.total + 2) return { decision: 'Lebih baik', why: `lolos gerbang, total ${L.total} ≥ ${P.total} + 2` };
-  if (L.total >= P.total - 1 && zeroVsTwo.length === 0) return { decision: 'Setara', why: `lolos gerbang, total ${L.total} ≥ ${P.total} − 1, tanpa R Lakar 0 vs pen.dev 2` };
-  return {
-    decision: 'Kalah',
-    why: zeroVsTwo.length ? `${zeroVsTwo.join(', ')}: Lakar 0 sementara pen.dev 2` : `total ${L.total} < ${P.total} − 1`,
-  };
+  const isAppeal = (c: JudgeCriterion) => (APPEAL_CRITERIA as readonly JudgeCriterion[]).includes(c);
+  const appealLoss: string[] = [];
+  if (DL <= DP - APPEAL_VETO_GAP) appealLoss.push(`daya tarik D ${DL} ≤ ${DP} − ${APPEAL_VETO_GAP}`);
+  const appealZero = zeroVsTwo.filter(isAppeal);
+  if (appealZero.length) appealLoss.push(`daya tarik ${appealZero.join(', ')}: Lakar 0 sementara pen.dev 2`);
+  const otherLoss: string[] = [];
+  if (L.total < P.total - EQUAL_TOLERANCE) otherLoss.push(`total ${L.total} < ${P.total} − ${EQUAL_TOLERANCE}`);
+  const otherZero = zeroVsTwo.filter((c) => !isAppeal(c));
+  if (otherZero.length) otherLoss.push(`${otherZero.join(', ')}: Lakar 0 sementara pen.dev 2`);
+  const pendevBriefViolations = [...d.pendevBrief.sizeProblems.map((p) => `ukuran: ${p}`), ...(P.criteria.R1?.median === 0 ? ['median R1 pen.dev = 0'] : [])];
+  const checks: DecisionChecks = { total: { lakar: L.total, pendev: P.total }, appeal: { lakar: DL, pendev: DP }, appealLoss, otherLoss, zeroVsTwo, pendevBriefViolations };
+  const td = `total ${L.total} vs ${P.total}, daya tarik ${DL} vs ${DP}`;
+  if (otherLoss.length) return { decision: 'Kalah', why: [...otherLoss, ...appealLoss].join('; '), checks };
+  if (appealLoss.length) {
+    if (pendevBriefViolations.length)
+      return { decision: 'Setara', why: `${appealLoss.join('; ')}, tetapi pen.dev melanggar brief mengikat (${pendevBriefViolations.join('; ')}); veto daya tarik dinetralkan, tidak naik ke Lebih baik`, checks };
+    return { decision: 'Kalah', why: appealLoss.join('; '), checks };
+  }
+  if (L.total >= P.total + BETTER_MARGIN && DL >= DP) return { decision: 'Lebih baik', why: `lolos gerbang, total ${L.total} ≥ ${P.total} + ${BETTER_MARGIN}, daya tarik ${DL} ≥ ${DP}`, checks };
+  if (L.total >= P.total + BETTER_MARGIN) return { decision: 'Setara', why: `lolos gerbang, total ${L.total} ≥ ${P.total} + ${BETTER_MARGIN} tetapi daya tarik ${DL} < ${DP}`, checks };
+  return { decision: 'Setara', why: `lolos gerbang, ${td}, tanpa alasan Kalah`, checks };
 }
 
 export type G0Decision = 'lolos' | 'gagal' | 'tidak dapat diputuskan';
@@ -111,7 +162,7 @@ const G0_PASS: readonly Decision[] = ['Setara', 'Lebih baik'];
  * ada prompt Kalah → gagal; A dan B sama-sama Setara/Lebih baik → lolos; selebihnya → tidak dapat diputuskan.
  */
 export function decideG0(
-  results: readonly { prompt: string; decision: { decision: Decision; why: string } }[],
+  results: readonly { prompt: string; decision: Pick<DecisionResult, 'decision' | 'why'> }[],
   roundStatus: 'lengkap' | 'tidak lengkap' | 'dibatalkan',
 ): { decision: G0Decision; why: string } {
   if (roundStatus === 'dibatalkan') return { decision: 'tidak dapat diputuskan', why: 'putaran dibatalkan' };

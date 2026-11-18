@@ -1,4 +1,4 @@
-// Parser jawaban juri yang ketat: satu objek JSON {X:{…}, Y:{…}} dengan 6 kriteria, slop, emoji, fokus.
+// Parser jawaban juri yang ketat: satu objek JSON {X:{…}, Y:{…}} dengan semua kriteria `JUDGE_CRITERIA` (8 di rubrik v2), slop, emoji, fokus.
 import { errorMessage } from '@lakar/schema';
 import { JUDGE_CRITERIA, type JudgeCriterion } from './prompt.js';
 

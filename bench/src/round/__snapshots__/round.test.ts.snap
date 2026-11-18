@@ -9,10 +9,10 @@ Keputusan di laporan ini **sementara, menunggu konfirmasi Adam**.
 
 ## Ringkasan
 
-| Prompt | Waktu Lakar (dtk) | Waktu pen.dev (dtk) | Lakar/pen.dev | Lakar/baseline | Biaya Lakar | Biaya pen.dev | Gerbang Lakar | Total Lakar | Total pen.dev | Keputusan |
-|---|---|---|---|---|---|---|---|---|---|---|
-| A | 120.0 | 130.0 | 0.92 | 0.91 | $0.70 | $0.60 | lolos | 6 | 9 | Kalah (sementara, menunggu konfirmasi Adam) |
-| B | 120.0 | 130.0 | 0.92 | 0.91 | $0.70 | $0.60 | lolos | 6 | 9 | Kalah (sementara, menunggu konfirmasi Adam) |
+| Prompt | Waktu Lakar (dtk) | Waktu pen.dev (dtk) | Lakar/pen.dev | Lakar/baseline | Biaya Lakar | Biaya pen.dev | Gerbang Lakar | Total Lakar (maks 16) | Total pen.dev | Daya tarik Lakar | Daya tarik pen.dev | Keputusan |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| A | 120.0 | 130.0 | 0.92 | 0.91 | $0.70 | $0.60 | lolos | 8 | 12 | 2 | 3 | Kalah (sementara, menunggu konfirmasi Adam) |
+| B | 120.0 | 130.0 | 0.92 | 0.91 | $0.70 | $0.60 | lolos | 8 | 12 | 2 | 3 | Kalah (sementara, menunggu konfirmasi Adam) |
 
 ## Keputusan G0 (sementara, menunggu konfirmasi Adam)
 
@@ -20,7 +20,7 @@ Keputusan G0: **gagal** (sementara, menunggu konfirmasi Adam). Alasan: Kalah di 
 
 | Prompt | Keputusan | Alasan | Median waktu baseline pen.dev (dtk) | Median biaya baseline pen.dev |
 |---|---|---|---|---|
-| A | Kalah | total 6 < 9 − 1 | 131.3 | $0.84 |
+| A | Kalah | total 8 < 12 − 1 | 131.3 | $0.84 |
 | B | Kalah | total 6 < 9 − 1 | 131.3 | – |
 
 Aturan: putaran dibatalkan → tidak dapat diputuskan; ada prompt Kalah → gagal; A dan B sama-sama Setara/Lebih baik → lolos; selebihnya → tidak dapat diputuskan. Biaya hanya dilaporkan (C8).
@@ -74,12 +74,17 @@ Ulangan valid: 2 dari 3. Detail dan bukti: \`bench/score-A.md\`.
 | R5 | 1 (rentang 2) **periksa Adam** | 1.5 (rentang 1) |
 | R6 | 1 (rentang 2) **periksa Adam** | 1.5 (rentang 1) |
 | R8 | 1 (rentang 2) **periksa Adam** | 1.5 (rentang 1) |
-| **Total (jumlah median)** | **6** | **9** |
+| R9 | 1 (rentang 2) **periksa Adam** | 1.5 (rentang 1) |
+| R10 | 1 (rentang 2) **periksa Adam** | 1.5 (rentang 1) |
+| **Total (jumlah median, maks 16)** | **8** | **12** |
+| **Daya tarik D = R9 + R10 (maks 4)** | **2** | **3** |
 | Slop (juri) | 1 (rentang 2) **periksa Adam** | 1.5 (rentang 1) |
+
+Brief mengikat pen.dev (ukuran frame): sesuai.
 
 ### Keputusan: **Kalah** (sementara, menunggu konfirmasi Adam)
 
-Alasan: total 6 < 9 − 1.
+Alasan: total 8 < 12 − 1.
 
 Strip: \`bench/runs/rounds/uji-1/B-lakar.png\` (390×844, 1 board), pen.dev –
 
@@ -130,8 +135,13 @@ Ulangan valid: 2 dari 3. Detail dan bukti: \`bench/score-B.md\`.
 | R5 | 1 (rentang 2) **periksa Adam** | 1.5 (rentang 1) |
 | R6 | 1 (rentang 2) **periksa Adam** | 1.5 (rentang 1) |
 | R8 | 1 (rentang 2) **periksa Adam** | 1.5 (rentang 1) |
-| **Total (jumlah median)** | **6** | **9** |
+| R9 | 1 (rentang 2) **periksa Adam** | 1.5 (rentang 1) |
+| R10 | 1 (rentang 2) **periksa Adam** | 1.5 (rentang 1) |
+| **Total (jumlah median, maks 16)** | **8** | **12** |
+| **Daya tarik D = R9 + R10 (maks 4)** | **2** | **3** |
 | Slop (juri) | 1 (rentang 2) **periksa Adam** | 1.5 (rentang 1) |
+
+Brief mengikat pen.dev (ukuran frame): sesuai.
 
 ### Keputusan: **Kalah** (sementara, menunggu konfirmasi Adam)
 
@@ -145,15 +155,17 @@ Biaya juri total: $0.50.
 
 G0 **gagal** (sementara, menunggu konfirmasi Adam). Fakta per prompt:
 
-- **A** — Kalah: total 6 < 9 − 1.
+- **A** — Kalah: total 8 < 12 − 1.
   - Gerbang: lolos.
-  - Total: Lakar 6 vs pen.dev 9.
+  - Total: Lakar 8 vs pen.dev 12; daya tarik: Lakar 2 vs pen.dev 3.
   - R dengan Lakar 0 vs pen.dev 2: tidak ada.
+  - Pelanggaran brief pen.dev: tidak ada.
   - Rasio waktu Lakar/median baseline: 0.91; Lakar/pen.dev putaran ini: 0.92.
 - **B** — Kalah: total 6 < 9 − 1.
   - Gerbang: lolos.
-  - Total: Lakar 6 vs pen.dev 9.
-  - R dengan Lakar 0 vs pen.dev 2: tidak ada.
+  - Total: Lakar 8 vs pen.dev 12; daya tarik: Lakar – vs pen.dev –.
+  - R dengan Lakar 0 vs pen.dev 2: –.
+  - Pelanggaran brief pen.dev: –.
   - Rasio waktu Lakar/median baseline: 0.91; Lakar/pen.dev putaran ini: 0.92.
 
 - C4: G1 tidak dimulai sebelum G0 lolos dan dikonfirmasi Adam.
@@ -173,8 +185,8 @@ Status: **menunggu konfirmasi Adam**. Bagian ini hanya diisi Adam; agen tidak pe
 
 | Prompt | Keputusan sementara | Kriteria rentang > 1 | Keputusan Adam | Koreksi skor |
 |---|---|---|---|---|
-| A | Kalah | R1 Lakar, R2 Lakar, R4 Lakar, R5 Lakar, R6 Lakar, R8 Lakar | menunggu konfirmasi Adam | menunggu konfirmasi Adam |
-| B | Kalah | R1 Lakar, R2 Lakar, R4 Lakar, R5 Lakar, R6 Lakar, R8 Lakar | menunggu konfirmasi Adam | menunggu konfirmasi Adam |
+| A | Kalah | R1 Lakar, R2 Lakar, R4 Lakar, R5 Lakar, R6 Lakar, R8 Lakar, R9 Lakar, R10 Lakar | menunggu konfirmasi Adam | menunggu konfirmasi Adam |
+| B | Kalah | R1 Lakar, R2 Lakar, R4 Lakar, R5 Lakar, R6 Lakar, R8 Lakar, R9 Lakar, R10 Lakar | menunggu konfirmasi Adam | menunggu konfirmasi Adam |
 
 Keputusan G0 final: menunggu konfirmasi Adam (sementara: gagal).
 
@@ -201,6 +213,8 @@ Keputusan G0 final: menunggu konfirmasi Adam (sementara: gagal).
 - sha256 \`packages/daemon/dist\`: \`d1\`
 - pen.dev desktop: 1.2.23; MCP server: pencil 1.0.0
 - Juri: model \`claude-opus-5-5\`; argv \`claude -p\`
+- Versi rubrik: 2
+- sha256 teks juri B: \`b2\`
 
 ## Protokol
 
@@ -263,9 +277,9 @@ Keputusan di laporan ini **sementara, menunggu konfirmasi Adam**.
 
 ## Ringkasan
 
-| Prompt | Waktu Lakar (dtk) | Waktu pen.dev (dtk) | Lakar/pen.dev | Lakar/baseline | Biaya Lakar | Biaya pen.dev | Gerbang Lakar | Total Lakar | Total pen.dev | Keputusan |
-|---|---|---|---|---|---|---|---|---|---|---|
-| B | 120.0 | 130.0 | 0.92 | 0.91 | $0.70 | $0.60 | lolos | 6 | 9 | Kalah (sementara, menunggu konfirmasi Adam) |
+| Prompt | Waktu Lakar (dtk) | Waktu pen.dev (dtk) | Lakar/pen.dev | Lakar/baseline | Biaya Lakar | Biaya pen.dev | Gerbang Lakar | Total Lakar (maks 16) | Total pen.dev | Daya tarik Lakar | Daya tarik pen.dev | Keputusan |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| B | 120.0 | 130.0 | 0.92 | 0.91 | $0.70 | $0.60 | lolos | 8 | 12 | 2 | 3 | Kalah (sementara, menunggu konfirmasi Adam) |
 
 ## Keputusan G0 (sementara, menunggu konfirmasi Adam)
 
@@ -273,7 +287,7 @@ Keputusan G0: **gagal** (sementara, menunggu konfirmasi Adam). Alasan: Kalah di 
 
 | Prompt | Keputusan | Alasan | Median waktu baseline pen.dev (dtk) | Median biaya baseline pen.dev |
 |---|---|---|---|---|
-| B | Kalah | total 6 < 9 − 1 | 131.3 | – |
+| B | Kalah | total 8 < 12 − 1 | 131.3 | – |
 
 Aturan: putaran dibatalkan → tidak dapat diputuskan; ada prompt Kalah → gagal; A dan B sama-sama Setara/Lebih baik → lolos; selebihnya → tidak dapat diputuskan. Biaya hanya dilaporkan (C8).
 
@@ -326,12 +340,17 @@ Ulangan valid: 2 dari 3. Detail dan bukti: \`bench/score-B.md\`.
 | R5 | 1 (rentang 2) **periksa Adam** | 1.5 (rentang 1) |
 | R6 | 1 (rentang 2) **periksa Adam** | 1.5 (rentang 1) |
 | R8 | 1 (rentang 2) **periksa Adam** | 1.5 (rentang 1) |
-| **Total (jumlah median)** | **6** | **9** |
+| R9 | 1 (rentang 2) **periksa Adam** | 1.5 (rentang 1) |
+| R10 | 1 (rentang 2) **periksa Adam** | 1.5 (rentang 1) |
+| **Total (jumlah median, maks 16)** | **8** | **12** |
+| **Daya tarik D = R9 + R10 (maks 4)** | **2** | **3** |
 | Slop (juri) | 1 (rentang 2) **periksa Adam** | 1.5 (rentang 1) |
+
+Brief mengikat pen.dev (ukuran frame): sesuai.
 
 ### Keputusan: **Kalah** (sementara, menunggu konfirmasi Adam)
 
-Alasan: total 6 < 9 − 1.
+Alasan: total 8 < 12 − 1.
 
 Strip: \`bench/runs/rounds/uji-1/B-lakar.png\` (390×844, 1 board), pen.dev –
 
@@ -341,10 +360,11 @@ Biaya juri total: $0.50.
 
 G0 **gagal** (sementara, menunggu konfirmasi Adam). Fakta per prompt:
 
-- **B** — Kalah: total 6 < 9 − 1.
+- **B** — Kalah: total 8 < 12 − 1.
   - Gerbang: lolos.
-  - Total: Lakar 6 vs pen.dev 9.
+  - Total: Lakar 8 vs pen.dev 12; daya tarik: Lakar 2 vs pen.dev 3.
   - R dengan Lakar 0 vs pen.dev 2: tidak ada.
+  - Pelanggaran brief pen.dev: tidak ada.
   - Rasio waktu Lakar/median baseline: 0.91; Lakar/pen.dev putaran ini: 0.92.
 
 - C4: G1 tidak dimulai sebelum G0 lolos dan dikonfirmasi Adam.
@@ -365,7 +385,7 @@ Status: **menunggu konfirmasi Adam**. Bagian ini hanya diisi Adam; agen tidak pe
 
 | Prompt | Keputusan sementara | Kriteria rentang > 1 | Keputusan Adam | Koreksi skor |
 |---|---|---|---|---|
-| B | Kalah | R1 Lakar, R2 Lakar, R4 Lakar, R5 Lakar, R6 Lakar, R8 Lakar | menunggu konfirmasi Adam | menunggu konfirmasi Adam |
+| B | Kalah | R1 Lakar, R2 Lakar, R4 Lakar, R5 Lakar, R6 Lakar, R8 Lakar, R9 Lakar, R10 Lakar | menunggu konfirmasi Adam | menunggu konfirmasi Adam |
 
 Keputusan G0 final: menunggu konfirmasi Adam (sementara: gagal).
 
@@ -381,6 +401,8 @@ Keputusan G0 final: menunggu konfirmasi Adam (sementara: gagal).
 - sha256 \`packages/check/dist\`: \`cc\`
 - pen.dev desktop: 1.2.23; MCP server: pencil 1.0.0
 - Juri: model \`claude-opus-5-5\`; argv \`claude -p\`
+- Versi rubrik: 2
+- sha256 teks juri B: \`b2\`
 
 ## Protokol
 
@@ -434,10 +456,10 @@ Env proses claude (agen dan juri): \`ENABLE_TOOL_SEARCH=false\`; dibuang dari en
 "
 `;
 
-exports[`laporan (snapshot) > score md: 6 kriteria × 2 alat, bukti per ulangan, pemetaan X/Y setelah penilaian, ulangan failed dicatat 1`] = `
+exports[`laporan (snapshot) > score md: 8 kriteria × 2 alat, bukti per ulangan, pemetaan X/Y setelah penilaian, ulangan failed dicatat 1`] = `
 "# Skor juri prompt B (putaran uji-1)
 
-Juri LLM buta, 3 ulangan dengan label X/Y diacak. Keputusan **Kalah** (sementara, menunggu konfirmasi Adam): total 6 < 9 − 1.
+Juri LLM buta, 3 ulangan dengan label X/Y diacak. Keputusan **Kalah** (sementara, menunggu konfirmasi Adam): total 8 < 12 − 1.
 
 Ulangan valid: 2 dari 3.
 
@@ -457,8 +479,14 @@ Ulangan valid: 2 dari 3.
 | R6 | pen.dev | 1 | 2 | – | 1.5 | 1 |  |
 | R8 | Lakar | 2 | 0 | – | 1 | 2 | **periksa Adam** |
 | R8 | pen.dev | 1 | 2 | – | 1.5 | 1 |  |
-| **Total** | Lakar |  |  |  | **6** | | |
-| **Total** | pen.dev |  |  |  | **9** | | |
+| R9 | Lakar | 2 | 0 | – | 1 | 2 | **periksa Adam** |
+| R9 | pen.dev | 1 | 2 | – | 1.5 | 1 |  |
+| R10 | Lakar | 2 | 0 | – | 1 | 2 | **periksa Adam** |
+| R10 | pen.dev | 1 | 2 | – | 1.5 | 1 |  |
+| **Total** | Lakar |  |  |  | **8** | | |
+| **Total** | pen.dev |  |  |  | **12** | | |
+| **Daya tarik (R9 + R10)** | Lakar |  |  |  | **2** | | |
+| **Daya tarik (R9 + R10)** | pen.dev |  |  |  | **3** | | |
 
 ## Slop dan emoji menurut juri
 
@@ -501,6 +529,16 @@ Ulangan valid: 2 dari 3.
 - Ulangan 1 (skor 2): b
 - Ulangan 2 (skor 0): b
 
+**R9**
+
+- Ulangan 1 (skor 2): R9 2
+- Ulangan 2 (skor 0): R9 0
+
+**R10**
+
+- Ulangan 1 (skor 2): b
+- Ulangan 2 (skor 0): b
+
 **Titik fokus (R2)**
 
 - Ulangan 1: hero
@@ -539,6 +577,16 @@ Ulangan valid: 2 dari 3.
 - Ulangan 2 (skor 2): b
 
 **R8**
+
+- Ulangan 1 (skor 1): b
+- Ulangan 2 (skor 2): b
+
+**R9**
+
+- Ulangan 1 (skor 1): R9 1
+- Ulangan 2 (skor 2): R9 2
+
+**R10**
 
 - Ulangan 1 (skor 1): b
 - Ulangan 2 (skor 2): b

@@ -14,7 +14,7 @@ import { LAKAR_INIT_RULES } from '../lakar/run.js';
 import { validateInit } from '../stream-metrics.js';
 import { lakarReconnect, pendevReconnect } from './reconnect.js';
 import { AWAITING_ADAM, isOfficialRound, renderRoundMarkdown, renderScoreMarkdown, ROUND_ID, type RoundPrompt, type RoundReport } from './report.js';
-import { aggregateScores, decide, decideG0, lakarGate, type Decision, type GateResult, type PromptScore } from './score.js';
+import { aggregateScores, appealAxis, decide, decideG0, lakarGate, type Decision, type DecisionInput, type GateResult, type PromptScore } from './score.js';
 
 const L = (evs: unknown[]): TimedLine[] => timedLines(evs, 1000);
 
@@ -103,6 +103,8 @@ const verdictFor = (s: number): JudgeVerdict['X'] => ({
   R5: { skor: s as 0 | 1 | 2, bukti: 'b' },
   R6: { skor: s as 0 | 1 | 2, bukti: 'b' },
   R8: { skor: s as 0 | 1 | 2, bukti: 'b' },
+  R9: { skor: s as 0 | 1 | 2, bukti: `R9 ${s}` },
+  R10: { skor: s as 0 | 1 | 2, bukti: 'b' },
   slop: { jumlah: s, butir: Array.from({ length: s }, (_, i) => `${i + 1}: x`) },
   emoji: 0,
   fokus: 'hero',
@@ -123,8 +125,10 @@ describe('agregasi skor', () => {
     const s = aggregateScores('A', [rep(1, 'lakar', 2, 1), rep(2, 'pendev', 0, 1), rep(3, 'lakar', 2, 1)]);
     expect(s.tools.lakar.criteria.R1).toMatchObject({ values: [2, 0, 2], median: 2, range: 2, flag: true });
     expect(s.tools.pendev.criteria.R1).toMatchObject({ values: [1, 1, 1], median: 1, range: 0, flag: false });
-    expect(s.tools.lakar.total).toBe(12);
-    expect(s.tools.pendev.total).toBe(6);
+    expect(s.tools.lakar.total).toBe(16);
+    expect(s.tools.pendev.total).toBe(8);
+    expect(appealAxis(s.tools.lakar)).toBe(4);
+    expect(appealAxis(s.tools.pendev)).toBe(2);
     expect(s.tools.lakar.criteria.R1.evidence.map((e) => e.bukti)).toEqual(['R1 2', 'R1 0', 'R1 2']);
   });
 
@@ -137,10 +141,11 @@ describe('agregasi skor', () => {
 });
 
 const okGate: GateResult = { ok: true, reasons: [], timeRatio: 1 };
-/** Skor sintetis: total diatur lewat R1..R8 (median langsung). */
+/** Skor sintetis: median langsung untuk R1, R2, R4, R5, R6, R8, R9, R10 (urut). */
 function score(lakar: number[], pendev: number[]): PromptScore {
   const mk = (v: number[]) => {
-    const keys = ['R1', 'R2', 'R4', 'R5', 'R6', 'R8'] as const;
+    const keys = ['R1', 'R2', 'R4', 'R5', 'R6', 'R8', 'R9', 'R10'] as const;
+    if (v.length !== keys.length) throw new Error('fixture skor harus 8 nilai');
     const criteria = Object.fromEntries(keys.map((k, i) => [k, { values: [v[i]!], median: v[i]!, range: 0, flag: false, evidence: [] }])) as any;
     return { criteria, total: v.reduce((a, b) => a + b, 0), slop: { values: [], median: undefined, range: undefined, flag: false, items: [] }, emoji: { values: [], median: undefined, range: undefined, flag: false }, focus: [] };
   };
@@ -157,24 +162,49 @@ describe('gerbang dan keputusan sementara', () => {
     expect(slow.timeRatio).toBeCloseTo(1.5003, 3);
   });
 
-  it('L 9 vs P 10 → Setara; L 8 vs P 10 → Kalah; L 12 vs P 9 → Lebih baik; gerbang gagal → Kalah', () => {
-    const d = (l: number[], p: number[], gate = okGate) => decide({ gate, lakarRunOk: true, pendevRunOk: true, score: score(l, p) }).decision;
-    expect(d([2, 2, 2, 1, 1, 1], [2, 2, 2, 2, 1, 1])).toBe('Setara');
-    expect(d([2, 2, 1, 1, 1, 1], [2, 2, 2, 2, 1, 1])).toBe('Kalah');
-    expect(d([2, 2, 2, 2, 2, 2], [2, 2, 2, 1, 1, 1])).toBe('Lebih baik');
-    expect(d([2, 2, 2, 2, 2, 2], [2, 2, 2, 1, 1, 1], { ok: false, reasons: ['layout_check gate = 1'], timeRatio: 1 })).toBe('Kalah');
+  const noBrief = { sizeProblems: [] as string[] };
+  const dec = (l: number[], p: number[], extra: Partial<DecisionInput> = {}) => decide({ gate: okGate, lakarRunOk: true, pendevRunOk: true, score: score(l, p), pendevBrief: noBrief, ...extra });
+
+  // (a) matriks I/O aturan keputusan v2. Urutan nilai: R1 R2 R4 R5 R6 R8 | R9 R10.
+  it('Kalah karena daya tarik: D_L ≤ D_P − 2, pen.dev patuh brief → Kalah, alasan "daya tarik"', () => {
+    const r = dec([2, 2, 2, 2, 2, 2, 1, 0], [2, 1, 1, 1, 1, 1, 2, 1]);
+    expect(r.checks).toMatchObject({ total: { lakar: 13, pendev: 10 }, appeal: { lakar: 1, pendev: 3 }, otherLoss: [], pendevBriefViolations: [] });
+    expect(r).toMatchObject({ decision: 'Kalah', why: expect.stringMatching(/^daya tarik D 1 ≤ 3 − 2/) });
+    // R9/R10 Lakar 0 vs pen.dev 2 juga Kalah-daya-tarik walau gap D hanya 1.
+    expect(dec([2, 2, 2, 2, 2, 2, 0, 2], [2, 2, 2, 2, 2, 2, 2, 1])).toMatchObject({ decision: 'Kalah', why: expect.stringMatching(/daya tarik R9: Lakar 0 sementara pen.dev 2/) });
   });
 
-  it('R Lakar 0 sementara pen.dev 2 → bukan Setara', () => {
-    const r = decide({ gate: okGate, lakarRunOk: true, pendevRunOk: true, score: score([0, 2, 2, 2, 2, 2], [2, 2, 2, 2, 1, 1]) });
-    expect(r).toMatchObject({ decision: 'Kalah', why: expect.stringMatching(/R1/) });
+  it('pembanding melanggar brief (ukuran frame / median R1 = 0) dan hanya Kalah-daya-tarik → Setara, tidak pernah Lebih baik', () => {
+    const size = dec([2, 2, 2, 2, 2, 2, 1, 0], [2, 1, 1, 1, 1, 1, 2, 1], { pendevBrief: { sizeProblems: ['board z 390×1109 ≠ 390×844'] } });
+    expect(size).toMatchObject({ decision: 'Setara', why: expect.stringMatching(/pen\.dev melanggar brief mengikat \(ukuran: board z 390×1109/) });
+    expect(size.checks!.pendevBriefViolations).toEqual(['ukuran: board z 390×1109 ≠ 390×844']);
+    const r1 = dec([2, 2, 2, 2, 2, 2, 0, 0], [0, 1, 1, 1, 1, 1, 2, 2]);
+    expect(r1).toMatchObject({ decision: 'Setara', why: expect.stringMatching(/median R1 pen\.dev = 0/) });
+    // Total Lakar jauh di atas (≥ +3) tetap Setara, bukan Lebih baik.
+    expect(r1.checks!.total.lakar - r1.checks!.total.pendev).toBeGreaterThanOrEqual(3);
   });
 
-  it('run Lakar gagal → Kalah; run pen.dev gagal → tidak dapat dinilai', () => {
-    expect(decide({ gate: okGate, lakarRunOk: false, pendevRunOk: true, score: score([2, 2, 2, 2, 2, 2], [0, 0, 0, 0, 0, 0]) }).decision).toBe('Kalah');
-    expect(decide({ gate: okGate, lakarRunOk: true, pendevRunOk: false, score: undefined }).decision).toBe('tidak dapat dinilai');
+  it('Kalah lain + pelanggaran pembanding → tetap Kalah', () => {
+    const viol = { pendevBrief: { sizeProblems: ['frame x 390×1109 ≠ 390×844'] } };
+    expect(dec([1, 1, 1, 1, 1, 1, 0, 0], [2, 2, 2, 1, 1, 1, 2, 2], viol)).toMatchObject({ decision: 'Kalah', why: expect.stringMatching(/^total 6 < 13 − 1/) });
+    expect(dec([0, 2, 2, 2, 2, 2, 0, 0], [2, 1, 1, 1, 1, 1, 2, 2], viol)).toMatchObject({ decision: 'Kalah', why: expect.stringMatching(/^R1: Lakar 0 sementara pen\.dev 2/) });
+  });
+
+  it('Lebih baik butuh T_L ≥ T_P + 3 dan D_L ≥ D_P; tanpa daya tarik → Setara', () => {
+    expect(dec([2, 2, 2, 2, 2, 2, 1, 1], [1, 1, 1, 1, 1, 2, 1, 1]).decision).toBe('Lebih baik');
+    expect(dec([2, 2, 2, 2, 2, 2, 1, 1], [1, 1, 2, 2, 2, 2, 1, 1]).decision).toBe('Setara'); // +2 saja
+    expect(dec([2, 2, 2, 2, 2, 2, 1, 0], [1, 1, 1, 1, 1, 1, 1, 1])).toMatchObject({ decision: 'Setara', why: expect.stringMatching(/daya tarik 1 < 2/) });
+    expect(dec([2, 2, 2, 1, 1, 1, 1, 1], [2, 2, 2, 2, 1, 1, 1, 1]).decision).toBe('Setara'); // T −1
+    expect(dec([2, 2, 1, 1, 1, 1, 1, 1], [2, 2, 2, 2, 1, 1, 1, 1]).decision).toBe('Kalah'); // T −2
+  });
+
+  it('gerbang Lakar gagal → Kalah (tidak berubah); run Lakar gagal → Kalah; run pen.dev gagal → tidak dapat dinilai', () => {
+    const failGate = { ok: false, reasons: ['layout_check gate = 1'], timeRatio: 1 };
+    expect(dec([2, 2, 2, 2, 2, 2, 2, 2], [0, 0, 0, 0, 0, 0, 0, 0], { gate: failGate })).toMatchObject({ decision: 'Kalah', why: expect.stringMatching(/gerbang gagal/) });
+    expect(dec([2, 2, 2, 2, 2, 2, 2, 2], [0, 0, 0, 0, 0, 0, 0, 0], { lakarRunOk: false }).decision).toBe('Kalah');
+    expect(decide({ gate: okGate, lakarRunOk: true, pendevRunOk: false, score: undefined, pendevBrief: noBrief }).decision).toBe('tidak dapat dinilai');
     // Gerbang Lakar gagal tetap Kalah walau run pen.dev juga gagal.
-    expect(decide({ gate: { ok: false, reasons: ['layout_check gate = 1'], timeRatio: 1 }, lakarRunOk: true, pendevRunOk: false, score: undefined })).toMatchObject({ decision: 'Kalah', why: expect.stringMatching(/gerbang gagal/) });
+    expect(decide({ gate: failGate, lakarRunOk: true, pendevRunOk: false, score: undefined, pendevBrief: noBrief })).toMatchObject({ decision: 'Kalah', why: expect.stringMatching(/gerbang gagal/) });
   });
 });
 
@@ -212,7 +242,8 @@ describe('laporan (snapshot)', () => {
     gate,
     sizeProblems: [],
     score: sc,
-    decision: decide({ gate, lakarRunOk: true, pendevRunOk: true, score: sc }),
+    decision: decide({ gate, lakarRunOk: true, pendevRunOk: true, score: sc, pendevBrief: { sizeProblems: [] } }),
+    pendevSizeProblems: [],
   };
   const report: RoundReport = {
     round: 'uji-1',
@@ -250,12 +281,14 @@ describe('laporan (snapshot)', () => {
       { prompt: 'B', tool: 'pendev', path: undefined, status: 'strip tidak ada' },
     ],
     judgeCostUsd: 0.5,
+    judge: { rubricVersion: '2', textSha256: { B: 'b2' } },
     notes: [],
   };
 
   it('round md memuat semua bagian AC', () => {
     const md = renderRoundMarkdown(report);
-    for (const s of ['Lakar/pen.dev', 'Lakar/baseline', 'Gerbang G0 Lakar', '### Emoji', '### Reconnect', 'Total (jumlah median)', 'sementara, menunggu konfirmasi Adam', '## Versi beku', 'R3/R7 tidak dihitung']) expect(md).toContain(s);
+    for (const s of ['Lakar/pen.dev', 'Lakar/baseline', 'Gerbang G0 Lakar', '### Emoji', '### Reconnect', 'Total (jumlah median, maks 16)', 'Daya tarik D = R9 + R10', 'sementara, menunggu konfirmasi Adam', '## Versi beku', 'R3/R7 tidak dihitung', 'Versi rubrik: 2', 'sha256 teks juri B: `b2`']) expect(md).toContain(s);
+    expect(renderRoundMarkdown({ ...report, judge: undefined })).toContain('Versi rubrik: tidak tercatat');
     expect(md).toMatchSnapshot();
   });
 
@@ -303,7 +336,7 @@ describe('laporan (snapshot)', () => {
     expect(renderRoundMarkdown({ ...official, g0: { decision: 'lolos', why: 'A Lebih baik, B Setara' } })).not.toContain('## Evaluasi arah');
   });
 
-  it('score md: 6 kriteria × 2 alat, bukti per ulangan, pemetaan X/Y setelah penilaian, ulangan failed dicatat', () => {
+  it('score md: 8 kriteria × 2 alat, bukti per ulangan, pemetaan X/Y setelah penilaian, ulangan failed dicatat', () => {
     const md = renderScoreMarkdown('uji-1', p);
     expect(md).toContain('putaran uji-1');
     expect(md.indexOf('Pemetaan X/Y')).toBeGreaterThan(md.indexOf('Bukti per ulangan'));
@@ -398,6 +431,8 @@ describe('pembekuan putaran resmi', () => {
     lakard: { startedAt: '2026-11-18T06:00:00.000Z', fonts: { families: ['Inter'], missing: [] }, pool: { size: 2, ready: 2, recreated: 0 } },
     newestDistMtimeMs: Date.parse('2026-11-18T05:00:00.000Z'),
     checkLakardFresh: true,
+    judgeText: { rubricVersion: '2', textSha256: { A: 'aa', B: 'bb' } },
+    rubric: { version: '2', date: '2026-11-18', judgeTextSha256: { A: 'aa', B: 'bb' }, sourceSha256: {} },
   };
   it('ID angka = resmi; uji-<k> bukan', () => {
     expect(isOfficialRound('1')).toBe(true);
@@ -418,6 +453,10 @@ describe('pembekuan putaran resmi', () => {
     expect(officialFreezeProblems(stale)[0]).toContain('lakard basi');
     expect(officialFreezeProblems({ ...stale, checkLakardFresh: false })).toEqual([]);
     expect(officialFreezeProblems({ ...base, newestDistMtimeMs: undefined })[0]).toContain('dist tidak ada');
+  });
+  it('sha teks juri ≠ bench/rubric/rubric.json (DESIGN.md diubah setelah snapshot) → masalah', () => {
+    expect(officialFreezeProblems({ ...base, judgeText: { rubricVersion: '2', textSha256: { A: 'aa', B: 'b-baru' } } })).toEqual(['rubrik juri: sha256 teks juri B b-baru ≠ rubric.json bb']);
+    expect(officialFreezeProblems({ ...base, rubric: undefined })[0]).toContain('rubric.json tidak ada');
   });
   it('font hilang / pool belum siap → masalah', () => {
     expect(officialFreezeProblems({ ...base, lakard: { ...base.lakard!, fonts: { families: [], missing: ['Inter'] } } })).toEqual(['font hilang: Inter']);

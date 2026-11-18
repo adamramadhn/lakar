@@ -5,21 +5,22 @@ import { join, relative } from 'node:path';
 import { G0_RULES, LAKAR_VERSION, SCHEMA_VERSION, errorMessage } from '@lakar/schema';
 import { buildArgs, buildEnv, shellQuote } from '../claude-runner.js';
 import { assignLabels, buildJudgeArgs, buildJudgeBlocks, EMPTY_MCP, JUDGE_REPS, runJudgeRep, type Assignment, type DesignImages, type JudgeRepRecord, type Tool } from '../judge/run.js';
-import { buildJudgeText, DESIGN_MD_PATH, judgeC7Problems, judgeLeaks } from '../judge/prompt.js';
+import { buildJudgeText, DESIGN_MD_PATH, JUDGE_CRITERIA, judgeC7Problems, judgeLeaks } from '../judge/prompt.js';
+import { readRubricJson, rubricShaProblems, type RubricJson } from '../judge/rubric.js';
 import { boardSizeProblems, LAKAR_ALLOWED_TOOLS, LAKAR_MCP_CONFIG, LAKARD_UNIT, lakarPreflightProblems, mcpServerNames, runLakar } from '../lakar/run.js';
 import { LakardClient, type LakardStatus } from '../lakar/lakard-client.js';
 import { Abort, log, sleep, stamp } from '../log.js';
 import { emptyRecord, PENDEV_ALLOWED_TOOLS, PENDEV_MCP_CONFIG, penDesktopVersion, preflight, runOne, RUNS_ROOT, type Preflight } from '../pendev/run.js';
 import { encodePngRgb } from '../png/codec.js';
 import { buildStrip, judgeImages } from '../png/strip.js';
-import { BENCH_ROOT, GOLDEN_SET_PATH, PROTOCOL_DIR, PROTOCOL_FILES, REPO_ROOT, renderPrompt, type PromptId, type Protocol } from '../protocol.js';
+import { BENCH_ROOT, GOLDEN_SET_PATH, PROTOCOL_DIR, PROTOCOL_FILES, REPO_ROOT, renderPrompt, type PromptId, type Protocol, type ProtocolConfig } from '../protocol.js';
 import type { RunRecord } from '../report.js';
 import type { TimedLine } from '../stream-metrics.js';
 import { comparePenHashes, git, gitPorcelain, isActive, md5PenFiles, newestMtimeMs, restartUserUnit, sha256, sha256Dir, systemdShow, type SystemdInfo } from '../sys.js';
 import { applyLakarArchive, benchLakarSlugs, planLakarArchive } from '../lakar/archive.js';
 import { countAgentEmoji, countLintEmoji } from './emoji.js';
 import { lakarReconnect, pendevReconnect } from './reconnect.js';
-import { isOfficialRound, OFFICIAL_CODE_PATHS, renderRoundJson, renderRoundMarkdown, renderScoreJson, renderScoreMarkdown, ROUND_ID, type FrozenVersions, type RoundPrompt, type RoundReport, type RoundRun } from './report.js';
+import { isOfficialRound, OFFICIAL_CODE_PATHS, renderRoundJson, renderRoundMarkdown, renderScoreJson, renderScoreMarkdown, ROUND_ID, type FrozenVersions, type JudgeTextInfo, type RoundPrompt, type RoundReport, type RoundRun } from './report.js';
 import { aggregateScores, decide, decideG0, lakarGate, NO_VALID_REPS } from './score.js';
 
 const ROUND_ORDER: readonly [PromptId, Tool][] = [
@@ -53,12 +54,16 @@ export type OfficialFreezeInput = {
   newestDistMtimeMs: number | undefined;
   /** (c) dicek hanya sesudah restart wajib (sebelum restart / dry-run: lakard memang boleh lebih tua dari build). */
   checkLakardFresh: boolean;
+  /** (e) versi rubrik + sha256 teks juri saat ini, dibandingkan dengan `bench/rubric/rubric.json`. */
+  judgeText: JudgeTextInfo;
+  rubric: RubricJson | undefined;
 };
 
 /**
  * Cek pembekuan putaran resmi (murni). Setiap masalah → Abort sebelum run apa pun.
  * (a) kode bersih, (b) protokol/model/claude/pen.dev = baseline (C9: tidak di-upgrade/downgrade),
- * (c) lakard startedAt > mtime dist terbaru (sesudah restart), (d) font lengkap dan pool siap.
+ * (c) lakard startedAt > mtime dist terbaru (sesudah restart), (d) font lengkap dan pool siap,
+ * (e) sha256 teks juri dan versi rubrik = `bench/rubric/rubric.json` (snapshot tracked).
  */
 export function officialFreezeProblems(i: OfficialFreezeInput): string[] {
   const out: string[] = [];
@@ -83,6 +88,7 @@ export function officialFreezeProblems(i: OfficialFreezeInput): string[] {
     else if (i.lakard.fonts.missing.length) out.push(`font hilang: ${i.lakard.fonts.missing.join(', ')}`);
     if (!((i.lakard.pool?.ready ?? 0) >= 1)) out.push(`pool render belum siap (ready=${i.lakard.pool?.ready ?? '?'})`);
   }
+  out.push(...rubricShaProblems({ version: i.judgeText.rubricVersion, sha: i.judgeText.textSha256 }, i.rubric).map((p) => `rubrik juri: ${p}`));
   return out;
 }
 
@@ -187,7 +193,13 @@ export function c7Targets(protocol: Protocol): { name: string; text: string }[] 
   return out;
 }
 
-export type JudgeTexts = Record<string, { text: string; secret: string }>;
+export type JudgeTexts = Record<string, { text: string; secret: string; sha256: string; rubricVersion: string | undefined }>;
+
+/** Versi rubrik + sha256 per prompt dari teks juri yang disiapkan. */
+export function judgeTextInfo(texts: JudgeTexts): JudgeTextInfo {
+  const versions = [...new Set(Object.values(texts).map((t) => t.rubricVersion))];
+  return { rubricVersion: versions[0], textSha256: Object.fromEntries(Object.entries(texts).map(([id, t]) => [id, t.sha256])) };
+}
 
 /** Teks juri per prompt + penjaga kebocoran dan C7. Gagal → Abort sebelum spawn apa pun. */
 export function prepareJudgeTexts(protocol: Protocol): JudgeTexts {
@@ -203,7 +215,7 @@ export function prepareJudgeTexts(protocol: Protocol): JudgeTexts {
     if (leaks.length) throw new Abort(`teks juri ${id} bocor: ${leaks.join('; ')}`);
     const c7 = judgeC7Problems(t.secret, targets);
     if (c7.length) throw new Abort(`C7 juri ${id} gagal:\n  ${c7.join('\n  ')}`);
-    out[id] = t;
+    out[id] = { ...t, sha256: sha256(t.text) };
   }
   return out;
 }
@@ -350,6 +362,86 @@ function writeStrip(roundDir: string, run: RoundRun): DesignImages | undefined {
   return judgeImages(strip);
 }
 
+/**
+ * Tulis teks juri ke `<jdir>/judge-text.md` (eksklusif): belum ada → ditulis; identik → dilewati (resume);
+ * berbeda → error (teks juri berubah di tengah putaran).
+ */
+export function writeJudgeTextExclusive(jdir: string, text: string): 'ditulis' | 'identik' {
+  const f = join(jdir, 'judge-text.md');
+  mkdirSync(jdir, { recursive: true });
+  if (existsSync(f)) {
+    if (readFileSync(f, 'utf8') === text) return 'identik';
+    throw new Error(`${relative(REPO_ROOT, f)} sudah ada dengan isi berbeda (teks juri berubah sejak awal); tidak ditimpa`);
+  }
+  writeFileSync(f, text, { flag: 'wx' });
+  return 'ditulis';
+}
+
+export type JudgePromptInput = {
+  prompt: string;
+  /** Dir juri prompt ini (`…/judge/<P>`). */
+  jdir: string;
+  text: string;
+  images: Record<Tool, DesignImages>;
+  emptyMcpConfig: string;
+  config: ProtocolConfig;
+  forbiddenCwdRoot: string;
+  /** Ulangan tersimpan yang dipakai ulang; selebihnya dipindah ke `rep-<k>.prev-<stamp>` dan dijalankan lagi. */
+  reuse: (r: JudgeRepRecord) => boolean;
+  /** Untuk tes: program pengganti `claude`. */
+  command?: string;
+  prefixArgs?: string[];
+};
+
+/**
+ * Juri buta 3× untuk satu prompt (dipakai `round` dan `rejudge`): teks juri disalin ke `judge-text.md`, penugasan X/Y
+ * acak `crypto` disimpan sekali (`assignments.json`), lalu ulangan dijalankan/dipakai ulang. Ulangan `invalid` → berhenti.
+ */
+export async function judgePrompt(i: JudgePromptInput): Promise<{ reps: JudgeRepRecord[]; fatal: string | undefined }> {
+  writeJudgeTextExclusive(i.jdir, i.text);
+  const assignFile = join(i.jdir, 'assignments.json');
+  let assignments: Assignment[];
+  if (existsSync(assignFile)) assignments = JSON.parse(readFileSync(assignFile, 'utf8'));
+  else {
+    assignments = assignLabels(JUDGE_REPS);
+    writeFileSync(assignFile, `${JSON.stringify(assignments, null, 1)}\n`, { flag: 'wx' });
+  }
+  const reps: JudgeRepRecord[] = [];
+  for (let k = 1; k <= JUDGE_REPS; k++) {
+    const repDir = join(i.jdir, `rep-${k}`);
+    const repFile = join(repDir, 'rep.json');
+    if (existsSync(repFile)) {
+      const old = JSON.parse(readFileSync(repFile, 'utf8')) as JudgeRepRecord;
+      // Ulangan `ok` dari rubrik lama (kriteria kurang, mis. tanpa R9/R10) tidak dipakai ulang: dijalankan lagi dengan teks saat ini.
+      const coversCriteria = old.status !== 'ok' || (['X', 'Y'] as const).every((l) => JUDGE_CRITERIA.every((c) => old.verdict?.[l]?.[c] !== undefined));
+      if (i.reuse(old) && coversCriteria) {
+        reps.push(old);
+        continue;
+      }
+      renameSync(repDir, `${repDir}.prev-${stamp()}`);
+    } else if (existsSync(repDir)) renameSync(repDir, `${repDir}.prev-${stamp()}`);
+    const mapping = assignments[k - 1]!;
+    const blocks = buildJudgeBlocks(i.text, { X: i.images[mapping.X], Y: i.images[mapping.Y] });
+    log(`juri ${i.prompt} ulangan ${k}: mulai`);
+    const rep = await runJudgeRep({
+      prompt: i.prompt,
+      rep: k,
+      mapping,
+      blocks,
+      dir: repDir,
+      emptyMcpConfig: i.emptyMcpConfig,
+      config: i.config,
+      forbiddenCwdRoot: i.forbiddenCwdRoot,
+      ...(i.command ? { command: i.command } : {}),
+      ...(i.prefixArgs ? { prefixArgs: i.prefixArgs } : {}),
+    });
+    log(`juri ${i.prompt} ulangan ${k}: ${rep.status}${rep.retried ? ' (diulang 1×)' : ''}, $${rep.costUsd.toFixed(3)}`);
+    reps.push(rep);
+    if (rep.status === 'invalid') return { reps, fatal: `juri ${i.prompt} ulangan ${k} invalid: ${rep.attempts.at(-1)?.problems.join('; ')}` };
+  }
+  return { reps, fatal: undefined };
+}
+
 export async function roundMain(argv: string[]): Promise<number> {
   const parsed = parseRoundArgs(argv);
   if (!parsed.ok) {
@@ -382,7 +474,10 @@ export async function roundMain(argv: string[]): Promise<number> {
   if (lp.length) throw new Abort(`preflight Lakar: ${lp.join('; ')}`);
   log(`lakard ${status.version} (schema ${status.schemaVersion}), pool ready ${status.pool?.ready}; .mcp.json = [lakar]`);
   const judgeTexts = prepareJudgeTexts(protocol);
+  const judgeInfo = judgeTextInfo(judgeTexts);
+  const rubric = readRubricJson();
   log('teks juri: tanpa nama alat/path; C7 juri lulus (protokol, skill, server MCP, prompt agen)');
+  log(`rubrik juri: versi ${judgeInfo.rubricVersion ?? '1 (tanpa baris versi)'}; ${Object.entries(judgeInfo.textSha256).map(([id, x]) => `sha256 ${id} ${x.slice(0, 12)}…`).join(', ')}`);
   const head = git(REPO_ROOT, ['rev-parse', 'HEAD']);
   const porcelain = gitPorcelain(REPO_ROOT, ['packages', 'tools', '.mcp.json']);
   const official = isOfficialRound(round);
@@ -398,6 +493,8 @@ export async function roundMain(argv: string[]): Promise<number> {
     lakard: st,
     newestDistMtimeMs: newestDistMtime(),
     checkLakardFresh,
+    judgeText: judgeInfo,
+    rubric,
   });
 
   const cfg = protocol.config;
@@ -412,6 +509,8 @@ export async function roundMain(argv: string[]): Promise<number> {
     console.log(`=== ${p}: argv pen.dev ===\n${argvFor(PENDEV_MCP_CONFIG, PENDEV_ALLOWED_TOOLS, rendered)}`);
   }
   console.log(`\n=== argv juri (stdin: satu pesan stream-json teks + gambar) ===\n${judgeArgv}`);
+  const shaProblems = rubricShaProblems({ version: judgeInfo.rubricVersion, sha: judgeInfo.textSha256 }, rubric);
+  console.log(`\nrubrik juri: versi ${judgeInfo.rubricVersion ?? '1 (tanpa baris versi)'}; ${Object.entries(judgeInfo.textSha256).map(([id, x]) => `sha256 ${id} ${x}`).join('; ')}; bench/rubric/rubric.json: ${shaProblems.length ? `BERBEDA (${shaProblems.join('; ')})` : 'sama'}`);
   console.log(`\nenv tambahan: ${JSON.stringify(cfg.env)}; dibuang: ${buildEnv(process.env, cfg).scrubbed.join(', ') || '-'}`);
   console.log(`\nkonvensi putaran:\n${CONVENTION.map((c) => `- ${c}`).join('\n')}`);
   // Dokumen Lakar buatan putaran bench lain: dipindah ke arsip bench sebelum run agar slug pilihan agen tidak bentrok
@@ -497,7 +596,7 @@ export async function roundMain(argv: string[]): Promise<number> {
     checkDist: existsSync(CHECK_DIST) ? sha256Dir(CHECK_DIST) : 'tidak ada',
     pendevDesktop: penDesktopVersion(),
     pendevMcp: undefined,
-    judge: { model: cfg.model, argv: judgeArgv },
+    judge: { model: cfg.model, argv: judgeArgv, rubricVersion: judgeInfo.rubricVersion, textSha256: judgeInfo.textSha256 },
   };
   const frozenFile = join(roundDir, 'frozen.json');
   const startedIso = new Date().toISOString();
@@ -609,42 +708,25 @@ export async function roundMain(argv: string[]): Promise<number> {
       ? lakarGate({ promptId: p, layoutGate: lakarRec.lakar?.layout?.summary.gate, sizeProblems, wallMs: lakarRec.wallMs, baselineMedianMs: baseline.medians[p] })
       : undefined;
 
-    const reps: JudgeRepRecord[] = [];
+    const pendevRec = r.pendev?.record;
+    const pendevSizeProblems = pendevRec ? boardSizeProblems(p, pendevRec.frames) : [];
+    let reps: JudgeRepRecord[] = [];
     const judgeable = Boolean(images.lakar && images.pendev);
     if (judgeable) judgeablePrompts.add(p);
     const judgeSkipped = Boolean(fatal) && judgeable;
     if (!fatal && judgeable) try {
-      const jdir = join(roundDir, 'judge', p);
-      mkdirSync(jdir, { recursive: true });
-      const assignFile = join(jdir, 'assignments.json');
-      let assignments: Assignment[];
-      if (existsSync(assignFile)) assignments = JSON.parse(readFileSync(assignFile, 'utf8'));
-      else {
-        assignments = assignLabels(JUDGE_REPS);
-        writeFileSync(assignFile, `${JSON.stringify(assignments, null, 1)}\n`, { flag: 'wx' });
-      }
-      for (let k = 1; k <= JUDGE_REPS; k++) {
-        const repDir = join(jdir, `rep-${k}`);
-        const repFile = join(repDir, 'rep.json');
-        if (existsSync(repFile)) {
-          const old = JSON.parse(readFileSync(repFile, 'utf8')) as JudgeRepRecord;
-          if (old.status !== 'invalid') {
-            reps.push(old);
-            continue;
-          }
-          renameSync(repDir, `${repDir}.prev-${stamp()}`);
-        } else if (existsSync(repDir)) renameSync(repDir, `${repDir}.prev-${stamp()}`);
-        const mapping = assignments[k - 1]!;
-        const blocks = buildJudgeBlocks(judgeTexts[p]!.text, { X: images[mapping.X]!, Y: images[mapping.Y]! });
-        log(`juri ${p} ulangan ${k}: mulai`);
-        const rep = await runJudgeRep({ prompt: p, rep: k, mapping, blocks, dir: repDir, emptyMcpConfig: emptyMcpPath, config: cfg, forbiddenCwdRoot: REPO_ROOT });
-        log(`juri ${p} ulangan ${k}: ${rep.status}${rep.retried ? ' (diulang 1×)' : ''}, $${rep.costUsd.toFixed(3)}`);
-        reps.push(rep);
-        if (rep.status === 'invalid') {
-          fatal = `juri ${p} ulangan ${k} invalid: ${rep.attempts.at(-1)?.problems.join('; ')}`;
-          break;
-        }
-      }
+      const j = await judgePrompt({
+        prompt: p,
+        jdir: join(roundDir, 'judge', p),
+        text: judgeTexts[p]!.text,
+        images: { lakar: images.lakar!, pendev: images.pendev! },
+        emptyMcpConfig: emptyMcpPath,
+        config: cfg,
+        forbiddenCwdRoot: REPO_ROOT,
+        reuse: (old) => old.status !== 'invalid',
+      });
+      reps = j.reps;
+      fatal ??= j.fatal;
     } catch (e) {
       // Laporan dan penjaga .pen tetap jalan walau tahap juri gagal (run desain berbayar sudah selesai).
       fatal = `juri ${p}: harness: ${errorMessage(e)}`;
@@ -663,10 +745,11 @@ export async function roundMain(argv: string[]): Promise<number> {
           lakarRunOk: lakarRec?.status === 'success',
           pendevRunOk: r.pendev?.record.status === 'success',
           score,
+          pendevBrief: { sizeProblems: pendevSizeProblems },
         });
     // Juri dilewati karena putaran berhenti: alasannya itu, bukan "tidak ada ulangan juri yang valid".
     const decision = judgeSkipped && !reps.length && decided.why === NO_VALID_REPS ? { ...decided, why: `juri tidak dijalankan: putaran dihentikan (${fatal})` } : decided;
-    results.push({ prompt: p, baselineMedianMs: baseline.medians[p], baselineCostUsd: baseline.costMedians[p], runs: r, gate, sizeProblems, score, decision });
+    results.push({ prompt: p, baselineMedianMs: baseline.medians[p], baselineCostUsd: baseline.costMedians[p], runs: r, gate, sizeProblems, score, decision, pendevSizeProblems });
   }
 
   // ---------- penjaga .pen + status ----------
@@ -712,6 +795,7 @@ export async function roundMain(argv: string[]): Promise<number> {
       }),
     ),
     judgeCostUsd: judgeCost,
+    judge: judgeInfo,
     notes,
   };
   writeFileSync(mdPath, renderRoundMarkdown(report));

@@ -2,12 +2,14 @@
 // CLI bench. `pendev-baseline [--dry-run]`: preflight → seri berselang A1 B1 A2 B2 … → bench/baseline-pendev.{md,json}.
 // `pendev-smoke`: satu run uji murah (prompt netral pendek) untuk membuktikan init memuat tool mcp__pencil__*; tidak masuk baseline.
 // `round --round <uji-k|n> [--dry-run] [--resume]`: putaran Lakar vs pen.dev + juri buta (lihat round/main.ts).
+// `rejudge --from <uji-k|n> --label <slug> [--resume] [--dry-run]`: nilai ulang strip putaran yang ada, tanpa agen (rejudge.ts).
+// `rubric-snapshot [--version <v>]`: snapshot rubrik juri tracked di bench/rubric/ (judge/rubric.ts).
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { errorMessage } from '@lakar/schema';
 import { buildArgs, buildEnv, shellQuote } from './claude-runner.js';
 import { Abort, log, stamp } from './log.js';
-import { BENCH_ROOT, REPO_ROOT, renderPrompt, type PromptId } from './protocol.js';
+import { BENCH_ROOT, GOLDEN_SET_PATH, loadProtocol, REPO_ROOT, renderPrompt, type PromptId } from './protocol.js';
 import { renderJson, renderMarkdown, summarizeRuns, type BaselineReport, type RunRecord } from './report.js';
 import { isFatal, needsRun, seriesOutcome } from './series.js';
 import {
@@ -21,7 +23,10 @@ import {
   userEffortLevel,
   type Preflight,
 } from './pendev/run.js';
-import { roundMain } from './round/main.js';
+import { prepareJudgeTexts, roundMain } from './round/main.js';
+import { planSnapshot, writeSnapshot } from './judge/rubric.js';
+import { DESIGN_MD_PATH } from './judge/prompt.js';
+import { rejudgeMain } from './rejudge.js';
 
 const SMOKE_PROMPT = 'Panggil tool get_app_state satu kali, lalu jawab satu kata: selesai.';
 
@@ -110,11 +115,44 @@ async function smoke(pre: Preflight): Promise<number> {
   return rec.status === 'invalid' || rec.status === 'aborted' || m.initProblems?.length ? 1 : 0;
 }
 
+const USAGE =
+  'pakai: node bench/dist/cli.js pendev-baseline [--dry-run] | pendev-smoke | round --round <uji-k|n> [--dry-run] [--resume] | rejudge --from <uji-k|n> --label <slug> [--resume] [--dry-run] | rubric-snapshot [--version <v>]';
+
+/** `rubric-snapshot [--version <v>]`: tulis `bench/rubric/v<ver>/` (eksklusif) dan perbarui `bench/rubric/rubric.json`. */
+function rubricSnapshot(args: string[]): number {
+  let version: string | undefined;
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i]!;
+    if (a === '--') continue;
+    if (a === '--version') version = args[++i];
+    else if (a.startsWith('--version=')) version = a.slice('--version='.length);
+    else {
+      console.error(`rubric-snapshot: argumen tidak dikenal: ${a}\n${USAGE}`);
+      return 64;
+    }
+  }
+  const protocol = loadProtocol();
+  const texts = prepareJudgeTexts(protocol);
+  const plan = planSnapshot({
+    designMd: readFileSync(DESIGN_MD_PATH, 'utf8'),
+    goldenMd: readFileSync(GOLDEN_SET_PATH, 'utf8'),
+    judgeTexts: Object.fromEntries(Object.entries(texts).map(([id, t]) => [id, t.text])),
+    ...(version !== undefined ? { version } : {}),
+    today: new Date().toISOString().slice(0, 10),
+  });
+  const how = writeSnapshot(plan);
+  log(`rubrik v${plan.version}: ${relative(REPO_ROOT, plan.dir)} ${how}; bench/rubric/rubric.json → v${plan.version}`);
+  for (const [id, s] of Object.entries(plan.json.judgeTextSha256)) console.log(`sha256 teks juri ${id}: ${s}`);
+  return 0;
+}
+
 async function main(args: string[]): Promise<number> {
   const [cmd, ...rest] = args;
   if (cmd === 'round') return roundMain(rest);
+  if (cmd === 'rubric-snapshot') return rubricSnapshot(rest);
+  if (cmd === 'rejudge') return rejudgeMain(rest);
   if (cmd !== 'pendev-baseline' && cmd !== 'pendev-smoke') {
-    console.error('pakai: node bench/dist/cli.js pendev-baseline [--dry-run] | pendev-smoke | round --round <uji-k|n> [--dry-run] [--resume]');
+    console.error(USAGE);
     return 64;
   }
   const pre = preflight();
