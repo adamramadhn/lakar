@@ -1,8 +1,8 @@
 // Adaptor Lakar untuk putaran: preflight lakard, snapshot dokumen, claude -p (waktu terukur, argumen sama dengan pen.dev),
 // lalu di luar waktu: slug dari transkrip, sesi HTTP harness → open → boards → layout-check → export skala 1 per board.
-import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
-import { LAKAR_VERSION, SCHEMA_VERSION, errorMessage } from '@lakar/schema';
+import { LAKAR_VERSION, SCHEMA_VERSION, SLUG_PATTERN, errorMessage } from '@lakar/schema';
 import { runClaude } from '../claude-runner.js';
 import { copyExclusive } from '../pendev/artifacts.js';
 import { readPngSizeFile } from '../png/codec.js';
@@ -13,6 +13,7 @@ import { pngScaleMismatch } from '../series.js';
 import { computeMetrics, validateInit, type InitRules, type TimedLine } from '../stream-metrics.js';
 import { systemdShow, type SystemdInfo } from '../sys.js';
 import { toolEvents } from '../tool-events.js';
+import { LAKAR_DOCS_LOG } from './archive.js';
 import { LakardClient, type LakardBoard, type LakardStatus, type LayoutCheck } from './lakard-client.js';
 
 export const LAKAR_SERVER = 'lakar';
@@ -75,6 +76,20 @@ export function findCommittedSlug(lines: readonly TimedLine[], server = LAKAR_SE
     } else if (u.name === `mcp__${server}__execute` && current) committed = current;
   }
   return { slug: committed, opened };
+}
+
+/**
+ * Slug `open_doc` (tool_use, sebelum result) dalam satu baris stream (murni, parse murah: hanya baris yang memuat
+ * `open_doc`). Dipakai pencatatan seketika `lakar-docs.jsonl` agar run yang mati tetap bisa dibereskan arsip.
+ */
+export function openDocSlugsInLine(line: string, server = LAKAR_SERVER): string[] {
+  if (!line.includes('open_doc')) return [];
+  const out: string[] = [];
+  for (const ev of toolEvents([{ t: 0, line }])) {
+    const s = ev.kind === 'use' && ev.use.name === `mcp__${server}__open_doc` ? ev.use.input?.slug : undefined;
+    if (typeof s === 'string' && SLUG_PATTERN.test(s)) out.push(s);
+  }
+  return out;
 }
 
 /** Ukuran board mengikat: lebar selalu, tinggi bila bukan null (landing = tinggi bebas). */
@@ -173,6 +188,9 @@ export async function runLakar(i: RunLakarInput): Promise<LakarRunRecord> {
     forbiddenCwdRoot: REPO_ROOT,
     ...(i.command ? { command: i.command } : {}),
     ...(i.prefixArgs ? { prefixArgs: i.prefixArgs } : {}),
+    onLine: ({ t, line }) => {
+      for (const slug of openDocSlugsInLine(line)) appendFileSync(join(i.outDir, LAKAR_DOCS_LOG), `${JSON.stringify({ t: Math.round(t), slug })}\n`);
+    },
   });
   const m = computeMetrics(run.lines, LAKAR_INIT_RULES, { exitCode: run.exitCode, timedOut: run.timedOut });
   applyMetrics(rec, m, run, i.outDir, i.runId);

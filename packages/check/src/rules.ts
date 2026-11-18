@@ -199,6 +199,11 @@ export function lc12(ctx: BoardContext, doc: ResolvedDocument): Finding[] {
 
 /** Jarak maks seed zona ke tepi bawah board, lebar min relatif board, dan jarak aman di atas zona. */
 export const BOTTOM_BAR_MAX_GAP = 48;
+/** Bar mengambang: seed zona juga bila celah ke tepi bawah ≤ 96 px dan tinggi ≤ 120 px. */
+export const FLOAT_MAX_GAP = 96;
+export const FLOAT_MAX_H = 120;
+/** Tinggi minimal bagian unit yang terlihat di celah di bawah zona mengambang agar dilaporkan (px). */
+export const PEEK_MIN = 2;
 const BOTTOM_BAR_MIN_WIDTH_RATIO = 0.5;
 export const BOTTOM_BAR_CLEARANCE = 8;
 /** Isi seksi minimal yang harus terlihat di atas zona agar judulnya tidak yatim (px). */
@@ -221,7 +226,9 @@ export type BottomZone = { members: ZoneMember[]; top: number };
 
 /**
  * Zona bawah: `Overlay /` (kedalaman mana pun) + frame/rect absolut ber-fill (atau backdropBlur) anak board atau anak
- * layar, lebar ≥ 50% board. Seed: bawahnya ≤ 48 px dari tepi bawah; lalu tumpukan yang menempel di atasnya.
+ * layar, atau anak langsung ber-fill dari pembungkus (frame absolut transparan anak board/layar, lebar ≥ 50% board,
+ * tinggi ≤ 50% board); lebar ≥ 50% board. Seed: bawahnya ≤ 48 px dari tepi bawah, atau bar mengambang (≤ 96 px,
+ * tinggi ≤ 120 px); lalu tumpukan yang menempel di atasnya.
  */
 export function bottomZone(ctx: BoardContext): BottomZone | undefined {
   const { board, boardRect } = ctx;
@@ -229,6 +236,15 @@ export function bottomZone(ctx: BoardContext): BottomZone | undefined {
     if (!p || p.type !== 'frame' || ctx.parentOf.get(p.id) !== board) return false;
     const r = ctx.bounds.get(p.id);
     return !!r && r.width >= SCREEN_MIN_W_RATIO * boardRect.width;
+  };
+  const painted = (n: ChildNode) => hasFills(n) || (n as Painted).backdropBlur! > 0;
+  /** Pembungkus: frame absolut tanpa fill/blur anak board/layar, lebar ≥ 50% board, tinggi ≤ 50% board. */
+  const isWrapper = (p: Container | undefined): boolean => {
+    if (!p || p.type !== 'frame' || painted(p)) return false;
+    const pp = ctx.parentOf.get(p.id);
+    if (!pp || isFlowChild(pp, p) || !(pp === board || isScreen(pp))) return false;
+    const r = ctx.bounds.get(p.id);
+    return !!r && r.width >= BOTTOM_BAR_MIN_WIDTH_RATIO * boardRect.width && r.height <= CARD_MAX_H_RATIO * boardRect.height;
   };
   const cands: ZoneMember[] = [];
   for (const n of ctx.nodes) {
@@ -238,14 +254,18 @@ export function bottomZone(ctx: BoardContext): BottomZone | undefined {
     if (!legacy) {
       if ((n.type !== 'frame' && n.type !== 'rect') || named(n, 'Status bar') || named(n, 'Home indicator')) continue;
       const parent = ctx.parentOf.get(n.id)!;
-      if (isFlowChild(parent, n) || !(parent === board || isScreen(parent))) continue;
-      if (!hasFills(n) && !((n as Painted).backdropBlur! > 0)) continue;
+      const direct = !isFlowChild(parent, n) && (parent === board || isScreen(parent));
+      if (!direct && !isWrapper(parent)) continue;
+      if (!painted(n)) continue;
       // Latar/scrim setinggi layar bukan bilah bawah (tanpa ini tepi zona jadi 0 dan tumpukan berhenti).
       if (r.height > CARD_MAX_H_RATIO * boardRect.height) continue;
     }
     cands.push({ node: n, rect: r, order: ctx.order.get(n.id)!, legacy });
   }
-  const members = cands.filter((c) => boardRect.height - bottom(c.rect) <= BOTTOM_BAR_MAX_GAP);
+  const members = cands.filter((c) => {
+    const gap = boardRect.height - bottom(c.rect);
+    return gap <= BOTTOM_BAR_MAX_GAP || (gap <= FLOAT_MAX_GAP && c.rect.height <= FLOAT_MAX_H);
+  });
   if (!members.length) return undefined;
   let top = Math.min(...members.map((m) => m.rect.y));
   for (let grew = true; grew; ) {
@@ -424,6 +444,63 @@ export function lc20(ctx: BoardContext): Finding[] {
     return true;
   };
 
+  /** Bawah mentah unit (sebelum clip): teks tanpa half-leading bawah, baris = gabungan isi. */
+  const rawBottomOf = (n: ChildNode, kind: string): number => {
+    const r = ctx.bounds.get(n.id)!;
+    if (n.type === 'text') return bottom(r) - Math.max(0, ((lineHeights.get(n.id) ?? n.lineHeight ?? 1.2 * n.size) - n.size) / 2);
+    if (kind === 'baris' && n.type === 'frame') {
+      let b = -Infinity;
+      for (const k of n.children) {
+        const kr = ctx.bounds.get(k.id);
+        if (kr && area(kr) > 0) b = Math.max(b, bottom(kr));
+      }
+      return Number.isFinite(b) ? b : bottom(r);
+    }
+    return bottom(r);
+  };
+
+  /** Sub-cek 4: unit terlihat di celah antara zona mengambang dan tepi bawah board, terpotong atau sebagian di belakang zona. */
+  const gap = (n: ChildNode): boolean => {
+    const kind = unitKind(n);
+    if (!kind) return false;
+    const vis = unitVisible(n, kind);
+    if (!vis) return false;
+    const cov = covering(zone, orderOf(n), vis);
+    if (!cov) return false;
+    const x0 = Math.min(...cov.members.map((m) => m.rect.x));
+    const x1 = Math.max(...cov.members.map((m) => right(m.rect)));
+    let floor = Math.max(...cov.members.map((m) => bottom(m.rect)));
+    // Penutup celah: node ber-fill/blur sesudah unit (z-order) selebar rentang zona yang menempel di bawahnya (mis. Home indicator ber-fill).
+    const order = orderOf(n);
+    const own = new Set(descendants(n).map((d) => d.id));
+    for (let grew = true; grew; ) {
+      grew = false;
+      for (const c of ctx.nodes) {
+        const cr = ctx.bounds.get(c.id);
+        if (!cr || orderOf(c) <= order || own.has(c.id) || !(hasFills(c) || (c as Painted).backdropBlur! > 0)) continue;
+        if (cr.x > x0 + TOLERANCE || right(cr) < x1 - TOLERANCE || cr.y > floor + TOLERANCE || bottom(cr) <= floor + TOLERANCE) continue;
+        floor = bottom(cr);
+        grew = true;
+      }
+    }
+    if (boardRect.height - floor <= TOLERANCE) return false;
+    const peek = intersect(vis, { x: x0, y: floor, width: x1 - x0, height: boardRect.height - floor });
+    if (!peek || peek.height < PEEK_MIN) return false;
+    const terpotong = rawBottomOf(n, kind) > bottom(vis) + TOLERANCE;
+    const behind = vis.y < floor - TOLERANCE;
+    if (!terpotong && !behind) return false;
+    out.push(
+      finding(
+        'LC-20',
+        'error',
+        n,
+        `${kind} terlihat di celah di bawah zona bawah mengambang ${cov.label} (y ${num(peek.y)}–${num(bottom(peek))}), ${terpotong ? 'terpotong' : 'sebagian di belakang zona'}`,
+        `jangan biarkan konten terlihat di celah di bawah bar mengambang: akhiri daftar sebelum zona, beri latar penutup sampai tepi bawah, atau tempelkan bar ke tepi bawah`,
+      ),
+    );
+    return true;
+  };
+
   const headingLike = (h: ChildNode): boolean => {
     if (h.type === 'text') return h.content.trim() !== '';
     if (h.type !== 'frame' || hasFills(h) || hasStroke(h)) return false;
@@ -471,11 +548,12 @@ export function lc20(ctx: BoardContext): Finding[] {
     return true;
   };
 
-  // Sub-cek 2 + 3, atas-ke-bawah: hanya yang terluar dilaporkan.
+  // Sub-cek 2 + 4 + 3, atas-ke-bawah: hanya yang terluar dilaporkan.
   const walk = (children: readonly ChildNode[]) => {
     for (const n of children) {
       if (excluded.has(n.id) || reported.has(n.id)) continue;
       if (cut(n)) continue;
+      if (gap(n)) continue;
       if (n.type === 'frame' && named(n, 'Crop /')) continue;
       if (orphan(n)) continue;
       if (n.type === 'frame') walk(n.children);

@@ -403,6 +403,61 @@ describe('LC-20 zona bawah struktural', () => {
     const s = frame('Scroll / Konten', [0, 0, 390, 844], [wrap], { clip: true, scrollY: 400 });
     expect(lc20(run(clean([s, abs('Mini player', [8, 690, 374, 56]), abs('Tab bar', [0, 746, 390, 64])])))).toEqual([]);
   });
+
+  // Tab bar mengambang (celah di bawahnya): kartu ber-fill tinggi 64 jarak 8 di Scroll yang clip sampai 844.
+  const card = (y: number) => frame(`Kartu ${y}`, [16, y, 358, 64], [text(`Eps. ${y}`, [32, y + 20, 200, 20])], solid);
+  const floatBar = () => abs('Tab bar', [20, 756, 350, 64]);
+
+  it('(B1) tab bar mengambang: kartu terlihat di celah di bawahnya dan terpotong tepi board → satu temuan pada kartu', () => {
+    const peek = card(830);
+    const f = lc20(run(clean([scroll([rect('Atas', [0, 0, 390, 676]), card(676), frame('Jeda', [0, 748, 390, 74], []), peek]), floatBar()])));
+    expect(f.map((x) => x.nodeId)).toEqual([peek.id]);
+    expect(f[0]!.detail).toBe(`kartu terlihat di celah di bawah zona bawah mengambang "Tab bar" (${f[0]!.detail.match(/\((\w+)\)/)![1]}) (y 830–844), terpotong`);
+    expect(f[0]!.expected).toBe('jangan biarkan konten terlihat di celah di bawah bar mengambang: akhiri daftar sebelum zona, beri latar penutup sampai tepi bawah, atau tempelkan bar ke tepi bawah');
+    expect(`${f[0]!.detail} ${f[0]!.expected}`).not.toMatch(C7);
+  });
+
+  it('(B1′) kartu sebagian di belakang zona yang menyembul ke celah → temuan; kartu utuh sepenuhnya di celah → tidak', () => {
+    const behind = rect('Kartu', [16, 790, 358, 40], solid);
+    const f = lc20(run(clean([scroll([rect('Atas', [0, 0, 390, 676]), card(676), frame('Jeda', [0, 748, 390, 42], []), behind, frame('Ekor', [0, 838, 390, 300], [])]), floatBar()])));
+    expect(f.map((x) => x.nodeId)).toEqual([behind.id]);
+    expect(f[0]!.detail).toMatch(/\(y 820–830\), sebagian di belakang zona$/);
+    const whole = rect('Kartu', [16, 824, 358, 16], solid);
+    expect(lc20(run(clean([scroll([rect('Atas', [0, 0, 390, 676]), card(676), frame('Jeda', [0, 748, 390, 76], []), whole, frame('Ekor', [0, 848, 390, 300], [])]), floatBar()])))).toEqual([]);
+  });
+
+  it('(B1″) celah ditutup node ber-fill sesudah konten (Home indicator ber-fill) → tanpa temuan', () => {
+    const peek = card(830);
+    const hi = rect('Home indicator', [0, 820, 390, 24], solid);
+    expect(lc20(run(clean([scroll([rect('Atas', [0, 0, 390, 676]), card(676), frame('Jeda', [0, 748, 390, 74], []), peek]), floatBar(), hi])))).toEqual([]);
+  });
+
+  it('(B2) tab bar mengambang bersih: konten terakhir ≤ zona − 8, celah kosong → tanpa temuan', () => {
+    expect(lc20(run(clean([scroll([rect('Atas', [0, 0, 390, 676]), card(676)]), floatBar()])))).toEqual([]);
+    expect(lc20(run(clean([scroll([rect('Atas', [0, 0, 390, 676]), card(676), frame('Jeda', [0, 748, 390, 300], [])]), floatBar()])))).toEqual([]);
+  });
+
+  it('(B3) kapsul mengambang dengan celah 60 px (> 48) tetap zona; kartu terpotong di tepinya → temuan', () => {
+    const kartu = rect('Kartu', [16, 700, 358, 72], solid);
+    const kapsul = abs('Kapsul', [16, 720, 358, 64]);
+    const f = lc20(run(clean([scroll([rect('Atas', [0, 0, 390, 700]), kartu, frame('Lanjut', [0, 780, 390, 400], [])]), kapsul])));
+    expect(f.map((x) => x.nodeId)).toEqual([kartu.id]);
+    expect(f[0]!.detail).toBe(`kartu terpotong zona bawah: terlihat y 700–720, tertutup "Kapsul" (${kapsul.id}) mulai y 720`);
+    // Terlalu tinggi untuk bar mengambang (> 120) atau terlalu jauh (> 96) → bukan zona.
+    expect(lc20(run(clean([scroll([rect('Atas', [0, 0, 390, 600]), rect('Kartu', [16, 600, 358, 72], solid)]), abs('Panel', [16, 620, 358, 164])])))).toEqual([]);
+    expect(lc20(run(clean([scroll([rect('Atas', [0, 0, 390, 600]), rect('Kartu', [16, 600, 358, 72], solid)]), abs('Kapsul', [16, 620, 358, 64])])))).toEqual([]);
+  });
+
+  it('(B4) kapsul ber-fill di dalam pembungkus absolut transparan = anggota zona', () => {
+    const kartu = rect('Kartu', [16, 700, 358, 72], solid);
+    const kapsul = frame('Kapsul', [16, 756, 358, 64], [], { layout: 'row', ...solid });
+    const wrap = frame('Bawah', [0, 740, 390, 104], [kapsul], { position: 'absolute' });
+    const f = lc20(run(clean([scroll([rect('Atas', [0, 0, 390, 700]), kartu, frame('Lanjut', [0, 780, 390, 400], [])]), wrap])));
+    expect(f.map((x) => x.nodeId)).toEqual([kartu.id]);
+    expect(f[0]!.detail).toBe(`kartu terpotong zona bawah: terlihat y 700–756, tertutup "Kapsul" (${kapsul.id}) mulai y 756`);
+    // Pembungkus ber-fill sendiri adalah kandidat biasa; pembungkus flow (bukan absolut) bukan pembungkus.
+    expect(lc20(run(clean([scroll([rect('Atas', [0, 0, 390, 700]), kartu, frame('Lanjut', [0, 780, 390, 400], [])]), frame('Bawah', [0, 740, 390, 104], [frame('Kapsul', [16, 756, 358, 64], [], solid)])])))).toEqual([]);
+  });
 });
 
 describe('fixture enam aturan', () => {

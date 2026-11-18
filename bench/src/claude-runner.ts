@@ -55,6 +55,8 @@ export type RunClaudeOptions = {
   prefixArgs?: string[];
   /** Root yang tidak boleh memuat cwd run (default: tidak dicek di sini). */
   forbiddenCwdRoot?: string;
+  /** Dipanggil untuk tiap baris stdout saat tiba (mis. pencatatan seketika); error hook ditelan agar run tidak mati. */
+  onLine?: (l: TimedLine) => void;
 };
 
 export type RunClaudeResult = {
@@ -128,6 +130,13 @@ export async function runClaude(opts: RunClaudeOptions): Promise<RunClaudeResult
   const onLine = (t: number, buf: Buffer) => {
     const line = buf.toString('utf8').replace(/\r$/, '');
     lines.push({ t, line });
+    if (opts.onLine) {
+      try {
+        opts.onLine({ t, line });
+      } catch {
+        /* hook pemanggil tidak boleh menghentikan run */
+      }
+    }
     if (initSeen || !opts.validateInit || !line.includes('"init"')) return;
     try {
       const ev = JSON.parse(line);

@@ -207,6 +207,36 @@ describe('runLakar (lakard + claude palsu)', () => {
     expect(fake!.calls.some((c) => c.path === '/docs/open')).toBe(false);
   });
 
+  it('A6 pencatatan seketika: open_doc di stream → lakar-docs.jsonl walau proses mati tanpa result/run.json', async () => {
+    const s = await setup('x-resep', false);
+    const outDir = join(s.runs, 'P3-lakar');
+    const dying = join(root, 'dying-claude.mjs');
+    const evs = [
+      { type: 'system', subtype: 'init', cwd: '__CWD__', model: 'claude-opus-5-5', mcp_servers: [{ name: 'lakar', status: 'connected' }], tools: ['mcp__lakar__execute', 'mcp__lakar__open_doc'] },
+      use('1', 'open_doc', { slug: 'x-resep' }),
+      use('2', 'open_doc', { slug: '../jahat' }),
+      use('3', 'execute', { code: 'open_doc' }),
+    ];
+    writeFileSync(dying, `const evs=${JSON.stringify(evs)};for(const e of evs){if(e.cwd==='__CWD__')e.cwd=process.cwd();process.stdout.write(JSON.stringify(e)+'\\n');}process.exit(1);`);
+    await runLakar({
+      runId: 't-P3',
+      prompt: 'p',
+      promptId: 'P3',
+      outDir,
+      config: { ...protocol.config, timeoutMs: 10_000 },
+      client: new LakardClient(fake!.url),
+      command: process.execPath,
+      prefixArgs: [dying],
+      mcpConfig: s.mcp,
+      runsRoot: s.runs,
+      systemd: () => ({}),
+    });
+    expect(existsSync(join(outDir, 'run.json'))).toBe(false);
+    const log = readFileSync(join(outDir, 'lakar-docs.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l));
+    expect(log.map((x) => x.slug)).toEqual(['x-resep']);
+    expect(typeof log[0].t).toBe('number');
+  });
+
   it('preflight gagal (versi beda) → aborted tanpa claude', async () => {
     const s = await setup('x', false);
     fake!.status.version = '0.0.0-lain';
@@ -267,6 +297,72 @@ describe('arsip dokumen bench lama (slug bentrok)', () => {
       writeFileSync(join(data, 'docs', 'gerak-beranda.lakar.json'), '{}');
       expect(() => applyLakarArchive(planLakarArchive(data, ['gerak-beranda', 'kasku-landing'], dest))).toThrow(/sudah ada/);
       expect(existsSync(join(data, 'docs', 'gerak-beranda.lakar.json'))).toBe(true);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  // Dir run terhenti: docs-before.json (+ stream.jsonl / lakar-docs.jsonl), tanpa run.json.
+  const stalled = (dir: string, before: string[], opts: { stream?: unknown[]; log?: string[]; rawStream?: string }) => {
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, 'docs-before.json'), JSON.stringify(before.map((s) => ({ name: `${s}.lakar.json`, size: 2, mtimeMs: 0 }))));
+    if (opts.stream || opts.rawStream !== undefined) writeFileSync(join(dir, 'stream.jsonl'), opts.rawStream ?? opts.stream!.map((e) => JSON.stringify(e)).join('\n'));
+    if (opts.log) writeFileSync(join(dir, 'lakar-docs.jsonl'), `${opts.log.join('\n')}\n`);
+  };
+
+  it('A1–A5: run terhenti diidentifikasi dari jejak sesinya; docs-before tidak pernah diatribusikan; dry-run tidak mengubah dataDir', async () => {
+    const { benchLakarSlugs, benchLakarSources, describeLakarArchive, planLakarArchive } = await import('./archive.js');
+    const root = mkdtempSync(join(tmpdir(), 'lakar-archive-stalled-'));
+    try {
+      const practice = join(root, 'practice');
+      const rounds = join(root, 'rounds');
+      mkdirSync(rounds, { recursive: true });
+      // A1: run terhenti (stream: tool_use open_doc tanpa result), slug tidak ada di docs-before.
+      stalled(join(practice, '4', 'P3-lakar'), ['milik-adam'], { stream: [use('1', 'open_doc', { slug: 'x-resep' }), { type: 'system', subtype: 'init' }] });
+      // A2: catatan langsung; stream terpotong; baris rusak dilewati.
+      stalled(join(practice, '5', 'P1-lakar'), [], { rawStream: '{"type":"assistant","message":{"content":[{"type":"tool_use","id":"1","name":"mcp__lakar__open_doc","inp', log: ['{"t":1,"slug":"y"}', '{"t":2,"slu', '{"t":3,"slug":"../jahat"}'] });
+      // A3: dokumen non-bench: ada di docs-before run terhenti; dir terhenti tanpa docs-before; dir non-Lakar.
+      stalled(join(practice, '5', 'P2-lakar'), ['milik-adam'], { stream: [use('1', 'open_doc', { slug: 'milik-adam' })] });
+      mkdirSync(join(practice, '5', 'P3-lakar'), { recursive: true });
+      writeFileSync(join(practice, '5', 'P3-lakar', 'stream.jsonl'), JSON.stringify(use('1', 'open_doc', { slug: 'milik-adam' })));
+      stalled(join(practice, '5', 'P1-pendev'), [], { stream: [use('1', 'open_doc', { slug: 'milik-adam' })] });
+      // A4: run selesai dengan slug yang ada di docs-before run itu (invalid "dokumen lama") → tidak diatribusikan.
+      const done = join(practice, '6', 'P3-lakar');
+      stalled(done, ['z'], {});
+      writeFileSync(join(done, 'run.json'), JSON.stringify({ status: 'invalid', lakar: { slug: 'z', opened: ['z', 'w'] } }));
+      // Run selesai tetapi slug hanya di catatan seketika (mis. timeout sebelum result open_doc) → ikut.
+      const late = join(practice, '6', 'P4-lakar');
+      stalled(late, [], { log: ['{"t":1,"slug":"v-telat"}'] });
+      writeFileSync(join(late, 'run.json'), JSON.stringify({ status: 'failed', lakar: { slug: undefined, opened: [] } }));
+      // Iterasi berjalan (7): run selesai dilewati, run terhenti ikut.
+      mkdirSync(join(practice, '7', 'P1-lakar'), { recursive: true });
+      writeFileSync(join(practice, '7', 'P1-lakar', 'run.json'), JSON.stringify({ lakar: { slug: 'putaran-ini' } }));
+      stalled(join(practice, '7', 'P2-lakar'), [], { log: ['{"t":1,"slug":"terhenti-di-sini"}'] });
+
+      const ex = { root: practice, id: '7' };
+      expect(benchLakarSources([rounds, practice], ex)).toEqual([
+        { slug: 'terhenti-di-sini', run: 'practice/7/P2-lakar', terhenti: true },
+        { slug: 'v-telat', run: 'practice/6/P4-lakar', terhenti: false },
+        { slug: 'w', run: 'practice/6/P3-lakar', terhenti: false },
+        { slug: 'x-resep', run: 'practice/4/P3-lakar', terhenti: true },
+        { slug: 'y', run: 'practice/5/P1-lakar', terhenti: true },
+      ]);
+      expect(benchLakarSlugs([rounds, practice], ex)).toEqual(['terhenti-di-sini', 'v-telat', 'w', 'x-resep', 'y']);
+      // A4: z dibuat run lain → tetap diarsip (diatribusikan ke run itu saja).
+      stalled(join(rounds, 'uji-1', 'B-lakar'), [], { stream: [use('1', 'open_doc', { slug: 'z' })] });
+      expect(benchLakarSources([rounds, practice], ex).filter((x) => x.slug === 'z')).toEqual([{ slug: 'z', run: 'rounds/uji-1/B-lakar', terhenti: true }]);
+
+      // A5: rencana (dry-run) tidak mengubah dataDir; teks menyebut slug dan run terhenti asalnya.
+      const data = join(root, 'data');
+      mkdirSync(join(data, 'docs'), { recursive: true });
+      for (const f of ['x-resep.lakar.json', 'milik-adam.lakar.json', 'z.lakar.json']) writeFileSync(join(data, 'docs', f), '{}');
+      const sources = benchLakarSources([rounds, practice], ex);
+      const plan = planLakarArchive(data, [...new Set(sources.map((x) => x.slug))], join(root, 'arsip'));
+      expect(plan.map((x) => x.slug)).toEqual(['x-resep', 'z']);
+      expect(describeLakarArchive(data, plan, sources)).toBe('docs/x-resep.lakar.json ← practice/4/P3-lakar (terhenti), docs/z.lakar.json ← rounds/uji-1/B-lakar (terhenti)');
+      expect(describeLakarArchive(data, [], sources)).toBe('-');
+      expect(snapshotLakarDocs(join(data, 'docs')).map((d) => d.name)).toEqual(['milik-adam.lakar.json', 'x-resep.lakar.json', 'z.lakar.json']);
+      expect(existsSync(join(root, 'arsip'))).toBe(false);
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

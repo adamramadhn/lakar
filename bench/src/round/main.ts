@@ -17,7 +17,7 @@ import { BENCH_ROOT, GOLDEN_SET_PATH, PROTOCOL_DIR, PROTOCOL_FILES, REPO_ROOT, r
 import type { RunRecord } from '../report.js';
 import type { TimedLine } from '../stream-metrics.js';
 import { comparePenHashes, git, gitPorcelain, isActive, md5PenFiles, newestMtimeMs, restartUserUnit, sha256, sha256Dir, systemdShow, type SystemdInfo } from '../sys.js';
-import { applyLakarArchive, benchLakarSlugs, planLakarArchive } from '../lakar/archive.js';
+import { applyLakarArchive, benchLakarSources, describeLakarArchive, planLakarArchive } from '../lakar/archive.js';
 import { countAgentEmoji, countLintEmoji } from './emoji.js';
 import { lakarReconnect, pendevReconnect } from './reconnect.js';
 import { isOfficialRound, OFFICIAL_CODE_PATHS, renderRoundJson, renderRoundMarkdown, renderScoreJson, renderScoreMarkdown, ROUND_ID, type FrozenVersions, type JudgeTextInfo, type RoundPrompt, type RoundReport, type RoundRun } from './report.js';
@@ -255,7 +255,7 @@ const CONVENTION = [
   'ID putaran dicek dengan `^(uji-[1-9]\\d*|[1-9]\\d*)$`: `uji-<k>` = putaran uji, angka polos = putaran resmi (story 16).',
   'Satu putaran = A dan B, urutan run A-pen.dev, A-Lakar, B-pen.dev, B-Lakar, lalu juri 3× per prompt. Satu run per alat per prompt; run tidak diulang untuk memilih hasil (C8).',
   'Putaran yang md-nya sudah ada ditolak kecuali `--resume`. `--resume` memakai ulang run `success`/`failed` dan ulangan juri yang sudah selesai; run `aborted`/`invalid` (gagal-setup) dipindah ke `<key>.prev-<stamp>` dan dijalankan lagi, dan dicatat sebagai percobaan sebelumnya.',
-  'Sebelum run, dokumen Lakar yang dibuat/dibuka agen di putaran bench lain (`run.json` → `lakar.slug`/`lakar.opened`) dipindah dari dataDir lakard ke `bench/runs/lakar-archive/<round>-<stamp>/`, lalu lakard di-restart (salinan dokumen di memori), agar slug pilihan agen tidak bentrok (`dokumen lama`). Dokumen non-bench tidak disentuh; pembungkus dan prompt tidak berubah.',
+  'Sebelum run, dokumen Lakar yang dibuat/dibuka agen di putaran bench lain (`run.json` → `lakar.slug`/`lakar.opened`; run terhenti tanpa `run.json` lewat `docs-before.json` + `lakar-docs.jsonl`/`stream.jsonl`; slug di `docs-before.json` run itu tidak dihitung) dipindah dari dataDir lakard ke `bench/runs/lakar-archive/<round>-<stamp>/`, lalu lakard di-restart (salinan dokumen di memori), agar slug pilihan agen tidak bentrok (`dokumen lama`). Dokumen non-bench tidak disentuh; pembungkus dan prompt tidak berubah.',
   'Versi beku dicatat sekali di awal putaran (`frozen.json`); `--resume` memakainya dan melaporkan perbedaan.',
   'Artefak di `bench/runs/rounds/<round>/` (gitignored): dir run per `<prompt>-<alat>`, strip `<prompt>-<alat>.png`, dan `judge/<prompt>/rep-<k>/` (pemetaan X/Y, transkrip juri).',
   'Putaran resmi (ID angka) dibekukan ketat sebelum run: `git status --porcelain` kode produk + harness kosong; protocolHash, model, Claude Code, dan pen.dev desktop = `bench/baseline-pendev.json`; lakard selalu di-restart dan `startedAt` harus lebih baru dari file `packages/*/dist` terbaru; font lengkap dan pool siap. Strip Lakar disalin ke `bench/round-<n>/` (tracked); strip dan `.pen` pen.dev tetap lokal di `bench/runs/` (EULA).',
@@ -516,8 +516,9 @@ export async function roundMain(argv: string[]): Promise<number> {
   // Dokumen Lakar buatan putaran bench lain: dipindah ke arsip bench sebelum run agar slug pilihan agen tidak bentrok
   // (`dokumen lama` → invalid). Dokumen non-bench tidak disentuh.
   const archiveDir = join(RUNS_ROOT, 'lakar-archive', `${round}-${stamp()}`);
-  const archivePlan = planLakarArchive(status.dataDir, benchLakarSlugs([join(RUNS_ROOT, 'rounds'), join(RUNS_ROOT, 'practice')], { root: join(RUNS_ROOT, 'rounds'), id: round }), archiveDir);
-  console.log(`\narsip dokumen Lakar bench lama (sebelum run, lalu restart lakard): ${archivePlan.length ? archivePlan.map((x) => relative(status!.dataDir, x.from)).join(', ') : '-'}`);
+  const archiveSources = benchLakarSources([join(RUNS_ROOT, 'rounds'), join(RUNS_ROOT, 'practice')], { root: join(RUNS_ROOT, 'rounds'), id: round });
+  const archivePlan = planLakarArchive(status.dataDir, [...new Set(archiveSources.map((x) => x.slug))], archiveDir);
+  console.log(`\narsip dokumen Lakar bench lama (sebelum run, lalu restart lakard): ${describeLakarArchive(status!.dataDir, archivePlan, archiveSources)}`);
   const preFreeze = official ? officialFreezeProblems(freezeInput(status, false)) : [];
   if (official) {
     const distMs = newestDistMtime();

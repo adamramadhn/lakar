@@ -8,7 +8,7 @@ import { buildArgs, shellQuote } from '../claude-runner.js';
 import { buildJudgeArgs, EMPTY_MCP, JUDGE_REPS, type DesignImages, type JudgeRepRecord, type Tool } from '../judge/run.js';
 import { buildJudgeTextWith, DESIGN_MD_PATH, JUDGE_CRITERIA, judgeC7Problems, judgeLeaks } from '../judge/prompt.js';
 import { lampiranB, readRubricJson, rubricVersionOf, type RubricJson } from '../judge/rubric.js';
-import { applyLakarArchive, benchLakarSlugs, planLakarArchive } from '../lakar/archive.js';
+import { applyLakarArchive, benchLakarSources, describeLakarArchive, planLakarArchive } from '../lakar/archive.js';
 import { LakardClient, type LakardStatus } from '../lakar/lakard-client.js';
 import { boardSizeProblemsFor, LAKAR_ALLOWED_TOOLS, LAKAR_MCP_CONFIG, LAKARD_UNIT, lakarPreflightProblems, mcpServerNames, runLakar } from '../lakar/run.js';
 import { Abort, log, stamp } from '../log.js';
@@ -525,7 +525,8 @@ export async function practiceMain(argv: string[]): Promise<number> {
   const argvFor = (mcp: string, allowed: string, prompt = '<prompt hasil render>') => shellQuote(['claude', ...buildArgs({ prompt, config: cfg, mcpConfig: mcp, allowedTools: allowed })]);
   const judgeArgv = shellQuote(['claude', ...buildJudgeArgs(cfg.model, relative(REPO_ROOT, emptyMcpPath))]);
   const archiveDir = join(RUNS_ROOT, 'lakar-archive', `practice-${iter}-${stamp()}`);
-  const archivePlan = planLakarArchive(status.dataDir, benchLakarSlugs([ROUNDS_RUNS, PRACTICE_RUNS], { root: PRACTICE_RUNS, id: String(iter) }), archiveDir);
+  const archiveSources = benchLakarSources([ROUNDS_RUNS, PRACTICE_RUNS], { root: PRACTICE_RUNS, id: String(iter) });
+  const archivePlan = planLakarArchive(status.dataDir, [...new Set(archiveSources.map((x) => x.slug))], archiveDir);
 
   console.log(`practice iterasi ${iter}${reusePendev ? ` (pen.dev dipakai ulang dari iterasi ${reusePendev})` : ''}`);
   console.log(`prompts.json sha256 ${promptsSha} (beku: sama); protocolHash ${protocol.hash}; rubrik ${rubric!.version} (Lampiran B = snapshot)`);
@@ -541,7 +542,7 @@ export async function practiceMain(argv: string[]): Promise<number> {
   console.log(
     `\nbiaya: iterasi sebelumnya ${Object.entries(prev.byIter).map(([j, c]) => `${j}: $${c.toFixed(2)}`).join(', ') || '–'}; terpakai di iterasi ini $${spentHere.toFixed(2)}; perkiraan sisa $${estimate.toFixed(2)} (per prompt: pen.dev $${COST_ESTIMATE.pendev}, Lakar $${COST_ESTIMATE.lakar}, juri $${COST_ESTIMATE.judge}); anggaran $${BUDGET_USD}: ${budget ?? 'cukup'}`,
   );
-  console.log(`\narsip dokumen Lakar bench lama (lalu restart lakard, wajib): ${archivePlan.length ? archivePlan.map((x) => relative(status.dataDir, x.from)).join(', ') : '-'}`);
+  console.log(`\narsip dokumen Lakar bench lama (lalu restart lakard, wajib): ${describeLakarArchive(status.dataDir, archivePlan, archiveSources)}`);
   if (dryRun) return 0;
   if (budget) throw new Abort(budget);
 
