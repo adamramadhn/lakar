@@ -2,6 +2,7 @@ import { mkdtempSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { SCHEMA_VERSION } from '@lakar/schema';
 import { newestMtimeMs } from '../sys.js';
 import type { JudgeRepRecord } from '../judge/run.js';
 import type { JudgeVerdict } from '../judge/parse.js';
@@ -257,7 +258,7 @@ describe('laporan (snapshot)', () => {
       baselineProtocolHash: 'h',
       model: 'claude-opus-5-5',
       claude: '2.1.325',
-      lakard: { version: '0.1.0', schemaVersion: 1 },
+      lakard: { version: '0.1.0', schemaVersion: SCHEMA_VERSION },
       icons: { lucide: '1.74.0' },
       skills: { 'core.md': 'aa' },
       g0Rules: '{}',
@@ -400,7 +401,7 @@ describe('resume (C8) dan baseline .pen', () => {
   it('--resume: versi beku dari awal putaran; perbedaan dilaporkan, pid/startedAt lakard diabaikan', () => {
     const f = {
       head: 'aaa', porcelain: '', protocolHash: 'h', baselineProtocolHash: 'h', model: 'm', claude: 'c1',
-      lakard: { version: '0.1', schemaVersion: 1, pid: 1, startedAt: 's1', browser: 'b' }, icons: { lucide: '1' }, skills: { 'core.md': 'x' },
+      lakard: { version: '0.1', schemaVersion: SCHEMA_VERSION, pid: 1, startedAt: 's1', browser: 'b' }, icons: { lucide: '1' }, skills: { 'core.md': 'x' },
       g0Rules: '[]', checkDist: 'd', pendevDesktop: 'p', pendevMcp: undefined, judge: { model: 'm', argv: 'claude -p' },
     };
     expect(frozenDrift(f, { ...f, lakard: { ...f.lakard, pid: 2, startedAt: 's2' } })).toEqual([]);

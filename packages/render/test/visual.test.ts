@@ -1,5 +1,6 @@
 // Tes golden properti visual (Design Notes story 8): fills, stroke, radius, shadows, efek, ellipse busur, ikon (story 10),
-// path, fill gambar, dan layar gulir hasil `duplicate`. Golden + piksel sampel + bounds numerik.
+// path, fill gambar, layar gulir hasil `duplicate`, dan fill efek conic/noise/mesh (story 22). Golden + piksel sampel +
+// bounds numerik + determinisme byte-identik + latensi.
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { resolveTokens, type ResolvedDocument } from '@lakar/schema';
 // Tes boleh memakai core lewat path relatif (manifest render TIDAK bergantung pada @lakar/core).
@@ -9,7 +10,9 @@ import {
   boardDoc,
   browserInstalled,
   compareGolden,
+  currentPage,
   ellipse,
+  freshPage,
   frame,
   icon,
   GOLDEN_MAX_RATIO,
@@ -24,6 +27,7 @@ import {
   testImageAsset,
   text,
 } from './harness.js';
+import { testLog } from '../../../tests/support/log.ts';
 
 const faces = interFaces(400);
 type Loose = Record<string, unknown>;
@@ -488,5 +492,172 @@ describe.skipIf(!browserInstalled)('render properti visual (Chromium, tanpa daem
     expect(result).toMatchObject({ ok: false, code: 'ICON_UNKNOWN', icons: ['lucide/hoem'] });
     const empty = await render(doc, boardId, faces, undefined, { icons: [] });
     expect(empty.result).toMatchObject({ ok: false, code: 'ICON_UNKNOWN', icons: ['lucide/house', 'lucide/hoem'] });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Fill efek (story 22): conic, noise ber-seed, mesh (canvas 2D). Deterministik: render ganda byte-identik.
+  // ---------------------------------------------------------------------------
+
+  const NIGHT = '#0B1020';
+  const meshHero = (cols: number, rows: number, tweak = 0): Loose => {
+    const pal = ['#0B1020', '#123B2A', '#0B1020', '#16A34A', '#0EA5E9', '#0B1020', '#22C55E', '#0B1020', '#1E3A8A', '#0B1020', '#0B1020', '#0F766E', '#0B1020', '#22C55E', '#0B1020', '#0B1020', '#0B1020', '#14532D', '#0B1020', '#0B1020'];
+    const colors = Array.from({ length: cols * rows }, (_, i) => pal[i % pal.length]!);
+    if (tweak) colors[0] = `#0B10${(0x20 + tweak).toString(16).padStart(2, '0').toUpperCase()}`;
+    return { type: 'mesh', columns: cols, rows, colors };
+  };
+  const grain = (seed: number, opacity = 0.1): Loose => ({ type: 'noise', opacity, size: 1.5, seed, blend: 'overlay' });
+
+  const conicBoard = () => {
+    const donut = ellipse(
+      abs(20, 20, {
+        width: 160,
+        height: 160,
+        inner: 0.72,
+        fills: [{ type: 'conic', angle: 0, stops: [{ offset: 0, color: GREEN }, { offset: 0.5, color: BLUE }, { offset: 1, color: GREEN }] }],
+      }),
+    );
+    const card = rect(
+      abs(220, 20, {
+        width: 200,
+        height: 160,
+        radius: 16,
+        fills: [{ type: 'conic', angle: 90, center: [0.5, 0.5], stops: [{ offset: 0, color: RED }, { offset: 0.25, color: RED }, { offset: 0.25, color: BLUE }, { offset: 1, color: BLUE }] }],
+      }),
+    );
+    return { children: [donut, card], donut, card };
+  };
+
+  it('efek-conic-donut: conic pada ellipse annulus (ikut mask) dan rect; from angle searah jarum jam', async () => {
+    const { children } = conicBoard();
+    const { png } = await run('efek-conic-donut', children, { width: 440, height: 200 });
+    const [donutTop, donutBottom, donutHole, cardRight, cardBottom, cardLeft] = await pixels(png, [
+      [100, 32], // jam 12 pita donut → stop 0 (hijau)
+      [100, 168], // jam 6 → stop 0,5 (biru)
+      [100, 100], // lubang → latar putih
+      [390, 150], // conic from 90°: ±122° (antara jam 3 dan jam 6) = seperempat pertama (merah)
+      [250, 160], // ±230° → biru
+      [320, 30], // jam 12 (360°) → biru
+    ]);
+    expectColor(donutTop!, GREEN, 'donut jam 12', 24);
+    expectColor(donutBottom!, BLUE, 'donut jam 6', 24);
+    expectColor(donutHole!, WHITE, 'lubang donut (mask)');
+    expectColor(cardRight!, RED, 'conic from 90 deg: kuadran kanan bawah merah', 24);
+    expectColor(cardBottom!, BLUE, 'conic kiri bawah biru', 24);
+    expectColor(cardLeft!, BLUE, 'conic jam 12 biru', 24);
+  });
+
+  it('efek-noise-seed: grain overlay di atas gradien, deterministik; seed berbeda → piksel berbeda', async () => {
+    const tile = (seed: number, x: number) =>
+      rect(abs(x, 20, { width: 200, height: 160, fills: [{ type: 'linear', angle: 90, stops: [{ offset: 0, color: '#1E3A8A' }, { offset: 1, color: '#F97316' }] }, grain(seed, 0.12)] }));
+    const { png } = await run('efek-noise-seed', [tile(7, 20), tile(7, 240)], { width: 460, height: 200 });
+    // Dua kotak seed sama → butir sama (ubin dari kiri atas kotak masing-masing); selisih ≤ 3 dari dither gradien Skia
+    // yang bergantung posisi layar.
+    const left = await pixels(png, Array.from({ length: 40 }, (_, i) => [20 + 10 + i * 4, 60 + (i % 7) * 9] as const));
+    const right = await pixels(png, Array.from({ length: 40 }, (_, i) => [240 + 10 + i * 4, 60 + (i % 7) * 9] as const));
+    const maxDiff = Math.max(...left.map((p, i) => Math.max(...p.map((v, k) => Math.abs(v - right[i]![k]!)))));
+    expect(maxDiff).toBeLessThanOrEqual(3);
+    // Ada butir: piksel bertetangga berbeda (bukan gradien mulus).
+    const row = await pixels(png, Array.from({ length: 30 }, (_, i) => [60 + i, 100] as const));
+    const jumps = row.slice(1).filter((p, i) => Math.abs(luma(p) - luma(row[i]!)) > 3).length;
+    expect(jumps).toBeGreaterThan(5);
+    // Seed berbeda → PNG berbeda.
+    const a = boardDoc([tile(7, 20)], { width: 240, height: 200 });
+    const b = boardDoc([tile(8, 20)], { width: 240, height: 200 });
+    const ra = await render(a.doc, a.boardId, faces);
+    const rb = await render(b.doc, b.boardId, faces);
+    expect(Buffer.compare(ra.png!, rb.png!)).not.toBe(0);
+    expect(await pixelDiffRatio(ra.png!, rb.png!, 2)).toBeGreaterThan(0.05);
+  });
+
+  it('efek-mesh-hero: mesh 5×4 + grain di board gelap 720×450 dengan teks di zona tenang', async () => {
+    const title = text('Aliran cahaya', abs(48, 300, { size: 40, lineHeight: 48, weight: 400, color: WHITE }));
+    const { png } = await run('efek-mesh-hero', [title], { width: 720, height: 450 }, [{ type: 'solid', color: NIGHT }, meshHero(5, 4), grain(3, 0.08)]);
+    // Titik kendali (0,25 , 1/3) hijau-ish; pojok kiri atas gelap.
+    const [ctrl, corner] = await pixels(png, [
+      [Math.round(720 * 0.75), Math.round(450 / 3)],
+      [2, 2],
+    ]);
+    expect(luma(corner!)).toBeLessThan(60);
+    expect(ctrl![1]).toBeGreaterThan(ctrl![0]!);
+    // Medan mulus: dua piksel bertetangga tidak melompat jauh (tanpa banding/tepi keras).
+    const line = await pixels(png, Array.from({ length: 60 }, (_, i) => [300 + i, 200] as const));
+    const maxJump = Math.max(...line.slice(1).map((p, i) => Math.abs(luma(p) - luma(line[i]!))));
+    expect(maxJump).toBeLessThan(40);
+  });
+
+  it('efek-mesh-ellipse: mesh pada ellipse busur dan path memakai mask bentuk yang sama', async () => {
+    const blob = ellipse(abs(20, 20, { width: 200, height: 200, fills: [meshHero(3, 3)] }));
+    const arc = ellipse(abs(240, 20, { width: 200, height: 200, inner: 0.6, startDeg: 0, sweepDeg: 270, fills: [meshHero(2, 2)] }));
+    const shape = path('M0 100 C50 0 150 0 200 100 S350 200 200 200 Z', [0, 0, 200, 200], abs(460, 20, { width: 200, height: 200, fills: [meshHero(3, 2)] }));
+    const { png } = await run('efek-mesh-ellipse', [blob, arc, shape], { width: 680, height: 240 });
+    const [blobCorner, arcGap, arcBand, pathOutside] = await pixels(png, [
+      [24, 24], // di luar lingkaran (pojok kotak) → latar putih
+      [240 + 40, 20 + 40], // kuadran busur yang kosong (270° → 360°) → putih
+      [240 + 100 + 80, 20 + 100], // pita jam 3 → terisi
+      [460 + 10, 20 + 10], // di luar path → putih
+    ]);
+    expectColor(blobCorner!, WHITE, 'mesh ellipse dipotong lingkaran');
+    expectColor(arcGap!, WHITE, 'mesh busur: kuadran kosong');
+    expect(luma(arcBand!)).toBeLessThan(200);
+    expectColor(pathOutside!, WHITE, 'mesh path dipotong bentuk');
+  });
+
+  it('determinisme: board conic, noise, mesh dirender 2× → PNG byte-identik', async () => {
+    const { children } = conicBoard();
+    const boards = [
+      boardDoc(children, { width: 440, height: 200 }),
+      boardDoc([rect(abs(0, 0, { width: 300, height: 200, fills: [{ type: 'solid', color: '#334155' }, grain(42, 0.1)] }))], { width: 300, height: 200 }),
+      boardDoc([], { width: 640, height: 400 }, [{ type: 'solid', color: NIGHT }, meshHero(4, 3), grain(5, 0.06)]),
+    ];
+    for (const { doc, boardId } of boards) {
+      const a = await render(doc, boardId, faces);
+      // Halaman bersih: cache mesh modul tidak ikut (render dari nol).
+      const p = await freshPage();
+      try {
+        const b = await render(doc, boardId, faces, p);
+        expect(a.result.ok && b.result.ok).toBe(true);
+        expect(Buffer.compare(a.png!, b.png!), boardId).toBe(0);
+      } finally {
+        await p.close();
+      }
+    }
+  });
+
+  it('latensi: board 1440×900 mesh 5×4 + noise vs board polos (median 5 render, selisih ≤ 150 ms)', async () => {
+    const size = { width: 1440, height: 900 };
+    const p = currentPage();
+    await p.setViewportSize(size);
+    // Waktu render di halaman: renderBoard (font, mount, 2 rAF, ukur) + satu frame lukis. Encode PNG screenshot dicatat
+    // terpisah (bergantung entropi gambar: grain di atas gradien = PNG besar), tidak masuk batas.
+    const time = async (fills: (i: number) => Loose[]) => {
+      const render: number[] = [];
+      const shot: number[] = [];
+      for (let i = 0; i < 5; i++) {
+        const { doc, boardId } = boardDoc([text('Judul', abs(80, 400, { size: 48, lineHeight: 56, color: WHITE }))], size, fills(i));
+        const ms = (await p.evaluate(
+          `(async ([doc, boardId, fonts]) => { const m = await import('/render/index.js'); const t0 = performance.now();
+            const r = await m.renderBoard(doc, boardId, document.getElementById('root'), { fonts, icons: [] });
+            await new Promise((res) => requestAnimationFrame(() => requestAnimationFrame(res)));
+            return r.ok ? performance.now() - t0 : -1; })(${JSON.stringify([doc, boardId, faces])})`,
+        )) as number;
+        expect(ms).toBeGreaterThan(0);
+        render.push(ms);
+        const t0 = performance.now();
+        await p.locator(`[data-lakar-id="${boardId}"]`).screenshot({ type: 'png', scale: 'css' });
+        shot.push(performance.now() - t0);
+      }
+      const med = (xs: number[]) => xs.sort((a, b) => a - b)[2]!;
+      return { render: med(render), shot: med(shot) };
+    };
+    await time(() => [{ type: 'solid', color: NIGHT }]); // pemanasan
+    const plain = await time(() => [{ type: 'solid', color: NIGHT }]);
+    // Warna mesh digeser tiap render agar cache tidak terpakai (biaya penuh tiap kali).
+    const fx = await time((i) => [{ type: 'solid', color: NIGHT }, meshHero(5, 4, i + 1), grain(9, 0.08)]);
+    const delta = fx.render - plain.render;
+    testLog(
+      `[latensi efek] render median polos ${plain.render.toFixed(1)} ms, mesh 5×4 + noise ${fx.render.toFixed(1)} ms, selisih ${delta.toFixed(1)} ms (batas 150 ms); ` +
+        `screenshot PNG median polos ${plain.shot.toFixed(0)} ms, efek ${fx.shot.toFixed(0)} ms (encode PNG, di luar batas)`,
+    );
+    expect(delta).toBeLessThanOrEqual(150);
   });
 });

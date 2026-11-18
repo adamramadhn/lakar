@@ -10,7 +10,7 @@ import { crc32, deflateSync } from 'node:zlib';
 import { fileURLToPath } from 'node:url';
 import { ChromiumRenderer, FontRegistry, IconCatalog, PACKAGE, PhotoService, RENDER_DIST_DIR, SafeNet, buildServer, loadConfig, startDaemon, type RunningDaemon } from './index.js';
 import { API } from '@lakar/exec';
-import { LakarError } from '@lakar/schema';
+import { LakarError, SCHEMA_VERSION } from '@lakar/schema';
 import { countDarkPixels, decodePng, readPngSize } from './png.js';
 import { chromiumInstalled } from '../../../tests/support/browser.ts';
 import { postJson } from '../../../tests/support/http.ts';
@@ -113,7 +113,7 @@ describe('@lakar/daemon', () => {
   it('file schemaVersion lebih baru → VERSION_MISMATCH + hint perbarui, bukan "rusak"', async () => {
     const { mkdir } = await import('node:fs/promises');
     await mkdir(join(dataDir, 'docs'), { recursive: true });
-    await writeFile(join(dataDir, 'docs', 'masa-depan.lakar.json'), '{"schemaVersion":2,"id":"Dddddddd","rev":0,"pages":[]}', 'utf8');
+    await writeFile(join(dataDir, 'docs', 'masa-depan.lakar.json'), JSON.stringify({ schemaVersion: SCHEMA_VERSION + 1, id: 'Dddddddd', rev: 0, pages: [] }), 'utf8');
     const r = await call('/docs/open', { slug: 'masa-depan' }, await newSession());
     expect(r.body.ok).toBe(false);
     expect(r.body.error!.code).toBe('VERSION_MISMATCH');
@@ -540,7 +540,7 @@ describe('ikon (AD-9): kanonik, ICON_UNKNOWN, /icons/search, render', () => {
       const { mkdir } = await import('node:fs/promises');
       await mkdir(join(tmp, 'docs'), { recursive: true });
       const stored = {
-        schemaVersion: 1,
+        schemaVersion: SCHEMA_VERSION,
         id: 'Dddddddd',
         rev: 1,
         pages: [
@@ -802,7 +802,7 @@ describe('screenshot menerima dokumen ter-resolve', () => {
       const { mkdir } = await import('node:fs/promises');
       await mkdir(join(tmp, 'docs'), { recursive: true });
       const stored = {
-        schemaVersion: 1,
+        schemaVersion: SCHEMA_VERSION,
         id: 'Dddddddd',
         rev: 2,
         tokens: { 'colors.surface': '#101010', 'colors.text-primary': '#FAFAFA', 'type.body.size': 18 },
@@ -908,7 +908,7 @@ describe('RENDER_FAILED', () => {
       icons: IconCatalog.load(),
     });
     try {
-      const err = await renderer.screenshot({ schemaVersion: 1, id: 'Dddddddd', rev: 0, pages: [{ id: 'Pppppppp', name: 'P', children: [] }] }, 'Bbbbbbbb').then(
+      const err = await renderer.screenshot({ schemaVersion: SCHEMA_VERSION, id: 'Dddddddd', rev: 0, pages: [{ id: 'Pppppppp', name: 'P', children: [] }] }, 'Bbbbbbbb').then(
         () => undefined,
         (e: unknown) => e,
       );
@@ -1000,7 +1000,7 @@ describe('font lokal (registry + FONT_MISSING)', () => {
     const renderer = new ChromiumRenderer({ browsersPath, pageUrl: () => `${d.url}/render/page`, timeoutMs: 15000, fonts, icons: IconCatalog.load() });
     try {
       const doc = {
-        schemaVersion: 1 as const,
+        schemaVersion: SCHEMA_VERSION,
         id: 'Dddddddd',
         rev: 0,
         pages: [{ id: 'Pppppppp', name: 'P', children: [{ type: 'board' as const, name: 'B', id: 'Bbbbbbbb', x: 0, y: 0, width: 50, height: 30, screen: 'app' as const, children: [{ type: 'text' as const, name: 'T', id: 'Tttttttt', content: 'a', size: 12 }] }] }],

@@ -1,10 +1,11 @@
-// Skema dokumen Lakar v1 (AD-2, AD-15, AD-16): primitif, token, properti visual, katalog node, dokumen.
+// Skema dokumen Lakar v2 (AD-2, AD-15, AD-16): primitif, token, properti visual, katalog node, dokumen.
+// v2 (story 22) menambah fill `conic`, `noise`, `mesh`; dokumen v1 dimigrasi identitas (`@lakar/core` MIGRATIONS[1]).
 // Satu sumber: tipe TS diturunkan dari zod di sini. Tanpa IO.
 import { z } from 'zod';
 import { LakarError } from './errors.js';
 import { ICON_LIBS, ICON_NAME_PATTERN } from './icons.js';
 
-export const SCHEMA_VERSION = 1 as const;
+export const SCHEMA_VERSION = 2 as const;
 
 // ---------------------------------------------------------------------------
 // Primitif
@@ -91,10 +92,50 @@ export const CATALOG_HINT = `type harus salah satu katalog v1: ${NODE_TYPES.join
 export const ColorStop = z.object({ offset: Unit, color: Color }).strict();
 const Stops = z.array(ColorStop).min(2);
 
+/** Batas fill efek (story 22). */
+export const NOISE_SIZE_MIN = 0.5;
+export const NOISE_SIZE_MAX = 8;
+export const NOISE_SEED_MAX = 9999;
+export const MESH_GRID_MIN = 2;
+export const MESH_GRID_MAX = 5;
+export const NOISE_BLENDS = ['normal', 'overlay', 'soft-light', 'multiply', 'screen'] as const;
+
+const MeshGrid = z.number().int().min(MESH_GRID_MIN).max(MESH_GRID_MAX);
+const MeshFill = z
+  .object({
+    type: z.literal('mesh'),
+    columns: MeshGrid,
+    rows: MeshGrid,
+    /** Warna titik kendali baris demi baris (= columns × rows). */
+    colors: z.array(Color).min(4).max(MESH_GRID_MAX * MESH_GRID_MAX),
+    /** Posisi titik kendali relatif kotak (= columns × rows); default grid rata. */
+    points: z.array(z.tuple([Unit, Unit])).min(4).max(MESH_GRID_MAX * MESH_GRID_MAX).optional(),
+  })
+  .strict()
+  .superRefine((f, ctx) => {
+    const n = f.columns * f.rows;
+    if (f.colors.length !== n) ctx.addIssue({ code: 'custom', path: ['colors'], message: `mesh: colors harus ${n} warna (columns ${f.columns} × rows ${f.rows}, baris demi baris), bukan ${f.colors.length}` });
+    if (f.points && f.points.length !== n) ctx.addIssue({ code: 'custom', path: ['points'], message: `mesh: points harus ${n} titik [x,y] (columns × rows), bukan ${f.points.length}` });
+  });
+
 export const Fill = z.discriminatedUnion('type', [
   z.object({ type: z.literal('solid'), color: Color }).strict(),
   z.object({ type: z.literal('linear'), angle: Px, stops: Stops }).strict(),
   z.object({ type: z.literal('radial'), center: z.tuple([Unit, Unit]).optional(), radius: Positive.optional(), stops: Stops }).strict(),
+  /** Gradien sudut (conic): angle derajat (0 = atas, searah jarum jam), center relatif kotak. */
+  z.object({ type: z.literal('conic'), angle: Px.optional(), center: z.tuple([Unit, Unit]).optional(), stops: Stops }).strict(),
+  /** Grain/noise ber-seed: ubin feTurbulence deterministik, dicampur ke lapisan di bawahnya dengan `blend`. */
+  z
+    .object({
+      type: z.literal('noise'),
+      opacity: Unit,
+      size: z.number().finite().min(NOISE_SIZE_MIN).max(NOISE_SIZE_MAX).optional(),
+      seed: z.number().int().min(0).max(NOISE_SEED_MAX).optional(),
+      blend: z.enum(NOISE_BLENDS).optional(),
+      mono: z.boolean().optional(),
+    })
+    .strict(),
+  MeshFill,
   z
     .object({
       type: z.literal('image'),

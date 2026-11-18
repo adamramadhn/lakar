@@ -8,7 +8,7 @@ import { createServer, type Server } from 'node:http';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { Browser, Page } from 'playwright-core';
-import type { IconGlyph, ResolvedDocument } from '@lakar/schema';
+import { SCHEMA_VERSION, type IconGlyph, type ResolvedDocument } from '@lakar/schema';
 import { chromiumInstalled, DEFAULT_BROWSERS_PATH } from '../../../tests/support/browser.ts';
 import { CHROMIUM_ARGS, type FontFaceSource, type RenderResult } from '../src/index.js';
 
@@ -272,7 +272,7 @@ export function boardDoc(
 ): { doc: ResolvedDocument; boardId: string } {
   const boardId = nid();
   const doc = {
-    schemaVersion: 1,
+    schemaVersion: SCHEMA_VERSION,
     id: 'Docu0001',
     rev: 0,
     pages: [

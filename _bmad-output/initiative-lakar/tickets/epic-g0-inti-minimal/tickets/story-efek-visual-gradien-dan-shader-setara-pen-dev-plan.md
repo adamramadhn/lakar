@@ -3,14 +3,14 @@ title: 'Efek visual gradien dan shader setara pen.dev'
 type: feature
 ticket: '22'
 created: '2026-11-18'
-status: in-progress
+status: built
 baseline_revision: 'b8821fadee3bed64e77bac9b9edb53a70bb74b2a'
 route: full
 route_source: auto
 risk: high
-review: ''
-review_source: ''
-lenses_ran: []
+review: quick
+review_source: pinned
+lenses_ran: [quick]
 review_loop_iteration: 0
 followup_review_recommended: false
 context:
@@ -18,7 +18,39 @@ context:
   - '{project-root}/bench/practice/LOG.md'
   - '{project-root}/_bmad-output/initiative-lakar/tickets/epic-g0-inti-minimal/tickets/story-skill-lebih-kaya-diuji-dengan-prompt-latihan-plan.md'
 warnings: [multiple-goals, oversized]
-deferred: []
+deferred:
+  - summary: >-
+      Perubahan skill efek belum terbukti membantu; P5 turun dari Lebih baik (16–11) ke Setara (13–12) di iterasi 2.
+    evidence: |-
+      bench/effects-2.md §Sebelum vs sesudah: baseline (skill lama) sudah lulus kedua prompt. Satu run per alat (C8) dan skor
+      pen.dev yang sama bergeser 11 → 12, jadi sebagian derau juri. Yang menuntaskan: run efek berulang/putaran 2 (story 21).
+    location: >-
+      packages/skills/skills/landing.md
+    severity: medium (unverified)
+  - summary: >-
+      Bitmap fill efek (data URL mesh, ubin SVG noise) tidak di-decode eksplisit sebelum ukur/screenshot, beda dengan aset gambar.
+    evidence: |-
+      Belum terlihat gagal: tes render ganda byte-identik (halaman segar, mesh 640×400 + noise) lulus dan PNG bench benar. Yang
+      menuntaskan: tes board besar dengan banyak fill efek di halaman dingin atau img.decode() untuk data URL sebelum ukur.
+    location: >-
+      packages/render/src/index.ts renderBoard
+    severity: medium (unverified)
+  - summary: >-
+      Pemadatan core.md/mobile.md (hapus "(slug baru)", "LC-20 = error.", detail alur akhir mobile, kalimat mutu) belum diukur pada P1–P4.
+    evidence: |-
+      Baris tersebut bagian skill v7 yang lulus P1–P4 4/4 (story 19); seri P1–P4 tidak diulang. Alur akhir lengkap masih ada
+      di core.md langkah 6. Yang menuntaskan: run P1–P4 / putaran 2 dengan skill v8.
+    location: >-
+      packages/skills/skills/core.md, packages/skills/skills/mobile.md
+    severity: medium (unverified)
+  - summary: >-
+      Contoh teruji landing/mobile kini selalu memakai mesh + noise sehingga agen mungkin menambah efek pada prompt yang tidak memintanya.
+    evidence: |-
+      Contoh dimandatkan plan; panduan berkata "bila permintaan atau merek meminta". Dampak pada prompt non-efek (P1–P4, A–E)
+      belum diukur. Yang menuntaskan: putaran 2 / run P1–P4 dan hitung bidang efek per board.
+    location: >-
+      packages/skills/skills/landing.md, packages/skills/skills/mobile.md (contoh teruji)
+    severity: medium (unverified)
 ---
 
 <intent-contract>
@@ -127,10 +159,28 @@ Shader fill WebGL tidak dibangun. Tapi kalau baseline menunjukkan pen.dev benar-
 
 **Catatan implementasi:**
 - Prompt efek beku: `bench/practice/effects/prompts.json` sha256 `5f0c23a7fb411f4fcf15e3f88f2e2f7b0f0f6b64f54d955e15fe22ecc834e441` (= `EFFECT_PROMPTS_SHA256`). Dua perubahan kata P5 (bukan makna) sebelum run pertama karena n-gram 6 kata sama dengan P1: "Desain halaman landing desktop selebar 1440px untuk" → "Desain landing page desktop dengan lebar 1440px untuk"; "dua tombol aksi, dan cuplikan" → "sepasang tombol aksi, serta cuplikan". Dicatat di LOG.
+- Baseline iterasi 1: stream pen.dev memakai `shader` 0 (mesh_gradient 5, blur 12, Generate("ai") 1) → tidak HALT. Restart pen-desktop berhasil 16,9 dtk.
+- DESIGN.md (cabang A) diamandemen sesudah baseline. sha sebelum `aa62ec83740620b9976fa4f715c3856e87c52b884b69fdb8f0b8a4f385816197`, sesudah `2a19530b99663875d40b9ade1e600765ef62afd83dadb5490fbececd2e862365`; snapshot tracked `bench/practice/effects/design-md/DESIGN.{before,after}.md`. §Anti-pattern dan Lampiran B byte-identik (dicek skrip); `round --round uji-9 --dry-run` sha teks juri A/B = rubric.json.
+- Bitmap mesh dibatasi 320 px (≤ 512 sesuai Design Notes) agar mesh < 30 ms per fill (512×320 terukur ±45 ms, 320×200 ±19 ms).
+- Latensi: render (renderBoard + 1 frame) mesh 5×4 + noise vs polos +16,6 ms (batas 150). Encode PNG screenshot TIDAK masuk batas: grain di atas gradien membuat PNG 1440×900 ±1 MB, screenshot ±515 ms vs ±85 ms polos (dicatat di output tes). Risiko waktu agen pada screenshot/export.
+- Iterasi 2 (`--reuse-pendev 1`) lulus: P5 Setara 13–12 (0,91×), P6 Setara 13–14 (0,86×), emoji 0, gate 0. Kumulatif seri $7,99 dari $15. Iterasi 3 tidak dijalankan.
 
 ## Plan Change Log
 
 ## Review Triage Log
+
+### 2026-11-18 — Review pass
+- verdicts: 9 findings — high 0, medium 1, low 4, false 0, maybe-false 4
+- findings:
+  - `[maybe-false]` `[defer]` Skill efek membuat P5 lebih buruk, tak terbukti membantu — AC lulus terpenuhi; sebab turunnya (skill vs derau juri, pen.dev 11→12 pada strip yang sama) tak bisa dipastikan dengan satu run (C8); dicatat di deferred + residual risk.
+  - `[low]` `[patch]` AC3: bukti `verify.sh` exit 0 sesudah restart pen-desktop tidak tercatat — ditambah baris di `bench/practice/LOG.md` (verify.sh exit 0, dijalankan ulang orkestrator: exit 0).
+  - `[low]` `[reject]` Batas latensi tidak mencakup encode PNG screenshot (+430 ms) — nyata tetapi berdampak kecil (rasio waktu end-to-end 0,86–0,91×); "render" dibaca sebagai renderBoard dan selisih encode dicatat di output tes + Implementation Notes; membatasi encode butuh perubahan nontrivial. Masuk residual risk.
+  - `[medium]` `[patch]` Mesh merata-ratakan RGB tanpa premultiply, titik transparan menggelapkan tetangga — `meshPixels` kini rata-rata RGB berbobot alpha (premultiplied), alpha rata-rata biasa; dicek: hijau ↔ `#00000000` tetap hijau dengan alpha memudar; golden tak berubah.
+  - `[maybe-false]` `[defer]` Bitmap efek tidak di-decode sebelum screenshot — tes render ganda di halaman segar byte-identik dan PNG bench benar; perlu tes board besar dingin untuk memastikan.
+  - `[low]` `[reject]` Restart pen-desktop bisa melewati 120 dtk bila probe MCP menggantung — nyata secara kode tapi jarang (restart nyata 16,9 dtk) dan perbaikannya menambah guard timeout; hanya memperlambat laporan.
+  - `[low]` `[patch]` Laporan seri efek dengan `--only` menyebut "semua 1 prompt" padahal keputusan memakai 2 — `renderPracticeMarkdown` kini memakai jumlah prompt beku seri (2), bukan jumlah hasil.
+  - `[maybe-false]` `[defer]` Pemadatan core/mobile menghapus instruksi skill v7 tanpa run ulang P1–P4 — alur akhir lengkap masih di core langkah 6; dampak hanya terukur dengan run P1–P4.
+  - `[maybe-false]` `[defer]` Contoh teruji selalu memakai mesh+noise → efek bocor ke prompt non-efek — contoh dimandatkan plan; dampak belum diukur.
 
 ## Design Notes
 
@@ -216,9 +266,25 @@ Cabang B (tanpa persetujuan): skill hanya memakai satu efek gradien per board, t
 
 ## Auto Run Result
 
-Status: **ready-for-dev** (halt setelah planning, menunggu plan_checkpoint Adam).
-- Keputusan untuk Adam di plan_checkpoint:
-  1. kedalaman "lantai + mesh" tanpa WebGL;
-  2. amandemen DESIGN.md (cabang A) atau tetap di aturan lama (cabang B);
-  3. anggaran seri efek ≤ $15, maksimal 3 iterasi.
-- Bila setuju: tawarkan `bmad-architecture` untuk memperbarui AD-15 + schemaVersion 2.
+Status: **built** (menunggu done_checkpoint: Adam melihat PNG).
+
+**Ringkasan:** skema v2 (fill `conic`, `noise` ber-seed, `mesh` canvas 2D) + migrasi identitas 1→2; render efek deterministik; dokumentasi API/MCP; panduan efek di skill core/landing/mobile; DESIGN.md cabang A (snapshot sebelum/sesudah tracked); harness `practice --series effects` (maks 3 iterasi, $15, semua prompt wajib lulus) + restart pen-desktop sesudah seri pen.dev. Prompt P5/P6 dibekukan di commit `dd66120` sebelum perubahan mesin/skill/DESIGN.md. Baseline pen.dev: shader 0 (mesh_gradient 5, blur, 1 Generate("ai")) → tidak HALT. Seri efek lulus di iterasi 2 (P5 Setara 13–12, 0,91×; P6 Setara 13–14, 0,86×; emoji 0, gate 0); kumulatif $7,99 dari $15. Baseline iterasi 1 (skill lama) juga sudah lulus (P5 Lebih baik 16–11, P6 Setara 14–14).
+
+**File:**
+- `packages/schema/src/nodes.ts` (+`v2.test.ts`, fixture): SCHEMA_VERSION 2, tiga fill baru dengan batas.
+- `packages/core/src/migrate.ts` (+tes): migrasi resmi 1→2 identitas; store/daemon menulis balik v2.
+- `packages/render/src/effects.ts` (baru), `paint.ts`, `layout.ts`, `shape.ts`: conic/noise/mesh, blend per lapisan, mesh ikut mask bentuk.
+- `packages/render/test/visual.test.ts` + 4 golden `efek-*`: golden, determinisme byte-identik, seed, latensi.
+- `packages/exec/src/api.ts`, `packages/skills/skills/api.md`, `packages/mcp/src/server.ts`: dokumentasi fill efek + contoh teruji.
+- `packages/skills/skills/{core,landing,mobile}.md`: panduan efek (core 4000/4000, mobile prosa 1500/1500).
+- `bench/src/practice/main.ts`, `cli.ts`, `sys.ts`, `prompts.ts`, `round/main.ts`, README, tes: config seri, restart pen-desktop, arsip slug practice-effects.
+- `bench/practice/effects/` (prompts beku, PNG Lakar iter 1–2, snapshot DESIGN.md), `bench/effects-{1,2}.{md,json}`, `bench/practice/LOG.md`.
+- `tests/practice-prompts.test.ts`, `tests/skills-c7.test.ts`: sha P5/P6, n-gram, C7 mencakup P5/P6.
+
+**Review (quick):** 9 temuan → 3 patch (mesh premultiplied alpha [medium], bukti verify.sh di LOG [low], jumlah prompt di laporan `--only` [low]); 4 defer (lihat frontmatter `deferred`); 2 ditolak (latensi encode PNG di luar batas — dampak kecil, dicatat sebagai risiko; timeout probe restart pen-desktop — jarang, perbaikan menambah guard).
+
+**Rekomendasi review lanjutan:** `false` (patch: 1 medium, 2 low; tidak ada high).
+
+**Verifikasi:** `pnpm build` exit 0; `pnpm test` 852/852 lulus (setelah patch); `pnpm --filter @lakar/render test` 39/39 (latensi: selisih render +6,6 ms, screenshot 84 → 514 ms di luar batas); `gen-skill-api` stabil; protocolHash `907cb36f…edb85d`; `bench/protocol`, `bench/rubric`, `bench/practice/prompts.json` tak berubah; `round --round uji-9 --dry-run` rubrik 2.1, sha A/B = `rubric.json`; `practice --iter 9 --dry-run` tetap Abort MAX_ITER 8; `practice --series effects --iter 1 --dry-run` P5/P6 sha beku, $15, rencana restart; `systemctl --user restart lakard` → active; `tools/node26/verify.sh` exit 0; pen-desktop active. PNG kedua alat P5/P6 dilihat orkestrator.
+
+**Risiko sisa:** P5 sesudah perubahan kurang ekspresif dibanding baseline (perbaikan skill belum terbukti menaikkan mutu); encode PNG board ber-grain ±5× lebih lambat; core.md dan mobile.md di batas token penuh; pemadatan skill dan contoh efek belum diukur pada P1–P4; kontras teks di atas efek hanya dijaga skill (LC-04 milik G1); AD-15/schemaVersion 2 belum dicatat di dokumen arsitektur (tawarkan `bmad-architecture`).

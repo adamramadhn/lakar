@@ -425,3 +425,66 @@ Setara/Lebih baik, waktu ≤ 1,5× pen.dev, emoji 0, gate 0. Laporan `bench/effe
   Kriteria/Prosedur/Risiko golden, 0 token terlarang, nama produk tidak ada di golden-set (`tests/practice-prompts.test.ts`).
   Penjaga C7 skill (`tests/skills-c7.test.ts`) kini juga memakai teks dan nama produk P5/P6.
 - Mulai sekarang prompt efek tidak diubah. Setiap iterasi seri efek mencatat sha `prompts.json` di `frozen.json`.
+
+## Seri efek iterasi 1: baseline (skill v7 apa adanya, mesin sebelum fill efek)
+
+Run `practice --series effects --iter 1` (pen.dev 1× + Lakar + juri 3×/prompt), HEAD `dd66120` (harness seri efek belum
+di-commit, tercatat di porcelain `frozen.json`). Skill: `core.md` 56f70449dbed0f12, `landing.md` b953c1b2bae4a8d4,
+`mobile.md` 49ae74fcd2dd37b4 (sama dengan iterasi 8 seri P1–P4). Prompt sha di frozen.json = `5f0c23a7…` (beku).
+
+| Prompt | Waktu Lakar / pen.dev | Rasio | T L–P | D L–P | Gate | Emoji (a/b/c) | Keputusan |
+|---|---|---|---|---|---|---|---|
+| P5 | 273,6 / 195,6 dtk | 1,40 | 16–11 | 4–2 | 0 | 0/0/0 | Lebih baik |
+| P6 | 104,3 / 133,3 dtk | 0,78 | 14–14 | 3–2 | 0 | 0/0/0 | Setara |
+
+- Pemakaian efek di stream pen.dev (tool_use agen): **`shader` 0** (agen membaca `scripts-and-shaders.md` di P5 tetapi
+  menulis di ringkasan bahwa ia tidak bisa membuat file shader), `mesh_gradient` P5 3 / P6 2, `angular` 0,
+  `gradientType` linear P5 2 / P6 6, radial P5 1 / P6 3, `Generate("ai")` P5 0 / P6 1, `Generate("stock")` P5 2 / P6 0,
+  `blur` P5 6 / P6 6 (`background_blur` 3 / 1), blend P5 0 / P6 1. Tanpa shader → tidak HALT; kedalaman "lantai + mesh"
+  tetap.
+- Kesan PNG (bukan keputusan): P5 Lakar sudah memakai garis aliran dari path + gradien di hero dan seksi ajakan akhir;
+  pen.dev memakai mesh hijau + garis gelombang. P6 Lakar: matahari dan cincin baik, tetapi "awan" berupa batang gelap
+  berblur yang terbaca sebagai garis keras, tanpa tekstur; pen.dev: langit senja ungu–oranye dengan grain halus.
+- Restart pen-desktop sesudah run pen.dev terakhir: **berhasil**, 16,9 dtk (active + MCP pencil menjawab `get_app_state`).
+  `bash tools/node26/verify.sh` sesudahnya (setelah iterasi 2 dan lagi saat verifikasi build orkestrator): exit 0
+  (pen-desktop active, snapshot C9 identik, lakard active).
+- Penjaga `.pen`: 41 file, berubah 0, hilang 0 (2 dokumen baru pen.dev).
+- Biaya iterasi 1: $5,02 (pen.dev $1,55, Lakar $2,08, juri $1,38); kumulatif seri $5,02 dari $15.
+
+## Seri efek iterasi 2: mesin fill efek + skill v8 (efek ekspresif)
+
+Perubahan (cabang A, DESIGN.md diamandemen setelah persetujuan Adam; §Anti-pattern dan Lampiran B tidak berubah, sha teks
+juri A/B tetap = `bench/rubric/rubric.json`):
+
+- **Mesin:** skema v2 (`conic`, `noise` ber-seed, `mesh` titik kendali) + migrasi identitas 1→2; render conic CSS, noise
+  ubin SVG feTurbulence + `background-blend-mode`, mesh bitmap canvas 2D (sisi ≤ 320) diskalakan ke kotak, ikut mask pada
+  ellipse/path. API `Fill efek` (api.md) + deskripsi execute MCP.
+- **Skill v8 (prinsip, kata sendiri):** `core.md` mengganti "maks satu gradien per board" dengan "efek ekspresif maks satu
+  bidang per board (fokus merek), teks di zona tenang/scrim, tidak di teks"; `landing.md` bidang efek berlapis (netral →
+  mesh dari aksen + ≤ 1 pendamping + netral, titik terang menjauhi teks → grain 0.04–0.08), panel solid untuk cuplikan
+  produk di atas efek, efek seksi lain = palet sama berintensitas lebih rendah, glow hanya satu cahaya lembut merek di latar
+  gelap; `mobile.md` satu bidang mesh + noise ≤ 0.08 untuk onboarding/sampul/sorotan. Contoh teruji landing (hero) dan
+  mobile (kartu sorotan) memperagakan satu bidang mesh + grain; lulus 0 error/warning/gate. Alasan: baseline Lakar tidak
+  punya grain/medan warna (P6 tanpa tekstur, efek dirakit dari batang berblur).
+- Skill: `core.md` 1137e13ea25db9b2 (4000/4000 token), `landing.md` ac8fb9e801fbc903 (prosa 1409), `mobile.md`
+  fe5abeead7a609a8 (prosa 1500/1500).
+
+Run `practice --series effects --iter 2 --reuse-pendev 1` (pen.dev iterasi 1 dipakai ulang; tanpa restart pen-desktop).
+
+| Prompt | Waktu Lakar / pen.dev | Rasio | T L–P | D L–P | Gate | Emoji (a/b/c) | Keputusan |
+|---|---|---|---|---|---|---|---|
+| P5 | 177,1 / 195,6 dtk | 0,91 | 13–12 | 3–3 | 0 | 0/0/0 | Setara |
+| P6 | 114,8 / 133,3 dtk | 0,86 | 13–14 | 3–2 | 0 | 0/0/0 | Setara |
+
+- **Lulus** (P5 dan P6 Setara, waktu ≤ 0,91×, emoji 0, gate 0). Prompt sha di frozen.json = `5f0c23a7…` (beku).
+- Catatan jujur: **baseline juga sudah lulus**, dan P5 turun dari Lebih baik (16–11) ke Setara (13–12). Strip pen.dev sama
+  (dipakai ulang) tetapi skornya 11 → 12, jadi sebagian selisih adalah derau juri; tetapi dari PNG, hero P5 iterasi 2
+  (mesh hijau lembut di pojok + panel status) memang kurang ekspresif dibanding garis aliran iterasi 1. P6 iterasi 2 lebih
+  rapi (langit senja bergradasi, siluet bukit, bulan, tanpa batang gelap keras), skor setara. Agen memakai `mesh` (P5 dan
+  P6) dan `noise` (keduanya); `conic` tidak dipakai. Iterasi 3 tidak dijalankan (sudah lulus).
+- Penjaga `.pen`: 43 file, berubah 0, hilang 0. lakard active.
+- Biaya iterasi 2: $2,97 (Lakar $1,61, juri $1,37); kumulatif seri **$7,99** dari $15.
+
+## Status seri efek: lulus di iterasi 2 — menunggu done_checkpoint (Adam melihat PNG)
+
+PNG Lakar: `bench/practice/effects/{1,2}/P{5,6}-lakar.png` (tracked); PNG pen.dev lokal: `bench/runs/practice-effects/1/P{5,6}-pendev.png` (EULA).

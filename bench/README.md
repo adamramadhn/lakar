@@ -13,7 +13,7 @@ dan laporan `bench/round-<id>.md|json`, `bench/score-<prompt>.md|json`.
 /opt/node-26/bin/node bench/dist/cli.js round --round <uji-k|n> [--dry-run] [--resume]
 /opt/node-26/bin/node bench/dist/cli.js rejudge --from <uji-k|n> --label <slug> [--resume] [--dry-run]
 /opt/node-26/bin/node bench/dist/cli.js rubric-snapshot [--version <v>]
-/opt/node-26/bin/node bench/dist/cli.js practice --iter <k> [--only P1,P3] [--reuse-pendev <j>] [--resume] [--dry-run]
+/opt/node-26/bin/node bench/dist/cli.js practice [--series practice|effects] --iter <k> [--only P1,P3] [--reuse-pendev <j>] [--resume] [--dry-run]
 ```
 
 ## Rubrik juri (v2) dan snapshot
@@ -79,6 +79,24 @@ runner, pembungkus (`bench/protocol/wrapper.txt`, read-only), dan juri rubrik v2
 - **Keluaran:** `bench/practice-<k>.md|json` (tracked), strip Lakar `bench/practice/<k>/<P>-lakar.png` (tracked,
   eksklusif), artefak mentah dan strip/`.pen` pen.dev lokal di `bench/runs/practice/<k>/` (EULA). Log iterasi skill:
   `bench/practice/LOG.md`.
+
+### Seri efek (`practice --series effects`, story 22)
+
+Seri latihan kedua untuk efek visual (gradien conic, grain/noise, mesh): dua prompt beku `bench/practice/effects/prompts.json`
+(P5 landing gelap berlatar efek, P6 onboarding mobile gelap bergradasi; sha `EFFECT_PROMPTS_SHA256`, loader dan tes yang
+sama, penjaga n-gram juga terhadap P1–P4). Runner, pembungkus, juri v2.1, `decide`, C8, `--reuse-pendev`, dan penjaga
+md5 `.pen` sama dengan seri `practice`; tanpa `--series` perilaku seri P1–P4 tidak berubah.
+
+- **Config seri** (`SERIES` di `bench/src/practice/main.ts`): maks 3 iterasi, anggaran kumulatif seri $15 (dari
+  `bench/effects-<j>.json`), lulus bila P5 **dan** P6 Setara/Lebih baik dengan gerbang waktu/emoji/gate yang sama.
+- **Keluaran:** `bench/effects-<k>.md|json` (tracked), strip Lakar `bench/practice/effects/<k>/<P>-lakar.png` (tracked),
+  artefak mentah dan strip/`.pen` pen.dev lokal di `bench/runs/practice-effects/<k>/` (EULA). Iterasi > 1 memuat tabel
+  Lakar iterasi 1 (sebelum perubahan) vs sesudah.
+- **Restart pen-desktop** (izin Adam): sekali per iterasi yang menjalankan pen.dev, sesudah run pen.dev terakhir dan
+  sebelum juri (`restartPenDesktopAfterSeries`, `bench/src/sys.ts`): `systemctl restart pen-desktop`, tunggu `is-active`
+  dan satu panggilan baca MCP pencil (`get_app_state`) berhasil, maks 120 dtk. Hasil dan durasi tercatat di laporan;
+  gagal → laporan ditandai, juri tetap jalan. Tidak pernah saat `--reuse-pendev` atau `--dry-run`.
+- Arsip slug Lakar sebelum run (semua seri dan `round`) memindai `runs/rounds`, `runs/practice`, dan `runs/practice-effects`.
 
 ## Batasan
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { summarizeFindings, type Finding } from '@lakar/schema';
+import { SCHEMA_VERSION, summarizeFindings, type Finding } from '@lakar/schema';
 import { testLog } from '../../../tests/support/log.ts';
 import {
   PACKAGE,
@@ -65,7 +65,7 @@ function docOf(specs: BoardSpec[], tokens?: Record<string, string | number>): { 
       children,
     };
   });
-  const doc = { schemaVersion: 1, id: 'Docu0001', rev: 1, ...(tokens ? { tokens } : {}), pages: [{ id: 'Page0001', name: 'Page 1', children: boards }] };
+  const doc = { schemaVersion: SCHEMA_VERSION, id: 'Docu0001', rev: 1, ...(tokens ? { tokens } : {}), pages: [{ id: 'Page0001', name: 'Page 1', children: boards }] };
   return { doc: doc as unknown as ResolvedDocument, boards: boards.map((b) => b.id), measures };
 }
 

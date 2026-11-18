@@ -81,7 +81,7 @@ describe('DocStore', () => {
     const doc = createDocument();
     await plain.write('d', doc);
     const raw = await readFile(plain.docPath('d'), 'utf8');
-    // Tiruan langkah migrasi (registri resmi v1 masih kosong): menambah token.
+    // Tiruan langkah migrasi: menambah token.
     const migrating = new DocStore(dir, { migrate: (r) => ({ ...(r as object), tokens: { 'colors.baru': '#000000' } }) });
     const read = await migrating.read('d');
     expect(read!.tokens).toEqual({ 'colors.baru': '#000000' });
@@ -92,6 +92,20 @@ describe('DocStore', () => {
     // Tanpa migrasi: file tidak ditulis ulang.
     await plain.read('d');
     expect(await readFile(plain.docPath('d'), 'utf8')).toBe(after);
+  });
+
+  it('read: dokumen v1 lama dimigrasi resmi ke v2 (identitas) dan ditulis balik', async () => {
+    const dir = join(root, 'v1');
+    const plain = new DocStore(dir);
+    const doc = createDocument();
+    await plain.write('lama', doc);
+    const v1 = { ...JSON.parse(await readFile(plain.docPath('lama'), 'utf8')), schemaVersion: 1 };
+    await writeFile(plain.docPath('lama'), `${JSON.stringify(v1, null, 2)}\n`, 'utf8');
+    const read = await new DocStore(dir).read('lama');
+    expect(read).toEqual(doc);
+    expect(read!.schemaVersion).toBe(2);
+    expect(JSON.parse(await readFile(plain.docPath('lama'), 'utf8'))).toEqual(doc);
+    expect(tmpFiles(plain.docsDir)).toEqual([]);
   });
 
   it('kill SIGKILL di tengah commit dokumen besar (≥ 8 kali): dokumen utuh, riwayat konsisten', async () => {

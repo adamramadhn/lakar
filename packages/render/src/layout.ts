@@ -18,7 +18,7 @@ import {
   boxShadowCss,
   DEFAULT_ASSET_BASE,
   dropShadowFilters,
-  fillsBackground,
+  applyFills,
   radiusCss,
   strokeOverlay,
   textShadowCss,
@@ -63,13 +63,13 @@ export function mountBoardNode(board: BoardNode, root: HTMLElement, ctx: RenderC
     width: px(board.width),
     height: px(board.height),
     overflow: 'hidden', // board selalu clip (AD-15)
-    background: fillsBackground(board.fills, ctx.assetBase) ?? '#FFFFFF',
     isolation: 'isolate', // blend anak dibatasi pada isi board
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'flex-start',
     justifyContent: 'flex-start',
   } satisfies Partial<CSSStyleDeclaration>);
+  if (!applyFills(el.style, board.fills, { assetBase: ctx.assetBase, doc: d, width: board.width, height: board.height })) el.style.background = '#FFFFFF';
   appendChildren(d, el, board.children, { layout: 'column', scrollY: 0 }, undefined, ctx);
   root.replaceChildren(el);
   return el;
@@ -220,17 +220,21 @@ function paddingCss(p: number | readonly number[]): string {
  */
 function paintBox(
   el: HTMLElement,
-  n: Pick<RectNode, 'fills' | 'stroke' | 'shadows'>,
+  n: Pick<RectNode, 'fills' | 'stroke' | 'shadows' | 'width' | 'height'>,
   radius: string | undefined,
   ctx: RenderContext,
 ): HTMLElement | undefined {
   const s = el.style;
-  const bg = fillsBackground(n.fills, ctx.assetBase);
-  if (bg) s.background = bg;
+  applyFills(s, n.fills, fillContext(el.ownerDocument, n, ctx));
   if (radius) s.borderRadius = radius;
   const shadow = boxShadowCss(n.stroke, n.shadows);
   if (shadow) s.boxShadow = shadow;
   return n.stroke ? strokeOverlay(el.ownerDocument, n.stroke, radius) : undefined;
+}
+
+/** Konteks fill node: ukuran kotak hanya bila tetap (angka); hug/fill → bitmap mesh default. */
+function fillContext(d: Document, n: { width?: Dim; height?: Dim }, ctx: RenderContext) {
+  return { assetBase: ctx.assetBase, doc: d, width: typeof n.width === 'number' ? n.width : undefined, height: typeof n.height === 'number' ? n.height : undefined };
 }
 
 /** rect dan ellipse tanpa busur: box CSS. */
@@ -249,8 +253,9 @@ function renderShape(d: Document, n: EllipseNode | PathNode, shape: Shape | unde
   el.setAttribute(NODE_ATTR, n.id);
   el.style.position = 'relative';
   if (!shape) return el;
-  const bg = fillsBackground(n.fills, ctx.assetBase);
-  if (bg) el.appendChild(fillLayer(d, shape, bg));
+  // Mesh pada bentuk ikut mask yang sama (lapisan fill ber-mask).
+  const layer = fillLayer(d, shape);
+  if (applyFills(layer.style, n.fills, fillContext(d, n, ctx))) el.appendChild(layer);
   const stroke = n.stroke ? strokeSvg(d, shape, n.stroke) : undefined;
   if (stroke) el.appendChild(stroke);
   return el;

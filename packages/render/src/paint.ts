@@ -3,6 +3,7 @@
 // board/frame/rect/ellipse/path/text/icon. Elemen node TIDAK pernah mendapat CSS `border`: tinta stroke
 // bagian dalam memakai overlay internal (tanpa data-lakar-id), bagian luar memakai box-shadow spread.
 import type { ResolvedFill as Fill, ResolvedShadow as Shadow, ResolvedStroke as Stroke } from '@lakar/schema';
+import { meshLayer, NOISE_DEFAULTS, noiseLayer } from './effects.js';
 
 /** Prefiks URL aset default (daemon dan harness menyajikan `/assets/<sha256>`). */
 export const DEFAULT_ASSET_BASE = '/assets/';
@@ -15,8 +16,12 @@ const stopsCss = (stops: readonly { offset: number; color: string }[]) => stops.
 /** URL aset gambar: `assetBase` + sha256. */
 export const assetUrl = (assetBase: string, assetId: string): string => `${assetBase}${assetId}`;
 
+/** Konteks lapisan fill: prefiks aset, dokumen DOM (canvas mesh), dan ukuran kotak bila sudah tetap (px). */
+export type FillContext = { assetBase: string; doc?: Document | undefined; width?: number | undefined; height?: number | undefined };
+
 /** Satu fill → satu lapisan CSS `background`. */
-function fillLayer(f: Fill, assetBase: string): string {
+function fillLayer(f: Fill, fc: FillContext): string {
+  const assetBase = fc.assetBase;
   switch (f.type) {
     case 'solid':
       return `linear-gradient(${f.color}, ${f.color})`;
@@ -27,6 +32,17 @@ function fillLayer(f: Fill, assetBase: string): string {
       const [cx, cy] = f.center ?? [0.5, 0.5];
       const r = f.radius ?? 0.5;
       return `radial-gradient(${pct(r)} ${pct(r)} at ${pct(cx)} ${pct(cy)}, ${stopsCss(f.stops)})`;
+    }
+    case 'conic': {
+      // Sudut: 0 = atas, searah jarum jam (sama dengan CSS `from`).
+      const [cx, cy] = f.center ?? [0.5, 0.5];
+      return `conic-gradient(from ${f.angle ?? 0}deg at ${pct(cx)} ${pct(cy)}, ${stopsCss(f.stops)})`;
+    }
+    case 'noise':
+      return noiseLayer(f);
+    case 'mesh': {
+      if (!fc.doc) throw new Error('fill mesh butuh dokumen DOM (canvas 2D)');
+      return meshLayer(f, fc.width, fc.height, fc.doc);
     }
     case 'image': {
       const url = `url("${assetUrl(assetBase, f.assetId)}")`;
@@ -44,12 +60,35 @@ function fillLayer(f: Fill, assetBase: string): string {
 }
 
 /** fills → CSS `background` berlapis: `fills[0]` paling bawah (CSS: lapisan pertama paling atas). */
-export function fillsBackground(fills: readonly Fill[] | undefined, assetBase: string): string | undefined {
+export function fillsBackground(fills: readonly Fill[] | undefined, ctx: string | FillContext): string | undefined {
   if (!fills || fills.length === 0) return undefined;
+  const fc = typeof ctx === 'string' ? { assetBase: ctx } : ctx;
   return fills
-    .map((f) => fillLayer(f, assetBase))
+    .map((f) => fillLayer(f, fc))
     .reverse()
     .join(', ');
+}
+
+/**
+ * `background-blend-mode` per lapisan (urutan CSS = fills terbalik): noise memakai `blend`-nya (default overlay),
+ * lapisan lain normal. Tanpa noise → undefined (properti tidak disetel).
+ */
+export function fillsBlendMode(fills: readonly Fill[] | undefined): string | undefined {
+  if (!fills?.some((f) => f.type === 'noise')) return undefined;
+  return fills
+    .map((f) => (f.type === 'noise' ? (f.blend ?? NOISE_DEFAULTS.blend) : 'normal'))
+    .reverse()
+    .join(', ');
+}
+
+/** Pasang fills ke style elemen: `background` + `background-blend-mode` (bila ada noise). */
+export function applyFills(st: CSSStyleDeclaration, fills: readonly Fill[] | undefined, fc: FillContext): boolean {
+  const bg = fillsBackground(fills, fc);
+  if (!bg) return false;
+  st.background = bg;
+  const blend = fillsBlendMode(fills);
+  if (blend) st.backgroundBlendMode = blend;
+  return true;
 }
 
 /** radius angka | [tl,tr,br,bl] → `border-radius`. */

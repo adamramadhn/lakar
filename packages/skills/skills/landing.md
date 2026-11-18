@@ -7,6 +7,7 @@ Board `1440 × bebas` (`screen:'landing'`). Mulai dengan tinggi besar (mis. 2000
 - Wrapper `Halaman` (kolom, `width:'fill'`) langsung di board; setiap seksi `Seksi / …` lebar fill dengan padding horizontal 80 (konten maks 1280, gutter 24). Ritme: padding vertikal seksi 96–128; judul seksi ↔ isi 32–48; antar-kartu 24; dalam grup 12–16; ikon ↔ teks 4–8.
 - **Navbar 72:** logo kiri (wadah 32 aksen + ikon + wordmark), 3–5 tautan `Link /` body-sm, kanan satu tombol sekunder + satu primer (tinggi 40). Garis bawah satu sisi.
 - **Hero ≥ 640** di bidang merek (`C.field`) atau putih: headline display ≤ 3 baris berupa klaim hasil, bukan nama fitur; subjudul body-lg ≤ 2 baris; satu CTA primer + satu sekunder; baris penguat kecil di bawah CTA (mis. "Gratis ongkir 3 kali pertama"). Visual hero adalah anak frame hero dan menyatu dengan latarnya: foto suasana nyata (`Image /` ≥ 520 lebar, radius 16–24) dengan 1–2 kartu data kecil `Overlay /` di atasnya (wajib bila permintaan menyebut foto), atau mockup produk di `Crop / …` terpotong tepi bawah. Bukan kartu berbingkai di kolom terpisah.
+- **Bidang efek** (bila permintaan atau merek meminta suasana ekspresif): latar hero/sampul = `fills` berlapis: netral (gelap/terang) → `mesh` 3×2–5×4 dari aksen, maks satu pendamping, dan netral (titik paling terang menjauhi blok teks) → `noise` opacity 0.04–0.08. Teks dan tombol berada di zona tenang medan atau di atas panel solid/scrim; kontras dihitung terhadap warna terburuk di bawah teks. Satu bidang per halaman; bila permintaan juga meminta efek di seksi lain, pakai palet yang sama dengan intensitas lebih rendah, bukan efek baru. Cuplikan produk di atas efek = panel solid (surface/raised) agar data terbaca. Ring/donut progres boleh `conic` bergradasi. Tanpa glow, kecuali satu cahaya lembut merek di belakang objek fokus pada latar gelap (blur ≥ 40, opacity ≤ 35%).
 - **Header seksi:** overline aksen → h2 → body-lg secondary, lebar ≤ 720. Rata kiri atau tengah, konsisten.
 - **Ritme:** dua seksi bersebelahan tidak boleh berstruktur sama (variasikan: bento, dua kolom teks + visual, daftar langkah, tabel banding, seksi bidang merek). Latar seksi bergantian putih → `C.field` → putih → `C.deep` (teks `C.on`/terang, satu seksi saja), bukan abu polos. Dalam grid ≥ 3 kartu, minimal satu kartu berbeda lebar, ditekankan (bidang/solid), atau memuat elemen non-teks.
 - **Kartu fitur/langkah:** ikon 24 di wadah 48 (tint; solid aksen untuk butir yang ditekankan), judul h4, deskripsi body-sm, dan satu detail konkret berpembanding (angka, durasi, harga) atau `Badge`. Alur bertahap: nomor/penanda tahap + garis penghubung, tahap kini disorot.
@@ -42,8 +43,9 @@ for(const l of ['Cara kerja','Asal biji','Harga','Untuk kafe']) T(links,'Link / 
 const act=Row(nav,'Aksi',{gap:12});
 Btn(act,'Masuk','secondary',{height:40,padding:[0,16]});
 Btn(act,'Coba sampel','primary',{height:40,padding:[0,16]});
-// Hero
-const hero=F(page,'Seksi / Hero',{width:'fill',padding:[96,80,0,80],gap:64,align:'center',fills:fill(C.field)});
+// Hero = satu bidang efek: tint merek + mesh lembut (aksen + pendamping, terang di tepi, tenang di tengah) + grain tipis
+const hero=F(page,'Seksi / Hero',{width:'fill',padding:[96,80,0,80],gap:64,align:'center',fills:[...fill(C.field),
+ {type:'mesh',columns:3,rows:2,colors:['#CDE8E4',C.field,'#F4E7C8',C.field,C.field,'#D3EBE7']},{type:'noise',opacity:0.05,seed:11}]});
 const copy=F(hero,'Hero / Teks',{width:800,gap:24,align:'center'});
 T(copy,'Overline','LANGGANAN BIJI KOPI UNTUK KAFE','overline',{color:C.acc});
 T(copy,'Headline','Biji segar tiba tiap Senin, disangrai 72 jam sebelumnya','display-lg',{width:'fill',align:'center'});

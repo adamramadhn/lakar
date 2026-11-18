@@ -1,5 +1,7 @@
 // Bacaan sistem untuk putaran: systemd show, hash file/direktori, md5 .pen lama, git HEAD/status (hanya baca),
-// ditambah restart lakard (user service) sebelum putaran dan mtime terbaru dist (bukti lakard memuat build saat ini).
+// ditambah restart lakard (user service) sebelum putaran, mtime terbaru dist (bukti lakard memuat build saat ini), dan
+// satu-satunya restart pen-desktop (`restartPenDesktopAfterSeries`, seri efek story 22, izin Adam: sekali per iterasi
+// yang menjalankan pen.dev, setelah run pen.dev terakhir).
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
@@ -24,10 +26,70 @@ export function systemdShow(unit: string, user: boolean): SystemdInfo {
   }
 }
 
-/** `systemctl --user restart <unit>` (hanya dipakai untuk lakard; service pen-* tidak pernah disentuh). */
+/** `systemctl --user restart <unit>` (hanya dipakai untuk lakard; service pen-* tidak lewat sini, lihat `restartPenDesktopAfterSeries`). */
 export function restartUserUnit(unit: string): void {
   if (unit.startsWith('pen-')) throw new Error(`restart ${unit} dilarang`);
   execFileSync('systemctl', ['--user', 'restart', unit], { encoding: 'utf8' });
+}
+
+export const PEN_DESKTOP_UNIT = 'pen-desktop';
+/** Batas tunggu pen-desktop aktif + MCP pencil menjawab sesudah restart (ms). */
+export const PEN_DESKTOP_RESTART_TIMEOUT_MS = 120_000;
+
+export type PenDesktopRestart = { ok: boolean; ms: number; detail: string };
+
+export type PenDesktopRestartDeps = {
+  /** `systemctl restart pen-desktop` (unit sistem). */
+  restart: () => void;
+  /** `systemctl is-active pen-desktop`. */
+  isActive: () => string;
+  /** Satu panggilan baca MCP pencil (mis. `get_app_state`); throw bila gagal. */
+  probe: () => Promise<void>;
+  sleep: (ms: number) => Promise<void>;
+  now: () => number;
+  timeoutMs?: number;
+};
+
+/**
+ * Restart pen-desktop **sesudah** seri pen.dev satu iterasi selesai (seri efek, izin Adam), lalu tunggu `is-active` dan
+ * satu panggilan baca MCP pencil berhasil, maks 120 dtk. Tidak pernah throw: hasil (berhasil/gagal, durasi) dicatat di
+ * laporan dan juri tetap jalan. Tidak dipanggil saat `--reuse-pendev` atau `--dry-run`.
+ */
+export async function restartPenDesktopAfterSeries(deps: PenDesktopRestartDeps): Promise<PenDesktopRestart> {
+  const t0 = deps.now();
+  const limit = deps.timeoutMs ?? PEN_DESKTOP_RESTART_TIMEOUT_MS;
+  const elapsed = () => deps.now() - t0;
+  try {
+    deps.restart();
+  } catch (e) {
+    return { ok: false, ms: elapsed(), detail: `systemctl restart ${PEN_DESKTOP_UNIT} gagal: ${errorMessage(e)}` };
+  }
+  let state = '';
+  let lastErr = '';
+  while (elapsed() <= limit) {
+    state = deps.isActive();
+    if (state === 'active') {
+      try {
+        await deps.probe();
+        return { ok: true, ms: elapsed(), detail: `${PEN_DESKTOP_UNIT} active; MCP pencil menjawab panggilan baca` };
+      } catch (e) {
+        lastErr = errorMessage(e);
+      }
+    }
+    await deps.sleep(2_000);
+  }
+  return { ok: false, ms: elapsed(), detail: `batas ${Math.round(limit / 1000)} dtk terlewati: is-active ${state || '?'}${lastErr ? `; MCP pencil: ${lastErr}` : ''}` };
+}
+
+/** Dependensi nyata `restartPenDesktopAfterSeries` (probe disuntikkan pemanggil: klien MCP pencil). */
+export function penDesktopRestartDeps(probe: () => Promise<void>): PenDesktopRestartDeps {
+  return {
+    restart: () => execFileSync('systemctl', ['restart', PEN_DESKTOP_UNIT], { encoding: 'utf8' }),
+    isActive: () => isActive(PEN_DESKTOP_UNIT, false),
+    probe,
+    sleep: (ms) => new Promise((r) => setTimeout(r, ms)),
+    now: () => Date.now(),
+  };
 }
 
 export function isActive(unit: string, user: boolean): string {

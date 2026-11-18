@@ -176,7 +176,7 @@ export const EXECUTE_DESCRIPTION =
   'Nama tidak dikenal → ICON_UNKNOWN dengan 3 saran nama kanonik (cari dulu dengan iconSearch atau tool icon_search). ' +
   "Semua node anak wajib name; sizing width/height: angka | 'hug' | 'fill' (+ minWidth/maxWidth/minHeight/maxHeight). " +
   "Efek (semua node anak, termasuk text dan icon): shadows[] {x,y,blur,spread?,color,type?:'drop'|'inner'}, opacity 0..1, blend, blur, backdropBlur, rotation. " +
-  "Cat (frame/rect/ellipse/path; radius hanya frame/rect): fills[] ({type:'solid',color} | {type:'linear',angle,stops} | {type:'radial',center?,radius?,stops} | {type:'image',assetId,fit}), " +
+  "Cat (frame/rect/ellipse/path; radius hanya frame/rect): fills[] ({type:'solid',color} | {type:'linear',angle,stops} | {type:'radial',center?,radius?,stops} | {type:'conic',angle?,center?,stops} | {type:'noise',opacity,size?,seed?,blend?,mono?} | {type:'mesh',columns,rows,colors (= columns×rows),points?} | {type:'image',assetId,fit}), " +
   "stroke {color, width, align:'inside'|'center'|'outside', sides?}, radius (n atau [tl,tr,br,bl]). " +
   "Warna: '#RRGGBB' atau '#RRGGBBAA'. Nilai boleh referensi token {$token:'colors.nama'} (token harus ada di dokumen). " +
   "x/y hanya untuk board atau node anak dengan position:'absolute'. Kunci di luar skema ditolak (SCHEMA_INVALID). " +

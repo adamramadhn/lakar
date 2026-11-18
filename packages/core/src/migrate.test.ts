@@ -24,10 +24,21 @@ const chain: MigrationRegistry = {
 };
 
 describe('migrateDocument', () => {
-  it('registri resmi kosong; versi kini → apa adanya (objek yang sama)', () => {
-    expect(Object.keys(MIGRATIONS)).toEqual([]);
+  it('registri resmi: 1→2 identitas; versi kini → apa adanya (objek yang sama)', () => {
+    expect(Object.keys(MIGRATIONS)).toEqual(['1']);
     const doc = JSON.parse(JSON.stringify(createDocument()));
+    expect(doc.schemaVersion).toBe(2);
     expect(migrateDocument(doc)).toBe(doc);
+  });
+
+  it('migrasi resmi 1→2: dokumen v1 lama dibuka sebagai v2 tanpa perubahan lain, input tidak dimutasi', () => {
+    const v2 = JSON.parse(JSON.stringify(createDocument()));
+    const v1 = { ...v2, schemaVersion: 1 };
+    const snapshot = structuredClone(v1);
+    const out = migrateDocument(v1) as Record<string, unknown>;
+    expect(out).toEqual(v2);
+    expect(v1).toEqual(snapshot);
+    expect(parseDocument(v1)).toEqual(v2);
   });
 
   it('rantai 1→2→3 dijalankan berurutan, input tidak dimutasi', () => {
@@ -39,7 +50,7 @@ describe('migrateDocument', () => {
   });
 
   it('lebih baru dari target → VERSION_MISMATCH', () => {
-    expect(codeOf(() => migrateDocument({ schemaVersion: 2 }))).toBe('VERSION_MISMATCH');
+    expect(codeOf(() => migrateDocument({ schemaVersion: 3 }))).toBe('VERSION_MISMATCH');
     expect(codeOf(() => parseDocument({ ...createDocument(), schemaVersion: 99 }))).toBe('VERSION_MISMATCH');
   });
 

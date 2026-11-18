@@ -15,8 +15,9 @@ Mode gelap (Malam): `Object.assign(C,{bg,sub:surface,line,line2,t1,t2,t3` dari n
 - **Ring/grafik** dari `ellipse` busur: jalur (`inner`, tint) + progres (`startDeg`, `sweepDeg` = persen × 360) di frame `layout:'none'`. Beberapa seri = busur bernada `C.data`, legenda titik bernada sama + nilai / sasaran.
 - **Tab bar** 3–5 item: ikon 24 + label `tab`; aktif = aksen + pil tint, lainnya muted. Bilah yang menempel di atasnya = `Overlay /` lapis raised + progres tipis aksen. Mengambang = `Overlay / Tab bar` absolut (lebar 350, x 20, di atas home indicator).
 - **Bilah bawah tetap** (aksi menetap): `Overlay / Bilah bawah` padding 16 20 34, total + tombol 56 lebar fill.
-- **Layar pertama hidup dan selesai rapi:** board pertama memuat inti permintaan (aksi utama, isi kunci, awal tiap bagian) di atas zona bawah (tab bar, bilah yang menempel, bilah aksi). Daftar menampilkan ≥ 3 butir utuh; bila tidak muat, rapatkan header, visual puncak, dan sorotan dulu, baru kurangi butir. Butir terakhir berakhir ≥ 8 di atas zona; tanpa judul seksi yang isinya tertutup atau kartu setengah terlihat. Seksi yang tidak muat mulai utuh di balik zona atau di board posisi akhir. LC-20 = error.
-- **Anggaran tinggi (hitung dulu):** tab bar mengambang mulai y 746; bilah menempel ±64 di atasnya; bilah aksi tetap ±734. Kurangi 54 status bar, jumlahkan header + seksi (judul 28 + jarak + isi). Lebih → rapatkan atau pindahkan seksi utuh ke bawah; font tidak dikecilkan.
+- **Layar pertama hidup dan selesai rapi:** board pertama memuat inti permintaan (aksi utama, isi kunci, awal tiap bagian) di atas zona bawah (tab bar, bilah yang menempel, bilah aksi). Daftar menampilkan ≥ 3 butir utuh; bila tidak muat, rapatkan header, visual puncak, dan sorotan dulu, baru kurangi butir. Butir terakhir berakhir ≥ 8 di atas zona; tanpa judul seksi yang isinya tertutup atau kartu setengah terlihat. Seksi yang tidak muat mulai utuh di balik zona atau di board posisi akhir.
+- **Anggaran tinggi (hitung dulu):** tab bar mengambang mulai y 746; bilah menempel ±64 di atasnya; bilah aksi tetap ±734. Kurangi 54 status bar, jumlahkan header + seksi. Lebih → rapatkan atau pindahkan seksi utuh ke bawah; font tidak dikecilkan.
+- **Bidang efek** (onboarding, sampul, kartu sorotan; bila diminta atau merek ekspresif): satu bidang `mesh` + `noise` ≤ 0.08, titik terang jauh dari teks; teks dan tombol di zona tenang atau panel solid (lihat contoh).
 - **Home indicator** 34 (nama layer persis `Home indicator`), garis 134 × 5 di tengah.
 - **Layar lebih panjang dari 844:** putuskan saat merencanakan. Status bar → header tetap → `Scroll / Konten` (`clip:true`) → bilah bawah tetap. Dua board 390 × 844 dibangun di execute pertama: posisi awal dan akhir (`const p=place(390,844,{near:b}); const b2=duplicate(b,{name:'… (akhir) …', x:p.x, y:p.y});` lalu `update(find({name:'Scroll / Konten', within:b2})[0].id, {scrollY:…})`), `scrollY` jatuh di awal seksi/butir dan butir terakhir selesai bersih di atas zona bawah.
 
@@ -24,7 +25,7 @@ Mode gelap (Malam): `Object.assign(C,{bg,sub:surface,line,line2,t1,t2,t3` dari n
 
 1. Execute 1: semua board lengkap (termasuk posisi akhir) dengan tinggi yang sudah dihitung.
 2. Error `check`: semua temuan diperbaiki dalam satu execute (`update`/`editId`), bukan satu per satu.
-3. Akhir sesuai `core`: satu screenshot per board → satu execute perbaikan semua temuan → `export`. Tanpa `inspect`; sisa kecil non-error disebut di ringkasan, bukan execute keempat.
+3. Akhir sesuai `core` (tanpa `inspect`, tanpa execute keempat).
 
 ## Contoh teruji
 
@@ -49,7 +50,10 @@ T(hi,'Judul','Halo, Sinta','title');
 const ib=Row(hd,'IconButton / Notifikasi',{width:44,height:44,radius:9999,justify:'center',stroke:line()});
 I(ib,'bell',20,C.t1);
 // Kartu sorotan di bidang merek: ring bersegmen (satu nada per keterampilan) + pembanding minggu lalu
-const card=F(w,'Kartu / Target mingguan',{width:'fill',padding:20,gap:16,radius:16,fills:fill(C.field),shadows:[{x:0,y:4,blur:16,color:'#10182814'}]});
+// Kartu sorotan = satu-satunya bidang efek: tint merek + mesh lembut + grain tipis. Layar onboarding/sampul gelap:
+// latar board = netral gelap → mesh (aksen, pendamping, netral; terang di atas) → noise 0.06, teks di bawah yang tenang.
+const card=F(w,'Kartu / Target mingguan',{width:'fill',padding:20,gap:16,radius:16,shadows:[{x:0,y:4,blur:16,color:'#10182814'}],
+ fills:[...fill(C.field),{type:'mesh',columns:2,rows:2,colors:['#DDE1FD',C.field,C.field,'#F5ECD7']},{type:'noise',opacity:0.05,seed:3}]});
 const top=Row(card,'Atas',{width:'fill',gap:20});
 const ring=F(top,'Ring / Target',{layout:'none',width:96,height:96});
 add(ring,{type:'ellipse',name:'Jalur',width:96,height:96,inner:0.8,fills:fill('#4F46E524')});

@@ -57,14 +57,13 @@ function maskImage(shape: Shape): string {
   return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
 }
 
-/** Lapisan fill internal bentuk: background fills + mask bentuk. */
-export function fillLayer(d: Document, shape: Shape, background: string): HTMLElement {
+/** Lapisan fill internal bentuk: mask bentuk; background fills dipasang pemanggil (`applyFills`). */
+export function fillLayer(d: Document, shape: Shape): HTMLElement {
   const el = d.createElement('div');
   const st = el.style;
   st.position = 'absolute';
   st.inset = '0';
   st.pointerEvents = 'none';
-  st.background = background;
   const mask = maskImage(shape);
   for (const [k, v] of [
     ['mask-image', mask],

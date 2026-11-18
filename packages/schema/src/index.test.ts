@@ -7,6 +7,7 @@ import {
   LakarError,
   NodeInput,
   PACKAGE,
+  SCHEMA_VERSION,
   Slug,
   XY_HINT,
   zodToLakarError,
@@ -65,10 +66,12 @@ describe('@lakar/schema', () => {
     expect(BoardNode.safeParse({ ...node, id: 'short' }).success).toBe(false);
   });
 
-  it('LakarDocument: schemaVersion 1 dan minimal 1 halaman', () => {
-    const doc = { schemaVersion: 1, id: 'Dddddddd', rev: 0, pages: [{ id: 'Pppppppp', name: 'Page 1', children: [] }] };
+  it('LakarDocument: schemaVersion = SCHEMA_VERSION (2) dan minimal 1 halaman; v1 hanya lewat migrasi (@lakar/core)', () => {
+    expect(SCHEMA_VERSION).toBe(2);
+    const doc = { schemaVersion: SCHEMA_VERSION, id: 'Dddddddd', rev: 0, pages: [{ id: 'Pppppppp', name: 'Page 1', children: [] }] };
     expect(LakarDocument.safeParse(doc).success).toBe(true);
-    expect(LakarDocument.safeParse({ ...doc, schemaVersion: 2 }).success).toBe(false);
+    expect(LakarDocument.safeParse({ ...doc, schemaVersion: 3 }).success).toBe(false);
+    expect(LakarDocument.safeParse({ ...doc, schemaVersion: 1 }).success).toBe(false);
     expect(LakarDocument.safeParse({ ...doc, pages: [] }).success).toBe(false);
   });
 

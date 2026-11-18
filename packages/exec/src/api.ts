@@ -654,7 +654,7 @@ export const API_REFERENCE: readonly ApiReferenceSection[] = [
   {
     title: 'Cat, stroke, radius',
     items: [
-      "`fills[]` (frame/rect/ellipse/path/board): `fills[0]` lapisan paling bawah. `{type:'solid', color}` | `{type:'linear', angle, stops:[{offset, color}]}` (sudut ala CSS: 0 = ke atas, 90 = ke kanan, searah jarum jam) | `{type:'radial', center?:[cx,cy] (0..1, default tengah), radius? (relatif kotak, default 0.5), stops}` | `{type:'image', assetId, fit:'cover'|'contain'|'fill'|'tile'}`.",
+      "`fills[]` (frame/rect/ellipse/path/board): `fills[0]` lapisan paling bawah. `{type:'solid', color}` | `{type:'linear', angle, stops:[{offset, color}]}` (sudut ala CSS: 0 = ke atas, 90 = ke kanan, searah jarum jam) | `{type:'radial', center?:[cx,cy] (0..1, default tengah), radius? (relatif kotak, default 0.5), stops}` | `{type:'image', assetId, fit:'cover'|'contain'|'fill'|'tile'}` | fill efek `conic`/`noise`/`mesh` (bagian Fill efek).",
       "Warna: `'#RRGGBB'` atau `'#RRGGBBAA'` (alpha di 2 digit akhir, mis. tint `#2563EB14`). rgba()/nama warna ditolak.",
       "`stroke: {color, width, align:'inside'|'center'|'outside', sides?:['top'|'right'|'bottom'|'left']}`; pemisah satu sisi = `sides:['bottom']`.",
       '`radius` (frame/rect): angka atau `[kiriAtas, kananAtas, kananBawah, kiriBawah]`.',
@@ -662,6 +662,19 @@ export const API_REFERENCE: readonly ApiReferenceSection[] = [
     example:
       `${BOARD}\nadd(b, {type:'rect', name:'Latar', width:390, height:200, fills:[{type:'solid', color:'#0B0C0F'}, {type:'radial', center:[0.8,0.2], radius:0.6, stops:[{offset:0, color:'#2563EB66'}, {offset:1, color:'#2563EB00'}]}]});\n` +
       "add(b, {type:'frame', name:'Garis bawah', width:'fill', height:48, stroke:{color:'#E4E7EC', width:1, align:'inside', sides:['bottom']}});",
+  },
+  {
+    title: 'Fill efek',
+    items: [
+      "`{type:'conic', angle?, center?, stops}`: gradien sudut; `angle` derajat titik awal (0 = atas, searah jarum jam, default 0), `center?:[cx,cy]` 0..1 (default tengah), stops minimal 2. Untuk ring/donut progres bergradasi (ellipse `inner`) dan sorotan berputar.",
+      "`{type:'noise', opacity, size?, seed?, blend?, mono?}`: grain ber-seed (seed sama → piksel sama). `opacity` 0..1 (grain halus 0.04–0.10), `size` ukuran butir px 0.5–8 (default 1.5), `seed` bulat 0..9999 (default 1), `blend` 'overlay' (default) | 'soft-light' | 'multiply' | 'screen' | 'normal', `mono` default true. Dicampur hanya dengan fill di bawahnya pada node yang sama: letakkan setelah gradien/mesh.",
+      "`{type:'mesh', columns, rows, colors, points?}`: medan warna dari titik kendali (rata dan mulus, tanpa tepi). `columns`/`rows` bulat 2..5; `colors` tepat columns×rows warna, baris demi baris dari kiri atas; `points?` tepat columns×rows `[x,y]` 0..1 (default grid rata). Jumlah tidak cocok → SCHEMA_INVALID. Dirender sebagai bitmap (sisi ≤ 512 px) yang diskalakan ke kotak; pada ellipse/path ikut bentuknya.",
+      'Warna fill efek boleh token `{$token}` seperti stops. Teks di atas efek: taruh di bagian medan yang tenang atau di atas permukaan solid/scrim.',
+    ],
+    example:
+      `${BOARD}\nconst hero = add(b, {type:'frame', name:'Hero / Medan', width:390, height:320, layout:'column', justify:'end', padding:24, fills:[{type:'solid', color:'#0B1020'}, {type:'mesh', columns:3, rows:2, colors:['#0B1020', '#1D4ED8', '#0B1020', '#0E7490', '#0B1020', '#0B1020'], points:[[0,0], [0.7,0.1], [1,0], [0.2,0.8], [0.6,1], [1,1]]}, {type:'noise', opacity:0.06, seed:7}]});\n` +
+      "add(hero, {type:'text', name:'Judul', content:'Malam yang tenang', size:28, lineHeight:36, weight:600, color:'#F8FAFC'});\n" +
+      "add(b, {type:'ellipse', name:'Ring progres', width:80, height:80, inner:0.8, startDeg:0, sweepDeg:300, fills:[{type:'conic', angle:0, stops:[{offset:0, color:'#22D3EE'}, {offset:0.83, color:'#2563EB'}, {offset:1, color:'#2563EB'}]}]});",
   },
   {
     title: 'Efek',

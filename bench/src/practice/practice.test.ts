@@ -4,9 +4,16 @@ import { buildJudgeText, buildJudgeTextWith, DESIGN_MD_PATH, judgeC7Problems, ju
 import { readRubricJson } from '../judge/rubric.js';
 import { GOLDEN_SET_PATH, loadProtocol } from '../protocol.js';
 import type { RoundRun } from '../round/report.js';
-import { sha256 } from '../sys.js';
+import { restartPenDesktopAfterSeries, sha256, type PenDesktopRestartDeps } from '../sys.js';
 import {
+  beforeAfter,
   budgetProblem,
+  EFFECTS_SERIES,
+  EFFECTS_RUNS,
+  passMinOf,
+  PRACTICE_RUNS,
+  PRACTICE_SERIES,
+  SERIES,
   emojiOf,
   estimateCost,
   BUDGET_USD,
@@ -26,17 +33,17 @@ import {
   type PracticePromptResult,
   type PracticeReport,
 } from './main.js';
-import { loadPracticePrompts } from './prompts.js';
+import { EFFECT_PROMPTS_PATH, EFFECT_PROMPTS_SHA256, loadPracticePrompts, PRACTICE_DIR, PRACTICE_ID, PRACTICE_PROMPTS_PATH, PRACTICE_PROMPTS_SHA256 } from './prompts.js';
 
 const HAVE_SOURCES = existsSync(DESIGN_MD_PATH) && existsSync(GOLDEN_SET_PATH);
 const { prompts } = loadPracticePrompts();
 
 describe('practice: argumen', () => {
   it('iter wajib, maks 7; only, reuse-pendev (< iter), resume, dry-run', () => {
-    expect(parsePracticeArgs(['--iter', '1'])).toEqual({ ok: true, value: { iter: 1, only: undefined, reusePendev: undefined, resume: false, dryRun: false } });
+    expect(parsePracticeArgs(['--iter', '1'])).toEqual({ ok: true, value: { series: 'practice', iter: 1, only: undefined, reusePendev: undefined, resume: false, dryRun: false } });
     expect(parsePracticeArgs(['--', '--iter=2', '--only', 'P1,P3,P1', '--reuse-pendev', '1', '--resume', '--dry-run'])).toEqual({
       ok: true,
-      value: { iter: 2, only: ['P1', 'P3'], reusePendev: 1, resume: true, dryRun: true },
+      value: { series: 'practice', iter: 2, only: ['P1', 'P3'], reusePendev: 1, resume: true, dryRun: true },
     });
     expect(parsePracticeArgs([]).ok).toBe(false);
     expect(parsePracticeArgs(['--iter', '0']).ok).toBe(false);
@@ -259,5 +266,123 @@ describe('practice: laporan', () => {
     expect(md).toContain('kumulatif **$10.70** dari anggaran $30');
     expect(md).toContain('`bench/practice/1/P1-lakar.png`');
     expect(md).toContain('31 file `.pen`');
+  });
+});
+
+describe('practice: seri (story 22)', () => {
+  it('--series: default practice; effects; tak dikenal ditolak', () => {
+    expect(parsePracticeArgs(['--series', 'effects', '--iter', '2', '--reuse-pendev', '1'])).toEqual({
+      ok: true,
+      value: { series: 'effects', iter: 2, only: undefined, reusePendev: 1, resume: false, dryRun: false },
+    });
+    expect(parsePracticeArgs(['--series=effects', '--iter', '1', '--only', 'P6'])).toMatchObject({ ok: true, value: { series: 'effects', only: ['P6'] } });
+    expect(parsePracticeArgs(['--series', 'effects', '--iter', '1', '--only', 'P1']).ok).toBe(false);
+    expect(parsePracticeArgs(['--series', 'round', '--iter', '1'])).toMatchObject({ ok: false, error: expect.stringContaining('--series') });
+  });
+
+  it('seri efek: maks 3 iterasi (iterasi ke-4 ditolak), praktik tetap maks 8', () => {
+    expect(parsePracticeArgs(['--series', 'effects', '--iter', '3', '--reuse-pendev', '1']).ok).toBe(true);
+    expect(parsePracticeArgs(['--series', 'effects', '--iter', '4'])).toMatchObject({ ok: false, error: '--iter 4 > 3: iterasi seri effects maksimal 3' });
+    expect(parsePracticeArgs(['--iter', '9'])).toMatchObject({ ok: false, error: '--iter 9 > 8: iterasi latihan maksimal 8' });
+  });
+
+  it('config default identik dengan perilaku lama', () => {
+    expect(PRACTICE_SERIES).toEqual({
+      id: 'practice',
+      title: 'Latihan skill',
+      promptsPath: PRACTICE_PROMPTS_PATH,
+      sha: PRACTICE_PROMPTS_SHA256,
+      ids: PRACTICE_ID,
+      maxIter: 8,
+      budgetUsd: 58.09,
+      passRule: { min: 3 },
+      reportPrefix: 'practice',
+      runsRoot: PRACTICE_RUNS,
+      pngDir: PRACTICE_DIR,
+      restartPenDesktop: false,
+      compareWithFirst: false,
+    });
+    expect(SERIES.practice).toBe(PRACTICE_SERIES);
+    expect(passMinOf(PRACTICE_SERIES, 4)).toBe(3);
+  });
+
+  it('config efek: P5/P6 beku, $15, semua prompt wajib lulus, laporan/run/PNG terpisah', () => {
+    expect(EFFECTS_SERIES).toMatchObject({ id: 'effects', promptsPath: EFFECT_PROMPTS_PATH, sha: EFFECT_PROMPTS_SHA256, maxIter: 3, budgetUsd: 15, passRule: 'all', reportPrefix: 'effects', runsRoot: EFFECTS_RUNS, restartPenDesktop: true });
+    expect(EFFECTS_SERIES.runsRoot.endsWith('bench/runs/practice-effects')).toBe(true);
+    expect(EFFECTS_SERIES.pngDir.endsWith('bench/practice/effects')).toBe(true);
+    expect(loadPracticePrompts(EFFECTS_SERIES.promptsPath, EFFECTS_SERIES.sha).prompts.map((p) => p.id)).toEqual(['P5', 'P6']);
+    expect(passMinOf(EFFECTS_SERIES, 2)).toBe(2);
+  });
+
+  it('practiceOutcome semua-lulus: satu prompt Kalah → belum lulus', () => {
+    const ids = ['P5', 'P6'];
+    expect(practiceOutcome([result('P5', 'Setara'), result('P6', 'Lebih baik')], ids, passMinOf(EFFECTS_SERIES, 2))).toEqual({ pass: true, passCount: 2, total: 2, reasons: [] });
+    const r = practiceOutcome([result('P5', 'Setara'), result('P6', 'Kalah')], ids, passMinOf(EFFECTS_SERIES, 2));
+    expect(r.pass).toBe(false);
+    expect(r.reasons).toEqual(['Setara/Lebih baik 1 dari 2 (< 2)']);
+  });
+
+  it('anggaran $15: iterasi 1 penuh + iterasi 2 reuse muat; melewati sisa → Abort', () => {
+    const iter1 = estimateCost({ prompts: ['P5', 'P6'], reusePendev: false, doneRuns: new Set(), doneJudge: new Set() });
+    const iter2 = estimateCost({ prompts: ['P5', 'P6'], reusePendev: true, doneRuns: new Set(), doneJudge: new Set() });
+    expect(iter1).toBe(5.6);
+    expect(iter2).toBe(3.8);
+    expect(budgetProblem(0, iter1, EFFECTS_SERIES.budgetUsd)).toBeUndefined();
+    expect(budgetProblem(9.5, iter2, EFFECTS_SERIES.budgetUsd)).toBeUndefined();
+    expect(budgetProblem(11.5, iter2, EFFECTS_SERIES.budgetUsd)).toMatch(/anggaran: terpakai \$11\.50 \+ perkiraan sisa \$3\.80 > \$15/);
+  });
+
+  it('perbandingan sebelum (iterasi 1) / sesudah', () => {
+    const before = [{ ...result('P5', 'Kalah', { lakarMs: 200_000 }), score: undefined }];
+    const now = [{ ...result('P5', 'Setara', { lakarMs: 120_000 }), score: undefined }, { ...result('P6', 'Setara'), score: undefined }];
+    const c = beforeAfter(before, now);
+    expect(c.map((x) => [x.id, x.before?.decision, x.after.decision, x.before?.ratio, x.after.ratio])).toEqual([
+      ['P5', 'Kalah', 'Setara', 2, 1.2],
+      ['P6', undefined, 'Setara', undefined, 1],
+    ]);
+  });
+});
+
+describe('restart pen-desktop sesudah seri pen.dev', () => {
+  const fake = (o: { active?: string[]; probeFails?: number; restartThrows?: boolean; timeoutMs?: number }) => {
+    let t = 0;
+    let probes = 0;
+    const calls: string[] = [];
+    const states = [...(o.active ?? ['active'])];
+    const deps: PenDesktopRestartDeps = {
+      restart: () => {
+        calls.push('restart');
+        if (o.restartThrows) throw new Error('izin ditolak');
+      },
+      isActive: () => (states.length > 1 ? states.shift()! : states[0]!),
+      probe: async () => {
+        calls.push('probe');
+        if (probes++ < (o.probeFails ?? 0)) throw new Error('not connected');
+      },
+      sleep: async (ms) => {
+        t += ms;
+      },
+      now: () => t,
+      ...(o.timeoutMs ? { timeoutMs: o.timeoutMs } : {}),
+    };
+    return { deps, calls };
+  };
+
+  it('berhasil: restart → tunggu active → probe MCP berhasil', async () => {
+    const { deps, calls } = fake({ active: ['activating', 'activating', 'active'], probeFails: 1 });
+    const r = await restartPenDesktopAfterSeries(deps);
+    expect(r).toEqual({ ok: true, ms: 6_000, detail: 'pen-desktop active; MCP pencil menjawab panggilan baca' });
+    expect(calls).toEqual(['restart', 'probe', 'probe']);
+  });
+
+  it('gagal: batas 120 dtk terlewati atau restart error (tidak throw)', async () => {
+    const t1 = await restartPenDesktopAfterSeries(fake({ active: ['failed'] }).deps);
+    expect(t1.ok).toBe(false);
+    expect(t1.detail).toMatch(/batas 120 dtk terlewati: is-active failed/);
+    expect(t1.ms).toBeGreaterThan(120_000);
+    const t2 = await restartPenDesktopAfterSeries(fake({ restartThrows: true }).deps);
+    expect(t2).toMatchObject({ ok: false, detail: expect.stringContaining('izin ditolak') });
+    const t3 = await restartPenDesktopAfterSeries(fake({ probeFails: 1000, timeoutMs: 10_000 }).deps);
+    expect(t3.detail).toMatch(/MCP pencil: not connected/);
   });
 });

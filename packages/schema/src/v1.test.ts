@@ -7,6 +7,7 @@ import {
   LakarError,
   NODE_TYPES,
   NodeInput,
+  SCHEMA_VERSION,
   XY_HINT,
   findTokenRefs,
   jsonSchemas,
@@ -191,7 +192,7 @@ describe('katalog v1', () => {
 });
 
 const doc = (pages: unknown[], tokens?: Record<string, number | string>): Doc =>
-  LakarDocument.parse({ schemaVersion: 1, id: 'Dddddddd', rev: 3, ...(tokens ? { tokens } : {}), pages });
+  LakarDocument.parse({ schemaVersion: SCHEMA_VERSION, id: 'Dddddddd', rev: 3, ...(tokens ? { tokens } : {}), pages });
 
 const fullDoc = () =>
   doc(
@@ -237,8 +238,9 @@ describe('dokumen dan token', () => {
   });
 
   it('dokumen tracer lama (tanpa clip/fills/tokens) tetap lolos', () => {
+    // Isi dokumen tracer v1; versi file dinaikkan oleh migrasi identitas 1→2 (@lakar/core, diuji di migrate.test.ts).
     const tracer = {
-      schemaVersion: 1,
+      schemaVersion: SCHEMA_VERSION,
       id: 'Dddddddd',
       rev: 1,
       pages: [

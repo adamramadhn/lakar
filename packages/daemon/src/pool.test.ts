@@ -476,7 +476,7 @@ describe('Chromium hilang', () => {
       // Dokumen dengan board ditulis langsung (execute pun akan gagal render saat check).
       await mkdir(join(tmp, 'docs'), { recursive: true });
       const doc = {
-        schemaVersion: 1,
+        schemaVersion: SCHEMA_VERSION,
         id: 'Dddddddd',
         rev: 1,
         tokens: {},

@@ -10,8 +10,14 @@ export type Migration = (doc: RawDocument) => RawDocument;
 /** Kunci n = langkah n→n+1. */
 export type MigrationRegistry = Readonly<Record<number, Migration>>;
 
-/** Registri migrasi resmi. v1 adalah versi pertama, jadi masih kosong. */
-export const MIGRATIONS: MigrationRegistry = Object.freeze({});
+/**
+ * Registri migrasi resmi.
+ * - 1 → 2 (story 22): v2 hanya menambah jenis fill (`conic`, `noise`, `mesh`); dokumen v1 valid apa adanya, jadi langkahnya
+ *   identitas yang hanya menaikkan `schemaVersion`. Pembaca v1 tidak bisa membuka v2 (fill baru), maka versinya naik.
+ */
+export const MIGRATIONS: MigrationRegistry = Object.freeze({
+  1: (d: RawDocument): RawDocument => ({ ...d, schemaVersion: 2 }),
+});
 
 export type MigrateOptions = { migrations?: MigrationRegistry; target?: number };
 
