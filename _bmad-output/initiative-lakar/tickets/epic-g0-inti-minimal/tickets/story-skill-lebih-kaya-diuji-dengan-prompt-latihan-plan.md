@@ -260,3 +260,24 @@ Blocking condition: iterasi 6 (iterasi terakhir yang diizinkan) belum lulus: 3/4
 - Verifikasi: build OK; 781/781 tes (48 file) setelah patch; api.md tanpa beda; protocolHash 907cb36f…edb85d; bench/protocol & bench/rubric tidak berubah sejak 97ec581; `round --dry-run` sha = rubric.json; `practice --dry-run` OK; penjaga `.pen` 41 file tidak berubah/hilang; lakard active; `tools/node26/verify.sh` exit 0. PNG iterasi 5 dan 6 dilihat orkestrator.
 - Risiko sisa: variasi run-ke-run (P3 1,26× → 1,71× pada prompt sama); impor Wikimedia kecil untuk gambar < 960 px; potret Wikimedia tidak seragam gaya; biaya run `.prev-*` tidak dihitung.
 
+
+### Lanjutan iterasi 7 (2026-11-18): **blocked** — iterasi konfirmasi dibatalkan (run P3 `invalid`)
+
+Blocking condition: iterasi 7 (terakhir yang diizinkan) dibatalkan harness setelah P3: `P3-lakar invalid: dokumen lama:
+dapur-wening-resep sudah ada sebelum run`. Dokumen itu sisa run P3 iterasi 4 yang dihentikan (tanpa `run.json`, jadi tidak
+diarsip `benchLakarSlugs`). Run `invalid` karena dokumen lama final menurut `isFinalRun` (C8), sehingga `--resume` tidak
+mengulangnya; juri tidak berjalan; P4 tidak dijalankan. Butuh keputusan Adam: izin run ulang P3/P4 + juri (sisa anggaran
+$7,09, perkiraan $5,10) dan/atau perbaikan harness pengarsipan run tanpa `run.json`.
+
+- Harness: `MAX_ITER` 7, `BUDGET_USD` 55,18 (+ tes), README (commit d82dbcf).
+- Skill v6 (commit d82dbcf): `mobile.md` layar pertama padat dan selesai rapi (header ≤ 64, visual puncak ≤ ±280, anggaran
+  tinggi terhadap zona bawah, seksi tidak muat mulai utuh di balik zona/board akhir, board akhir dibangun di execute
+  pertama, `scrollY` di awal seksi), §Alur execute (perbaiki semua temuan sekaligus, maks 3 execute), board tanpa
+  `layout`; `core.md` koleksi satu hue per kategori (palet kategori = satu peran), langkah 6 satu screenshot per board +
+  satu execute perbaikan semua temuan, tanpa `inspect`. core 3994/4000, mobile prosa 1481/1500.
+- Iterasi 7 (`--reuse-pendev 2`): P1 1,09× gate 0, P2 0,89× gate 0, P3 1,16× (invalid), P4 tidak dijalankan; emoji (a)/(b) 0.
+  Biaya $2,91; kumulatif $48,09 dari $55,18.
+- Verifikasi: build OK; 793/793 tes (48 file) sebelum run; api.md tanpa beda; protocolHash 907cb36f…edb85d; bench/protocol &
+  bench/rubric tidak berubah sejak 97ec581; `round --dry-run` sha = rubric.json; `practice --dry-run` OK; penjaga `.pen`
+  41 file berubah/hilang 0; lakard active; `tools/node26/verify.sh` exit 0.
+- Laporan: bench/practice-7.md; PNG Lakar bench/practice/7/P1,P2; LOG bench/practice/LOG.md.

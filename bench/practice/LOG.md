@@ -300,3 +300,35 @@ Perubahan skill v6 (prinsip umum, berlaku untuk layar apa pun):
 Skill: `core.md` 38e5bdecbeb86cfd, `landing.md` b953c1b2bae4a8d4 (tidak berubah), `mobile.md` 292380fd57fe8f8a.
 Verifikasi sebelum run: build OK, 793/793 tes (48 file; termasuk C7, batas token, contoh skill 0 error/warning/gate),
 api.md sama, protocolHash 907cb36f…edb85d, bench/protocol & bench/rubric tidak berubah sejak 97ec581, lakard active.
+
+### Hasil iterasi 7 (`bench/practice-7.md`, HEAD `d82dbcf`, pen.dev dipakai ulang dari iterasi 2): **dibatalkan**
+
+| Prompt | Waktu Lakar / pen.dev | Rasio | Gate | Emoji (a/b) | Keputusan | Catatan |
+|---|---|---|---|---|---|---|
+| P1 | 239,6 / 219,5 dtk | 1,09 | 0 | 0/0 | tidak dinilai | 5 execute + 1 FONT_MISSING (`≤`) + 1 `inspect` |
+| P2 | 132,2 / 147,7 dtk | 0,89 | 0 | 0/0 | tidak dinilai | dua board dibangun di execute pertama; tile koleksi kini 6 hue berbeda; 5 execute (3 perapatan berurutan) |
+| P3 | 150,5 / 129,9 dtk | 1,16 | – | 0/– | Kalah (run `invalid`) | `dokumen lama: dapur-wening-resep sudah ada sebelum run` |
+| P4 | – | – | – | – | tidak dijalankan | iterasi berhenti setelah P3 |
+
+- Penyebab: dokumen `dapur-wening-resep` (172 byte, 12:25 UTC) tertinggal dari run P3 iterasi 4 yang dihentikan. Run itu
+  tidak punya `run.json`, sehingga `benchLakarSlugs` (yang membaca slug dari `run.json`) tidak mengarsipkannya. Agen
+  iterasi 7 kebetulan memilih slug yang sama → `invalid` (`dokumen lama`).
+- Run `invalid` karena `dokumen lama` bersifat final menurut `isFinalRun` (agen sudah bekerja penuh; C8: tidak diulang untuk
+  memilih hasil), jadi `--resume` tidak boleh mengulang P3. Juri tidak dijalankan untuk prompt mana pun. Iterasi 8 tidak
+  diizinkan.
+- Kesan dari PNG P2 (tanpa juri, bukan keputusan): keragaman hue koleksi tercapai; layar pertama memuat semua bagian dan
+  board posisi akhir rapi; masih ada sisa butir daftar yang terlihat di celah antara tab bar mengambang dan home indicator
+  (tidak ditandai LC-20).
+- Disiplin alur akhir belum tercapai penuh: P2 3 execute perapatan berurutan setelah execute pertama, P3 2 SCHEMA_INVALID
+  + `layout_check` terpisah, P1 `inspect` tambahan; waktu tetap ≤ 1,16×.
+- Penjaga `.pen`: 41 file, berubah 0, hilang 0. lakard active.
+- Biaya iterasi 7: $2,91 (Lakar saja); kumulatif **$48,09** dari $55,18.
+
+## Status: HALT `blocked` (iterasi 7 = iterasi konfirmasi terakhir, dibatalkan karena run P3 `invalid`)
+
+- Butuh keputusan Adam: (a) izin satu run ulang P3 iterasi 7 (atau iterasi 8) setelah dokumen sisa iterasi 4 diarsip —
+  menyimpang dari aturan C8 `isFinalRun`, walau penyebabnya kegagalan setup harness, bukan pemilihan hasil; anggaran
+  sisa $7,09 cukup untuk P3 + P4 + juri 4 prompt (perkiraan $5,10); (b) perbaikan harness: `benchLakarSlugs` juga membaca
+  slug `open_doc` dari `stream.jsonl` run tanpa `run.json` (run yang dihentikan), agar sisa seperti ini selalu diarsip.
+- Catatan: dokumen `dapur-wening-resep` sekarang tercatat di `run.json` P3 iterasi 7, jadi arsip berikutnya akan
+  memindahkannya otomatis.
