@@ -3,13 +3,48 @@
 import type { BoardMeasure } from '@lakar/ports';
 import { findBoard, type Finding, type ResolvedBoardNode as BoardNode, type ResolvedDocument } from '@lakar/schema';
 import { codePoints, graphemes, isEmojiGrapheme, leadingIconGlyph, onlyIconGlyphs } from './glyphs.js';
-import { lc01a, lc01b, lc02a, lc05, lc12, lc20 } from './rules.js';
+import { capWarnings, lc01a, lc01b, lc02a, lc02b, lc04, lc05, lc11, lc12, lc18, lc20, lc23, lc24, lc25, lc26, lc27, lc28, lc29, lc30 } from './rules.js';
 import { boardContext } from './tree.js';
 
 export const PACKAGE = '@lakar/check';
 
 export { codePoints, emojiIn, graphemes, isEmojiGrapheme, leadingIconGlyph, LC01B_GLYPHS, onlyIconGlyphs } from './glyphs.js';
-export { BOTTOM_BAR_CLEARANCE, BOTTOM_BAR_MAX_GAP, bottomZone, lc01a, lc01b, lc02a, lc05, lc12, lc20, MIN_TEXT_SIZE, ORPHAN_MIN_BODY, SCREEN_SIZES, type BottomZone } from './rules.js';
+export {
+  BOTTOM_BAR_CLEARANCE,
+  BOTTOM_BAR_MAX_GAP,
+  bottomZone,
+  capWarnings,
+  CONTRAST_MIN,
+  CONTRAST_MIN_LARGE,
+  contrastRatio,
+  isLargeText,
+  lc01a,
+  lc01b,
+  lc02a,
+  lc02b,
+  lc04,
+  lc05,
+  lc11,
+  lc12,
+  lc18,
+  lc20,
+  lc23,
+  lc24,
+  lc25,
+  lc26,
+  lc27,
+  lc28,
+  lc29,
+  lc30,
+  MAX_WARNINGS_PER_RULE,
+  MIN_TEXT_SIZE,
+  ORPHAN_MIN_BODY,
+  paddingOf,
+  parseHex,
+  RANGE_HYPHEN,
+  SCREEN_SIZES,
+  type BottomZone,
+} from './rules.js';
 export { changedNodeIds, touchedBoards } from './touched.js';
 export { TOLERANCE, visibleRect } from './tree.js';
 
@@ -41,7 +76,7 @@ export function glyphScan(board: BoardNode): { findings: Finding[]; allowGlyphs:
   return { findings: [...lc01a(ctx), ...lc01b(ctx)], allowGlyphs: [...allow].sort((a, b) => a - b) };
 }
 
-const RULE_ORDER = ['LC-01a', 'LC-01b', 'LC-02a', 'LC-05', 'LC-12', 'LC-20'];
+const RULE_ORDER = ['LC-01a', 'LC-01b', 'LC-02a', 'LC-02b', 'LC-04', 'LC-05', 'LC-11', 'LC-12', 'LC-18', 'LC-20', 'LC-23', 'LC-24', 'LC-25', 'LC-26', 'LC-27', 'LC-28', 'LC-29', 'LC-30'];
 
 /**
  * Urutan stabil: error lalu warning, lalu urutan dokumen (`order` id → indeks) dan urutan aturan.
@@ -64,8 +99,30 @@ export function checkBoard({ doc, boardId, measure }: { doc: ResolvedDocument; b
   const board = findBoard(doc, boardId);
   if (!board) return [];
   const ctx = boardContext(board, measure);
-  const all = [...lc01a(ctx), ...lc01b(ctx), ...lc02a(ctx), ...lc05(ctx), ...lc12(ctx, doc), ...lc20(ctx)];
-  return sortFindings(all, ctx.order);
+  const clipped = lc02a(ctx);
+  const cut = new Set(clipped.map((f) => f.nodeId));
+  const all = [
+    ...lc01a(ctx),
+    ...lc01b(ctx),
+    ...clipped,
+    // Teks yang elemennya sudah terpotong clip (LC-02a) tidak dilaporkan lagi sebagai luapan ink.
+    ...lc02b(ctx).filter((f) => !cut.has(f.nodeId)),
+    ...lc04(ctx),
+    ...lc05(ctx),
+    ...lc11(ctx),
+    ...lc12(ctx, doc),
+    ...lc18(ctx),
+    ...lc20(ctx),
+    ...lc23(ctx),
+    ...lc24(ctx),
+    ...lc25(ctx),
+    ...lc26(ctx),
+    ...lc27(ctx),
+    ...lc28(ctx),
+    ...lc29(ctx),
+    ...lc30(ctx),
+  ];
+  return capWarnings(sortFindings(all, ctx.order));
 }
 
 /** `[x, y, w, h]` dibulatkan, relatif board. */

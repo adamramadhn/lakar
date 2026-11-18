@@ -128,14 +128,14 @@ export const STATUS_DESCRIPTION =
 
 /** Deskripsi tool `read_skill`. */
 export const READ_SKILL_DESCRIPTION =
-  'Baca panduan skill Lakar (Markdown). Urutan baca: core dulu (alur kerja, prelude helper, token, konvensi), lalu skill jenis layar ' +
-  '(landing atau mobile, berisi contoh teruji); icons bila ragu nama ikon; api hanya untuk referensi lengkap. ' +
+  'Baca panduan skill Lakar (Markdown). Baca core (alur kerja, prelude helper, token, konvensi) + polish (spacing, komponen, tipografi, kontras) ' +
+  '+ skill jenis layar (landing atau mobile, berisi contoh teruji) di giliran yang sama (panggilan paralel); icons bila ragu nama ikon; api hanya untuk referensi lengkap. ' +
   'Tanpa name → daftar {skills:[{name, available}]}; dengan name → isi skill. ' +
-  'Nama: core, landing, mobile, icons, api. Nama lain atau skill yang belum tersedia → NOT_FOUND dengan daftar yang tersedia.';
+  'Nama: core, polish, landing, mobile, icons, api. Nama lain atau skill yang belum tersedia → NOT_FOUND dengan daftar yang tersedia.';
 
 /** Instruksi server MCP (dikirim saat initialize): urutan kerja singkat. */
 export const SERVER_INSTRUCTIONS =
-  'Lakar: canvas desain lewat kode. Sebelum menggambar, read_skill core lalu read_skill landing atau mobile sesuai jenis layar. ' +
+  'Lakar: canvas desain lewat kode. Sebelum menggambar, read_skill core + polish + landing/mobile di giliran yang sama (paralel; app desktop: core + polish). ' +
   'Lalu open_doc dan bangun lewat sedikit execute besar (2–4 untuk landing, 1–2 untuk mobile) yang diawali prelude dari skill core; ' +
   'baca check di respons execute, perbaiki dengan editId/edits atau update, akhiri dengan satu screenshot, perbaikan, lalu export PNG.';
 
@@ -165,7 +165,11 @@ export const LAYOUT_CHECK_DESCRIPTION =
   "LC-20 konten tertutup zona bawah (bar 'Overlay / …' atau frame/rect absolut ber-fill yang menempel bawah atau mengambang, termasuk kapsul ber-fill di dalam pembungkus absolut transparan, ditumpuk): " +
   'konten terakhir posisi akhir scroll berakhir ≤ y zona − 8, tidak ada kartu/teks/gambar terpotong di tepi atas zona, ' +
   'tidak ada judul seksi yang isinya tertutup zona, dan tidak ada konten terlihat terpotong di celah di bawah bar mengambang atau mengintip di celah antar-bar bertumpuk; ' +
+  "LC-02b teks (ink terukur) meluap dari isi induk dan menabrak tepi/saudara (< 4px); LC-11 saudara tumpang tindih sebagian (kecuali 'Overlay / …', 'Crop / …', gap negatif); " +
+  'LC-04 kontras teks setelah komposit < 4.5:1 (teks ≥ 24 atau ≥ 19 tebal: < 3:1; di atas gradien/opacity/blend = warning, di atas foto/noise/mesh dilewati); ' +
   'LC-12 (warning) ukuran board (mobile 390×844, app 1440×900 atau 1440×1024, landing lebar 1440, atau expectedSize) dan tabrakan antarboard (pakai place). ' +
+  'Warning polesan: LC-18 kartu bersarang, LC-23 celah teks ↔ badge/tombol/ikon < 8, LC-24 proporsi badge di baris, LC-25 radius tidak konsentris, ' +
+  'LC-26 ruang di atas judul ≤ bawah, LC-27 > 6 ukuran huruf, LC-28 baris > 80 karakter, LC-29 bobot < 400 di < 18px, LC-30 tanda baca (... dan tanda hubung rentang); maks 3 per aturan per board. ' +
   'Selesai bila 0 error gerbang. Output: satu baris ringkasan lalu satu baris per temuan ' +
   "'<level>[·gerbang] · <aturan> · <nama node> (<id>) · <terukur> · <seharusnya>' (maks 60 baris). " +
   'Board tidak ada → NOT_FOUND; dokumen yang tidak bisa dirender → error yang sama dengan screenshot.';

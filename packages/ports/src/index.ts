@@ -4,8 +4,14 @@ export const PACKAGE = '@lakar/ports';
 
 /** Bounds satu node hasil render, relatif border-box board (float, px CSS). */
 export type NodeBounds = { id: string; x: number; y: number; width: number; height: number };
-/** Baris teks terukur. */
-export type TextMeasure = { id: string; lines: number; lineHeight: number };
+/** Kotak relatif border-box board (px CSS). */
+export type InkRect = { x: number; y: number; width: number; height: number };
+/**
+ * Baris teks terukur. `ink` = gabungan kotak glyph (Range) dari karakter non-spasi pertama sampai terakhir, relatif
+ * board; vertikal per baris = kotak baris (line-height). Bisa melewati bounds elemen (mis. teks `pre` di kolom sempit).
+ * Teks kosong/hanya spasi: tanpa `ink`.
+ */
+export type TextMeasure = { id: string; lines: number; lineHeight: number; ink?: InkRect };
 /** Hasil ukur board (AD-5): ukuran board + bounds setiap node anak (urutan DOM = urutan dokumen). */
 export type BoardMeasure = { width: number; height: number; nodes: NodeBounds[]; texts: TextMeasure[] };
 

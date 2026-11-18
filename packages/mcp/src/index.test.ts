@@ -14,7 +14,7 @@ import { chromiumInstalled, DEFAULT_BROWSERS_PATH } from '../../../tests/support
 import { testLog } from '../../../tests/support/log.ts';
 
 /** Skill v1 (packages/skills; mcp tidak bergantung pada paket itu, hanya membaca file untuk perbandingan). */
-const SKILL_NAMES = ['core', 'landing', 'mobile', 'icons', 'api'] as const;
+const SKILL_NAMES = ['core', 'polish', 'landing', 'mobile', 'icons', 'api'] as const;
 const readSkill = (name: string) => readFile(fileURLToPath(new URL(`../../skills/skills/${name}.md`, import.meta.url)), 'utf8');
 
 const PNG_B64 = Buffer.from('fake-png').toString('base64');
@@ -119,7 +119,7 @@ function fakeDaemon() {
     if (req.url === '/skills/read') {
       if (body.name === undefined) return send(200, { ok: true, data: { skills: [{ name: 'core', available: true }] } });
       if (body.name === 'core') return send(200, { ok: true, data: { name: 'core', content: '# core\nisi' } });
-      return send(404, { ok: false, error: { code: 'NOT_FOUND', message: `skill "${body.name}" tidak ada`, hint: 'skill dikenal: core, landing, mobile, icons, api; tersedia: core', retryable: false } });
+      return send(404, { ok: false, error: { code: 'NOT_FOUND', message: `skill "${body.name}" tidak ada`, hint: 'skill dikenal: core, polish, landing, mobile, icons, api; tersedia: core', retryable: false } });
     }
     if (req.url === '/screenshot') {
       if (body.boardId === 'ZZZZZZZZ') return send(404, { ok: false, error: { code: 'NOT_FOUND', message: 'board tidak ada', hint: 'pakai id', retryable: false } });
@@ -191,14 +191,14 @@ describe('@lakar/mcp', () => {
     expect(PHOTO_SEARCH_DESCRIPTION).toContain("photo('<ref>')");
   });
 
-  it('instructions server: read_skill core lalu skill jenis layar, sedikit execute besar; deskripsi read_skill menyarankan urutan', async () => {
+  it('instructions server: read_skill core + polish + skill jenis layar di giliran yang sama, sedikit execute besar; deskripsi read_skill menyebut polish', async () => {
     const c = await connect(url);
     const ins = c.getInstructions() ?? '';
     expect(ins).toBe(SERVER_INSTRUCTIONS);
-    expect(ins.indexOf('read_skill core')).toBeGreaterThanOrEqual(0);
-    expect(ins.indexOf('read_skill core')).toBeLessThan(ins.indexOf('landing atau mobile'));
+    expect(ins).toContain('read_skill core + polish + landing/mobile di giliran yang sama');
     expect(ins).toContain('sedikit execute besar');
-    expect(READ_SKILL_DESCRIPTION).toMatch(/core dulu.*landing atau mobile/);
+    expect(READ_SKILL_DESCRIPTION).toMatch(/core .*\+ polish .*\+ skill jenis layar \(landing atau mobile.*giliran yang sama/);
+    expect(READ_SKILL_DESCRIPTION).toContain('Nama: core, polish, landing, mobile, icons, api.');
   });
 
   it('sesi dibuat dengan versi mcp: POST /sessions {client, version, schemaVersion}', async () => {
@@ -297,7 +297,7 @@ describe('@lakar/mcp', () => {
     expect((core.content as any)[0].text).toBe('# core\nisi');
     const none = await c.callTool({ name: 'read_skill', arguments: { name: 'landing' } });
     expect(none.isError).toBe(true);
-    expect((none.content as any)[0].text).toMatch(/^NOT_FOUND: .*\nhint: skill dikenal: core, landing, mobile, icons, api/);
+    expect((none.content as any)[0].text).toMatch(/^NOT_FOUND: .*\nhint: skill dikenal: core, polish, landing, mobile, icons, api/);
     const boards = await c.callTool({ name: 'list_boards', arguments: {} });
     expect(JSON.parse((boards.content as any)[0].text).boards[0]).toMatchObject({ wip: true });
     const ins = await c.callTool({ name: 'inspect', arguments: { id: 'Tttttttt', depth: 1 } });

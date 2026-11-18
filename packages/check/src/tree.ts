@@ -1,6 +1,6 @@
 // Penelusuran pohon board (urutan dokumen) untuk aturan check. Murni.
 import type { ResolvedBoardNode as BoardNode, ResolvedChildNode as ChildNode, ResolvedFrameNode as FrameNode } from '@lakar/schema';
-import type { BoardMeasure, NodeBounds } from '@lakar/ports';
+import type { BoardMeasure, NodeBounds, TextMeasure } from '@lakar/ports';
 
 export type Container = BoardNode | FrameNode;
 export type Rect = { x: number; y: number; width: number; height: number };
@@ -31,6 +31,10 @@ export type BoardContext = {
   /** Semua node anak, urutan dokumen. */
   nodes: readonly ChildNode[];
   parentOf: ReadonlyMap<string, Container>;
+  /** Ink teks terukur (id teks → kotak glyph relatif board); tanpa entri = pakai bounds. */
+  ink: ReadonlyMap<string, Rect>;
+  /** Hasil ukur teks per id (baris, line-height). */
+  textMeasure: ReadonlyMap<string, TextMeasure>;
 };
 
 export function boardContext(board: BoardNode, measure: BoardMeasure): BoardContext {
@@ -54,7 +58,33 @@ export function boardContext(board: BoardNode, measure: BoardMeasure): BoardCont
     order,
     nodes,
     parentOf,
+    ink: new Map(measure.texts.flatMap((t) => (t.ink ? [[t.id, t.ink] as const] : []))),
+    textMeasure: new Map(measure.texts.map((t) => [t.id, t])),
   };
+}
+
+/** Leluhur `n` dari induk langsung sampai board (inklusif). */
+export function ancestors(ctx: BoardContext, n: { id: string }): Container[] {
+  const out: Container[] = [];
+  for (let p = ctx.parentOf.get(n.id); p; p = ctx.parentOf.get(p.id)) out.push(p);
+  return out;
+}
+
+/** Kotak tinta teks (ink terukur, atau bounds bila tidak ada). */
+export function inkRect(ctx: BoardContext, n: { id: string }): Rect | undefined {
+  return ctx.ink.get(n.id) ?? ctx.bounds.get(n.id);
+}
+
+/** `a` memuat `b` (toleransi pembulatan). */
+export function contains(a: Rect, b: Rect, tol = TOLERANCE): boolean {
+  return b.x >= a.x - tol && b.y >= a.y - tol && right(b) <= right(a) + tol && bottom(b) <= bottom(a) + tol;
+}
+
+/** Gabungan dua kotak. */
+export function union(a: Rect, b: Rect): Rect {
+  const x = Math.min(a.x, b.x);
+  const y = Math.min(a.y, b.y);
+  return { x, y, width: Math.max(right(a), right(b)) - x, height: Math.max(bottom(a), bottom(b)) - y };
 }
 
 /** Semua keturunan `n` (tanpa `n`). */

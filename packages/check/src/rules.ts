@@ -1,10 +1,14 @@
 // Aturan G0 (AD-8): satu fungsi per aturan. Masukan: board ter-resolve + hasil ukur render. Murni.
-import type { Finding, ResolvedDocument, ResolvedTextNode as TextNode } from '@lakar/schema';
+import { G0_RULES, type Finding, type ResolvedDocument, type ResolvedFill, type ResolvedTextNode as TextNode } from '@lakar/schema';
 import { cpLabel, codePoints, emojiIn, GLYPH_ICON, leadingIconGlyph } from './glyphs.js';
 import {
+  ancestors,
   area,
   bottom,
+  contains,
   descendants,
+  inkRect,
+  union,
   isFlowChild,
   named,
   num,
@@ -633,5 +637,636 @@ export function lc20(ctx: BoardContext): Finding[] {
     }
   };
   walk(board.children);
+  return out;
+}
+
+// ===========================================================================
+// Aturan polesan (story 1.23): luapan ink, tumpang tindih, kontras (error); spacing, proporsi, tipografi (warning).
+// ===========================================================================
+
+const levelOf = (rule: Finding['rule']): Finding['level'] => G0_RULES[rule].level;
+const nonEmpty = (t: TextNode): boolean => t.content.trim() !== '';
+const rotated = (n: { rotation?: number | undefined }): boolean => (n.rotation ?? 0) !== 0;
+/** Komponen: aturan spacing/proporsi tidak menilai isi di dalamnya. */
+const COMPONENTS = ['Button /', 'IconButton /', 'Badge /', 'Chip /', 'Tab /', 'Link /', 'Input /'];
+const isComponent = (n: { name: string }): boolean => COMPONENTS.some((c) => named(n, c));
+const inComponent = (ctx: BoardContext, n: ChildNode): boolean => isComponent(n) || ancestors(ctx, n).some((a) => a.type === 'frame' && isComponent(a));
+
+type Pad = { t: number; r: number; b: number; l: number };
+const ZERO_PAD: Pad = { t: 0, r: 0, b: 0, l: 0 };
+
+/** Padding frame per sisi (`n` | `[v,h]` | `[t,r,b,l]`); board = 0. */
+export function paddingOf(n: Container): Pad {
+  if (n.type === 'board' || n.padding === undefined) return ZERO_PAD;
+  const p = n.padding as number | readonly number[];
+  if (typeof p === 'number') return { t: p, r: p, b: p, l: p };
+  if (p.length === 2) return { t: p[0]!, r: p[1]!, b: p[0]!, l: p[1]! };
+  return { t: p[0]!, r: p[1]!, b: p[2]!, l: p[3]! };
+}
+
+const textsIn = (n: ChildNode): TextNode[] => [n, ...descendants(n)].filter((t): t is TextNode => t.type === 'text' && nonEmpty(t));
+const lineHeightOf = (ctx: BoardContext, t: TextNode): number => ctx.textMeasure.get(t.id)?.lineHeight ?? t.lineHeight ?? 1.2 * t.size;
+const fillsOf = (n: ChildNode | Container): readonly ResolvedFill[] => ((n as { fills?: readonly ResolvedFill[] }).fills ?? []);
+const strokeAll = (n: ChildNode): boolean => {
+  const s = (n as { stroke?: { sides?: readonly string[] } }).stroke;
+  return s !== undefined && (!s.sides || s.sides.length >= 4);
+};
+const dropShadow = (n: ChildNode): boolean => ((n as { shadows?: readonly { type?: string }[] }).shadows ?? []).some((s) => s.type !== 'inner');
+
+/** Batasi detail warning ≤ 120 karakter. */
+const clip120 = (s: string): string => ([...s].length > 120 ? `${[...s].slice(0, 119).join('')}…` : s);
+
+// ---------------------------------------------------------------------------
+// LC-02b · ink teks meluap dari content box induk
+// ---------------------------------------------------------------------------
+
+/** Luapan > 1 px dihitung (ink Range bisa berbeda sub-piksel dari bounds). */
+export const INK_OVERFLOW_MIN = 1;
+/**
+ * Luapan baru cacat bila sisa jarak ink ke batas tampak terdekat di sisi itu < 4 px: tepi wadah ber-cat (fill/stroke)
+ * atau ber-clip terdekat, tepi board, atau saudara (dari teks sampai wadah itu) yang menghadang di sisi itu.
+ * Luapan kecil ke padding yang masih lega tidak terlihat sebagai cacat.
+ */
+export const INK_CLEARANCE_MIN = 4;
+
+type Side = (typeof SIDES)[number];
+const painted = (n: Container): boolean => n.type === 'board' || fillsOf(n).length > 0 || (n as { stroke?: unknown }).stroke !== undefined || n.clip === true;
+
+/** Sisa jarak ink ke batas tampak di `side` (negatif = menabrak); `by` = nama penghadang. */
+function clearance(ctx: BoardContext, t: TextNode, ink: Rect, side: Side): { gap: number; by: string } {
+  let best = { gap: Infinity, by: '' };
+  const take = (gap: number, by: string) => {
+    if (gap < best.gap) best = { gap, by };
+  };
+  let unit: ChildNode = t;
+  for (const a of ancestors(ctx, t)) {
+    const ur = unit.type === 'text' ? ink : ctx.bounds.get(unit.id);
+    for (const s of a.children) {
+      if (s === unit || named(s, 'Overlay /') || named(s, 'Crop /') || !ur) continue;
+      const sr = s.type === 'text' ? (nonEmpty(s) ? inkRect(ctx, s) : undefined) : ctx.bounds.get(s.id);
+      if (!sr || area(sr) <= 0 || !visibleRect(ctx, s)) continue;
+      const hOverlap = Math.min(bottom(sr), bottom(ink)) - Math.max(sr.y, ink.y) > 0;
+      const vOverlap = Math.min(right(sr), right(ink)) - Math.max(sr.x, ink.x) > 0;
+      if (side === 'kanan' && hOverlap && sr.x >= right(ur) - TOLERANCE) take(sr.x - right(ink), `${s.name} (${s.id})`);
+      if (side === 'kiri' && hOverlap && right(sr) <= ur.x + TOLERANCE) take(ink.x - right(sr), `${s.name} (${s.id})`);
+      if (side === 'bawah' && vOverlap && sr.y >= bottom(ur) - TOLERANCE) take(sr.y - bottom(ink), `${s.name} (${s.id})`);
+      if (side === 'atas' && vOverlap && bottom(sr) <= ur.y + TOLERANCE) take(ink.y - bottom(sr), `${s.name} (${s.id})`);
+    }
+    if (painted(a)) {
+      const r = a.type === 'board' ? ctx.boardRect : ctx.bounds.get(a.id);
+      if (r) {
+        const o = overflow(ink, r);
+        take(-o[side], `tepi ${a.name} (${a.id})`);
+      }
+      break;
+    }
+    if (a.type === 'board') break;
+    unit = a;
+  }
+  return best;
+}
+
+export function lc02b(ctx: BoardContext): Finding[] {
+  const out: Finding[] = [];
+  for (const t of texts(ctx)) {
+    if (!nonEmpty(t) || rotated(t) || named(t, 'Overlay /')) continue;
+    const ink = ctx.ink.get(t.id);
+    if (!ink || !visibleRect(ctx, t)) continue;
+    const anc = ancestors(ctx, t);
+    if (anc.some((a) => a.type === 'frame' && (named(a, 'Crop /') || named(a, 'Overlay /') || rotated(a)))) continue;
+    const parent = anc[0]!;
+    const pr = parent.type === 'board' ? ctx.boardRect : ctx.bounds.get(parent.id);
+    if (!pr) continue;
+    // Anak flow: content box (bounds − padding); anak absolut / frame layout none: padding box (= bounds).
+    const pad = isFlowChild(parent, t) ? paddingOf(parent) : ZERO_PAD;
+    const box: Rect = { x: pr.x + pad.l, y: pr.y + pad.t, width: pr.width - pad.l - pad.r, height: pr.height - pad.t - pad.b };
+    const o = overflow(ink, box);
+    const scrolled = parent.type === 'frame' && (parent.scrollY ?? 0) > 0;
+    const hits = SIDES.flatMap((s) => {
+      if (o[s] <= INK_OVERFLOW_MIN || (scrolled && (s === 'atas' || s === 'bawah'))) return [];
+      const c = clearance(ctx, t, ink, s);
+      return c.gap < INK_CLEARANCE_MIN ? [{ s, c }] : [];
+    });
+    if (!hits.length) continue;
+    out.push(
+      finding(
+        'LC-02b',
+        levelOf('LC-02b'),
+        t,
+        `teks ${quote(t.content)} meluap ${hits.map(({ s, c }) => `${num(o[s])}px di ${s} (sisa ${num(c.gap)}px ke ${c.by})`).join(', ')} dari isi ${parent.name} (${parent.id})`,
+        `di dalam isi induk: teks width:'fill' (dibungkus) atau perlebar/perpendek; di Row, teks fill dan badge/ikon hug`,
+      ),
+    );
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+// LC-11 · saudara tumpang tindih sebagian
+// ---------------------------------------------------------------------------
+
+export function lc11(ctx: BoardContext): Finding[] {
+  const out: Finding[] = [];
+  const containers: Container[] = [ctx.board, ...ctx.nodes.filter((n): n is FrameNode => n.type === 'frame')];
+  for (const c of containers) {
+    if (c.type === 'frame' && ((c.gap ?? 0) as number) < 0) continue;
+    const kids = c.children.flatMap((k) => {
+      if (named(k, 'Overlay /') || named(k, 'Crop /') || rotated(k) || (k.opacity ?? 1) <= 0) return [];
+      if (!visibleRect(ctx, k)) return [];
+      const r = k.type === 'text' ? inkRect(ctx, k) : ctx.bounds.get(k.id);
+      if (!r || area(r) <= 0) return [];
+      const hasText = k.type === 'text' ? nonEmpty(k) : textsIn(k).length > 0;
+      return [{ k, r, flow: isFlowChild(c, k), hasText }];
+    });
+    for (let j = 1; j < kids.length; j++) {
+      const b = kids[j]!;
+      for (let i = 0; i < j; i++) {
+        const a = kids[i]!;
+        if (!(a.flow && b.flow) && !(a.hasText && b.hasText)) continue;
+        const ix = intersect(a.r, b.r);
+        if (!ix || ix.width < 1 || ix.height < 1) continue;
+        // Termuat penuh di dalam bentuk/wadah (mis. label di tengah ring) bukan tabrakan; ink teks yang menutupi saudara tetap tabrakan.
+        if ((a.k.type !== 'text' && contains(a.r, b.r)) || (b.k.type !== 'text' && contains(b.r, a.r))) continue;
+        out.push(
+          finding(
+            'LC-11',
+            levelOf('LC-11'),
+            b.k,
+            `tumpang tindih ${num(ix.width)}×${num(ix.height)}px dengan ${a.k.name} (${a.k.id}) di ${c.name}`,
+            `pisahkan (perkecil/bungkus teks, gap ≥ 8); tumpukan sengaja: frame "Overlay / …"`,
+          ),
+        );
+        break;
+      }
+    }
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+// LC-04 · kontras teks setelah komposit
+// ---------------------------------------------------------------------------
+
+type RGB = [number, number, number];
+type RGBA = [number, number, number, number];
+
+export function parseHex(hex: string): RGBA {
+  const h = hex.replace('#', '');
+  const v = (i: number) => parseInt(h.slice(i, i + 2), 16) / 255;
+  return [v(0), v(2), v(4), h.length >= 8 ? v(6) : 1];
+}
+const over = (top: RGBA, bottom: RGB, alpha = 1): RGB => {
+  const a = top[3] * alpha;
+  return [top[0] * a + bottom[0] * (1 - a), top[1] * a + bottom[1] * (1 - a), top[2] * a + bottom[2] * (1 - a)];
+};
+const lin = (c: number) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+const luminance = (c: RGB) => 0.2126 * lin(c[0]) + 0.7152 * lin(c[1]) + 0.0722 * lin(c[2]);
+/** Rasio kontras WCAG 2. */
+export function contrastRatio(a: RGB, b: RGB): number {
+  const [x, y] = [luminance(a), luminance(b)].sort((p, q) => q - p) as [number, number];
+  return (x + 0.05) / (y + 0.05);
+}
+const toHex = (c: RGB) => `#${c.map((v) => Math.round(v * 255).toString(16).padStart(2, '0')).join('').toUpperCase()}`;
+
+export const CONTRAST_MIN = 4.5;
+export const CONTRAST_MIN_LARGE = 3;
+/** Teks besar: ≥ 24px, atau ≥ 19px dengan bobot ≥ 700. */
+export const isLargeText = (t: { size: number; weight?: number | undefined }): boolean => t.size >= 24 || (t.size >= 19 && (t.weight ?? 400) >= 700);
+const MAX_CANDIDATES = 64;
+type Effects = { opacity?: number | undefined; blend?: string | undefined; backdropBlur?: number | undefined };
+const effectsOf = (n: unknown): Effects => n as Effects;
+
+export function lc04(ctx: BoardContext): Finding[] {
+  const out: Finding[] = [];
+  const painters = ctx.nodes.filter((n) => (n.type === 'frame' || n.type === 'rect' || n.type === 'ellipse' || n.type === 'path') && fillsOf(n).length > 0);
+  for (const t of texts(ctx)) {
+    if (!nonEmpty(t) || (t.opacity ?? 1) <= 0) continue;
+    const ink = inkRect(ctx, t);
+    if (!ink || area(ink) <= 0 || !visibleRect(ctx, t)) continue;
+    const order = ctx.order.get(t.id)!;
+    const anc = ancestors(ctx, t);
+    const ancIds = new Set(anc.map((a) => a.id));
+    let warn = false;
+    let alphaText = 1;
+    for (const n of [t, ...anc.filter((a): a is FrameNode => a.type === 'frame')]) {
+      const e = effectsOf(n);
+      if (e.opacity !== undefined && e.opacity < 1) {
+        alphaText *= e.opacity;
+        warn = true;
+      }
+      if (e.blend && e.blend !== 'normal') warn = true;
+    }
+    // Penutup di atas teks (urutan sesudahnya) → tak tentu.
+    let indeterminate = false;
+    for (const p of painters) {
+      if (ctx.order.get(p.id)! <= order) continue;
+      const v = visibleRect(ctx, p);
+      if (v && intersect(v, ink)) {
+        indeterminate = true;
+        break;
+      }
+    }
+    if (indeterminate) continue;
+    // Lapisan di bawah teks: leluhur + node sebelumnya yang memuat penuh ink (lainnya yang beririsan = sebagian).
+    type Layer = { node: ChildNode | Container; partial: boolean; alpha: number };
+    const layers: Layer[] = [];
+    for (const p of painters) {
+      if (ctx.order.get(p.id)! >= order) continue;
+      const isAnc = ancIds.has(p.id);
+      const v = visibleRect(ctx, p);
+      if (!v || !intersect(v, ink)) continue;
+      const shape = p.type === 'ellipse' || p.type === 'path';
+      const partial = shape || (!isAnc && !contains(v, ink));
+      let alpha = 1;
+      for (const n of [p, ...ancestors(ctx, p).filter((a) => a.type === 'frame' && !ancIds.has(a.id))]) {
+        const e = effectsOf(n);
+        if (e.opacity !== undefined && e.opacity < 1) alpha *= e.opacity;
+        if ((e.opacity !== undefined && e.opacity < 1) || (e.blend && e.blend !== 'normal') || (e.backdropBlur ?? 0) > 0) warn = true;
+      }
+      layers.push({ node: p, partial, alpha });
+    }
+    layers.sort((a, b) => (ctx.order.get(a.node.id) ?? 0) - (ctx.order.get(b.node.id) ?? 0));
+    // Turun dari lapisan teratas sampai fill opak penuh (dasar).
+    type Paint = { fill: ResolvedFill; alpha: number };
+    const above: Paint[] = [];
+    let base: RGB[] | undefined;
+    let skip = false;
+    scan: for (let i = layers.length - 1; i >= 0; i--) {
+      const l = layers[i]!;
+      if (l.partial) {
+        skip = true;
+        break;
+      }
+      const fills = fillsOf(l.node);
+      for (let j = fills.length - 1; j >= 0; j--) {
+        const f = fills[j]!;
+        if (f.type === 'image' || f.type === 'noise' || f.type === 'mesh') {
+          skip = true;
+          break scan;
+        }
+        const stops = f.type === 'solid' ? [f.color] : f.stops.map((s) => s.color);
+        if (f.type !== 'solid') warn = true;
+        if (l.alpha >= 1 && stops.every((c) => parseHex(c)[3] >= 1)) {
+          base = stops.map((c) => parseHex(c).slice(0, 3) as RGB);
+          break scan;
+        }
+        above.push({ fill: f, alpha: l.alpha });
+      }
+    }
+    if (skip) continue;
+    if (!base) {
+      const bf = fillsOf(ctx.board);
+      if (bf.some((f) => f.type === 'image' || f.type === 'noise' || f.type === 'mesh')) continue;
+      base = [[1, 1, 1]];
+      for (const f of bf) {
+        const stops = f.type === 'solid' ? [f.color] : (f as { stops: { color: string }[] }).stops.map((s) => s.color);
+        if (f.type !== 'solid') warn = true;
+        base = base.flatMap((c) => stops.map((s) => over(parseHex(s), c)));
+      }
+    }
+    let cands = base;
+    for (let k = above.length - 1; k >= 0; k--) {
+      const { fill: f, alpha } = above[k]!;
+      const stops = f.type === 'solid' ? [f.color] : (f as { stops: { color: string }[] }).stops.map((s) => s.color);
+      cands = cands.flatMap((c) => stops.map((s) => over(parseHex(s), c, alpha)));
+      if (cands.length > MAX_CANDIDATES) {
+        skip = true;
+        break;
+      }
+    }
+    if (skip) continue;
+    const fg = parseHex(t.color ?? '#000000');
+    let worst: { ratio: number; text: RGB; bg: RGB } | undefined;
+    for (const bg of cands) {
+      const text = over(fg, bg, alphaText);
+      const ratio = contrastRatio(text, bg);
+      if (!worst || ratio < worst.ratio) worst = { ratio, text, bg };
+    }
+    if (!worst) continue;
+    const min = isLargeText(t) ? CONTRAST_MIN_LARGE : CONTRAST_MIN;
+    if (worst.ratio >= min) continue;
+    const ratio = Math.floor(worst.ratio * 100) / 100;
+    out.push(
+      finding(
+        'LC-04',
+        warn ? 'warning' : levelOf('LC-04'),
+        t,
+        clip120(`kontras ${ratio}:1 (${toHex(worst.text)} di atas ${toHex(worst.bg)}${warn ? ', gradien/opacity/blend: perkiraan' : ''}) ${quote(t.content)}`),
+        `≥ ${min}:1 setelah komposit: teks lebih gelap/terang atau latar lebih kontras; acc2/kuning bukan teks kecil`,
+      ),
+    );
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+// LC-23 · celah teks ↔ badge/tombol/ikon di Row < 8 (warning)
+// ---------------------------------------------------------------------------
+
+export const ROW_GAP_MIN = 8;
+
+export function lc23(ctx: BoardContext): Finding[] {
+  const out: Finding[] = [];
+  const isTarget = (n: ChildNode) => (n.type === 'frame' && (named(n, 'Badge /') || named(n, 'Button /') || named(n, 'IconButton /'))) || (n.type === 'icon' && n.size >= 20);
+  /** Teks atau frame berisi teks (bukan target): kotak = bounds ∪ ink teks di dalamnya. */
+  const textExtent = (n: ChildNode): Rect | undefined => {
+    if (isTarget(n)) return undefined;
+    if (n.type === 'text') return nonEmpty(n) ? inkRect(ctx, n) : undefined;
+    const ts = textsIn(n);
+    if (!ts.length) return undefined;
+    let r: Rect | undefined = ctx.bounds.get(n.id);
+    for (const t of ts) {
+      const i = ctx.ink.get(t.id);
+      if (r && i) r = union(r, i);
+    }
+    return r;
+  };
+  for (const row of ctx.nodes) {
+    if (row.type !== 'frame' || row.layout !== 'row' || inComponent(ctx, row)) continue;
+    const flow = row.children.filter((k) => isFlowChild(row, k) && !!visibleRect(ctx, k));
+    for (let i = 1; i < flow.length; i++) {
+      const a = flow[i - 1]!;
+      const b = flow[i]!;
+      let gap: number | undefined;
+      let target: ChildNode | undefined;
+      let other: ChildNode | undefined;
+      const ea = textExtent(a);
+      const eb = textExtent(b);
+      if (ea && isTarget(b)) {
+        gap = ctx.bounds.get(b.id)!.x - right(ea);
+        [target, other] = [b, a];
+      } else if (isTarget(a) && eb) {
+        gap = eb.x - right(ctx.bounds.get(a.id)!);
+        [target, other] = [a, b];
+      }
+      if (gap === undefined || gap >= ROW_GAP_MIN - TOLERANCE) continue;
+      out.push(finding('LC-23', 'warning', target!, `celah ${num(gap)}px ke teks ${other!.name} (${other!.id})`, `≥ ${ROW_GAP_MIN}: gap Row ≥ 8, teks width:'fill', badge/ikon hug`));
+    }
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+// LC-24 · proporsi badge di baris (warning)
+// ---------------------------------------------------------------------------
+
+export function lc24(ctx: BoardContext): Finding[] {
+  const out: Finding[] = [];
+  const isBadge = (n: ChildNode) => n.type === 'frame' && named(n, 'Badge /');
+  /** Teks saudara (kedalaman ≤ 2 dari baris), tanpa isi badge. */
+  const siblingTexts = (row: Container, unit: ChildNode): TextNode[] => {
+    const outT: TextNode[] = [];
+    for (const k of row.children) {
+      if (k === unit || isBadge(k) || !isFlowChild(row, k)) continue;
+      if (k.type === 'text' && nonEmpty(k)) outT.push(k);
+      if (k.type === 'frame') for (const g of k.children) if (g.type === 'text' && nonEmpty(g)) outT.push(g);
+    }
+    return outT;
+  };
+  for (const b of ctx.nodes) {
+    if (!isBadge(b) || !visibleRect(ctx, b)) continue;
+    if (ancestors(ctx, b).some((a) => a.type === 'frame' && isComponent(a))) continue;
+    let unit: ChildNode = b;
+    let row = ctx.parentOf.get(b.id)!;
+    let sib = siblingTexts(row, unit);
+    // Pembungkus berisi badge saja (mis. kolom status, grup badge): naik maks 2 tingkat.
+    for (let up = 0; !sib.length && up < 2 && row.type === 'frame'; up++) {
+      unit = row;
+      row = ctx.parentOf.get(row.id)!;
+      sib = siblingTexts(row, unit);
+    }
+    if (!sib.length || row.type !== 'frame' || row.layout !== 'row') continue;
+    const big = sib.reduce((m, t) => (t.size > m.size || (t.size === m.size && lineHeightOf(ctx, t) > lineHeightOf(ctx, m)) ? t : m));
+    const lh = lineHeightOf(ctx, big);
+    const h = ctx.bounds.get(b.id)?.height ?? 0;
+    const own = textsIn(b);
+    const ownSize = Math.max(0, ...own.map((t) => t.size));
+    const ownLines = Math.max(0, ...own.map((t) => ctx.textMeasure.get(t.id)?.lines ?? 1));
+    const issues: string[] = [];
+    if (h > lh + TOLERANCE) issues.push(`tinggi ${num(h)} > line-height ${num(lh)}`);
+    if (ownSize > 0 && ownSize >= big.size) issues.push(`teks ${num(ownSize)} ≥ ${num(big.size)}`);
+    if (ownLines > 1) issues.push(`teks ${ownLines} baris`);
+    if (!issues.length) continue;
+    out.push(finding('LC-24', 'warning', b, `${issues.join(', ')} dari ${quote(big.content)}`, `Badge sm (20, teks 12) di baris; md (24) hanya di samping judul ≥ 18; 1 baris, hug`));
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+// LC-18 · kartu bersarang (warning)
+// ---------------------------------------------------------------------------
+
+export function lc18(ctx: BoardContext): Finding[] {
+  const isCard = (n: ChildNode | Container): n is FrameNode => {
+    if (n.type !== 'frame' || isComponent(n) || named(n, 'Overlay /') || n.children.length < 2) return false;
+    if (!(fillsOf(n).length > 0 || strokeAll(n))) return false;
+    const p = paddingOf(n);
+    return Math.min(p.t, p.r, p.b, p.l) >= 12;
+  };
+  const elevated = (n: ChildNode) => strokeAll(n) || dropShadow(n);
+  const out: Finding[] = [];
+  for (const c of ctx.nodes) {
+    if (!isCard(c) || !elevated(c) || !visibleRect(ctx, c)) continue;
+    const outer = ancestors(ctx, c).find((a): a is FrameNode => isCard(a) && elevated(a));
+    if (!outer) continue;
+    out.push(finding('LC-18', 'warning', c, `kartu ber-${strokeAll(c) ? 'garis' : 'bayangan'} di dalam kartu ${outer.name} (${outer.id})`, 'satu lapis: kartu dalam jadi baris/bidang tanpa garis dan bayangan, atau judul di luar kartu'));
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+// LC-25 · radius tidak konsentris (warning)
+// ---------------------------------------------------------------------------
+
+export const CONCENTRIC_MAX_PAD = 24;
+const CORNERS = [
+  { key: 'kiri atas', i: 0, h: 'l', v: 't' },
+  { key: 'kanan atas', i: 1, h: 'r', v: 't' },
+  { key: 'kanan bawah', i: 2, h: 'r', v: 'b' },
+  { key: 'kiri bawah', i: 3, h: 'l', v: 'b' },
+] as const;
+
+export function lc25(ctx: BoardContext): Finding[] {
+  const out: Finding[] = [];
+  const radii = (n: { radius?: number | readonly number[] | undefined }): [number, number, number, number] => {
+    const r = n.radius ?? 0;
+    return typeof r === 'number' ? [r, r, r, r] : [r[0]!, r[1]!, r[2]!, r[3]!];
+  };
+  for (const p of ctx.nodes) {
+    if (p.type !== 'frame' || !p.children.length) continue;
+    const pr = ctx.bounds.get(p.id);
+    if (!pr) continue;
+    const ro = radii(p);
+    const full = Math.min(pr.width, pr.height) / 2 - TOLERANCE;
+    const pad = paddingOf(p);
+    for (const c of p.children) {
+      if ((c.type !== 'frame' && c.type !== 'rect') || !(fillsOf(c).length > 0 || c.stroke !== undefined)) continue;
+      const cr = ctx.bounds.get(c.id);
+      if (!cr || area(cr) <= 0) continue;
+      const ri = radii(c);
+      const cFull = Math.min(cr.width, cr.height) / 2 - TOLERANCE;
+      for (const k of CORNERS) {
+        const Ro = ro[k.i];
+        const Ri = ri[k.i];
+        const ph = pad[k.h];
+        const pv = pad[k.v];
+        if (Ro <= 0 || Ro >= full || Ri >= cFull) continue;
+        if (ph <= 0 || pv <= 0 || ph > CONCENTRIC_MAX_PAD || pv > CONCENTRIC_MAX_PAD || Math.abs(ph - pv) > 2) continue;
+        const ex = k.h === 'l' ? pr.x + ph : right(pr) - ph;
+        const ey = k.v === 't' ? pr.y + pv : bottom(pr) - pv;
+        const cx = k.h === 'l' ? cr.x : right(cr);
+        const cy = k.v === 't' ? cr.y : bottom(cr);
+        if (Math.abs(cx - ex) > 1 || Math.abs(cy - ey) > 1) continue;
+        const pp = Math.min(ph, pv);
+        if (Math.abs(Ro - (Ri + pp)) <= 2) continue;
+        const inner = Ro - pp;
+        out.push(
+          finding(
+            'LC-25',
+            'warning',
+            c,
+            `radius ${num(Ri)} di sudut ${k.key} ${p.name} (radius ${num(Ro)}, padding ${num(pp)})`,
+            inner >= 6 ? `luar = dalam + padding: radius dalam ${num(inner)} atau luar ${num(Ri + pp)}` : `luar = dalam + padding: luar ${num(Math.max(Ri, 6) + pp)} (dalam ≥ 6) atau padding lebih kecil`,
+          ),
+        );
+        break;
+      }
+    }
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+// LC-26 · ritme judul: ruang di atas ≤ ruang di bawah (warning)
+// ---------------------------------------------------------------------------
+
+/** Nilai (harga, angka, jam), bukan judul: memuat angka dan ≤ 4 huruf. */
+const isValue = (s: string): boolean => /\d/.test(s) && (s.match(/\p{L}/gu)?.length ?? 0) <= 4;
+
+export function lc26(ctx: BoardContext): Finding[] {
+  const out: Finding[] = [];
+  /** Kelompok konten sebelumnya: teks > 14 atau ≥ 2 teks (overline/kicker, ikon, badge tidak dihitung). */
+  const isContent = (n: ChildNode) => {
+    if (n.type === 'frame' && named(n, 'Badge /')) return false;
+    const ts = textsIn(n);
+    return ts.length >= 2 || ts.some((t) => t.size > 14);
+  };
+  for (const h of texts(ctx)) {
+    if (!nonEmpty(h) || h.size < 20 || (h.weight ?? 400) < 600 || named(h, 'KPI /') || named(h, 'Display /') || isValue(h.content)) continue;
+    let unit: ChildNode = h;
+    let col = ctx.parentOf.get(h.id)!;
+    if (col.type === 'frame' && col.layout === 'row') {
+      const biggest = Math.max(...textsIn(col).map((t) => t.size));
+      const pp = ctx.parentOf.get(col.id);
+      if (h.size < biggest || !pp || !isFlowChild(pp, col)) continue;
+      unit = col;
+      col = pp;
+    }
+    const isColumn = col.type === 'board' || (col.layout ?? 'none') === 'column';
+    if (!isColumn || !isFlowChild(col, unit)) continue;
+    const flow = col.children.filter((k) => {
+      const r = ctx.bounds.get(k.id);
+      return isFlowChild(col, k) && !!r && area(r) > 0;
+    });
+    const i = flow.indexOf(unit);
+    if (i <= 0 || i >= flow.length - 1) continue;
+    const prev = flow[i - 1]!;
+    if (!isContent(prev)) continue;
+    const ur = ctx.bounds.get(unit.id)!;
+    const above = ur.y - bottom(ctx.bounds.get(prev.id)!);
+    const below = ctx.bounds.get(flow[i + 1]!.id)!.y - bottom(ur);
+    if (above > below + TOLERANCE) continue;
+    out.push(finding('LC-26', 'warning', h, `judul ${quote(h.content)}: ruang atas ${num(above)} ≤ bawah ${num(below)}`, 'judul + isi satu kelompok (gap 8–16), antarkelompok ≥ 2× (mis. 24–32)'));
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+// LC-27 · ukuran huruf per board (warning)
+// ---------------------------------------------------------------------------
+
+export const MAX_TEXT_SIZES = 6;
+
+export function lc27(ctx: BoardContext): Finding[] {
+  const sizes = [...new Set(texts(ctx).filter((t) => nonEmpty(t) && visibleRect(ctx, t)).map((t) => t.size))].sort((a, b) => a - b);
+  if (sizes.length <= MAX_TEXT_SIZES) return [];
+  return [finding('LC-27', 'warning', ctx.board, `${sizes.length} ukuran huruf: ${sizes.map(num).join(', ')}`, `≤ ${MAX_TEXT_SIZES} (idealnya ±5): satukan peran yang berdekatan`)];
+}
+
+// ---------------------------------------------------------------------------
+// LC-28 · panjang baris (warning)
+// ---------------------------------------------------------------------------
+
+export const MAX_LINE_CHARS = 80;
+
+export function lc28(ctx: BoardContext): Finding[] {
+  const out: Finding[] = [];
+  for (const t of texts(ctx)) {
+    const lines = ctx.textMeasure.get(t.id)?.lines ?? 0;
+    if (lines < 2 || !nonEmpty(t)) continue;
+    const avg = [...t.content.replace(/\n/g, '')].length / lines;
+    if (avg <= MAX_LINE_CHARS) continue;
+    out.push(finding('LC-28', 'warning', t, `rata-rata ${Math.round(avg)} karakter per baris (${lines} baris)`, `45–75 karakter: persempit lebar teks (mis. 560–680 untuk 16px)`));
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+// LC-29 · bobot tipis pada teks kecil (warning)
+// ---------------------------------------------------------------------------
+
+export function lc29(ctx: BoardContext): Finding[] {
+  return texts(ctx)
+    .filter((t) => nonEmpty(t) && (t.weight ?? 400) < 400 && t.size < 18)
+    .map((t) => finding('LC-29', 'warning', t, `bobot ${t.weight} pada ${num(t.size)}px ${quote(t.content)}`, 'bobot ≥ 400 untuk teks < 18px (tipis hanya ≥ 28px)'));
+}
+
+// ---------------------------------------------------------------------------
+// LC-30 · tanda baca (warning)
+// ---------------------------------------------------------------------------
+
+/** Rentang angka/jam dengan tanda hubung (`09.00-10.00`, `5-10`); tanggal ISO, telepon, kode tidak cocok. */
+const NUM = String.raw`\d{1,3}(?:[.,:]\d{1,3})*`;
+export const RANGE_HYPHEN = new RegExp(String.raw`(?<![\p{L}\d.,:/#+-])${NUM} ?- ?${NUM}(?![\p{L}\d/-])`, 'u');
+
+export function lc30(ctx: BoardContext): Finding[] {
+  const out: Finding[] = [];
+  for (const t of texts(ctx)) {
+    const issues: string[] = [];
+    // Teks mono bisa cuplikan kode: "..." di sana bukan elipsis prosa.
+    if (t.content.includes('...') && !/mono/i.test(t.family ?? '')) issues.push('"..." (pakai "…")');
+    const m = RANGE_HYPHEN.exec(t.content);
+    if (m) issues.push(`tanda hubung di rentang ${JSON.stringify(m[0])} (pakai "–")`);
+    if (issues.length) out.push(finding('LC-30', 'warning', t, `${issues.join('; ')} di ${quote(t.content)}`, 'en dash untuk rentang (09.00–10.00), karakter … untuk elipsis'));
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+// Batas warning per board
+// ---------------------------------------------------------------------------
+
+export const MAX_WARNINGS_PER_RULE = 3;
+
+/** Maks 3 warning per aturan; sisanya dicatat di detail temuan ketiga sebagai `(+n serupa)`. Detail ≤ 120 karakter. */
+export function capWarnings(findings: readonly Finding[]): Finding[] {
+  const count = new Map<string, number>();
+  for (const f of findings) if (f.level === 'warning') count.set(f.rule, (count.get(f.rule) ?? 0) + 1);
+  const seen = new Map<string, number>();
+  const out: Finding[] = [];
+  for (const f of findings) {
+    if (f.level !== 'warning') {
+      out.push(f);
+      continue;
+    }
+    const k = (seen.get(f.rule) ?? 0) + 1;
+    seen.set(f.rule, k);
+    if (k > MAX_WARNINGS_PER_RULE) continue;
+    const extra = k === MAX_WARNINGS_PER_RULE ? count.get(f.rule)! - MAX_WARNINGS_PER_RULE : 0;
+    const suffix = extra > 0 ? ` (+${extra} serupa)` : '';
+    const room = 120 - [...suffix].length;
+    const d = [...f.detail];
+    out.push({ ...f, detail: (d.length > room ? `${d.slice(0, room - 1).join('')}…` : f.detail) + suffix });
+  }
   return out;
 }

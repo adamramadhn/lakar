@@ -12,7 +12,7 @@ import {
   leadingIconGlyph,
   touchedBoards,
 } from './index.js';
-import type { BoardMeasure, NodeBounds } from '@lakar/ports';
+import type { BoardMeasure, NodeBounds, TextMeasure } from '@lakar/ports';
 import type { ResolvedDocument } from '@lakar/schema';
 
 // ---- Pembangun dokumen + BoardMeasure sintetis (bounds ditulis eksplisit).
@@ -42,16 +42,21 @@ function docOf(specs: BoardSpec[], tokens?: Record<string, string | number>): { 
   const boards = specs.map((s) => {
     const id = s.id ?? nid();
     const nodes: NodeBounds[] = [];
+    const texts: TextMeasure[] = [];
     const strip = (children: Loose[]): Loose[] =>
-      children.map(({ _r, children: kids, ...n }) => {
+      children.map(({ _r, _ink, _lines, _lh, children: kids, ...n }) => {
         const r = _r as R;
         nodes.push({ id: n.id as string, x: r[0], y: r[1], width: r[2], height: r[3] });
+        if (_ink || _lines || _lh) {
+          const ink = _ink as R | undefined;
+          texts.push({ id: n.id as string, lines: (_lines as number) ?? 1, lineHeight: (_lh as number) ?? r[3], ...(ink ? { ink: { x: ink[0], y: ink[1], width: ink[2], height: ink[3] } } : {}) });
+        }
         return kids ? { ...n, children: strip(kids as Loose[]) } : n;
       });
     const width = s.width ?? 390;
     const height = s.height ?? 844;
     const children = strip(s.children);
-    measures.set(id, { width, height, nodes, texts: [] });
+    measures.set(id, { width, height, nodes, texts });
     return {
       type: 'board',
       id,
@@ -600,3 +605,248 @@ describe('kinerja aturan murni', () => {
   });
 });
 
+
+// ---------------------------------------------------------------------------
+// Aturan polesan (story 1.23)
+// ---------------------------------------------------------------------------
+
+const solidFill = (c: string) => ({ fills: [{ type: 'solid', color: c }] });
+const badgeOf = (label: string, r: R, extra: Loose = {}) =>
+  frame(`Badge / ${label}`, r, [text(label, [r[0] + 6, r[1] + 2, r[2] - 12, 16], { size: 12, name: 'Teks', color: '#0B5A2B' })], { layout: 'row', ...solidFill('#15803D1F'), radius: 9999, ...extra });
+
+describe('LC-02b ink teks meluap dari induk', () => {
+  /** Baris daftar B round-2: kolom teks fill 122, judul hug meluap ke lencana. */
+  const row = (inkW: number, badgeX = 286) => {
+    const judul = text('Kekuatan tubuh atas', [152, 10, 122, 20], { name: 'Judul', size: 14, lineHeight: 20, _ink: [152, 10, inkW, 20], _lh: 20 });
+    const teks = frame('Teks', [152, 10, 122, 40], [judul, text('40 mnt', [152, 30, 122, 20], { name: 'Meta', _ink: [152, 30, 40, 20], _lh: 20 })]);
+    const badge = badgeOf('Berikutnya', [badgeX, 18, 80, 24]);
+    return { judul, spec: clean([frame('Item', [20, 0, 350, 60], [teks, badge], { layout: 'row', padding: [10, 16], ...solidFill('#241D18') })]) };
+  };
+
+  it('positif: ink melewati kolom dan menabrak lencana', () => {
+    const { judul, spec } = row(138.5, 286);
+    const f = only(run(spec), 'LC-02b');
+    expect(f).toHaveLength(1);
+    expect(f[0]).toMatchObject({ level: 'error', nodeId: judul.id });
+    expect(f[0]!.detail).toContain('16.5px di kanan');
+  });
+
+  it('negatif: ink pas di kolom; luapan kecil ke padding yang masih lega', () => {
+    expect(only(run(row(120).spec), 'LC-02b')).toEqual([]);
+    // kartu padding 16, teks meluap 2px ke padding kanan → sisa 14px ke tepi kartu
+    const t = text('Tambal komposit', [16, 16, 100, 20], { _ink: [16, 16, 102, 20], _lh: 20 });
+    expect(only(run(clean([frame('Kartu', [0, 0, 132, 52], [t], { padding: 16, ...solidFill('#F6F7F9') })])), 'LC-02b')).toEqual([]);
+  });
+
+  it('negatif: di dalam Crop / atau Overlay /', () => {
+    const t = text('Judul panjang sekali', [0, 0, 60, 20], { _ink: [0, 0, 160, 20] });
+    expect(only(run(clean([frame('Crop / Foto', [0, 0, 80, 40], [t], { ...solidFill('#000000') })])), 'LC-02b')).toEqual([]);
+  });
+});
+
+describe('LC-11 saudara tumpang tindih sebagian', () => {
+  it('positif: dua teks absolut beririsan sebagian', () => {
+    const a = text('Label kiri', [0, 0, 100, 20], { position: 'absolute' });
+    const b = text('Label kanan', [80, 10, 100, 20], { position: 'absolute' });
+    const f = only(run(clean([frame('Grafik', [0, 0, 300, 100], [a, b], { layout: 'none' })])), 'LC-11');
+    expect(f).toHaveLength(1);
+    expect(f[0]).toMatchObject({ level: 'error', nodeId: b.id });
+  });
+
+  it('positif: ink teks flow menimpa saudara flow', () => {
+    const t = text('Judul yang terlalu panjang', [0, 0, 100, 20], { _ink: [0, 0, 150, 20] });
+    const i = { type: 'icon', id: nid(), name: 'Ikon', lib: 'lucide', icon: 'check', size: 20, _r: [120, 0, 20, 20] };
+    expect(only(run(clean([frame('Baris', [0, 0, 200, 20], [t, i], { layout: 'row' })])), 'LC-11')).toHaveLength(1);
+  });
+
+  it('negatif: label termuat penuh di dalam bentuk (layout none), Overlay /, gap negatif', () => {
+    const ring = frame('Ring', [0, 0, 96, 96], [{ type: 'ellipse', id: nid(), name: 'Jalur', _r: [0, 0, 96, 96] }, frame('Tengah', [0, 0, 96, 96], [text('60%', [30, 38, 36, 20])], { position: 'absolute' })], { layout: 'none' });
+    expect(only(run(clean([ring])), 'LC-11')).toEqual([]);
+    const ov = frame('Kartu', [0, 0, 300, 100], [text('A', [0, 0, 100, 20], { position: 'absolute' }), frame('Overlay / Lencana', [80, 10, 100, 20], [text('B', [80, 10, 100, 20])], { position: 'absolute' })], { layout: 'none' });
+    expect(only(run(clean([ov])), 'LC-11')).toEqual([]);
+    const avatars = frame('Avatar', [0, 0, 100, 40], [frame('A1', [0, 0, 40, 40], [text('AB', [10, 10, 20, 20])]), frame('A2', [28, 0, 40, 40], [text('CD', [38, 10, 20, 20])])], { layout: 'row', gap: -12 });
+    expect(only(run(clean([avatars])), 'LC-11')).toEqual([]);
+  });
+});
+
+describe('LC-04 kontras teks', () => {
+  it('positif: abu muda di atas putih (error, gerbang)', () => {
+    const t = text('Keterangan', [0, 0, 100, 20], { color: '#98A2B3' });
+    const f = only(run(clean([t])), 'LC-04');
+    expect(f).toHaveLength(1);
+    expect(f[0]).toMatchObject({ level: 'error', nodeId: t.id });
+    expect(f[0]!.detail).toMatch(/kontras 2\.\d+:1 \(#98A2B3 di atas #FFFFFF\)/);
+    expect(summarizeFindings(f).gate).toBe(1);
+  });
+
+  it('positif: teks lencana nada terang di atas tint hex8 (komposit)', () => {
+    const t = text('Selesai', [6, 2, 50, 16], { size: 12, color: '#15803D' });
+    const f = only(run(clean([frame('Badge / Selesai', [0, 0, 62, 20], [t], { layout: 'row', ...solidFill('#15803D1F') })])), 'LC-04');
+    expect(f).toHaveLength(1);
+    expect(f[0]!.detail).toContain('4.25:1');
+  });
+
+  it('negatif: teks gelap; teks besar ≥ 3:1; nada gelap di atas tint', () => {
+    expect(only(run(clean([text('Judul', [0, 0, 100, 20], { color: '#101828' })])), 'LC-04')).toEqual([]);
+    expect(only(run(clean([text('Judul besar', [0, 0, 200, 32], { size: 24, color: '#8A8A8A' })])), 'LC-04')).toEqual([]);
+    expect(only(run(clean([text('Judul kecil', [0, 0, 200, 20], { size: 14, color: '#8A8A8A' })])), 'LC-04')).toHaveLength(1);
+    const t = text('Selesai', [6, 2, 50, 16], { size: 12, color: '#0B5A2B' });
+    expect(only(run(clean([frame('Badge / Selesai', [0, 0, 62, 20], [t], { layout: 'row', ...solidFill('#15803D1F') })])), 'LC-04')).toEqual([]);
+  });
+
+  it('dilewati: teks di atas foto tanpa scrim, atau tertutup sebagian lapisan', () => {
+    const img = { fills: [{ type: 'image', assetId: 'a'.repeat(64), fit: 'cover' }] };
+    expect(only(run(clean([frame('Image / Sampul', [0, 0, 200, 100], [text('Judul', [10, 10, 100, 20], { color: '#FFFFFF' })], img)])), 'LC-04')).toEqual([]);
+    const partial = frame('Kartu', [0, 0, 200, 100], [rect('Pita', [0, 0, 50, 100], { position: 'absolute', ...solidFill('#000000') }), text('Judul', [10, 10, 100, 20], { color: '#FFFFFF', position: 'absolute' })], { layout: 'none', ...solidFill('#FFFFFF') });
+    expect(only(run(clean([partial])), 'LC-04')).toEqual([]);
+  });
+
+  it('gradien atau opacity → warning (stop terburuk), tidak dihitung gerbang', () => {
+    const grad = { fills: [{ type: 'linear', angle: 90, stops: [{ offset: 0, color: '#0F172A' }, { offset: 1, color: '#94A3B8' }] }] };
+    const f = only(run(clean([frame('Hero', [0, 0, 300, 100], [text('Judul', [10, 10, 100, 20], { color: '#FFFFFF' })], grad)])), 'LC-04');
+    expect(f).toHaveLength(1);
+    expect(f[0]!.level).toBe('warning');
+    expect(f[0]!.detail).toContain('#94A3B8');
+    expect(summarizeFindings(f).gate).toBe(0);
+    const op = only(run(clean([text('Redup', [0, 0, 100, 20], { color: '#667085', opacity: 0.6 })])), 'LC-04');
+    expect(op.map((x) => x.level)).toEqual(['warning']);
+  });
+});
+
+describe('LC-23 celah teks ↔ badge/tombol/ikon', () => {
+  const rowWith = (gapPx: number, name = 'Baris') =>
+    frame(name, [0, 0, 300, 24], [text('Kopi susu', [0, 2, 100, 20], { _ink: [0, 2, 100, 20] }), badgeOf('Baru', [100 + gapPx, 0, 50, 24])], { layout: 'row' });
+  it('positif: celah 4 → warning', () => {
+    const f = only(run(clean([rowWith(4)])), 'LC-23');
+    expect(f).toHaveLength(1);
+    expect(f[0]).toMatchObject({ level: 'warning' });
+    expect(f[0]!.detail).toContain('celah 4px');
+  });
+  it('negatif: celah 12; di dalam Button /; ikon < 20', () => {
+    expect(only(run(clean([rowWith(12)])), 'LC-23')).toEqual([]);
+    expect(only(run(clean([frame('Button / Kirim', [0, 0, 300, 40], [rowWith(4, 'Isi')], { layout: 'row' })])), 'LC-23')).toEqual([]);
+    const i = { type: 'icon', id: nid(), name: 'Ikon', lib: 'lucide', icon: 'check', size: 16, _r: [104, 4, 16, 16] };
+    expect(only(run(clean([frame('Baris', [0, 0, 300, 24], [text('Kopi', [0, 2, 100, 20]), i], { layout: 'row' })])), 'LC-23')).toEqual([]);
+  });
+});
+
+describe('LC-24 proporsi badge di baris', () => {
+  const rowWith = (badgeH: number, wrapper = false) => {
+    const b = badgeOf('Berikutnya', [250, 0, 80, badgeH]);
+    const kids = [frame('Teks', [0, 0, 200, 40], [text('Percakapan', [0, 0, 200, 20], { size: 14, lineHeight: 20, _lh: 20 }), text('Unit 4', [0, 20, 200, 20], { size: 14, _lh: 20 })]), wrapper ? frame('Status', [250, 0, 100, badgeH], [b], { layout: 'row' }) : b];
+    return { b, spec: clean([frame('Item', [0, 0, 350, 40], kids, { layout: 'row', gap: 12 })]) };
+  };
+  it('positif: lencana 24 di samping judul line-height 20 (juga lewat pembungkus)', () => {
+    for (const w of [false, true]) {
+      const { b, spec } = rowWith(24, w);
+      const f = only(run(spec), 'LC-24');
+      expect(f).toHaveLength(1);
+      expect(f[0]).toMatchObject({ level: 'warning', nodeId: b.id });
+      expect(f[0]!.detail).toContain('tinggi 24 > line-height 20');
+    }
+  });
+  it('negatif: lencana sm 20; lencana di kolom', () => {
+    expect(only(run(rowWith(20).spec), 'LC-24')).toEqual([]);
+    const col = frame('Legenda', [0, 0, 200, 80], [text('Menit belajar', [0, 0, 200, 20], { _lh: 20 }), badgeOf('+20', [0, 24, 60, 24])]);
+    expect(only(run(clean([col])), 'LC-24')).toEqual([]);
+  });
+});
+
+describe('LC-18 kartu bersarang', () => {
+  const inner = (extra: Loose) => frame('Kartu dalam', [16, 16, 200, 80], [text('A', [32, 32, 50, 20]), text('B', [32, 52, 50, 20])], { padding: 16, ...extra });
+  it('positif: kartu bergaris di dalam kartu berbayang', () => {
+    const k = inner({ stroke: { color: '#E4E7EC', width: 1, align: 'inside' } });
+    const outer = frame('Kartu', [0, 0, 232, 160], [k, text('C', [16, 100, 50, 20])], { padding: 16, ...solidFill('#FFFFFF'), shadows: [{ x: 0, y: 4, blur: 16, color: '#10182814' }] });
+    const f = only(run(clean([outer])), 'LC-18');
+    expect(f).toHaveLength(1);
+    expect(f[0]).toMatchObject({ level: 'warning', nodeId: k.id });
+  });
+  it('negatif: bidang tint tanpa garis/bayangan di dalam kartu; garis satu sisi', () => {
+    const outer = (k: Loose) => frame('Kartu', [0, 0, 232, 160], [k, text('C', [16, 100, 50, 20])], { padding: 16, stroke: { color: '#E4E7EC', width: 1, align: 'inside' } });
+    expect(only(run(clean([outer(inner(solidFill('#F6F7F9')))])), 'LC-18')).toEqual([]);
+    expect(only(run(clean([outer(inner({ stroke: { color: '#E4E7EC', width: 1, align: 'inside', sides: ['bottom'] } }))])), 'LC-18')).toEqual([]);
+  });
+});
+
+describe('LC-25 radius konsentris', () => {
+  const card = (ri: number, ro = 20, pad = 12) => {
+    const c = frame('Ikon', [pad, pad, 40, 40], [], { radius: ri, ...solidFill('#E6F2F1') });
+    return { c, spec: clean([frame('Item', [0, 0, 300, 64], [c, text('Judul', [64, 22, 100, 20])], { layout: 'row', padding: pad, radius: ro, ...solidFill('#FFFFFF') })]) };
+  };
+  it('positif: luar 12, dalam 12, padding 12', () => {
+    const { c, spec } = card(12, 12);
+    const f = only(run(spec), 'LC-25');
+    expect(f).toHaveLength(1);
+    expect(f[0]).toMatchObject({ level: 'warning', nodeId: c.id });
+    expect(f[0]!.detail).toContain('radius 12 di sudut kiri atas Item (radius 12, padding 12)');
+  });
+  it('negatif: luar = dalam + padding; induk full; padding > 24', () => {
+    expect(only(run(card(8, 20).spec), 'LC-25')).toEqual([]);
+    expect(only(run(card(8, 9999).spec), 'LC-25')).toEqual([]);
+    expect(only(run(card(8, 12, 32).spec), 'LC-25')).toEqual([]);
+  });
+});
+
+describe('LC-26 ritme judul', () => {
+  const col = (above: number, below: number, prev: Loose) => {
+    const h = text('Pelajaran hari ini', [0, 0, 0, 0], { size: 20, weight: 600 });
+    const y1 = 100 + above;
+    h._r = [0, y1, 300, 28];
+    return { h, spec: clean([frame('Konten', [0, 0, 350, 400], [prev, h, frame('Daftar', [0, y1 + 28 + below, 350, 100], [text('Butir', [0, y1 + 28 + below, 100, 20])])])]) };
+  };
+  const card = () => frame('Kartu', [0, 0, 350, 100], [text('Target mingguan', [0, 0, 200, 20], { size: 16 }), text('90 dari 150', [0, 24, 200, 20])]);
+  it('positif: ruang atas 24 = bawah 24', () => {
+    const { h, spec } = col(24, 24, card());
+    const f = only(run(spec), 'LC-26');
+    expect(f).toHaveLength(1);
+    expect(f[0]).toMatchObject({ level: 'warning', nodeId: h.id });
+  });
+  it('negatif: atas 32 > bawah 12; sebelumnya overline; nilai harga', () => {
+    expect(only(run(col(32, 12, card()).spec), 'LC-26')).toEqual([]);
+    expect(only(run(col(8, 16, text('CARA KERJA', [0, 80, 100, 20], { size: 12 })).spec), 'LC-26')).toEqual([]);
+    const { h, spec } = col(8, 8, card());
+    h.content = 'Rp 79.000';
+    expect(only(run(spec), 'LC-26')).toEqual([]);
+  });
+});
+
+describe('LC-27/28/29/30 tipografi dan tanda baca', () => {
+  it('LC-27: 7 ukuran → warning; 6 → tidak', () => {
+    const sizes = (n: number) => clean(Array.from({ length: n }, (_, i) => text(`T${i}`, [0, i * 30, 100, 20], { size: 12 + i * 2 })));
+    expect(only(run(sizes(7)), 'LC-27')).toHaveLength(1);
+    expect(only(run(sizes(6)), 'LC-27')).toEqual([]);
+  });
+  it('LC-28: rata-rata > 80 karakter per baris', () => {
+    const long = 'a'.repeat(200);
+    expect(only(run(clean([text(long, [0, 0, 380, 40], { _lines: 2 })])), 'LC-28')).toHaveLength(1);
+    expect(only(run(clean([text('a'.repeat(120), [0, 0, 380, 40], { _lines: 2 })])), 'LC-28')).toEqual([]);
+  });
+  it('LC-29: bobot < 400 di bawah 18px', () => {
+    expect(only(run(clean([text('Tipis', [0, 0, 100, 20], { weight: 300 })])), 'LC-29')).toHaveLength(1);
+    expect(only(run(clean([text('Tipis besar', [0, 0, 300, 40], { weight: 300, size: 32 })])), 'LC-29')).toEqual([]);
+  });
+  it.each(['09.00-10.00', '09:00 - 10:00', 'Rp 50-100 rb', '5-10 menit', 'Memuat...'])('LC-30 positif %j', (s) => {
+    expect(only(run(clean([text(s, [0, 0, 200, 20])])), 'LC-30')).toHaveLength(1);
+  });
+  it.each(['2026-11-18', '0812-3456-7890', 'PO-2611-084', 'SKU B-12', 'A1-B2', '09.00–10.00', 'Memuat…'])('LC-30 negatif %j', (s) => {
+    expect(only(run(clean([text(s, [0, 0, 200, 20])])), 'LC-30')).toEqual([]);
+  });
+  it('LC-30: "..." di teks mono (cuplikan kode) tidak dihitung', () => {
+    expect(only(run(clean([text('fetch(url, ...)', [0, 0, 200, 20], { family: 'JetBrains Mono' })])), 'LC-30')).toEqual([]);
+  });
+});
+
+describe('batas warning per aturan per board', () => {
+  it('12 teks bobot 300 berukuran 14 → 3 temuan LC-29, temuan ketiga "(+9 serupa)", detail ≤ 120', () => {
+    const kids = Array.from({ length: 12 }, (_, i) => text(`Butir tipis nomor ${i + 1} dengan keterangan yang cukup panjang untuk dipotong rapi`, [0, i * 24, 380, 20], { weight: 300 }));
+    const f = only(run(clean(kids)), 'LC-29');
+    expect(f).toHaveLength(3);
+    expect(f[2]!.detail.endsWith('(+9 serupa)')).toBe(true);
+    expect(f[0]!.detail.endsWith('serupa)')).toBe(false);
+    for (const x of f) expect([...x.detail].length).toBeLessThanOrEqual(120);
+  });
+  it('error tidak dibatasi', () => {
+    const kids = Array.from({ length: 5 }, (_, i) => text(`Abu ${i}`, [0, i * 24, 100, 20], { color: '#D0D5DD' }));
+    expect(only(run(clean(kids)), 'LC-04')).toHaveLength(5);
+  });
+});

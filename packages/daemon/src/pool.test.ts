@@ -435,6 +435,7 @@ describe.skipIf(!browserInstalled)('pool render (AD-18) + endpoint story 12, Chr
     const list = await c.call('/skills/read', {}, s);
     expect(list.body.data.skills).toEqual([
       { name: 'core', available: true },
+      { name: 'polish', available: false },
       { name: 'landing', available: false },
       { name: 'mobile', available: false },
       { name: 'icons', available: false },
@@ -445,7 +446,7 @@ describe.skipIf(!browserInstalled)('pool render (AD-18) + endpoint story 12, Chr
       const r = await c.call('/skills/read', { name }, s);
       expect(r.status).toBe(404);
       expect(r.body.error!.code).toBe('NOT_FOUND');
-      expect(r.body.error!.hint).toContain('core, landing, mobile, icons, api');
+      expect(r.body.error!.hint).toContain('core, polish, landing, mobile, icons, api');
       expect(r.body.error!.hint).toContain('tersedia: core');
     }
     expect((await c.call('/skills/read', {})).status).toBe(401);

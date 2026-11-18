@@ -1,5 +1,6 @@
 // Laporan putaran: `bench/round-<round>.md|json` dan laporan skor (`bench/score-<id>.md|json`; putaran resmi ≥ 2:
 // `bench/round-<n>/score-<id>.md|json`). Render murni (tes snapshot).
+import { G0_RULES } from '@lakar/schema';
 import type { JudgeRepRecord, Tool } from '../judge/run.js';
 import { JUDGE_CRITERIA } from '../judge/prompt.js';
 import type { LakarExtra } from '../lakar/run.js';
@@ -7,6 +8,14 @@ import type { RunRecord } from '../report.js';
 import type { TextEmojiCount } from './emoji.js';
 import type { Reconnect } from './reconnect.js';
 import { appealAxis, TOOL_LABEL, TOOLS, type Agg, type DecisionResult, type G0Decision, type GateResult, type PromptScore } from './score.js';
+
+/** Aturan katalog R3/R7 (Lampiran A: LC-03/06/07/11/13/14/17/18/21) yang belum ada di `G0_RULES`, dihitung dari `G0_RULES`. */
+const R3R7_RULES = ['LC-03', 'LC-06', 'LC-07', 'LC-11', 'LC-13', 'LC-14', 'LC-17', 'LC-18', 'LC-21'] as const;
+export function r3r7Missing(rules: Readonly<Record<string, unknown>> = G0_RULES): string {
+  const missing = R3R7_RULES.filter((r) => !(r in rules));
+  if (!missing.length) return 'semua aturan katalog LC-03/06/07/11/13/14/17/18/21 sudah ada di `G0_RULES`.';
+  return `aturan ${missing.map((r, i) => (i === 0 ? r : r.slice(3))).join('/')} belum ada di \`G0_RULES\`.`;
+}
 
 export const ROUND_ID = /^(uji-[1-9]\d*|[1-9]\d*)$/;
 /** Putaran resmi (story 16): ID angka polos. */
@@ -177,7 +186,7 @@ export function renderRoundMarkdown(r: RoundReport): string {
     L.push(`- Ukuran board: ${lk?.boards.length ? lk.boards.map((b) => `${b.name} ${b.width}×${b.height}`).join(', ') : '–'}${p.sizeProblems.length ? ` → ${p.sizeProblems.join('; ')}` : ' → sesuai'}`);
     L.push(`- Waktu ≤ 1,5 × median baseline: ${p.gate?.timeRatio === undefined ? '–' : `rasio ${p.gate.timeRatio.toFixed(2)}`}`);
     L.push(`- Hasil: ${p.gate ? (p.gate.ok ? '**lolos**' : `**gagal** (${p.gate.reasons.join('; ')})`) : '–'}`);
-    L.push('- R3/R7 tidak dihitung di G0 (keputusan epic): aturan LC-03/06/07/11/13/14/17/18/21 belum ada di `G0_RULES`.');
+    L.push(`- R3/R7 tidak dihitung di G0 (keputusan epic): ${r3r7Missing()}`);
     if (lk) L.push(`- Dokumen Lakar: slug \`${lk.slug ?? '–'}\` (dibuka agen: ${lk.opened.join(', ') || '–'}), salinan \`${lk.docPath ?? '–'}\``);
     L.push('');
     L.push('### Emoji', '');

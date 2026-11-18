@@ -310,7 +310,7 @@ function renderText(d: Document, n: TextNode): HTMLElement {
     s.overflowWrap = 'break-word';
   }
   // `fixed`: width/height angka dari sizing; overflow tidak dipotong agar teks yang meluber tetap terlihat
-  // (check G0 belum punya aturan teks meluber kotaknya; `measure.texts` belum dipakai aturan mana pun).
+  // (check LC-02b/LC-11 menilai luberan dari `measure.texts[].ink`, bukan dari bounds elemen).
   if (wrap === 'fixed') s.overflow = 'visible';
   el.textContent = n.content;
   return el;

@@ -1,7 +1,7 @@
 // Tes teks + font: wrap/baris, bobot, FONT_MISSING, dan bukti Inter benar-benar dipakai (bukan fallback).
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { parseUnicodeRange, type FontFaceSource } from '../src/index.js';
-import { boardDoc, browserInstalled, compareGolden, freshPage, interFaces, render, start, stop, text } from './harness.js';
+import { boardDoc, browserInstalled, compareGolden, frame, freshPage, interFaces, render, start, stop, text } from './harness.js';
 
 const LONG = 'Desain yang baik dimulai dari tata letak yang jujur dan teks yang terbaca.';
 
@@ -35,6 +35,35 @@ describe.skipIf(!browserInstalled)('render teks dan font (Chromium, tanpa daemon
     expect(Math.abs(b.width - 120)).toBeLessThanOrEqual(0.5);
     // wrap auto: satu baris per \n, tidak dibungkus
     expect(result.measure.texts.find((x) => x.id === auto.id)!.lines).toBe(2);
+  });
+
+  it('ink: teks hug di kolom sempit melewati bounds; spasi di ujung tidak menambah ink; teks wrap tidak melebar', async () => {
+    const hug = text('Kekuatan tubuh atas sekali', { lineHeight: 20 });
+    const col = frame({ layout: 'column', width: 80 }, [hug]);
+    const spaced = text('Halo   ', { lineHeight: 20 });
+    const bare = text('Halo', { lineHeight: 20 });
+    const wrapped = text(LONG, { width: 120, lineHeight: 24 });
+    const empty = text('   ', { lineHeight: 20 });
+    const { doc, boardId } = boardDoc([col, spaced, bare, wrapped, empty], { width: 440, height: 320 });
+    const { result } = await render(doc, boardId, interFaces(400));
+    if (!result.ok) throw new Error(JSON.stringify(result));
+    const tm = (id: unknown) => result.measure.texts.find((x) => x.id === id)!;
+    const nb = (id: unknown) => result.measure.nodes.find((x) => x.id === id)!;
+    // hug di kolom 80: bounds tetap 80, ink jauh lebih lebar (white-space pre)
+    expect(Math.abs(nb(hug.id).width - 80)).toBeLessThanOrEqual(0.5);
+    expect(tm(hug.id).ink!.width).toBeGreaterThan(120);
+    expect(Math.abs(tm(hug.id).ink!.height - 20)).toBeLessThanOrEqual(0.5);
+    // spasi di ujung: bounds lebih lebar, ink sama dengan teks tanpa spasi
+    expect(nb(spaced.id).width).toBeGreaterThan(nb(bare.id).width + 5);
+    expect(Math.abs(tm(spaced.id).ink!.width - tm(bare.id).ink!.width)).toBeLessThanOrEqual(0.5);
+    // wrap: ink di dalam bounds (spasi pembungkus tidak menggantung), tinggi = baris × 24
+    const w = tm(wrapped.id);
+    const wb = nb(wrapped.id);
+    expect(w.ink!.x).toBeGreaterThanOrEqual(wb.x - 0.5);
+    expect(w.ink!.x + w.ink!.width).toBeLessThanOrEqual(wb.x + wb.width + 0.5);
+    expect(Math.abs(w.ink!.height - w.lines * 24)).toBeLessThanOrEqual(1);
+    // teks kosong: tanpa ink
+    expect(tm(empty.id).ink).toBeUndefined();
   });
 
   it('teks bobot: Inter 400 vs 700 dengan lebar berbeda', async () => {

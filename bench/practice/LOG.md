@@ -562,3 +562,71 @@ tidak di-restart, tidak disentuh). HEAD `7588a9a` + skill v9 di porcelain `froze
 
 PNG Lakar: `bench/practice/effects/{1,2,3}/P{5,6}-lakar.png` (tracked); PNG pen.dev lokal:
 `bench/runs/practice-effects/1/P{5,6}-pendev.png` (EULA). Iterasi 2 tetap tercatat lulus.
+
+---
+
+# §1.23 Seri polish (story 23): disiplin spacing, komponen, kontras
+
+Prompt beku P7–P9 (sha `b41ba79e…`, commit `0347f15`) dan iterasi 1 baseline skill/check lama (commit `cb8a30f`) dicatat
+di plan story 23 (Implementation Notes). Bagian ini mencatat perubahan mesin/skill dan pindaian arsip sebelum seri iterasi 2.
+
+## Pindaian arsip layout_check (sebelum seri iterasi 2)
+
+Arsip: 90 dokumen (`bench/runs/**` 80 + `~/.local/share/lakar/docs` 10), 126 board; daemon dist sementara (port acak,
+dataDir salinan). Sebelum = dist baseline (`7fce0c5`, check/render belum berubah); sesudah = dist story 23.
+
+| Aturan | Level akhir | Sebelum | Sesudah (temuan / dok) |
+|---|---|---|---|
+| LC-20 | error·gerbang | 34 | 34 (tidak berubah) |
+| LC-02b ink teks meluap | error·gerbang | – | 36 / 16 |
+| LC-04 kontras setelah komposit | error·gerbang | – | 579 / 55 (+36 warning gradien/opacity/blend di 18 dok) |
+| LC-11 saudara tumpang tindih sebagian | error·gerbang | – | 0 |
+| LC-18 kartu bersarang | warning | – | 26 / 10 |
+| LC-23 celah teks ↔ badge/tombol/ikon < 8 | warning | – | 42 / 26 |
+| LC-24 proporsi badge di baris | warning | – | 125 / 53 |
+| LC-25 radius tidak konsentris | warning | – | 110 / 45 |
+| LC-26 ritme judul | warning | – | 26 / 12 |
+| LC-27 > 6 ukuran huruf | warning | – | 30 / 30 |
+| LC-28 baris > 80 karakter | warning | – | 10 / 10 |
+| LC-29 bobot < 400 di < 18px | warning | – | 0 |
+| LC-30 tanda baca | warning | – | 0 |
+
+Warning dihitung sesudah batas 3 per aturan per board. Dokumen dengan gate > 0: 16 → 65 (hampir seluruhnya LC-04).
+
+Klasifikasi setiap temuan error baru (skrip scratchpad `cls23.mjs`):
+
+- **LC-04 (579):** untuk setiap temuan, elemen teks dipotret dan warna latar modus pikselnya dibandingkan dengan latar
+  hasil komposit aturan: 579/579 cocok (selisih kanal 0 di 406, 1 di 173). Rasio yang dilaporkan = rasio piksel nyata,
+  jadi 0 positif palsu. Kasus terbanyak: teks badge nada terang di atas tint (#15803D di #E3F0E7 4,25; #B45309 4,25;
+  #DC2626 3,99; #2563EB 3,98), `t3` di atas `field` (4,34), `acc2` sebagai teks (2,6).
+- **LC-02b:** definisi awal (ink keluar dari content box > 1 px) menghasilkan 92 temuan; crop PNG memperlihatkan luapan
+  1–4 px ke padding yang masih lega (mis. "Tambal" 1,2 px, "Gilang Ramadhan" 1,1 px, "Ruang" 1,8 px, "Selamat malam,
+  Nadia" 2 px, "Mix Nostalgia" 3,9 px di padding 16) tidak terlihat sebagai cacat = positif palsu. Definisi diperbaiki
+  sekali (umum): luapan juga harus menyisakan < 4 px ke batas tampak terdekat di sisi itu (tepi wadah ber-cat/ber-clip,
+  tepi board, atau saudara yang menghadang). Sesudahnya 36 temuan (18 unik); semua crop memperlihatkan cacat nyata: teks
+  menabrak lencana/ikon/spinner (B round-2 "Kekuatan tubuh atas" −4,5 px, "PO-2611-102 …" −8,3 px, "Rata-rata tunggu
+  14 mnt …" −12,2 px, "Resepsionis · Kemang" −2 px, "Hari ini · 36 mnt …" −1,8 px), teks menyentuh tepi chip kalender
+  ("Fluoride"/"Retainer" sisa 1,2–1,8 px) atau tepi bawah kartu janji (sisa 2,5 px), dan "Tiba 10:05 · 35 mnt" yang
+  melewati kolomnya sampai 2,4 px dari sudut lencana. 0 positif palsu → tetap error.
+- **LC-11:** 0 temuan di arsip (aturan diuji fixture).
+
+Ketiga aturan error tetap `error·gerbang`; tidak ada yang diturunkan ke warning.
+
+Bukti B round-2 (`bench/runs/rounds/2/B-lakar/doc/gerak-beranda.lakar.json`): `LC-02b` Judul `c2KYVEr1` (meluap 16,5 px
+dari isi `QlUl5ORY`, sisa −4,5 px ke lencana) dan `LC-24` `P2QitxDJ` (tinggi 24 > line-height 20), ditambah `LC-23`
+(celah −4,5 px).
+
+## Perubahan mesin dan skill (story 23)
+
+- `TextMeasure.ink` (render): gabungan kotak Range rangkaian non-spasi, vertikal = kotak baris; spasi di ujung/pembungkus
+  tidak menambah lebar.
+- `@lakar/check`: LC-02b, LC-04, LC-11 (error·gerbang) dan LC-18, LC-23–LC-30 (warning), maks 3 warning per aturan per
+  board (`(+n serupa)`), detail ≤ 120. Temuan LC-04 level warning (gradien/opacity/blend) tidak dihitung gerbang.
+- Skill: `polish.md` baru (dibaca paralel dengan `core` + jenis layar); `core.md` `Badge(p,label,tone,icon,size='sm')`
+  sm 20 / md 24 dengan teks nada gelap (fg × 0,5; latar gelap tetap fg terang), alur langkah 1 membaca `polish`, frasa
+  terlarang dan detail spacing/radius dipindah ke `polish`; `landing.md`/`mobile.md` overline maks 2, "·" maks 2 per meta,
+  grid 12 kolom landing; contoh disesuaikan (Badge sm, radius konsentris, kelompok judul + daftar, ≤ 6 ukuran huruf).
+- Skill sha16 / token: `core.md` 4b76e5eaa59219ec (4000/4000), `polish.md` 16bd668b35f25124 (total 2056, prosa 1739),
+  `landing.md` 98a40de3e63f4f57 (3500/3500, prosa 1488), `mobile.md` bdf73b6f372d6857 (total 3209, prosa 1500/1500).
+  Contoh teruji (core/polish/landing/mobile/icons/api) lulus 0 error / 0 gerbang / 0 warning; `pnpm test` 922/922.
+- Seri iterasi 2 (`--iter 2 --reuse-pendev 1`) dijalankan sesi orkestrasi sesudah review; hasilnya dicatat di bawah.
