@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { encodePngRgb, encodePngRgbaWithChunks } from '../png/codec.js';
 import { GOLDEN_SET_PATH, loadProtocol } from '../protocol.js';
 import { parseJudgeOutput } from './parse.js';
-import { buildJudgeText, DESIGN_MD_PATH, extractCriteria, judgeC7Problems, judgeLeaks, scrubToolNames } from './prompt.js';
+import { buildJudgeText, DESIGN_MD_PATH, extractCriteria, judgeC7Problems, judgeLeaks, neutralizeInternalTerms, parseDesignTokens, scrubToolNames, tokenLeaks } from './prompt.js';
 import { assignLabels, buildJudgeArgs, buildJudgeBlocks, judgeMessageLine, runJudgeRep } from './run.js';
 
 const protocol = loadProtocol();
@@ -44,6 +44,25 @@ describe('teks juri', () => {
       expect(judgeLeaks(bad).length, bad).toBeGreaterThan(0);
     }
     expect(judgeLeaks('Desain X, bagian 1 dari 3')).toEqual([]);
+    // Kosakata internal: referensi token, ID aturan lint, istilah node "board".
+    for (const bad of ['Hijau `{colors.accent-green}`', 'Frasa terlarang (LC-19)', 'Board persis 390×844']) expect(judgeLeaks(bad).length, bad).toBeGreaterThan(0);
+    expect(judgeLeaks('mockup dashboard di artboard')).toEqual([]);
+  });
+
+  it('istilah internal sistem desain dinetralkan: token → nilai, `Nama /` dan LC-nn dibuang, board → artboard', () => {
+    const md = "---\nname: x\ncolors:\n  # komentar\n  accent-green: '#15803D'         # teks putih\n  on-accent: '#FFFFFF'\ntypography:\n  mobile-title: { fontSize: 22px, lineHeight: 28px, fontWeight: '700' }\nrounded:\n  md: 8px\n---\nisi\n";
+    const tokens = parseDesignTokens(md);
+    expect(tokens.get('accent-green')).toBe('`#15803D`');
+    expect(tokens.get('on-accent')).toBe('teks/ikon di atas aksen `#FFFFFF`');
+    expect(tokens.get('mobile-title')).toBe('(teks 22px/28px, tebal 700)');
+    expect(tokens.has('md')).toBe(false);
+    const t = neutralizeInternalTerms(
+      'Hijau `{colors.accent-green}` + `on-accent`. Sapaan `mobile-title`. CTA opsional (`Ekstra /`). Ikon `star`. **Frasa** (LC-19, per bahasa). Board 390, dua board.',
+      tokens,
+    );
+    expect(t).toBe('Hijau `#15803D` + teks/ikon di atas aksen `#FFFFFF`. Sapaan (teks 22px/28px, tebal 700). CTA opsional. Ikon `star`. **Frasa** (per bahasa). Artboard 390, dua artboard.');
+    expect(tokenLeaks(t, tokens)).toEqual([]);
+    expect(tokenLeaks('pakai accent-green', tokens)).toEqual(['accent-green']);
   });
 
   it.skipIf(!HAVE_SOURCES && process.env.LAKAR_C7_ALLOW_MISSING_SOURCES === '1')('teks juri nyata: rubrik 6 kriteria, slop 12, prompt tanpa pembungkus, tanpa [G], tanpa nama alat', () => {
@@ -60,6 +79,9 @@ describe('teks juri', () => {
       expect(t.text).toContain('Setiap pelanggaran hanya dihitung di');
       expect(t.text).toContain('Setiap skor wajib disertai bukti');
       expect(t.secret).not.toContain(protocol.prompts[id]);
+      // Kebutaan: tanpa kosakata internal sistem desain (token, konvensi nama node, ID lint, "board").
+      expect(t.text).not.toMatch(/\{colors\.|\{typography\.|mobile-title|on-accent|accent-green|Ekstra \/|\bLC-\d|\bboards?\b/i);
+      expect(tokenLeaks(t.text, parseDesignTokens(design))).toEqual([]);
     }
   });
 

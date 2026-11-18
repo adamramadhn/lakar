@@ -218,3 +218,42 @@ describe('runLakar (lakard + claude palsu)', () => {
     expect(snapshotLakarDocs(d).map((x) => x.name)).toEqual(['a.lakar.json']);
   });
 });
+
+describe('arsip dokumen bench lama (slug bentrok)', () => {
+  it('slug dari run Lakar putaran lain (slug + opened, termasuk .prev); putaran ini dan dokumen non-bench tidak disentuh', async () => {
+    const { applyLakarArchive, benchLakarSlugs, planLakarArchive } = await import('./archive.js');
+    const root = mkdtempSync(join(tmpdir(), 'lakar-archive-'));
+    try {
+      const rounds = join(root, 'rounds');
+      const put = (dir: string, lakar: unknown) => {
+        mkdirSync(join(rounds, dir), { recursive: true });
+        writeFileSync(join(rounds, dir, 'run.json'), JSON.stringify({ status: 'success', lakar }));
+      };
+      put('uji-1/A-lakar', { slug: 'kasku-landing', opened: ['kasku-landing'] });
+      put('uji-1/B-lakar.prev-20261118T000000Z', { slug: undefined, opened: ['gerak-coba'] });
+      put('uji-1/A-pendev', { slug: 'bukan-lakar' });
+      put('uji-2/B-lakar', { slug: 'gerak-beranda', opened: ['gerak-beranda', '../jahat'] });
+      put('1/A-lakar', { slug: 'putaran-ini' });
+      expect(benchLakarSlugs(rounds, '1')).toEqual(['gerak-beranda', 'gerak-coba', 'kasku-landing']);
+
+      const data = join(root, 'data');
+      mkdirSync(join(data, 'docs'), { recursive: true });
+      mkdirSync(join(data, 'exports', 'kasku-landing'), { recursive: true });
+      for (const f of ['kasku-landing.lakar.json', 'kasku-landing.history.jsonl', 'gerak-beranda.lakar.json', 'milik-adam.lakar.json']) writeFileSync(join(data, 'docs', f), '{}');
+      const dest = join(root, 'arsip', '1-x');
+      const plan = planLakarArchive(data, benchLakarSlugs(rounds, '1'), dest);
+      expect(plan.map((x) => x.from.slice(data.length + 1))).toEqual(['docs/gerak-beranda.lakar.json', 'docs/kasku-landing.lakar.json', 'docs/kasku-landing.history.jsonl', 'exports/kasku-landing']);
+      applyLakarArchive(plan);
+      expect(snapshotLakarDocs(join(data, 'docs')).map((d) => d.name)).toEqual(['milik-adam.lakar.json']);
+      expect(existsSync(join(dest, 'docs', 'kasku-landing.history.jsonl'))).toBe(true);
+      expect(existsSync(join(dest, 'exports', 'kasku-landing'))).toBe(true);
+      // Tujuan sudah ada → error sebelum apa pun dipindah.
+      writeFileSync(join(data, 'docs', 'kasku-landing.lakar.json'), '{}');
+      writeFileSync(join(data, 'docs', 'gerak-beranda.lakar.json'), '{}');
+      expect(() => applyLakarArchive(planLakarArchive(data, ['gerak-beranda', 'kasku-landing'], dest))).toThrow(/sudah ada/);
+      expect(existsSync(join(data, 'docs', 'gerak-beranda.lakar.json'))).toBe(true);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+});

@@ -4,7 +4,7 @@ import type { JudgeVerdict } from '../judge/parse.js';
 import { emptyRecord } from '../pendev/run.js';
 import type { TimedLine } from '../stream-metrics.js';
 import { countAgentEmoji, countEmojiInText, countLintEmoji } from './emoji.js';
-import { isFinalRun, parseRoundArgs, penBaseline, roundOutcome, roundStartProblem } from './main.js';
+import { frozenDrift, harnessErrorStatus, isFinalRun, parseRoundArgs, penBaseline, roundOutcome, roundStartProblem } from './main.js';
 import { LAKAR_INIT_RULES } from '../lakar/run.js';
 import { validateInit } from '../stream-metrics.js';
 import { lakarReconnect, pendevReconnect } from './reconnect.js';
@@ -59,7 +59,8 @@ describe('reconnect', () => {
     const r = lakarReconnect(st(1, 0), st(2, 1, '1'), errLines);
     expect(r.events.map((e) => e.kind)).toEqual(['lakard pid', 'lakard startedAt', 'lakard NRestarts', 'halaman Chromium dibuat ulang']);
     expect(r.toolErrors).toEqual([{ tool: 'mcp__lakar__execute', ms: 1000, snippet: 'RENDER_FAILED: halaman mati' }]);
-    expect(r.count).toBe(5);
+    // Satu restart lakard (3 sinyal) = 1, halaman dibuat ulang = 1, satu tool_result = 1.
+    expect(r.count).toBe(3);
     expect(r.affectedMs).toBe(1000);
     expect(lakarReconnect(st(1, 0), st(1, 0), []).count).toBe(0);
   });
@@ -67,6 +68,7 @@ describe('reconnect', () => {
   it('pen.dev: NRestarts/ActiveEnterTimestamp berubah dan tool_result is_error', () => {
     const r = pendevReconnect({ NRestarts: '0', ActiveEnterTimestamp: 'a' }, { NRestarts: '1', ActiveEnterTimestamp: 'b' }, errLines);
     expect(r.events).toHaveLength(2);
+    expect(r.count).toBe(1); // satu restart pen-desktop (NRestarts + ActiveEnterTimestamp)
     // Error snippet biasa (RENDER_FAILED milik Lakar, EXEC_ERROR) bukan reconnect pen.dev.
     expect(r.toolErrors).toHaveLength(0);
     const tr = L([
@@ -166,6 +168,8 @@ describe('gerbang dan keputusan sementara', () => {
   it('run Lakar gagal → Kalah; run pen.dev gagal → tidak dapat dinilai', () => {
     expect(decide({ gate: okGate, lakarRunOk: false, pendevRunOk: true, score: score([2, 2, 2, 2, 2, 2], [0, 0, 0, 0, 0, 0]) }).decision).toBe('Kalah');
     expect(decide({ gate: okGate, lakarRunOk: true, pendevRunOk: false, score: undefined }).decision).toBe('tidak dapat dinilai');
+    // Gerbang Lakar gagal tetap Kalah walau run pen.dev juga gagal.
+    expect(decide({ gate: { ok: false, reasons: ['layout_check gate = 1'], timeRatio: 1 }, lakarRunOk: true, pendevRunOk: false, score: undefined })).toMatchObject({ decision: 'Kalah', why: expect.stringMatching(/gerbang gagal/) });
   });
 });
 
@@ -296,7 +300,23 @@ describe('resume (C8) dan baseline .pen', () => {
     expect(r).toEqual({ baseline: { a: '1' }, from: 'pen-before-20261118T040000Z.json' });
     expect(penBaseline(['A-lakar'], () => ({}), { a: '3' })).toEqual({ baseline: { a: '3' }, from: undefined });
   });
-  it('PNG bukan skala 1 → exit 3 dengan alasan', () => {
+  it('PNG bukan skala 1 → exit 3 dengan alasan; juga dilaporkan saat putaran belum lengkap', () => {
     expect(roundOutcome({ fatal: undefined, pen: { changed: [], removed: [] }, allRuns: true, allReps: true, pngScaleMismatch: ['A-lakar'] })).toMatchObject({ status: 'lengkap', exitCode: 3, reasons: ['png_scale_mismatch: A-lakar'] });
+    expect(roundOutcome({ fatal: undefined, pen: { changed: [], removed: [] }, allRuns: true, allReps: false, pngScaleMismatch: ['B-pendev'] })).toMatchObject({ status: 'tidak lengkap', exitCode: 2, reasons: ['run atau ulangan juri belum lengkap', 'png_scale_mismatch: B-pendev'] });
+  });
+  it('error harness sesudah agen berjalan → failed (final, C8); sebelum agen → aborted (boleh diulang)', () => {
+    expect(harnessErrorStatus(true)).toBe('failed');
+    expect(isFinalRun({ status: harnessErrorStatus(true), reason: 'harness: ENOSPC' })).toBe(true);
+    expect(harnessErrorStatus(false)).toBe('aborted');
+    expect(isFinalRun({ status: harnessErrorStatus(false), reason: 'harness: x' })).toBe(false);
+  });
+  it('--resume: versi beku dari awal putaran; perbedaan dilaporkan, pid/startedAt lakard diabaikan', () => {
+    const f = {
+      head: 'aaa', porcelain: '', protocolHash: 'h', baselineProtocolHash: 'h', model: 'm', claude: 'c1',
+      lakard: { version: '0.1', schemaVersion: 1, pid: 1, startedAt: 's1', browser: 'b' }, icons: { lucide: '1' }, skills: { 'core.md': 'x' },
+      g0Rules: '[]', checkDist: 'd', pendevDesktop: 'p', pendevMcp: undefined, judge: { model: 'm', argv: 'claude -p' },
+    };
+    expect(frozenDrift(f, { ...f, lakard: { ...f.lakard, pid: 2, startedAt: 's2' } })).toEqual([]);
+    expect(frozenDrift(f, { ...f, head: 'bbb', skills: { 'core.md': 'y' } })).toEqual(['head: aaa → bbb', 'skills: {"core.md":"x"} → {"core.md":"y"}']);
   });
 });

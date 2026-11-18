@@ -12,7 +12,7 @@ review: quick
 review_source: pinned
 lenses_ran: [quick]
 review_loop_iteration: 0
-followup_review_recommended: true
+followup_review_recommended: false
 context:
   - '{project-root}/_bmad-output/initiative-lakar/tickets/epic-g0-inti-minimal/tickets/story-baseline-waktu-pen-dev-a-dan-b-terukur-dengan-pembungkus-res-plan.md'
 warnings: [oversized]
@@ -209,6 +209,20 @@ Satu perintah `round` menjalankan putaran uji `uji-1` (A,B × Lakar,pen.dev = 4 
   - `[low]` `[patch]` `pngScaleMismatch` tidak dilaporkan/ditindak di putaran — terverifikasi. Fix: `roundOutcome` memberi alasan `png_scale_mismatch: <run>` dan exit 3 (sama dengan seri baseline). Tes.
   - `[medium]` `[patch]` Exception di tahap juri (spawn, penjaga kebocoran, fs) membuang laporan dan penjaga `.pen` — terverifikasi (tanpa try/catch). Fix: tahap juri per prompt dibungkus try/catch → `fatal`, laporan + penjaga tetap jalan (status `dibatalkan`).
 
+### 2026-11-18 — Review pass (follow-up)
+- verdicts: 10 findings (8 lens quick + 2 fokus orkestrator) — high 1, medium 6, low 3, false 0, maybe-false 0
+- findings:
+  - `[low]` `[patch]` Run B-Lakar `invalid` `dokumen lama` menghentikan putaran sebelum juri A; keputusan A tertulis "tidak ada ulangan juri yang valid" — terverifikasi (`fatal` menahan semua juri; berhenti memang sesuai matriks "putaran berhenti", alasannya yang menyesatkan). Fix: alasan menjadi `juri tidak dijalankan: putaran dihentikan (<fatal>)` (konstanta `NO_VALID_REPS`). Akar masalahnya (slug bentrok) ditangani baris slug di bawah.
+  - `[medium]` `[patch]` `decide`: run pen.dev gagal dicek sebelum gerbang Lakar, sehingga gerbang gagal + pen.dev gagal = "tidak dapat dinilai", bukan Kalah — terverifikasi. Fix: gerbang dicek sebelum pen.dev. Tes kombinasi.
+  - `[medium]` `[patch]` Run final tanpa PNG (mis. Lakar `failed no_doc`) membuat putaran `tidak lengkap` exit 2 selamanya, dan `png_scale_mismatch` hilang di cabang tidak lengkap — terverifikasi. Fix: `allReps` hanya untuk prompt yang bisa dinilai (kedua strip ada); alasan mismatch juga ditulis saat tidak lengkap. Tes.
+  - `[low]` `[patch]` Satu restart lakard dihitung 3 reconnect (pid+startedAt+NRestarts), satu restart pen-desktop dihitung 2 — terverifikasi. Fix: `count` = 1 per restart + 1 per halaman dibuat ulang + tool_result; `events` tetap rinci. Tes diperbarui (5 → 3; pen.dev 1).
+  - `[low]` `[reject]` Teks Boundaries plan (pen.dev "tool_result is_error") tidak sama dengan kode/DEFINITIONS setelah patch pass pertama — perbaikannya hanya mengedit plan; ditolak sesuai aturan triage. DEFINITIONS di round md sudah menjelaskan aturan yang dipakai.
+  - `[medium]` `[patch]` Ulangan juri `invalid`/terputus dipindah ke `rep-k.prev-*` dan dijalankan ulang tanpa jejak di laporan — terverifikasi. Fix: setiap `rep-*.prev-*` dicatat di catatan round md ("percobaan ulangan sebelumnya tidak dipakai"). Penggantian tanpa `--resume` hanya terjadi setelah crash sebelum md ditulis (md ada → wajib `--resume`).
+  - `[medium]` `[patch]` `--resume` menulis versi beku (HEAD, versi claude/lakard, sha skill, tanggal) dari pemanggilan resume, bukan dari saat run — terverifikasi. Fix: `frozen.json` ditulis sekali di awal putaran (`wx`); resume memakai versi + tanggal itu dan mencatat perbedaan (`frozenDrift`, pid/startedAt lakard diabaikan). Tes.
+  - `[medium]` `[patch]` Error harness sesudah `claude` berjalan (mis. tulis `metrics.json` gagal) membuat run `aborted`, lalu `--resume` menjalankan ulang run berbayar (C8) — terverifikasi (catch di `roundMain` selalu `emptyRecord` = aborted). Fix: `harnessErrorStatus` → `failed` (final) bila `stream.jsonl` ada, untuk kedua alat. Tes.
+  - `[medium]` `[patch]` (fokus orkestrator 2) Teks juri memuat kosakata internal sistem desain: `{colors.accent-green}`, `on-accent`, `on-accent-orange`, `mobile-title`, `Ekstra /`, `LC-19`, dan istilah node "board" — terverifikasi dengan merender teks juri nyata (sumbernya kriteria golden-set + frontmatter DESIGN.md + teks harness, bukan transkrip/metadata; verdict dan stream juri uji-1 tidak menyebut token itu). Juri hanya menerima teks + PNG; tidak ada nama file, path, metadata PNG (dijaga `assertBarePng`), dan urutan X/Y acak. Fix: `parseDesignTokens` + `neutralizeInternalTerms` (token → nilai hex/ukuran teks, `Nama /` dan `LC-nn` dibuang, board → artboard), `tokenLeaks` + pola baru di `judgeLeaks` (abort sebelum spawn). Kriteria tetap sama maknanya. Tes unit + tes teks juri nyata.
+  - `[high]` `[patch]` (fokus orkestrator 3) Putaran resmi hampir pasti `invalid` `dokumen lama`: agen memilih slug dari nama produk (`kasku-landing`, `gerak-beranda-mobile` sudah ada dari uji-1), dan lakard menyimpan salinan dokumen di memori — terverifikasi (`docs` Map di `packages/daemon/src/server.ts`). Fix di harness saja: `bench/src/lakar/archive.ts` mengambil slug `lakar.slug`/`lakar.opened` dari `run.json` putaran bench lain, memindahkan dokumen, history, dan dir export ke `bench/runs/lakar-archive/<round>-<stamp>/` (tanpa menimpa), lalu `systemctl --user restart lakard` + tunggu pid baru dan pool siap + preflight ulang, sebelum run apa pun. Dokumen non-bench tidak disentuh. Pembungkus/prompt/protokol tidak berubah (`protocolHash` tetap `907cb36f…`). `--dry-run` mencetak rencana arsip tanpa memindahkan. Tes dengan dir sementara; jalur nyata dijalankan sekali (lihat Auto Run Result).
+
 ## Design Notes
 
 - **Kenapa juri lewat stream-json input:** sudah dicoba di mesin ini (2026-11-18): `claude -p --input-format stream-json` dengan blok `image` base64, `--tools ""`, dan mcp kosong menghasilkan init `tools=[] mcp=[]`, menjawab dengan benar, biaya $0,02. Tanpa tool Read, juri tidak bisa membaca file atau path apa pun.
@@ -273,4 +287,54 @@ Satu perintah `round` menjalankan putaran uji `uji-1` (A,B × Lakar,pen.dev = 4 
   - Slug Lakar yang sama di putaran berikut (mis. `kasku-landing`) → `invalid dokumen lama`. Story 16 perlu mengarsip/memindah dokumen bench sebelum putaran resmi.
   - PNG putaran ada di `bench/runs/` (gitignored), bukan `bench/<id>-<alat>.png`.
   - Keputusan masih sementara (HITL Adam).
+
+### Follow-up review pass (2026-11-18)
+
+- **Status: built.** Review `quick` (pinned) atas diff `d7cf579..` ditambah tiga fokus orkestrator. Ada 10 temuan: 9 patch (high 1, medium 6, low 2), 1 reject (low, perbaikannya hanya mengedit plan), 0 defer. Patch diterapkan orkestrator sendiri, karena implementer step-03 dari sesi sebelumnya tidak bisa di-re-engage.
+- **Ringkasan perubahan:**
+  - Jalur `--resume` dan C8:
+    - `frozen.json` menyimpan versi beku dan tanggal awal putaran.
+    - Error harness sesudah agen berjalan menjadi `failed` (final).
+    - Ulangan juri `.prev` dicatat di laporan.
+    - Status `tidak lengkap` hanya untuk prompt yang bisa dinilai, dan mismatch selalu dilaporkan.
+  - Keputusan:
+    - gerbang gagal → Kalah, walau run pen.dev juga gagal;
+    - alasan "juri tidak dijalankan" bila putaran berhenti.
+  - Reconnect dihitung per kejadian.
+  - Kebutaan juri: istilah internal dinetralkan, penjaga kebocoran diperluas.
+  - Slug: dokumen Lakar dari putaran bench lain diarsipkan, lalu lakard di-restart sebelum run.
+- **Fokus 1** (resume, penjaga `.pen`, try/catch juri), ditinjau ulang:
+  - `penBaseline` memakai snapshot paling awal. Benar.
+  - try/catch juri menetapkan `fatal`, lalu laporan dan penjaga `.pen` tetap jalan. Benar.
+  - Celah yang ditemukan dan sudah di-patch: versi beku saat resume, error harness pasca-agen, dan jejak ulangan juri.
+- **File:**
+  - `bench/src/lakar/archive.ts` (baru): arsip slug bench.
+  - `bench/src/sys.ts`: `restartUserUnit`, yang menolak unit `pen-*`.
+  - `bench/src/round/main.ts`: arsip + restart + preflight ulang, `frozen.json`/`frozenDrift`, `harnessErrorStatus`, `allReps` per prompt yang bisa dinilai, catatan ulangan `.prev`, dan alasan keputusan.
+  - `bench/src/round/score.ts`: urutan gerbang, `NO_VALID_REPS`.
+  - `bench/src/round/reconnect.ts`: hitungan per kejadian.
+  - `bench/src/judge/prompt.ts`: `parseDesignTokens`, `neutralizeInternalTerms`, `tokenLeaks`, pola kebocoran baru, "artboard".
+  - Tes: `judge/judge.test.ts`, `lakar/lakar.test.ts`, `round/round.test.ts`.
+- **Verifikasi:**
+  - `pnpm build` exit 0.
+  - `pnpm test`: 42 file, 678 tes lulus, 0 skip.
+  - `round --round 1 --dry-run` exit 0:
+    - `protocolHash` = baseline `907cb36f…`, tidak berubah;
+    - C7 agen dan juri lulus;
+    - rencana arsip tercetak (6 entri);
+    - tidak ada `bench/round-1.md`.
+  - Teks juri nyata dirender ulang. Diff hanya pada istilah internal; tidak ada `{colors.`, `mobile-title`, `on-accent`, `LC-`, atau `board`.
+  - Jalur arsip nyata dijalankan sekali lewat fungsi yang sama (tanpa claude, $0):
+    - 6 entri (`kasku-landing`, `gerak-beranda-mobile`) dipindah ke `bench/runs/lakar-archive/verifikasi-review-20261118T044757Z/`;
+    - lakard di-restart, pid 380920 → 560203, siap dalam 1,3 dtk;
+    - rencana sesudahnya kosong.
+  - `tools/node26/verify.sh` exit 0. lakard `active`.
+  - `git status --porcelain | grep -c bench/runs` = 0.
+  - Tanpa run `claude -p` berbayar.
+- **Follow-up review: false.** Satu high di-patch (slug), tetapi jalurnya sudah terverifikasi nyata (arsip + restart + pool siap). Tidak ada risiko spesifik yang tersisa tanpa verifikasi. Jumlah patch per verdict: high 1, medium 6, low 2.
+- **Risiko residual:**
+  - Laporan `uji-1` yang sudah di-commit dibuat dengan teks juri lama (masih memuat istilah internal). Laporan itu tidak diregenerasi, karena skornya memang berasal dari teks itu.
+  - Integrasi penuh arsip → run dalam satu `roundMain` baru akan teruji di putaran resmi story 16.
+  - Slug agen yang bentrok dengan dokumen non-bench tetap `invalid` (disengaja).
+  - PNG di `bench/runs` dibiarkan untuk story 16.
 

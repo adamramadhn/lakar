@@ -5,6 +5,7 @@ import type { SystemdInfo } from '../sys.js';
 
 export type ReconnectEvent = { kind: string; detail: string };
 export type ToolErrorHit = { tool: string; ms: number | undefined; snippet: string };
+/** `count` = kejadian reconnect: satu restart service (pid/startedAt/NRestarts/ActiveEnterTimestamp berubah bersama) = 1, halaman Chromium dibuat ulang = 1, tiap tool_result terdampak = 1. `events` = rincian sinyal. */
 export type Reconnect = { count: number; affectedMs: number; events: ReconnectEvent[]; toolErrors: ToolErrorHit[] };
 
 const LAKAR_ERROR = /RENDER_FAILED|VERSION_MISMATCH|lakard tidak menjawab/;
@@ -65,12 +66,14 @@ export function lakarReconnect(before: DaemonState | undefined, after: DaemonSta
     }
   }
   const toolErrors = toolResultHits(lines, (c, text) => c?.is_error === true && (LAKAR_ERROR.test(text) || TRANSPORT_ERROR.test(text)));
-  return { count: events.length + toolErrors.length, affectedMs: sum(toolErrors), events, toolErrors };
+  const restart = events.some((e) => e.kind.startsWith('lakard ')) ? 1 : 0;
+  const recreated = events.some((e) => e.kind === 'halaman Chromium dibuat ulang') ? 1 : 0;
+  return { count: restart + recreated + toolErrors.length, affectedMs: sum(toolErrors), events, toolErrors };
 }
 
 /** pen.dev: NRestarts/ActiveEnterTimestamp pen-desktop berubah, tool_result `is_error` berpola putus transport. */
 export function pendevReconnect(before: SystemdInfo | undefined, after: SystemdInfo | undefined, lines: readonly TimedLine[]): Reconnect {
   const events = systemdEvents('pen-desktop', before, after);
   const toolErrors = toolResultHits(lines, (c, text) => c?.is_error === true && TRANSPORT_ERROR.test(text));
-  return { count: events.length + toolErrors.length, affectedMs: sum(toolErrors), events, toolErrors };
+  return { count: (events.length ? 1 : 0) + toolErrors.length, affectedMs: sum(toolErrors), events, toolErrors };
 }

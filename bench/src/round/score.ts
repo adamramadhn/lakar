@@ -71,6 +71,8 @@ export function lakarGate(g: GateInput): GateResult {
   return { ok: reasons.length === 0, reasons, timeRatio };
 }
 
+export const NO_VALID_REPS = 'tidak ada ulangan juri yang valid';
+
 export type Decision = 'Setara' | 'Lebih baik' | 'Kalah' | 'tidak dapat dinilai';
 
 export type DecisionInput = {
@@ -83,9 +85,10 @@ export type DecisionInput = {
 /** Keputusan sementara (Lampiran B). Run Lakar gagal → Kalah; run pen.dev gagal → tidak dapat dinilai. */
 export function decide(d: DecisionInput): { decision: Decision; why: string } {
   if (!d.lakarRunOk) return { decision: 'Kalah', why: 'run Lakar gagal' };
-  if (!d.pendevRunOk) return { decision: 'tidak dapat dinilai', why: 'run pen.dev gagal' };
+  // Gerbang Lakar tidak bergantung pada pen.dev: gerbang gagal → Kalah walau run pen.dev juga gagal.
   if (!d.gate.ok) return { decision: 'Kalah', why: `gerbang gagal: ${d.gate.reasons.join('; ')}` };
-  if (!d.score || d.score.validReps === 0) return { decision: 'tidak dapat dinilai', why: 'tidak ada ulangan juri yang valid' };
+  if (!d.pendevRunOk) return { decision: 'tidak dapat dinilai', why: 'run pen.dev gagal' };
+  if (!d.score || d.score.validReps === 0) return { decision: 'tidak dapat dinilai', why: NO_VALID_REPS };
   const L = d.score.tools.lakar;
   const P = d.score.tools.pendev;
   if (L.total === undefined || P.total === undefined) return { decision: 'tidak dapat dinilai', why: 'total skor tidak lengkap' };

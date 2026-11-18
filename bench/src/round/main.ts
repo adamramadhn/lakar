@@ -15,11 +15,12 @@ import { buildStrip, judgeImages } from '../png/strip.js';
 import { BENCH_ROOT, GOLDEN_SET_PATH, PROTOCOL_DIR, PROTOCOL_FILES, REPO_ROOT, renderPrompt, type PromptId, type Protocol } from '../protocol.js';
 import type { RunRecord } from '../report.js';
 import type { TimedLine } from '../stream-metrics.js';
-import { comparePenHashes, git, isActive, md5PenFiles, sha256, sha256Dir, systemdShow, type SystemdInfo } from '../sys.js';
+import { comparePenHashes, git, isActive, md5PenFiles, restartUserUnit, sha256, sha256Dir, systemdShow, type SystemdInfo } from '../sys.js';
+import { applyLakarArchive, benchLakarSlugs, planLakarArchive } from '../lakar/archive.js';
 import { countAgentEmoji, countLintEmoji } from './emoji.js';
 import { lakarReconnect, pendevReconnect } from './reconnect.js';
 import { renderRoundJson, renderRoundMarkdown, renderScoreJson, renderScoreMarkdown, ROUND_ID, type FrozenVersions, type RoundPrompt, type RoundReport, type RoundRun } from './report.js';
-import { aggregateScores, decide, lakarGate } from './score.js';
+import { aggregateScores, decide, lakarGate, NO_VALID_REPS } from './score.js';
 
 const ROUND_ORDER: readonly [PromptId, Tool][] = [
   ['A', 'pendev'],
@@ -66,6 +67,7 @@ export function roundOutcome(i: {
   fatal: string | undefined;
   pen: { changed: string[]; removed: string[] };
   allRuns: boolean;
+  /** Semua prompt yang bisa dinilai (kedua run punya strip) punya ulangan juri lengkap. Prompt tanpa strip diputuskan tanpa juri. */
   allReps: boolean;
   /** Run dengan PNG ≠ ukuran board/frame (bukan skala 1) → exit 3 seperti seri baseline. */
   pngScaleMismatch?: string[];
@@ -75,8 +77,9 @@ export function roundOutcome(i: {
   if (i.pen.changed.length || i.pen.removed.length) reasons.push(`.pen lama berubah/hilang: ${[...i.pen.changed, ...i.pen.removed].join(', ')}`);
   if (reasons.length) return { status: 'dibatalkan', reasons, exitCode: 1 };
   const mm = i.pngScaleMismatch ?? [];
-  if (i.allRuns && i.allReps) return mm.length ? { status: 'lengkap', reasons: [`png_scale_mismatch: ${mm.join(', ')}`], exitCode: 3 } : { status: 'lengkap', reasons, exitCode: 0 };
-  return { status: 'tidak lengkap', reasons: ['run atau ulangan juri belum lengkap'], exitCode: 2 };
+  const mmReason = mm.length ? [`png_scale_mismatch: ${mm.join(', ')}`] : [];
+  if (i.allRuns && i.allReps) return { status: 'lengkap', reasons: mmReason, exitCode: mm.length ? 3 : 0 };
+  return { status: 'tidak lengkap', reasons: ['run atau ulangan juri belum lengkap', ...mmReason], exitCode: 2 };
 }
 
 /**
@@ -149,6 +152,8 @@ const CONVENTION = [
   'ID putaran dicek dengan `^(uji-[1-9]\\d*|[1-9]\\d*)$`: `uji-<k>` = putaran uji, angka polos = putaran resmi (story 16).',
   'Satu putaran = A dan B, urutan run A-pen.dev, A-Lakar, B-pen.dev, B-Lakar, lalu juri 3× per prompt. Satu run per alat per prompt; run tidak diulang untuk memilih hasil (C8).',
   'Putaran yang md-nya sudah ada ditolak kecuali `--resume`. `--resume` memakai ulang run `success`/`failed` dan ulangan juri yang sudah selesai; run `aborted`/`invalid` (gagal-setup) dipindah ke `<key>.prev-<stamp>` dan dijalankan lagi, dan dicatat sebagai percobaan sebelumnya.',
+  'Sebelum run, dokumen Lakar yang dibuat/dibuka agen di putaran bench lain (`run.json` → `lakar.slug`/`lakar.opened`) dipindah dari dataDir lakard ke `bench/runs/lakar-archive/<round>-<stamp>/`, lalu lakard di-restart (salinan dokumen di memori), agar slug pilihan agen tidak bentrok (`dokumen lama`). Dokumen non-bench tidak disentuh; pembungkus dan prompt tidak berubah.',
+  'Versi beku dicatat sekali di awal putaran (`frozen.json`); `--resume` memakainya dan melaporkan perbedaan.',
   'Artefak di `bench/runs/rounds/<round>/` (gitignored): dir run per `<prompt>-<alat>`, strip `<prompt>-<alat>.png`, dan `judge/<prompt>/rep-<k>/` (pemetaan X/Y, transkrip juri).',
 ];
 
@@ -161,6 +166,52 @@ const DEFINITIONS = [
   'Normalisasi PNG: board/frame top-level (urutan dokumen) dikomposit di atas #808080, ditumpuk vertikal berjarak 48 px #808080, di-encode ulang RGB hanya IHDR/IDAT/IEND. Juri menerima tile lebar penuh (tinggi ≤ 1000 untuk lebar > 600, ≤ 1568 untuk lebih sempit) + satu overview sisi panjang ≤ 1568.',
   'Juri: `claude -p --input-format stream-json` tanpa tool/MCP (init wajib `tools=[]`, `mcp_servers=[]`), satu pesan berisi teks juri + gambar berlabel netral; label X/Y diacak per ulangan dengan `crypto` dan kedua penugasan wajib muncul. Jawaban JSON divalidasi ketat; tidak valid → 1 percobaan ulang, lalu `failed`.',
 ];
+
+/** Field versi beku yang dibandingkan saat `--resume` (tanggal dan pid/startedAt lakard boleh berbeda karena restart). */
+export function frozenDrift(first: FrozenVersions, now: FrozenVersions): string[] {
+  const pick = (f: FrozenVersions) => ({
+    head: f.head,
+    porcelain: f.porcelain,
+    protocolHash: f.protocolHash,
+    model: f.model,
+    claude: f.claude,
+    lakard: `${f.lakard.version}/${f.lakard.schemaVersion}/${f.lakard.browser ?? ''}`,
+    icons: JSON.stringify(f.icons),
+    skills: JSON.stringify(f.skills),
+    g0Rules: f.g0Rules,
+    checkDist: f.checkDist,
+    pendevDesktop: f.pendevDesktop,
+    judge: JSON.stringify(f.judge),
+  });
+  const a = pick(first);
+  const b = pick(now);
+  return (Object.keys(a) as (keyof typeof a)[]).filter((k) => a[k] !== b[k]).map((k) => `${k}: ${a[k] || '(kosong)'} → ${b[k] || '(kosong)'}`);
+}
+
+/**
+ * Status run saat harness melempar error (C8): bila claude sudah dijalankan (transkrip ada), run final `failed`,
+ * bukan `aborted` yang boleh diulang lewat `--resume`.
+ */
+export function harnessErrorStatus(agentRan: boolean): 'failed' | 'aborted' {
+  return agentRan ? 'failed' : 'aborted';
+}
+
+/** Tunggu lakard hidup lagi setelah restart: pid baru dan pool render siap (≤ 90 dtk). */
+async function waitLakard(client: LakardClient, oldPid: number, timeoutMs = 90_000): Promise<LakardStatus> {
+  const until = Date.now() + timeoutMs;
+  let last = 'belum menjawab';
+  while (Date.now() < until) {
+    try {
+      const st = await client.status();
+      if (st.pid !== oldPid && (st.pool?.ready ?? 0) >= 1) return st;
+      last = `pid ${st.pid}, pool ready ${st.pool?.ready ?? '?'}`;
+    } catch (e) {
+      last = (e as Error).message;
+    }
+    await new Promise((r) => setTimeout(r, 500));
+  }
+  throw new Abort(`lakard tidak siap ${timeoutMs / 1000} dtk setelah restart (${last})`);
+}
 
 function runRecordPath(dir: string): string {
   return join(dir, 'run.json');
@@ -252,8 +303,26 @@ export async function roundMain(argv: string[]): Promise<number> {
   console.log(`\n=== argv juri (stdin: satu pesan stream-json teks + gambar) ===\n${judgeArgv}`);
   console.log(`\nenv tambahan: ${JSON.stringify(cfg.env)}; dibuang: ${buildEnv(process.env, cfg).scrubbed.join(', ') || '-'}`);
   console.log(`\nkonvensi putaran:\n${CONVENTION.map((c) => `- ${c}`).join('\n')}`);
+  // Dokumen Lakar buatan putaran bench lain: dipindah ke arsip bench sebelum run agar slug pilihan agen tidak bentrok
+  // (`dokumen lama` → invalid). Dokumen non-bench tidak disentuh.
+  const archiveDir = join(RUNS_ROOT, 'lakar-archive', `${round}-${stamp()}`);
+  const archivePlan = planLakarArchive(status.dataDir, benchLakarSlugs(join(RUNS_ROOT, 'rounds'), round), archiveDir);
+  console.log(`\narsip dokumen Lakar bench lama (sebelum run, lalu restart lakard): ${archivePlan.length ? archivePlan.map((x) => relative(status!.dataDir, x.from)).join(', ') : '-'}`);
   if (dryRun) return 0;
   if (porcelain) throw new Abort(`produk tidak beku: git status --porcelain -- packages tools .mcp.json tidak kosong:\n${porcelain}`);
+  const archiveNotes: string[] = [];
+  if (archivePlan.length) {
+    applyLakarArchive(archivePlan);
+    log(`arsip: ${archivePlan.length} entri dokumen bench lama dipindah ke ${relative(REPO_ROOT, archiveDir)}; restart lakard`);
+    const oldPid = status.pid;
+    restartUserUnit(LAKARD_UNIT);
+    status = await waitLakard(client, oldPid);
+    const lp2 = lakarPreflightProblems(status, mcpServerNames());
+    if (lp2.length) throw new Abort(`preflight Lakar sesudah restart: ${lp2.join('; ')}`);
+    archiveNotes.push(
+      `Sebelum run: dokumen Lakar buatan putaran bench lain dipindah ke \`${relative(REPO_ROOT, archiveDir)}\` (${[...new Set(archivePlan.map((x) => x.slug))].join(', ')}), lalu lakard di-restart (pid ${oldPid} → ${status.pid}) agar slug agen tidak bentrok dengan dokumen lama. Restart ini sebelum run, jadi bukan reconnect.`,
+    );
+  }
 
   // ---------- putaran ----------
   const roundDir = join(RUNS_ROOT, 'rounds', round);
@@ -265,9 +334,37 @@ export async function roundMain(argv: string[]): Promise<number> {
   const penBefore = pb.baseline;
   writeFileSync(join(roundDir, `pen-before-${stamp()}.json`), `${JSON.stringify(penNow, null, 1)}\n`);
   log(`md5 ${Object.keys(penBefore).length} file .pen lama dicatat${pb.from ? ` (baseline dari ${pb.from})` : ''}`);
-  const notes: string[] = [];
+  const notes: string[] = [...archiveNotes];
   const mcpVersionFile = join(roundDir, 'pendev-mcp-version.txt');
   const serverVersion: { v?: string } = existsSync(mcpVersionFile) ? { v: readFileSync(mcpVersionFile, 'utf8').trim() } : {};
+  // Versi beku dicatat sekali di awal putaran (sebelum run); --resume memakai catatan itu dan melaporkan perbedaannya.
+  const frozenNow: FrozenVersions = {
+    head,
+    porcelain,
+    protocolHash: protocol.hash,
+    baselineProtocolHash: baseline.protocolHash,
+    model: cfg.model,
+    claude: pre.claudeVersion,
+    lakard: { version: status.version, schemaVersion: status.schemaVersion, pid: status.pid, startedAt: status.startedAt, browser: status.pool?.browserVersion },
+    icons: status.icons ?? {},
+    skills: Object.fromEntries(readdirSync(SKILLS_DIR).filter((f) => f.endsWith('.md')).sort().map((f) => [f, sha256(readFileSync(join(SKILLS_DIR, f)))])),
+    g0Rules: JSON.stringify(G0_RULES),
+    checkDist: existsSync(CHECK_DIST) ? sha256Dir(CHECK_DIST) : 'tidak ada',
+    pendevDesktop: penDesktopVersion(),
+    pendevMcp: undefined,
+    judge: { model: cfg.model, argv: judgeArgv },
+  };
+  const frozenFile = join(roundDir, 'frozen.json');
+  const startedIso = new Date().toISOString();
+  let frozenFirst: { date: string; frozen: FrozenVersions };
+  if (existsSync(frozenFile)) {
+    frozenFirst = JSON.parse(readFileSync(frozenFile, 'utf8'));
+    const drift = frozenDrift(frozenFirst.frozen, frozenNow);
+    notes.push(`Laporan dibuat ulang ${startedIso} (--resume); versi beku dan tanggal dari awal putaran ${frozenFirst.date}.${drift.length ? ` Berbeda saat --resume: ${drift.join('; ')}.` : ' Tidak ada perbedaan versi saat --resume.'}`);
+  } else {
+    frozenFirst = { date: startedIso, frozen: frozenNow };
+    writeFileSync(frozenFile, `${JSON.stringify(frozenFirst, null, 1)}\n`, { flag: 'wx' });
+  }
   const prevUris: string[] = [];
   const runs = new Map<string, RoundRun>();
   let fatal: string | undefined;
@@ -309,7 +406,7 @@ export async function roundMain(argv: string[]): Promise<number> {
         rec = await runOne({ pre, runId, prompt, promptId: p, attempt: 1, outDir: dir, prevUris }, serverVersion);
       } catch (e) {
         mkdirSync(dir, { recursive: true });
-        rec = { ...emptyRecord({ runId, promptId: p, attempt: 1 }), reason: `harness: ${(e as Error).message}` };
+        rec = { ...emptyRecord({ runId, promptId: p, attempt: 1 }), status: harnessErrorStatus(existsSync(join(dir, 'stream.jsonl'))), reason: `harness: ${(e as Error).message}` };
       }
       rec.pendevSystemd = { before, after: systemdShow('pen-desktop', false) };
       if (serverVersion.v) writeFileSync(mcpVersionFile, `${serverVersion.v}\n`);
@@ -318,7 +415,7 @@ export async function roundMain(argv: string[]): Promise<number> {
         rec = await runLakar({ runId, prompt, promptId: p, outDir: dir, config: cfg, client });
       } catch (e) {
         mkdirSync(dir, { recursive: true });
-        rec = { ...emptyRecord({ runId, promptId: p, attempt: 1 }), reason: `harness: ${(e as Error).message}` };
+        rec = { ...emptyRecord({ runId, promptId: p, attempt: 1 }), status: harnessErrorStatus(existsSync(join(dir, 'stream.jsonl'))), reason: `harness: ${(e as Error).message}` };
       }
     }
     writeFileSync(runRecordPath(dir), `${JSON.stringify(rec, null, 1)}\n`);
@@ -332,6 +429,7 @@ export async function roundMain(argv: string[]): Promise<number> {
 
   // ---------- strip + juri ----------
   const results: RoundPrompt[] = [];
+  const judgeablePrompts = new Set<string>();
   let judgeCost = 0;
   for (const p of cfg.promptIds) {
     const r: Partial<Record<Tool, RoundRun>> = { lakar: runs.get(`${p}-lakar`), pendev: runs.get(`${p}-pendev`) };
@@ -353,7 +451,10 @@ export async function roundMain(argv: string[]): Promise<number> {
       : undefined;
 
     const reps: JudgeRepRecord[] = [];
-    if (!fatal && images.lakar && images.pendev) try {
+    const judgeable = Boolean(images.lakar && images.pendev);
+    if (judgeable) judgeablePrompts.add(p);
+    const judgeSkipped = Boolean(fatal) && judgeable;
+    if (!fatal && judgeable) try {
       const jdir = join(roundDir, 'judge', p);
       mkdirSync(jdir, { recursive: true });
       const assignFile = join(jdir, 'assignments.json');
@@ -390,16 +491,22 @@ export async function roundMain(argv: string[]): Promise<number> {
       fatal = `juri ${p}: harness: ${(e as Error).message}`;
       log(`putaran berhenti: ${fatal}`);
     }
+    // Ulangan juri yang tidak dipakai (init tidak valid, atau terputus sebelum rep.json) tetap tercatat di laporan.
+    const jdirAll = join(roundDir, 'judge', p);
+    const prevReps = existsSync(jdirAll) ? readdirSync(jdirAll).filter((d) => /^rep-\d+\.prev-/.test(d)).sort() : [];
+    if (prevReps.length) notes.push(`Juri ${p}: percobaan ulangan sebelumnya tidak dipakai (init tidak valid atau terputus sebelum rep.json): ${prevReps.map((d) => `\`${relative(REPO_ROOT, join(jdirAll, d))}\``).join(', ')}.`);
     judgeCost += reps.reduce((s, x) => s + x.costUsd, 0);
     const score = reps.length ? aggregateScores(p, reps) : undefined;
-    const decision = !r.lakar
+    const decided = !r.lakar
       ? { decision: 'tidak dapat dinilai' as const, why: 'run Lakar tidak dijalankan (putaran berhenti lebih awal)' }
       : decide({
-      gate: gate ?? { ok: false, reasons: ['run Lakar tidak ada'], timeRatio: undefined },
-      lakarRunOk: lakarRec?.status === 'success',
-      pendevRunOk: r.pendev?.record.status === 'success',
-      score,
-    });
+          gate: gate ?? { ok: false, reasons: ['run Lakar tidak ada'], timeRatio: undefined },
+          lakarRunOk: lakarRec?.status === 'success',
+          pendevRunOk: r.pendev?.record.status === 'success',
+          score,
+        });
+    // Juri dilewati karena putaran berhenti: alasannya itu, bukan "tidak ada ulangan juri yang valid".
+    const decision = judgeSkipped && !reps.length && decided.why === NO_VALID_REPS ? { ...decided, why: `juri tidak dijalankan: putaran dihentikan (${fatal})` } : decided;
     results.push({ prompt: p, baselineMedianMs: baseline.medians[p], runs: r, gate, sizeProblems, score, decision });
   }
 
@@ -407,7 +514,7 @@ export async function roundMain(argv: string[]): Promise<number> {
   const penAfter = md5PenFiles();
   const cmp = comparePenHashes(penBefore, penAfter);
   const allRuns = ROUND_ORDER.every(([p, t]) => runs.has(`${p}-${t}`));
-  const allReps = results.every((x) => x.score && x.score.reps.length === JUDGE_REPS);
+  const allReps = results.filter((x) => judgeablePrompts.has(x.prompt)).every((x) => x.score && x.score.reps.length === JUDGE_REPS);
   const mismatch = [...runs.values()].filter((x) => x.record.pngScaleMismatch).map((x) => x.key);
   const outcome = roundOutcome({ fatal, pen: cmp, allRuns, allReps, pngScaleMismatch: mismatch });
   const roundStatus = outcome.status;
@@ -415,26 +522,11 @@ export async function roundMain(argv: string[]): Promise<number> {
   const failedReps = results.flatMap((x) => x.score?.reps.filter((y) => y.status !== 'ok').map((y) => `${x.prompt} ulangan ${y.rep} ${y.status}`) ?? []);
   if (failedReps.length) notes.push(`Ulangan juri tidak valid (tidak diganti): ${failedReps.join(', ')}.`);
 
-  const frozen: FrozenVersions = {
-    head,
-    porcelain,
-    protocolHash: protocol.hash,
-    baselineProtocolHash: baseline.protocolHash,
-    model: cfg.model,
-    claude: pre.claudeVersion,
-    lakard: { version: status.version, schemaVersion: status.schemaVersion, pid: status.pid, startedAt: status.startedAt, browser: status.pool?.browserVersion },
-    icons: status.icons ?? {},
-    skills: Object.fromEntries(readdirSync(SKILLS_DIR).filter((f) => f.endsWith('.md')).sort().map((f) => [f, sha256(readFileSync(join(SKILLS_DIR, f)))])),
-    g0Rules: JSON.stringify(G0_RULES),
-    checkDist: existsSync(CHECK_DIST) ? sha256Dir(CHECK_DIST) : 'tidak ada',
-    pendevDesktop: penDesktopVersion(),
-    pendevMcp: serverVersion.v,
-    judge: { model: cfg.model, argv: judgeArgv },
-  };
+  const frozen: FrozenVersions = { ...frozenFirst.frozen, pendevMcp: serverVersion.v };
   if (status.version !== LAKAR_VERSION || status.schemaVersion !== SCHEMA_VERSION) notes.push(`lakard ${status.version}/${status.schemaVersion} ≠ bench ${LAKAR_VERSION}/${SCHEMA_VERSION}`);
   const report: RoundReport = {
     round,
-    date: new Date().toISOString(),
+    date: frozenFirst.date,
     status: roundStatus,
     statusReasons,
     frozen,

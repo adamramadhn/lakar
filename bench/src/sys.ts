@@ -1,4 +1,5 @@
-// Bacaan sistem yang hanya-baca untuk putaran: systemd show, hash file/direktori, md5 .pen lama, git HEAD/status.
+// Bacaan sistem untuk putaran: systemd show, hash file/direktori, md5 .pen lama, git HEAD/status (hanya baca),
+// ditambah restart lakard (user service) setelah arsip dokumen bench lama.
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
@@ -19,6 +20,12 @@ export function systemdShow(unit: string, user: boolean): SystemdInfo {
   } catch (e) {
     return { error: (e as Error).message };
   }
+}
+
+/** `systemctl --user restart <unit>` (hanya dipakai untuk lakard; service pen-* tidak pernah disentuh). */
+export function restartUserUnit(unit: string): void {
+  if (unit.startsWith('pen-')) throw new Error(`restart ${unit} dilarang`);
+  execFileSync('systemctl', ['--user', 'restart', unit], { encoding: 'utf8' });
 }
 
 export function isActive(unit: string, user: boolean): string {

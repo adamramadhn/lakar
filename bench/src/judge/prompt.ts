@@ -23,6 +23,10 @@ export const JUDGE_LEAK_PATTERNS: readonly RegExp[] = [
   /\bbench\//i,
   /\.(png|pen|json|jsonl|md)\b/i,
   /\bbytes?\b/i,
+  // Kosakata internal sistem desain/alat: referensi token `{grup.nama}`, ID aturan lint, istilah node "board".
+  /\{[a-z]+\.[a-z0-9*-]+\}/i,
+  /\bLC-\d/,
+  /\bboards?\b/i,
 ];
 
 export function judgeLeaks(text: string): string[] {
@@ -30,6 +34,61 @@ export function judgeLeaks(text: string): string[] {
     const m = text.match(re);
     return m ? [`"${m[0].trim()}" (${re.source})`] : [];
   });
+}
+
+/** Nilai token DESIGN.md (frontmatter `colors:` dan `typography:`) → deskripsi visual yang bisa dicek dari gambar. */
+export function parseDesignTokens(designMd: string): Map<string, string> {
+  const out = new Map<string, string>();
+  const fm = designMd.match(/^---\n([\s\S]*?)\n---/);
+  if (!fm) throw new Error('teks juri: frontmatter DESIGN.md tidak ditemukan');
+  let group = '';
+  for (const line of fm[1]!.split('\n')) {
+    const g = line.match(/^([a-z]+):\s*(#.*)?$/);
+    if (g) {
+      group = g[1]!;
+      continue;
+    }
+    if (/^\S/.test(line)) group = '';
+    const m = line.match(/^ {2}'?([a-z0-9-]+)'?:\s*('[^']*'|\{[^}]*\}|[^#\s][^#]*?)\s*(#.*)?$/);
+    if (!m) continue;
+    const [, name, raw] = m as unknown as [string, string, string];
+    if (group === 'colors') {
+      const hex = raw.match(/#[0-9A-Fa-f]{6}/)?.[0];
+      if (hex) out.set(name, name.startsWith('on-') ? `teks/ikon di atas aksen \`${hex}\`` : `\`${hex}\``);
+    } else if (group === 'typography') {
+      const size = raw.match(/fontSize:\s*'?([^,'}]+)'?/)?.[1]?.trim();
+      const lh = raw.match(/lineHeight:\s*'?([^,'}]+)'?/)?.[1]?.trim();
+      const w = raw.match(/fontWeight:\s*'?(\d+)'?/)?.[1];
+      if (size) out.set(name, `(teks ${size}${lh ? `/${lh}` : ''}${w ? `, tebal ${w}` : ''})`);
+    }
+  }
+  if (!out.size) throw new Error('teks juri: token warna/tipografi DESIGN.md tidak ditemukan');
+  return out;
+}
+
+/**
+ * Netralkan kosakata internal sistem desain di teks juri (kebutaan): nama/referensi token diganti nilainya
+ * (warna hex, ukuran teks), konvensi nama node (`Nama /`) dan ID aturan lint (`LC-nn`) dibuang, "board" → "artboard".
+ * Juri tetap menilai kriteria yang sama dari gambar, tanpa istilah yang hanya dikenal satu alat.
+ */
+export function neutralizeInternalTerms(text: string, tokens: ReadonlyMap<string, string>): string {
+  let out = text.replace(/ ?\(`[^`]*\/`\)/g, '').replace(/`([^`]+)`/g, (span, inner: string) => {
+    const ref = inner.match(/^\{[a-z]+\.([a-z0-9-]+)\}$/);
+    const name = ref ? ref[1]! : inner;
+    const v = tokens.get(name);
+    if (v) return v;
+    if (ref) return '';
+    if (/ \/$/.test(inner)) return '';
+    return span;
+  });
+  out = out.replace(/ ?\(LC-\d+[a-z]?\)/g, '').replace(/\bLC-\d+[a-z]?(, ?| )?/g, '');
+  out = out.replace(/\b([Bb])oard(s?)\b/g, (_m, b: string, pl: string) => `${b === 'B' ? 'A' : 'a'}rtboard${pl}`);
+  return out;
+}
+
+/** Nama token bertanda hubung (mis. `accent-green`, `mobile-title`) yang masih muncul di teks juri. */
+export function tokenLeaks(text: string, tokens: ReadonlyMap<string, string>): string[] {
+  return [...tokens.keys()].filter((k) => k.includes('-') && new RegExp(`(^|[^a-z0-9-])${k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}($|[^a-z0-9-])`).test(text));
 }
 
 /** Buang nama alat (kata utuh) lalu rapikan spasi ganda. */
@@ -195,7 +254,7 @@ export function buildJudgeText(designMd: string, goldenMd: string, promptId: str
     '',
     '## Gambar',
     '',
-    'Setiap desain dikirim sebagai potongan vertikal berurutan berlabel "Desain X, bagian i dari n" (lebar penuh, skala asli), ditambah satu gambar "overview" seluruh desain yang diperkecil. Bila desain terdiri dari beberapa board, board-board itu ditumpuk vertikal menjadi satu strip. Area abu-abu polos (#808080) di luar board dan jarak antar-board adalah latar netral penilaian, bukan bagian desain.',
+    'Setiap desain dikirim sebagai potongan vertikal berurutan berlabel "Desain X, bagian i dari n" (lebar penuh, skala asli), ditambah satu gambar "overview" seluruh desain yang diperkecil. Bila desain terdiri dari beberapa artboard, artboard-artboard itu ditumpuk vertikal menjadi satu strip. Area abu-abu polos (#808080) di luar artboard dan jarak antar-artboard adalah latar netral penilaian, bukan bagian desain.',
     '',
     '## Format jawaban',
     '',
@@ -205,7 +264,12 @@ export function buildJudgeText(designMd: string, goldenMd: string, promptId: str
     '',
     JUDGE_JSON_SHAPE,
   ].join('\n');
-  return { text: scrubToolNames(text), secret: scrubToolNames(secretParts.join('\n')) };
+  const tokens = parseDesignTokens(designMd);
+  const clean = (t: string) => neutralizeInternalTerms(scrubToolNames(t), tokens);
+  const out = { text: clean(text), secret: clean(secretParts.join('\n')) };
+  const leftover = tokenLeaks(out.text, tokens);
+  if (leftover.length) throw new Error(`teks juri: istilah token internal tersisa: ${leftover.join(', ')}`);
+  return out;
 }
 
 // ---------- penjaga C7 juri ----------
