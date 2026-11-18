@@ -272,3 +272,18 @@ risk = "high"
 notes = ["Arahan Adam: protokol beku yang sama; satu run per alat per prompt (C8); agen tidak mengisi konfirmasi Adam; G1 hanya dimulai bila round-2 lolos dan dikonfirmasi."]
 plan_checkpoint = true
 done_checkpoint = true
+
+[[entry]]
+id = 23
+type = "story"
+title = "Skill polish dan disiplin spacing dari ui-skills"
+description = "Adam mengonfirmasi round-2 (A Setara, B Setara) dengan catatan spacing: lencana \"Berikutnya\" di B terlalu besar dan menempel ke judul. Akar masalahnya ada tiga: prelude Badge tetap 24 px, teks judul dalam Row tanpa width fill, dan tidak ada aturan check untuk luapan atau tumpang tindih. Hasil analisis seluruh registry ui-skills.com yang disetujui Adam ada di _bmad-output/initiative-lakar/analisis-ui-skills-polish.md. Lingkupnya: (1) prelude Badge berukuran sm/md dengan teks yang lulus kontras; (2) skill baru polish.md, dibaca setelah core, berisi struktur dan spacing, komponen, tipografi, warna, kekayaan informasi, tanda slop baru, dan kritik diri (parafrase, atribusi untuk sumber Apache/MIT); (3) revisi kecil landing.md dan mobile.md (overline maks 2, pembatasan \"·\", grid 12 kolom); (4) aturan layout_check baru: error untuk teks meluap, tumpang tindih saudara, dan kontras setelah komposit; warning untuk proporsi badge, gap < 8, kartu bersarang, radius konsentris, ritme judul, jumlah ukuran huruf, panjang baris, bobot tipis, dan tanda baca; (5) uji lewat seri latihan non-A/B dibanding pen.dev dengan juri v2.1."
+verify = "pnpm build dan pnpm test lulus. Setiap aturan check baru punya fixture positif dan negatif, dan aturan berstatus error tidak memberi positif palsu pada arsip dokumen bench (>= 80 dokumen, hasilnya tercatat). Dokumen B-lakar round-2 memicu aturan luapan/tumpang tindih atau proporsi badge. Tes skill lulus: contoh lolos terhadap api.ts, batas token core, read_skill polish tersedia, dan tidak ada frasa rubrik, kata khas A/B, atau teks prompt latihan di skill (C7). Seri latihan non-A/B (Lakar vs pen.dev, juri v2.1, satu run per alat per prompt) tercatat dengan PNG, skor, waktu, dan biaya kumulatif <= $15. Lakar Setara atau Lebih baik di semua prompt seri, nol emoji, 0 error gerbang. Adam sudah melihat PNG."
+covers = ["R6", "R5"]
+after = [21]
+hitl = true
+risk = "medium"
+references = ["_bmad-output/initiative-lakar/analisis-ui-skills-polish.md", "bench/round-2.md#konfirmasi-adam", "bench/practice/LOG.md"]
+notes = ["Keputusan Adam 2026-11-18: skill polish yang diperkaya dari analisis ui-skills.com disetujui (\"setuju\"); dikerjakan di g0 sebelum G1.", "C7, C8, C9 berlaku; restart pen-desktop hanya setelah seri pen.dev selesai; jangan menyalin teks sumber tanpa lisensi."]
+plan_checkpoint = true
+done_checkpoint = true
