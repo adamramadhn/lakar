@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { createServer } from 'node:net';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { ChromiumRenderer, PACKAGE, RENDER_MODULE_PATH, buildServer, loadConfig, startDaemon, type RunningDaemon } from './index.js';
+import { ChromiumRenderer, FontRegistry, PACKAGE, RENDER_DIST_DIR, buildServer, loadConfig, startDaemon, type RunningDaemon } from './index.js';
 import { LakarError } from '@lakar/schema';
 import { countDarkPixels, decodePng, readPngSize } from './png.js';
 
@@ -61,9 +61,13 @@ describe('@lakar/daemon', () => {
   });
 
   it('dist render tanpa impor non-relatif (dimuat apa adanya di Chromium)', async () => {
-    const js = await readFile(RENDER_MODULE_PATH, 'utf8');
-    expect(js).not.toMatch(/from\s*['"]@/);
-    expect(js).not.toMatch(/(?:from|import)\s*\(?\s*['"][^./'"][^'"]*['"]/);
+    const files = readdirSync(RENDER_DIST_DIR).filter((f) => f.endsWith('.js'));
+    expect(files).toContain('index.js');
+    for (const f of files) {
+      const js = await readFile(join(RENDER_DIST_DIR, f), 'utf8');
+      expect(js, f).not.toMatch(/from\s*['"]@/);
+      expect(js, f).not.toMatch(/(?:from|import)\s*\(?\s*['"][^./'"][^'"]*['"]/);
+    }
   });
 
   it('open_doc baru → dibuat, ditulis, rev 0; buka lagi dari sesi baru → created:false', async () => {
@@ -368,7 +372,7 @@ describe('RENDER_FAILED', () => {
   });
 
   it.skipIf(!browserInstalled)('adaptor Chromium: halaman render tidak bisa dimuat → LakarError RENDER_FAILED retryable', async () => {
-    const renderer = new ChromiumRenderer({ browsersPath, pageUrl: () => 'http://127.0.0.1:1/render/page', timeoutMs: 5000 });
+    const renderer = new ChromiumRenderer({ browsersPath, pageUrl: () => 'http://127.0.0.1:1/render/page', timeoutMs: 5000, fonts: FontRegistry.load() });
     try {
       const err = await renderer.screenshot({ schemaVersion: 1, id: 'Dddddddd', rev: 0, pages: [{ id: 'Pppppppp', name: 'P', children: [] }] }, 'Bbbbbbbb').then(
         () => undefined,
@@ -380,6 +384,126 @@ describe('RENDER_FAILED', () => {
       await renderer.close();
     }
   }, 60_000);
+});
+
+describe('font lokal (registry + FONT_MISSING)', () => {
+  let s: string;
+  const board = (body: string, name: string) =>
+    `const b=add(null,{type:'board',name:'${name}',x:0,y:0,width:200,height:60,screen:'app'}); ${body}; b`;
+  /** Buat board baru lewat execute, kembalikan ID-nya. */
+  const makeBoard = async (body: string, name: string) => {
+    const r = await call('/execute', { code: board(body, name) }, s);
+    expect(r.status, JSON.stringify(r.body.error)).toBe(200);
+    return r.body.data.created[0].id as string;
+  };
+
+  beforeAll(async () => {
+    s = await newSession();
+    await call('/docs/open', { slug: 'font-lokal' }, s);
+  });
+
+  it('registry: 8 keluarga arketipe terdaftar, tanpa paket hilang', () => {
+    const reg = FontRegistry.load();
+    expect(reg.missing).toEqual([]);
+    expect(reg.families()).toEqual(['Inter', 'Plus Jakarta Sans', 'JetBrains Mono', 'Manrope', 'IBM Plex Mono', 'Bricolage Grotesque', 'DM Sans', 'DM Mono']);
+    const faces = reg.resolveFaces([{ family: 'Inter', weight: 400, style: 'normal' }]);
+    expect(faces.map((f) => f.url)).toEqual(['/fonts/inter/inter-latin-400-normal.woff2', '/fonts/inter/inter-latin-ext-400-normal.woff2']);
+    expect(faces[0]!.unicodeRange).toMatch(/^U\+0000-00FF/);
+  });
+
+  it.each([
+    ['Manrope italic', `add(b,{type:'text',name:'T',content:'a',size:12,family:'Manrope',style:'italic'})`, /Manrope 400 italic/, /Manrope tersedia weight 200\/300\/400\/500\/600\/700\/800 style normal/],
+    ['DM Mono 700', `add(b,{type:'text',name:'T',content:'a',size:12,family:'DM Mono',weight:700})`, /DM Mono 700 normal/, /DM Mono tersedia weight 300\/400\/500/],
+  ])('varian hilang %s → 422 FONT_MISSING + varian tersedia', async (_l, body, msg, hint) => {
+    const id = await makeBoard(body, 'Varian');
+    const r = await call('/screenshot', { boardId: id }, s);
+    expect(r.status).toBe(422);
+    expect(r.body).toMatchObject({ ok: false, error: { code: 'FONT_MISSING', retryable: false } });
+    expect(r.body.error!.message).toMatch(msg);
+    expect(r.body.error!.hint).toMatch(hint);
+  });
+
+  it.skipIf(!browserInstalled)('family tak terdaftar → 422 FONT_MISSING (hint memuat Inter); screenshot valid berikutnya tetap berhasil', async () => {
+    const bad = await makeBoard(`add(b,{type:'text',name:'T',content:'Halo',size:16,family:'Roboto'})`, 'Roboto');
+    const r = await call('/screenshot', { boardId: bad }, s);
+    expect(r.status).toBe(422);
+    expect(r.body).toMatchObject({ ok: false, error: { code: 'FONT_MISSING', retryable: false } });
+    expect(r.body.error!.message).toContain('Roboto');
+    expect(r.body.error!.hint).toContain('Inter');
+    const good = await makeBoard(`add(b,{type:'text',name:'T',content:'Tebal',size:24,weight:700})`, 'Inter700');
+    const r2 = await call('/screenshot', { boardId: good }, s);
+    expect(r2.status, JSON.stringify(r2.body.error)).toBe(200);
+    const img = decodePng(Buffer.from(r2.body.data.png, 'base64'));
+    expect(img.width).toBe(200);
+    expect(countDarkPixels(img, 0, 0, 200, 60)).toBeGreaterThan(50);
+  }, 60_000);
+
+  it.skipIf(!browserInstalled)('cakupan glyph: teks "Lihat →" → 422 FONT_MISSING U+2192 (hint: node icon); screenshot valid berikutnya 200', async () => {
+    const bad = await makeBoard(`add(b,{type:'text',name:'T',content:'Lihat →',size:16})`, 'Panah');
+    const r = await call('/screenshot', { boardId: bad }, s);
+    expect(r.status).toBe(422);
+    expect(r.body).toMatchObject({ ok: false, error: { code: 'FONT_MISSING', retryable: false } });
+    expect(r.body.error!.message).toContain('U+2192');
+    expect(r.body.error!.hint).toContain('Inter');
+    expect(r.body.error!.hint).toMatch(/node icon/);
+    const good = await makeBoard(`add(b,{type:'text',name:'T',content:'Lihat',size:16})`, 'TanpaPanah');
+    const r2 = await call('/screenshot', { boardId: good }, s);
+    expect(r2.status, JSON.stringify(r2.body.error)).toBe(200);
+  }, 60_000);
+
+  it.skipIf(!browserInstalled)('face gagal dimuat (URL 404) → LakarError FONT_MISSING non-retryable, renderer tetap bisa dipakai', async () => {
+    const real = FontRegistry.load();
+    let broken = true;
+    const fonts = {
+      families: () => real.families(),
+      resolveFaces: (reqs: Parameters<FontRegistry['resolveFaces']>[0]) =>
+        real.resolveFaces(reqs).map((f) => (broken ? { ...f, url: `${f.url}.hilang` } : f)),
+    } as unknown as FontRegistry;
+    const renderer = new ChromiumRenderer({ browsersPath, pageUrl: () => `${d.url}/render/page`, timeoutMs: 15000, fonts });
+    try {
+      const doc = {
+        schemaVersion: 1 as const,
+        id: 'Dddddddd',
+        rev: 0,
+        pages: [{ id: 'Pppppppp', name: 'P', children: [{ type: 'board' as const, name: 'B', id: 'Bbbbbbbb', x: 0, y: 0, width: 50, height: 30, screen: 'app' as const, children: [{ type: 'text' as const, name: 'T', id: 'Tttttttt', content: 'a', size: 12 }] }] }],
+      };
+      const err = await renderer.screenshot(doc, 'Bbbbbbbb').then(() => undefined, (e: unknown) => e);
+      expect(err).toBeInstanceOf(LakarError);
+      expect(err).toMatchObject({ code: 'FONT_MISSING', retryable: false });
+      broken = false;
+      const png = await renderer.screenshot(doc, 'Bbbbbbbb');
+      expect(readPngSize(Buffer.from(png))).toEqual({ width: 50, height: 30 });
+    } finally {
+      await renderer.close();
+    }
+  }, 60_000);
+
+  it('GET /fonts: file registry → 200 font/woff2; traversal / id asing / file asing → 404', async () => {
+    const ok = await fetch(`${d.url}/fonts/inter/inter-latin-400-normal.woff2`);
+    expect(ok.status).toBe(200);
+    expect(ok.headers.get('content-type')).toBe('font/woff2');
+    const buf = Buffer.from(await ok.arrayBuffer());
+    expect(buf.subarray(0, 4).toString('latin1')).toBe('wOF2');
+    for (const path of [
+      '/fonts/inter/..%2Fpackage.json',
+      '/fonts/inter/..%2F..%2Fpackage.json',
+      '/fonts/roboto/roboto-latin-400-normal.woff2',
+      '/fonts/inter/inter-cyrillic-400-normal.woff2',
+      '/fonts/inter/inter-latin-450-normal.woff2',
+      '/fonts/manrope/manrope-latin-400-italic.woff2',
+      '/fonts/..%2Finter/inter-latin-400-normal.woff2',
+    ]) {
+      expect((await fetch(`${d.url}${path}`)).status, path).toBe(404);
+    }
+  });
+
+  it('GET /render/:file: modul dist disajikan; nama lain → 404', async () => {
+    const r = await fetch(`${d.url}/render/layout.js`);
+    expect(r.status).toBe(200);
+    expect(r.headers.get('content-type')).toMatch(/javascript/);
+    expect((await fetch(`${d.url}/render/..%2Fpackage.json`)).status).toBe(404);
+    expect((await fetch(`${d.url}/render/index.d.ts`)).status).toBe(404);
+  });
 });
 
 describe('lakard main', () => {

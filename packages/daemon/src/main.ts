@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // Entry `lakard`. Jalankan: /opt/node-26/bin/pnpm lakard  (atau /opt/node-26/bin/node packages/daemon/dist/main.js)
 import { loadConfig } from './config.js';
+import { FontRegistry } from './fonts.js';
 import { startDaemon } from './start.js';
 
 let config;
@@ -12,7 +13,9 @@ try {
 }
 
 try {
-  const daemon = await startDaemon(config);
+  const fonts = FontRegistry.load();
+  if (fonts.missing.length) console.warn(`lakard: paket font tidak ditemukan: ${fonts.missing.join(', ')}`);
+  const daemon = await startDaemon(config, { fonts });
   let closing = false;
   const shutdown = (signal: string) => {
     if (closing) return;

@@ -14,8 +14,10 @@ import {
   type ResolvedDocument,
 } from '@lakar/schema';
 import { z } from 'zod';
+import { readFile } from 'node:fs/promises';
 import { readRenderModule, RENDER_PAGE_HTML } from './chromium.js';
 import type { DaemonConfig } from './config.js';
+import { FontRegistry } from './fonts.js';
 import { SESSION_HEADER, Sessions, UnknownSessionError } from './sessions.js';
 import { DocStore } from './store.js';
 
@@ -34,15 +36,22 @@ const STATUS: Record<ErrorCode, number> = {
   VERSION_MISMATCH: 409,
 };
 
+const notFound = (what: string) => new LakarError('NOT_FOUND', `${what} tidak ada`, { hint: 'periksa path' });
+
 const OpenBody = z.object({ slug: z.string() });
 const ExecuteBody = z.object({ code: z.string().min(1), description: z.string().optional() });
 const ScreenshotBody = z.object({ boardId: z.string().optional() }).optional();
 
-export type BuildOptions = { config: DaemonConfig; render: RenderPort<ResolvedDocument> };
+export type BuildOptions = {
+  config: DaemonConfig;
+  render: RenderPort<ResolvedDocument>;
+  /** Registry font yang disajikan di `/fonts/...` (default: dimuat dari paket Fontsource). */
+  fonts?: FontRegistry;
+};
 
-export type Daemon = { app: FastifyInstance; store: DocStore; sessions: Sessions };
+export type Daemon = { app: FastifyInstance; store: DocStore; sessions: Sessions; fonts: FontRegistry };
 
-export function buildServer({ config, render }: BuildOptions): Daemon {
+export function buildServer({ config, render, fonts = FontRegistry.load() }: BuildOptions): Daemon {
   const app = Fastify({ logger: false, bodyLimit: 1024 * 1024 });
   const store = new DocStore(config.dataDir);
   const sessions = new Sessions();
@@ -156,7 +165,17 @@ export function buildServer({ config, render }: BuildOptions): Daemon {
 
   // Halaman render untuk Chromium (dimuat oleh adaptor ChromiumRenderer).
   app.get('/render/page', async (_req, reply) => reply.type('text/html; charset=utf-8').send(RENDER_PAGE_HTML));
-  app.get('/render/index.js', async (_req, reply) => reply.type('text/javascript; charset=utf-8').send(await readRenderModule()));
+  app.get<{ Params: { file: string } }>('/render/:file', async (req, reply) => {
+    const js = await readRenderModule(req.params.file);
+    if (js === undefined) throw notFound(`modul render ${req.params.file}`);
+    return reply.type('text/javascript; charset=utf-8').send(js);
+  });
+  // Font lokal (AD-10): hanya file woff2 milik registry; path lain → 404.
+  app.get<{ Params: { pkg: string; file: string } }>('/fonts/:pkg/:file', async (req, reply) => {
+    const path = fonts.filePath(req.params.pkg, req.params.file);
+    if (!path) throw notFound(`font ${req.params.pkg}/${req.params.file}`);
+    return reply.type('font/woff2').header('cache-control', 'public, max-age=31536000, immutable').send(await readFile(path));
+  });
 
-  return { app, store, sessions };
+  return { app, store, sessions, fonts };
 }
