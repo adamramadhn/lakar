@@ -2,7 +2,7 @@
 
 Status: **lengkap**. Tanggal: 2026-11-18T05:33:24.692Z.
 
-Keputusan di laporan ini **sementara, menunggu konfirmasi Adam**.
+Keputusan di laporan ini sudah dikonfirmasi Adam (2026-11-18): **A Kalah, B Setara, G0 gagal**. Lihat bagian Konfirmasi Adam dan Evaluasi arah. Label "sementara" di bawah adalah keluaran juri sebelum konfirmasi.
 
 ## Ringkasan
 
@@ -149,14 +149,34 @@ Biaya juri total: $1.46.
 
 ## Konfirmasi Adam
 
-Status: **menunggu konfirmasi Adam**. Bagian ini hanya diisi Adam; agen tidak pernah mengisinya.
+Status: **dikonfirmasi Adam, 2026-11-18** (dicatat orkestrator dari jawaban Adam di sesi).
 
 | Prompt | Keputusan sementara | Kriteria rentang > 1 | Keputusan Adam | Koreksi skor |
 |---|---|---|---|---|
-| A | Lebih baik | tidak ada | menunggu konfirmasi Adam | menunggu konfirmasi Adam |
-| B | Lebih baik | tidak ada | menunggu konfirmasi Adam | menunggu konfirmasi Adam |
+| A | Lebih baik | tidak ada | **Kalah** | Skor juri 9 vs 6 tidak diterima. Pewarnaan dan beberapa komponen UI pen.dev lebih matang: bidang bernuansa warna merek, badge delta berwarna, warna kedua yang bermakna (chip "4 invoice"), ikon fitur solid, avatar foto. Lakar unggul di struktur dan copy, tetapi lebih datar. |
+| B | Lebih baik | tidak ada | **Setara** | Secara informasi pen.dev lebih menarik: chip streak "12 hari", "74% dari target harian", tiga jadwal dengan status berbeda, rating, foto. Lakar terlalu kaku, flat, kurang inovatif. pen.dev melanggar brief (board 390×1109, teks Inggris), jadi hasil akhirnya Setara. |
 
-Keputusan G0 final: menunggu konfirmasi Adam (sementara: lolos).
+Keputusan G0 final: **gagal** (A Kalah). Sesuai C4, G1 tidak dimulai sebelum arah dievaluasi; lihat Evaluasi arah di bawah.
+
+## Evaluasi arah (setelah konfirmasi Adam)
+
+- **Yang terbukti layak:**
+  - mesin Lakar: skema, transaksi, render, ikon, check, pool, dan MCP;
+  - waktu 0,96× dan 0,73× baseline pen.dev, di bawah batas 1,5×;
+  - kepatuhan brief: 0 emoji, 0 error gerbang, ukuran board tepat.
+  
+  Render sudah mendukung gradien, bayangan, chip, dan ring bertingkat, jadi kesenjangan ini bukan keterbatasan mesin.
+- **Yang belum layak: selera visual dan kekayaan informasi.**
+  - Skill G0 membuat aturan anti-slop ("satu aksen", reduksi, gelap netral) dijalankan terlalu harfiah, sehingga hasilnya aman tetapi datar.
+  - Belum ada foto stok, padahal foto menjadi pembeda nyata di B.
+- **Juri tidak terkalibrasi.** Rubrik memberi bobot besar pada kepatuhan, sedangkan kekayaan informasi dan polesan warna hampir tidak dinilai. Akibatnya skor 9–10 vs 6 bertentangan dengan penilaian Adam. Kalau tidak diperbaiki, gerbang berikutnya mengoptimalkan target yang salah.
+- **Keputusan arah (Adam, 2026-11-18):** arah editor sendiri dipertahankan. Sebelum G1, epic G0 mendapat putaran perbaikan:
+  1. kalibrasi juri terhadap penilaian Adam (kriteria kekayaan informasi & detail, serta polesan warna & komponen);
+  2. foto stok lokal ditarik dari G1 ke G0;
+  3. revisi skill agar lebih kaya, diuji dengan prompt latihan non-A/B (C7);
+  4. putaran resmi 2 untuk A dan B di kedua alat.
+  
+  G1 baru dimulai bila putaran 2 lolos dan dikonfirmasi Adam.
 
 ## Versi beku
 
