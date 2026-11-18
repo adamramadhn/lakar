@@ -332,3 +332,10 @@ api.md sama, protocolHash 907cb36f…edb85d, bench/protocol & bench/rubric tidak
   slug `open_doc` dari `stream.jsonl` run tanpa `run.json` (run yang dihentikan), agar sisa seperti ini selalu diarsip.
 - Catatan: dokumen `dapur-wening-resep` sekarang tercatat di `run.json` P3 iterasi 7, jadi arsip berikutnya akan
   memindahkannya otomatis.
+
+### Catatan review iterasi 7 (2026-11-18)
+
+- Review quick: prelude `core.md` memakai warna yang sama untuk pendamping (`acc2`, seri data ketiga) dan status warning
+  (`#B45309`), sehingga badge `extra` = `warning`. Diganti `#CA8A04` (prinsip: pendamping dan status = peran berbeda, warna
+  berbeda). core.md sha 6ce0eace7c3f255c; belum diuji di run latihan (tidak ada iterasi lagi).
+- Ditunda: arsip dokumen run tanpa `run.json` (penyebab pembatalan iterasi 7); celah LC-20 di bawah tab bar mengambang.

@@ -3,7 +3,7 @@ title: 'Skill lebih kaya diuji dengan prompt latihan'
 type: feature
 ticket: '19'
 created: '2026-11-18'
-status: in-progress
+status: blocked
 baseline_revision: '97ec58176a5e8d7abf19dddc6f7d6ac79266cc85'
 route: full
 route_source: auto
@@ -12,14 +12,30 @@ review: 'quick'
 review_source: 'pinned'
 lenses_ran: [quick]
 review_loop_iteration: 0
-followup_review_recommended: true
+followup_review_recommended: false
 context:
   - '{project-root}/bench/round-1.md'
   - '{project-root}/bench/README.md'
   - '{project-root}/_bmad-output/initiative-lakar/tickets/epic-g0-inti-minimal/tickets/story-juri-bench-terkalibrasi-terhadap-penilaian-adam-plan.md'
   - '{project-root}/_bmad-output/initiative-lakar/tickets/epic-g0-inti-minimal/tickets/story-agen-mencari-dan-memakai-foto-stok-lokal-plan.md'
 warnings: [oversized]
-deferred: []
+deferred:
+  - summary: >-
+      benchLakarSlugs tidak mengarsipkan dokumen Lakar dari run yang dihentikan tanpa run.json, sehingga run berikutnya invalid (dokumen lama) dan final.
+    evidence: |-
+      Iterasi 7 P3: dokumen dapur-wening-resep sisa P3 iterasi 4 (dihentikan, tanpa run.json) membuat run invalid; isFinalRun memperlakukannya final dan practice berhenti. Perbaikan: baca slug open_doc dari stream.jsonl (findCommittedSlug) bila run.json tidak ada, termasuk dir .prev-*.
+    location: >-
+      bench/src/lakar/archive.ts:19
+    severity: medium
+  - summary: >-
+      LC-20 tidak menandai konten yang tampak di celah antara tab bar mengambang dan tepi bawah board (di balik home indicator).
+    evidence: |-
+      PNG P2 iterasi 7 (bench/practice/7/P2-lakar.png) menampilkan butir daftar terpotong di y 810-844; layout-check gate 0. bottomZone mengecualikan Home indicator dan cut hanya memeriksa unit yang mulai di atas tepi atas zona.
+    location: >-
+      packages/check/src/rules.ts (lc20)
+    severity: medium
+blocked_at: "2026-11-18"
+blocked_reason: "Iterasi 7 (konfirmasi terakhir) dibatalkan: P3 invalid (dokumen sisa iterasi 4 tidak diarsip), juri tidak berjalan, P4 tidak dijalankan; butuh keputusan Adam (run ulang P3/P4+juri, perbaikan arsip)"
 ---
 
 <intent-contract>
@@ -176,6 +192,17 @@ Catatan orkestrator lanjutan 2026-11-18 (iterasi 7, konfirmasi; menggantikan but
   - `[medium]` `[patch]` Prelude `Badge` dengan nada tak dikenal (mis. `info`) menghasilkan `undefined` — fallback `??C.acc` (07ab5c6); core.md tetap ≤ 4000 token (tes lulus).
   - `[low]` `[reject]` Baris mode gelap `mobile.md:5` berbentuk kode setengah prosa — P2 gelap dirender tanpa galat execute di keenam iterasi; agen membacanya sebagai panduan, bukan salinan.
 
+### 2026-11-18 — Review pass (iterasi 7, skill v6)
+- verdicts: 7 findings — high 1, medium 3, low 3, false 0, maybe-false 0
+- findings:
+  - `[high]` `[reject]` AC iterasi terakhir tidak terpenuhi (iterasi 7 dibatalkan: P1/P2 tidak dijuri, P3 `invalid`, P4 tidak dijalankan; v6 belum pernah dijuri; Setara P3 iterasi 5 ditolong `decide` karena board pen.dev iterasi 2 390×1656 ≠ 390×844) — benar, tetapi tidak bisa dipatch tanpa iterasi ke-8 yang dilarang; ini kondisi HALT `blocked` (keputusan Adam). Netralisasi P3 lewat aturan `decide` dicatat sebagai risiko sisa (aturan keputusan tidak boleh diubah).
+  - `[medium]` `[defer]` `benchLakarSlugs` (`bench/src/lakar/archive.ts`) hanya membaca slug dari `run.json`, jadi dokumen dari run yang dihentikan tanpa `run.json` tidak diarsip → run berikutnya `invalid` `dokumen lama` (final menurut `isFinalRun`) — penyebab langsung pembatalan iterasi 7; kode dari 1.14 (dcd6464), bukan perubahan story ini. Perbaikan: fallback `findCommittedSlug` dari `stream.jsonl` (+ dir `.prev-*`). Sebelum putaran resmi (story 21).
+  - `[medium]` `[patch]` Prelude `core.md`: `acc2` dan `data[2]` = `#B45309` = `warn`, sehingga `Badge` `extra` dan `warning` identik dan pendamping tak bisa dibedakan dari status — `acc2`/`data[2]` diganti `#CA8A04` (emas, rating/pencapaian); `warn` tetap. Belum diuji di run latihan (tidak ada iterasi lagi); build, 793/793 tes, api.md, token core lulus.
+  - `[low]` `[reject]` Contoh teruji `mobile.md` tanpa avatar dan selalu memakai baris tanggal, berbeda dari aturan header hemat ruang — prosa membolehkan baris konteks bila ruang tersisa dan avatar foto butuh aset foto di contoh yang diuji offline; perbaikan lebih dari koreksi langsung (fixture foto), dampak kecil (P2 iterasi 7 tetap memakai avatar).
+  - `[medium]` `[defer]` LC-20 tidak memeriksa celah di bawah tab bar mengambang (y 810–844, di balik home indicator transparan): butir daftar yang tampak di sana tidak ditandai — terlihat di PNG P2 iterasi 7; kode check 1.11 (db1df37), bukan story ini.
+  - `[low]` `[reject]` `landing.md` masih memuat pola pricing/jadwal (tier/slot, kuota), alur bertahap, dan foto suasana hero yang mirip P1 — pola landing umum yang berlaku untuk banyak produk; "alur bertahap" sudah diputuskan dibiarkan di review sebelumnya (carried); penjaga n-gram C7 lulus.
+  - `[low]` `[reject]` Biaya run tanpa `run.json`/`.prev-*` tidak masuk anggaran dan `readJson` bisa melempar pada `run.json` setengah tertulis — carried (biaya `.prev-*`, selisih < $0,30, ditolak di review sebelumnya); `run.json` setengah tertulis belum pernah terjadi (ditulis sekali di akhir run).
+
 ## Design Notes
 
 **Diagnosis (aturan penyebab datar → prinsip baru, kata sendiri):**
@@ -281,3 +308,18 @@ $7,09, perkiraan $5,10) dan/atau perbaikan harness pengarsipan run tanpa `run.js
   bench/rubric tidak berubah sejak 97ec581; `round --dry-run` sha = rubric.json; `practice --dry-run` OK; penjaga `.pen`
   41 file berubah/hilang 0; lakard active; `tools/node26/verify.sh` exit 0.
 - Laporan: bench/practice-7.md; PNG Lakar bench/practice/7/P1,P2; LOG bench/practice/LOG.md.
+
+- Review quick (iterasi 7): 7 temuan — 1 patch medium (`acc2`/`data[2]` prelude `#CA8A04`, beda dari `warn`), 2 defer
+  medium (arsip run tanpa `run.json`; celah LC-20 di bawah tab bar mengambang), 4 reject (1 high = kondisi HALT, 3 low).
+  `followup_review_recommended: false` (hanya 1 medium di-patch). Skill akhir = v6 + patch warna (core.md sha 6ce0eace7c3f255c);
+  patch itu belum diuji di run latihan.
+- Verifikasi orkestrator setelah patch: build OK; 793/793 tes (48 file); api.md tanpa beda; protocolHash 907cb36f…edb85d;
+  bench/protocol & bench/rubric bersih sejak 97ec581; `round --dry-run` rubric.json: sama; `practice --dry-run` OK;
+  lakard di-restart dan active; `tools/node26/verify.sh` exit 0.
+- PNG dilihat orkestrator: P1 Lakar vs pen.dev setara secara kasar (struktur lengkap, foto mentor/hero, harga dan jadwal
+  kaya status; potret testimoni besar kurang serasi). P2 Lakar: tile koleksi kini 6 hue berbeda (sasaran tercapai), tetapi
+  layar pertama hanya memuat 1 episode, kartu "lanjutkan" dan mini player menampilkan episode yang sama, thumbnail episode
+  berupa bidang warna berteks (pen.dev memakai foto, 4 episode terlihat), dan ada butir terpotong di bawah tab bar.
+  Kesan: P2 kemungkinan di bawah pen.dev.
+- Risiko sisa: v6 belum pernah dijuri; Setara P3 bergantung pada board pen.dev iterasi 2 yang salah ukuran; variasi
+  run-ke-run tinggi; disiplin execute (P1 `inspect`, P2 3 execute perapatan) belum tercapai.

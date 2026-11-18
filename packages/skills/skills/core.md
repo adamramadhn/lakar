@@ -18,7 +18,7 @@ Tempel di awal setiap execute. Arketipe lain: `Object.assign(C,{…})`, `Object.
 ```js
 // prelude
 const C={bg:'#FFFFFF',sub:'#F6F7F9',line:'#E4E7EC',line2:'#D0D5DD',t1:'#101828',t2:'#475467',t3:'#667085',acc:'#0F766E',tint:'#0F766E14',on:'#FFFFFF',
- field:'#E6F2F1',deep:'#0B4F4A',acc2:'#B45309',data:['#0F766E','#5EB8AE','#B45309'],ok:'#15803D',warn:'#B45309',bad:'#DC2626'};
+ field:'#E6F2F1',deep:'#0B4F4A',acc2:'#CA8A04',data:['#0F766E','#5EB8AE','#CA8A04'],ok:'#15803D',warn:'#B45309',bad:'#DC2626'};
 const FONT={h:'Plus Jakarta Sans',b:'Inter',m:'JetBrains Mono'};
 const R=(size,lineHeight,weight,letterSpacing=0)=>({size,lineHeight,weight,letterSpacing});
 const TY={'display-xl':R(64,72,700,-0.02),'display-lg':R(48,56,700,-0.02),h1:R(40,48,700,-0.015),h2:R(32,40,700,-0.01),
