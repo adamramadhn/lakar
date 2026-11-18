@@ -2,8 +2,8 @@
 // inspect, layout_check, screenshot, export, icon_search.
 import { McpServer, type CallToolResult } from '@modelcontextprotocol/server';
 import { z } from 'zod';
-import { LAKAR_VERSION, SCHEMA_VERSION, findingLine, summaryText, type ApiResult, type Finding, type FindingSummary } from '@lakar/schema';
-import { DaemonClient, VERSION_HINT, formatError } from './client.js';
+import { LAKAR_VERSION, SCHEMA_VERSION, VERSION_HINT, errorMessage, findingLine, summaryText, type ApiResult, type Finding, type FindingSummary } from '@lakar/schema';
+import { DaemonClient, formatError } from './client.js';
 
 export const SERVER_NAME = 'lakar';
 export const SERVER_VERSION = LAKAR_VERSION;
@@ -14,13 +14,19 @@ async function guarded(fn: () => Promise<CallToolResult>): Promise<CallToolResul
   try {
     return await fn();
   } catch (e) {
-    return errorResult((e as Error).message);
+    return errorResult(errorMessage(e));
   }
 }
 
-function asText<T>(r: ApiResult<T>): CallToolResult {
+/** Hasil tool dari respons daemon: error AD-11 → teks error terformat; sukses → `content(data)`. */
+function asResult<T>(r: ApiResult<T>, content: (data: T) => CallToolResult['content']): CallToolResult {
   if (!r.ok) return errorResult(formatError(r.error));
-  return { content: [{ type: 'text', text: JSON.stringify(r.data) }] };
+  return { content: content(r.data) };
+}
+
+/** Seperti `asResult` dengan satu blok teks `format(data)` (default JSON). */
+function asText<T>(r: ApiResult<T>, format: (data: T) => string = JSON.stringify): CallToolResult {
+  return asResult(r, (data) => [{ type: 'text', text: format(data) }]);
 }
 
 /** Batas baris temuan di output MCP. */
@@ -191,12 +197,7 @@ export function createLakarMcpServer(daemonUrl: string): McpServer {
   server.registerTool(
     'status',
     { description: STATUS_DESCRIPTION, inputSchema: z.object({}) },
-    () =>
-      guarded(async () => {
-        const r = await client.status<StatusData>();
-        if (!r.ok) return errorResult(formatError(r.error));
-        return { content: [{ type: 'text', text: formatStatus(r.data) }] };
-      }),
+    () => guarded(async () => asText(await client.status<StatusData>(), formatStatus)),
   );
 
   server.registerTool(
@@ -208,8 +209,7 @@ export function createLakarMcpServer(daemonUrl: string): McpServer {
     ({ name }) =>
       guarded(async () => {
         const r = await client.call<{ name: string; content: string } | { skills: { name: string; available: boolean }[] }>('/skills/read', name !== undefined ? { name } : {});
-        if (!r.ok) return errorResult(formatError(r.error));
-        return { content: [{ type: 'text', text: 'content' in r.data ? r.data.content : JSON.stringify(r.data) }] };
+        return asText(r, (data) => ('content' in data ? data.content : JSON.stringify(data)));
       }),
   );
 
@@ -281,9 +281,7 @@ export function createLakarMcpServer(daemonUrl: string): McpServer {
         if (description !== undefined) body.description = description;
         if (editId !== undefined) body.editId = editId;
         if (edits !== undefined) body.edits = edits;
-        const r = await client.call<ExecuteData>('/execute', body);
-        if (!r.ok) return errorResult(formatError(r.error));
-        return { content: [{ type: 'text', text: formatExecute(r.data) }] };
+        return asText(await client.call<ExecuteData>('/execute', body), formatExecute);
       }),
   );
 
@@ -304,14 +302,10 @@ export function createLakarMcpServer(daemonUrl: string): McpServer {
         if (boardId !== undefined) body.boardId = boardId;
         if (nodeId !== undefined) body.nodeId = nodeId;
         const r = await client.call<{ boardId: string; nodeId?: string; width: number; height: number; mimeType: string; png: string }>('/screenshot', body);
-        if (!r.ok) return errorResult(formatError(r.error));
-        const { png, ...meta } = r.data;
-        return {
-          content: [
-            { type: 'image', data: png, mimeType: 'image/png' },
-            { type: 'text', text: JSON.stringify(meta) },
-          ],
-        };
+        return asResult(r, ({ png, ...meta }) => [
+          { type: 'image', data: png, mimeType: 'image/png' },
+          { type: 'text', text: JSON.stringify(meta) },
+        ]);
       }),
   );
 
@@ -342,9 +336,7 @@ export function createLakarMcpServer(daemonUrl: string): McpServer {
     },
     ({ boardId }) =>
       guarded(async () => {
-        const r = await client.call<LayoutCheckData>('/layout-check', boardId ? { boardId } : {});
-        if (!r.ok) return errorResult(formatError(r.error));
-        return { content: [{ type: 'text', text: formatLayoutCheck(r.data) }] };
+        return asText(await client.call<LayoutCheckData>('/layout-check', boardId ? { boardId } : {}), formatLayoutCheck);
       }),
   );
 

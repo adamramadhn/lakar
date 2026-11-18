@@ -2,6 +2,7 @@
 // Entry `lakard`. Service: systemctl --user {start,restart,status} lakard (tools/lakard/install-service.sh).
 // Manual: /opt/node-26/bin/node packages/daemon/dist/main.js
 import { IconCatalog } from '@lakar/icons';
+import { errorMessage } from '@lakar/schema';
 import { loadConfig } from './config.js';
 import { FontRegistry } from './fonts.js';
 import { startDaemon } from './start.js';
@@ -10,7 +11,7 @@ let config;
 try {
   config = loadConfig();
 } catch (e) {
-  console.error(`lakard: ${(e as Error).message}`);
+  console.error(`lakard: ${errorMessage(e)}`);
   process.exit(1);
 }
 

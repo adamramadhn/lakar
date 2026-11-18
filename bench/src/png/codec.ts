@@ -1,5 +1,6 @@
 // Kodek PNG murni (hanya node:zlib bawaan): dekode 8-bit colortype 2/6 non-interlaced → RGBA,
 // encode RGB 8-bit dengan tepat tiga chunk IHDR/IDAT/IEND (tanpa metadata apa pun).
+import { closeSync, openSync, readSync } from 'node:fs';
 import { deflateSync, inflateSync } from 'node:zlib';
 
 export const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
@@ -25,6 +26,29 @@ export function crc32(buf: Uint8Array): number {
   let c = 0xffffffff;
   for (let i = 0; i < buf.length; i++) c = CRC_TABLE[(c ^ buf[i]!) & 0xff]! ^ (c >>> 8);
   return (c ^ 0xffffffff) >>> 0;
+}
+
+/**
+ * Lebar/tinggi dari 24 byte pertama PNG (signature + chunk IHDR), tanpa verifikasi CRC: cukup kepala file
+ * (`readChunks` butuh chunk utuh).
+ */
+export function readPngSize(head: Uint8Array): { width: number; height: number } {
+  const b = Buffer.from(head.buffer, head.byteOffset, head.byteLength);
+  if (b.length < 24 || !b.subarray(0, 8).equals(PNG_SIGNATURE)) throw new Error('bukan PNG (signature)');
+  if (b.toString('ascii', 12, 16) !== 'IHDR') throw new Error('bukan PNG (chunk pertama bukan IHDR)');
+  return { width: b.readUInt32BE(16), height: b.readUInt32BE(20) };
+}
+
+/** `readPngSize` atas 24 byte pertama file `path`. */
+export function readPngSizeFile(path: string): { width: number; height: number } {
+  const fd = openSync(path, 'r');
+  try {
+    const buf = Buffer.alloc(24);
+    const n = readSync(fd, buf, 0, 24, 0);
+    return readPngSize(buf.subarray(0, n));
+  } finally {
+    closeSync(fd);
+  }
 }
 
 /** Daftar chunk (type + data) dengan verifikasi signature dan CRC. */

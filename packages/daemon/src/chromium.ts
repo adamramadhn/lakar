@@ -4,8 +4,9 @@ import { readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { BoardMeasure, IconCatalogPort, MeasureOptions, RenderPort, RenderStatus, ScreenshotOptions } from '@lakar/ports';
-import { CHROMIUM_ARGS, NODE_ATTR, findBoard, fontRequests, iconRefs, type FontFaceSource, type RenderResult } from '@lakar/render';
-import { LakarError, type IconGlyph, type ResolvedDocument } from '@lakar/schema';
+import { CHROMIUM_ARGS, NODE_ATTR, fontRequests, iconRefs, type FontFaceSource, type RenderResult } from '@lakar/render';
+import { LakarError, findBoard, type IconGlyph, type ResolvedDocument } from '@lakar/schema';
+import { notFound } from './errors.js';
 import type { Browser, Page } from 'playwright-core';
 import type { FontRegistry } from './fonts.js';
 import { RenderPool, type Lease } from './pool.js';
@@ -38,7 +39,7 @@ export async function readRenderModule(file: string): Promise<string | undefined
   return readFile(join(RENDER_DIST_DIR, file), 'utf8').catch(() => undefined);
 }
 
-export const ASSET_HINT = 'assetId adalah sha256 file gambar di store aset daemon; impor gambar dulu (aset harus ada di store)';
+const ASSET_HINT = 'assetId adalah sha256 file gambar di store aset daemon; impor gambar dulu (aset harus ada di store)';
 
 export type ChromiumOptions = {
   browsersPath: string;
@@ -114,7 +115,7 @@ export class ChromiumRenderer implements RenderPort<ResolvedDocument> {
       { doc, boardId, fonts, icons, allowGlyphs: [...allowGlyphs] },
     );
     if (!result.ok && result.code === 'NOT_FOUND') {
-      throw new LakarError('NOT_FOUND', result.message, { hint: ASSET_HINT, retryable: false });
+      throw notFound(result.message, ASSET_HINT);
     }
     if (!result.ok && result.code === 'ICON_UNKNOWN') {
       throw new LakarError('ICON_UNKNOWN', result.message, {
@@ -148,7 +149,7 @@ export class ChromiumRenderer implements RenderPort<ResolvedDocument> {
       const el = page.locator(`[${NODE_ATTR}="${target}"]`);
       // Elemen tidak ada / tanpa luas: kesalahan permintaan, bukan kerusakan halaman (locator akan menunggu sampai timeout).
       const box = (await el.count()) === 1 ? await el.boundingBox() : null;
-      if (!box) throw new LakarError('NOT_FOUND', `node ${target} tidak ada di board ${boardId}`, { hint: 'pakai ID dari created[] execute atau inspect' });
+      if (!box) throw notFound(`node ${target} tidak ada di board ${boardId}`, 'pakai ID dari created[] execute atau inspect');
       if (box.width < 0.5 || box.height < 0.5) {
         throw new LakarError('SCHEMA_INVALID', `node ${target} berukuran ${box.width}×${box.height}, tidak bisa dipotret`, { hint: 'potret parent-nya atau board' });
       }

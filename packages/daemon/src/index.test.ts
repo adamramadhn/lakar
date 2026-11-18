@@ -12,14 +12,15 @@ import { ChromiumRenderer, FontRegistry, IconCatalog, PACKAGE, RENDER_DIST_DIR, 
 import { API } from '@lakar/exec';
 import { LakarError } from '@lakar/schema';
 import { countDarkPixels, decodePng, readPngSize } from './png.js';
+import { chromiumInstalled } from '../../../tests/support/browser.ts';
+import { postJson } from '../../../tests/support/http.ts';
+import { testLog } from '../../../tests/support/log.ts';
 
 const TRACER = `const b=add(null,{type:'board',name:'Tracer',x:0,y:0,width:390,height:844,screen:'mobile'}); add(b,{type:'text',name:'Judul',content:'Halo dari Lakar',size:32})`;
 
 const baseConfig = loadConfig({});
 const browsersPath = process.env.LAKAR_BROWSERS_PATH || baseConfig.browsersPath;
-const browserInstalled =
-  existsSync(browsersPath) &&
-  readdirSync(browsersPath).some((d) => d.startsWith('chromium_headless_shell-') && existsSync(join(browsersPath, d, 'INSTALLATION_COMPLETE')));
+const browserInstalled = chromiumInstalled(browsersPath);
 if (!browserInstalled) {
   console.warn(`[@lakar/daemon] SKIP tes Chromium: chromium-headless-shell belum terpasang di ${browsersPath}. Jalankan: bash scripts/install-browser.sh`);
 }
@@ -40,15 +41,7 @@ const DESC = 'langkah uji daemon lakar';
 const withDesc = (path: string, body: unknown) =>
   path === '/execute' && body && typeof body === 'object' && 'code' in body && !('description' in body) ? { ...body, description: DESC } : body;
 
-async function call(path: string, rawBody: unknown, session?: string): Promise<Res> {
-  const body = withDesc(path, rawBody);
-  const r = await fetch(`${d.url}${path}`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', ...(session ? { 'x-lakar-session': session } : {}) },
-    body: JSON.stringify(body ?? {}),
-  });
-  return { status: r.status, body: (await r.json()) as Res['body'] };
-}
+const call = (path: string, rawBody: unknown, session?: string): Promise<Res> => postJson(d.url, path, withDesc(path, rawBody), session);
 const newSession = async () => (await call('/sessions', {})).body.data.sessionId as string;
 
 beforeAll(async () => {
@@ -778,7 +771,7 @@ describe.skipIf(!browserInstalled)('check G0 (AD-8): execute + /layout-check', (
     const sorted = [...times].sort((a, b) => a - b);
     const p50 = sorted[Math.floor((sorted.length - 1) * 0.5)]!;
     const p95 = sorted[Math.ceil((sorted.length - 1) * 0.95)]!;
-    console.log(`[check] latensi render + check (1 board, 152 node, 12 execute): p50 ${p50} ms, p95 ${p95} ms`);
+    testLog(`[check] latensi render + check (1 board, 152 node, 12 execute): p50 ${p50} ms, p95 ${p95} ms`);
     expect(d.sessions.require(sid).log.at(-1)!.summary).toEqual({ error: 0, warning: 0, gate: 0 });
     expect(p50).toBeLessThanOrEqual(600);
   }, 120_000);
@@ -1152,8 +1145,8 @@ describe('lakard main', () => {
 
   it('SIGTERM → berhenti bersih (exit 0)', async () => {
     const tmp = await mkdtemp(join(tmpdir(), 'lakar-main-'));
+    const child = spawn(process.execPath, [mainJs], { env: { ...process.env, LAKAR_PORT: '0', LAKAR_DATA_DIR: tmp } });
     try {
-      const child = spawn(process.execPath, [mainJs], { env: { ...process.env, LAKAR_PORT: '0', LAKAR_DATA_DIR: tmp } });
       await new Promise<void>((resolve, reject) => {
         child.stdout.on('data', (c: Buffer) => c.toString().includes('mendengarkan http://127.0.0.1:') && resolve());
         child.on('exit', () => reject(new Error('keluar sebelum listen')));
@@ -1162,6 +1155,8 @@ describe('lakard main', () => {
       child.kill('SIGTERM');
       expect(await exited).toBe(0);
     } finally {
+      // Timeout/assert gagal: jangan tinggalkan lakard yatim.
+      if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL');
       await rm(tmp, { recursive: true, force: true });
     }
   });

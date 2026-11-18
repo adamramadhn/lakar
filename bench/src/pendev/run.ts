@@ -4,13 +4,15 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join, relative } from 'node:path';
-import { runClaude, shellQuote } from '../claude-runner.js';
-import { Abort, canonical, log } from '../log.js';
+import { errorMessage } from '@lakar/schema';
+import { runClaude, shellQuote, type RunClaudeResult } from '../claude-runner.js';
+import { Abort, canonical, log, sleep } from '../log.js';
 import { BENCH_ROOT, GOLDEN_SET_PATH, REPO_ROOT, checkProtocolC7, loadProtocol, type Protocol } from '../protocol.js';
 import type { RunRecord } from '../report.js';
 import { pngScaleMismatch } from '../series.js';
-import { computeMetrics, validateInit, type InitRules } from '../stream-metrics.js';
-import { copyExclusive, readPngSizeFile } from './artifacts.js';
+import { computeMetrics, validateInit, type InitRules, type RunMetrics } from '../stream-metrics.js';
+import { copyExclusive } from './artifacts.js';
+import { readPngSizeFile } from '../png/codec.js';
 import { runNewDoc, snapshotDocuments, uriToPath, verifyNewDoc } from './newdoc.js';
 import { PencilClient, loadServerConfig, type StdioServerConfig } from './pencil-client.js';
 
@@ -28,7 +30,7 @@ export function userEffortLevel(): string {
     const v = JSON.parse(readFileSync(join(homedir(), '.claude/settings.json'), 'utf8'))?.effortLevel;
     return v === undefined ? '`~/.claude/settings.json` tanpa `effortLevel`' : `\`~/.claude/settings.json\` effortLevel=${JSON.stringify(v)}`;
   } catch (e) {
-    return `\`~/.claude/settings.json\` tidak terbaca (${(e as Error).message})`;
+    return `\`~/.claude/settings.json\` tidak terbaca (${errorMessage(e)})`;
   }
 }
 
@@ -116,6 +118,33 @@ export function emptyRecord(i: Pick<RunOneInput, 'runId' | 'promptId' | 'attempt
   };
 }
 
+/**
+ * Metrik transkrip → rekaman run (sama untuk pen.dev dan Lakar), lalu `metrics.json` (metrik + argv + env
+ * yang dibuang) dan satu baris log ringkas.
+ */
+export function applyMetrics(rec: RunRecord, m: RunMetrics, run: RunClaudeResult, outDir: string, runId: string): void {
+  Object.assign(rec, {
+    status: m.status,
+    reason: m.reason,
+    wallMs: m.wallMs,
+    durationMs: m.durationMs,
+    durationApiMs: m.durationApiMs,
+    costUsd: m.totalCostUsd,
+    numTurns: m.numTurns,
+    toolCalls: m.toolCalls,
+    firstToolUseMs: m.firstToolUseMs,
+    lastToolResultMs: m.lastToolResultMs,
+    spawnToFirstEventMs: m.spawnToFirstEventMs,
+    transcriptBytes: run.stdoutBytes,
+    model: m.init?.model,
+    modelUsageKeys: m.modelUsageKeys,
+    claudeCodeVersion: m.init?.claudeCodeVersion,
+    startedAt: run.startedAt,
+  } satisfies Partial<RunRecord>);
+  writeFileSync(join(outDir, 'metrics.json'), `${JSON.stringify({ ...m, argv: shellQuote(['claude', ...run.argv]), scrubbedEnv: run.scrubbedEnv }, null, 1)}\n`);
+  log(`${runId}: ${m.status}${m.reason ? ` (${m.reason})` : ''}, wall ${m.wallMs ?? '–'} ms, $${m.totalCostUsd ?? '–'}, ${m.toolCalls} tool call`);
+}
+
 /** Satu run: newdoc + verifikasi → claude -p → (di luar waktu) save, salin .pen, Export PNG, cek IHDR. */
 export async function runOne(i: RunOneInput, serverVersion: { v?: string }): Promise<RunRecord> {
   const rec = emptyRecord(i);
@@ -132,7 +161,7 @@ export async function runOne(i: RunOneInput, serverVersion: { v?: string }): Pro
   try {
     serverVersion.v ??= pre.serverVersion ? `${pre.serverVersion.name} ${pre.serverVersion.version}` : undefined;
     for (let k = 0; k < NEWDOC_READY_TRIES && !(v && v.problems.length === 0); k++) {
-      if (k) await new Promise((r) => setTimeout(r, 1_000));
+      if (k) await sleep(1_000);
       try {
         // get_app_state bisa masih melaporkan dokumen lama (ctrl+shift+n asinkron): ulangi juga saat ada masalah.
         const st = await pre.appState();
@@ -147,7 +176,7 @@ export async function runOne(i: RunOneInput, serverVersion: { v?: string }): Pro
     await pre.close(); // 4. klien harness ditutup sebelum claude
   }
   if (!v) {
-    rec.reason = `newdoc: verifikasi gagal setelah ${NEWDOC_READY_TRIES} percobaan: ${(lastErr as Error)?.message}`;
+    rec.reason = `newdoc: verifikasi gagal setelah ${NEWDOC_READY_TRIES} percobaan: ${errorMessage(lastErr)}`;
     return rec;
   }
   rec.uri = v.uri;
@@ -171,26 +200,7 @@ export async function runOne(i: RunOneInput, serverVersion: { v?: string }): Pro
     forbiddenCwdRoot: REPO_ROOT,
   });
   const m = computeMetrics(run.lines, PENDEV_INIT_RULES, { exitCode: run.exitCode, timedOut: run.timedOut });
-  Object.assign(rec, {
-    status: m.status,
-    reason: m.reason,
-    wallMs: m.wallMs,
-    durationMs: m.durationMs,
-    durationApiMs: m.durationApiMs,
-    costUsd: m.totalCostUsd,
-    numTurns: m.numTurns,
-    toolCalls: m.toolCalls,
-    firstToolUseMs: m.firstToolUseMs,
-    lastToolResultMs: m.lastToolResultMs,
-    spawnToFirstEventMs: m.spawnToFirstEventMs,
-    transcriptBytes: run.stdoutBytes,
-    model: m.init?.model,
-    modelUsageKeys: m.modelUsageKeys,
-    claudeCodeVersion: m.init?.claudeCodeVersion,
-    startedAt: run.startedAt,
-  } satisfies Partial<RunRecord>);
-  writeFileSync(join(i.outDir, 'metrics.json'), `${JSON.stringify({ ...m, argv: shellQuote(['claude', ...run.argv]), scrubbedEnv: run.scrubbedEnv }, null, 1)}\n`);
-  log(`${i.runId}: ${m.status}${m.reason ? ` (${m.reason})` : ''}, wall ${m.wallMs ?? '–'} ms, $${m.totalCostUsd ?? '–'}, ${m.toolCalls} tool call`);
+  applyMetrics(rec, m, run, i.outDir, i.runId);
   if (m.status === 'invalid') return rec;
 
   // Di luar waktu: save, salin .pen, frame top-level, Export PNG skala 1, IHDR.
@@ -223,9 +233,9 @@ export async function runOne(i: RunOneInput, serverVersion: { v?: string }): Pro
     }
   } catch (e) {
     if (rec.status === 'success') rec.status = 'failed';
-    rec.reason = `${rec.reason ? `${rec.reason}; ` : ''}post: ${(e as Error).message}`;
+    rec.reason = `${rec.reason ? `${rec.reason}; ` : ''}post: ${errorMessage(e)}`;
   } finally {
-    await post?.close().catch((e: Error) => log(`${i.runId}: post close gagal (diabaikan): ${e.message}`));
+    await post?.close().catch((e: unknown) => log(`${i.runId}: post close gagal (diabaikan): ${errorMessage(e)}`));
   }
   return rec;
 }

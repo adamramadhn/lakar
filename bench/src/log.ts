@@ -1,4 +1,4 @@
-// Utilitas CLI bench bersama (pen.dev, Lakar, putaran): log stderr, Abort preflight, cap waktu seri, JSON kanonik.
+// Utilitas CLI bench bersama (pen.dev, Lakar, putaran): log stderr, Abort preflight, cap waktu seri, JSON kanonik, sleep.
 
 /** Kegagalan preflight/harness yang menghentikan perintah dengan exit 1 (bukan crash). */
 export class Abort extends Error {}
@@ -22,3 +22,6 @@ export function canonical(x: unknown): string {
       .join(',')}}`;
   return JSON.stringify(x);
 }
+
+/** Jeda `ms` milidetik (satu helper untuk semua tunggu-ulang harness). */
+export const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));

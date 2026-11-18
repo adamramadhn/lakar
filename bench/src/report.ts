@@ -1,4 +1,4 @@
-// Laporan baseline (md + json). Bagian generik (versi, protokol, tabel run, median) dipakai ulang story 14.
+// Laporan baseline pen.dev (md + json). Tipe `RunRecord` juga dipakai run Lakar dan laporan putaran (round/).
 import { summarize, type Summary } from './stats.js';
 
 export type RunRecordStatus = 'success' | 'failed' | 'invalid' | 'aborted';

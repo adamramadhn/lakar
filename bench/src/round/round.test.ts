@@ -3,6 +3,7 @@ import type { JudgeRepRecord } from '../judge/run.js';
 import type { JudgeVerdict } from '../judge/parse.js';
 import { emptyRecord } from '../pendev/run.js';
 import type { TimedLine } from '../stream-metrics.js';
+import { timedLines, toolResultEvent, toolUseEvent } from '../../../tests/support/stream.ts';
 import { countAgentEmoji, countEmojiInText, countLintEmoji } from './emoji.js';
 import { frozenDrift, harnessErrorStatus, isFinalRun, parseRoundArgs, penBaseline, roundOutcome, roundStartProblem } from './main.js';
 import { LAKAR_INIT_RULES } from '../lakar/run.js';
@@ -11,7 +12,7 @@ import { lakarReconnect, pendevReconnect } from './reconnect.js';
 import { renderRoundMarkdown, renderScoreMarkdown, ROUND_ID, type RoundPrompt, type RoundReport } from './report.js';
 import { aggregateScores, decide, lakarGate, type GateResult, type PromptScore } from './score.js';
 
-const L = (evs: unknown[]): TimedLine[] => evs.map((e, i) => ({ t: i * 1000, line: JSON.stringify(e) }));
+const L = (evs: unknown[]): TimedLine[] => timedLines(evs, 1000);
 
 describe('argumen dan konvensi putaran', () => {
   it('ID putaran: uji-<k> atau angka polos', () => {
@@ -49,10 +50,10 @@ describe('emoji', () => {
 describe('reconnect', () => {
   const st = (pid: number, recreated: number, NRestarts = '0') => ({ pid, startedAt: `s${pid}`, recreated, systemd: { NRestarts } });
   const errLines = L([
-    { type: 'assistant', message: { content: [{ type: 'tool_use', id: 'a', name: 'mcp__lakar__execute', input: {} }] } },
-    { type: 'user', message: { content: [{ type: 'tool_result', tool_use_id: 'a', is_error: true, content: [{ type: 'text', text: 'RENDER_FAILED: halaman mati' }] }] } },
-    { type: 'assistant', message: { content: [{ type: 'tool_use', id: 'b', name: 'mcp__lakar__execute', input: {} }] } },
-    { type: 'user', message: { content: [{ type: 'tool_result', tool_use_id: 'b', is_error: true, content: 'EXEC_ERROR biasa' }] } },
+    toolUseEvent('a', 'mcp__lakar__execute', {}),
+    toolResultEvent('a', [{ type: 'text', text: 'RENDER_FAILED: halaman mati' }], true),
+    toolUseEvent('b', 'mcp__lakar__execute', {}),
+    toolResultEvent('b', 'EXEC_ERROR biasa', true),
   ]);
 
   it('Lakar: pid berubah, recreated +1, tool_result RENDER_FAILED dihitung terpisah', () => {
@@ -72,10 +73,10 @@ describe('reconnect', () => {
     // Error snippet biasa (RENDER_FAILED milik Lakar, EXEC_ERROR) bukan reconnect pen.dev.
     expect(r.toolErrors).toHaveLength(0);
     const tr = L([
-      { type: 'assistant', message: { content: [{ type: 'tool_use', id: 'p', name: 'mcp__pencil__execute', input: {} }] } },
-      { type: 'user', message: { content: [{ type: 'tool_result', tool_use_id: 'p', is_error: true, content: "Error: Node 'x' not found!" }] } },
-      { type: 'assistant', message: { content: [{ type: 'tool_use', id: 'q', name: 'mcp__pencil__execute', input: {} }] } },
-      { type: 'user', message: { content: [{ type: 'tool_result', tool_use_id: 'q', is_error: true, content: 'MCP error -32000: Connection closed' }] } },
+      toolUseEvent('p', 'mcp__pencil__execute', {}),
+      toolResultEvent('p', "Error: Node 'x' not found!", true),
+      toolUseEvent('q', 'mcp__pencil__execute', {}),
+      toolResultEvent('q', 'MCP error -32000: Connection closed', true),
     ]);
     const r2 = pendevReconnect(undefined, undefined, tr);
     expect(r2.toolErrors.map((h) => h.tool)).toEqual(['mcp__pencil__execute']);
@@ -84,8 +85,8 @@ describe('reconnect', () => {
 
   it('Lakar: tool_result sukses yang menyebut RENDER_FAILED (mis. read_skill api) bukan reconnect', () => {
     const ok = L([
-      { type: 'assistant', message: { content: [{ type: 'tool_use', id: 's', name: 'mcp__lakar__read_skill', input: { name: 'api' } }] } },
-      { type: 'user', message: { content: [{ type: 'tool_result', tool_use_id: 's', content: 'kode error: RENDER_FAILED, VERSION_MISMATCH' }] } },
+      toolUseEvent('s', 'mcp__lakar__read_skill', { name: 'api' }),
+      toolResultEvent('s', 'kode error: RENDER_FAILED, VERSION_MISMATCH'),
     ]);
     expect(lakarReconnect(undefined, undefined, ok).count).toBe(0);
   });

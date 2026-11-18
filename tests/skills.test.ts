@@ -7,6 +7,7 @@ import { renderApiMarkdown } from '../packages/exec/src/api-md.ts';
 import { IconCatalog } from '../packages/icons/src/index.ts';
 import { FontRegistry } from '../packages/daemon/src/fonts.ts';
 import { SKILL_NAMES, SKILLS_DIR, estimateTokens, splitCode } from '../packages/skills/src/index.ts';
+import { testLog } from './support/log.ts';
 
 const read = (name: string) => readFileSync(join(SKILLS_DIR, `${name}.md`), 'utf8');
 const REGEN = 'regenerasi: /opt/node-26/bin/pnpm build && /opt/node-26/bin/node scripts/gen-skill-api.mjs';
@@ -19,7 +20,7 @@ describe('skill: batas token (estimateTokens = karakter / 3.2)', () => {
     const md = read(name);
     const total = estimateTokens(md);
     const prose = estimateTokens(splitCode(md).prose);
-    console.log(`[skills] ${name}.md: total ${total} token, prosa ${prose} token`);
+    testLog(`[skills] ${name}.md: total ${total} token, prosa ${prose} token`);
     expect(total, `${name}.md total ${total} > ${lim.total}`).toBeLessThanOrEqual(lim.total);
     if ('prose' in lim) expect(prose, `${name}.md prosa ${prose} > ${lim.prose}`).toBeLessThanOrEqual(lim.prose);
   });

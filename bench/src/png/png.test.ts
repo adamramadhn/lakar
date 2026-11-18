@@ -2,7 +2,7 @@ import { deflateSync } from 'node:zlib';
 import { describe, expect, it } from 'vitest';
 import { crc32, decodePng, encodePngRgb, encodePngRgbaWithChunks, readChunks, PNG_SIGNATURE, type RgbaImage } from './codec.js';
 import { buildStrip, compositeOver, downscaleBox, judgeImages, stackVertical, tileHeightFor, tiles } from './strip.js';
-import { readPngSize } from '../pendev/artifacts.js';
+import { readPngSize } from './codec.js';
 
 const rgba = (width: number, height: number, px: (x: number, y: number) => [number, number, number, number]): RgbaImage => {
   const data = new Uint8Array(width * height * 4);

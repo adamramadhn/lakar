@@ -1,4 +1,5 @@
 // Parser jawaban juri yang ketat: satu objek JSON {X:{…}, Y:{…}} dengan 6 kriteria, slop, emoji, fokus.
+import { errorMessage } from '@lakar/schema';
 import { JUDGE_CRITERIA, type JudgeCriterion } from './prompt.js';
 
 export type CriterionScore = { skor: 0 | 1 | 2; bukti: string };
@@ -66,7 +67,7 @@ export function parseJudgeOutput(text: string | undefined): ParseResult {
   try {
     v = JSON.parse(jsonText(text));
   } catch (e) {
-    return { ok: false, problems: [`bukan JSON: ${(e as Error).message}`] };
+    return { ok: false, problems: [`bukan JSON: ${errorMessage(e)}`] };
   }
   const problems: string[] = [];
   if (!isObj(v)) return { ok: false, problems: ['akar JSON bukan objek'] };

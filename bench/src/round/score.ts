@@ -21,7 +21,7 @@ export type ToolScore = {
 };
 export type PromptScore = { prompt: string; validReps: number; reps: JudgeRepRecord[]; tools: Record<Tool, ToolScore> };
 
-export function agg(values: number[]): Agg {
+function agg(values: number[]): Agg {
   const range = values.length ? Math.max(...values) - Math.min(...values) : undefined;
   return { values, median: median(values), range, flag: range !== undefined && range > RANGE_FLAG };
 }

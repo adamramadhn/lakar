@@ -5,6 +5,10 @@
 export const ICON_LIBS = ['lucide', 'simple-icons'] as const;
 export type IconLib = (typeof ICON_LIBS)[number];
 
+/** Pencarian ikon (`icon_search`, `iconSearch`, katalog): jumlah hasil default dan maksimum. */
+export const ICON_SEARCH_DEFAULT_LIMIT = 10;
+export const ICON_SEARCH_MAX_LIMIT = 50;
+
 /** Nama ikon kanonik: huruf kecil/angka, `-` dan `_` (beberapa slug simple-icons memakai `_`). */
 export const ICON_NAME_PATTERN = /^[a-z0-9][a-z0-9_-]*$/;
 

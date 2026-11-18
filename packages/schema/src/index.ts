@@ -6,6 +6,7 @@ export const PACKAGE = '@lakar/schema';
 
 export * from './errors.js';
 export * from './findings.js';
+export * from './glyphs.js';
 export * from './icons.js';
 export * from './nodes.js';
 export * from './tokens.js';

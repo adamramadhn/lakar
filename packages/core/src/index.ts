@@ -6,6 +6,7 @@ export const PACKAGE = '@lakar/core';
 
 export { IdAllocator, collectIds, type RandomSource } from './ids.js';
 export { DocumentLocks } from './locks.js';
+export { isPlainObject } from './object.js';
 export { MIGRATIONS, migrateDocument, parseDocument, type MigrateOptions, type Migration, type MigrationRegistry, type RawDocument } from './migrate.js';
 export {
   beginTransaction,

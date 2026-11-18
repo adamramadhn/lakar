@@ -2,8 +2,7 @@
 // (dikenali dari magic bytes) yang disajikan; SVG/HTML/lainnya tidak pernah disajikan sebagai aset.
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
-
-export const ASSET_ID = /^[a-f0-9]{64}$/;
+import { ASSET_ID_PATTERN } from '@lakar/schema';
 
 /** MIME raster dari magic bytes, atau undefined. */
 export function rasterType(buf: Uint8Array): string | undefined {
@@ -18,7 +17,7 @@ export function rasterType(buf: Uint8Array): string | undefined {
 
 /** Baca aset `hash` dari store. Hash tidak valid, file tidak ada, atau bukan raster → undefined. */
 export async function readAsset(dataDir: string, hash: string): Promise<{ type: string; body: Buffer } | undefined> {
-  if (!ASSET_ID.test(hash)) return undefined;
+  if (!ASSET_ID_PATTERN.test(hash)) return undefined;
   const body = await readFile(join(dataDir, 'assets', hash)).catch(() => undefined);
   if (!body) return undefined;
   const type = rasterType(body);

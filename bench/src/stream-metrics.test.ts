@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { computeMetrics, validateInit, type InitRules, type TimedLine } from './stream-metrics.js';
+import { toolResultEvent, toolUseEvent } from '../../tests/support/stream.ts';
 
 const RULES: InitRules = { server: 'pencil', requiredTools: ['mcp__pencil__execute'], forbiddenCwdRoot: '/root/lakar' };
 
@@ -13,8 +14,8 @@ const init = (over: Record<string, unknown> = {}) => ({
   tools: ['mcp__pencil__execute', 'mcp__pencil__get_app_state'],
   ...over,
 });
-const toolUse = (id: string) => ({ type: 'assistant', message: { content: [{ type: 'tool_use', id, name: 'mcp__pencil__execute', input: {} }] } });
-const toolResult = (id: string) => ({ type: 'user', message: { content: [{ type: 'tool_result', tool_use_id: id, content: 'OK' }] } });
+const toolUse = (id: string) => toolUseEvent(id, 'mcp__pencil__execute', {});
+const toolResult = (id: string) => toolResultEvent(id, 'OK');
 const result = (over: Record<string, unknown> = {}) => ({
   type: 'result',
   subtype: 'success',

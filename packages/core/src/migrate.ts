@@ -2,6 +2,7 @@
 // rantai langkah n→n+1; validasi penuh tetap oleh `LakarDocument`. Write-back hasil migrasi ada di daemon.
 import { LakarDocument, LakarError, SCHEMA_VERSION, zodToLakarError, type LakarDocument as Doc } from '@lakar/schema';
 import { host } from './host.js';
+import { isPlainObject } from './object.js';
 
 export type RawDocument = Record<string, unknown>;
 /** Satu langkah: dokumen versi n → dokumen versi n+1. Boleh memutasi argumennya (sudah salinan). */
@@ -13,8 +14,6 @@ export type MigrationRegistry = Readonly<Record<number, Migration>>;
 export const MIGRATIONS: MigrationRegistry = Object.freeze({});
 
 export type MigrateOptions = { migrations?: MigrationRegistry; target?: number };
-
-const isPlainObject = (v: unknown): v is RawDocument => typeof v === 'object' && v !== null && !Array.isArray(v);
 
 /**
  * Bawa dokumen mentah ke versi `target` (default `SCHEMA_VERSION`). Input tidak dimutasi.

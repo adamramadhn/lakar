@@ -43,7 +43,7 @@ export function boundsMap(boardId: string, m: BoardMeasure): Map<string, BoundsT
 }
 
 /** Properti tersimpan (token apa adanya) + bounds + anak bersarang sampai `depth` (lebih dalam → childCount). */
-export function inspectTree(node: AnyTree, bounds: ReadonlyMap<string, BoundsTuple>, depth: number): Record<string, unknown> {
+function inspectTree(node: AnyTree, bounds: ReadonlyMap<string, BoundsTuple>, depth: number): Record<string, unknown> {
   const { children, ...props } = node;
   const out: Record<string, unknown> = { ...props };
   const b = bounds.get(node.id);

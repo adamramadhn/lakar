@@ -2,14 +2,14 @@
 // 127.0.0.1:0 menyajikan halaman kosong (tanpa import map), dist render apa adanya, font Inter, dan
 // aset gambar in-memory di `/assets/<sha256>` (sama dengan daemon).
 import { createHash } from 'node:crypto';
-import { existsSync, readdirSync } from 'node:fs';
+import { existsSync } from 'node:fs';
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { createServer, type Server } from 'node:http';
-import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { Browser, Page } from 'playwright-core';
 import type { IconGlyph, ResolvedDocument } from '@lakar/schema';
+import { chromiumInstalled, DEFAULT_BROWSERS_PATH } from '../../../tests/support/browser.ts';
 import { CHROMIUM_ARGS, type FontFaceSource, type RenderResult } from '../src/index.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -20,10 +20,8 @@ const INTER_FILES = join(dirname(fileURLToPath(import.meta.resolve('@fontsource/
 const INTER_UNICODE = JSON.parse(await readFile(join(INTER_FILES, '..', 'unicode.json'), 'utf8')) as Record<string, string>;
 
 /** Default sama dengan daemon `config.ts` (C9: cache browser khusus Lakar). */
-export const browsersPath = process.env.LAKAR_BROWSERS_PATH || join(homedir(), '.cache', 'lakar', 'ms-playwright');
-export const browserInstalled =
-  existsSync(browsersPath) &&
-  readdirSync(browsersPath).some((d) => d.startsWith('chromium_headless_shell-') && existsSync(join(browsersPath, d, 'INSTALLATION_COMPLETE')));
+export const browsersPath = DEFAULT_BROWSERS_PATH;
+export const browserInstalled = chromiumInstalled(browsersPath);
 
 const PAGE_HTML = '<!doctype html><html><head><meta charset="utf-8"><title>render harness</title>' +
   '<style>html,body{margin:0;padding:0;background:transparent}</style></head><body><div id="root"></div></body></html>';

@@ -62,7 +62,7 @@ type Side = 'top' | 'right' | 'bottom' | 'left';
 const SIDES: readonly Side[] = ['top', 'right', 'bottom', 'left'];
 
 /** Lebar tinta stroke di dalam dan di luar tepi box. */
-export function strokeSplit(s: Stroke): { inside: number; outside: number } {
+function strokeSplit(s: Stroke): { inside: number; outside: number } {
   if (s.align === 'inside') return { inside: s.width, outside: 0 };
   if (s.align === 'outside') return { inside: 0, outside: s.width };
   return { inside: s.width / 2, outside: s.width / 2 };

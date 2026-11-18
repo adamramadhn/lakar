@@ -18,6 +18,7 @@ import {
   type LakarDocument as Doc,
 } from '@lakar/schema';
 import { host } from './host.js';
+import { isPlainObject } from './object.js';
 import { IdAllocator, type RandomSource } from './ids.js';
 import { indexNodes, isContainer, locate, subtree, type Container, type Location } from './tree.js';
 
@@ -62,8 +63,6 @@ const FORBIDDEN_PATCH_KEYS: Record<string, string> = {
   id: 'ID tidak bisa diubah; buat node baru dengan add() atau duplicate()',
   children: 'anak diubah lewat add/move/remove, bukan lewat patch',
 };
-
-const isPlainObject = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
 
 function requireId(op: OpKind, what: string, v: unknown): string {
   if (typeof v !== 'string' || !ID_PATTERN.test(v)) {

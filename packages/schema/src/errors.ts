@@ -41,3 +41,12 @@ export class LakarError extends Error {
     return body;
   }
 }
+
+/**
+ * Pesan dari nilai yang dilempar: `message` bila berupa string (Error, atau objek mirip Error), selain itu
+ * `String(e)`. Untuk `Error` biasa sama persis dengan `e.message`.
+ */
+export function errorMessage(e: unknown): string {
+  const m = (e as { message?: unknown } | null | undefined)?.message;
+  return typeof m === 'string' ? m : String(e);
+}

@@ -5,7 +5,7 @@
 // - LakarError dari isi sewa (FONT_MISSING / NOT_FOUND / ICON_UNKNOWN / SCHEMA_INVALID) = kesalahan dokumen:
 //   halaman tetap dipakai.
 import type { RenderStatus } from '@lakar/ports';
-import { LakarError } from '@lakar/schema';
+import { LakarError, errorMessage } from '@lakar/schema';
 import type { Browser, Page } from 'playwright-core';
 
 export type PoolOptions = {
@@ -30,6 +30,8 @@ type Slot = {
   /** Pernah punya halaman: pembuatan berikutnya dihitung `recreated`. */
   hadPage: boolean;
   creating: Promise<Page> | undefined;
+  /** Pembuatan halaman DPR 2 yang sedang berjalan (satu per slot; panggilan `page2()` paralel berbagi). */
+  creating2: Promise<Page> | undefined;
 };
 
 /** Akses halaman selama sewa. */
@@ -44,9 +46,9 @@ type Waiter = { resolve(slot: Slot): void; reject(e: Error): void; timer: NodeJS
 
 const RETRY_HINT = 'coba lagi; bila terus gagal jalankan scripts/install-browser.sh lalu systemctl --user restart lakard';
 
-export const renderFailed = (message: string) => new LakarError('RENDER_FAILED', message, { hint: RETRY_HINT, retryable: true });
+const renderFailed = (message: string) => new LakarError('RENDER_FAILED', message, { hint: RETRY_HINT, retryable: true });
 
-const firstLine = (e: unknown) => ((e as Error)?.message ?? String(e)).split('\n')[0]!;
+const firstLine = (e: unknown) => errorMessage(e).split('\n')[0]!;
 
 export class RenderPool {
   readonly #opts: PoolOptions;
@@ -71,6 +73,7 @@ export class RenderPool {
       dead: false,
       hadPage: false,
       creating: undefined,
+      creating2: undefined,
     }));
   }
 
@@ -112,12 +115,7 @@ export class RenderPool {
       if (slot.gen !== gen) throw new Error('slot dibuang selama penyiapan');
       const lease: Lease = {
         page,
-        page2: async () => {
-          if (slot.gen !== gen) throw new Error('slot sudah dibuang');
-          if (!slot.page2 || slot.page2.isClosed()) slot.page2 = await this.#watch(slot, await this.#opts.openPage(await this.#ensureBrowser(), 2));
-          if (slot.gen !== gen) throw new Error('slot sudah dibuang');
-          return slot.page2;
-        },
+        page2: () => this.#ensurePage2(slot, gen),
       };
       return fn(lease);
     })();
@@ -148,6 +146,7 @@ export class RenderPool {
       s.gen++;
       s.page = undefined;
       s.page2 = undefined;
+      s.creating2 = undefined;
     }
     const b = this.#browser ?? (await this.#browserPromise?.catch(() => undefined));
     this.#browser = undefined;
@@ -205,6 +204,7 @@ export class RenderPool {
     slot.page = undefined;
     slot.page2 = undefined;
     slot.creating = undefined;
+    slot.creating2 = undefined;
     for (const p of pages) if (p) void p.context().close().catch(() => {});
     if (!this.#closed) void this.#ensurePage(slot).catch(() => {});
   }
@@ -272,6 +272,33 @@ export class RenderPool {
       });
     }
     return slot.creating;
+  }
+
+  /**
+   * Halaman DPR 2 slot untuk sewa generasi `gen`. Halaman dibuka ke variabel lokal dan baru disimpan di slot bila
+   * generasinya masih sama; slot yang dibuang selama pembukaan → halaman itu ditutup (tidak bocor). Panggilan
+   * paralel berbagi satu promise sehingga hanya satu context yang dibuka.
+   */
+  #ensurePage2(slot: Slot, gen: number): Promise<Page> {
+    if (slot.gen !== gen) return Promise.reject(new Error('slot sudah dibuang'));
+    if (slot.page2 && !slot.page2.isClosed()) return Promise.resolve(slot.page2);
+    if (!slot.creating2) {
+      const p = (async () => {
+        const page = await this.#opts.openPage(await this.#ensureBrowser(), 2);
+        if (slot.gen !== gen || this.#closed) {
+          await page.context().close().catch(() => {});
+          throw new Error('slot sudah dibuang');
+        }
+        slot.page2 = this.#watch(slot, page);
+        return page;
+      })();
+      slot.creating2 = p;
+      const clear = () => {
+        if (slot.creating2 === p) slot.creating2 = undefined;
+      };
+      p.then(clear, clear);
+    }
+    return slot.creating2;
   }
 
   /** Halaman crash/tertutup di luar sewa → slot dibuang dan dibuat ulang. Saat disewa: sewa itu yang gagal. */

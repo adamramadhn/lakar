@@ -3,18 +3,17 @@
 // blok `// pakai prelude` didahului blok prelude core.md; blok api.md masing-masing di dokumen kosong baru.
 // LAKAR_SKILL_PNG_DIR=<dir> → PNG setiap board contoh ditulis ke sana untuk pemeriksaan visual.
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { existsSync, readdirSync } from 'node:fs';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { SKILL_NAMES, SKILLS_DIR, splitCode, type SkillName } from '@lakar/skills';
 import { loadConfig, startDaemon, type RunningDaemon } from './index.js';
+import { chromiumInstalled } from '../../../tests/support/browser.ts';
+import { postJson } from '../../../tests/support/http.ts';
 
 const baseConfig = loadConfig({});
 const browsersPath = process.env.LAKAR_BROWSERS_PATH || baseConfig.browsersPath;
-const browserInstalled =
-  existsSync(browsersPath) &&
-  readdirSync(browsersPath).some((d) => d.startsWith('chromium_headless_shell-') && existsSync(join(browsersPath, d, 'INSTALLATION_COMPLETE')));
+const browserInstalled = chromiumInstalled(browsersPath);
 if (!browserInstalled) {
   console.warn(`[@lakar/daemon] SKIP tes Chromium: chromium-headless-shell belum terpasang di ${browsersPath}. Jalankan: bash scripts/install-browser.sh`);
 }
@@ -28,14 +27,7 @@ type Body = { ok: boolean; data?: any; error?: { code: string; message: string; 
 let d: RunningDaemon;
 let dataDir: string;
 
-async function call(path: string, body: unknown, session?: string): Promise<Body> {
-  const r = await fetch(`${d.url}${path}`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', ...(session ? { 'x-lakar-session': session } : {}) },
-    body: JSON.stringify(body),
-  });
-  return (await r.json()) as Body;
-}
+const call = async (path: string, body: unknown, session?: string): Promise<Body> => (await postJson(d.url, path, body, session)).body;
 
 /** Sesi baru dengan dokumen kosong `slug` aktif. */
 async function freshDoc(slug: string): Promise<string> {

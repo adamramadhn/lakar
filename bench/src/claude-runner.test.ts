@@ -104,6 +104,26 @@ setTimeout(()=>{w('ult","subtype":"success"}\\n');process.stderr.write('err');},
     }
   });
 
+  it('stream.jsonl sudah ada (flag wx) → error dilempar sebelum spawn (agen tidak dijalankan), file lama tidak ditimpa', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'bench-runner-test-'));
+    try {
+      const fake = join(dir, 'fake.mjs');
+      const marker = join(dir, 'spawned');
+      writeFileSync(fake, `import { writeFileSync } from 'node:fs'; writeFileSync(${JSON.stringify(marker)}, 'x');`);
+      const out = join(dir, 'out');
+      mkdirSync(out);
+      writeFileSync(join(out, 'stream.jsonl'), 'lama');
+      await expect(
+        runClaude({ prompt: 'p', mcpConfig: 'm', allowedTools: 'a', config: { ...protocol.config, timeoutMs: 10_000 }, outDir: out, command: process.execPath, prefixArgs: [fake] }),
+      ).rejects.toThrow(/transkrip run tidak bisa ditulis: .*EEXIST/);
+      expect(readFileSync(join(out, 'stream.jsonl'), 'utf8')).toBe('lama');
+      expect(existsSync(join(out, 'timing.json'))).toBe(false);
+      expect(existsSync(marker)).toBe(false);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it('tanpa rawArgs, prompt/mcpConfig/allowedTools wajib', async () => {
     await expect(runClaude({ config: protocol.config, outDir: '/nonexistent' })).rejects.toThrow(/wajib/);
   });

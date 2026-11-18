@@ -1,7 +1,7 @@
 // Check G0 (AD-8): aturan murni atas dokumen ter-resolve + hasil ukur render (BoardMeasure).
 // Arah spine: check → schema, ports saja.
 import type { BoardMeasure } from '@lakar/ports';
-import type { Finding, ResolvedBoardNode as BoardNode, ResolvedDocument } from '@lakar/schema';
+import { findBoard, type Finding, type ResolvedBoardNode as BoardNode, type ResolvedDocument } from '@lakar/schema';
 import { codePoints, graphemes, isEmojiGrapheme, leadingIconGlyph, onlyIconGlyphs } from './glyphs.js';
 import { lc01a, lc01b, lc02a, lc05, lc12, lc20 } from './rules.js';
 import { boardContext } from './tree.js';
@@ -14,11 +14,6 @@ export { changedNodeIds, touchedBoards } from './touched.js';
 export { TOLERANCE } from './tree.js';
 
 const EMPTY_MEASURE: BoardMeasure = { width: 0, height: 0, nodes: [], texts: [] };
-
-function findBoard(doc: ResolvedDocument, boardId: string): BoardNode | undefined {
-  for (const p of doc.pages) for (const b of p.children) if (b.id === boardId) return b;
-  return undefined;
-}
 
 /**
  * Temuan glyph (LC-01a/b) tanpa render + code point yang harus di-allow saat ukur (agar board tetap

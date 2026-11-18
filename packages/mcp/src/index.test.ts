@@ -1,9 +1,8 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createServer, request, type IncomingMessage, type Server } from 'node:http';
 import { spawn, type ChildProcess } from 'node:child_process';
-import { existsSync, readdirSync } from 'node:fs';
 import { mkdtemp, rm } from 'node:fs/promises';
-import { homedir, tmpdir } from 'node:os';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Client, InMemoryTransport } from '@modelcontextprotocol/client';
@@ -11,6 +10,8 @@ import { StdioClientTransport } from '@modelcontextprotocol/client/stdio';
 import { LAKAR_VERSION, SCHEMA_VERSION } from '@lakar/schema';
 import { PACKAGE, READ_SKILL_DESCRIPTION, SERVER_INSTRUCTIONS, SERVER_VERSION, createLakarMcpServer, formatStatus } from './index.js';
 import { readFile } from 'node:fs/promises';
+import { chromiumInstalled, DEFAULT_BROWSERS_PATH } from '../../../tests/support/browser.ts';
+import { testLog } from '../../../tests/support/log.ts';
 
 /** Skill v1 (packages/skills; mcp tidak bergantung pada paket itu, hanya membaca file untuk perbandingan). */
 const SKILL_NAMES = ['core', 'landing', 'mobile', 'icons', 'api'] as const;
@@ -146,7 +147,7 @@ describe('@lakar/mcp', () => {
   beforeAll(async () => {
     url = await fake.listen();
   });
-  afterAll(() => fake.server.close());
+  afterAll(() => new Promise<void>((r) => fake.server.close(() => r())));
 
   it('mengekspor nama paket', () => {
     expect(PACKAGE).toBe('@lakar/mcp');
@@ -429,23 +430,26 @@ describe('@lakar/mcp', () => {
     const mainJs = fileURLToPath(new URL('../dist/main.js', import.meta.url));
     const transport = new StdioClientTransport({ command: process.execPath, args: [mainJs], env: { LAKAR_URL: url } });
     const client = new Client({ name: 'stdio-test', version: '0' });
-    await client.connect(transport);
     try {
+      await client.connect(transport);
       const o = await client.callTool({ name: 'open_doc', arguments: { slug: 'stdio-a' } });
       expect(JSON.parse((o.content as any)[0].text).slug).toBe('stdio-a');
     } finally {
+      // connect gagal pun: proses anak stdio tidak boleh tertinggal.
       await client.close();
+      await transport.close();
     }
     const deadTransport = new StdioClientTransport({ command: process.execPath, args: [mainJs], env: { LAKAR_URL: 'http://127.0.0.1:1' } });
     const c2 = new Client({ name: 'stdio-test', version: '0' });
-    await c2.connect(deadTransport);
     try {
+      await c2.connect(deadTransport);
       const r = await c2.callTool({ name: 'execute', arguments: { code: '1' } });
       expect(r.isError).toBe(true);
       expect((r.content as any)[0].text).toContain('http://127.0.0.1:1');
       expect((await c2.listTools()).tools).toHaveLength(10);
     } finally {
       await c2.close();
+      await deadTransport.close();
     }
   });
 });
@@ -454,10 +458,8 @@ describe('@lakar/mcp', () => {
 // Integrasi: lakard asli (proses terpisah, Chromium Lakar) di balik daemon tiruan yang meneruskan respons apa adanya.
 // ---------------------------------------------------------------------------
 
-const browsersPath = process.env.LAKAR_BROWSERS_PATH || join(homedir(), '.cache', 'lakar', 'ms-playwright');
-const browserInstalled =
-  existsSync(browsersPath) &&
-  readdirSync(browsersPath).some((d) => d.startsWith('chromium_headless_shell-') && existsSync(join(browsersPath, d, 'INSTALLATION_COMPLETE')));
+const browsersPath = DEFAULT_BROWSERS_PATH;
+const browserInstalled = chromiumInstalled(browsersPath);
 
 const FIXTURE = `
   const b = add(null, {type:'board', name:'Home · mobile', x:0, y:0, width:390, height:800, screen:'mobile'});
@@ -542,7 +544,7 @@ describe.skipIf(!browserInstalled)('layout_check dengan respons lakard asli', ()
     expect(lines[1]).toMatch(/^error·gerbang · LC-01a · Sapaan \([A-Za-z0-9]{8}\) · emoji "👋" U\+1F44B di "Halo 👋" · hapus emoji; ikon pakai node icon \(icon_search\)$/);
     expect(lines[6]).toMatch(/^warning · LC-12 · Home · mobile \([A-Za-z0-9]{8}\) · ukuran 390×800 · 390×844$/);
     expect(text).not.toMatch(/golden|juri|rubrik|Lampiran B|skor|pen\.dev|benchmark/i);
-    console.log(`[mcp] layout_check:\n${text}`);
+    testLog(`[mcp] layout_check:\n${text}`);
   }, 60_000);
 
   it('read_skill terhadap lakard asli: kelima skill tersedia, isi sama dengan file skill', async () => {
@@ -570,7 +572,7 @@ describe.skipIf(!browserInstalled)('layout_check dengan respons lakard asli', ()
     expect(text).toMatch(new RegExp(`^lakard ${LAKAR_VERSION.replaceAll('.', '\\.')} \\(schema ${SCHEMA_VERSION}, .*\\) · mcp ${LAKAR_VERSION.replaceAll('.', '\\.')}: cocok`));
     expect(text).toMatch(/\npool: 2 halaman · \d siap/);
     expect(text).toMatch(/\nfont: 8 keluarga, hilang: -/);
-    console.log(`[mcp] status:\n${text}`);
+    testLog(`[mcp] status:\n${text}`);
   }, 60_000);
 });
 

@@ -1,9 +1,6 @@
-// Klien HTTP harness ke lakard (127.0.0.1:7466), dipakai di luar waktu terukur. Bentuk respons AD-11 {ok, data|error}.
+// Klien HTTP harness ke lakard (`DEFAULT_LAKARD_URL`), dipakai di luar waktu terukur. Bentuk respons AD-11 {ok, data|error}.
 // Sengaja tidak mengimpor packages/mcp (arah dependensi bench → schema saja).
-import type { Finding, FindingSummary } from '@lakar/schema';
-
-export const LAKARD_URL = 'http://127.0.0.1:7466';
-export const SESSION_HEADER = 'x-lakar-session';
+import { DEFAULT_LAKARD_URL, SESSION_HEADER, errorMessage, type Finding, type FindingSummary } from '@lakar/schema';
 
 export type LakardStatus = {
   version: string;
@@ -35,7 +32,7 @@ export class LakardClient {
   #session: string | undefined;
 
   constructor(
-    readonly baseUrl = LAKARD_URL,
+    readonly baseUrl = DEFAULT_LAKARD_URL,
     readonly fetchImpl: Fetch = fetch,
   ) {}
 
@@ -47,7 +44,7 @@ export class LakardClient {
     try {
       res = await this.fetchImpl(`${this.baseUrl}${path}`, { method, headers, ...(body !== undefined ? { body: JSON.stringify(body) } : {}), signal: AbortSignal.timeout(120_000) });
     } catch (e) {
-      throw new LakardError('UNREACHABLE', `lakard tidak menjawab di ${this.baseUrl}${path}: ${(e as Error).message}`);
+      throw new LakardError('UNREACHABLE', `lakard tidak menjawab di ${this.baseUrl}${path}: ${errorMessage(e)}`);
     }
     let json: any;
     try {

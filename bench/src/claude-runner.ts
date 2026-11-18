@@ -90,6 +90,17 @@ export async function runClaude(opts: RunClaudeOptions): Promise<RunClaudeResult
   const { env, scrubbed } = buildEnv(process.env, opts.config);
   const stdoutFile = createWriteStream(join(opts.outDir, 'stream.jsonl'), { flags: 'wx' });
   const stderrFile = createWriteStream(join(opts.outDir, 'stderr.txt'), { flags: 'wx' });
+  // Gagal buka/tulis (mis. file sudah ada, flag `wx`) dicatat lalu dilempar setelah proses selesai dan
+  // pembersihan berjalan, bukan event 'error' tanpa listener yang menjatuhkan seluruh harness.
+  const fileErrors: Error[] = [];
+  for (const f of [stdoutFile, stderrFile]) f.on('error', (e) => fileErrors.push(e));
+  // File transkrip harus terbuka sebelum spawn: gagal buka (mis. EEXIST) → berhenti tanpa menjalankan agen berbayar.
+  await Promise.all([stdoutFile, stderrFile].map((f) => new Promise<void>((r) => (f.pending ? f.once('ready', () => r()).once('error', () => r()) : r()))));
+  if (fileErrors.length) {
+    for (const f of [stdoutFile, stderrFile]) f.destroy();
+    rmSync(cwd, { recursive: true, force: true });
+    throw new Error(`transkrip run tidak bisa ditulis: ${fileErrors.map((e) => e.message).join('; ')}`);
+  }
   const lines: TimedLine[] = [];
   let pending: Buffer[] = [];
   let stdoutBytes = 0;
@@ -167,6 +178,7 @@ export async function runClaude(opts: RunClaudeOptions): Promise<RunClaudeResult
     await Promise.all([new Promise((r) => stdoutFile.end(r)), new Promise((r) => stderrFile.end(r))]);
     rmSync(cwd, { recursive: true, force: true });
   }
+  if (fileErrors.length) throw new Error(`transkrip run tidak bisa ditulis: ${fileErrors.map((e) => e.message).join('; ')}`);
 
   writeFileSync(
     join(opts.outDir, 'timing.json'),

@@ -3,11 +3,10 @@
 import { randomBytes, randomUUID } from 'node:crypto';
 import { LakarError, type ErrorCode, type FindingSummary } from '@lakar/schema';
 
-export const SESSION_HEADER = 'x-lakar-session';
 /** Jumlah snippet gagal yang diingat per sesi (LRU). */
-export const FAILED_MAX = 20;
+const FAILED_MAX = 20;
 /** Jumlah entri log execute per sesi. */
-export const SESSION_LOG_MAX = 200;
+const SESSION_LOG_MAX = 200;
 
 /** Sesi tidak ada/tidak dikenal. Ditandai struktural agar HTTP 401 tidak bergantung pada teks pesan. */
 export class UnknownSessionError extends LakarError {}
@@ -44,11 +43,17 @@ export type Session = {
 
 const ALNUM = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
 
-/** editId 8 karakter acak [A-Za-z0-9]. */
-export function newEditId(): string {
-  const bytes = randomBytes(8);
+/** Byte di atas batas ini dibuang (rejection sampling): 248 = 4 × 62, jadi setiap karakter sama peluangnya. */
+const UNBIASED_LIMIT = 256 - (256 % ALNUM.length);
+
+/** editId 8 karakter acak [A-Za-z0-9], tanpa bias modulo. */
+function newEditId(): string {
   let s = '';
-  for (const b of bytes) s += ALNUM[b % ALNUM.length];
+  while (s.length < 8) {
+    for (const b of randomBytes(8)) {
+      if (b < UNBIASED_LIMIT && s.length < 8) s += ALNUM[b % ALNUM.length];
+    }
+  }
   return s;
 }
 

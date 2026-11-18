@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { summarizeFindings, type Finding } from '@lakar/schema';
+import { testLog } from '../../../tests/support/log.ts';
 import {
   PACKAGE,
   boundsOf,
@@ -378,7 +379,7 @@ describe('kinerja aturan murni', () => {
     const t0 = performance.now();
     const f = checkBoard({ doc, boardId: boards[0]!, measure });
     const ms = performance.now() - t0;
-    console.log(`[check] aturan G0 500 node: ${ms.toFixed(2)} ms`);
+    testLog(`[check] aturan G0 500 node: ${ms.toFixed(2)} ms`);
     expect(f.length).toBeGreaterThan(0);
     expect(ms).toBeLessThan(100);
   });

@@ -8,7 +8,7 @@ import type { Reconnect } from './reconnect.js';
 import { TOOL_LABEL, TOOLS, type Agg, type Decision, type GateResult, type PromptScore } from './score.js';
 
 export const ROUND_ID = /^(uji-[1-9]\d*|[1-9]\d*)$/;
-export const PROVISIONAL = 'sementara, menunggu konfirmasi Adam';
+const PROVISIONAL = 'sementara, menunggu konfirmasi Adam';
 
 export type RoundRun = {
   key: string;

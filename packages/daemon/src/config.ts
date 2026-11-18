@@ -3,15 +3,17 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
+import { DEFAULT_TIMEOUT_MS as EXEC_TIMEOUT_DEFAULT_MS, DEFAULT_MEMORY_BYTES as EXEC_MEMORY_DEFAULT_BYTES } from '@lakar/exec';
+import { DEFAULT_LAKARD_PORT } from '@lakar/schema';
 
 /** AD-14: daemon hanya bind ke loopback. Sengaja tidak bisa diubah. */
 export const HOST = '127.0.0.1' as const;
-export const DEFAULT_PORT = 7466;
+export const DEFAULT_PORT = DEFAULT_LAKARD_PORT;
 /** Pool render AD-18: jumlah halaman hangat (default, min, maks). */
 export const RENDER_PAGES_DEFAULT = 2;
 export const RENDER_PAGES_MIN = 2;
 export const RENDER_PAGES_MAX = 8;
-export const RENDER_TIMEOUT_DEFAULT_MS = 15000;
+const RENDER_TIMEOUT_DEFAULT_MS = 15000;
 
 export type DaemonConfig = {
   host: typeof HOST;
@@ -102,8 +104,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): DaemonConfig {
     port: port ? intIn(port.name, port.raw, 0, 65535) : DEFAULT_PORT,
     dataDir: pick('data_dir')?.raw || join(home, '.local', 'share', 'lakar'),
     browsersPath: pick('browsers_path')?.raw || join(home, '.cache', 'lakar', 'ms-playwright'),
-    execTimeoutMs: 2000,
-    execMemoryBytes: 64 * 1024 * 1024,
+    execTimeoutMs: EXEC_TIMEOUT_DEFAULT_MS,
+    execMemoryBytes: EXEC_MEMORY_DEFAULT_BYTES,
     renderTimeoutMs: timeout ? intIn(timeout.name, timeout.raw, 100, 600_000) : RENDER_TIMEOUT_DEFAULT_MS,
     renderPages: pages ? intIn(pages.name, pages.raw, RENDER_PAGES_MIN, RENDER_PAGES_MAX) : RENDER_PAGES_DEFAULT,
     ...(configPath ? { configPath } : {}),

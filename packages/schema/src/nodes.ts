@@ -12,6 +12,8 @@ export const SCHEMA_VERSION = 1 as const;
 
 export const ID_PATTERN = /^[A-Za-z0-9]{8}$/;
 export const SLUG_PATTERN = /^[a-z0-9][a-z0-9-]{0,63}$/;
+/** ID aset gambar: hash sha256 hex huruf kecil (`<dataDir>/assets/<sha256>`). */
+export const ASSET_ID_PATTERN = /^[a-f0-9]{64}$/;
 export const TOKEN_NAME_PATTERN = /^[a-z0-9][a-z0-9-]*(\.[a-z0-9][a-z0-9-]*)*$/;
 
 /** Pesan issue warna; `zodToLakarError` memakainya untuk memilih hint warna. */
@@ -96,7 +98,7 @@ export const Fill = z.discriminatedUnion('type', [
   z
     .object({
       type: z.literal('image'),
-      assetId: z.string().regex(/^[a-f0-9]{64}$/, 'assetId: hash sha256 hex 64 karakter'),
+      assetId: z.string().regex(ASSET_ID_PATTERN, 'assetId: hash sha256 hex 64 karakter'),
       fit: z.enum(['cover', 'contain', 'fill', 'tile']),
     })
     .strict(),
@@ -298,7 +300,6 @@ export type EllipseInput = z.infer<typeof EllipseInput>;
 export type PathInput = z.infer<typeof PathInput>;
 export type IconInput = z.infer<typeof IconInput>;
 export type NodeInput = z.infer<typeof NodeInput>;
-export type ChildInput = Exclude<NodeInput, BoardInput>;
 
 // ---------------------------------------------------------------------------
 // Node tersimpan: input + id (+ children untuk kontainer).
@@ -350,6 +351,15 @@ export const LakarDocument = z
   })
   .strict();
 export type LakarDocument = z.infer<typeof LakarDocument>;
+
+/**
+ * Board `boardId` di halaman mana pun (generik: dokumen tersimpan maupun ter-resolve), atau undefined.
+ * Render memegang salinannya sendiri (dist render dimuat di Chromium tanpa bundler).
+ */
+export function findBoard<B extends { id: string }>(doc: { pages: readonly { children: readonly B[] }[] }, boardId: string): B | undefined {
+  for (const p of doc.pages) for (const b of p.children) if (b.id === boardId) return b;
+  return undefined;
+}
 
 export type HistoryEntry = {
   rev: number;

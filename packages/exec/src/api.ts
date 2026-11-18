@@ -1,9 +1,9 @@
 // Permukaan API snippet `execute` (AD-7) — didefinisikan SEKALI di sini: tipe publik ber-JSDoc
 // (`LakarApi`) dan tabel runtime `API` (signature, doc, contoh yang dites, implementasi host).
 // Tanpa IO. Semua op baca bekerja di salinan kerja transaksi dan mengembalikan salinan.
-import type { Transaction } from '@lakar/core';
+import { isPlainObject, type Transaction } from '@lakar/core';
 import type { IconCatalogMatch, IconCatalogPort } from '@lakar/ports';
-import { ID_PATTERN, LakarError, NODE_TYPES, type AnyNode, type ErrorCode, type LakarDocument as Doc, type NodeInput, type NodeType } from '@lakar/schema';
+import { ICON_SEARCH_DEFAULT_LIMIT, ICON_SEARCH_MAX_LIMIT, ID_PATTERN, LakarError, NODE_TYPES, type AnyNode, type ErrorCode, type LakarDocument as Doc, type NodeInput, type NodeType } from '@lakar/schema';
 
 // ---------------------------------------------------------------------------
 // Batas
@@ -22,9 +22,6 @@ export const LOG_MAX_LINES = 100;
 export const LOG_MAX_BYTES = 16 * 1024;
 /** Jarak default antar-board untuk `place`. */
 export const DEFAULT_PLACE_GAP = 80;
-/** `iconSearch`: jumlah hasil default dan maksimum. */
-export const ICON_SEARCH_DEFAULT_LIMIT = 10;
-export const ICON_SEARCH_MAX_LIMIT = 50;
 
 // ---------------------------------------------------------------------------
 // Tipe publik
@@ -137,7 +134,7 @@ export type ApiContext = {
 
 export type ApiFunction = {
   kind: 'op' | 'read';
-  /** Tanda tangan untuk dokumentasi (`api.md` nanti dihasilkan dari sini). */
+  /** Tanda tangan untuk dokumentasi (`api.md` dihasilkan dari sini oleh `scripts/gen-skill-api.mjs`). */
   signature: string;
   doc: string;
   returns: string;
@@ -168,7 +165,6 @@ export const API_GLOBALS: Readonly<Record<'keep' | 'console', ApiGlobal>> = {
 // Helper
 // ---------------------------------------------------------------------------
 
-const isPlainObject = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
 const show = (v: unknown): string => (Array.isArray(v) ? 'array' : (JSON.stringify(v) ?? String(v)));
 
 const ADDRESS_HINT = 'pakai ID 8 karakter dari add()/duplicate(), get()/find()/children(), created[].id, atau keep';

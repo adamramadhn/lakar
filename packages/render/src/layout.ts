@@ -156,7 +156,7 @@ function sizingOf(n: ChildNode): Sized {
 }
 
 /** `wrap` default: `auto` bila width tidak diisi/hug, `wrap` bila width angka/fill. */
-export function textWrap(n: TextNode): 'auto' | 'wrap' | 'fixed' {
+function textWrap(n: TextNode): 'auto' | 'wrap' | 'fixed' {
   return n.wrap ?? (typeof n.width === 'number' || n.width === 'fill' ? 'wrap' : 'auto');
 }
 
@@ -304,7 +304,8 @@ function renderText(d: Document, n: TextNode): HTMLElement {
     s.whiteSpace = 'pre-wrap';
     s.overflowWrap = 'break-word';
   }
-  // `fixed`: width/height angka dari sizing; overflow tidak dipotong (LC-01b di story 11).
+  // `fixed`: width/height angka dari sizing; overflow tidak dipotong agar teks yang meluber tetap terlihat
+  // (check G0 belum punya aturan teks meluber kotaknya; `measure.texts` belum dipakai aturan mana pun).
   if (wrap === 'fixed') s.overflow = 'visible';
   el.textContent = n.content;
   return el;

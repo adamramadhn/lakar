@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { assertSafeDestination, copyExclusive, readPngSize, readPngSizeFile } from './artifacts.js';
+import { assertSafeDestination, copyExclusive } from './artifacts.js';
+import { readPngSize, readPngSizeFile } from '../png/codec.js';
 
 function pngHead(w: number, h: number): Buffer {
   const b = Buffer.alloc(33);

@@ -3,17 +3,18 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { LAKAR_VERSION, SCHEMA_VERSION } from '@lakar/schema';
+import { LAKAR_VERSION, SCHEMA_VERSION, SESSION_HEADER } from '@lakar/schema';
 import { encodePngRgbaWithChunks } from '../png/codec.js';
 import { loadProtocol } from '../protocol.js';
 import type { TimedLine } from '../stream-metrics.js';
-import { LakardClient, SESSION_HEADER } from './lakard-client.js';
+import { timedLines, toolResultEvent, toolUseEvent } from '../../../tests/support/stream.ts';
+import { LakardClient } from './lakard-client.js';
 import { boardSizeProblems, findCommittedSlug, lakarPreflightProblems, runLakar, snapshotLakarDocs } from './run.js';
 
 const protocol = loadProtocol();
-const L = (evs: unknown[]): TimedLine[] => evs.map((e, i) => ({ t: i * 100, line: JSON.stringify(e) }));
-const use = (id: string, name: string, input: unknown) => ({ type: 'assistant', message: { content: [{ type: 'tool_use', id, name: `mcp__lakar__${name}`, input }] } });
-const res = (id: string, is_error = false, text = 'ok') => ({ type: 'user', message: { content: [{ type: 'tool_result', tool_use_id: id, is_error, content: [{ type: 'text', text }] }] } });
+const L = (evs: unknown[]): TimedLine[] => timedLines(evs, 100);
+const use = (id: string, name: string, input: unknown) => toolUseEvent(id, `mcp__lakar__${name}`, input);
+const res = (id: string, is_error = false, text = 'ok') => toolResultEvent(id, [{ type: 'text', text }], is_error);
 
 describe('findCommittedSlug', () => {
   it('open_doc terakhir yang diikuti execute sukses', () => {

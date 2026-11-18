@@ -2,6 +2,7 @@
 import type { DaemonState } from '../lakar/run.js';
 import type { TimedLine } from '../stream-metrics.js';
 import type { SystemdInfo } from '../sys.js';
+import { toolEvents } from '../tool-events.js';
 
 export type ReconnectEvent = { kind: string; detail: string };
 export type ToolErrorHit = { tool: string; ms: number | undefined; snippet: string };
@@ -20,26 +21,13 @@ function resultText(c: any): string {
 
 /** tool_result yang cocok `match`, dengan ms tool_use → tool_result. */
 export function toolResultHits(lines: readonly TimedLine[], match: (c: any, text: string) => boolean): ToolErrorHit[] {
-  const uses = new Map<string, { name: string; t: number }>();
   const out: ToolErrorHit[] = [];
-  for (const { t, line } of lines) {
-    let ev: any;
-    try {
-      ev = JSON.parse(line);
-    } catch {
-      continue;
-    }
-    const content = ev?.message?.content;
-    if (!Array.isArray(content)) continue;
-    for (const c of content) {
-      if (ev.type === 'assistant' && c?.type === 'tool_use') uses.set(String(c.id), { name: String(c.name), t });
-      if (ev.type === 'user' && c?.type === 'tool_result') {
-        const text = resultText(c);
-        if (!match(c, text)) continue;
-        const u = uses.get(String(c.tool_use_id));
-        out.push({ tool: u?.name ?? '?', ms: u ? Math.round(t - u.t) : undefined, snippet: text.replace(/\s+/g, ' ').slice(0, 200) });
-      }
-    }
+  for (const ev of toolEvents(lines)) {
+    if (ev.kind !== 'result') continue;
+    const text = resultText(ev.block);
+    if (!match(ev.block, text)) continue;
+    const u = ev.use;
+    out.push({ tool: u?.name ?? '?', ms: u ? Math.round(ev.t - u.t) : undefined, snippet: text.replace(/\s+/g, ' ').slice(0, 200) });
   }
   return out;
 }

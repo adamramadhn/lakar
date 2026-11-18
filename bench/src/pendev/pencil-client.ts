@@ -1,7 +1,7 @@
 // Klien MCP stdio milik harness untuk server `pencil` (pen.dev desktop). Dipakai di luar waktu terukur:
 // verifikasi dokumen baru sebelum run, lalu save + daftar frame + Export PNG setelah `result`.
 import { readFileSync } from 'node:fs';
-import { Client } from '@modelcontextprotocol/client';
+import { Client, type Transport } from '@modelcontextprotocol/client';
 import { StdioClientTransport } from '@modelcontextprotocol/client/stdio';
 
 export type StdioServerConfig = { type: 'stdio'; command: string; args: string[]; env: Record<string, string> };
@@ -48,6 +48,10 @@ function inheritedEnv(): Record<string, string> {
   return out;
 }
 
+function stdioTransport(cfg: StdioServerConfig): Transport {
+  return new StdioClientTransport({ command: cfg.command, args: cfg.args, env: { ...inheritedEnv(), ...cfg.env }, stderr: 'ignore' });
+}
+
 function textOf(res: any): string {
   return Array.isArray(res?.content) ? res.content.filter((c: any) => c?.type === 'text').map((c: any) => c.text).join('\n') : '';
 }
@@ -62,10 +66,19 @@ export class PencilClient {
     this.serverVersion = v ? { name: v.name, version: v.version } : undefined;
   }
 
-  static async connect(cfg: StdioServerConfig): Promise<PencilClient> {
-    const transport = new StdioClientTransport({ command: cfg.command, args: cfg.args, env: { ...inheritedEnv(), ...cfg.env }, stderr: 'ignore' });
+  /**
+   * Hubungkan klien harness. `connect` gagal → transport (dan proses anaknya) ditutup lalu error dilempar
+   * ulang, agar tidak ada proses `pencil` yatim. `makeTransport` hanya untuk tes.
+   */
+  static async connect(cfg: StdioServerConfig, makeTransport: (cfg: StdioServerConfig) => Transport = stdioTransport): Promise<PencilClient> {
+    const transport = makeTransport(cfg);
     const client = new Client({ name: 'lakar-bench-harness', version: '0' });
-    await client.connect(transport);
+    try {
+      await client.connect(transport);
+    } catch (e) {
+      await transport.close().catch(() => {});
+      throw e;
+    }
     return new PencilClient(client);
   }
 

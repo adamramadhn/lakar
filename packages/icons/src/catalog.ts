@@ -1,10 +1,11 @@
 // Katalog ikon kanonik (AD-9): nama kanonik + alias, pencarian deterministik, saran ICON_UNKNOWN, glyph.
 // Mengimplementasikan `IconCatalogPort` (@lakar/ports) secara struktural (icons hanya bergantung pada schema).
-import { ICON_LIBS, LakarError, type IconGlyph, type IconLib, type IconMatch } from '@lakar/schema';
+import { ICON_LIBS, ICON_SEARCH_DEFAULT_LIMIT, ICON_SEARCH_MAX_LIMIT, LakarError, type IconGlyph, type IconLib, type IconMatch } from '@lakar/schema';
 import { loadLucide, loadSimpleIcons, type LucideData, type SimpleIconsData } from './data.js';
 
-export const SEARCH_DEFAULT_LIMIT = 10;
-export const SEARCH_MAX_LIMIT = 50;
+/** Batas pencarian kanonik dari @lakar/schema (sama dengan exec `iconSearch` dan daemon `/icons/search`). */
+export const SEARCH_DEFAULT_LIMIT = ICON_SEARCH_DEFAULT_LIMIT;
+export const SEARCH_MAX_LIMIT = ICON_SEARCH_MAX_LIMIT;
 /** Jumlah saran nama kanonik di pesan ICON_UNKNOWN. */
 export const SUGGESTION_COUNT = 3;
 /** Panjang maksimum nama yang dipakai menghitung saran (membatasi kerja jarak edit di host). */

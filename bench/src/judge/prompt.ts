@@ -13,7 +13,7 @@ export type JudgeCriterion = (typeof JUDGE_CRITERIA)[number];
 const TOOL_WORDS: readonly RegExp[] = [/pen\.dev/gi, /\blakar\b/gi, /\bpencil\b/gi, /\bpen\b/gi];
 
 /** Penjaga kebocoran: nama alat, path, nama file, atau URI di teks yang dikirim ke juri. */
-export const JUDGE_LEAK_PATTERNS: readonly RegExp[] = [
+const JUDGE_LEAK_PATTERNS: readonly RegExp[] = [
   /lakar/i,
   /pen\.dev/i,
   /pencil/i,

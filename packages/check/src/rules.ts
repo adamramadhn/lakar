@@ -197,7 +197,7 @@ export function lc12(ctx: BoardContext, doc: ResolvedDocument): Finding[] {
 
 /** Jarak maks bar ke tepi bawah board, lebar min relatif board, dan jarak aman di atas bar. */
 export const BOTTOM_BAR_MAX_GAP = 48;
-export const BOTTOM_BAR_MIN_WIDTH_RATIO = 0.5;
+const BOTTOM_BAR_MIN_WIDTH_RATIO = 0.5;
 export const BOTTOM_BAR_CLEARANCE = 8;
 
 const isChrome = (n: ChildNode) => named(n, 'Overlay /') || named(n, 'Status bar') || named(n, 'Home indicator');

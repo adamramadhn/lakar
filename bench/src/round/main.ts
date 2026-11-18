@@ -2,13 +2,13 @@
 // per prompt, lalu `bench/round-<round>.md|json` dan `bench/score-<id>.md|json`.
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
-import { G0_RULES, LAKAR_VERSION, SCHEMA_VERSION } from '@lakar/schema';
+import { G0_RULES, LAKAR_VERSION, SCHEMA_VERSION, errorMessage } from '@lakar/schema';
 import { buildArgs, buildEnv, shellQuote } from '../claude-runner.js';
 import { assignLabels, buildJudgeArgs, buildJudgeBlocks, EMPTY_MCP, JUDGE_REPS, runJudgeRep, type Assignment, type DesignImages, type JudgeRepRecord, type Tool } from '../judge/run.js';
 import { buildJudgeText, DESIGN_MD_PATH, judgeC7Problems, judgeLeaks } from '../judge/prompt.js';
 import { boardSizeProblems, LAKAR_ALLOWED_TOOLS, LAKAR_MCP_CONFIG, LAKARD_UNIT, lakarPreflightProblems, mcpServerNames, runLakar } from '../lakar/run.js';
 import { LakardClient, type LakardStatus } from '../lakar/lakard-client.js';
-import { Abort, log, stamp } from '../log.js';
+import { Abort, log, sleep, stamp } from '../log.js';
 import { emptyRecord, PENDEV_ALLOWED_TOOLS, PENDEV_MCP_CONFIG, penDesktopVersion, preflight, runOne, RUNS_ROOT, type Preflight } from '../pendev/run.js';
 import { encodePngRgb } from '../png/codec.js';
 import { buildStrip, judgeImages } from '../png/strip.js';
@@ -206,9 +206,9 @@ async function waitLakard(client: LakardClient, oldPid: number, timeoutMs = 90_0
       if (st.pid !== oldPid && (st.pool?.ready ?? 0) >= 1) return st;
       last = `pid ${st.pid}, pool ready ${st.pool?.ready ?? '?'}`;
     } catch (e) {
-      last = (e as Error).message;
+      last = errorMessage(e);
     }
-    await new Promise((r) => setTimeout(r, 500));
+    await sleep(500);
   }
   throw new Abort(`lakard tidak siap ${timeoutMs / 1000} dtk setelah restart (${last})`);
 }
@@ -279,7 +279,7 @@ export async function roundMain(argv: string[]): Promise<number> {
   try {
     status = await client.status();
   } catch (e) {
-    throw new Abort(`lakard: ${(e as Error).message}`);
+    throw new Abort(`lakard: ${errorMessage(e)}`);
   }
   const lp = lakarPreflightProblems(status, mcpServerNames());
   if (lp.length) throw new Abort(`preflight Lakar: ${lp.join('; ')}`);
@@ -406,7 +406,7 @@ export async function roundMain(argv: string[]): Promise<number> {
         rec = await runOne({ pre, runId, prompt, promptId: p, attempt: 1, outDir: dir, prevUris }, serverVersion);
       } catch (e) {
         mkdirSync(dir, { recursive: true });
-        rec = { ...emptyRecord({ runId, promptId: p, attempt: 1 }), status: harnessErrorStatus(existsSync(join(dir, 'stream.jsonl'))), reason: `harness: ${(e as Error).message}` };
+        rec = { ...emptyRecord({ runId, promptId: p, attempt: 1 }), status: harnessErrorStatus(existsSync(join(dir, 'stream.jsonl'))), reason: `harness: ${errorMessage(e)}` };
       }
       rec.pendevSystemd = { before, after: systemdShow('pen-desktop', false) };
       if (serverVersion.v) writeFileSync(mcpVersionFile, `${serverVersion.v}\n`);
@@ -415,7 +415,7 @@ export async function roundMain(argv: string[]): Promise<number> {
         rec = await runLakar({ runId, prompt, promptId: p, outDir: dir, config: cfg, client });
       } catch (e) {
         mkdirSync(dir, { recursive: true });
-        rec = { ...emptyRecord({ runId, promptId: p, attempt: 1 }), status: harnessErrorStatus(existsSync(join(dir, 'stream.jsonl'))), reason: `harness: ${(e as Error).message}` };
+        rec = { ...emptyRecord({ runId, promptId: p, attempt: 1 }), status: harnessErrorStatus(existsSync(join(dir, 'stream.jsonl'))), reason: `harness: ${errorMessage(e)}` };
       }
     }
     writeFileSync(runRecordPath(dir), `${JSON.stringify(rec, null, 1)}\n`);
@@ -441,7 +441,7 @@ export async function roundMain(argv: string[]): Promise<number> {
         const im = writeStrip(roundDir, run);
         if (im) images[t] = im;
       } catch (e) {
-        notes.push(`strip ${run.key} gagal: ${(e as Error).message}`);
+        notes.push(`strip ${run.key} gagal: ${errorMessage(e)}`);
       }
     }
     const lakarRec = r.lakar?.record;
@@ -488,7 +488,7 @@ export async function roundMain(argv: string[]): Promise<number> {
       }
     } catch (e) {
       // Laporan dan penjaga .pen tetap jalan walau tahap juri gagal (run desain berbayar sudah selesai).
-      fatal = `juri ${p}: harness: ${(e as Error).message}`;
+      fatal = `juri ${p}: harness: ${errorMessage(e)}`;
       log(`putaran berhenti: ${fatal}`);
     }
     // Ulangan juri yang tidak dipakai (init tidak valid, atau terputus sebelum rep.json) tetap tercatat di laporan.

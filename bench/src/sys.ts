@@ -4,6 +4,8 @@ import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
+import { errorMessage } from '@lakar/schema';
+import { REPO_ROOT } from './protocol.js';
 
 export type SystemdInfo = { NRestarts?: string; ActiveEnterTimestamp?: string; MainPID?: string; ActiveState?: string; error?: string };
 
@@ -18,7 +20,7 @@ export function systemdShow(unit: string, user: boolean): SystemdInfo {
     }
     return info;
   } catch (e) {
-    return { error: (e as Error).message };
+    return { error: errorMessage(e) };
   }
 }
 
@@ -61,7 +63,7 @@ export function sha256Dir(dir: string): string {
 }
 
 /** Direktori .pen yang dijaga (md5 sebelum/sesudah putaran). Isi .pen hanya dibaca sebagai byte untuk hash. */
-export const PEN_GUARD_DIRS = ['/root/.pencil/documents', '/root/lakar/design', '/root/comprice', '/opt/pen'];
+const PEN_GUARD_DIRS = ['/root/.pencil/documents', join(REPO_ROOT, 'design'), '/root/comprice', '/opt/pen'];
 
 /** md5 semua `.pen` di `dirs` (path → md5). */
 export function md5PenFiles(dirs: readonly string[] = PEN_GUARD_DIRS): Record<string, string> {

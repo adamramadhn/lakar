@@ -50,7 +50,7 @@ export function pathShape(n: Pick<PathNode, 'd' | 'viewBox'>): Shape {
 const xmlAttr = (s: string) => s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
 
 /** `mask-image` data URL: bentuk hitam opak, `preserveAspectRatio='none'`. */
-export function maskImage(shape: Shape): string {
+function maskImage(shape: Shape): string {
   const svg =
     `<svg xmlns="${SVG_NS}" viewBox="${shape.viewBox.map(num).join(' ')}" preserveAspectRatio="none">` +
     `<path d="${xmlAttr(shape.d)}" fill="#000" fill-rule="${shape.rule}"/></svg>`;

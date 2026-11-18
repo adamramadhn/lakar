@@ -1,9 +1,10 @@
 // Protokol benchmark yang dibekukan (AD-13, C7): pembungkus netral + teks prompt + argumen claude.
-// Dipakai ulang story 14 (bench Lakar). Hash protokol mengikat ketiga file.
+// Dipakai bench pen.dev dan putaran Lakar vs pen.dev. Hash protokol mengikat ketiga file.
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { errorMessage } from '@lakar/schema';
 
 /** Root paket bench (`bench/`), sama dari `src/*.ts` (vitest) maupun `dist/*.js`. */
 export const BENCH_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -158,7 +159,7 @@ export function checkC7(rendered: string, goldenText: string, prompts: Partial<R
     try {
       golden = extractGoldenPrompt(goldenText, id);
     } catch (e) {
-      problems.push(`(a) ${(e as Error).message}`);
+      problems.push(`(a) ${errorMessage(e)}`);
       continue;
     }
     if (prompts[id] !== golden) problems.push(`(a) prompt ${id} di prompts.json berbeda dari blockquote golden-set`);

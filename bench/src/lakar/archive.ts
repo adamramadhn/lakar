@@ -5,10 +5,10 @@
 // (lakard menyimpan salinan dokumen di memori per slug). Pembungkus, prompt, dan produk tidak berubah.
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, statSync } from 'node:fs';
 import { join } from 'node:path';
+import { SLUG_PATTERN } from '@lakar/schema';
 
 /** Dir run Lakar di dalam dir putaran: `<prompt>-lakar` atau percobaan sebelumnya `<prompt>-lakar.prev-<stamp>`. */
 const LAKAR_RUN_DIR = /^[A-Za-z0-9]+-lakar(\.prev-.+)?$/;
-const SLUG = /^[a-z0-9][a-z0-9-]*$/;
 
 /**
  * Slug dokumen Lakar yang dibuat/dibuka agen di putaran bench selain `currentRound` (dari `run.json`:
@@ -32,7 +32,7 @@ export function benchLakarSlugs(roundsRoot: string, currentRound: string): strin
         continue;
       }
       const cands = [rec.lakar?.slug, ...(Array.isArray(rec.lakar?.opened) ? rec.lakar!.opened : [])];
-      for (const s of cands) if (typeof s === 'string' && SLUG.test(s)) out.add(s);
+      for (const s of cands) if (typeof s === 'string' && SLUG_PATTERN.test(s)) out.add(s);
     }
   }
   return [...out].sort();

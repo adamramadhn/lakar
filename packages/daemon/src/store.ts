@@ -8,7 +8,7 @@ import { mkdir, open, readFile, readdir, rename, rm, truncate, type FileHandle }
 import { join } from 'node:path';
 import { randomBytes } from 'node:crypto';
 import { migrateDocument, parseDocument, type MigrationRegistry } from '@lakar/core';
-import { LakarError, type HistoryEntry, type LakarDocument } from '@lakar/schema';
+import { LakarError, errorMessage, type HistoryEntry, type LakarDocument } from '@lakar/schema';
 
 export type DocStoreOptions = {
   /** Registri migrasi (default: registri resmi core). */
@@ -78,7 +78,7 @@ export class DocStore {
     try {
       json = JSON.parse(text);
     } catch (e) {
-      throw new LakarError('SCHEMA_INVALID', `file dokumen ${slug}.lakar.json bukan JSON valid: ${(e as Error).message}`, {
+      throw new LakarError('SCHEMA_INVALID', `file dokumen ${slug}.lakar.json bukan JSON valid: ${errorMessage(e)}`, {
         hint: 'pulihkan file dari cadangan atau buka slug lain',
       });
     }

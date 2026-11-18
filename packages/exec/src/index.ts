@@ -11,7 +11,7 @@ import {
 } from 'quickjs-emscripten';
 import type { Transaction } from '@lakar/core';
 import type { IconCatalogPort } from '@lakar/ports';
-import { LakarError } from '@lakar/schema';
+import { LakarError, errorMessage } from '@lakar/schema';
 import { API, DEFAULT_TIMEOUT_MS, KEEP_MAX_BYTES, LOG_MAX_BYTES, LOG_MAX_LINES, MAX_OPS, SNIPPET_GLOBALS, VALUE_MAX_BYTES, type ApiContext } from './api.js';
 
 export const PACKAGE = '@lakar/exec';
@@ -54,7 +54,7 @@ const modules = new Map<number, Promise<QuickJSWASMModule>>();
  * QuickJS tidak bisa menghitung ukuran alokasi (malloc_usable_size tidak tersedia), jadi heap WASM
  * itu sendiri yang dibatasi. Snippet dijalankan berurutan (sinkron), jadi batas modul = batas per panggilan.
  */
-export function loadQuickJS(memoryBytes: number = DEFAULT_MEMORY_BYTES): Promise<QuickJSWASMModule> {
+function loadQuickJS(memoryBytes: number = DEFAULT_MEMORY_BYTES): Promise<QuickJSWASMModule> {
   let p = modules.get(memoryBytes);
   if (!p) {
     const maximum = Math.ceil((BASE_HEAP_BYTES + memoryBytes) / WASM_PAGE);
@@ -158,7 +158,7 @@ class LogBuffer {
 type Dumped = { name?: unknown; message?: unknown; stack?: unknown; lineNumber?: unknown; __lakarError?: unknown };
 
 /** Lokasi baris snippet dari error QuickJS: frame `snippet.js:L:K` pertama, atau `lineNumber` SyntaxError. */
-export function snippetLocation(dumped: unknown, code: string): { line: number; column?: number; text: string } | undefined {
+function snippetLocation(dumped: unknown, code: string): { line: number; column?: number; text: string } | undefined {
   if (!dumped || typeof dumped !== 'object') return undefined;
   const d = dumped as Dumped;
   const m = typeof d.stack === 'string' ? /snippet\.js:(\d+)(?::(\d+))?/.exec(d.stack) : null;
@@ -278,7 +278,7 @@ export async function runSnippet(code: string, tx: Transaction, opts: RunOptions
           const args = argHandles.map((h) => ctx.dump(h));
           return toHandle(ctx, fn(args));
         } catch (e) {
-          const err = ctx.newError({ name: e instanceof LakarError ? 'LakarError' : 'TypeError', message: errMessage(e) });
+          const err = ctx.newError({ name: e instanceof LakarError ? 'LakarError' : 'TypeError', message: errorMessage(e) });
           if (e instanceof LakarError) {
             hostErrors.push(e);
             ctx.setProp(err, '__lakarError', ctx.newNumber(hostErrors.length - 1));
@@ -371,9 +371,5 @@ function toHandle(ctx: QuickJSContext, v: unknown): QuickJSHandle | undefined {
     throw new Error('gagal mengirim nilai host ke snippet');
   }
   return r.value;
-}
-
-function errMessage(e: unknown): string {
-  return e instanceof Error ? e.message : String(e);
 }
 export { renderApiMarkdown } from './api-md.js';

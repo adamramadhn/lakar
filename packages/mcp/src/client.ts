@@ -1,18 +1,17 @@
 // Klien HTTP ke lakard. mcp stateless (AD-1): semua state ada di daemon, di balik sessionId.
-import { LAKAR_VERSION, SCHEMA_VERSION, type ApiErrorBody, type ApiResult } from '@lakar/schema';
+import { LAKAR_VERSION, SCHEMA_VERSION, SESSION_HEADER, VERSION_HINT, errorMessage, type ApiErrorBody, type ApiResult } from '@lakar/schema';
+
+export { VERSION_HINT };
 
 export const START_HINT =
   'jalankan service: systemctl --user start lakard (belum terpasang: bash /root/lakar/tools/lakard/install-service.sh; ' +
   'manual: /opt/node-26/bin/node /root/lakar/packages/daemon/dist/main.js)';
-/** Hint bila versi mcp dan lakard berbeda. */
-export const VERSION_HINT =
-  'bangun ulang lalu restart service: /opt/node-26/bin/pnpm -C /root/lakar build && systemctl --user restart lakard (atau bash /root/lakar/scripts/release.sh)';
 /** Nama klien yang dikirim saat membuat sesi. */
 export const CLIENT_NAME = 'lakar-mcp';
 
 export class DaemonUnavailableError extends Error {
   constructor(url: string, cause: unknown) {
-    super(`lakard tidak menjawab di ${url} (${(cause as Error)?.message ?? String(cause)}). ${START_HINT}`);
+    super(`lakard tidak menjawab di ${url} (${errorMessage(cause)}). ${START_HINT}`);
     this.name = 'DaemonUnavailableError';
   }
 }
@@ -38,12 +37,12 @@ export class DaemonClient {
     this.url = url.replace(/\/+$/, '');
   }
 
-  async #post<T>(path: string, body: unknown, session?: string, method: 'POST' | 'GET' = 'POST'): Promise<{ status: number; result: ApiResult<T> }> {
+  async #request<T>(path: string, body: unknown, session?: string, method: 'POST' | 'GET' = 'POST'): Promise<{ status: number; result: ApiResult<T> }> {
     let res: Response;
     try {
       res = await fetch(`${this.url}${path}`, {
         method,
-        headers: method === 'POST' ? { 'content-type': 'application/json', ...(session ? { 'x-lakar-session': session } : {}) } : {},
+        headers: method === 'POST' ? { 'content-type': 'application/json', ...(session ? { [SESSION_HEADER]: session } : {}) } : {},
         ...(method === 'POST' ? { body: JSON.stringify(body ?? {}) } : {}),
         signal: AbortSignal.timeout(60_000),
       });
@@ -76,7 +75,7 @@ export class DaemonClient {
 
   /** GET /status (tanpa sesi). */
   async status<T>(): Promise<ApiResult<T>> {
-    return (await this.#post<T>('/status', undefined, undefined, 'GET')).result;
+    return (await this.#request<T>('/status', undefined, undefined, 'GET')).result;
   }
 
   /**
@@ -87,7 +86,7 @@ export class DaemonClient {
   #session(): Promise<string> {
     if (!this.#sessionPromise) {
       const p = (async () => {
-        const { result } = await this.#post<SessionInfo>('/sessions', { client: CLIENT_NAME, version: LAKAR_VERSION, schemaVersion: SCHEMA_VERSION });
+        const { result } = await this.#request<SessionInfo>('/sessions', { client: CLIENT_NAME, version: LAKAR_VERSION, schemaVersion: SCHEMA_VERSION });
         if (!result.ok) {
           if (result.error.code === 'VERSION_MISMATCH') throw new VersionMismatchError(result.error);
           throw new Error(`gagal membuat sesi: ${result.error.message}`);
@@ -114,10 +113,10 @@ export class DaemonClient {
   /** Panggil endpoint daemon dalam sesi. Sesi hilang (daemon restart, HTTP 401) → sesi baru, ulang sekali. */
   async call<T>(path: string, body: unknown): Promise<ApiResult<T>> {
     const pending = this.#session();
-    const first = await this.#post<T>(path, body, await pending);
+    const first = await this.#request<T>(path, body, await pending);
     if (first.status !== 401) return first.result;
     if (this.#sessionPromise === pending) this.#sessionPromise = undefined;
-    return (await this.#post<T>(path, body, await this.#session())).result;
+    return (await this.#request<T>(path, body, await this.#session())).result;
   }
 }
 

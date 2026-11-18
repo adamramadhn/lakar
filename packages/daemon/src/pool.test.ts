@@ -1,6 +1,6 @@
 // Story 12: pool render hangat (AD-18), endpoint status/sesi/boards/inspect/export/skills, config.toml.
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { existsSync, readdirSync } from 'node:fs';
+import { readdirSync } from 'node:fs';
 import { mkdtemp, mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -8,27 +8,20 @@ import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import type { Page } from 'playwright-core';
 import { LAKAR_VERSION, SCHEMA_VERSION } from '@lakar/schema';
-import { INSPECT_MAX_BYTES, inspectFit, loadConfig, parseFlatToml, startDaemon, type RunningDaemon } from './index.js';
+import { INSPECT_MAX_BYTES, RenderPool, inspectFit, loadConfig, parseFlatToml, startDaemon, type RunningDaemon } from './index.js';
 import { decodePng, readPngSize } from './png.js';
+import { chromiumInstalled } from '../../../tests/support/browser.ts';
+import { postJson, type LakardBody } from '../../../tests/support/http.ts';
 
 const baseConfig = loadConfig({ LAKAR_CONFIG: '' });
 const browsersPath = process.env.LAKAR_BROWSERS_PATH || baseConfig.browsersPath;
-const browserInstalled =
-  existsSync(browsersPath) &&
-  readdirSync(browsersPath).some((d) => d.startsWith('chromium_headless_shell-') && existsSync(join(browsersPath, d, 'INSTALLATION_COMPLETE')));
+const browserInstalled = chromiumInstalled(browsersPath);
 const mainJs = fileURLToPath(new URL('../dist/main.js', import.meta.url));
 
-type Body = { ok: boolean; data?: any; error?: { code: string; message: string; hint: string; retryable: boolean } };
+type Body = LakardBody;
 
 function client(base: () => string) {
-  const call = async (path: string, body: unknown, session?: string): Promise<{ status: number; body: Body }> => {
-    const r = await fetch(`${base()}${path}`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', ...(session ? { 'x-lakar-session': session } : {}) },
-      body: JSON.stringify(body ?? {}),
-    });
-    return { status: r.status, body: (await r.json()) as Body };
-  };
+  const call = (path: string, body: unknown, session?: string): Promise<{ status: number; body: Body }> => postJson(base(), path, body, session);
   const status = async () => ((await (await fetch(`${base()}/status`)).json()) as Body).data;
   const session = async () => (await call('/sessions', {})).body.data.sessionId as string;
   /** Sesi + dokumen `slug` berisi satu board w×h berwarna `color`. */
@@ -123,6 +116,70 @@ describe('inspectFit (batas 32 KB)', () => {
     expect(big.truncated).toBe(true);
     expect(big.depth).toBeLessThan(3);
     expect(Buffer.byteLength(JSON.stringify(big.node))).toBeLessThanOrEqual(INSPECT_MAX_BYTES);
+  });
+});
+
+describe('RenderPool page2 (browser/halaman tiruan)', () => {
+  type FakePage = { dpr: 1 | 2; closed: boolean; isClosed(): boolean; context(): { close(): Promise<void> }; on(): void };
+  const fakePage = (dpr: 1 | 2): FakePage => {
+    const p: FakePage = {
+      dpr,
+      closed: false,
+      isClosed: () => p.closed,
+      context: () => ({
+        close: async () => {
+          p.closed = true;
+        },
+      }),
+      on: () => {},
+    };
+    return p;
+  };
+  const fakeBrowser = { isConnected: () => true, version: () => 'tiruan', on: () => {}, close: async () => {} };
+  /** Pool 1 slot; `gate2` menahan openPage DPR 2 sampai dilepas. */
+  const pool = (timeoutMs: number, gate2?: Promise<void>) => {
+    const opened2: FakePage[] = [];
+    const p = new RenderPool({
+      size: 1,
+      timeoutMs,
+      launch: async () => fakeBrowser as never,
+      openPage: async (_b, dpr) => {
+        const page = fakePage(dpr);
+        if (dpr === 2) {
+          opened2.push(page);
+          await (gate2 ?? new Promise((r) => setTimeout(r, 10)));
+        }
+        return page as never;
+      },
+    });
+    return { p, opened2 };
+  };
+
+  it('page2() paralel dalam satu sewa → satu halaman DPR 2 dibuka dan dibagi; sewa berikutnya memakainya ulang', async () => {
+    const { p, opened2 } = pool(5_000);
+    const [a, b] = await p.lease(async (l) => Promise.all([l.page2(), l.page2()]));
+    expect(a).toBe(b);
+    expect(opened2).toHaveLength(1);
+    expect(await p.lease((l) => l.page2())).toBe(a);
+    expect(opened2).toHaveLength(1);
+    await p.close();
+  });
+
+  it('lease basi: slot dibuang (batas waktu) selama page2 dibuka → halaman itu ditutup, tidak disimpan di slot', async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    const { p, opened2 } = pool(50, gate);
+    await expect(p.lease((l) => l.page2())).rejects.toMatchObject({ code: 'RENDER_FAILED', retryable: true });
+    expect(opened2).toHaveLength(1);
+    release();
+    const stale = opened2[0]!;
+    for (let i = 0; i < 50 && !stale.closed; i++) await new Promise((r) => setTimeout(r, 5));
+    expect(stale.closed).toBe(true);
+    // Sewa baru tidak menerima halaman basi: halaman DPR 2 baru dibuka.
+    const fresh = await p.lease((l) => l.page2());
+    expect(fresh).not.toBe(stale);
+    expect(opened2).toHaveLength(2);
+    await p.close();
   });
 });
 

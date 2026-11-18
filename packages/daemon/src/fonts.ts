@@ -19,7 +19,7 @@ export const FONT_PACKAGES = [
   'dm-mono',
 ] as const;
 
-export const FONT_SUBSETS = ['latin', 'latin-ext'] as const;
+const FONT_SUBSETS = ['latin', 'latin-ext'] as const;
 type Subset = (typeof FONT_SUBSETS)[number];
 
 const FILE_PATTERN = /^[a-z0-9-]+-(latin|latin-ext)-\d{3}-(normal|italic)\.woff2$/;

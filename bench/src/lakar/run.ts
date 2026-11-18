@@ -2,16 +2,17 @@
 // lalu di luar waktu: slug dari transkrip, sesi HTTP harness → open → boards → layout-check → export skala 1 per board.
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
-import { LAKAR_VERSION, SCHEMA_VERSION } from '@lakar/schema';
-import { runClaude, shellQuote } from '../claude-runner.js';
-import { log } from '../log.js';
-import { copyExclusive, readPngSizeFile } from '../pendev/artifacts.js';
-import { emptyRecord, RUNS_ROOT } from '../pendev/run.js';
+import { LAKAR_VERSION, SCHEMA_VERSION, errorMessage } from '@lakar/schema';
+import { runClaude } from '../claude-runner.js';
+import { copyExclusive } from '../pendev/artifacts.js';
+import { readPngSizeFile } from '../png/codec.js';
+import { applyMetrics, emptyRecord, RUNS_ROOT } from '../pendev/run.js';
 import { REPO_ROOT, type ProtocolConfig } from '../protocol.js';
 import type { RunRecord } from '../report.js';
 import { pngScaleMismatch } from '../series.js';
 import { computeMetrics, validateInit, type InitRules, type TimedLine } from '../stream-metrics.js';
 import { systemdShow, type SystemdInfo } from '../sys.js';
+import { toolEvents } from '../tool-events.js';
 import { LakardClient, type LakardBoard, type LakardStatus, type LayoutCheck } from './lakard-client.js';
 
 export const LAKAR_SERVER = 'lakar';
@@ -52,7 +53,7 @@ export function snapshotLakarDocs(docsDir: string): DocEntry[] {
 
 export type DaemonState = { pid: number | undefined; startedAt: string | undefined; recreated: number | undefined; systemd: SystemdInfo };
 
-export function daemonState(status: LakardStatus | undefined, systemd: SystemdInfo): DaemonState {
+function daemonState(status: LakardStatus | undefined, systemd: SystemdInfo): DaemonState {
   return { pid: status?.pid, startedAt: status?.startedAt, recreated: status?.pool?.recreated, systemd };
 }
 
@@ -61,30 +62,17 @@ export function daemonState(status: LakardStatus | undefined, systemd: SystemdIn
  * `opened` = semua slug yang pernah dibuka agen (urut).
  */
 export function findCommittedSlug(lines: readonly TimedLine[], server = LAKAR_SERVER): { slug: string | undefined; opened: string[] } {
-  const uses = new Map<string, { name: string; input: any }>();
   const opened: string[] = [];
   let current: string | undefined;
   let committed: string | undefined;
-  for (const { line } of lines) {
-    let ev: any;
-    try {
-      ev = JSON.parse(line);
-    } catch {
-      continue;
-    }
-    const content = ev?.message?.content;
-    if (!Array.isArray(content)) continue;
-    for (const c of content) {
-      if (ev.type === 'assistant' && c?.type === 'tool_use') uses.set(String(c.id), { name: String(c.name), input: c.input });
-      if (ev.type === 'user' && c?.type === 'tool_result') {
-        const u = uses.get(String(c.tool_use_id));
-        if (!u || c.is_error) continue;
-        if (u.name === `mcp__${server}__open_doc` && typeof u.input?.slug === 'string') {
-          current = u.input.slug;
-          opened.push(u.input.slug);
-        } else if (u.name === `mcp__${server}__execute` && current) committed = current;
-      }
-    }
+  for (const ev of toolEvents(lines)) {
+    if (ev.kind !== 'result') continue;
+    const u = ev.use;
+    if (!u || ev.block.is_error) continue;
+    if (u.name === `mcp__${server}__open_doc` && typeof u.input?.slug === 'string') {
+      current = u.input.slug;
+      opened.push(u.input.slug);
+    } else if (u.name === `mcp__${server}__execute` && current) committed = current;
   }
   return { slug: committed, opened };
 }
@@ -146,7 +134,7 @@ export async function runLakar(i: RunLakarInput): Promise<LakarRunRecord> {
   try {
     status = await client.status();
   } catch (e) {
-    rec.reason = `preflight: ${(e as Error).message}`;
+    rec.reason = `preflight: ${errorMessage(e)}`;
     return rec;
   }
   const problems = lakarPreflightProblems(status, mcpServerNames(mcpConfig));
@@ -174,26 +162,7 @@ export async function runLakar(i: RunLakarInput): Promise<LakarRunRecord> {
     ...(i.prefixArgs ? { prefixArgs: i.prefixArgs } : {}),
   });
   const m = computeMetrics(run.lines, LAKAR_INIT_RULES, { exitCode: run.exitCode, timedOut: run.timedOut });
-  Object.assign(rec, {
-    status: m.status,
-    reason: m.reason,
-    wallMs: m.wallMs,
-    durationMs: m.durationMs,
-    durationApiMs: m.durationApiMs,
-    costUsd: m.totalCostUsd,
-    numTurns: m.numTurns,
-    toolCalls: m.toolCalls,
-    firstToolUseMs: m.firstToolUseMs,
-    lastToolResultMs: m.lastToolResultMs,
-    spawnToFirstEventMs: m.spawnToFirstEventMs,
-    transcriptBytes: run.stdoutBytes,
-    model: m.init?.model,
-    modelUsageKeys: m.modelUsageKeys,
-    claudeCodeVersion: m.init?.claudeCodeVersion,
-    startedAt: run.startedAt,
-  } satisfies Partial<RunRecord>);
-  writeFileSync(join(i.outDir, 'metrics.json'), `${JSON.stringify({ ...m, argv: shellQuote(['claude', ...run.argv]), scrubbedEnv: run.scrubbedEnv }, null, 1)}\n`);
-  log(`${i.runId}: ${m.status}${m.reason ? ` (${m.reason})` : ''}, wall ${m.wallMs ?? '–'} ms, $${m.totalCostUsd ?? '–'}, ${m.toolCalls} tool call`);
+  applyMetrics(rec, m, run, i.outDir, i.runId);
 
   // 2'. status reconnect sesudah (sebelum operasi harness agar export harness tidak tercampur)
   let after: LakardStatus | undefined;
@@ -262,7 +231,7 @@ export async function runLakar(i: RunLakarInput): Promise<LakarRunRecord> {
       }
     } else if (rec.status === 'success') fail('no_frames');
   } catch (e) {
-    fail(`post: ${(e as Error).message}`);
+    fail(`post: ${errorMessage(e)}`);
   }
   return rec;
 }

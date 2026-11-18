@@ -4,6 +4,7 @@
 // `round --round <uji-k|n> [--dry-run] [--resume]`: putaran Lakar vs pen.dev + juri buta (lihat round/main.ts).
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
+import { errorMessage } from '@lakar/schema';
 import { buildArgs, buildEnv, shellQuote } from './claude-runner.js';
 import { Abort, log, stamp } from './log.js';
 import { BENCH_ROOT, REPO_ROOT, renderPrompt, type PromptId } from './protocol.js';
@@ -58,7 +59,7 @@ async function series(pre: Preflight): Promise<number> {
         rec = await runOne({ pre, runId, prompt: renderPrompt(p as PromptId, protocol), promptId: p, attempt, outDir: join(dir, runId), prevUris }, serverVersion);
       } catch (e) {
         mkdirSync(join(dir, runId), { recursive: true });
-        rec = { ...emptyRecord({ runId, promptId: p, attempt }), reason: `harness: ${(e as Error).message}` };
+        rec = { ...emptyRecord({ runId, promptId: p, attempt }), reason: `harness: ${errorMessage(e)}` };
       }
       runs.push(rec);
       writeFileSync(join(dir, runId, 'run.json'), `${JSON.stringify(rec, null, 1)}\n`);

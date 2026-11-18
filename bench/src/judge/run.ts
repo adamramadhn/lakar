@@ -4,7 +4,7 @@ import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { runClaude } from '../claude-runner.js';
 import { readChunks } from '../png/codec.js';
-import { readPngSize } from '../pendev/artifacts.js';
+import { readPngSize } from '../png/codec.js';
 import type { ProtocolConfig } from '../protocol.js';
 import { computeMetrics, validateInit, type InitRules } from '../stream-metrics.js';
 import { parseJudgeOutput, type JudgeVerdict } from './parse.js';

@@ -9,3 +9,4 @@ export * from './log.js';
 export * from './pendev/pencil-client.js';
 export * from './pendev/newdoc.js';
 export * from './pendev/artifacts.js';
+export { readPngSize, readPngSizeFile } from './png/codec.js';
