@@ -109,3 +109,31 @@ Perkiraan iterasi 3 dengan `--reuse-pendev 2`: $7,60 → $28,08 ≤ $30 (boleh).
   datar P2).
 
 Skill: `core.md` `c74a5de318365869`, `landing.md` `3daa5de39ffc37ac`, `mobile.md` `d3c210ef78fab03d`.
+
+### Hasil iterasi 3 (`bench/practice-3.md`, HEAD `43f0cc5`, pen.dev dipakai ulang dari iterasi 2)
+
+| Prompt | Waktu Lakar / pen.dev | T L–P | D L–P | Keputusan | Kelemahan Lakar menurut bukti juri |
+|---|---|---|---|---|---|
+| P1 | 286.5 / 219.5 dtk (1,31) | 10–12 | 3–4 | Kalah (T < P − 1) | R1 0/0/0: foto hero dan mentor yang diminta tidak ada; R5/R10 visual lemah; 1 warna tanpa makna (R4) |
+| P2 | 125.6 / 147.7 dtk (0,85) | 12–14 | 3–3 | Kalah (T < P − 1) | sampul/avatar inisial tanpa artwork (R5 1); tanpa langkah khas yang menonjol (R8 1); hijau hanya sekali (R10 1) |
+| P3 | 155.0 / 129.9 dtk (1,19) | 15–15 | 4–4 | Setara | – (alur akhir v3 menurunkan waktu dari 1,84× ke 1,19×) |
+| P4 | 225.8 / 231.5 dtk (0,98) | 14–12 | 4–4 | Setara | – |
+
+- 2 dari 4 Setara/Lebih baik → **belum lulus**. Waktu ≤ 1,5×, emoji 0, gate 0 di keempat prompt.
+- Catatan derau juri: strip pen.dev P2 identik dengan iterasi 2 (dipakai ulang), tetapi T pen.dev naik 12 → 14.
+- Biaya iterasi 3: $7,32; kumulatif **$27,80** dari $30.
+
+## Status: HALT `blocked` (3 iterasi, belum lulus)
+
+Sesuai plan §Iterasi butir 4, tidak ada iterasi ke-4 (juga sisa anggaran $2,20 < perkiraan iterasi). Ringkasan:
+
+- Lulus per iterasi: 1/4 (iter 1, P4 pen.dev gagal), 3/4 tetapi P3 1,84× (iter 2), 2/4 (iter 3).
+- Yang terbukti membaik: R9 Lakar 2 hampir di semua prompt (kaya informasi), R10 naik ke 2 di P3/P4 iterasi 3
+  (permukaan berlapis, warna kedua bermakna, badge bernada), waktu dalam gerbang di iterasi 3, nol emoji/gate.
+- Penghambat utama yang bukan skill: **foto stok tidak tersedia sepanjang latihan.** Openverse (penyedia aktif tanpa
+  key Pexels) menjawab 504 atau > 8 dtk untuk hampir semua kueri (cek terakhir: 200 setelah 21 dtk), sehingga setiap
+  prompt yang meminta foto (P1 hero + mentor, P2 foto profil/sampul, P3 foto hidangan) kehilangan R1/R5/R10 terhadap
+  pen.dev yang punya gambar sendiri. Ini mengenai A dan B putaran resmi dengan cara yang sama.
+- Butuh keputusan Adam: (a) key Pexels (bila tersedia) atau penyedia foto lain/timeout Openverse lebih panjang di
+  luar story ini; (b) apakah iterasi skill dilanjutkan dengan anggaran baru; (c) penilaian PNG
+  `bench/practice/<k>/<P>-lakar.png` vs `bench/runs/practice/<k>/<P>-pendev.png`.
