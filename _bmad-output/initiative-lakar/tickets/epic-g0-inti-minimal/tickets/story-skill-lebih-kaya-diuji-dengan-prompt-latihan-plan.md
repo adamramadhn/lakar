@@ -3,7 +3,7 @@ title: 'Skill lebih kaya diuji dengan prompt latihan'
 type: feature
 ticket: '19'
 created: '2026-11-18'
-status: blocked
+status: in-progress
 baseline_revision: '97ec58176a5e8d7abf19dddc6f7d6ac79266cc85'
 route: full
 route_source: auto
@@ -129,6 +129,12 @@ Catatan orkestrator lanjutan 2026-11-18 (iterasi 4–6; menggantikan butir "Iter
 - Run practice panjang: jalankan foreground dengan timeout maksimal atau background + polling sampai selesai dalam giliran yang sama; jangan pernah mengakhiri giliran untuk menunggu.
 - Iterasi 6 belum lulus → berhenti, tulis status di LOG, laporkan (orkestrator HALT `blocked`).
 
+Catatan orkestrator lanjutan 2026-11-18 (iterasi 7, konfirmasi; menggantikan butir "Iterasi maks 6 … Jangan iterasi ke-7" dan "Iterasi 6 belum lulus → berhenti" di atas, lihat Plan Change Log):
+- Satu iterasi konfirmasi saja: iterasi **7**, `practice --iter 7 --reuse-pendev 2` (pen.dev tidak dijalankan/disentuh). Anggaran iterasi 7 ≤ **$10** → batas kumulatif ≤ **$55,18** ($45,18 iter 1–6 + $10). Sesuaikan `MAX_ITER` 7 / `BUDGET_USD` 55,18 di `bench/src/practice/main.ts` + tes. Tidak ada iterasi ke-8.
+- Skill v6 (prinsip umum, kata sendiri, C7; tanpa rubrik/prompt A/B/teks prompt latihan/nama produk): (a) layar pertama mobile padat dan selesai rapi — header/sapaan hemat ruang, informasi penting termuat sebelum zona bawah, tidak berakhir dengan judul seksi yang isinya tertutup atau kartu terpotong; konten lebih panjang → pola gulir yang benar dengan posisi akhir bersih; (b) warna dalam satu koleksi (tile/kategori/mix) beragam hue yang bermakna dan harmonis, bukan gradasi satu hue; (c) disiplin alur akhir: sedikit execute besar, tanpa putaran screenshot berlebih, temuan LC-20 diperbaiki dalam satu execute. `core.md` ≤ 4000 token; detail mobile di `mobile.md`.
+- LC-20 kini error gerbang untuk konten terpotong/tertutup zona bawah (commit db1df37; plan `plan-1-11-lc20-zona-bawah-struktural.md`).
+- Iterasi 7 belum lulus → HALT `blocked` dengan LOG.
+
 ## Plan Change Log
 
 - 2026-11-18 — Blokir dibuka atas keputusan Adam (setelah HALT `blocked` iterasi 3, $27,80 terpakai):
@@ -149,6 +155,13 @@ Catatan orkestrator lanjutan 2026-11-18 (iterasi 4–6; menggantikan butir "Iter
   (`packages/daemon/src/photos/providers.ts` + tes). Iterasi 4 tercatat `aborted` (tidak dijuri, P3 tidak selesai, P4
   tidak dijalankan; biayanya tetap dihitung kumulatif); iterasi berikutnya = iterasi 5 baru dengan `--reuse-pendev 2`
   (bukan `--resume` iterasi 4, karena P1/P2 iterasi 4 rusak oleh kegagalan infrastruktur foto). Sisa: iterasi 5 dan 6.
+- 2026-11-18 — Blokir dibuka atas keputusan Adam (setelah HALT `blocked` iterasi 6: 3/4, P3 waktu 1,71×; kumulatif
+  $45,18): (1) check LC-20 diperluas (commit db1df37; plan `plan-1-11-lc20-zona-bawah-struktural.md`) sehingga konten
+  terpotong/tertutup zona bawah (tab bar, mini player, bilah aksi) menjadi error gerbang di setiap execute;
+  (2) skill v6 menambah prinsip mobile (layar pertama padat dan selesai rapi, keragaman hue koleksi, disiplin alur akhir);
+  (3) SATU iterasi konfirmasi (iterasi 7) dengan anggaran ≤ $10 (batas kumulatif $55,18; `MAX_ITER` 7) dan
+  `--reuse-pendev 2` (tanpa run pen.dev; RAM terbatas). Intent-contract, prompt latihan (sha 582c5d11…), dan aturan
+  keputusan/juri v2.1 tidak diubah. Bila iterasi 7 belum lulus → HALT `blocked` dengan LOG; tidak ada iterasi ke-8.
 
 ## Review Triage Log
 
