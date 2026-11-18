@@ -97,6 +97,39 @@ describe('update', () => {
     expect(find(tx.commit('abs').doc, judul)).toMatchObject({ position: 'absolute', x: 10, y: 4 });
   });
 
+  it('anak frame layout none: x/y tanpa position diterima, position:absolute ditambahkan (add/update/replace/duplicate)', () => {
+    const { doc, home, isi, judul } = fixture();
+    const tx = beginTransaction(doc, { sessionId: 's' });
+    const none = tx.add(home, { type: 'frame', name: 'Bebas', layout: 'none', width: 100, height: 100 });
+    const dflt = tx.add(home, { type: 'frame', name: 'Default', width: 100, height: 100 });
+    // X1 + X4: add dengan x/y ke frame none (eksplisit maupun default).
+    const a = tx.add(none, { type: 'rect', name: 'Titik', x: 10, y: 20, width: 4, height: 4 });
+    const b = tx.add(dflt, { type: 'rect', name: 'Titik', y: 3, width: 4, height: 4 });
+    // X2: update x tanpa position pada anak frame none.
+    const c = tx.add(none, { type: 'text', name: 'Label', content: 'A', size: 12 });
+    tx.update(c, { x: 5 });
+    tx.replace(a, { type: 'ellipse', name: 'Bulat', x: 1, y: 2, width: 4, height: 4 });
+    const d = tx.duplicate(c, { y: 9 });
+    // Tanpa x/y atau dengan x null: tidak ditambahkan position.
+    const e = tx.add(none, { type: 'rect', name: 'Polos', width: 4, height: 4 });
+    const out = tx.commit('none').doc;
+    expect(find(out, a)).toMatchObject({ type: 'ellipse', position: 'absolute', x: 1, y: 2 });
+    expect(find(out, b)).toMatchObject({ position: 'absolute', y: 3 });
+    expect(find(out, c)).toMatchObject({ position: 'absolute', x: 5 });
+    expect(find(out, d)).toMatchObject({ position: 'absolute', x: 5, y: 9 });
+    expect('position' in find(out, e)!).toBe(false);
+    expect(parseDocument(out)).toEqual(out);
+    // X3: parent flow (frame column, board) tetap SCHEMA_INVALID + XY_HINT.
+    const t2 = beginTransaction(doc, { sessionId: 's' });
+    expect(caught(() => t2.add(isi, { type: 'rect', name: 'R', x: 1, width: 4, height: 4 })).hint).toBe(XY_HINT);
+    expect(caught(() => t2.add(home, { type: 'rect', name: 'R', x: 1, width: 4, height: 4 })).hint).toBe(XY_HINT);
+    expect(caught(() => t2.update(judul, { x: 1 })).hint).toBe(XY_HINT);
+    expect(caught(() => t2.replace(judul, { type: 'rect', name: 'R', y: 1, width: 4, height: 4 })).hint).toBe(XY_HINT);
+    // Urutan error add lama: skema salah ke parent tak ada → SCHEMA_INVALID; parent tak ada → NOT_FOUND.
+    expect(code(() => t2.add('ZZZZZZZZ', { type: 'rect', name: 'R', x: 1, width: -1, height: 4 }))).toBe('SCHEMA_INVALID');
+    expect(code(() => t2.add('ZZZZZZZZ', { type: 'rect', name: 'R', width: 4, height: 4 }))).toBe('NOT_FOUND');
+  });
+
   it('hapus field wajib / nilai salah / patch bukan objek → SCHEMA_INVALID, tidak berubah', () => {
     const { doc, judul } = fixture();
     expectAtomic(doc, () => {}, (tx) => tx.update(judul, { content: null }), 'SCHEMA_INVALID');

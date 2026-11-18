@@ -50,6 +50,30 @@ export function formatExecute(data: ExecuteData): string {
   return [JSON.stringify(rest), head, ...findingLines(check.findings, EXECUTE_FINDING_LINES)].join('\n');
 }
 
+/** Mulai ke-N ini, baris jumlah execute membawa pengingat batas skill. */
+export const EXECUTE_REMINDER_FROM = 3;
+
+/** Baris jumlah execute sesi MCP ini (pengingat saja; pemanggilan tidak pernah diblokir). */
+export function executeCountLine(n: number): string {
+  const head = `execute ke-${n} di sesi ini`;
+  if (n < EXECUTE_REMINDER_FROM) return head;
+  if (n === EXECUTE_REMINDER_FROM) return `${head} · batas skill tercapai untuk mobile/app (3, termasuk perbaikan); landing maks 4 — lanjut screenshot/export`;
+  return `${head} · melewati batas skill (mobile/app 3, landing 4, termasuk perbaikan) — hentikan perbaikan kecil, lanjut screenshot/export`;
+}
+
+/** Tambahkan baris jumlah execute ke hasil tool: selalu pada sukses, pada error hanya bila N ≥ 3. */
+export function withExecuteCount(result: CallToolResult, n: number): CallToolResult {
+  if (result.isError && n < EXECUTE_REMINDER_FROM) return result;
+  const content = [...(result.content ?? [])];
+  const i = content.findLastIndex((c) => c.type === 'text');
+  const line = executeCountLine(n);
+  if (i >= 0) {
+    const last = content[i] as { type: 'text'; text: string };
+    content[i] = { ...last, text: `${last.text}\n${line}` };
+  } else content.push({ type: 'text', text: line });
+  return { ...result, content };
+}
+
 type LayoutCheckData = { docId: string; rev: number; boards: { id: string; name: string; summary: FindingSummary }[]; summary: FindingSummary; findings: Finding[] };
 
 /** Output layout_check: satu baris ringkasan lalu baris temuan (maks 60). */
@@ -140,7 +164,7 @@ export const LAYOUT_CHECK_DESCRIPTION =
   'LC-05 teks lebih kecil dari 12px; ' +
   "LC-20 konten tertutup zona bawah (bar 'Overlay / …' atau frame/rect absolut ber-fill yang menempel bawah atau mengambang, termasuk kapsul ber-fill di dalam pembungkus absolut transparan, ditumpuk): " +
   'konten terakhir posisi akhir scroll berakhir ≤ y zona − 8, tidak ada kartu/teks/gambar terpotong di tepi atas zona, ' +
-  'tidak ada judul seksi yang isinya tertutup zona, dan tidak ada konten terlihat terpotong di celah di bawah bar mengambang; ' +
+  'tidak ada judul seksi yang isinya tertutup zona, dan tidak ada konten terlihat terpotong di celah di bawah bar mengambang atau mengintip di celah antar-bar bertumpuk; ' +
   'LC-12 (warning) ukuran board (mobile 390×844, app 1440×900 atau 1440×1024, landing lebar 1440, atau expectedSize) dan tabrakan antarboard (pakai place). ' +
   'Selesai bila 0 error gerbang. Output: satu baris ringkasan lalu satu baris per temuan ' +
   "'<level>[·gerbang] · <aturan> · <nama node> (<id>) · <terukur> · <seharusnya>' (maks 60 baris). " +
@@ -216,6 +240,7 @@ export const PHOTO_SEARCH_DESCRIPTION =
 export function createLakarMcpServer(daemonUrl: string): McpServer {
   const client = new DaemonClient(daemonUrl);
   const server = new McpServer({ name: SERVER_NAME, version: SERVER_VERSION }, { instructions: SERVER_INSTRUCTIONS });
+  let executes = 0;
 
   server.registerTool(
     'status',
@@ -297,15 +322,21 @@ export function createLakarMcpServer(daemonUrl: string): McpServer {
           .describe('edit find/replace berurutan terhadap snippet editId; kosong = jalankan ulang'),
       }),
     },
-    ({ code, description, editId, edits }) =>
-      guarded(async () => {
-        const body: Record<string, unknown> = {};
-        if (code !== undefined) body.code = code;
-        if (description !== undefined) body.description = description;
-        if (editId !== undefined) body.editId = editId;
-        if (edits !== undefined) body.edits = edits;
-        return asText(await client.call<ExecuteData>('/execute', body), formatExecute);
-      }),
+    async ({ code, description, editId, edits }) => {
+      // Dihitung per instance server (= satu sesi agen), sukses maupun error.
+      const n = ++executes;
+      return withExecuteCount(
+        await guarded(async () => {
+          const body: Record<string, unknown> = {};
+          if (code !== undefined) body.code = code;
+          if (description !== undefined) body.description = description;
+          if (editId !== undefined) body.editId = editId;
+          if (edits !== undefined) body.edits = edits;
+          return asText(await client.call<ExecuteData>('/execute', body), formatExecute);
+        }),
+        n,
+      );
+    },
   );
 
   server.registerTool(

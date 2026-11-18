@@ -50,8 +50,9 @@ T(hi,'Judul','Halo, Sinta','title');
 const ib=Row(hd,'IconButton / Notifikasi',{width:44,height:44,radius:9999,justify:'center',stroke:line()});
 I(ib,'bell',20,C.t1);
 // Kartu sorotan di bidang merek: ring bersegmen (satu nada per keterampilan) + pembanding minggu lalu
-// Kartu sorotan = satu-satunya bidang efek: tint merek + mesh lembut + kontur gema dari ring + grain tipis. Onboarding/sampul
-// gelap: latar board netral gelap → mesh (aksen, pendamping; terang di atas) → gelombang/cincin → noise 0.06 → satu cahaya merek.
+// Peragaan bidang efek (maks satu per layar): pakai hanya bila permintaan/merek minta suasana ekspresif (atau onboarding/
+// sampul); tanpa itu kartu ini cukup fill(C.field) polos, tanpa mesh/noise/Kontur. Onboarding/sampul gelap: latar netral gelap →
+// mesh (aksen, pendamping; terang di atas) → gelombang/cincin → noise 0.06 → satu cahaya merek.
 const card=F(w,'Kartu / Target mingguan',{width:'fill',padding:20,gap:16,radius:16,clip:true,shadows:[{x:0,y:4,blur:16,color:'#10182814'}],
  fills:[...fill(C.field),{type:'mesh',columns:2,rows:2,colors:['#DDE1FD',C.field,C.field,'#F5ECD7']},{type:'noise',opacity:0.05,seed:3}]});
 const fx=F(card,'Crop / Kontur',{position:'absolute',x:0,y:0,width:350,height:232,layout:'none',clip:true});

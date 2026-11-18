@@ -645,7 +645,7 @@ export const API_REFERENCE: readonly ApiReferenceSection[] = [
     title: 'Padding dan posisi',
     items: [
       '`padding`: angka | `[vertikal, horizontal]` | `[atas, kanan, bawah, kiri]` (urutan CSS).',
-      "`position:'absolute'` + `x`/`y`: relatif kotak parent, keluar dari flow (x/y tanpa position → SCHEMA_INVALID). Anak frame `layout:'none'` selalu absolut. Pakai untuk node `Overlay /`; selebihnya flex.",
+      "`position:'absolute'` + `x`/`y`: relatif kotak parent, keluar dari flow (x/y tanpa position di parent flow → SCHEMA_INVALID). Anak frame `layout:'none'` selalu absolut: x/y diterima, `position:'absolute'` ditambahkan otomatis (tetap absolut bila layout frame diubah). Pakai untuk node `Overlay /`; selebihnya flex.",
     ],
     example:
       `${BOARD}\nconst bar = add(b, {type:'frame', name:'Overlay / Tab bar', position:'absolute', x:20, y:746, width:350, height:64, layout:'row', padding:[0,8], align:'center', radius:24, fills:[{type:'solid', color:'#FFFFFF'}], stroke:{color:'#E4E7EC', width:1, align:'inside'}});\n` +

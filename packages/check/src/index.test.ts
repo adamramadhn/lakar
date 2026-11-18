@@ -458,6 +458,43 @@ describe('LC-20 zona bawah struktural', () => {
     // Pembungkus ber-fill sendiri adalah kandidat biasa; pembungkus flow (bukan absolut) bukan pembungkus.
     expect(lc20(run(clean([scroll([rect('Atas', [0, 0, 390, 700]), kartu, frame('Lanjut', [0, 780, 390, 400], [])]), frame('Bawah', [0, 740, 390, 104], [frame('Kapsul', [16, 756, 358, 64], [], solid)])])))).toEqual([]);
   });
+
+  // Dua bar bertumpuk dengan celah 8 di antaranya (mini player y674–738, tab bar y746–810); Home indicator ber-fill menutup sisanya.
+  const mini = (h = 64) => abs('Mini player', [8, 674, 374, h]);
+  const tabs = () => abs('Tab bar', [0, 746, 390, 64]);
+  const home = () => rect('Home indicator', [0, 810, 390, 34], solid);
+
+  it('(L1) celah antar-bar: kartu di bawah kedua bar mengintip di celah → satu temuan pada kartu', () => {
+    const kartu = rect('Kartu', [16, 700, 358, 80], solid);
+    const f = lc20(run(clean([scroll([rect('Atas', [0, 0, 390, 666]), frame('Jeda', [0, 666, 390, 34], []), kartu, frame('Lanjut', [0, 780, 390, 400], [])]), mini(), tabs(), home()])));
+    expect(f.map((x) => x.nodeId)).toEqual([kartu.id]);
+    expect(f[0]!.detail).toBe('kartu terlihat di celah di antara bar zona bawah "Mini player" dan "Tab bar" (y 738–746), sebagian tertutup bar');
+    expect(f[0]!.expected).toBe('jangan biarkan konten mengintip di celah antar-bar: rapatkan bar (celah 0), beri latar penutup di belakang keduanya, atau akhiri daftar sebelum zona');
+    expect(`${f[0]!.detail} ${f[0]!.expected}`).not.toMatch(C7);
+  });
+
+  it('(L1′) kedua bar di dalam pembungkus `Overlay /` transparan → tetap satu temuan pada kartu', () => {
+    const kartu = rect('Kartu', [16, 700, 358, 80], solid);
+    const wrap = frame('Overlay / Bawah', [0, 674, 390, 136], [mini(), tabs()], { position: 'absolute', layout: 'none' });
+    const f = lc20(run(clean([scroll([rect('Atas', [0, 0, 390, 666]), frame('Jeda', [0, 666, 390, 34], []), kartu, frame('Lanjut', [0, 780, 390, 400], [])]), wrap, home()])));
+    expect(f.map((x) => x.nodeId)).toEqual([kartu.id]);
+    expect(f[0]!.detail).toBe('kartu terlihat di celah di antara bar zona bawah "Mini player" dan "Tab bar" (y 738–746), sebagian tertutup bar');
+  });
+
+  it('(L2) celah antar-bar bersih: konten berakhir ≤ zona − 8, atau celah ditutup panel latar / anggota zona → tanpa temuan', () => {
+    expect(lc20(run(clean([scroll([rect('Atas', [0, 0, 390, 594]), rect('Kartu', [16, 594, 358, 64], solid)]), mini(), tabs(), home()])))).toEqual([]);
+    const body = () => scroll([rect('Atas', [0, 0, 390, 666]), frame('Jeda', [0, 666, 390, 34], []), rect('Kartu', [16, 700, 358, 80], solid), frame('Lanjut', [0, 780, 390, 400], [])]);
+    expect(lc20(run(clean([body(), rect('Latar', [0, 674, 390, 170], { position: 'absolute', ...solid }), mini(), tabs(), home()])))).toEqual([]);
+    expect(lc20(run(clean([body(), mini(), abs('Pemisah', [0, 736, 390, 12]), tabs(), home()])))).toEqual([]);
+  });
+
+  it('(L3) bar menempel (celah 0) → sub-cek celah antar-bar tidak memicu', () => {
+    expect(lc20(run(clean([scroll([rect('Atas', [0, 0, 390, 666]), frame('Jeda', [0, 666, 390, 34], []), rect('Kartu', [16, 700, 358, 80], solid), frame('Lanjut', [0, 780, 390, 400], [])]), mini(72), tabs(), home()])))).toEqual([]);
+  });
+
+  it('(L4) unit utuh di dalam celah antar-bar → tidak dilaporkan', () => {
+    expect(lc20(run(clean([scroll([rect('Atas', [0, 0, 390, 666]), frame('Jeda', [0, 666, 390, 73], []), rect('Garis', [16, 739, 358, 6], solid), frame('Lanjut', [0, 745, 390, 400], [])]), mini(), tabs(), home()])))).toEqual([]);
+  });
 });
 
 describe('fixture enam aturan', () => {

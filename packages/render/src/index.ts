@@ -5,7 +5,7 @@
 // Dokumen yang diterima sudah di-resolve token-nya oleh daemon (`resolveTokens`), jadi tipe `Resolved*`.
 import type { IconGlyph, ResolvedBoardNode as BoardNode, ResolvedDocument as LakarDocument } from '@lakar/schema';
 import { codePointLabel, fontKey, fontRequests, loadFaces, missingFaces, uncoveredGlyphs, type FontFaceSource, type FontRequest } from './fonts.js';
-import { assetIds, decodeAssets } from './assets.js';
+import { assetIds, decodeAssets, decodeDataUrls, inlineDataUrls } from './assets.js';
 import { mountBoardNode } from './layout.js';
 import { glyphMap, iconKey, iconRefs } from './icon.js';
 import { DEFAULT_ASSET_BASE } from './paint.js';
@@ -72,7 +72,7 @@ const nextFrame = (w: Window) => new Promise<void>((r) => w.requestAnimationFram
 /**
  * Render + ukur board. Alur: cek glyph setiap node icon (`opts.icons`, tidak lengkap → ICON_UNKNOWN)
  * → cek face untuk setiap varian teks → cek cakupan glyph (`unicode-range`, kecuali `allowGlyphs`)
- * → muat face → muat + decode aset gambar (gagal → NOT_FOUND) → mount →
+ * → muat face → muat + decode aset gambar (gagal → NOT_FOUND) → mount → decode bitmap efek (data URL; gagal diabaikan) →
  * `fonts.ready` + 2 rAF → verifikasi ulang status `loaded` → ukur.
  * Board tidak ada → exception (bukan FONT_MISSING).
  */
@@ -117,6 +117,8 @@ export async function renderBoard(
     return { ok: false, code: 'NOT_FOUND', assets: absentAssets, message: `aset gambar tidak bisa dimuat: ${absentAssets.join(', ')}` };
   }
   const el = mountBoardNode(board, root, { assetBase, icons });
+  // Bitmap efek (mesh PNG, ubin noise SVG) di-decode sebelum 2 rAF dan ukur; dipegang sampai ukur selesai.
+  const effectImages = await decodeDataUrls(d, inlineDataUrls(el));
   await d.fonts.ready;
   const w = d.defaultView!;
   await nextFrame(w);
@@ -125,5 +127,6 @@ export async function renderBoard(
   if (notLoaded.length) return fontMissing(notLoaded, 'font tidak berstatus loaded');
   const measure = measureBoard(el);
   images.length = 0;
+  effectImages.length = 0;
   return { ok: true, measure };
 }

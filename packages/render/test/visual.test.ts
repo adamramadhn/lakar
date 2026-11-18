@@ -623,6 +623,25 @@ describe.skipIf(!browserInstalled)('render properti visual (Chromium, tanpa daem
     }
   });
 
+  it('bitmap efek (mesh PNG + ubin noise SVG) dikumpulkan dari background inline dan ter-decode sebelum ukur', async () => {
+    const { doc, boardId } = boardDoc([rect(abs(0, 0, { width: 200, height: 100, fills: [{ type: 'solid', color: '#334155' }, grain(11, 0.1)] }))], { width: 640, height: 400 }, [
+      { type: 'solid', color: NIGHT },
+      meshHero(4, 3),
+      grain(12, 0.06),
+    ]);
+    const r = (await currentPage().evaluate(
+      `(async ([doc, boardId, fonts]) => { const m = await import('/render/index.js'); const a = await import('/render/assets.js');
+        const r = await m.renderBoard(doc, boardId, document.getElementById('root'), { fonts, icons: [] });
+        const urls = a.inlineDataUrls(document.querySelector('[data-lakar-id="' + boardId + '"]'));
+        const imgs = await a.decodeDataUrls(document, [...urls, 'data:image/png;base64,AAAA']);
+        return { ok: r.ok, kinds: urls.map((u) => u.slice(0, u.indexOf(',')).replace(/;base64$/, '')).sort(), decoded: imgs.length }; })(${JSON.stringify([doc, boardId, faces])})`,
+    )) as { ok: boolean; kinds: string[]; decoded: number };
+    expect(r.ok).toBe(true);
+    // Satu mesh PNG + dua ubin noise (seed berbeda); data URL rusak diabaikan (bukan NOT_FOUND).
+    expect(r.kinds).toEqual(['data:image/png', 'data:image/svg+xml', 'data:image/svg+xml']);
+    expect(r.decoded).toBe(3);
+  });
+
   it('latensi: board 1440×900 mesh 5×4 + noise vs board polos (median 5 render, selisih ≤ 150 ms)', async () => {
     const size = { width: 1440, height: 900 };
     const p = currentPage();

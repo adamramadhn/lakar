@@ -1,10 +1,10 @@
 // Bacaan sistem untuk putaran: systemd show, hash file/direktori, md5 .pen lama, git HEAD/status (hanya baca),
 // ditambah restart lakard (user service) sebelum putaran, mtime terbaru dist (bukti lakard memuat build saat ini), dan
-// satu-satunya restart pen-desktop (`restartPenDesktopAfterSeries`, seri efek story 22, izin Adam: sekali per iterasi
-// yang menjalankan pen.dev, setelah run pen.dev terakhir).
+// satu-satunya restart pen-desktop (`restartPenDesktopAfterSeries`, izin Adam: sekali per iterasi/putaran yang
+// menjalankan pen.dev, setelah run pen.dev terakhir; dipakai seri practice, seri efek, dan round).
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { errorMessage } from '@lakar/schema';
 import { REPO_ROOT } from './protocol.js';
@@ -43,7 +43,7 @@ export type PenDesktopRestartDeps = {
   restart: () => void;
   /** `systemctl is-active pen-desktop`. */
   isActive: () => string;
-  /** Satu panggilan baca MCP pencil (mis. `get_app_state`); throw bila gagal. */
+  /** Satu panggilan baca MCP pencil (mis. `get_app_state`); throw bila gagal. Dibatasi sisa batas waktu (boleh menggantung). */
   probe: () => Promise<void>;
   sleep: (ms: number) => Promise<void>;
   now: () => number;
@@ -51,9 +51,10 @@ export type PenDesktopRestartDeps = {
 };
 
 /**
- * Restart pen-desktop **sesudah** seri pen.dev satu iterasi selesai (seri efek, izin Adam), lalu tunggu `is-active` dan
- * satu panggilan baca MCP pencil berhasil, maks 120 dtk. Tidak pernah throw: hasil (berhasil/gagal, durasi) dicatat di
- * laporan dan juri tetap jalan. Tidak dipanggil saat `--reuse-pendev` atau `--dry-run`.
+ * Restart pen-desktop **sesudah** seri pen.dev satu iterasi/putaran selesai (practice, efek, round; izin Adam), lalu tunggu
+ * `is-active` dan satu panggilan baca MCP pencil berhasil, maks 120 dtk (+ satu interval tunggu). Probe yang menggantung
+ * dipotong sisa batas waktu. Tidak pernah throw: hasil (berhasil/gagal, durasi) dicatat di laporan dan juri tetap jalan.
+ * Tidak dipanggil saat `--reuse-pendev`, `--dry-run`, atau tanpa run pen.dev di pemanggilan itu.
  */
 export async function restartPenDesktopAfterSeries(deps: PenDesktopRestartDeps): Promise<PenDesktopRestart> {
   const t0 = deps.now();
@@ -70,7 +71,7 @@ export async function restartPenDesktopAfterSeries(deps: PenDesktopRestartDeps):
     state = deps.isActive();
     if (state === 'active') {
       try {
-        await deps.probe();
+        await withTimeout(deps.probe(), limit - elapsed());
         return { ok: true, ms: elapsed(), detail: `${PEN_DESKTOP_UNIT} active; MCP pencil menjawab panggilan baca` };
       } catch (e) {
         lastErr = errorMessage(e);
@@ -79,6 +80,47 @@ export async function restartPenDesktopAfterSeries(deps: PenDesktopRestartDeps):
     await deps.sleep(2_000);
   }
   return { ok: false, ms: elapsed(), detail: `batas ${Math.round(limit / 1000)} dtk terlewati: is-active ${state || '?'}${lastErr ? `; MCP pencil: ${lastErr}` : ''}` };
+}
+
+/**
+ * Langkah restart pen-desktop sesudah seri (practice, efek, round): pen.dev dipakai ulang → alasan, tanpa restart;
+ * ada run pen.dev di pemanggilan ini → `restart()` sekali, hasil ditulis ke `file`; selain itu hasil tersimpan di
+ * `file` dari pemanggilan sebelumnya (`--resume`) atau alasan "tidak ada run pen.dev".
+ */
+export async function penDesktopRestartStep(o: {
+  pendevRan: number;
+  reusedFrom?: string | undefined;
+  file: string;
+  restart: () => Promise<PenDesktopRestart>;
+}): Promise<{ result: PenDesktopRestart | string; ran: boolean }> {
+  if (o.reusedFrom !== undefined) return { result: `pen.dev dipakai ulang dari ${o.reusedFrom}`, ran: false };
+  if (o.pendevRan > 0) {
+    const result = await o.restart();
+    writeFileSync(o.file, `${JSON.stringify(result, null, 1)}\n`);
+    return { result, ran: true };
+  }
+  let stored: PenDesktopRestart | undefined;
+  try {
+    stored = existsSync(o.file) ? (JSON.parse(readFileSync(o.file, 'utf8')) as PenDesktopRestart) : undefined;
+  } catch {
+    stored = undefined;
+  }
+  return { result: stored ?? 'tidak ada run pen.dev di pemanggilan ini', ran: false };
+}
+
+/** `p` atau reject sesudah `ms` (timer dibersihkan; tidak menahan proses). */
+async function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const limit = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`probe tidak menjawab dalam ${Math.max(0, Math.round(ms / 1000))} dtk`)), Math.max(0, ms));
+    timer.unref?.();
+  });
+  p.catch(() => undefined);
+  try {
+    return await Promise.race([p, limit]);
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 /** Dependensi nyata `restartPenDesktopAfterSeries` (probe disuntikkan pemanggil: klien MCP pencil). */

@@ -42,3 +42,37 @@ export async function decodeAssets(d: Document, ids: readonly string[], assetBas
   );
   return { failed: results.filter((x): x is string => x !== undefined), images };
 }
+
+const DATA_URL_RE = /url\("(data:[^"]*)"\)/g;
+
+/** URL `data:` unik di `background-image` inline `el` dan turunannya (bitmap mesh PNG, ubin SVG noise). */
+export function inlineDataUrls(el: HTMLElement): string[] {
+  const out = new Set<string>();
+  for (const e of [el, ...el.querySelectorAll<HTMLElement | SVGElement>('*')]) {
+    const bg = e.style?.backgroundImage;
+    if (!bg || !bg.includes('data:')) continue;
+    for (const m of bg.matchAll(DATA_URL_RE)) out.add(m[1]!);
+  }
+  return [...out];
+}
+
+/**
+ * `decode()` bitmap efek (data URL) sesudah mount, sebelum ukur/screenshot, supaya lukisan pertama tidak menunggu
+ * decode. Gagal decode diabaikan (bukan NOT_FOUND: datanya buatan render sendiri). `images` dipegang pemanggil.
+ */
+export async function decodeDataUrls(d: Document, urls: readonly string[]): Promise<HTMLImageElement[]> {
+  const images: HTMLImageElement[] = [];
+  await Promise.all(
+    urls.map(async (url) => {
+      const img = new (d.defaultView!.Image)();
+      img.src = url;
+      try {
+        await img.decode();
+        images.push(img);
+      } catch {
+        // abaikan
+      }
+    }),
+  );
+  return images;
+}

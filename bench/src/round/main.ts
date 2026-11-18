@@ -16,7 +16,25 @@ import { buildStrip, judgeImages } from '../png/strip.js';
 import { BENCH_ROOT, GOLDEN_SET_PATH, PROTOCOL_DIR, PROTOCOL_FILES, REPO_ROOT, renderPrompt, type PromptId, type Protocol, type ProtocolConfig } from '../protocol.js';
 import type { RunRecord } from '../report.js';
 import type { TimedLine } from '../stream-metrics.js';
-import { comparePenHashes, git, gitPorcelain, isActive, md5PenFiles, newestMtimeMs, restartUserUnit, sha256, sha256Dir, systemdShow, type SystemdInfo } from '../sys.js';
+import {
+  comparePenHashes,
+  git,
+  gitPorcelain,
+  isActive,
+  md5PenFiles,
+  newestMtimeMs,
+  PEN_DESKTOP_RESTART_TIMEOUT_MS,
+  penDesktopRestartDeps,
+  penDesktopRestartStep,
+  restartPenDesktopAfterSeries,
+  restartUserUnit,
+  sha256,
+  sha256Dir,
+  systemdShow,
+  type PenDesktopRestart,
+  type SystemdInfo,
+} from '../sys.js';
+import { PencilClient } from '../pendev/pencil-client.js';
 import { applyLakarArchive, benchLakarSources, describeLakarArchive, planLakarArchive } from '../lakar/archive.js';
 import { countAgentEmoji, countLintEmoji } from './emoji.js';
 import { lakarReconnect, pendevReconnect } from './reconnect.js';
@@ -362,6 +380,20 @@ export function writeStrip(roundDir: string, run: RoundRun): DesignImages | unde
   return judgeImages(strip);
 }
 
+/** Predikat pakai-ulang ulangan juri tersimpan di `round` (`--resume`): semua kecuali `invalid`. */
+export const ROUND_JUDGE_REUSE = (old: JudgeRepRecord): boolean => old.status !== 'invalid';
+
+/**
+ * `judge/<P>/judge-text.md` tersimpan di dir putaran yang isinya berbeda dari teks juri saat ini (mis. rubrik naik
+ * versi sejak putaran dimulai). Murni (hanya baca); path relatif terhadap `roundDir`.
+ */
+export function staleJudgeTexts(roundDir: string, judgeTexts: Readonly<Record<string, { text: string }>>): string[] {
+  return Object.entries(judgeTexts)
+    .map(([p, t]) => ({ rel: join('judge', p, 'judge-text.md'), text: t.text }))
+    .filter(({ rel, text }) => existsSync(join(roundDir, rel)) && readFileSync(join(roundDir, rel), 'utf8') !== text)
+    .map(({ rel }) => rel);
+}
+
 /**
  * Tulis teks juri ke `<jdir>/judge-text.md` (eksklusif): belum ada → ditulis; identik → dilewati (resume);
  * berbeda → error (teks juri berubah di tengah putaran).
@@ -476,6 +508,11 @@ export async function roundMain(argv: string[]): Promise<number> {
   const judgeTexts = prepareJudgeTexts(protocol);
   const judgeInfo = judgeTextInfo(judgeTexts);
   const rubric = readRubricJson();
+  const roundDir = join(RUNS_ROOT, 'rounds', round);
+  const stale = staleJudgeTexts(roundDir, judgeTexts);
+  const staleMessage = stale.length
+    ? `teks juri berbeda dari yang tersimpan di putaran ${round} (${stale.map((f) => relative(REPO_ROOT, join(roundDir, f))).join(', ')}): ulangan juri lama tidak bisa dilanjutkan dengan teks ini; mulai putaran baru, atau nilai ulang strip putaran ini dengan \`rejudge --from ${round} --label <label>\``
+    : undefined;
   log('teks juri: tanpa nama alat/path; C7 juri lulus (protokol, skill, server MCP, prompt agen)');
   log(`rubrik juri: versi ${judgeInfo.rubricVersion ?? '1 (tanpa baris versi)'}; ${Object.entries(judgeInfo.textSha256).map(([id, x]) => `sha256 ${id} ${x.slice(0, 12)}…`).join(', ')}`);
   const head = git(REPO_ROOT, ['rev-parse', 'HEAD']);
@@ -532,7 +569,11 @@ export async function roundMain(argv: string[]): Promise<number> {
         `- masalah: ${preFreeze.length ? `\n  ${preFreeze.join('\n  ')}` : 'tidak ada'}`,
     );
   }
+  // Restart pen-desktop: sekali sesudah run pen.dev terakhir pemanggilan ini, sebelum strip/juri.
+  console.log(`\nrestart pen-desktop: sekali sesudah run pen.dev terakhir pemanggilan ini (bila ada run pen.dev yang dijalankan), sebelum strip/juri; tunggu active + MCP pencil menjawab (maks ${PEN_DESKTOP_RESTART_TIMEOUT_MS / 1000} dtk); hasil dicatat di laporan${dryRun ? ' (dry-run: tidak dijalankan)' : ''}`);
+  if (staleMessage) console.log(`\nMASALAH: ${staleMessage}`);
   if (dryRun) return 0;
+  if (staleMessage) throw new Abort(staleMessage);
   if (preFreeze.length) throw new Abort(`putaran resmi tidak beku:\n  ${preFreeze.join('\n  ')}`);
   if (porcelain) throw new Abort(`produk tidak beku: git status --porcelain -- packages tools .mcp.json tidak kosong:\n${porcelain}`);
   const archiveNotes: string[] = [];
@@ -561,7 +602,6 @@ export async function roundMain(argv: string[]): Promise<number> {
   }
 
   // ---------- putaran ----------
-  const roundDir = join(RUNS_ROOT, 'rounds', round);
   mkdirSync(join(roundDir, 'judge'), { recursive: true });
   if (!existsSync(emptyMcpPath)) writeFileSync(emptyMcpPath, EMPTY_MCP);
   // Resume: baseline .pen = snapshot paling awal putaran ini, agar perubahan di pemanggilan sebelumnya tetap terdeteksi.
@@ -613,6 +653,7 @@ export async function roundMain(argv: string[]): Promise<number> {
   const prevUris: string[] = [];
   const runs = new Map<string, RoundRun>();
   let fatal: string | undefined;
+  let pendevRan = 0;
 
   for (const [p, tool] of ROUND_ORDER) {
     const key = `${p}-${tool}`;
@@ -647,6 +688,7 @@ export async function roundMain(argv: string[]): Promise<number> {
     log(`${key}: mulai`);
     if (tool === 'pendev') {
       const before = systemdShow('pen-desktop', false);
+      pendevRan++;
       try {
         rec = await runOne({ pre, runId, prompt, promptId: p, attempt: 1, outDir: dir, prevUris }, serverVersion);
       } catch (e) {
@@ -670,6 +712,30 @@ export async function roundMain(argv: string[]): Promise<number> {
       log(`putaran berhenti: ${fatal}`);
       break;
     }
+  }
+
+  // ---------- restart pen-desktop: sesudah run pen.dev terakhir, sebelum strip/juri ----------
+  const step = await penDesktopRestartStep({
+    pendevRan,
+    file: join(roundDir, 'pen-desktop-restart.json'),
+    restart: () => {
+      log('restart pen-desktop (sesudah run pen.dev terakhir)');
+      return restartPenDesktopAfterSeries(
+        penDesktopRestartDeps(async () => {
+          const c = await PencilClient.connect(pre.server);
+          try {
+            await c.appState();
+          } finally {
+            await c.close().catch(() => undefined);
+          }
+        }),
+      );
+    },
+  });
+  const penDesktopRestart: PenDesktopRestart | string = step.result;
+  if (step.ran && typeof penDesktopRestart !== 'string') {
+    log(`restart pen-desktop: ${penDesktopRestart.ok ? 'berhasil' : 'GAGAL'} (${(penDesktopRestart.ms / 1000).toFixed(1)} dtk; ${penDesktopRestart.detail})`);
+    if (!penDesktopRestart.ok) notes.push(`Restart pen-desktop GAGAL: ${penDesktopRestart.detail}. Juri tetap dijalankan.`);
   }
 
   // ---------- strip + juri ----------
@@ -724,7 +790,7 @@ export async function roundMain(argv: string[]): Promise<number> {
         emptyMcpConfig: emptyMcpPath,
         config: cfg,
         forbiddenCwdRoot: REPO_ROOT,
-        reuse: (old) => old.status !== 'invalid',
+        reuse: ROUND_JUDGE_REUSE,
       });
       reps = j.reps;
       fatal ??= j.fatal;
@@ -781,6 +847,7 @@ export async function roundMain(argv: string[]): Promise<number> {
     definitions: DEFINITIONS,
     penGuard: { files: Object.keys(penBefore).length, changed: cmp.changed, removed: cmp.removed, added: cmp.added },
     lakardActiveAfter: isActive(LAKARD_UNIT, true),
+    penDesktopRestart,
     results,
     g0: decideG0(results, roundStatus),
     pngs: results.flatMap((x) =>

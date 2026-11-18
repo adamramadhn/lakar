@@ -2,7 +2,8 @@
 // (story 19): Lakar vs pen.dev pada prompt latihan beku (bukan A–E), runner + pembungkus + juri rubrik v2.1 yang sama
 // dengan `round`. Latihan bukan gerbang G0: keluarannya `bench/practice-<k>.md|json` untuk mengiterasi skill, strip Lakar
 // di `bench/practice/<k>/`. Seri `effects` (story 22): P5/P6 efek visual, `bench/effects-<k>.md|json`, strip Lakar di
-// `bench/practice/effects/<k>/`, run di `bench/runs/practice-effects/<k>/`, restart pen-desktop sesudah run pen.dev.
+// `bench/practice/effects/<k>/`, run di `bench/runs/practice-effects/<k>/`. Kedua seri (practice dan efek) me-restart pen-desktop
+// sesudah run pen.dev terakhir iterasi.
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { errorMessage } from '@lakar/schema';
@@ -43,6 +44,7 @@ import {
   md5PenFiles,
   PEN_DESKTOP_RESTART_TIMEOUT_MS,
   penDesktopRestartDeps,
+  penDesktopRestartStep,
   restartPenDesktopAfterSeries,
   restartUserUnit,
   sha256,
@@ -76,7 +78,7 @@ export type SeriesId = 'practice' | 'effects';
 /**
  * Konfigurasi seri latihan. `practice` (default, story 19) = perilaku lama persis: P1–P4, maks 8 iterasi, $58,09, lulus
  * ≥ 3 dari 4, laporan `bench/practice-<k>`. `effects` (story 22) = P5/P6, maks 3 iterasi, $15, semua prompt wajib lulus,
- * laporan `bench/effects-<k>`, restart pen-desktop sesudah iterasi yang menjalankan pen.dev.
+ * laporan `bench/effects-<k>`. Seri practice dan efek me-restart pen-desktop sesudah iterasi yang menjalankan pen.dev.
  */
 export type SeriesConfig = {
   id: SeriesId;
@@ -95,7 +97,7 @@ export type SeriesConfig = {
   runsRoot: string;
   /** Strip Lakar tracked di `<pngDir>/<k>/<P>-lakar.png`. */
   pngDir: string;
-  /** Restart pen-desktop sesudah run pen.dev terakhir iterasi (izin Adam, seri efek). */
+  /** Restart pen-desktop sesudah run pen.dev terakhir iterasi (izin Adam; seri practice dan efek). */
   restartPenDesktop: boolean;
   /** Laporan iterasi > 1 memuat perbandingan dengan iterasi 1 (sebelum perubahan). */
   compareWithFirst: boolean;
@@ -113,7 +115,7 @@ export const PRACTICE_SERIES: SeriesConfig = {
   reportPrefix: 'practice',
   runsRoot: PRACTICE_RUNS,
   pngDir: PRACTICE_DIR,
-  restartPenDesktop: false,
+  restartPenDesktop: true,
   compareWithFirst: false,
 };
 
@@ -381,7 +383,7 @@ export type PracticeReport = {
   penGuard: { files: number; changed: string[]; removed: string[]; added: string[] };
   lakardActiveAfter: string;
   notes: string[];
-  /** Seri efek: hasil restart pen-desktop sesudah run pen.dev terakhir; string = alasan tidak dijalankan. */
+  /** Seri practice dan efek: hasil restart pen-desktop sesudah run pen.dev terakhir; string = alasan tidak dijalankan. */
   penDesktopRestart?: PenDesktopRestart | string;
   /** Seri efek iterasi > 1: Lakar iterasi 1 vs iterasi ini. */
   comparison?: BeforeAfter[];
@@ -815,27 +817,32 @@ export async function practiceMain(argv: string[]): Promise<number> {
     }
   }
 
-  // ---------- restart pen-desktop (seri efek): sesudah run pen.dev terakhir, sebelum juri ----------
+  // ---------- restart pen-desktop (seri practice dan efek): sesudah run pen.dev terakhir, sebelum juri ----------
   let penDesktopRestart: PenDesktopRestart | string | undefined;
   if (series.restartPenDesktop) {
-    const restartFile = join(iterDir, 'pen-desktop-restart.json');
-    if (reuseDir) penDesktopRestart = `pen.dev dipakai ulang dari iterasi ${reusePendev}`;
-    else if (pendevRan > 0) {
-      log('restart pen-desktop (sesudah run pen.dev terakhir)');
-      penDesktopRestart = await restartPenDesktopAfterSeries(
-        penDesktopRestartDeps(async () => {
-          const c = await PencilClient.connect(pre.server);
-          try {
-            await c.appState();
-          } finally {
-            await c.close().catch(() => undefined);
-          }
-        }),
-      );
-      writeFileSync(restartFile, `${JSON.stringify(penDesktopRestart, null, 1)}\n`);
+    const step = await penDesktopRestartStep({
+      pendevRan,
+      reusedFrom: reuseDir ? `iterasi ${reusePendev}` : undefined,
+      file: join(iterDir, 'pen-desktop-restart.json'),
+      restart: () => {
+        log('restart pen-desktop (sesudah run pen.dev terakhir)');
+        return restartPenDesktopAfterSeries(
+          penDesktopRestartDeps(async () => {
+            const c = await PencilClient.connect(pre.server);
+            try {
+              await c.appState();
+            } finally {
+              await c.close().catch(() => undefined);
+            }
+          }),
+        );
+      },
+    });
+    penDesktopRestart = step.result;
+    if (step.ran && typeof penDesktopRestart !== 'string') {
       log(`restart pen-desktop: ${penDesktopRestart.ok ? 'berhasil' : 'GAGAL'} (${(penDesktopRestart.ms / 1000).toFixed(1)} dtk; ${penDesktopRestart.detail})`);
       if (!penDesktopRestart.ok) notes.push(`Restart pen-desktop GAGAL: ${penDesktopRestart.detail}. Juri tetap dijalankan.`);
-    } else penDesktopRestart = readJson<PenDesktopRestart>(restartFile) ?? 'tidak ada run pen.dev di pemanggilan ini';
+    }
   }
 
   // ---------- strip + juri + keputusan ----------

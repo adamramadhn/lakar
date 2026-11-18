@@ -277,6 +277,13 @@ export function bottomZone(ctx: BoardContext): BottomZone | undefined {
       grew = true;
     }
   }
+  // Kandidat di dalam anggota transparan (mis. `Overlay / Bawah` tanpa fill berisi mini player + tab bar) ikut jadi anggota,
+  // agar celah di antara isinya bisa dinilai (sub-cek 5). Tepi atas zona tidak berubah (isinya di dalam rentang pembungkus).
+  for (const m of [...members]) {
+    if (painted(m.node)) continue;
+    const inside = new Set(descendants(m.node).map((d) => d.id));
+    for (const c of cands) if (!members.includes(c) && inside.has(c.node.id)) members.push(c);
+  }
   return { members: members.sort((a, b) => a.rect.y - b.rect.y || a.order - b.order), top };
 }
 
@@ -501,6 +508,71 @@ export function lc20(ctx: BoardContext): Finding[] {
     return true;
   };
 
+  /**
+   * Sub-cek 5: unit terlihat di celah di antara dua bar zona bawah yang bertumpuk (mis. mini player di atas tab bar),
+   * sebagian tertutup bar. Celah yang ditutup node ber-fill/blur sesudah unit (z-order) tidak dihitung.
+   */
+  const between = (n: ChildNode): boolean => {
+    const kind = unitKind(n);
+    if (!kind) return false;
+    const vis = unitVisible(n, kind);
+    if (!vis) return false;
+    const cov = covering(zone, orderOf(n), vis);
+    if (!cov || cov.members.length < 2) return false;
+    const order = orderOf(n);
+    const own = new Set(descendants(n).map((d) => d.id));
+    // Pembungkus transparan (tanpa fill/blur) yang memuat anggota zona lain tidak menutup celah di antara isinya.
+    const memberIds = new Set(cov.members.map((m) => m.node.id));
+    const wraps = (m: ZoneMember) => !(hasFills(m.node) || (m.node as Painted).backdropBlur! > 0) && descendants(m.node).some((d) => memberIds.has(d.id));
+    const ms = cov.members.filter((m) => !wraps(m)).sort((a, b) => a.rect.y - b.rect.y || a.order - b.order);
+    if (ms.length < 2) return false;
+    let upper = ms[0]!;
+    for (const lower of ms.slice(1)) {
+      const holeTop = bottom(upper.rect);
+      if (lower.rect.y > holeTop + TOLERANCE) {
+        const x0 = Math.max(upper.rect.x, lower.rect.x);
+        const x1 = Math.min(right(upper.rect), right(lower.rect));
+        if (x1 > x0) {
+          // Penutup lubang: node ber-fill/blur sesudah unit selebar irisan x pengapit, dirapatkan dari atas dan bawah.
+          let top = holeTop;
+          let low = lower.rect.y;
+          for (let grew = true; grew && low - top > TOLERANCE; ) {
+            grew = false;
+            for (const c of ctx.nodes) {
+              const cr = ctx.bounds.get(c.id);
+              if (!cr || orderOf(c) <= order || own.has(c.id) || !(hasFills(c) || (c as Painted).backdropBlur! > 0)) continue;
+              if (cr.x > x0 + TOLERANCE || right(cr) < x1 - TOLERANCE) continue;
+              if (cr.y <= top + TOLERANCE && bottom(cr) > top + TOLERANCE) {
+                top = Math.min(bottom(cr), low);
+                grew = true;
+              } else if (bottom(cr) >= low - TOLERANCE && cr.y < low - TOLERANCE && cr.y > top) {
+                low = cr.y;
+                grew = true;
+              }
+            }
+          }
+          if (low - top > TOLERANCE) {
+            const peek = intersect(vis, { x: x0, y: top, width: x1 - x0, height: low - top });
+            if (peek && peek.height >= PEEK_MIN && (vis.y < top - TOLERANCE || bottom(vis) > low + TOLERANCE)) {
+              out.push(
+                finding(
+                  'LC-20',
+                  'error',
+                  n,
+                  `${kind} terlihat di celah di antara bar zona bawah "${upper.node.name}" dan "${lower.node.name}" (y ${num(peek.y)}–${num(bottom(peek))}), sebagian tertutup bar`,
+                  `jangan biarkan konten mengintip di celah antar-bar: rapatkan bar (celah 0), beri latar penutup di belakang keduanya, atau akhiri daftar sebelum zona`,
+                ),
+              );
+              return true;
+            }
+          }
+        }
+      }
+      if (bottom(lower.rect) > bottom(upper.rect)) upper = lower;
+    }
+    return false;
+  };
+
   const headingLike = (h: ChildNode): boolean => {
     if (h.type === 'text') return h.content.trim() !== '';
     if (h.type !== 'frame' || hasFills(h) || hasStroke(h)) return false;
@@ -548,12 +620,13 @@ export function lc20(ctx: BoardContext): Finding[] {
     return true;
   };
 
-  // Sub-cek 2 + 4 + 3, atas-ke-bawah: hanya yang terluar dilaporkan.
+  // Sub-cek 2 + 4 + 5 + 3, atas-ke-bawah: hanya yang terluar dilaporkan.
   const walk = (children: readonly ChildNode[]) => {
     for (const n of children) {
       if (excluded.has(n.id) || reported.has(n.id)) continue;
       if (cut(n)) continue;
       if (gap(n)) continue;
+      if (between(n)) continue;
       if (n.type === 'frame' && named(n, 'Crop /')) continue;
       if (orphan(n)) continue;
       if (n.type === 'frame') walk(n.children);

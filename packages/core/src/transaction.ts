@@ -122,6 +122,18 @@ function mergePatch(op: OpKind, node: AnyNode, patch: unknown): NodeInput {
   return parsed.data;
 }
 
+/**
+ * Anak frame `layout:'none'` selalu absolut: input/patch polos tanpa kunci `position` yang membawa x atau y
+ * mendapat `position:'absolute'` eksplisit (dokumen tersimpan tetap valid terhadap skema per-node). Parent flow
+ * (row/column) dan board tidak dinormalisasi: x/y tanpa position di sana tetap SCHEMA_INVALID + XY_HINT.
+ */
+function implicitAbsolute(parent: AnyNode | null | undefined, raw: unknown): unknown {
+  if (!parent || parent.type !== 'frame' || (parent.layout ?? 'none') !== 'none') return raw;
+  if (!isPlainObject(raw) || Object.hasOwn(raw, 'position') || raw.type === 'board') return raw;
+  const has = (v: unknown) => v !== undefined && v !== null;
+  return has(raw.x) || has(raw.y) ? { ...raw, position: 'absolute' } : raw;
+}
+
 /** Bangun node tersimpan dari input tervalidasi; anak hanya untuk kontainer. */
 function buildNode(input: NodeInput, id: string, children: ChildNode[] | undefined): AnyNode {
   if (input.type === 'board' || input.type === 'frame') return { ...input, id, children: children ?? [] } as AnyNode;
@@ -187,7 +199,8 @@ export function beginTransaction(doc: Doc, opts: TransactionOptions): Transactio
     add(parentId, raw) {
       return op('add', (w) => {
         const pid = parentId === null ? null : requireId('add', 'parentId', parentId);
-        const input = parseInput('add', raw);
+        // Parent dicari tanpa throw dulu (normalisasi x/y); urutan error lama tetap (skema → parent).
+        const input = parseInput('add', implicitAbsolute(pid === null ? null : locate(w, pid)?.node, raw));
         let target: Container | null = null;
         if (pid === null) {
           if (input.type !== 'board') {
@@ -219,7 +232,7 @@ export function beginTransaction(doc: Doc, opts: TransactionOptions): Transactio
     update(id, patch) {
       op('update', (w) => {
         const loc = mustLocate(w, 'update', requireId('update', 'id', id));
-        const input = mergePatch('update', loc.node, patch);
+        const input = mergePatch('update', loc.node, implicitAbsolute(loc.parent, patch));
         loc.siblings[loc.index] = buildNode(input, loc.node.id, 'children' in loc.node ? loc.node.children : undefined);
       });
     },
@@ -232,7 +245,7 @@ export function beginTransaction(doc: Doc, opts: TransactionOptions): Transactio
             hint: 'ID dan posisi dipertahankan otomatis; anak dipertahankan bila tipe baru frame/board',
           });
         }
-        const input = parseInput('replace', raw);
+        const input = parseInput('replace', implicitAbsolute(loc.parent, raw));
         const old = loc.node;
         if (old.type === 'board' && input.type !== 'board') {
           throw new LakarError('SCHEMA_INVALID', `replace: board ${old.id} hanya bisa diganti dengan board, bukan ${input.type}`, {
@@ -300,7 +313,7 @@ export function beginTransaction(doc: Doc, opts: TransactionOptions): Transactio
     duplicate(id, patch) {
       return op('duplicate', (w) => {
         const loc = mustLocate(w, 'duplicate', requireId('duplicate', 'id', id));
-        const rootInput = patch === undefined ? undefined : mergePatch('duplicate', loc.node, patch);
+        const rootInput = patch === undefined ? undefined : mergePatch('duplicate', loc.node, implicitAbsolute(loc.parent, patch));
         const copy = host.structuredClone(loc.node);
         const fresh: string[] = [];
         for (const n of subtree(copy)) {

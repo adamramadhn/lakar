@@ -1,10 +1,12 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { buildJudgeText, buildJudgeTextWith, DESIGN_MD_PATH, judgeC7Problems, judgeLeaks, NO_CRITERIA_SENTENCE } from '../judge/prompt.js';
 import { readRubricJson } from '../judge/rubric.js';
 import { GOLDEN_SET_PATH, loadProtocol } from '../protocol.js';
 import type { RoundRun } from '../round/report.js';
-import { restartPenDesktopAfterSeries, sha256, type PenDesktopRestartDeps } from '../sys.js';
+import { penDesktopRestartStep, restartPenDesktopAfterSeries, sha256, type PenDesktopRestartDeps } from '../sys.js';
 import {
   beforeAfter,
   budgetProblem,
@@ -299,7 +301,8 @@ describe('practice: seri (story 22)', () => {
       reportPrefix: 'practice',
       runsRoot: PRACTICE_RUNS,
       pngDir: PRACTICE_DIR,
-      restartPenDesktop: false,
+      // Satu-satunya perubahan sengaja (story 20): restart pen-desktop sesudah seri pen.dev juga di seri practice.
+      restartPenDesktop: true,
       compareWithFirst: false,
     });
     expect(SERIES.practice).toBe(PRACTICE_SERIES);
@@ -384,5 +387,54 @@ describe('restart pen-desktop sesudah seri pen.dev', () => {
     expect(t2).toMatchObject({ ok: false, detail: expect.stringContaining('izin ditolak') });
     const t3 = await restartPenDesktopAfterSeries(fake({ probeFails: 1000, timeoutMs: 10_000 }).deps);
     expect(t3.detail).toMatch(/MCP pencil: not connected/);
+  });
+
+  it('(P4) probe MCP menggantung → selesai ≤ batas (+ satu interval) dengan ok:false, tidak throw', async () => {
+    const t0 = Date.now();
+    let probes = 0;
+    const r = await restartPenDesktopAfterSeries({
+      restart: () => undefined,
+      isActive: () => 'active',
+      probe: () => {
+        probes++;
+        return new Promise<void>(() => undefined);
+      },
+      sleep: (ms) => new Promise((res) => setTimeout(res, Math.min(ms, 20))),
+      now: () => Date.now(),
+      timeoutMs: 150,
+    });
+    const took = Date.now() - t0;
+    expect(r.ok).toBe(false);
+    expect(r.detail).toMatch(/batas 0 dtk terlewati: is-active active; MCP pencil: probe tidak menjawab/);
+    expect(probes).toBeGreaterThanOrEqual(1);
+    expect(took).toBeLessThan(150 + 2_000);
+  });
+});
+
+describe('langkah restart pen-desktop sesudah seri (practice, efek, round)', () => {
+  it('(P1/P2) ada run pen.dev → restart sekali, hasil ditulis; (P3) dipakai ulang / tanpa run → tanpa restart, hasil tersimpan atau alasan', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'bench-pen-restart-'));
+    try {
+      const file = join(dir, 'pen-desktop-restart.json');
+      let calls = 0;
+      const restart = async () => {
+        calls++;
+        return { ok: true, ms: 15_000, detail: 'pen-desktop active; MCP pencil menjawab panggilan baca' };
+      };
+      expect(await penDesktopRestartStep({ pendevRan: 0, file, restart })).toEqual({ result: 'tidak ada run pen.dev di pemanggilan ini', ran: false });
+      expect(await penDesktopRestartStep({ pendevRan: 2, reusedFrom: 'iterasi 3', file, restart })).toEqual({ result: 'pen.dev dipakai ulang dari iterasi 3', ran: false });
+      expect(calls).toBe(0);
+      const r = await penDesktopRestartStep({ pendevRan: 2, file, restart });
+      expect(calls).toBe(1);
+      expect(r).toEqual({ result: { ok: true, ms: 15_000, detail: 'pen-desktop active; MCP pencil menjawab panggilan baca' }, ran: true });
+      expect(JSON.parse(readFileSync(file, 'utf8'))).toEqual(r.result);
+      // --resume tanpa run pen.dev baru: hasil pemanggilan sebelumnya dipakai, tanpa restart lagi.
+      expect(await penDesktopRestartStep({ pendevRan: 0, file, restart })).toEqual({ result: r.result, ran: false });
+      writeFileSync(file, '{rusak');
+      expect((await penDesktopRestartStep({ pendevRan: 0, file, restart })).result).toBe('tidak ada run pen.dev di pemanggilan ini');
+      expect(calls).toBe(1);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

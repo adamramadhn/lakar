@@ -332,8 +332,36 @@ describe('@lakar/mcp', () => {
     expect(JSON.parse(lines[0]!)).toEqual({ docId: 'Dddddddd', rev: 4, created: [], bounds: { Bbbbbbbb: [0, 0, 390, 844] } });
     expect(lines[1]).toBe('check board Bbbbbbbb: 25 error (25 gerbang), 0 warning');
     expect(lines[2]).toBe('error·gerbang · LC-05 · Caption 0 (Tttt0000) · size 11px · ≥ 12');
-    expect(lines).toHaveLength(2 + 20 + 1);
-    expect(lines.at(-1)).toBe('… 5 temuan lagi (layout_check untuk daftar penuh)');
+    expect(lines).toHaveLength(2 + 20 + 1 + 1);
+    expect(lines.at(-2)).toBe('… 5 temuan lagi (layout_check untuk daftar penuh)');
+    expect(lines.at(-1)).toBe('execute ke-1 di sesi ini');
+  });
+
+  it('jumlah execute per sesi: ke-1/2 tanpa saran, ≥ 3 pengingat batas skill (sukses dan error), tidak diblokir', async () => {
+    fake.seen.length = 0;
+    const c = await connect(url);
+    const last = (r: any) => ((r.content as any).at(-1).text as string).split('\n').at(-1);
+    const e1 = await c.callTool({ name: 'execute', arguments: { code: 'add(null,{})', description: 'board satu' } });
+    expect(last(e1)).toBe('execute ke-1 di sesi ini');
+    const e2 = await c.callTool({ name: 'execute', arguments: { code: 'boom' } });
+    expect(e2.isError).toBe(true);
+    expect((e2.content as any)[0].text).toMatch(/\neditId: Eeeeeeee$/);
+    const reminder = (n: number) =>
+      n === 3
+        ? 'execute ke-3 di sesi ini · batas skill tercapai untuk mobile/app (3, termasuk perbaikan); landing maks 4 — lanjut screenshot/export'
+        : `execute ke-${n} di sesi ini · melewati batas skill (mobile/app 3, landing 4, termasuk perbaikan) — hentikan perbaikan kecil, lanjut screenshot/export`;
+    const e3 = await c.callTool({ name: 'execute', arguments: { code: 'boom' } });
+    expect(e3.isError).toBe(true);
+    expect(last(e3)).toBe(reminder(3));
+    for (const n of [4, 5]) {
+      const e = await c.callTool({ name: 'execute', arguments: { code: 'add(null,{})', description: 'board lagi' } });
+      expect(e.isError).toBeFalsy();
+      expect(last(e)).toBe(reminder(n));
+    }
+    expect(fake.seen.filter((x) => x.path === '/execute')).toHaveLength(5);
+    expect(`${reminder(3)} ${reminder(5)}`).not.toMatch(/rubrik|juri|skor|golden/i);
+    // Sesi lain (instance server baru) mulai dari 1 lagi.
+    expect(last(await (await connect(url)).callTool({ name: 'execute', arguments: { code: 'add(null,{})', description: 'board baru' } }))).toBe('execute ke-1 di sesi ini');
   });
 
   it('layout_check → POST /layout-check {boardId?}; satu ringkasan + maks 60 baris; board tak ada → NOT_FOUND', async () => {
@@ -381,7 +409,7 @@ describe('@lakar/mcp', () => {
     expect(o.isError).toBeFalsy();
     expect(JSON.parse((o.content as any)[0].text)).toMatchObject({ slug: 'tracer-a', created: true });
     const e = await c.callTool({ name: 'execute', arguments: { code: 'add(null,{})', description: 'board tracer' } });
-    expect(JSON.parse((e.content as any)[0].text).created).toHaveLength(1);
+    expect(JSON.parse(((e.content as any)[0].text as string).split('\n')[0]!).created).toHaveLength(1);
     const s = await c.callTool({ name: 'screenshot', arguments: {} });
     expect((s.content as any)[0]).toEqual({ type: 'image', data: PNG_B64, mimeType: 'image/png' });
     expect(JSON.parse((s.content as any)[1].text)).toEqual({ boardId: 'Bbbbbbbb', width: 390, height: 844, mimeType: 'image/png' });
@@ -419,7 +447,7 @@ describe('@lakar/mcp', () => {
     const edits = [{ find: 'boom', replace: '1' }];
     const r = await c.callTool({ name: 'execute', arguments: { editId: 'Eeeeeeee', edits } });
     expect(r.isError).toBeFalsy();
-    expect(JSON.parse((r.content as any)[0].text)).toMatchObject({ rev: 2, value: 1, logs: 'halo' });
+    expect(JSON.parse(((r.content as any)[0].text as string).split('\n')[0]!)).toMatchObject({ rev: 2, value: 1, logs: 'halo' });
     expect(fake.seen.find((x) => x.path === '/execute')!.body).toEqual({ editId: 'Eeeeeeee', edits });
     const { tools } = await c.listTools();
     const exec = tools.find((t) => t.name === 'execute')!;
@@ -558,7 +586,8 @@ describe.skipIf(!browserInstalled)('layout_check dengan respons lakard asli', ()
     const eLines = ((e.content as any)[0].text as string).split('\n');
     expect(JSON.parse(eLines[0]!)).toMatchObject({ rev: 1, bounds: expect.any(Object) });
     expect(eLines[1]).toMatch(/^check board [A-Za-z0-9]{8}: 5 error \(5 gerbang\), 1 warning$/);
-    expect(eLines.slice(2)).toHaveLength(6);
+    expect(eLines.slice(2, -1)).toHaveLength(6);
+    expect(eLines.at(-1)).toBe('execute ke-1 di sesi ini');
 
     const r = await c.callTool({ name: 'layout_check', arguments: {} });
     expect(r.isError).toBeFalsy();
@@ -569,7 +598,7 @@ describe.skipIf(!browserInstalled)('layout_check dengan respons lakard asli', ()
     expect(lines[0]).toBe(`layout_check rev 1, 1 board (${real.data.boards[0].id}): 5 error (5 gerbang), 1 warning`);
     expect(lines.slice(1)).toHaveLength(6);
     expect(lines.slice(1).map((l) => l.split(' · ')[1])).toEqual(['LC-01a', 'LC-01b', 'LC-05', 'LC-02a', 'LC-20', 'LC-12']);
-    expect(lines.slice(1)).toEqual(eLines.slice(2));
+    expect(lines.slice(1)).toEqual(eLines.slice(2, -1));
     expect(lines[1]).toMatch(/^error·gerbang · LC-01a · Sapaan \([A-Za-z0-9]{8}\) · emoji "👋" U\+1F44B di "Halo 👋" · hapus emoji; ikon pakai node icon \(icon_search\)$/);
     expect(lines[6]).toMatch(/^warning · LC-12 · Home · mobile \([A-Za-z0-9]{8}\) · ukuran 390×800 · 390×844$/);
     expect(text).not.toMatch(/golden|juri|rubrik|Lampiran B|skor|pen\.dev|benchmark/i);

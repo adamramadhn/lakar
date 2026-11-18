@@ -92,6 +92,8 @@ export type RoundReport = {
   definitions: string[];
   penGuard: { files: number; changed: string[]; removed: string[]; added: string[] } | undefined;
   lakardActiveAfter: string | undefined;
+  /** Restart pen-desktop sesudah run pen.dev terakhir pemanggilan ini (hasil), atau alasan tidak dijalankan. */
+  penDesktopRestart?: { ok: boolean; ms: number; detail: string } | string | undefined;
   results: RoundPrompt[];
   /** Keputusan G0 sementara (`decideG0`), menunggu konfirmasi Adam. */
   g0: { decision: G0Decision; why: string };
@@ -277,6 +279,10 @@ export function renderRoundMarkdown(r: RoundReport): string {
     L.push(`- Berubah: ${r.penGuard.changed.length ? r.penGuard.changed.map((x) => `\`${x}\``).join(', ') : 'tidak ada'}; hilang: ${r.penGuard.removed.length ? r.penGuard.removed.map((x) => `\`${x}\``).join(', ') : 'tidak ada'}; baru: ${r.penGuard.added.length}.`);
   } else L.push('- tidak dicek (dry-run)');
   L.push(`- \`systemctl --user is-active lakard\` sesudah putaran: ${r.lakardActiveAfter ?? '–'}`);
+  if (r.penDesktopRestart !== undefined) {
+    const x = r.penDesktopRestart;
+    L.push(typeof x === 'string' ? `- Restart pen-desktop: tidak dijalankan (${cell(x)}).` : `- Restart pen-desktop sesudah run pen.dev terakhir: **${x.ok ? 'berhasil' : 'GAGAL'}**, durasi ${sec(x.ms)} dtk (${cell(x.detail)}).`);
+  }
   L.push('');
   if (r.notes.length) {
     L.push('## Catatan', '');

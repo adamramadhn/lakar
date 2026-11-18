@@ -1,16 +1,19 @@
-import { mkdtempSync, utimesSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { SCHEMA_VERSION } from '@lakar/schema';
 import { newestMtimeMs } from '../sys.js';
-import type { JudgeRepRecord } from '../judge/run.js';
+import { EMPTY_MCP, type JudgeRepRecord } from '../judge/run.js';
+import { encodePngRgb } from '../png/codec.js';
+import { judgeImagesFromStripPng } from '../png/strip.js';
+import { loadProtocol } from '../protocol.js';
 import type { JudgeVerdict } from '../judge/parse.js';
 import { emptyRecord } from '../pendev/run.js';
 import type { TimedLine } from '../stream-metrics.js';
 import { timedLines, toolResultEvent, toolUseEvent } from '../../../tests/support/stream.ts';
 import { countAgentEmoji, countEmojiInText, countLintEmoji } from './emoji.js';
-import { claudeSemver, copyPngExclusive, frozenDrift, harnessErrorStatus, isFinalRun, officialFreezeProblems, parseRoundArgs, penBaseline, roundOutcome, roundStartProblem, type OfficialFreezeInput } from './main.js';
+import { claudeSemver, copyPngExclusive, judgePrompt, ROUND_JUDGE_REUSE, staleJudgeTexts, frozenDrift, harnessErrorStatus, isFinalRun, officialFreezeProblems, parseRoundArgs, penBaseline, roundOutcome, roundStartProblem, type OfficialFreezeInput } from './main.js';
 import { LAKAR_INIT_RULES } from '../lakar/run.js';
 import { validateInit } from '../stream-metrics.js';
 import { lakarReconnect, pendevReconnect } from './reconnect.js';
@@ -293,6 +296,14 @@ describe('laporan (snapshot)', () => {
     expect(md).toMatchSnapshot();
   });
 
+  it('restart pen-desktop sesudah run pen.dev tercatat di laporan (hasil atau alasan tidak dijalankan)', () => {
+    expect(renderRoundMarkdown({ ...report, penDesktopRestart: { ok: true, ms: 14_200, detail: 'pen-desktop active; MCP pencil menjawab panggilan baca' } })).toContain(
+      '- Restart pen-desktop sesudah run pen.dev terakhir: **berhasil**, durasi 14.2 dtk (pen-desktop active; MCP pencil menjawab panggilan baca).',
+    );
+    expect(renderRoundMarkdown({ ...report, penDesktopRestart: 'tidak ada run pen.dev di pemanggilan ini' })).toContain('- Restart pen-desktop: tidak dijalankan (tidak ada run pen.dev di pemanggilan ini).');
+    expect(renderRoundMarkdown(report)).not.toContain('Restart pen-desktop');
+  });
+
   it('putaran resmi: Keputusan G0 setelah Ringkasan; Evaluasi arah/PNG/Konfirmasi Adam sebelum Versi beku; Konfirmasi tidak diisi', () => {
     const official: RoundReport = {
       ...report,
@@ -482,4 +493,87 @@ describe('pembekuan putaran resmi', () => {
     writeFileSync(join(d, 'src2.png'), 'B');
     expect(() => copyPngExclusive(join(d, 'src2.png'), dest)).toThrow('tidak ditimpa');
   });
+});
+
+// ---------- resume dengan hasil juri rubrik lama (R1/R2) ----------
+
+const verdictAll = (sc: number) =>
+  Object.fromEntries([
+    ...['R1', 'R2', 'R4', 'R5', 'R6', 'R8', 'R9', 'R10'].map((r) => [r, { skor: sc, bukti: `${r} bukti elemen kiri atas` }]),
+    ['slop', { jumlah: 0, butir: [] }],
+    ['emoji', 0],
+    ['fokus', 'judul atas'],
+  ]);
+/** claude palsu juri: init tanpa tool/MCP; X 2, Y 1; setiap spawn dicatat ke $SPAWNS. */
+const FAKE_JUDGE = `import fs from 'node:fs';let s='';process.stdin.on('data',(d)=>(s+=d));process.stdin.on('end',()=>{
+fs.appendFileSync(process.env.SPAWNS,'1\\n');
+const w=(e)=>process.stdout.write(JSON.stringify(e)+'\\n');w({type:'system',subtype:'init',cwd:process.cwd(),tools:[],mcp_servers:[]});
+w({type:'result',subtype:'success',is_error:false,result:${JSON.stringify(JSON.stringify({ X: verdictAll(2), Y: verdictAll(1) }))},total_cost_usd:0.01});});`;
+
+describe('round --resume dengan hasil juri rubrik lama', () => {
+  const roots: string[] = [];
+  afterEach(() => {
+    delete process.env.SPAWNS;
+    for (const r of roots.splice(0)) rmSync(r, { recursive: true, force: true });
+  });
+  const tmp = () => {
+    const r = mkdtempSync(join(tmpdir(), 'bench-round-resume-'));
+    roots.push(r);
+    return r;
+  };
+
+  it('(R1) judge-text.md tersimpan berbeda dari teks juri saat ini → terdaftar (fungsi murni); sama/tidak ada → kosong', () => {
+    const roundDir = tmp();
+    mkdirSync(join(roundDir, 'judge', 'A'), { recursive: true });
+    mkdirSync(join(roundDir, 'judge', 'B'), { recursive: true });
+    writeFileSync(join(roundDir, 'judge', 'A', 'judge-text.md'), 'teks juri A v2');
+    writeFileSync(join(roundDir, 'judge', 'B', 'judge-text.md'), 'teks juri B v2.1');
+    const texts = { A: { text: 'teks juri A v2.1' }, B: { text: 'teks juri B v2.1' }, C: { text: 'teks juri C v2.1' } };
+    expect(staleJudgeTexts(roundDir, texts)).toEqual([join('judge', 'A', 'judge-text.md')]);
+    expect(staleJudgeTexts(roundDir, { B: texts.B, C: texts.C })).toEqual([]);
+    expect(staleJudgeTexts(join(roundDir, 'tidak-ada'), texts)).toEqual([]);
+  });
+
+  it('(R2) teks sama: ulangan ok tanpa R9/R10 dijalankan ulang (spawn +1), ulangan lengkap dipakai ulang', async () => {
+    const root = tmp();
+    const protocol = loadProtocol();
+    writeFileSync(join(root, 'fake.mjs'), FAKE_JUDGE);
+    writeFileSync(join(root, 'mcp-empty.json'), EMPTY_MCP);
+    process.env.SPAWNS = join(root, 'spawns');
+    const spawns = () => (existsSync(join(root, 'spawns')) ? readFileSync(join(root, 'spawns'), 'utf8').split('\n').filter(Boolean).length : 0);
+    const png = (w: number, h: number, v: number) => encodePngRgb({ width: w, height: h, data: new Uint8Array(w * h * 3).fill(v) });
+    const input = {
+      prompt: 'B',
+      jdir: join(root, 'judge', 'B'),
+      text: 'teks juri B (uji)',
+      images: { lakar: judgeImagesFromStripPng(png(4, 6, 200)), pendev: judgeImagesFromStripPng(png(4, 8, 30)) },
+      emptyMcpConfig: join(root, 'mcp-empty.json'),
+      config: { ...protocol.config, timeoutMs: 10_000 },
+      forbiddenCwdRoot: join(root, 'terlarang'),
+      reuse: ROUND_JUDGE_REUSE,
+      command: process.execPath,
+      prefixArgs: [join(root, 'fake.mjs')],
+    };
+    const first = await judgePrompt(input);
+    expect(first.fatal).toBeUndefined();
+    expect(spawns()).toBe(3);
+    // Ulangan 2 dari rubrik lama: ok tanpa R9/R10.
+    const repFile = join(root, 'judge', 'B', 'rep-2', 'rep.json');
+    const old = JSON.parse(readFileSync(repFile, 'utf8')) as JudgeRepRecord & { verdict: Record<string, Record<string, unknown>> };
+    expect(old.status).toBe('ok');
+    for (const l of ['X', 'Y']) {
+      delete old.verdict[l]!.R9;
+      delete old.verdict[l]!.R10;
+    }
+    writeFileSync(repFile, JSON.stringify(old));
+    const again = await judgePrompt(input);
+    expect(spawns()).toBe(4);
+    expect(again.reps.map((r) => r.status)).toEqual(['ok', 'ok', 'ok']);
+    expect(again.reps[1]!.verdict?.X?.R9).toBeDefined();
+    // Ketiga ulangan kini lengkap: dipakai ulang tanpa spawn.
+    await judgePrompt(input);
+    expect(spawns()).toBe(4);
+    expect(ROUND_JUDGE_REUSE({ ...old, status: 'invalid' })).toBe(false);
+    expect(ROUND_JUDGE_REUSE({ ...old, status: 'failed' })).toBe(true);
+  }, 30_000);
 });

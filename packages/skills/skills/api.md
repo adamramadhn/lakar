@@ -241,7 +241,7 @@ add(row, {type:'rect', name:'Penanda', width:24, height:24, radius:6, fills:[{ty
 ## Padding dan posisi
 
 - `padding`: angka | `[vertikal, horizontal]` | `[atas, kanan, bawah, kiri]` (urutan CSS).
-- `position:'absolute'` + `x`/`y`: relatif kotak parent, keluar dari flow (x/y tanpa position → SCHEMA_INVALID). Anak frame `layout:'none'` selalu absolut. Pakai untuk node `Overlay /`; selebihnya flex.
+- `position:'absolute'` + `x`/`y`: relatif kotak parent, keluar dari flow (x/y tanpa position di parent flow → SCHEMA_INVALID). Anak frame `layout:'none'` selalu absolut: x/y diterima, `position:'absolute'` ditambahkan otomatis (tetap absolut bila layout frame diubah). Pakai untuk node `Overlay /`; selebihnya flex.
 
 ```js
 const b = add(null, {type:'board', name:'Beranda', x:0, y:0, width:390, height:844, screen:'mobile'});

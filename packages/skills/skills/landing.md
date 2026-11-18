@@ -43,10 +43,10 @@ for(const l of ['Cara kerja','Asal biji','Harga','Untuk kafe']) T(links,'Link / 
 const act=Row(nav,'Aksi',{gap:12});
 Btn(act,'Masuk','secondary',{height:40,padding:[0,16]});
 Btn(act,'Coba sampel','primary',{height:40,padding:[0,16]});
-// Hero = satu bidang efek: tint merek + mesh lembut (aksen + pendamping) + struktur + grain tipis
+// Efek (mesh/noise/Crop / Kontur) hanya bila brief/merek minta suasana ekspresif/hero pantas; selain itu fill(C.field) polos
 const hero=F(page,'Seksi / Hero',{width:'fill',padding:[96,80,0,80],gap:64,align:'center',clip:true,fills:[...fill(C.field),
  {type:'mesh',columns:3,rows:2,colors:['#CDE8E4',C.field,'#F4E7C8',C.field,C.field,'#D3EBE7']},{type:'noise',opacity:0.05,seed:11}]});
-// Struktur: kontur kebun, 16 garis melintasi lebar penuh, merunduk di tengah (zona teks tenang)
+// Kontur: 16 garis selebar penuh, merunduk di tengah (teks tenang)
 const fx=F(hero,'Crop / Kontur',{position:'absolute',x:0,y:0,width:1440,height:756,layout:'none',clip:true});
 for(let i=0;i<16;i++){const y=60+i*26,k=i%5===2;
  add(fx,{type:'path',name:'Kontur / '+(i+1),d:`M0 ${y} C 420 ${y+40} 300 ${y+420} 720 ${y+430} S 1020 ${y+40} 1440 ${y}`,viewBox:[0,0,1440,756],width:1440,height:756,stroke:{color:C.acc+(k?'80':(16+i*2).toString(16).padStart(2,'0')),width:k?1.5:1,align:'center'}});}
