@@ -3,11 +3,11 @@
 // Elemen node TIDAK memakai CSS `border` (padding-box = border-box untuk x/y absolute); stroke memakai
 // overlay internal + box-shadow (paint.ts) atau overlay SVG (shape.ts).
 import type {
+  IconGlyph,
   ResolvedBoardNode as BoardNode,
   ResolvedChildNode as ChildNode,
   ResolvedEllipseNode as EllipseNode,
   ResolvedFrameNode as FrameNode,
-  ResolvedIconNode as IconNode,
   ResolvedPathNode as PathNode,
   ResolvedRectNode as RectNode,
   ResolvedTextNode as TextNode,
@@ -24,6 +24,7 @@ import {
   textShadowCss,
 } from './paint.js';
 import { ellipseShape, fillLayer, pathShape, strokeSvg, type Shape } from './shape.js';
+import { iconKey, renderIconElement } from './icon.js';
 
 /** Atribut penanda node di DOM; daemon memakainya untuk screenshot elemen board. */
 export const NODE_ATTR = 'data-lakar-id';
@@ -45,9 +46,9 @@ type Positioned = { position?: 'absolute' | undefined; x?: number | undefined; y
 /** Konteks parent: arah flow (`none` = semua anak absolute) dan geser `scrollY` anak-anaknya. */
 type Parent = { layout: 'row' | 'column' | 'none'; scrollY: number };
 
-/** Konteks render: prefiks URL aset gambar. */
-export type RenderContext = { assetBase: string };
-const DEFAULT_CTX: RenderContext = { assetBase: DEFAULT_ASSET_BASE };
+/** Konteks render: prefiks URL aset gambar dan glyph ikon (kunci `lib/icon`). */
+export type RenderContext = { assetBase: string; icons: ReadonlyMap<string, IconGlyph> };
+const DEFAULT_CTX: RenderContext = { assetBase: DEFAULT_ASSET_BASE, icons: new Map() };
 
 const px = (n: number) => `${n}px`;
 
@@ -125,7 +126,9 @@ function renderChild(d: Document, n: ChildNode, parent: Parent, ctx: RenderConte
       filters = dropShadowFilters(n.shadows);
       break;
     case 'icon':
-      el = renderPlaceholder(d, n);
+      el = renderIconElement(d, n, ctx.icons.get(iconKey(n.lib, n.icon)), NODE_ATTR);
+      // Drop shadow mengikuti bentuk glyph (seperti path); inner/spread tidak didukung.
+      filters = dropShadowFilters(n.shadows);
       break;
   }
   const s = el.style;
@@ -304,15 +307,5 @@ function renderText(d: Document, n: TextNode): HTMLElement {
   // `fixed`: width/height angka dari sizing; overflow tidak dipotong (LC-01b di story 11).
   if (wrap === 'fixed') s.overflow = 'visible';
   el.textContent = n.content;
-  return el;
-}
-
-/**
- * [sementara: story 10] icon belum dirender visualnya: kotak kosong ber-data-lakar-id berukuran `size`,
- * supaya layout dan pengukuran DOM sudah menghitungnya. Efek bersama tetap diterapkan.
- */
-function renderPlaceholder(d: Document, n: IconNode): HTMLElement {
-  const el = d.createElement('div');
-  el.setAttribute(NODE_ATTR, n.id);
   return el;
 }

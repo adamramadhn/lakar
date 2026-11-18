@@ -10,6 +10,7 @@ import {
   type QuickJSWASMModule,
 } from 'quickjs-emscripten';
 import type { Transaction } from '@lakar/core';
+import type { IconCatalogPort } from '@lakar/ports';
 import { LakarError } from '@lakar/schema';
 import { API, KEEP_MAX_BYTES, LOG_MAX_BYTES, LOG_MAX_LINES, MAX_OPS, SNIPPET_GLOBALS, VALUE_MAX_BYTES, type ApiContext } from './api.js';
 
@@ -24,6 +25,8 @@ export type RunOptions = {
   memoryBytes?: number;
   /** `keep` sesi dari execute sukses sebelumnya (default `{}`). */
   keep?: Record<string, unknown>;
+  /** Katalog ikon (wajib): kanonikalisasi node icon dan `iconSearch` (AD-9). */
+  icons: IconCatalogPort;
 };
 export type RunSuccess = {
   ok: true;
@@ -210,7 +213,7 @@ function describeDumped(d: unknown): string {
  * kodenya diteruskan apa adanya (+ lokasi baris). Error snippet lain → EXEC_ERROR, lewat batas waktu →
  * EXEC_TIMEOUT. Lebih dari `MAX_OPS` op mutasi → EXEC_ERROR walau ditangkap snippet.
  */
-export async function runSnippet(code: string, tx: Transaction, opts: RunOptions = {}): Promise<RunResult> {
+export async function runSnippet(code: string, tx: Transaction, opts: RunOptions): Promise<RunResult> {
   const memoryBytes = opts.memoryBytes ?? DEFAULT_MEMORY_BYTES;
   const qjs = await loadQuickJS(memoryBytes);
   const timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
@@ -235,6 +238,7 @@ export async function runSnippet(code: string, tx: Transaction, opts: RunOptions
   const apiCtx: ApiContext = {
     tx,
     view: () => tx.view(),
+    icons: opts.icons,
     countOp() {
       ops++;
       if (ops > MAX_OPS) {

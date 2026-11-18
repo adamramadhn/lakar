@@ -3,9 +3,9 @@
 import { readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { RenderPort } from '@lakar/ports';
-import { CHROMIUM_ARGS, findBoard, fontRequests, type FontFaceSource, type RenderResult } from '@lakar/render';
-import { LakarError, type ResolvedDocument } from '@lakar/schema';
+import type { IconCatalogPort, RenderPort } from '@lakar/ports';
+import { CHROMIUM_ARGS, findBoard, fontRequests, iconRefs, type FontFaceSource, type RenderResult } from '@lakar/render';
+import { LakarError, type IconGlyph, type ResolvedDocument } from '@lakar/schema';
 import type { Browser, Page } from 'playwright-core';
 import type { FontRegistry } from './fonts.js';
 import { Mutex } from './mutex.js';
@@ -24,7 +24,8 @@ export const RENDER_PAGE_HTML = `<!doctype html>
 import { renderBoard } from '/render/index.js';
 // AD-5/AD-6: render memuat face yang diberikan, ukur setelah fonts.ready + dua rAF.
 // Aset gambar disajikan daemon di /assets/<sha256> (store aset <dataDir>/assets).
-window.__lakarRender = (doc, boardId, fonts) => renderBoard(doc, boardId, document.getElementById('root'), { fonts, assetBase: '/assets/' });
+// Glyph ikon (AD-9) di-resolve daemon dari katalog @lakar/icons dan dikirim sebagai data JSON.
+window.__lakarRender = (doc, boardId, fonts, icons) => renderBoard(doc, boardId, document.getElementById('root'), { fonts, icons, assetBase: '/assets/' });
 window.__lakarReady = true;
 </script></body></html>
 `;
@@ -44,6 +45,8 @@ export type ChromiumOptions = {
   timeoutMs: number;
   /** Registry font lokal: face board di-resolve sebelum render (AD-10). */
   fonts: FontRegistry;
+  /** Katalog ikon: glyph node icon board di-resolve sebelum render (AD-9). */
+  icons: IconCatalogPort<string, IconGlyph>;
 };
 
 export class ChromiumRenderer implements RenderPort<ResolvedDocument> {
@@ -76,6 +79,7 @@ export class ChromiumRenderer implements RenderPort<ResolvedDocument> {
       // FONT_MISSING di luar pembungkus RENDER_FAILED: kesalahan dokumen, bukan kerusakan halaman.
       const board = findBoard(doc, boardId);
       const fonts: FontFaceSource[] = board ? this.#opts.fonts.resolveFaces(fontRequests(board)) : [];
+      const icons: IconGlyph[] = board ? iconRefs(board).flatMap((r) => this.#opts.icons.glyph(r.lib, r.icon) ?? []) : [];
       let result: RenderResult;
       let page: Page;
       try {
@@ -84,9 +88,14 @@ export class ChromiumRenderer implements RenderPort<ResolvedDocument> {
         if (board) await page.setViewportSize({ width: Math.max(1, Math.ceil(board.width)), height: Math.max(1, Math.ceil(board.height)) });
         // Fungsi ini berjalan di halaman Chromium (lihat RENDER_PAGE_HTML), bukan di Node.
         result = await page.evaluate(
-          ({ doc, boardId, fonts }) =>
-            (globalThis as unknown as { __lakarRender(d: unknown, id: string, f: unknown): Promise<RenderResult> }).__lakarRender(doc, boardId, fonts),
-          { doc, boardId, fonts },
+          ({ doc, boardId, fonts, icons }) =>
+            (globalThis as unknown as { __lakarRender(d: unknown, id: string, f: unknown, i: unknown): Promise<RenderResult> }).__lakarRender(
+              doc,
+              boardId,
+              fonts,
+              icons,
+            ),
+          { doc, boardId, fonts, icons },
         );
       } catch (e) {
         throw await this.#failed(e);
@@ -94,6 +103,12 @@ export class ChromiumRenderer implements RenderPort<ResolvedDocument> {
       // Halaman tetap dipakai: hanya dokumen yang salah.
       if (!result.ok && result.code === 'NOT_FOUND') {
         throw new LakarError('NOT_FOUND', result.message, { hint: ASSET_HINT, retryable: false });
+      }
+      if (!result.ok && result.code === 'ICON_UNKNOWN') {
+        throw new LakarError('ICON_UNKNOWN', result.message, {
+          hint: 'perbaiki node icon lewat execute (update(id, {icon})) dengan nama kanonik; cari dengan iconSearch / icon_search',
+          retryable: false,
+        });
       }
       if (!result.ok) {
         throw new LakarError('FONT_MISSING', result.message, {

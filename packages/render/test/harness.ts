@@ -9,7 +9,7 @@ import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { Browser, Page } from 'playwright-core';
-import type { ResolvedDocument } from '@lakar/schema';
+import type { IconGlyph, ResolvedDocument } from '@lakar/schema';
 import { CHROMIUM_ARGS, type FontFaceSource, type RenderResult } from '../src/index.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -106,10 +106,18 @@ export async function freshPage(): Promise<Page> {
 }
 
 // Kode yang dievaluasi di halaman ditulis sebagai string: transform vitest tidak boleh menyentuh `import()`.
-const RENDER_IN_PAGE = `async ([doc, boardId, fonts, assetBase]) => {
+const RENDER_IN_PAGE = `async ([doc, boardId, fonts, assetBase, icons]) => {
   const m = await import('/render/index.js');
-  return m.renderBoard(doc, boardId, document.getElementById('root'), { fonts, assetBase });
+  return m.renderBoard(doc, boardId, document.getElementById('root'), { fonts, assetBase, icons });
 }`;
+
+/**
+ * Glyph ikon asli (lucide-static 1.74.0 + simple-icons 16.38.0) dari fixture yang dibuat sekali oleh
+ * `test/fixtures/gen-icon-glyphs.mjs` (sumber: katalog @lakar/icons). Render sendiri tidak bergantung pada icons.
+ */
+export const ICON_GLYPHS: readonly IconGlyph[] = (
+  JSON.parse(await readFile(join(HERE, 'fixtures', 'icon-glyphs.json'), 'utf8')) as { glyphs: IconGlyph[] }
+).glyphs;
 
 /** Render board di halaman harness: viewport = ukuran board sebelum mount, lalu screenshot elemen board. */
 export async function render(
@@ -117,11 +125,11 @@ export async function render(
   boardId: string,
   fonts: readonly FontFaceSource[],
   p: Page = currentPage(),
-  opts: { assetBase?: string } = {},
+  opts: { assetBase?: string; icons?: readonly IconGlyph[] } = {},
 ): Promise<{ result: RenderResult; png: Buffer | undefined }> {
   const board = doc.pages.flatMap((pg) => pg.children).find((b) => b.id === boardId);
   if (board) await p.setViewportSize({ width: Math.max(1, Math.ceil(board.width)), height: Math.max(1, Math.ceil(board.height)) });
-  const args = [doc, boardId, fonts, opts.assetBase ?? ASSET_BASE];
+  const args = [doc, boardId, fonts, opts.assetBase ?? ASSET_BASE, opts.icons ?? ICON_GLYPHS];
   const result = (await p.evaluate(`(${RENDER_IN_PAGE})(${JSON.stringify(args)})`)) as RenderResult;
   if (!result.ok) return { result, png: undefined };
   const png = await p.locator(`[data-lakar-id="${boardId}"]`).screenshot({ type: 'png', scale: 'css', animations: 'disabled', caret: 'hide' });
@@ -256,6 +264,7 @@ export const text = (content: string, props: Loose = {}): Loose => ({ type: 'tex
 export const rect = (props: Loose = {}): Loose => ({ type: 'rect', name: 'Rect', id: nid(), ...props });
 export const ellipse = (props: Loose = {}): Loose => ({ type: 'ellipse', name: 'Ellipse', id: nid(), ...props });
 export const path = (d: string, viewBox: [number, number, number, number], props: Loose = {}): Loose => ({ type: 'path', name: 'Path', id: nid(), d, viewBox, ...props });
+export const icon = (lib: string, name: string, props: Loose = {}): Loose => ({ type: 'icon', name: `Icon / ${lib} / ${name}`, id: nid(), lib, icon: name, size: 24, ...props });
 
 /** Dokumen satu board (latar putih). */
 export function boardDoc(

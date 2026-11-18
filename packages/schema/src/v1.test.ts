@@ -112,6 +112,13 @@ describe('katalog v1', () => {
     expect(e.hint).toBe(XY_HINT);
   });
 
+  it('slug simple-icons ber-underscore lolos; huruf besar/awalan _ ditolak', () => {
+    const icon = (name: string) => ({ type: 'icon', name: 'I', icon: name, lib: 'simple-icons', size: 16 });
+    expect(NodeInput.safeParse(icon('hive_blockchain')).success).toBe(true);
+    expect(NodeInput.safeParse(icon('_x')).success).toBe(false);
+    expect(NodeInput.safeParse(icon('Github')).success).toBe(false);
+  });
+
   it('x/y pada node absolute lolos (semua tipe anak)', () => {
     expect(NodeInput.safeParse({ type: 'ellipse', name: 'E', position: 'absolute', x: 4, y: 4 }).success).toBe(true);
     expect(NodeInput.safeParse({ type: 'rect', name: 'R', position: 'absolute', x: 4 }).success).toBe(true);

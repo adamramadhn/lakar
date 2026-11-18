@@ -2,14 +2,17 @@
 import Fastify, { type FastifyInstance, type FastifyReply } from 'fastify';
 import { DocumentLocks, createDocument, transact } from '@lakar/core';
 import { runSnippet } from '@lakar/exec';
-import type { RenderPort } from '@lakar/ports';
-import { findBoard } from '@lakar/render';
+import { IconCatalog } from '@lakar/icons';
+import type { IconCatalogPort, RenderPort } from '@lakar/ports';
+import { findBoard, iconRefs } from '@lakar/render';
 import {
+  ICON_LIBS,
   LakarError,
   SLUG_PATTERN,
   resolveTokens,
   type ApiErrorBody,
   type ErrorCode,
+  type IconGlyph,
   type LakarDocument,
   type ResolvedDocument,
 } from '@lakar/schema';
@@ -87,17 +90,27 @@ function applyEdits(code: string, edits: { find: string; replace: string }[]): s
   return out;
 }
 const ScreenshotBody = z.object({ boardId: z.string().optional() }).optional();
+const IconSearchBody = z
+  .object({
+    query: z.string().trim().min(1, 'query wajib (string tidak kosong)'),
+    lib: z.enum(ICON_LIBS).optional(),
+    limit: z.number().int().min(1).max(50).optional(),
+  })
+  .strict();
+const ICON_SEARCH_HINT = "kirim {query, lib?, limit?}, mis. {query:'dumbbell'} atau {query:'github', lib:'simple-icons'}; limit 1–50 (default 10)";
 
 export type BuildOptions = {
   config: DaemonConfig;
   render: RenderPort<ResolvedDocument>;
   /** Registry font yang disajikan di `/fonts/...` (default: dimuat dari paket Fontsource). */
   fonts?: FontRegistry;
+  /** Katalog ikon (default: lucide-static + simple-icons terpasang). */
+  icons?: IconCatalogPort<string, IconGlyph>;
 };
 
-export type Daemon = { app: FastifyInstance; store: DocStore; sessions: Sessions; fonts: FontRegistry };
+export type Daemon = { app: FastifyInstance; store: DocStore; sessions: Sessions; fonts: FontRegistry; icons: IconCatalogPort<string, IconGlyph> };
 
-export function buildServer({ config, render, fonts = FontRegistry.load() }: BuildOptions): Daemon {
+export function buildServer({ config, render, fonts = FontRegistry.load(), icons = IconCatalog.load() }: BuildOptions): Daemon {
   const app = Fastify({ logger: false, bodyLimit: 1024 * 1024 });
   const store = new DocStore(config.dataDir);
   const sessions = new Sessions();
@@ -226,7 +239,7 @@ export function buildServer({ config, render, fonts = FontRegistry.load() }: Bui
       try {
         // AD-4: error tak tertangkap di snippet → lempar di dalam body → rollback penuh oleh `transact`.
         committed = await transact(doc, { sessionId: session.id, description: label }, async (tx) => {
-          const run = await runSnippet(code, tx, { timeoutMs: config.execTimeoutMs, memoryBytes: config.execMemoryBytes, keep: session.keep });
+          const run = await runSnippet(code, tx, { timeoutMs: config.execTimeoutMs, memoryBytes: config.execMemoryBytes, keep: session.keep, icons });
           if (!run.ok) throw run.error;
           return run;
         });
@@ -266,8 +279,18 @@ export function buildServer({ config, render, fonts = FontRegistry.load() }: Bui
         hint: boardId ? 'pakai ID board dari created[] execute' : 'buat board dulu lewat execute: add(null,{type:"board",...})',
       });
     }
+    // AD-9: ikon yang tidak dikenal katalog (mis. dokumen lama di disk) → ICON_UNKNOWN + 3 saran sebelum render.
+    for (const r of iconRefs(board)) icons.canonical(r.lib, r.icon);
     const png = await render.screenshot(doc, board.id);
     return ok(reply, { boardId: board.id, width: board.width, height: board.height, mimeType: 'image/png', png: Buffer.from(png).toString('base64') });
+  });
+
+  // Pencarian ikon (AD-9): tanpa dokumen aktif, sesi wajib seperti endpoint lain.
+  app.post('/icons/search', async (req, reply) => {
+    sessions.require(req.headers[SESSION_HEADER]);
+    const body = parse(IconSearchBody, req.body, ICON_SEARCH_HINT);
+    const results = icons.search(body.query, { ...(body.lib ? { lib: body.lib } : {}), ...(body.limit !== undefined ? { limit: body.limit } : {}) });
+    return ok(reply, { query: body.query, results });
   });
 
   // Halaman render untuk Chromium (dimuat oleh adaptor ChromiumRenderer).
@@ -291,5 +314,5 @@ export function buildServer({ config, render, fonts = FontRegistry.load() }: Bui
     return reply.type(asset.type).header('cache-control', 'public, max-age=31536000, immutable').send(asset.body);
   });
 
-  return { app, store, sessions, fonts };
+  return { app, store, sessions, fonts, icons };
 }

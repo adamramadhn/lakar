@@ -8,7 +8,8 @@ import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { crc32, deflateSync } from 'node:zlib';
 import { fileURLToPath } from 'node:url';
-import { ChromiumRenderer, FontRegistry, PACKAGE, RENDER_DIST_DIR, buildServer, loadConfig, startDaemon, type RunningDaemon } from './index.js';
+import { ChromiumRenderer, FontRegistry, IconCatalog, PACKAGE, RENDER_DIST_DIR, buildServer, loadConfig, startDaemon, type RunningDaemon } from './index.js';
+import { API } from '@lakar/exec';
 import { LakarError } from '@lakar/schema';
 import { countDarkPixels, decodePng, readPngSize } from './png.js';
 
@@ -434,6 +435,142 @@ describe('execute AD-7: description, editId, keep, value/logs', () => {
   });
 });
 
+describe('ikon (AD-9): kanonik, ICON_UNKNOWN, /icons/search, render', () => {
+  let s: string;
+  const slug = 'ikon-a';
+  const file = () => join(dataDir, 'docs', `${slug}.lakar.json`);
+  const BOARD = `add(null,{type:'board',name:'Ikon',x:0,y:0,width:200,height:120,screen:'app',fills:[{type:'solid',color:'#FFFFFF'}]})`;
+  /** Saran dari pesan ICON_UNKNOWN (`…; saran: a, b, c`). */
+  const suggestionsOf = (message: string) => /saran: ([a-z0-9_, -]+)/.exec(message)![1]!.split(', ');
+
+  beforeAll(async () => {
+    s = await newSession();
+    await call('/docs/open', { slug }, s);
+  });
+
+  it.skipIf(!browserInstalled)('execute icon:home → get mengembalikan house + version + default name; screenshot memuat piksel ikon berwarna', async () => {
+    const r = await call(
+      '/execute',
+      { code: `const b = ${BOARD};\nconst i = add(b, {type:'icon', lib:'lucide', icon:'home', size:48, color:'#E53935', strokeWidth:2.5, position:'absolute', x:76, y:36});\nget(i)` },
+      s,
+    );
+    expect(r.status, JSON.stringify(r.body.error)).toBe(200);
+    expect(r.body.data.value).toMatchObject({ type: 'icon', lib: 'lucide', icon: 'house', version: '1.74.0', name: 'Icon / lucide / house' });
+    const shot = await call('/screenshot', {}, s);
+    expect(shot.status, JSON.stringify(shot.body.error)).toBe(200);
+    const img = decodePng(Buffer.from(shot.body.data.png, 'base64'));
+    let red = 0;
+    let redOutside = 0;
+    for (let y = 0; y < img.height; y++) {
+      for (let x = 0; x < img.width; x++) {
+        const i = (y * img.width + x) * img.channels;
+        const [pr, pg, pb] = [img.pixels[i]!, img.pixels[i + 1]!, img.pixels[i + 2]!];
+        if (pr > 180 && pg < 110 && pb < 110) {
+          if (x >= 74 && x < 126 && y >= 34 && y < 86) red++;
+          else redOutside++;
+        }
+      }
+    }
+    expect(red).toBeGreaterThan(150);
+    expect(redOutside).toBe(0);
+  }, 60_000);
+
+  it.each(['hoem', 'tidak-ada'])('icon:%s → 422 ICON_UNKNOWN, tepat 3 saran, editId, rev tetap', async (icon) => {
+    const before = await readFile(file(), 'utf8');
+    const r = await call('/execute', { code: `const b = ${BOARD};\nadd(b, {type:'icon', lib:'lucide', icon:'${icon}', size:24});` }, s);
+    expect(r.status).toBe(422);
+    expect(r.body.error!.code).toBe('ICON_UNKNOWN');
+    expect(r.body.error!.message).toMatch(/^baris 2:/);
+    const sug = suggestionsOf(r.body.error!.message);
+    expect(sug).toHaveLength(3);
+    expect(new Set(sug).size).toBe(3);
+    if (icon === 'hoem') expect(sug).toContain('house');
+    expect(r.body.error!.hint).toMatch(/icon_search/);
+    expect(r.body.error!.editId).toMatch(/^[A-Za-z0-9]{8}$/);
+    expect(await readFile(file(), 'utf8')).toBe(before);
+  });
+
+  it('salah pustaka → hint lib; versi asing → SCHEMA_INVALID', async () => {
+    const r = await call('/execute', { code: `const b = ${BOARD}; add(b, {type:'icon', lib:'lucide', icon:'github', size:24});` }, s);
+    expect(r.body.error!.code).toBe('ICON_UNKNOWN');
+    expect(r.body.error!.hint).toContain("lib:'simple-icons'");
+    const v = await call('/execute', { code: `const b = ${BOARD}; add(b, {type:'icon', lib:'lucide', icon:'house', version:'0.1.0', size:24});` }, s);
+    expect(v.body.error!.code).toBe('SCHEMA_INVALID');
+  });
+
+  it('POST /icons/search: dumbbell pertama lucide/dumbbell; input tidak valid → 400; tanpa sesi → 401', async () => {
+    const r = await call('/icons/search', { query: 'dumbbell' }, s);
+    expect(r.status, JSON.stringify(r.body.error)).toBe(200);
+    expect(r.body.data.query).toBe('dumbbell');
+    expect(r.body.data.results[0]).toMatchObject({ lib: 'lucide', icon: 'dumbbell' });
+    const gh = await call('/icons/search', { query: 'github', lib: 'simple-icons', limit: 2 }, s);
+    expect(gh.body.data.results).toHaveLength(2);
+    expect(gh.body.data.results[0]).toMatchObject({ lib: 'simple-icons', icon: 'github' });
+    // tanpa dokumen aktif tetap bisa
+    expect((await call('/icons/search', { query: 'gym' }, await newSession())).body.data.results.map((m: { icon: string }) => m.icon)).toContain('dumbbell');
+    for (const bad of [{}, { query: '' }, { query: 'x', limit: 0 }, { query: 'x', limit: 51 }, { query: 'x', lib: 'feather' }, { query: 'x', extra: 1 }]) {
+      const e = await call('/icons/search', bad, s);
+      expect(e.status, JSON.stringify(bad)).toBe(400);
+      expect(e.body.error!.code).toBe('SCHEMA_INVALID');
+    }
+    expect((await call('/icons/search', { query: 'x' })).status).toBe(401);
+  });
+
+  it.each(Object.entries(API))('contoh API %s sukses dengan katalog asli', async (name, fn) => {
+    const sid = await newSession();
+    await call('/docs/open', { slug: `contoh-${name.toLowerCase()}` }, sid);
+    const r = await call('/execute', { code: fn.example }, sid);
+    expect(r.status, JSON.stringify(r.body.error)).toBe(200);
+  });
+
+  it('screenshot dokumen lama berisi ikon tak dikenal → 422 ICON_UNKNOWN + 3 saran sebelum render; setelah diperbaiki → 200', async () => {
+    const tmp = await mkdtemp(join(tmpdir(), 'lakar-icon-old-'));
+    const seen: unknown[] = [];
+    const capture = { screenshot: async (doc: unknown) => (seen.push(doc), new Uint8Array([1])) };
+    const { app } = buildServer({ config: { ...baseConfig, port: 0, dataDir: tmp }, render: capture });
+    try {
+      const { mkdir } = await import('node:fs/promises');
+      await mkdir(join(tmp, 'docs'), { recursive: true });
+      const stored = {
+        schemaVersion: 1,
+        id: 'Dddddddd',
+        rev: 1,
+        pages: [
+          {
+            id: 'Pppppppp',
+            name: 'Page 1',
+            children: [
+              {
+                type: 'board', name: 'B', x: 0, y: 0, width: 100, height: 100, screen: 'app', id: 'Bbbbbbbb',
+                children: [{ type: 'icon', name: 'Ikon', id: 'Iiiiiiii', lib: 'lucide', icon: 'hoem', size: 24 }],
+              },
+            ],
+          },
+        ],
+      };
+      await writeFile(join(tmp, 'docs', 'lama.lakar.json'), JSON.stringify(stored), 'utf8');
+      const post = (url: string, payload: unknown, session?: string) =>
+        app.inject({ method: 'POST', url, payload: payload as object, headers: session ? { 'x-lakar-session': session } : {} });
+      const sid = (await post('/sessions', {})).json().data.sessionId as string;
+      expect((await post('/docs/open', { slug: 'lama' }, sid)).json().ok).toBe(true);
+      const r = await post('/screenshot', {}, sid);
+      expect(r.statusCode).toBe(422);
+      expect(r.json().error.code).toBe('ICON_UNKNOWN');
+      expect(suggestionsOf(r.json().error.message)).toHaveLength(3);
+      expect(seen).toHaveLength(0);
+      const fix = await post('/execute', { code: `update('Iiiiiiii', {icon:'home'})`, description: 'perbaiki nama ikon lama' }, sid);
+      expect(fix.statusCode, fix.body).toBe(200);
+      const ok = await post('/screenshot', {}, sid);
+      expect(ok.statusCode, ok.body).toBe(200);
+      expect(seen).toHaveLength(1);
+      expect((seen[0] as typeof stored).pages[0]!.children[0]!.children[0]).toMatchObject({ icon: 'house', version: '1.74.0', name: 'Ikon' });
+    } finally {
+      await app.close();
+      await rm(tmp, { recursive: true, force: true });
+    }
+  });
+});
+
 describe('screenshot menerima dokumen ter-resolve', () => {
   it('ref token diganti nilai sebelum RenderPort dipanggil', async () => {
     const tmp = await mkdtemp(join(tmpdir(), 'lakar-tokens-'));
@@ -509,7 +646,13 @@ describe('RENDER_FAILED', () => {
   });
 
   it.skipIf(!browserInstalled)('adaptor Chromium: halaman render tidak bisa dimuat → LakarError RENDER_FAILED retryable', async () => {
-    const renderer = new ChromiumRenderer({ browsersPath, pageUrl: () => 'http://127.0.0.1:1/render/page', timeoutMs: 5000, fonts: FontRegistry.load() });
+    const renderer = new ChromiumRenderer({
+      browsersPath,
+      pageUrl: () => 'http://127.0.0.1:1/render/page',
+      timeoutMs: 5000,
+      fonts: FontRegistry.load(),
+      icons: IconCatalog.load(),
+    });
     try {
       const err = await renderer.screenshot({ schemaVersion: 1, id: 'Dddddddd', rev: 0, pages: [{ id: 'Pppppppp', name: 'P', children: [] }] }, 'Bbbbbbbb').then(
         () => undefined,
@@ -596,7 +739,7 @@ describe('font lokal (registry + FONT_MISSING)', () => {
       resolveFaces: (reqs: Parameters<FontRegistry['resolveFaces']>[0]) =>
         real.resolveFaces(reqs).map((f) => (broken ? { ...f, url: `${f.url}.hilang` } : f)),
     } as unknown as FontRegistry;
-    const renderer = new ChromiumRenderer({ browsersPath, pageUrl: () => `${d.url}/render/page`, timeoutMs: 15000, fonts });
+    const renderer = new ChromiumRenderer({ browsersPath, pageUrl: () => `${d.url}/render/page`, timeoutMs: 15000, fonts, icons: IconCatalog.load() });
     try {
       const doc = {
         schemaVersion: 1 as const,

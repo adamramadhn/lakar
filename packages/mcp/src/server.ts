@@ -1,4 +1,4 @@
-// Server MCP Lakar (v2): tool open_doc, execute, screenshot → HTTP lakard.
+// Server MCP Lakar (v2): tool open_doc, execute, screenshot, icon_search → HTTP lakard.
 import { McpServer, type CallToolResult } from '@modelcontextprotocol/server';
 import { z } from 'zod';
 import type { ApiResult } from '@lakar/schema';
@@ -36,13 +36,18 @@ export const EXECUTE_DESCRIPTION =
   "setTokens({'colors.primary':'#0F62FE','spacing.4':16}) merge token, null menghapus; " +
   'get(id) → NodeView; find({type?, name?: string|RegExp, within?}) → NodeView[] urutan dokumen; children(id|null) → NodeView[] anak langsung (null = board); ' +
   'NodeView = properti tersimpan (token apa adanya) + parentId, path, childIds (hanya-baca: jangan kirim balik ke update/add); ' +
-  'place(w, h, {near?, gap?}) → {x,y} posisi board baru yang tidak tumpang tindih (gap default 80). ' +
+  'place(w, h, {near?, gap?}) → {x,y} posisi board baru yang tidak tumpang tindih (gap default 80); ' +
+  "iconSearch(query, {lib?:'lucide'|'simple-icons', limit?}) → [{lib, icon, tags?, title?, aliasOf?}] cari ikon (default 10, maks 50; sama dengan tool icon_search). " +
   'keep: objek JSON per sesi yang bertahan antar-execute bila sukses (mis. keep.hero = add(...); lalu get(keep.hero)). ' +
   'console.log(...) → data.logs. Nilai ekspresi terakhir → data.value (JSON; dipotong di 32 KB dengan valueTruncated). ' +
   "Katalog node v1 (tertutup): board (parent null) {type:'board', name, x, y, width, height, screen:'landing'|'app'|'mobile', expectedSize?:{width,height}, fills?}; " +
   "frame {layout?:'none'|'row'|'column', gap? (boleh negatif), padding?: n|[v,h]|[t,r,b,l], align?:'start'|'center'|'end'|'stretch', justify?:'start'|'center'|'end'|'space-between', clip?, scrollY?}; " +
   "text {content, size, family?, weight? (100–900), style?:'normal'|'italic', lineHeight? px, letterSpacing? em, align?:'left'|'center'|'right'|'justify', wrap?:'auto'|'wrap'|'fixed', numeric?:'proportional'|'tabular', color?}; " +
   "rect {}; ellipse {startDeg?, sweepDeg? (-360..360), inner? [0,1)}; path {d, viewBox:[x,y,w,h]}; icon {lib:'lucide'|'simple-icons', icon (nama kanonik, mis. 'arrow-right'), size, color?, strokeWidth?, filled?}. " +
+  "Icon: lucide = ikon UI, simple-icons = khusus logo brand; jangan pakai emoji/karakter sebagai ikon. Alias dikonversi otomatis ke nama kanonik (lucide 'home' → 'house'); " +
+  "name default 'Icon / <lib> / <icon>'; version diisi otomatis (jangan dikirim). Lucide: stroke = color (default #000000), strokeWidth dalam unit grid 24 (default 2), " +
+  'filled:true mengisi bentuk dengan color; simple-icons: fill = color (default warna brand), strokeWidth/filled diabaikan; kotak = size×size. ' +
+  'Nama tidak dikenal → ICON_UNKNOWN dengan 3 saran nama kanonik (cari dulu dengan iconSearch atau tool icon_search). ' +
   "Semua node anak wajib name; sizing width/height: angka | 'hug' | 'fill' (+ minWidth/maxWidth/minHeight/maxHeight). " +
   "Efek (semua node anak, termasuk text dan icon): shadows[] {x,y,blur,spread?,color,type?:'drop'|'inner'}, opacity 0..1, blend, blur, backdropBlur, rotation. " +
   "Cat (frame/rect/ellipse/path; radius hanya frame/rect): fills[] ({type:'solid',color} | {type:'linear',angle,stops} | {type:'radial',center?,radius?,stops} | {type:'image',assetId,fit}), " +
@@ -53,6 +58,13 @@ export const EXECUTE_DESCRIPTION =
   'Snippet tanpa op yang sukses tidak menambah rev. ' +
   'Error menyebut baris:kolom snippet dan membawa editId: perbaiki tanpa mengirim ulang kode dengan execute({editId, edits:[{find, replace}]}) ' +
   '(find harus muncul tepat sekali; description diwarisi; edits kosong = jalankan ulang; editId hilang saat daemon restart → kirim code lengkap).';
+
+/** Deskripsi tool `icon_search` (AD-9). */
+export const ICON_SEARCH_DESCRIPTION =
+  'Cari ikon untuk node icon di execute. Pustaka: lucide (ikon UI) dan simple-icons (KHUSUS logo brand, mis. github, whatsapp). ' +
+  'Mengembalikan {query, results:[{lib, icon, tags?, title?, aliasOf?}]} urut skor: nama persis > awalan nama/alias > token nama > tag persis > tag sebagian (default 10, maks 50). ' +
+  "Pakai lib + icon hasilnya apa adanya: add(b, {type:'icon', lib, icon, size}). icon = nama kanonik; alias (aliasOf ada) juga diterima dan otomatis disimpan sebagai nama kanonik. " +
+  'Di dalam snippet execute, fungsi yang sama tersedia sebagai iconSearch(query, {lib?, limit?}).';
 
 export function createLakarMcpServer(daemonUrl: string): McpServer {
   const client = new DaemonClient(daemonUrl);
@@ -114,6 +126,25 @@ export function createLakarMcpServer(daemonUrl: string): McpServer {
             { type: 'text', text: JSON.stringify(meta) },
           ],
         };
+      }),
+  );
+
+  server.registerTool(
+    'icon_search',
+    {
+      description: ICON_SEARCH_DESCRIPTION,
+      inputSchema: z.object({
+        query: z.string().describe('kata kunci, mis. "dumbbell", "arrow right", "github"'),
+        lib: z.enum(['lucide', 'simple-icons']).optional().describe('batasi pustaka: lucide (ikon UI) atau simple-icons (logo brand)'),
+        limit: z.number().int().optional().describe('jumlah hasil 1–50 (default 10)'),
+      }),
+    },
+    ({ query, lib, limit }) =>
+      guarded(async () => {
+        const body: Record<string, unknown> = { query };
+        if (lib !== undefined) body.lib = lib;
+        if (limit !== undefined) body.limit = limit;
+        return asText(await client.call('/icons/search', body));
       }),
   );
 

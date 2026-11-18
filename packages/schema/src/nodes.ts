@@ -2,6 +2,7 @@
 // Satu sumber: tipe TS diturunkan dari zod di sini. Tanpa IO.
 import { z } from 'zod';
 import { LakarError } from './errors.js';
+import { ICON_LIBS, ICON_NAME_PATTERN } from './icons.js';
 
 export const SCHEMA_VERSION = 1 as const;
 
@@ -261,10 +262,11 @@ const pathShape = {
 const iconShape = {
   type: z.literal('icon'),
   ...childBase,
-  lib: z.enum(['lucide', 'simple-icons']),
+  lib: z.enum(ICON_LIBS),
   // `name` (dari childBase) = nama layer (AD-3, mis. "Icon / lucide / arrow-right"); nama ikon kanonik
   // pustaka disimpan terpisah di `icon` supaya tidak bertabrakan dengan nama layer (AD-9 × AD-3).
-  icon: z.string().regex(/^[a-z0-9][a-z0-9-]*$/, 'nama ikon kanonik: huruf kecil/angka/tanda hubung, mis. "arrow-right"'),
+  // `_` ada di beberapa slug simple-icons (mis. "hive_blockchain").
+  icon: z.string().regex(ICON_NAME_PATTERN, 'nama ikon kanonik: huruf kecil/angka/tanda hubung/garis bawah, mis. "arrow-right"'),
   version: z.string().min(1).optional(),
   size: tok(Positive),
   color: Color.optional(),

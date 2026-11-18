@@ -1,4 +1,4 @@
-// Tes golden properti visual (Design Notes story 8): fills, stroke, radius, shadows, efek, ellipse busur,
+// Tes golden properti visual (Design Notes story 8): fills, stroke, radius, shadows, efek, ellipse busur, ikon (story 10),
 // path, fill gambar, dan layar gulir hasil `duplicate`. Golden + piksel sampel + bounds numerik.
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { resolveTokens, type ResolvedDocument } from '@lakar/schema';
@@ -11,6 +11,7 @@ import {
   compareGolden,
   ellipse,
   frame,
+  icon,
   GOLDEN_MAX_RATIO,
   interFaces,
   path,
@@ -420,5 +421,72 @@ describe.skipIf(!browserInstalled)('render properti visual (Chromium, tanpa daem
       } else near(nb.y, na.y);
     });
     expect(shifted).toBe(TINT.length * 2);
+  });
+  it('ikon: lucide stroke/filled/strokeWidth/ukuran 16–32, simple-icons warna brand, row bersama teks, opacity/rotation, drop shadow', async () => {
+    const lu = (name: string, x: number, y: number, props: Loose = {}) => icon('lucide', name, abs(x, y, props));
+    const house = lu('house', 20, 20, { size: 32, color: RED, strokeWidth: 2 });
+    const star = lu('star', 70, 20, { size: 32, color: '#F9A825', filled: true, strokeWidth: 1.5 });
+    const check = lu('check', 120, 24, { size: 24, color: GREEN, strokeWidth: 3 });
+    const h16 = lu('house', 160, 28, { size: 16 });
+    const h20 = lu('house', 184, 26, { size: 20 });
+    const h24 = lu('house', 212, 24, { size: 24, color: BLUE });
+    const gh = icon('simple-icons', 'github', abs(260, 20, { size: 32 }));
+    const wa = icon('simple-icons', 'whatsapp', abs(310, 20, { size: 32 }));
+    const scatter = lu('chart-scatter', 360, 20, { size: 32, color: '#8E24AA', strokeWidth: 1 });
+    const row = frame(abs(20, 90, { layout: 'row', gap: 8, align: 'center' }), [
+      icon('lucide', 'search', { size: 20, color: '#1A1A1A' }),
+      text('Cari', { size: 16, lineHeight: 20, color: '#1A1A1A' }),
+    ]);
+    const faded = lu('house', 120, 84, { size: 32, color: RED, opacity: 0.5 });
+    const rotated = lu('star', 170, 84, { size: 32, color: BLUE, rotation: 45, strokeWidth: 2 });
+    const shadowed = lu('house', 240, 76, { size: 48, color: '#37474F', strokeWidth: 2, shadows: [{ type: 'drop', x: 4, y: 6, blur: 4, color: '#00000080' }] });
+    const { png, at } = await run('ikon', [house, star, check, h16, h20, h24, gh, wa, scatter, row, faded, rotated, shadowed], { width: 420, height: 150 });
+    // Kotak node = size×size (rotasi: AABB).
+    for (const [n, size] of [[house, 32], [check, 24], [h16, 16], [h20, 20], [gh, 32]] as const) {
+      near(at(n.id).width, size);
+      near(at(n.id).height, size);
+    }
+    // Ikon flow di row: kotak 20×20, dipusatkan dengan teks.
+    const rowIcon = (row.children as Loose[])[0]!;
+    near(at(rowIcon.id).width, 20);
+    const s = 32 / 24;
+    const [door, doorInside, starFill, checkMid, ghRing, outside, fadedDoor, scatterDot, h24Door] = await pixels(png, [
+      [Math.floor(20 + 15 * s), Math.floor(20 + 17 * s)], // tiang pintu kanan rumah (x=15)
+      [Math.floor(20 + 12 * s), Math.floor(20 + 17 * s)], // di dalam pintu: kosong
+      [Math.floor(70 + 12 * s), Math.floor(20 + 12 * s)], // pusat bintang filled
+      [126, 38], // tengah garis kiri centang (grid 6.5,14.5)
+      [Math.floor(260 + 12 * s), Math.floor(20 + 1.5 * s)], // cincin atas logo github
+      [400, 140],
+      [Math.floor(120 + 15 * s), Math.floor(84 + 17 * s)],
+      [Math.floor(360 + 11.5 * s), Math.floor(20 + 11.5 * s)], // titik fill currentColor
+      [212 + 15, 24 + 17],
+    ]);
+    expectColor(door!, RED, 'stroke lucide = color');
+    expectColor(doorInside!, WHITE, 'fill none di dalam pintu');
+    expectColor(starFill!, '#F9A825', 'filled: bentuk diisi color');
+    expectColor(checkMid!, GREEN, 'centang strokeWidth 3');
+    expectColor(ghRing!, '#181717', 'github warna brand default');
+    expectColor(outside!, WHITE, 'latar di luar ikon');
+    expectColor(fadedDoor!, '#F29C9A', 'opacity 0.5', 10);
+    expectColor(scatterDot!, '#8E24AA', 'fill currentColor → color', 24);
+    expectColor(h24Door!, BLUE, 'ukuran 24 warna biru');
+    // Rotasi 45°: AABB lebih besar dari kotak.
+    expect(at(rotated.id).width).toBeGreaterThan(40);
+    // Drop shadow mengikuti bentuk glyph: bayangan di bawah garis lantai rumah, bukan kotak penuh.
+    const k = 48 / 24;
+    const [floorShadow, boxCorner] = await pixels(png, [
+      [Math.floor(240 + 12 * k + 4), Math.floor(76 + 21 * k + 6)],
+      [240 + 47 + 4, 76 + 2 + 6],
+    ]);
+    expect(luma(floorShadow!)).toBeLessThan(220);
+    expectColor(boxCorner!, WHITE, 'pojok kotak tanpa glyph: tanpa bayangan', 6);
+  });
+
+  it('ikon tanpa glyph → ICON_UNKNOWN sebelum mount (tidak ada placeholder kosong)', async () => {
+    const { doc, boardId } = boardDoc([icon('lucide', 'house'), icon('lucide', 'hoem')]);
+    const { result } = await render(doc, boardId, faces);
+    expect(result).toMatchObject({ ok: false, code: 'ICON_UNKNOWN', icons: ['lucide/hoem'] });
+    const empty = await render(doc, boardId, faces, undefined, { icons: [] });
+    expect(empty.result).toMatchObject({ ok: false, code: 'ICON_UNKNOWN', icons: ['lucide/house', 'lucide/hoem'] });
   });
 });

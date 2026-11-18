@@ -1,3 +1,6 @@
+import { IconCatalog } from '@lakar/icons';
+import type { IconCatalogPort } from '@lakar/ports';
+import type { IconGlyph } from '@lakar/schema';
 import { ChromiumRenderer } from './chromium.js';
 import type { DaemonConfig } from './config.js';
 import { FontRegistry } from './fonts.js';
@@ -6,16 +9,21 @@ import { buildServer, type Daemon } from './server.js';
 export type RunningDaemon = Daemon & { url: string; renderer: ChromiumRenderer; close(): Promise<void> };
 
 /** Rakit + listen di 127.0.0.1 (AD-14). Port 0 = port acak (tes). */
-export async function startDaemon(config: DaemonConfig, opts: { fonts?: FontRegistry } = {}): Promise<RunningDaemon> {
+export async function startDaemon(
+  config: DaemonConfig,
+  opts: { fonts?: FontRegistry; icons?: IconCatalogPort<string, IconGlyph> } = {},
+): Promise<RunningDaemon> {
   let url = '';
   const fonts = opts.fonts ?? FontRegistry.load();
+  const icons = opts.icons ?? IconCatalog.load();
   const renderer = new ChromiumRenderer({
     browsersPath: config.browsersPath,
     pageUrl: () => `${url}/render/page`,
     timeoutMs: config.renderTimeoutMs,
     fonts,
+    icons,
   });
-  const daemon = buildServer({ config, render: renderer, fonts });
+  const daemon = buildServer({ config, render: renderer, fonts, icons });
   await daemon.app.listen({ host: config.host, port: config.port });
   const addr = daemon.app.server.address();
   if (!addr || typeof addr === 'string') throw new Error('alamat listen tidak diketahui');

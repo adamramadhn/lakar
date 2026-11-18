@@ -1,7 +1,42 @@
 import { describe, expect, it } from 'vitest';
 import { beginTransaction, createDocument } from '@lakar/core';
-import { LakarDocument, resolveTokens, type LakarDocument as Doc } from '@lakar/schema';
-import { API, API_GLOBALS, MAX_OPS, PACKAGE, runSnippet, type RunResult } from './index.js';
+import type { IconCatalogPort } from '@lakar/ports';
+import { LakarDocument, LakarError, resolveTokens, type LakarDocument as Doc } from '@lakar/schema';
+import { API, API_GLOBALS, MAX_OPS, PACKAGE, runSnippet as runSnippetRaw, type RunOptions, type RunResult } from './index.js';
+
+/** Katalog ikon palsu kecil (struktural); katalog asli dites di @lakar/icons dan daemon. */
+const FAKE_LIBS: Record<string, { version: string; icons: Record<string, string[]>; aliases: Record<string, string> }> = {
+  lucide: {
+    version: '1.74.0',
+    icons: { house: ['home', 'building'], search: ['find', 'magnifier'], dumbbell: ['gym', 'workout'], ellipsis: ['more'], star: ['favorite'], check: ['done'] },
+    aliases: { home: 'house', 'more-horizontal': 'ellipsis' },
+  },
+  'simple-icons': { version: '16.38.0', icons: { github: ['git'], hive_blockchain: ['hive'] }, aliases: {} },
+};
+const fakeIcons: IconCatalogPort & { searches: unknown[] } = {
+  searches: [],
+  versions: { lucide: '1.74.0', 'simple-icons': '16.38.0' },
+  canonical(lib, icon) {
+    const l = FAKE_LIBS[lib]!;
+    const hit = Object.hasOwn(l.icons, icon) ? icon : l.aliases[icon];
+    if (hit) return { icon: hit, version: l.version };
+    const other = Object.keys(FAKE_LIBS).find((o) => o !== lib && Object.hasOwn(FAKE_LIBS[o]!.icons, icon));
+    throw new LakarError('ICON_UNKNOWN', `ikon ${JSON.stringify(icon)} tidak ada di ${lib}; saran: ${Object.keys(l.icons).slice(0, 3).join(', ')}`, {
+      hint: `${other ? `pakai lib:'${other}'; ` : ''}cari dengan iconSearch() (MCP: icon_search)`,
+    });
+  },
+  search(query, opts = {}) {
+    this.searches.push({ query, ...opts });
+    const out = [];
+    for (const [lib, l] of Object.entries(FAKE_LIBS)) {
+      if (opts.lib && opts.lib !== lib) continue;
+      for (const [icon, tags] of Object.entries(l.icons)) if (icon.includes(query) || tags.includes(query)) out.push({ lib, icon, tags });
+    }
+    return out.slice(0, opts.limit ?? 10);
+  },
+  glyph: () => undefined,
+};
+const runSnippet = (code: string, tx: Parameters<typeof runSnippetRaw>[1], opts: Partial<RunOptions> = {}) => runSnippetRaw(code, tx, { icons: fakeIcons, ...opts });
 
 const tracer = `const b=add(null,{type:'board',name:'Tracer',x:0,y:0,width:390,height:844,screen:'mobile'}); add(b,{type:'text',name:'Judul',content:'Halo dari Lakar',size:32})`;
 const BOARD = (name = 'B', x = 0, w = 390, h = 844) => `add(null,{type:'board',name:'${name}',x:${x},y:0,width:${w},height:${h},screen:'mobile'})`;
@@ -25,7 +60,7 @@ async function commitRun(code: string, doc: Doc = createDocument()) {
 describe('@lakar/exec', () => {
   it('mengekspor nama paket dan permukaan API lengkap (AD-7)', () => {
     expect(PACKAGE).toBe('@lakar/exec');
-    expect(Object.keys(API)).toEqual(['add', 'update', 'replace', 'move', 'duplicate', 'remove', 'setTokens', 'get', 'find', 'children', 'place']);
+    expect(Object.keys(API)).toEqual(['add', 'update', 'replace', 'move', 'duplicate', 'remove', 'setTokens', 'get', 'find', 'children', 'place', 'iconSearch']);
     for (const [name, fn] of Object.entries(API)) {
       expect(fn.signature.startsWith(`${name}(`), name).toBe(true);
       expect(fn.doc.length, name).toBeGreaterThan(20);
@@ -243,7 +278,7 @@ describe('@lakar/exec', () => {
       const ts = errRun(await runSnippet('const a = 1;\nconst b: number = 2', txFor()));
       expect(ts.message).toMatch(/^baris 2:\d+: SyntaxError/);
       const ref = errRun(await runSnippet('fetch("x")', txFor()));
-      expect(ref.hint).toContain('add, update, replace, move, duplicate, remove, setTokens, get, find, children, place, keep, console.log');
+      expect(ref.hint).toContain('add, update, replace, move, duplicate, remove, setTokens, get, find, children, place, iconSearch, keep, console.log');
     });
 
     it('error host yang ditangkap snippet tidak membatalkan transaksi; e.code tersedia', async () => {
@@ -295,6 +330,80 @@ describe('@lakar/exec', () => {
       txFor(),
     );
     expect(okRun(r).value).toEqual(Array(8).fill('undefined'));
+  });
+  describe('ikon (AD-9)', () => {
+    const B = `const b = ${BOARD('Ikon')};`;
+    const icons = async (code: string) => {
+      const { r, c } = await commitRun(`${B}\n${code}`);
+      const board = c.doc.pages[0]!.children[0]!;
+      return { r, c, nodes: board.children as Record<string, unknown>[] };
+    };
+
+    it('alias → kanonik, version distempel, name default; name kanonik + nama layer dipertahankan', async () => {
+      const { nodes } = await icons(`add(b, {type:'icon', lib:'lucide', icon:'home', size:24});\nadd(b, {type:'icon', lib:'lucide', icon:'search', name:'Cari', size:20});`);
+      expect(nodes[0]).toMatchObject({ type: 'icon', lib: 'lucide', icon: 'house', version: '1.74.0', name: 'Icon / lucide / house' });
+      expect(nodes[1]).toMatchObject({ icon: 'search', name: 'Cari', version: '1.74.0' });
+    });
+
+    it('slug simple-icons ber-underscore diterima', async () => {
+      const { nodes } = await icons(`add(b, {type:'icon', lib:'simple-icons', icon:'hive_blockchain', size:24});`);
+      expect(nodes[0]).toMatchObject({ icon: 'hive_blockchain', version: '16.38.0', name: 'Icon / simple-icons / hive_blockchain' });
+    });
+
+    it('update/replace/duplicate mengkanonikkan dan menstempel version; lib/icon digabung dari node lama', async () => {
+      const { nodes } = await icons(
+        `const i = add(b, {type:'icon', lib:'lucide', icon:'star', size:24});\n` +
+          `update(i, {icon:'more-horizontal'});\n` +
+          `const j = duplicate(i, {icon:'home'});\n` +
+          `const r = add(b, {type:'rect', name:'R', width:10, height:10});\n` +
+          `replace(r, {type:'icon', lib:'simple-icons', icon:'github', size:16});\n` +
+          `update(j, {lib:'lucide', version: null});`,
+      );
+      expect(nodes.map((n) => [n.icon, n.version, n.name])).toEqual([
+        ['ellipsis', '1.74.0', 'Icon / lucide / star'],
+        ['house', '1.74.0', 'Icon / lucide / star'],
+        ['github', '16.38.0', 'Icon / simple-icons / github'],
+      ]);
+    });
+
+    it('update lib ke simple-icons pada house → ICON_UNKNOWN + rollback', async () => {
+      const e = errRun(await runSnippet(`${B}\nconst i = add(b, {type:'icon', lib:'lucide', icon:'house', size:24});\nupdate(i, {lib:'simple-icons'});`, txFor()));
+      expect(e.code).toBe('ICON_UNKNOWN');
+    });
+
+    it('nama tak dikenal → ICON_UNKNOWN + baris L:K + saran; salah pustaka → hint lib', async () => {
+      const e = errRun(await runSnippet(`${B}\n\nadd(b, {type:'icon', lib:'lucide', icon:'hoem', size:24});`, txFor()));
+      expect(e.code).toBe('ICON_UNKNOWN');
+      expect(e.message).toMatch(/^baris 3:/);
+      expect(e.message).toMatch(/saran: house, search, dumbbell/);
+      expect(e.hint).toMatch(/iconSearch/);
+      const e2 = errRun(await runSnippet(`${B}\nadd(b, {type:'icon', lib:'lucide', icon:'github', size:24});`, txFor()));
+      expect(e2.hint).toContain("lib:'simple-icons'");
+    });
+
+    it('version asing → SCHEMA_INVALID + hint hapus version; version terpasang diterima', async () => {
+      const e = errRun(await runSnippet(`${B}\nadd(b, {type:'icon', lib:'lucide', icon:'house', version:'0.1.0', size:24});`, txFor()));
+      expect(e.code).toBe('SCHEMA_INVALID');
+      expect(e.hint).toMatch(/hapus version/);
+      const { nodes } = await icons(`add(b, {type:'icon', lib:'lucide', icon:'house', version:'1.74.0', size:24});`);
+      expect(nodes[0]!.version).toBe('1.74.0');
+    });
+
+    it('input tidak valid dibiarkan sampai validasi core (SCHEMA_INVALID)', async () => {
+      expect(errRun(await runSnippet(`${B}\nadd(b, {type:'icon', lib:'phosphor', icon:'house', size:24});`, txFor())).code).toBe('SCHEMA_INVALID');
+      expect(errRun(await runSnippet(`${B}\nadd(b, {type:'icon', lib:'lucide', icon:42, size:24});`, txFor())).code).toBe('SCHEMA_INVALID');
+      expect(errRun(await runSnippet(`${B}\nadd(b, {type:'icon', lib:'lucide', icon:'house'});`, txFor())).code).toBe('SCHEMA_INVALID');
+    });
+
+    it('iconSearch: meneruskan ke katalog; default limit 10; input tidak valid → SCHEMA_INVALID', async () => {
+      fakeIcons.searches.length = 0;
+      const r = okRun(await runSnippet(`[iconSearch('dumbbell')[0], iconSearch('gym', {lib:'lucide', limit:2}).map((m) => m.icon)]`, txFor()));
+      expect(r.value).toEqual([{ lib: 'lucide', icon: 'dumbbell', tags: ['gym', 'workout'] }, ['dumbbell']]);
+      expect(fakeIcons.searches).toEqual([{ query: 'dumbbell', limit: 10 }, { query: 'gym', lib: 'lucide', limit: 2 }]);
+      for (const bad of [`iconSearch('')`, `iconSearch(5)`, `iconSearch('x', {lib:'feather'})`, `iconSearch('x', {limit:0})`, `iconSearch('x', {limit:51})`, `iconSearch('x', {top:1})`, `iconSearch('x', 3)`]) {
+        expect(errRun(await runSnippet(bad, txFor())).code, bad).toBe('SCHEMA_INVALID');
+      }
+    });
   });
 });
 

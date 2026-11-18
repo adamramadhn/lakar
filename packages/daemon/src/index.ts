@@ -6,3 +6,4 @@ export { FontRegistry, FONT_PACKAGES, type FontFamilyEntry } from './fonts.js';
 export { ASSET_ID, rasterType, readAsset } from './assets.js';
 export { DocStore } from './store.js';
 export { startDaemon, type RunningDaemon } from './start.js';
+export { IconCatalog } from '@lakar/icons';

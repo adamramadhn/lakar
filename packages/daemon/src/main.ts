@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 // Entry `lakard`. Jalankan: /opt/node-26/bin/pnpm lakard  (atau /opt/node-26/bin/node packages/daemon/dist/main.js)
+import { IconCatalog } from '@lakar/icons';
 import { loadConfig } from './config.js';
 import { FontRegistry } from './fonts.js';
 import { startDaemon } from './start.js';
@@ -15,7 +16,9 @@ try {
 try {
   const fonts = FontRegistry.load();
   if (fonts.missing.length) console.warn(`lakard: paket font tidak ditemukan: ${fonts.missing.join(', ')}`);
-  const daemon = await startDaemon(config, { fonts });
+  // Katalog ikon dimuat saat start (bukan di permintaan pertama); paket hilang → gagal start yang jelas.
+  const icons = IconCatalog.load();
+  const daemon = await startDaemon(config, { fonts, icons });
   let closing = false;
   const shutdown = (signal: string) => {
     if (closing) return;

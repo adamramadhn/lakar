@@ -37,6 +37,11 @@ function fakeDaemon() {
       if (body.editId === 'Eeeeeeee') return send(200, { ok: true, data: { docId: 'Dddddddd', rev: 2, created: [], value: 1, logs: 'halo' } });
       return send(200, { ok: true, data: { docId: 'Dddddddd', rev: 1, created: [{ id: 'Bbbbbbbb', name: 'Tracer', path: ['Tracer'] }] } });
     }
+    if (req.url === '/icons/search') {
+      if (!body.query) return send(400, { ok: false, error: { code: 'SCHEMA_INVALID', message: 'query: wajib', hint: 'kirim {query}', retryable: false } });
+      const results = body.query === 'dumbbell' ? [{ lib: 'lucide', icon: 'dumbbell', tags: ['gym'] }] : [];
+      return send(200, { ok: true, data: { query: body.query, results } });
+    }
     if (req.url === '/screenshot') {
       if (body.boardId === 'ZZZZZZZZ') return send(404, { ok: false, error: { code: 'NOT_FOUND', message: 'board tidak ada', hint: 'pakai id', retryable: false } });
       return send(200, { ok: true, data: { boardId: 'Bbbbbbbb', width: 390, height: 844, mimeType: 'image/png', png: PNG_B64 } });
@@ -74,10 +79,29 @@ describe('@lakar/mcp', () => {
     expect(PACKAGE).toBe('@lakar/mcp');
   });
 
-  it('daftar tool: open_doc, execute, screenshot', async () => {
+  it('daftar tool: open_doc, execute, screenshot, icon_search', async () => {
     const c = await connect(url);
     const { tools } = await c.listTools();
-    expect(tools.map((t) => t.name).sort()).toEqual(['execute', 'open_doc', 'screenshot']);
+    expect(tools.map((t) => t.name).sort()).toEqual(['execute', 'icon_search', 'open_doc', 'screenshot']);
+  });
+
+  it('icon_search → POST /icons/search {query, lib?, limit?}; hasil pertama dumbbell; deskripsi menyebut kanonik/alias/brand', async () => {
+    fake.seen.length = 0;
+    const c = await connect(url);
+    const r = await c.callTool({ name: 'icon_search', arguments: { query: 'dumbbell', lib: 'lucide', limit: 3 } });
+    expect(r.isError).toBeFalsy();
+    const data = JSON.parse((r.content as any)[0].text);
+    expect(data.results[0]).toMatchObject({ lib: 'lucide', icon: 'dumbbell' });
+    expect(fake.seen.at(-1)).toMatchObject({ path: '/icons/search', body: { query: 'dumbbell', lib: 'lucide', limit: 3 } });
+    expect(fake.seen.at(-1)!.session).toMatch(/^s\d+$/);
+    await c.callTool({ name: 'icon_search', arguments: { query: 'gym' } });
+    expect(fake.seen.at(-1)!.body).toEqual({ query: 'gym' });
+    const bad = await c.callTool({ name: 'icon_search', arguments: { query: '' } });
+    expect(bad.isError).toBe(true);
+    expect((bad.content as any)[0].text).toMatch(/^SCHEMA_INVALID/);
+    const tool = (await c.listTools()).tools.find((t) => t.name === 'icon_search')!;
+    expect(Object.keys((tool.inputSchema as any).properties).sort()).toEqual(['lib', 'limit', 'query']);
+    for (const s of ['kanonik', 'alias', 'logo brand', 'simple-icons', 'lucide', 'iconSearch(']) expect(tool.description).toContain(s);
   });
 
   it('alur open_doc → execute → screenshot, sesi malas dan dipakai ulang', async () => {
@@ -177,7 +201,7 @@ describe('@lakar/mcp', () => {
       const r = await c2.callTool({ name: 'execute', arguments: { code: '1' } });
       expect(r.isError).toBe(true);
       expect((r.content as any)[0].text).toContain('http://127.0.0.1:1');
-      expect((await c2.listTools()).tools).toHaveLength(3);
+      expect((await c2.listTools()).tools).toHaveLength(4);
     } finally {
       await c2.close();
     }

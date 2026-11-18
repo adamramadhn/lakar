@@ -2,6 +2,7 @@
 // (`LakarApi`) dan tabel runtime `API` (signature, doc, contoh yang dites, implementasi host).
 // Tanpa IO. Semua op baca bekerja di salinan kerja transaksi dan mengembalikan salinan.
 import type { Transaction } from '@lakar/core';
+import type { IconCatalogMatch, IconCatalogPort } from '@lakar/ports';
 import { ID_PATTERN, LakarError, NODE_TYPES, type AnyNode, type ErrorCode, type LakarDocument as Doc, type NodeInput, type NodeType } from '@lakar/schema';
 
 // ---------------------------------------------------------------------------
@@ -19,6 +20,9 @@ export const LOG_MAX_LINES = 100;
 export const LOG_MAX_BYTES = 16 * 1024;
 /** Jarak default antar-board untuk `place`. */
 export const DEFAULT_PLACE_GAP = 80;
+/** `iconSearch`: jumlah hasil default dan maksimum. */
+export const ICON_SEARCH_DEFAULT_LIMIT = 10;
+export const ICON_SEARCH_MAX_LIMIT = 50;
 
 // ---------------------------------------------------------------------------
 // Tipe publik
@@ -61,6 +65,17 @@ export type PlaceOptions = {
 
 export type Point = { x: number; y: number };
 
+/** Opsi `iconSearch`. */
+export type IconSearchOptions = {
+  /** Batasi ke satu pustaka: `lucide` (ikon UI) atau `simple-icons` (logo brand). */
+  lib?: 'lucide' | 'simple-icons';
+  /** Jumlah hasil (default 10, maks 50). */
+  limit?: number;
+};
+
+/** Satu hasil `iconSearch`. `aliasOf` ada bila `icon` adalah alias (nilai = nama kanonik). */
+export type IconSearchMatch = IconCatalogMatch<'lucide' | 'simple-icons'>;
+
 /** Properti node untuk `add`/`replace` (katalog v1 tertutup), tanpa `id`/`children`. */
 export type NodeProps = NodeInput;
 /** Patch dangkal untuk `update`/`duplicate`; `null` menghapus properti opsional. */
@@ -68,7 +83,17 @@ export type NodePatch = Record<string, unknown>;
 
 /** Fungsi global yang tersedia di snippet `execute`. */
 export interface LakarApi {
-  /** Tambah node ke board/frame `parentId` (null = halaman, khusus board). Mengembalikan ID baru 8 karakter. */
+  /**
+   * Tambah node ke board/frame `parentId` (null = halaman, khusus board). Mengembalikan ID baru 8 karakter.
+   *
+   * Node `icon` ({type:'icon', lib:'lucide'|'simple-icons', icon, size, color?, strokeWidth?, filled?}): `icon` = nama
+   * ikon kanonik pustaka (alias dikonversi otomatis, mis. lucide `home` → `house`); `name` = nama layer (default
+   * `Icon / <lib> / <icon>`); `version` diisi otomatis dengan versi pustaka terpasang (jangan dikirim). Nama tidak
+   * dikenal → ICON_UNKNOWN + 3 saran (cari dengan `iconSearch`).
+   * Gambar lucide: stroke = `color` (default #000000), `strokeWidth` dalam unit grid 24 (default 2), ujung/sambungan
+   * bulat, `filled: true` mengisi bentuk dengan `color`. Simple-icons (khusus logo brand): fill = `color` (default
+   * warna brand), `strokeWidth`/`filled` diabaikan. Kotak node = `size`×`size`.
+   */
   add(parentId: string | null, node: NodeProps): string;
   /** Merge dangkal properti; `null` menghapus properti opsional. `type`/`id`/`children` tidak bisa diubah. */
   update(id: string, patch: NodePatch): void;
@@ -90,6 +115,11 @@ export interface LakarApi {
   children(id: string | null): NodeView[];
   /** Posisi bebas tumpang tindih untuk board baru berukuran `w`×`h`. */
   place(w: number, h: number, opts?: PlaceOptions): Point;
+  /**
+   * Cari ikon di katalog terpasang (lucide = ikon UI, simple-icons = logo brand). Urut skor: nama persis >
+   * awalan nama/alias > token nama > tag persis > tag sebagian. Pakai `lib` + `icon` hasilnya di node icon.
+   */
+  iconSearch(query: string, opts?: IconSearchOptions): IconSearchMatch[];
 }
 
 /** Konteks host untuk satu snippet. */
@@ -99,6 +129,8 @@ export type ApiContext = {
   view(): Readonly<Doc>;
   /** Dipanggil setelah setiap op mutasi sukses; melempar bila melewati `MAX_OPS`. */
   countOp(): void;
+  /** Katalog ikon (kanonikalisasi node icon, `iconSearch`). */
+  icons: IconCatalogPort;
 };
 
 export type ApiFunction = {
@@ -164,6 +196,56 @@ function rejectDerivedKeys(fn: string, obj: unknown): void {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Ikon (AD-9): kanonikalisasi sebelum op core
+// ---------------------------------------------------------------------------
+
+const ICON_KEYS = ['icon', 'lib', 'version'] as const;
+
+/** `lib` yang dikenal katalog, atau undefined (dibiarkan sampai validasi core → SCHEMA_INVALID). */
+const knownLib = (ctx: ApiContext, lib: unknown): string | undefined =>
+  typeof lib === 'string' && Object.hasOwn(ctx.icons.versions, lib) ? lib : undefined;
+
+/**
+ * Kanonikkan `icon` + stempel `version` untuk lib/icon gabungan. Versi asing → SCHEMA_INVALID; nama tidak
+ * dikenal → ICON_UNKNOWN (dari katalog). Mengembalikan undefined bila input dibiarkan untuk validasi core.
+ */
+function canonicalIcon(ctx: ApiContext, fn: string, lib: unknown, icon: unknown, version: unknown): { icon: string; version: string } | undefined {
+  const l = knownLib(ctx, lib);
+  if (l === undefined || typeof icon !== 'string') return undefined;
+  const installed = ctx.icons.versions[l]!;
+  if (version !== undefined && version !== null && version !== installed) {
+    throw new LakarError('SCHEMA_INVALID', `${fn}: version ikon ${show(version)} bukan versi ${l} terpasang (${installed})`, {
+      hint: 'hapus version dari node icon; diisi otomatis dengan versi pustaka terpasang',
+    });
+  }
+  return ctx.icons.canonical(l, icon);
+}
+
+/** add/replace: node icon → `icon` kanonik, `version` terpasang, `name` default `Icon / <lib> / <icon>`. */
+function iconNode(ctx: ApiContext, fn: string, node: unknown): unknown {
+  if (!isPlainObject(node) || node.type !== 'icon') return node;
+  const c = canonicalIcon(ctx, fn, node.lib, node.icon, node.version);
+  if (!c) return node;
+  return { ...node, icon: c.icon, version: c.version, ...(node.name === undefined ? { name: `Icon / ${node.lib as string} / ${c.icon}` } : {}) };
+}
+
+/** update/duplicate: patch yang menyentuh icon/lib/version pada node icon → lib/icon digabung dari node lama. */
+function iconPatch(ctx: ApiContext, fn: string, id: unknown, patch: unknown): unknown {
+  if (!isPlainObject(patch) || !ICON_KEYS.some((k) => Object.hasOwn(patch, k))) return patch;
+  if (typeof id !== 'string' || !ID_PATTERN.test(id)) return patch;
+  const hit = walk(ctx.view()).find((e) => e.node.id === id);
+  if (!hit || hit.node.type !== 'icon') return patch;
+  const old = hit.node as { lib: string; icon: string };
+  const lib = Object.hasOwn(patch, 'lib') ? patch.lib : old.lib;
+  const icon = Object.hasOwn(patch, 'icon') ? patch.icon : old.icon;
+  const c = canonicalIcon(ctx, fn, lib, icon, patch.version);
+  return c ? { ...patch, icon: c.icon, version: c.version } : patch;
+}
+
+const ICON_SEARCH_KEYS = ['lib', 'limit'];
+const ICON_SEARCH_HINT = "contoh: iconSearch('dumbbell') atau iconSearch('arrow right', {lib:'lucide', limit:5})";
+
 type Entry = { node: AnyNode; parentId: string | null; path: string[] };
 
 /** Semua node dalam urutan dokumen (pre-order: halaman → board → anak). */
@@ -227,13 +309,16 @@ export const API: { readonly [K in keyof LakarApi]: ApiFunction } = {
     signature: "add(parentId: string | null, node: {type: 'board'|'frame'|'text'|'rect'|'ellipse'|'path'|'icon', name, ...}): string",
     doc:
       'Tambah node ke board/frame parentId (null = halaman, khusus board). Katalog v1 tertutup: board, frame, text, rect, ellipse, path, icon. ' +
-      'Anak ditambahkan satu per satu (tanpa children bersarang). Mengembalikan ID 8 karakter secara sinkron.',
+      'Anak ditambahkan satu per satu (tanpa children bersarang). Mengembalikan ID 8 karakter secara sinkron. ' +
+      "Icon: {type:'icon', lib:'lucide'|'simple-icons', icon:<nama kanonik>, size, color?, strokeWidth?, filled?}; alias dikonversi ke nama kanonik " +
+      "(lucide 'home' → 'house'), name default 'Icon / <lib> / <icon>', version diisi otomatis (jangan dikirim); nama tidak dikenal → ICON_UNKNOWN + 3 saran (cari dengan iconSearch).",
     returns: 'ID node baru (string 8 karakter)',
-    errors: ['SCHEMA_INVALID', 'NOT_FOUND'],
-    example: `${BOARD}\nadd(b, {type:'text', name:'Judul', content:'Halo', size:32});`,
+    errors: ['SCHEMA_INVALID', 'NOT_FOUND', 'ICON_UNKNOWN'],
+    example: `${BOARD}\nadd(b, {type:'text', name:'Judul', content:'Halo', size:32});\nadd(b, {type:'icon', lib:'lucide', icon:'home', size:24, color:'#1A1A1A'});`,
     call(ctx, [parentId, node]) {
       rejectDerivedKeys('add', node);
-      return mutation(ctx, () => ctx.tx.add(parentId as string | null, node));
+      const n = iconNode(ctx, 'add', node);
+      return mutation(ctx, () => ctx.tx.add(parentId as string | null, n));
     },
   },
   update: {
@@ -241,11 +326,12 @@ export const API: { readonly [K in keyof LakarApi]: ApiFunction } = {
     signature: 'update(id: string, patch: {...}): void',
     doc: 'Merge dangkal properti ke node; null menghapus properti opsional. type/id/children tidak bisa diubah (ganti tipe → replace).',
     returns: 'undefined',
-    errors: ['SCHEMA_INVALID', 'NOT_FOUND'],
+    errors: ['SCHEMA_INVALID', 'NOT_FOUND', 'ICON_UNKNOWN'],
     example: `${BOARD}\nconst t = add(b, {type:'text', name:'Judul', content:'Halo', size:32});\nupdate(t, {size: 40, color: '#1A1A1A'});`,
     call(ctx, [id, patch]) {
       rejectDerivedKeys('update', patch);
-      mutation(ctx, () => ctx.tx.update(id as string, patch));
+      const p = iconPatch(ctx, 'update', id, patch);
+      mutation(ctx, () => ctx.tx.update(id as string, p));
       return undefined;
     },
   },
@@ -254,11 +340,12 @@ export const API: { readonly [K in keyof LakarApi]: ApiFunction } = {
     signature: "replace(id: string, node: {type, name, ...}): void",
     doc: 'Ganti semua properti node (boleh ganti tipe, kecuali board ↔ non-board). ID dan posisi tetap; anak dipertahankan bila tipe baru frame/board.',
     returns: 'undefined',
-    errors: ['SCHEMA_INVALID', 'NOT_FOUND'],
+    errors: ['SCHEMA_INVALID', 'NOT_FOUND', 'ICON_UNKNOWN'],
     example: `${BOARD}\nconst r = add(b, {type:'rect', name:'Kotak', width:100, height:40});\nreplace(r, {type:'ellipse', name:'Bulat', width:40, height:40});`,
     call(ctx, [id, node]) {
       rejectDerivedKeys('replace', node);
-      mutation(ctx, () => ctx.tx.replace(id as string, node));
+      const n = iconNode(ctx, 'replace', node);
+      mutation(ctx, () => ctx.tx.replace(id as string, n));
       return undefined;
     },
   },
@@ -279,11 +366,12 @@ export const API: { readonly [K in keyof LakarApi]: ApiFunction } = {
     signature: 'duplicate(id: string, patch?: {...}): string',
     doc: 'Salin node beserta subtree dengan ID baru, disisipkan tepat setelah asal; patch (aturan update) di-merge ke akar salinan.',
     returns: 'ID akar salinan (string 8 karakter)',
-    errors: ['SCHEMA_INVALID', 'NOT_FOUND'],
+    errors: ['SCHEMA_INVALID', 'NOT_FOUND', 'ICON_UNKNOWN'],
     example: `${BOARD}\nconst f = add(b, {type:'frame', name:'Kartu', layout:'column', gap:8});\nadd(f, {type:'text', name:'Judul', content:'Halo', size:16});\nduplicate(f, {name:'Kartu 2'});`,
     call(ctx, [id, patch]) {
       rejectDerivedKeys('duplicate', patch);
-      return mutation(ctx, () => ctx.tx.duplicate(id as string, patch));
+      const p = iconPatch(ctx, 'duplicate', id, patch);
+      return mutation(ctx, () => ctx.tx.duplicate(id as string, p));
     },
   },
   remove: {
@@ -421,6 +509,34 @@ export const API: { readonly [K in keyof LakarApi]: ApiFunction } = {
       if (!boards.length) return { x: 0, y: 0 };
       // Baris atas: kanan dari board paling kanan, sejajar board paling atas.
       return { x: Math.max(...boards.map((b) => b.x + b.w)) + gap, y: Math.min(...boards.map((b) => b.y)) };
+    },
+  },
+  iconSearch: {
+    kind: 'read',
+    signature: "iconSearch(query: string, opts?: {lib?: 'lucide'|'simple-icons', limit?: number}): {lib, icon, tags?, title?, aliasOf?}[]",
+    doc:
+      'Cari ikon di katalog terpasang: lucide (ikon UI) dan simple-icons (khusus logo brand). Urut skor: nama persis > awalan nama/alias > ' +
+      `token nama > tag persis > tag sebagian; default ${ICON_SEARCH_DEFAULT_LIMIT} hasil, maks ${ICON_SEARCH_MAX_LIMIT}. Pakai lib + icon hasilnya di node icon (alias juga diterima, disimpan sebagai nama kanonik).`,
+    returns: '{lib, icon, tags?, title?, aliasOf?}[] (bisa kosong)',
+    errors: ['SCHEMA_INVALID'],
+    example: `${BOARD}\nconst [m] = iconSearch('dumbbell', {lib:'lucide', limit:3});\nadd(b, {type:'icon', lib:m.lib, icon:m.icon, size:24});`,
+    call(ctx, [query, opts]) {
+      if (typeof query !== 'string' || !query.trim()) {
+        throw new LakarError('SCHEMA_INVALID', `iconSearch: query harus string tidak kosong, bukan ${show(query)}`, { hint: ICON_SEARCH_HINT });
+      }
+      const o = opts ?? {};
+      if (!isPlainObject(o)) throw new LakarError('SCHEMA_INVALID', `iconSearch: opsi harus objek {lib?, limit?}, bukan ${show(o)}`, { hint: ICON_SEARCH_HINT });
+      const unknown = Object.keys(o).filter((k) => !ICON_SEARCH_KEYS.includes(k));
+      if (unknown.length) throw new LakarError('SCHEMA_INVALID', `iconSearch: kunci opsi tidak dikenal: ${unknown.join(', ')}`, { hint: `kunci yang didukung: ${ICON_SEARCH_KEYS.join(', ')}` });
+      if (o.lib !== undefined && knownLib(ctx, o.lib) === undefined) {
+        throw new LakarError('SCHEMA_INVALID', `iconSearch: lib tidak dikenal: ${show(o.lib)}`, { hint: `lib salah satu: ${Object.keys(ctx.icons.versions).join(', ')} (atau hilangkan untuk semua)` });
+      }
+      const limit = o.limit ?? ICON_SEARCH_DEFAULT_LIMIT;
+      if (typeof limit !== 'number' || !Number.isInteger(limit) || limit < 1 || limit > ICON_SEARCH_MAX_LIMIT) {
+        throw new LakarError('SCHEMA_INVALID', `iconSearch: limit harus bilangan bulat 1–${ICON_SEARCH_MAX_LIMIT}, bukan ${show(limit)}`, { hint: `hilangkan limit untuk default ${ICON_SEARCH_DEFAULT_LIMIT}` });
+      }
+      const res = ctx.icons.search(query, { ...(o.lib !== undefined ? { lib: o.lib as string } : {}), limit });
+      return JSON.parse(JSON.stringify(res)) as unknown;
     },
   },
 };
