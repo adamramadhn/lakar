@@ -190,3 +190,13 @@ Skill: `core.md` `39be8af8dcb0ad25`, `landing.md` `f0049a9b76822eea`, `mobile.md
   dikirim ke Wikimedia, atau penyedia foto lain. Sesudah itu: lanjutkan iterasi 4 (`--resume` hanya mengulang P3; P1/P2
   tetap dengan foto gagal) atau mulai iterasi 5 baru (`--iter 5 --reuse-pendev 2`, disarankan; sisa iterasi 5–6,
   sisa anggaran ≈ $27).
+
+### Perbaikan orkestrator setelah iterasi 4 (commit fada52e)
+
+- Respons 429 Wikimedia sendiri meminta "use thumbnail images in sizes listed on https://w.wiki/GHai". Uji ulang: file
+  asli dan thumbnail lewat host `upload.wikimedia.org` → 429; thumbnail bucket standar lewat host `thumb.wikimedia.org`
+  (1280/1920/3840) → 200 dengan UA yang sama (HTTP/1.1, tanpa kontak).
+- Perbaikan sesuai arahan Wikimedia (bukan mengakali batas, UA tetap tanpa data pribadi): `wikimediaImportUrl` selalu
+  memakai thumbnail bucket standar dari path pratinjau `thumb.wikimedia.org` (maks 3840 JPEG/WebP, 1920 PNG); file asli
+  tidak pernah diunduh. Uji langsung lewat `PhotoService` hasil build: 3/3 foto `wikimedia:` terimpor (1920 px).
+- Iterasi 4 tercatat `aborted` (tidak dijuri). Lanjut iterasi 5 baru `--iter 5 --reuse-pendev 2`; iterasi 6 terakhir.
