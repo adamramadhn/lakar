@@ -4,7 +4,7 @@
 // `round --round <uji-k|n> [--dry-run] [--resume]`: putaran Lakar vs pen.dev + juri buta (lihat round/main.ts).
 // `rejudge --from <uji-k|n> --label <slug> [--resume] [--dry-run]`: nilai ulang strip putaran yang ada, tanpa agen (rejudge.ts).
 // `rubric-snapshot [--version <v>]`: snapshot rubrik juri tracked di bench/rubric/ (judge/rubric.ts).
-// `practice [--series practice|effects] --iter <k> [--only P1,P3] [--reuse-pendev <j>] [--resume] [--dry-run]`: latihan skill pada prompt latihan beku
+// `practice [--series practice|effects|polish] --iter <k> [--only P1,P3] [--reuse-pendev <j>] [--resume] [--dry-run]`: latihan skill pada prompt latihan beku
 // (practice/main.ts; seri `effects` = P5/P6 efek visual, story 22); bukan gerbang G0.
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
@@ -119,7 +119,7 @@ async function smoke(pre: Preflight): Promise<number> {
 }
 
 const USAGE =
-  'pakai: node bench/dist/cli.js pendev-baseline [--dry-run] | pendev-smoke | round --round <uji-k|n> [--dry-run] [--resume] | rejudge --from <uji-k|n> --label <slug> [--resume] [--dry-run] | rubric-snapshot [--version <v>] | practice [--series practice|effects] --iter <k> [--only P1,P3] [--reuse-pendev <j>] [--resume] [--dry-run]';
+  'pakai: node bench/dist/cli.js pendev-baseline [--dry-run] | pendev-smoke | round --round <uji-k|n> [--dry-run] [--resume] | rejudge --from <uji-k|n> --label <slug> [--resume] [--dry-run] | rubric-snapshot [--version <v>] | practice [--series practice|effects|polish] --iter <k> [--only P1,P3] [--reuse-pendev <j>] [--resume] [--dry-run]';
 
 /** `rubric-snapshot [--version <v>]`: tulis `bench/rubric/v<ver>/` (eksklusif) dan perbarui `bench/rubric/rubric.json`. */
 function rubricSnapshot(args: string[]): number {

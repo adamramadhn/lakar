@@ -8,6 +8,9 @@ import {
   EFFECT_PROMPTS_PATH,
   EFFECT_PROMPTS_SHA256,
   loadPracticePrompts,
+  POLISH_ID,
+  POLISH_PROMPTS_PATH,
+  POLISH_PROMPTS_SHA256,
   PRACTICE_PROMPTS_PATH,
   PRACTICE_PROMPTS_SHA256,
   practicePromptProblems,
@@ -108,6 +111,51 @@ describe('prompt efek beku (P5/P6)', () => {
   });
 
   it.skipIf(!hasGolden)('(d) nama produk efek tidak ada di golden-set', () => {
+    const golden = readFileSync(GOLDEN_SET_PATH, 'utf8').toLowerCase();
+    for (const p of prompts) expect(golden.includes(p.name.toLowerCase()), p.name).toBe(false);
+  });
+});
+
+// Seri polish (story 23): P7–P9 dibekukan dengan commit tersendiri sebelum skill/check/render diubah.
+describe('prompt polish beku (P7–P9)', () => {
+  const { prompts } = loadPracticePrompts(POLISH_PROMPTS_PATH, POLISH_PROMPTS_SHA256);
+  const earlier = [...loadPracticePrompts().prompts, ...loadPracticePrompts(EFFECT_PROMPTS_PATH, EFFECT_PROMPTS_SHA256).prompts];
+
+  it('(a) sha256 polish/prompts.json = konstanta beku; id P7–P9; kalimat penutup baku', () => {
+    expect(sha256(readFileSync(POLISH_PROMPTS_PATH))).toBe(POLISH_PROMPTS_SHA256);
+    expect(() => loadPracticePrompts(POLISH_PROMPTS_PATH)).toThrow(/prompt latihan berubah/);
+    expect(prompts.map((p) => p.id)).toEqual(['P7', 'P8', 'P9']);
+    for (const p of prompts) expect(POLISH_ID.test(p.id), p.id).toBe(true);
+    expect(practicePromptProblems(prompts)).toEqual([]);
+    expect(prompts.map((p) => [p.kind, p.size])).toEqual([
+      ['mobile', { width: 390, height: 844 }],
+      ['dashboard', { width: 1440, height: 900 }],
+      ['landing', { width: 1440, height: null }],
+    ]);
+  });
+
+  it('(b0) tanpa kalimat penutup baku: tidak ada n-gram 6 kata yang sama dengan P1–P6; nama produk baru', () => {
+    const phrases = forbiddenPhrases(earlier.map((p) => withoutClosing(p.text)));
+    for (const p of prompts) expect(hits(withoutClosing(p.text), phrases), p.id).toEqual([]);
+    for (const p of prompts) expect(earlier.some((q) => q.name.toLowerCase() === p.name.toLowerCase()), p.name).toBe(false);
+  });
+
+  it.skipIf(!hasGolden)('(b) tanpa kalimat penutup baku: tidak ada n-gram 6 kata yang sama dengan prompt A–E', () => {
+    const golden = readFileSync(GOLDEN_SET_PATH, 'utf8');
+    const phrases = forbiddenPhrases(GOLDEN_IDS.map((id) => withoutClosing(extractGoldenPrompt(golden, id))));
+    for (const p of prompts) expect(hits(withoutClosing(p.text), phrases), p.id).toEqual([]);
+  });
+
+  it.skipIf(!hasGolden)('(c) tanpa frasa Kriteria/Prosedur/Risiko golden dan tanpa token terlarang', () => {
+    const golden = readFileSync(GOLDEN_SET_PATH, 'utf8');
+    const phrases = forbiddenPhrases(forbiddenSources(golden, GOLDEN_IDS));
+    for (const p of prompts) {
+      expect(hits(p.text, phrases), p.id).toEqual([]);
+      for (const re of FORBIDDEN_TOKENS) expect(p.text.match(re)?.[0], `${p.id} ${re.source}`).toBeUndefined();
+    }
+  });
+
+  it.skipIf(!hasGolden)('(d) nama produk polish tidak ada di golden-set', () => {
     const golden = readFileSync(GOLDEN_SET_PATH, 'utf8').toLowerCase();
     for (const p of prompts) expect(golden.includes(p.name.toLowerCase()), p.name).toBe(false);
   });

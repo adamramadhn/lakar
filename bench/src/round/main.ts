@@ -603,7 +603,7 @@ export async function roundMain(argv: string[]): Promise<number> {
   // Dokumen Lakar buatan putaran bench lain: dipindah ke arsip bench sebelum run agar slug pilihan agen tidak bentrok
   // (`dokumen lama` → invalid). Dokumen non-bench tidak disentuh.
   const archiveDir = join(RUNS_ROOT, 'lakar-archive', `${round}-${stamp()}`);
-  const archiveSources = benchLakarSources([join(RUNS_ROOT, 'rounds'), join(RUNS_ROOT, 'practice'), join(RUNS_ROOT, 'practice-effects')], { root: join(RUNS_ROOT, 'rounds'), id: round });
+  const archiveSources = benchLakarSources([join(RUNS_ROOT, 'rounds'), join(RUNS_ROOT, 'practice'), join(RUNS_ROOT, 'practice-effects'), join(RUNS_ROOT, 'practice-polish')], { root: join(RUNS_ROOT, 'rounds'), id: round });
   const archivePlan = planLakarArchive(status.dataDir, [...new Set(archiveSources.map((x) => x.slug))], archiveDir);
   console.log(`\narsip dokumen Lakar bench lama (sebelum run, lalu restart lakard): ${describeLakarArchive(status!.dataDir, archivePlan, archiveSources)}`);
   const preFreeze = official ? officialFreezeProblems(freezeInput(status, false)) : [];

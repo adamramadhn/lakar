@@ -24,6 +24,14 @@ export const EFFECT_PROMPTS_SHA256 = '5f0c23a7fb411f4fcf15e3f88f2e2f7b0f0f6b64f5
 /** Id prompt seri efek. */
 export const EFFECT_ID = /^P[56]$/;
 
+// Seri polish (story 23): tiga prompt hold-out (P7 mobile, P8 dashboard, P9 landing) dengan baris daftar berstatus,
+// dibekukan dengan commit tersendiri sebelum skill, check, atau render diubah (iterasi 1 = baseline skill lama).
+export const POLISH_PROMPTS_PATH = join(PRACTICE_DIR, 'polish', 'prompts.json');
+/** sha256 `bench/practice/polish/prompts.json` yang dibekukan (jangan diubah setelah iterasi 1 seri polish dimulai). */
+export const POLISH_PROMPTS_SHA256 = 'b41ba79e9ca6818f388da5bd9a1718f6899a631c95ca360a8f60e48a7a2dd036';
+/** Id prompt seri polish. */
+export const POLISH_ID = /^P[789]$/;
+
 export type PracticeKind = 'landing' | 'mobile' | 'dashboard';
 export type PracticePrompt = { id: string; name: string; kind: PracticeKind; text: string; size: BoardSpec };
 

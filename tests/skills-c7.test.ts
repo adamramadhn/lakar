@@ -5,7 +5,7 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { GOLDEN_SET_PATH, PROTOCOL_DIR, forbiddenPhrases, forbiddenSources, loadProtocol, words } from '../bench/src/protocol.ts';
-import { EFFECT_PROMPTS_PATH, EFFECT_PROMPTS_SHA256, loadPracticePrompts } from '../bench/src/practice/prompts.ts';
+import { EFFECT_PROMPTS_PATH, EFFECT_PROMPTS_SHA256, loadPracticePrompts, POLISH_PROMPTS_PATH, POLISH_PROMPTS_SHA256 } from '../bench/src/practice/prompts.ts';
 
 const ROOT = join(import.meta.dirname, '..');
 const SKILLS = join(ROOT, 'packages/skills/skills');
@@ -13,8 +13,8 @@ const DESIGN_PATH = join(ROOT, '_bmad-output/initiative-lakar/ux-lakar/DESIGN.md
 const ALLOW_MISSING = process.env.LAKAR_C7_ALLOW_MISSING_SOURCES === '1';
 
 const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-/** Prompt latihan beku (story 19: P1–P4; story 22: seri efek P5/P6): teksnya sumber terlarang, nama produknya token terlarang. */
-const practice = [...loadPracticePrompts().prompts, ...loadPracticePrompts(EFFECT_PROMPTS_PATH, EFFECT_PROMPTS_SHA256).prompts];
+/** Prompt latihan beku (story 19: P1–P4; story 22: seri efek P5/P6; story 23: seri polish P7–P9): teksnya sumber terlarang, nama produknya token terlarang. */
+const practice = [...loadPracticePrompts().prompts, ...loadPracticePrompts(EFFECT_PROMPTS_PATH, EFFECT_PROMPTS_SHA256).prompts, ...loadPracticePrompts(POLISH_PROMPTS_PATH, POLISH_PROMPTS_SHA256).prompts];
 
 /** Token terlarang di skill (bahasa penilaian, nama produk prompt golden dan latihan, label rubrik R1–R10). */
 export const SKILL_FORBIDDEN_TOKENS: readonly RegExp[] = [
@@ -91,7 +91,7 @@ describe('C7: isi skill bebas sumber terlarang', () => {
       const practicePhrase = words(p.text).slice(4, 10).join(' ');
       expect(skillC7Problems(`Catatan: ${practicePhrase}.`, phrases), p.id).toContain(`frasa sumber terlarang: "${practicePhrase}"`);
     }
-    expect(practice.map((p) => p.id)).toEqual(['P1', 'P2', 'P3', 'P4', 'P5', 'P6']);
+    expect(practice.map((p) => p.id)).toEqual(['P1', 'P2', 'P3', 'P4', 'P5', 'P6', 'P7', 'P8', 'P9']);
     for (const t of ['skor akhir', 'lolos R3', 'naik di R9', 'R10 penuh', 'nilai juri', 'Kasku', 'lihat pen.dev', ...practice.map((p) => `contoh ${p.name}`)]) expect(skillC7Problems(t, phrases).length, t).toBeGreaterThan(0);
   });
 });

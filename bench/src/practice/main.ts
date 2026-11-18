@@ -1,4 +1,4 @@
-// Perintah `practice [--series practice|effects] --iter <k> [--only P1,P3] [--reuse-pendev <j>] [--resume] [--dry-run]`
+// Perintah `practice [--series practice|effects|polish] --iter <k> [--only P1,P3] [--reuse-pendev <j>] [--resume] [--dry-run]`
 // (story 19): Lakar vs pen.dev pada prompt latihan beku (bukan A–E), runner + pembungkus + juri rubrik v2.1 yang sama
 // dengan `round`. Latihan bukan gerbang G0: keluarannya `bench/practice-<k>.md|json` untuk mengiterasi skill, strip Lakar
 // di `bench/practice/<k>/`. Seri `effects` (story 22): P5/P6 efek visual, `bench/effects-<k>.md|json`, strip Lakar di
@@ -52,12 +52,14 @@ import {
   systemdShow,
   type PenDesktopRestart,
 } from '../sys.js';
-import { EFFECT_ID, EFFECT_PROMPTS_PATH, EFFECT_PROMPTS_SHA256, loadPracticePrompts, PRACTICE_DIR, PRACTICE_ID, PRACTICE_PROMPTS_PATH, PRACTICE_PROMPTS_SHA256, type PracticePrompt } from './prompts.js';
+import { EFFECT_ID, EFFECT_PROMPTS_PATH, EFFECT_PROMPTS_SHA256, loadPracticePrompts, POLISH_ID, POLISH_PROMPTS_PATH, POLISH_PROMPTS_SHA256, PRACTICE_DIR, PRACTICE_ID, PRACTICE_PROMPTS_PATH, PRACTICE_PROMPTS_SHA256, type PracticePrompt } from './prompts.js';
 
 export const PRACTICE_RUNS = join(RUNS_ROOT, 'practice');
 export const ROUNDS_RUNS = join(RUNS_ROOT, 'rounds');
 /** Run seri efek (story 22): artefak mentah + strip/.pen pen.dev lokal (EULA). */
 export const EFFECTS_RUNS = join(RUNS_ROOT, 'practice-effects');
+/** Run seri polish (story 23): artefak mentah + strip/.pen pen.dev lokal (EULA). */
+export const POLISH_RUNS = join(RUNS_ROOT, 'practice-polish');
 /** Iterasi maksimal (plan story 19, Plan Change Log 2026-11-18: iterasi 4–6, iterasi konfirmasi 7, lalu iterasi 8 = ulang penuh iterasi 7 yang batal karena cacat harness): tidak ada iterasi ke-9. */
 export const MAX_ITER = 8;
 /** Anggaran run berbayar kumulatif semua iterasi latihan (USD): $48,09 terpakai iterasi 1–7 + $10 iterasi 8. */
@@ -71,9 +73,9 @@ export const PASS_MIN = 3;
 const SKILLS_DIR = join(REPO_ROOT, 'packages/skills/skills');
 const PEN_RESTART_LIMIT_S = PEN_DESKTOP_RESTART_TIMEOUT_MS / 1000;
 const PASS_DECISIONS = ['Setara', 'Lebih baik'];
-export const PRACTICE_USAGE = 'pakai: node bench/dist/cli.js practice [--series practice|effects] --iter <k> [--only P1,P3] [--reuse-pendev <j>] [--resume] [--dry-run]';
+export const PRACTICE_USAGE = 'pakai: node bench/dist/cli.js practice [--series practice|effects|polish] --iter <k> [--only P1,P3] [--reuse-pendev <j>] [--resume] [--dry-run]';
 
-export type SeriesId = 'practice' | 'effects';
+export type SeriesId = 'practice' | 'effects' | 'polish';
 
 /**
  * Konfigurasi seri latihan. `practice` (default, story 19) = perilaku lama persis: P1–P4, maks 8 iterasi, $58,09, lulus
@@ -136,7 +138,24 @@ export const EFFECTS_SERIES: SeriesConfig = {
   compareWithFirst: true,
 };
 
-export const SERIES: Record<SeriesId, SeriesConfig> = { practice: PRACTICE_SERIES, effects: EFFECTS_SERIES };
+/** Seri polish (story 23): iterasi 1 = baseline skill/check lama, iterasi 2 = sesudah perubahan (reuse pen.dev iterasi 1); maks 3, anggaran $15, P7–P9 wajib lulus. */
+export const POLISH_SERIES: SeriesConfig = {
+  id: 'polish',
+  title: 'Seri polish',
+  promptsPath: POLISH_PROMPTS_PATH,
+  sha: POLISH_PROMPTS_SHA256,
+  ids: POLISH_ID,
+  maxIter: 3,
+  budgetUsd: 15,
+  passRule: 'all',
+  reportPrefix: 'polish',
+  runsRoot: POLISH_RUNS,
+  pngDir: join(PRACTICE_DIR, 'polish'),
+  restartPenDesktop: true,
+  compareWithFirst: true,
+};
+
+export const SERIES: Record<SeriesId, SeriesConfig> = { practice: PRACTICE_SERIES, effects: EFFECTS_SERIES, polish: POLISH_SERIES };
 
 /** Jumlah minimum Setara/Lebih baik (murni). */
 export const passMinOf = (series: Pick<SeriesConfig, 'passRule'>, total: number): number => (series.passRule === 'all' ? total : series.passRule.min);
@@ -178,7 +197,7 @@ export function parsePracticeArgs(args: readonly string[]): { ok: true; value: P
   let only: string[] | undefined;
   if (onlyRaw !== undefined) {
     only = onlyRaw.split(',').map((x) => x.trim()).filter(Boolean);
-    if (!only.length || only.some((x) => !series.ids.test(x))) return { ok: false, error: `--only ${JSON.stringify(onlyRaw)}: daftar ID prompt latihan (mis. ${series.id === 'practice' ? 'P1,P3' : 'P5'})` };
+    if (!only.length || only.some((x) => !series.ids.test(x))) return { ok: false, error: `--only ${JSON.stringify(onlyRaw)}: daftar ID prompt latihan (mis. ${series.id === 'practice' ? 'P1,P3' : series.id === 'polish' ? 'P7' : 'P5'})` };
     only = [...new Set(only)];
   }
   let reusePendev: number | undefined;
@@ -405,7 +424,7 @@ export function renderPracticeMarkdown(r: PracticeReport): string {
   L.push(`Status: **${r.status}**${r.statusReasons.length ? ` (${r.statusReasons.join('; ')})` : ''}. Tanggal: ${r.date}.`, '');
   L.push('Latihan bukan gerbang G0. Prompt latihan beku (bukan A–E), runner, pembungkus, dan juri rubrik yang sama dengan putaran; keputusan memakai aturan v2 dengan baseline waktu = wall pen.dev prompt yang sama.', '');
   L.push(`## Hasil iterasi: **${r.outcome.pass ? 'lulus' : 'belum lulus'}**`, '');
-  const expected = series.id === 'practice' ? 4 : 2; // jumlah prompt beku seri (P1–P4 / P5–P6), bukan jumlah yang dijalankan (--only)
+  const expected = series.id === 'practice' ? 4 : series.id === 'polish' ? 3 : 2; // jumlah prompt beku seri (P1–P4 / P5–P6 / P7–P9), bukan jumlah yang dijalankan (--only)
   const rule = series.passRule === 'all' ? `semua ${expected} prompt` : `≥ ${series.passRule.min} dari ${expected}`;
   L.push(`- Lakar Setara/Lebih baik: ${r.outcome.passCount} dari ${r.outcome.total} (syarat ${rule}; di setiap prompt waktu ≤ ${TIME_GATE_FACTOR} × pen.dev, emoji Lakar 0, layout_check gate 0).`);
   for (const x of r.outcome.reasons) L.push(`- Belum terpenuhi: ${x}`);
@@ -667,7 +686,7 @@ export async function practiceMain(argv: string[]): Promise<number> {
   const argvFor = (mcp: string, allowed: string, prompt = '<prompt hasil render>') => shellQuote(['claude', ...buildArgs({ prompt, config: cfg, mcpConfig: mcp, allowedTools: allowed })]);
   const judgeArgv = shellQuote(['claude', ...buildJudgeArgs(cfg.model, relative(REPO_ROOT, emptyMcpPath))]);
   const archiveDir = join(RUNS_ROOT, 'lakar-archive', `${series.reportPrefix}-${iter}-${stamp()}`);
-  const archiveSources = benchLakarSources([ROUNDS_RUNS, PRACTICE_RUNS, EFFECTS_RUNS], { root: series.runsRoot, id: String(iter) });
+  const archiveSources = benchLakarSources([ROUNDS_RUNS, PRACTICE_RUNS, EFFECTS_RUNS, POLISH_RUNS], { root: series.runsRoot, id: String(iter) });
   const archivePlan = planLakarArchive(status.dataDir, [...new Set(archiveSources.map((x) => x.slug))], archiveDir);
 
   console.log(`${series.id === 'practice' ? 'practice' : `practice seri ${series.id}`} iterasi ${iter}${reusePendev ? ` (pen.dev dipakai ulang dari iterasi ${reusePendev})` : ''}`);

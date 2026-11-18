@@ -14,7 +14,7 @@ dan laporan `bench/round-<id>.md|json`, `bench/score-<prompt>.md|json` (putaran 
 /opt/node-26/bin/node bench/dist/cli.js round --round <uji-k|n> [--dry-run] [--resume]
 /opt/node-26/bin/node bench/dist/cli.js rejudge --from <uji-k|n> --label <slug> [--resume] [--dry-run]
 /opt/node-26/bin/node bench/dist/cli.js rubric-snapshot [--version <v>]
-/opt/node-26/bin/node bench/dist/cli.js practice [--series practice|effects] --iter <k> [--only P1,P3] [--reuse-pendev <j>] [--resume] [--dry-run]
+/opt/node-26/bin/node bench/dist/cli.js practice [--series practice|effects|polish] --iter <k> [--only P1,P3] [--reuse-pendev <j>] [--resume] [--dry-run]
 ```
 
 ## Rubrik juri (v2) dan snapshot
@@ -97,7 +97,15 @@ md5 `.pen` sama dengan seri `practice`; tanpa `--series` perilaku seri P1–P4 t
   sebelum juri (`restartPenDesktopAfterSeries`, `bench/src/sys.ts`): `systemctl restart pen-desktop`, tunggu `is-active`
   dan satu panggilan baca MCP pencil (`get_app_state`) berhasil, maks 120 dtk. Hasil dan durasi tercatat di laporan;
   gagal → laporan ditandai, juri tetap jalan. Tidak pernah saat `--reuse-pendev` atau `--dry-run`.
-- Arsip slug Lakar sebelum run (semua seri dan `round`) memindai `runs/rounds`, `runs/practice`, dan `runs/practice-effects`.
+### Seri polish (`practice --series polish`, story 23)
+
+Seri ketiga untuk disiplin spacing dan komponen: tiga prompt hold-out beku `bench/practice/polish/prompts.json` (P7 mobile
+terang, P8 dashboard 1440×900, P9 landing; sha `POLISH_PROMPTS_SHA256`, penjaga n-gram juga terhadap P1–P6). Config:
+maks 3 iterasi, anggaran kumulatif $15 (`bench/polish-<j>.json`), semua prompt wajib Setara/Lebih baik. Iterasi 1 =
+baseline skill/check lama (pen.dev + Lakar + juri); iterasi 2 = sesudah perubahan dengan `--reuse-pendev 1` (C8), laporan
+memuat tabel iterasi 1 vs sesudah. Run di `bench/runs/practice-polish/<k>/`, strip Lakar `bench/practice/polish/<k>/`.
+
+- Arsip slug Lakar sebelum run (semua seri dan `round`) memindai `runs/rounds`, `runs/practice`, `runs/practice-effects`, dan `runs/practice-polish`.
 
 ## Batasan
 

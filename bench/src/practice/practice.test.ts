@@ -11,6 +11,8 @@ import {
   beforeAfter,
   budgetProblem,
   EFFECTS_SERIES,
+  POLISH_RUNS,
+  POLISH_SERIES,
   EFFECTS_RUNS,
   passMinOf,
   PRACTICE_RUNS,
@@ -35,7 +37,7 @@ import {
   type PracticePromptResult,
   type PracticeReport,
 } from './main.js';
-import { EFFECT_PROMPTS_PATH, EFFECT_PROMPTS_SHA256, loadPracticePrompts, PRACTICE_DIR, PRACTICE_ID, PRACTICE_PROMPTS_PATH, PRACTICE_PROMPTS_SHA256 } from './prompts.js';
+import { EFFECT_PROMPTS_PATH, EFFECT_PROMPTS_SHA256, loadPracticePrompts, POLISH_PROMPTS_PATH, POLISH_PROMPTS_SHA256, PRACTICE_DIR, PRACTICE_ID, PRACTICE_PROMPTS_PATH, PRACTICE_PROMPTS_SHA256 } from './prompts.js';
 
 const HAVE_SOURCES = existsSync(DESIGN_MD_PATH) && existsSync(GOLDEN_SET_PATH);
 const { prompts } = loadPracticePrompts();
@@ -315,6 +317,16 @@ describe('practice: seri (story 22)', () => {
     expect(EFFECTS_SERIES.pngDir.endsWith('bench/practice/effects')).toBe(true);
     expect(loadPracticePrompts(EFFECTS_SERIES.promptsPath, EFFECTS_SERIES.sha).prompts.map((p) => p.id)).toEqual(['P5', 'P6']);
     expect(passMinOf(EFFECTS_SERIES, 2)).toBe(2);
+  });
+
+  it('config polish: P7–P9 beku, $15, semua prompt wajib lulus, banding iterasi 1, laporan/run/PNG terpisah', () => {
+    expect(POLISH_SERIES).toMatchObject({ id: 'polish', promptsPath: POLISH_PROMPTS_PATH, sha: POLISH_PROMPTS_SHA256, maxIter: 3, budgetUsd: 15, passRule: 'all', reportPrefix: 'polish', runsRoot: POLISH_RUNS, restartPenDesktop: true, compareWithFirst: true });
+    expect(POLISH_SERIES.runsRoot.endsWith('bench/runs/practice-polish')).toBe(true);
+    expect(POLISH_SERIES.pngDir.endsWith('bench/practice/polish')).toBe(true);
+    expect(SERIES.polish).toBe(POLISH_SERIES);
+    expect(loadPracticePrompts(POLISH_SERIES.promptsPath, POLISH_SERIES.sha).prompts.map((p) => p.id)).toEqual(['P7', 'P8', 'P9']);
+    expect(parsePracticeArgs(['--series', 'polish', '--iter', '2', '--reuse-pendev', '1', '--only', 'P8'])).toMatchObject({ ok: true, value: { series: 'polish', only: ['P8'], reusePendev: 1 } });
+    expect(parsePracticeArgs(['--series', 'polish', '--iter', '1', '--only', 'P5']).ok).toBe(false);
   });
 
   it('practiceOutcome semua-lulus: satu prompt Kalah → belum lulus', () => {

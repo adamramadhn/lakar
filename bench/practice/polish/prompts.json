@@ -1,0 +1,32 @@
+[
+  {
+    "id": "P7",
+    "name": "Rodaku",
+    "kind": "mobile",
+    "text": "Desain layar beranda aplikasi mobile bengkel motor \"Rodaku\" (390x844). Isi: header dengan nama motor dan jarak tempuh, kartu servis berikutnya dengan estimasi biaya, daftar 5 riwayat servis dengan tanggal, bengkel, biaya, dan status (selesai, menunggu suku cadang, dijadwalkan), pengingat ganti oli, dan tab bar 4 ikon. Mode terang, aksen hijau. Bahasa Indonesia. Kualitas setara desainer produk senior: hierarki tipografi jelas, spacing konsisten (grid 8px), kontras baik, auto/flex layout.",
+    "size": {
+      "width": 390,
+      "height": 844
+    }
+  },
+  {
+    "id": "P8",
+    "name": "Lumbung",
+    "kind": "dashboard",
+    "text": "Desain layar dashboard desktop (1440x900) untuk \"Lumbung\", sistem gudang distributor beras. Isi: sidebar navigasi, header dengan pencarian SKU dan tombol tambah pengiriman, ringkasan stok dan pengiriman dibanding minggu lalu, tabel pesanan keluar dengan pelanggan, jumlah karung, jadwal, dan status, grafik stok 14 hari per gudang, dan daftar pemasok yang terlambat. Mode terang, aksen biru tua. Bahasa Indonesia. Kualitas setara desainer produk senior: hierarki tipografi jelas, spacing konsisten (grid 8px), kontras baik, auto/flex layout.",
+    "size": {
+      "width": 1440,
+      "height": 900
+    }
+  },
+  {
+    "id": "P9",
+    "name": "Mejaku",
+    "kind": "landing",
+    "text": "Desain landing page desktop 1440px untuk \"Mejaku\", aplikasi reservasi meja untuk restoran kecil. Bagian: navigasi atas, hero berisi judul, subjudul, tombol aksi, dan pratinjau aplikasi berisi daftar reservasi malam ini; 3 fitur utama; perbandingan paket harga; testimoni pemilik restoran dengan foto; FAQ; footer. Aksen merah bata. Bahasa Indonesia. Kualitas setara desainer produk senior: hierarki tipografi jelas, spacing konsisten (grid 8px), kontras baik, auto/flex layout.",
+    "size": {
+      "width": 1440,
+      "height": null
+    }
+  }
+]
