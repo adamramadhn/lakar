@@ -189,7 +189,7 @@ add(b, {type:'icon', lib:m.lib, icon:m.icon, size:24});
 
 `photo(ref: string): {assetId, width, height, credit, license, creator, sourcePageUrl}`
 
-Foto stok untuk ref dari tool photo_search (mis. 'pexels:2014422' atau 'openverse:<uuid>'). Tulis ref sebagai literal string di kode (photo('pexels:2014422')), bukan variabel: daemon mengunduhnya sekali ke store aset lokal sebelum snippet berjalan, lalu render hanya memakai file lokal. Pakai assetId di fill {type:'image', assetId, fit:'cover'} pada frame/rect bernama 'Image / …'; width/height = ukuran piksel asli; credit = baris kredit siap pakai. Atribusi sudah tercatat di metadata aset: kredit tidak ditampilkan di UI kecuali pengguna memintanya; sebut di ringkasan akhir.
+Foto stok untuk ref dari tool photo_search (mis. 'wikimedia:<id>', 'pexels:2014422' atau 'openverse:<uuid>'). Tulis ref sebagai literal string di kode (photo('pexels:2014422')), bukan variabel: daemon mengunduhnya sekali ke store aset lokal sebelum snippet berjalan, lalu render hanya memakai file lokal. Pakai assetId di fill {type:'image', assetId, fit:'cover'} pada frame/rect bernama 'Image / …'; width/height = ukuran piksel asli; credit = baris kredit siap pakai. Atribusi sudah tercatat di metadata aset: kredit tidak ditampilkan di UI kecuali pengguna memintanya; sebut di ringkasan akhir.
 
 - Mengembalikan: {assetId, width, height, credit, license, creator, sourcePageUrl}
 - Error: NOT_FOUND, SCHEMA_INVALID

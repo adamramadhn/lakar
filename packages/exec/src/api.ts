@@ -120,7 +120,7 @@ export interface LakarApi {
    */
   iconSearch(query: string, opts?: IconSearchOptions): IconSearchMatch[];
   /**
-   * Foto stok terimpor untuk ref `photo_search` (mis. `'pexels:2014422'`). Ref harus ditulis literal di kode
+   * Foto stok terimpor untuk ref `photo_search` (mis. `'wikimedia:12345678'` atau `'pexels:2014422'`). Ref harus ditulis literal di kode
    * (`photo('pexels:2014422')`): daemon mengimpornya ke store aset sebelum snippet berjalan. Pakai `assetId` di fill
    * `{type:'image', assetId, fit:'cover'}`; `credit` = baris kredit siap pakai.
    */
@@ -140,12 +140,12 @@ export type ApiContext = {
   photos?: PhotoLibraryPort;
 };
 
-/** Format ref foto (`photo_search`): `pexels:<id>` atau `openverse:<uuid>`. */
-export const PHOTO_REF_PATTERN = /^(pexels|openverse):[A-Za-z0-9-]{1,64}$/;
-const PHOTO_REF_LITERAL = /photo\(\s*(['"])((?:pexels|openverse):[A-Za-z0-9-]{1,64})\1/g;
+/** Format ref foto (`photo_search`): `wikimedia:<pageid>`, `pexels:<id>`, atau `openverse:<uuid>`. */
+export const PHOTO_REF_PATTERN = /^(?:(?:pexels|openverse):[A-Za-z0-9-]{1,64}|wikimedia:\d{1,12})$/;
+const PHOTO_REF_LITERAL = /photo\(\s*(['"])((?:pexels|wikimedia|openverse):[A-Za-z0-9-]{1,64})\1/g;
 
 /**
- * Ref foto literal di kode snippet (`photo('pexels:123')` / `photo("openverse:<uuid>")`), unik, urutan muncul.
+ * Ref foto literal di kode snippet (`photo('wikimedia:123')` / `photo('pexels:123')` / `photo("openverse:<uuid>")`), unik, urutan muncul.
  * Daemon mengimpornya sebelum snippet berjalan (snippet sinkron, tanpa jaringan).
  */
 export function photoRefsInCode(code: string): string[] {
@@ -563,7 +563,7 @@ export const API: { readonly [K in keyof LakarApi]: ApiFunction } = {
     kind: 'read',
     signature: 'photo(ref: string): {assetId, width, height, credit, license, creator, sourcePageUrl}',
     doc:
-      "Foto stok untuk ref dari tool photo_search (mis. 'pexels:2014422' atau 'openverse:<uuid>'). Tulis ref sebagai literal string di kode " +
+      "Foto stok untuk ref dari tool photo_search (mis. 'wikimedia:<id>', 'pexels:2014422' atau 'openverse:<uuid>'). Tulis ref sebagai literal string di kode " +
       "(photo('pexels:2014422')), bukan variabel: daemon mengunduhnya sekali ke store aset lokal sebelum snippet berjalan, lalu render hanya memakai file lokal. " +
       "Pakai assetId di fill {type:'image', assetId, fit:'cover'} pada frame/rect bernama 'Image / …'; width/height = ukuran piksel asli; " +
       'credit = baris kredit siap pakai. Atribusi sudah tercatat di metadata aset: kredit tidak ditampilkan di UI kecuali pengguna memintanya; sebut di ringkasan akhir.',
@@ -576,7 +576,7 @@ export const API: { readonly [K in keyof LakarApi]: ApiFunction } = {
       "add(k, {type:'text', name:'Judul', content:'Kamar deluks, 2 tamu', size:16, lineHeight:24, weight:600, color:'#101828'});",
     call(ctx, [ref]) {
       if (typeof ref !== 'string' || !PHOTO_REF_PATTERN.test(ref)) {
-        throw new LakarError('SCHEMA_INVALID', `photo: ref harus 'pexels:<id>' atau 'openverse:<uuid>', bukan ${show(ref)}`, {
+        throw new LakarError('SCHEMA_INVALID', `photo: ref harus 'wikimedia:<id>', 'pexels:<id>' atau 'openverse:<uuid>', bukan ${show(ref)}`, {
           hint: "pakai ref dari hasil photo_search apa adanya, mis. photo('pexels:2014422')",
         });
       }

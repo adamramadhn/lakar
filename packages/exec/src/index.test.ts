@@ -436,16 +436,16 @@ describe('@lakar/exec', () => {
       const e = errRun(await runSnippet(`const x = 'pexels:' + '99'; photo(x)`, txFor()));
       expect(e.code).toBe('NOT_FOUND');
       expect(e.hint).toMatch(/literal/);
-      for (const bad of [`photo('foo')`, `photo(42)`, `photo('https://images.pexels.com/x.jpg')`, `photo('unsplash:abc')`, `photo()`]) {
+      for (const bad of [`photo('foo')`, `photo(42)`, `photo('https://images.pexels.com/x.jpg')`, `photo('unsplash:abc')`, `photo('wikimedia:abc')`, `photo()`]) {
         expect(errRun(await runSnippet(bad, txFor())).code, bad).toBe('SCHEMA_INVALID');
       }
       expect(errRun(await runSnippetRaw(`photo('pexels:2014422')`, txFor(), { icons: fakeIcons })).code).toBe('NOT_FOUND');
     });
 
-    it('photoRefsInCode: hanya literal pexels/openverse, unik, urutan muncul', () => {
+    it('photoRefsInCode: hanya literal pexels/wikimedia/openverse, unik, urutan muncul', () => {
       const uuid = '0a1b2c3d-4e5f-6789-abcd-ef0123456789';
-      const code = `const a = photo('pexels:2014422');\nconst b = photo( "openverse:${uuid}" );\nphoto('pexels:2014422'); photo(x); photo('foo'); photo(\`pexels:1\`); photo('pexels:12")`;
-      expect(photoRefsInCode(code)).toEqual(['pexels:2014422', `openverse:${uuid}`]);
+      const code = `const a = photo('pexels:2014422');\nconst b = photo( "openverse:${uuid}" );\nconst c = photo('wikimedia:98688894');\nphoto('pexels:2014422'); photo(x); photo('foo'); photo(\`pexels:1\`); photo('pexels:12")`;
+      expect(photoRefsInCode(code)).toEqual(['pexels:2014422', `openverse:${uuid}`, 'wikimedia:98688894']);
       expect(photoRefsInCode('add(b, {})')).toEqual([]);
     });
   });

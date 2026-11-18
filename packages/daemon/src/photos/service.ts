@@ -1,4 +1,4 @@
-// Layanan foto stok daemon: pencarian (Pexels dengan key, cadangan Openverse tanpa key), cache hasil cari,
+// Layanan foto stok daemon: pencarian (Pexels dengan key → Wikimedia Commons → cadangan Openverse), cache hasil cari,
 // impor on-demand ke store aset beralamat hash + metadata sidecar + indeks ref → sha, dan `resolve` sinkron
 // untuk fungsi snippet `photo(ref)` (AD-7: snippet sinkron; unduhan terjadi di daemon sebelum snippet, AD-10).
 // Key Pexels hanya dibaca dari file (mode 600, milik uid daemon), dibaca ulang bila mtime berubah, dan tidak
@@ -14,6 +14,8 @@ import {
   IMAGE_MAX_BYTES,
   OpenverseProvider,
   PexelsProvider,
+  WikimediaMaxlagError,
+  WikimediaProvider,
   parseRef,
   type Orientation,
   type PhotoCandidate,
@@ -38,7 +40,25 @@ export const THUMBNAILS_MAX = 6;
 const THUMB_CACHE_BYTES = 24 * 1024 * 1024;
 
 export type KeyFileState = 'present' | 'absent' | 'insecure' | 'invalid';
-export type FallbackReason = 'no-key' | 'key-insecure' | 'key-invalid' | 'pexels-401' | 'pexels-429' | 'pexels-5xx' | 'pexels-timeout' | 'pexels-error';
+/**
+ * Alasan penyedia terakhir yang dilewati: kunci/Pexels (provider `wikimedia`) atau Wikimedia (provider `openverse`).
+ */
+export type FallbackReason =
+  | 'no-key'
+  | 'key-insecure'
+  | 'key-invalid'
+  | 'pexels-401'
+  | 'pexels-429'
+  | 'pexels-5xx'
+  | 'pexels-timeout'
+  | 'pexels-error'
+  | 'pexels-empty'
+  | 'wikimedia-5xx'
+  | 'wikimedia-429'
+  | 'wikimedia-timeout'
+  | 'wikimedia-maxlag'
+  | 'wikimedia-error'
+  | 'wikimedia-empty';
 
 /** Kandidat untuk klien (tanpa URL unduhan/thumbnail penyedia: render tidak pernah hotlink). */
 export type PhotoResult = {
@@ -121,12 +141,24 @@ function netToLakar(e: unknown, what: string, provider?: ProviderName): LakarErr
       const hint =
         provider === 'openverse'
           ? 'batas permintaan anonim Openverse tercapai; tunggu sekitar 1 menit lalu ulangi, dan pakai ulang ref dari hasil photo_search sebelumnya (tersimpan 24 jam)'
-          : `batas permintaan penyedia tercapai; ${RETRY_HINT}`;
+          : provider === 'wikimedia'
+            ? 'batas permintaan Wikimedia Commons tercapai; tunggu sebentar lalu ulangi, dan pakai ulang ref dari hasil photo_search sebelumnya (tersimpan 24 jam)'
+            : `batas permintaan penyedia tercapai; ${RETRY_HINT}`;
       return new LakarError('EXEC_ERROR', `${what}: ${e.message}`, { hint, retryable: true });
     }
     return new LakarError('EXEC_ERROR', `${what}: ${e.message}`, { hint: e.retryable ? RETRY_HINT : 'pilih kandidat lain dari photo_search', retryable: e.retryable });
   }
   return new LakarError('EXEC_ERROR', `${what}: kesalahan tak terduga`, { hint: RETRY_HINT, retryable: true });
+}
+
+function wikimediaReason(e: unknown): FallbackReason {
+  if (e instanceof WikimediaMaxlagError) return 'wikimedia-maxlag';
+  if (e instanceof NetError) {
+    if (e.status === 429) return 'wikimedia-429';
+    if ((e.status ?? 0) >= 500) return 'wikimedia-5xx';
+    if (e.kind === 'timeout') return 'wikimedia-timeout';
+  }
+  return 'wikimedia-error';
 }
 
 function pexelsReason(e: unknown): FallbackReason {
@@ -175,6 +207,7 @@ export class PhotoService implements PhotoLibraryPort {
   readonly #net: SafeNet;
   readonly #uid: number | undefined;
   readonly #now: () => number;
+  readonly #wikimedia: WikimediaProvider;
   readonly #openverse: OpenverseProvider;
   readonly #search: Lru<PhotoCandidate[]>;
   readonly #candidates: Lru<PhotoCandidate>;
@@ -193,6 +226,7 @@ export class PhotoService implements PhotoLibraryPort {
     this.#net = opts.net ?? new SafeNet();
     this.#uid = opts.uid ?? process.getuid?.();
     this.#now = opts.now ?? Date.now;
+    this.#wikimedia = new WikimediaProvider(this.#net);
     this.#openverse = new OpenverseProvider(this.#net);
     this.#search = new Lru(SEARCH_CACHE_MAX, SEARCH_CACHE_TTL_MS, this.#now);
     this.#candidates = new Lru(SEARCH_CACHE_MAX * SEARCH_LIMIT_MAX, SEARCH_CACHE_TTL_MS, this.#now);
@@ -259,7 +293,7 @@ export class PhotoService implements PhotoLibraryPort {
 
   status(): PhotoStatus {
     const k = this.keyState();
-    return { provider: k.state === 'present' ? 'pexels' : 'openverse', keyFile: k.state, imported: this.#imported.size };
+    return { provider: k.state === 'present' ? 'pexels' : 'wikimedia', keyFile: k.state, imported: this.#imported.size };
   }
 
   async #cachedSearch(p: PhotoProvider, query: string, orientation: Orientation | undefined, limit: number): Promise<PhotoCandidate[]> {
@@ -272,33 +306,47 @@ export class PhotoService implements PhotoLibraryPort {
     return res;
   }
 
-  /** Cari foto. Pexels bila key valid; tanpa key / Pexels gagal → Openverse. Keduanya gagal → EXEC_ERROR. */
+  /**
+   * Cari foto. Urutan: Pexels (bila key valid) → Wikimedia Commons → Openverse. Penyedia pertama yang mengembalikan
+   * ≥ 1 kandidat dipakai; error atau hasil kosong → penyedia berikutnya. Semua kosong → NOT_FOUND; tak ada yang
+   * kosong dan semua gagal → EXEC_ERROR dari error terakhir.
+   */
   async search(q: { query: string; orientation?: Orientation; limit?: number; preview?: boolean }): Promise<SearchResponse> {
     const limit = q.limit ?? SEARCH_LIMIT_DEFAULT;
-    let provider: ProviderName = 'openverse';
     let fallbackReason: FallbackReason | undefined;
-    let found: PhotoCandidate[] | undefined;
+    const chain: PhotoProvider[] = [];
     const pexels = this.#pexelsProvider();
-    if (pexels) {
-      try {
-        found = await this.#cachedSearch(pexels, q.query, q.orientation, limit);
-        provider = 'pexels';
-      } catch (e) {
-        fallbackReason = pexelsReason(e);
-      }
-    } else {
+    if (pexels) chain.push(pexels);
+    else {
       const st = this.keyState().state;
       fallbackReason = st === 'insecure' ? 'key-insecure' : st === 'invalid' ? 'key-invalid' : 'no-key';
     }
-    if (!found) {
+    chain.push(this.#wikimedia, this.#openverse);
+    let provider: ProviderName = chain[0]!.name;
+    let found: PhotoCandidate[] | undefined;
+    let anyEmpty = false;
+    let lastError: { error: unknown; provider: ProviderName } | undefined;
+    for (const [i, p] of chain.entries()) {
+      provider = p.name;
+      const last = i === chain.length - 1;
+      let res: PhotoCandidate[];
       try {
-        found = await this.#cachedSearch(this.#openverse, q.query, q.orientation, limit);
+        res = await this.#cachedSearch(p, q.query, q.orientation, limit);
       } catch (e) {
-        throw netToLakar(e, 'pencarian foto gagal', 'openverse');
+        lastError = { error: e, provider: p.name };
+        if (!last) fallbackReason = p.name === 'pexels' ? pexelsReason(e) : wikimediaReason(e);
+        continue;
       }
+      if (res.length) {
+        found = res;
+        break;
+      }
+      anyEmpty = true;
+      if (!last) fallbackReason = p.name === 'pexels' ? 'pexels-empty' : 'wikimedia-empty';
     }
-    if (!found.length) {
-      throw new LakarError('NOT_FOUND', `tidak ada foto untuk ${JSON.stringify(q.query)} (${provider})`, {
+    if (!found) {
+      if (!anyEmpty && lastError) throw netToLakar(lastError.error, 'pencarian foto gagal', lastError.provider);
+      throw new LakarError('NOT_FOUND', `tidak ada foto untuk ${JSON.stringify(q.query)} (${chain.map((p) => p.name).join(', ')})`, {
         hint: 'coba kata kunci lain yang lebih umum atau dalam bahasa Inggris, mis. "hotel room"; hilangkan orientation',
       });
     }
@@ -345,7 +393,7 @@ export class PhotoService implements PhotoLibraryPort {
     for (const ref of unique) {
       if (!parseRef(ref)) {
         throw new LakarError('SCHEMA_INVALID', `ref foto tidak valid: ${JSON.stringify(ref)}`, {
-          hint: "pakai ref dari photo_search apa adanya, mis. photo('pexels:2014422') atau photo('openverse:<uuid>')",
+          hint: "pakai ref dari photo_search apa adanya, mis. photo('wikimedia:<id>'), photo('pexels:2014422') atau photo('openverse:<uuid>')",
         });
       }
     }
@@ -376,12 +424,12 @@ export class PhotoService implements PhotoLibraryPort {
     if (hit) return hit;
     const parsed = parseRef(ref)!;
     const notFound = () =>
-      new LakarError('NOT_FOUND', `foto ${ref} tidak dikenal`, { hint: 'pakai ref literal dari hasil photo_search terbaru, mis. photo(\'<ref>\')' });
+      new LakarError('NOT_FOUND', `foto ${ref} tidak dikenal`, { hint: "pakai ref literal dari hasil photo_search terbaru, mis. photo('wikimedia:<id>')" });
     let provider: PhotoProvider | undefined;
     if (parsed.provider === 'pexels') {
       provider = this.#pexelsProvider();
       if (!provider) throw new LakarError('NOT_FOUND', `foto ${ref} tidak dikenal (penyedia Pexels tidak aktif)`, { hint: 'jalankan photo_search lalu pakai ref dari hasilnya' });
-    } else provider = this.#openverse;
+    } else provider = parsed.provider === 'wikimedia' ? this.#wikimedia : this.#openverse;
     let c: PhotoCandidate | undefined;
     try {
       c = await provider.byId(parsed.id);
@@ -442,7 +490,12 @@ export class PhotoService implements PhotoLibraryPort {
 }
 
 function infoFrom(sha: string, meta: AssetMeta): PhotoInfo {
-  const credit = meta.provider === 'pexels' ? `Foto: ${meta.creator} / Pexels` : meta.attribution;
+  const credit =
+    meta.provider === 'pexels'
+      ? `Foto: ${meta.creator} / Pexels`
+      : meta.provider === 'wikimedia'
+        ? `Foto: ${meta.creator} / Wikimedia Commons (${meta.license})`
+        : meta.attribution;
   return {
     assetId: sha,
     width: meta.width,

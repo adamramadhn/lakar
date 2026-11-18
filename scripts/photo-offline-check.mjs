@@ -1,9 +1,10 @@
 // Verifikasi live foto stok (orkestrator, bukan tes CI): lakard di 127.0.0.1:7466 (atau LAKAR_URL).
 //   /opt/node-26/bin/node scripts/photo-offline-check.mjs [query]
-// 1. photo_search ("kamar hotel" untuk Pexels, "hotel room" untuk Openverse) lewat HTTP daemon; 2. doc uji `photo-check`: execute kartu dengan foto kandidat
+// 1. photo_search ("kamar hotel" untuk Pexels, "hotel room" untuk Wikimedia Commons/Openverse) lewat HTTP daemon; 2. doc uji `photo-check`: execute kartu dengan foto kandidat
 // pertama lalu screenshot daemon; 3. Playwright terpisah (Chromium Lakar, page.route membatalkan semua host selain
 // 127.0.0.1) memuat /render/page, me-render board yang sama, screenshot ulang; 4. bandingkan (selisih piksel ≤ 1 %),
-// cetak permintaan luar yang tercatat (harus 0) dan path metadata aset. Dokumen dibaca dari dataDir hanya-baca.
+// cetak permintaan luar yang tercatat (harus 0) dan path metadata aset; cek isi metadata (provider, atribusi, ukuran).
+// Dokumen dan metadata dibaca dari dataDir hanya-baca.
 import { readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -17,7 +18,7 @@ const { CHROMIUM_ARGS, NODE_ATTR, fontRequests } = await dist('packages/render/d
 const { resolveTokens, findBoard } = await dist('packages/schema/dist/index.js');
 
 const BASE = (process.env.LAKAR_URL || 'http://127.0.0.1:7466').replace(/\/+$/, '');
-// Default: 'kamar hotel' untuk Pexels (locale id-ID); Openverse praktis hanya berbahasa Inggris → 'hotel room'.
+// Default: 'kamar hotel' untuk Pexels (locale id-ID); Wikimedia Commons/Openverse praktis hanya berbahasa Inggris → 'hotel room'.
 let QUERY = process.argv[2];
 const SLUG = 'photo-check';
 const MAX_DIFF = 0.01;
@@ -138,6 +139,15 @@ external.length === 0 ? pass('0 permintaan luar dari halaman render') : fail(`pe
 console.log(`external_requests=${JSON.stringify(external)}`);
 const metaPath = join(status.dataDir, 'assets', 'meta', `${photo.assetId}.json`);
 console.log(`meta=${metaPath}`);
+const meta = JSON.parse(readFileSync(metaPath, 'utf8'));
+info(`meta: provider ${meta.provider}, ${meta.width}×${meta.height}, ${meta.bytes} byte, ${meta.license}, ${meta.attribution}`);
+search.provider === status.photos?.provider ? pass(`photo_search memakai penyedia utama ${search.provider}`) : fail(`photo_search jatuh ke ${search.provider} (${search.fallbackReason ?? '-'}), bukan ${status.photos?.provider}`);
+meta.provider === search.provider ? pass(`meta provider ${meta.provider}`) : fail(`meta provider ${meta.provider} ≠ ${search.provider}`);
+const missing = ['creator', 'license', 'sourcePageUrl', 'attribution', ...(meta.provider === 'wikimedia' ? ['licenseUrl'] : [])].filter((k) => !meta[k]);
+missing.length ? fail(`meta tanpa ${missing.join(', ')}`) : pass('meta memuat creator, license, sourcePageUrl, attribution' + (meta.provider === 'wikimedia' ? ', licenseUrl' : ''));
+if (meta.provider === 'wikimedia') {
+  Math.max(meta.width, meta.height) >= 1200 ? pass(`sisi panjang ${Math.max(meta.width, meta.height)} ≥ 1200`) : fail(`sisi panjang ${Math.max(meta.width, meta.height)} < 1200`);
+}
 console.log(`index=${join(status.dataDir, 'photos', 'index.json')}`);
 console.log(failed ? `HASIL: ${failed} cek gagal` : 'HASIL: semua cek lulus');
 process.exit(failed ? 1 : 0);

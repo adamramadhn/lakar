@@ -1,6 +1,6 @@
 // Penyedia foto palsu untuk tes (bukan bagian dist paket mana pun): satu server HTTP lokal yang meniru
-// api.pexels.com, api.openverse.org, images.pexels.com, upload.wikimedia.org, dan live.staticflickr.com berdasarkan
-// header Host. SafeNet tes memakai transport http ke server ini + resolver palsu; validasi URL/allowlist/IP tetap asli.
+// api.pexels.com, commons.wikimedia.org, api.openverse.org, images.pexels.com, thumb/upload.wikimedia.org, dan
+// live.staticflickr.com berdasarkan header Host. SafeNet tes memakai transport http ke server ini + resolver palsu; validasi URL/allowlist/IP tetap asli.
 import { createServer, request as httpRequest, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import { crc32, deflateSync } from 'node:zlib';
 import type { SafeNetOptions } from '../../packages/daemon/src/photos/net.ts';
@@ -78,14 +78,127 @@ const OV_RESULTS = [
   ovImage(OV_CC0, 'https://live.staticflickr.com/65535/kamar_b.png', 'cc0'),
 ];
 
-export type FakeRequest = { host: string; path: string; auth?: string };
+// ---------------------------------------------------------------------------
+// Wikimedia Commons palsu: setiap baris matriks (kandidat baik, buruk, ranking, keragaman, orientation, URL impor).
+// ---------------------------------------------------------------------------
+
+type WikiSpec = {
+  id: number;
+  title: string;
+  index: number;
+  width?: number;
+  height?: number;
+  size?: number;
+  mime?: string;
+  license?: string;
+  short?: string;
+  artist?: string;
+  categories?: string;
+  nonFree?: boolean;
+  /** Thumbnail tanpa segmen `/330px-` (turunan URL impor gagal). */
+  oddThumb?: boolean;
+};
+
+const MIB = 1024 * 1024;
+const wikiFile = (title: string) => title.replace(/^File:/, '').replace(/ /g, '_');
+const UTM = '?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=';
+
+/** ID halaman Wikimedia palsu per kasus. */
+export const WIKI = {
+  bySa: 1001, // relevansi 1, CC BY-SA, 4000 lebar → impor turunan 3840px
+  cc0: 1002, // CC0, 3000 lebar, 2 MiB → impor URL asli
+  featured: 1003, // Featured pictures → naik
+  bw: 1004, // hitam-putih → turun
+  spam1: 1005,
+  spam2: 1006,
+  spam3: 1007, // pembuat sama ketiga → dibuang (maks 2 per pembuat)
+  png: 1008, // PNG 20 MiB → impor turunan 1920px
+  portrait: 1009,
+  square: 1010,
+  svg: 2001,
+  tiff: 2002,
+  nc: 2003,
+  gfdl: 2004,
+  nonFree: 2005,
+  small: 2006,
+  panorama: 2007,
+  map: 2008,
+  pdArt: 2009,
+  logo: 2010,
+  oddThumb: 2011,
+} as const;
+
+const WIKI_SPECS: WikiSpec[] = [
+  { id: WIKI.bySa, title: 'File:Running shoes on track.jpg', index: 1, width: 4000, height: 3000, size: 5 * MIB, license: 'cc-by-sa-4.0', short: 'CC BY-SA 4.0', artist: '<a href="//commons.wikimedia.org/wiki/User:Ana" title="User:Ana">Ana &amp; Co</a>', categories: 'Running shoes|Self-published work' },
+  { id: WIKI.cc0, title: 'File:Shoes on wooden floor.jpg', index: 2, width: 3000, height: 2000, size: 2 * MIB, license: 'cc0', short: 'CC0', artist: 'Budi', categories: 'Shoes' },
+  { id: WIKI.bw, title: 'File:Old shoe shop.jpg', index: 3, width: 3000, height: 2000, size: 2 * MIB, license: 'pd', short: 'Public domain', artist: 'Citra', categories: 'Black and white photographs of shops|PD-old-70' },
+  { id: WIKI.spam1, title: 'File:Liat Portal 1.jpg', index: 4, width: 3000, height: 2000, size: 2 * MIB, license: 'cc-by-4.0', short: 'CC BY 4.0', artist: 'Liat Portal' },
+  { id: WIKI.featured, title: 'File:Trail runner shoes.jpg', index: 5, width: 3000, height: 2000, size: 2 * MIB, license: 'cc-by-sa-3.0', short: 'CC BY-SA 3.0', artist: 'Dewi', categories: 'Featured pictures of objects|Shoes' },
+  { id: WIKI.spam2, title: 'File:Liat Portal 2.jpg', index: 6, width: 3000, height: 2000, size: 2 * MIB, license: 'cc-by-4.0', short: 'CC BY 4.0', artist: 'Liat Portal' },
+  { id: WIKI.spam3, title: 'File:Liat Portal 3.jpg', index: 7, width: 3000, height: 2000, size: 2 * MIB, license: 'cc-by-4.0', short: 'CC BY 4.0', artist: 'Liat Portal' },
+  { id: WIKI.png, title: 'File:Sneaker studio.png', index: 8, width: 5000, height: 4000, size: 20 * MIB, mime: 'image/png', license: 'cc0', short: 'CC0', artist: 'Eka' },
+  { id: WIKI.portrait, title: 'File:Runner portrait.jpg', index: 9, width: 2000, height: 3000, size: 2 * MIB, license: 'cc-by-2.0', short: 'CC BY 2.0', artist: 'Fajar' },
+  { id: WIKI.square, title: 'File:Shoe square.jpg', index: 10, width: 2000, height: 2000, size: 2 * MIB, license: 'cc-by-2.0', short: 'CC BY 2.0', artist: 'Gita' },
+  { id: WIKI.svg, title: 'File:Shoe vector.svg', index: 11, mime: 'image/svg+xml' },
+  { id: WIKI.tiff, title: 'File:Shoe scan.tif', index: 12, mime: 'image/tiff' },
+  { id: WIKI.nc, title: 'File:Shoe nc.jpg', index: 13, license: 'cc-by-nc-sa-2.0', short: 'CC BY-NC-SA 2.0' },
+  { id: WIKI.gfdl, title: 'File:Shoe gfdl.jpg', index: 14, license: 'gfdl', short: 'GFDL' },
+  { id: WIKI.nonFree, title: 'File:Shoe nonfree.jpg', index: 15, nonFree: true },
+  { id: WIKI.small, title: 'File:Shoe small.jpg', index: 16, width: 640, height: 480 },
+  { id: WIKI.panorama, title: 'File:Shoe panorama.jpg', index: 17, width: 4000, height: 1000 },
+  { id: WIKI.map, title: 'File:Shoe district.jpg', index: 18, categories: 'Maps of Jakarta' },
+  { id: WIKI.pdArt, title: 'File:Shoe still life.jpg', index: 19, license: 'pd', short: 'Public domain', categories: 'PD-Art (PD-old-100)' },
+  { id: WIKI.logo, title: 'File:Shoe brand logo.jpg', index: 20 },
+  { id: WIKI.oddThumb, title: 'File:Shoe huge.jpg', index: 21, width: 9000, height: 6000, size: 30 * MIB, oddThumb: true },
+];
+
+function wikiPage(w: WikiSpec) {
+  const file = wikiFile(w.title);
+  const meta: Record<string, { value: string }> = {
+    ObjectName: { value: file },
+    Artist: { value: w.artist ?? 'Hadi' },
+    LicenseShortName: { value: w.short ?? 'CC BY 4.0' },
+    License: { value: w.license ?? 'cc-by-4.0' },
+    LicenseUrl: { value: 'https://creativecommons.org/licenses/by/4.0' },
+    Categories: { value: w.categories ?? 'Shoes' },
+  };
+  if (w.nonFree) meta.NonFree = { value: 'true' };
+  return {
+    pageid: w.id,
+    ns: 6,
+    title: w.title,
+    index: w.index,
+    imageinfo: [
+      {
+        size: w.size ?? 2 * MIB,
+        width: w.width ?? 3000,
+        height: w.height ?? 2000,
+        thumburl: w.oddThumb
+          ? `https://thumb.wikimedia.org/wikipedia/commons/thumb/a/ab/${file}/lossy-page1-${file}${UTM}thumbnail`
+          : `https://thumb.wikimedia.org/wikipedia/commons/thumb/a/ab/${file}/330px-${file}${UTM}thumbnail`,
+        thumbwidth: 330,
+        url: `https://upload.wikimedia.org/wikipedia/commons/a/ab/${file}${UTM}original`,
+        descriptionurl: `https://commons.wikimedia.org/wiki/${encodeURIComponent(w.title.replace(/ /g, '_'))}`,
+        mime: w.mime ?? 'image/jpeg',
+        extmetadata: meta,
+      },
+    ],
+  };
+}
+
+export const WIKI_PAGES = WIKI_SPECS.map(wikiPage);
+
+export type FakeRequest = { host: string; path: string; auth?: string; ua?: string };
 export type Mode = 'ok' | 'hang' | number;
+export type WikiMode = Mode | 'maxlag' | 'empty';
 
 export type FakeProviders = {
   port: number;
   requests: FakeRequest[];
-  /** Mode api.pexels.com / api.openverse.org: ok, hang, atau status HTTP. */
-  mode: { pexels: Mode; openverse: Mode };
+  /** Mode api.pexels.com / commons.wikimedia.org / api.openverse.org: ok, hang, atau status HTTP (+ maxlag/empty Wikimedia). */
+  mode: { pexels: Mode; wikimedia: WikiMode; openverse: Mode | 'empty' };
+  /** Konkurensi maksimum permintaan API commons.wikimedia.org yang teramati (reset manual). */
+  wikiConcurrency: { now: number; max: number };
   /** Alamat per host untuk resolver palsu (default 127.0.0.1). */
   ipFor: Map<string, string>;
   /** Opsi SafeNet tes: transport http ke server ini; loopback diizinkan khusus tes, IP lain tetap difilter asli. */
@@ -95,7 +208,8 @@ export type FakeProviders = {
 
 export async function startFakeProviders(): Promise<FakeProviders> {
   const requests: FakeRequest[] = [];
-  const mode: FakeProviders['mode'] = { pexels: 'ok', openverse: 'ok' };
+  const mode: FakeProviders['mode'] = { pexels: 'ok', wikimedia: 'ok', openverse: 'ok' };
+  const wikiConcurrency = { now: 0, max: 0 };
   const ipFor = new Map<string, string>();
   const json = (res: ServerResponse, status: number, body: unknown) => {
     res.writeHead(status, { 'content-type': 'application/json' });
@@ -109,8 +223,35 @@ export async function startFakeProviders(): Promise<FakeProviders> {
     const host = (req.headers.host ?? '').split(':')[0]!;
     const path = req.url ?? '/';
     const auth = req.headers.authorization;
-    requests.push({ host, path, ...(auth ? { auth } : {}) });
+    const ua = req.headers['user-agent'];
+    requests.push({ host, path, ...(auth ? { auth } : {}), ...(ua ? { ua } : {}) });
     const u = new URL(path, 'http://x');
+    if (host === 'commons.wikimedia.org') {
+      wikiConcurrency.now++;
+      wikiConcurrency.max = Math.max(wikiConcurrency.max, wikiConcurrency.now);
+      res.on('close', () => wikiConcurrency.now--);
+      if (mode.wikimedia === 'hang') return;
+      // Jeda kecil agar permintaan paralel (bila ada) benar-benar tumpang tindih.
+      setTimeout(() => {
+        if (typeof mode.wikimedia === 'number') return json(res, mode.wikimedia, { error: 'palsu' });
+        if (mode.wikimedia === 'maxlag') {
+          res.writeHead(200, { 'content-type': 'application/json', 'retry-after': '5' });
+          return res.end(JSON.stringify({ error: { code: 'maxlag', info: 'Waiting for a database server: 6 seconds lagged.' } }));
+        }
+        if (u.pathname !== '/w/api.php') return json(res, 404, {});
+        const pageids = u.searchParams.get('pageids');
+        if (pageids) {
+          const hit = WIKI_PAGES.find((p) => String(p.pageid) === pageids);
+          return json(res, 200, { batchcomplete: true, query: { pages: [hit ?? { pageid: Number(pageids), missing: true }] } });
+        }
+        if (u.searchParams.get('generator') === 'search') {
+          if (mode.wikimedia === 'empty') return json(res, 200, { batchcomplete: true });
+          return json(res, 200, { batchcomplete: true, query: { pages: WIKI_PAGES } });
+        }
+        return json(res, 200, { error: { code: 'badvalue', info: 'palsu' } });
+      }, 25);
+      return;
+    }
     const apiMode = host === 'api.pexels.com' ? mode.pexels : host === 'api.openverse.org' && !u.pathname.endsWith('/thumb/') ? mode.openverse : 'ok';
     if (apiMode === 'hang') return; // tidak pernah menjawab
     if (typeof apiMode === 'number') return json(res, apiMode, { error: 'palsu' });
@@ -130,7 +271,7 @@ export async function startFakeProviders(): Promise<FakeProviders> {
       return json(res, 404, {});
     }
     if (host === 'api.openverse.org') {
-      if (u.pathname === '/v1/images/') return json(res, 200, { result_count: OV_RESULTS.length, results: OV_RESULTS });
+      if (u.pathname === '/v1/images/') return json(res, 200, apiMode === 'empty' ? { result_count: 0, results: [] } : { result_count: OV_RESULTS.length, results: OV_RESULTS });
       const thumb = /^\/v1\/images\/([0-9a-f-]+)\/thumb\/$/.exec(u.pathname);
       // Seperti Openverse asli (negosiasi konten DRF): Accept tanpa `*/*` (mis. hanya `image/*`) → 406.
       if (thumb) return (req.headers.accept ?? '*/*').includes('*/*') ? png(res, THUMB_PNG) : json(res, 406, { detail: 'Could not satisfy the request Accept header.' });
@@ -171,6 +312,7 @@ export async function startFakeProviders(): Promise<FakeProviders> {
       }
       return png(res, u.searchParams.has('h') ? THUMB_PNG : PHOTO_PNG);
     }
+    if (host === 'thumb.wikimedia.org') return png(res, /\/330px-/.test(u.pathname) ? THUMB_PNG : WIKI_PNG);
     if (host === 'upload.wikimedia.org' || host === 'live.staticflickr.com') return png(res, WIKI_PNG);
     json(res, 404, {});
   });
@@ -180,6 +322,7 @@ export async function startFakeProviders(): Promise<FakeProviders> {
     port,
     requests,
     mode,
+    wikiConcurrency,
     ipFor,
     netOptions: () => ({
       resolve: async (hostname) => [{ address: ipFor.get(hostname) ?? '127.0.0.1', family: 4 }],

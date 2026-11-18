@@ -99,7 +99,7 @@ export function formatStatus(st: StatusData): string {
 /** Deskripsi tool `status`. */
 export const STATUS_DESCRIPTION =
   'Status lakard: versi daemon dan mcp (cocok/tidak), pool render (halaman siap/sibuk/antre, dibuat ulang), font hilang, versi ikon, ' +
-  'penyedia foto stok (pexels/openverse, status file key, jumlah foto terimpor), sesi aktif. ' +
+  'penyedia foto stok (pexels/wikimedia/openverse, status file key, jumlah foto terimpor), sesi aktif. ' +
   'Tetap bekerja walau versi tidak cocok. Daemon mati → error berisi cara menjalankan service (systemctl --user start lakard).';
 
 /** Deskripsi tool `read_skill`. */
@@ -200,15 +200,15 @@ export const PHOTO_THUMBNAILS_MAX = 6;
 
 /** Deskripsi tool `photo_search`. */
 export const PHOTO_SEARCH_DESCRIPTION =
-  'Cari foto stok nyata untuk gambar di desain (sampul, kartu, hero, avatar orang/tempat, makanan, produk; bukan ikon fitur). Photos provided by Pexels; tanpa key Pexels, ' +
-  'cadangan Openverse (hanya CC0, Public Domain Mark, CC BY dari Flickr/Wikimedia). ' +
+  'Cari foto stok nyata untuk gambar di desain (sampul, kartu, hero, avatar orang/tempat, makanan, produk; bukan ikon fitur). Photos provided by Pexels bila key Pexels terpasang; ' +
+  'selain itu Wikimedia Commons (foto CC0/Public Domain, CC BY, CC BY-SA; tersaring dan terurut mutu), cadangan Openverse (CC0, Public Domain Mark, CC BY). ' +
   'Mengembalikan teks JSON {provider, fallbackReason?, query, results:[{ref, width, height, alt, avgColor?, creator, license, sourcePageUrl, credit}], previews} ' +
   `lalu thumbnail pratinjau (maks ${PHOTO_THUMBNAILS_MAX} gambar; previews:[ref] di JSON = urutan gambar). ` +
   "Pakai di execute: const p = photo('<ref>'); lalu fills:[{type:'image', assetId:p.assetId, fit:'cover'}] pada frame/rect bernama 'Image / …'. " +
   'Ref ditulis literal di kode; foto diunduh sekali ke aset lokal saat execute (maks 6 foto baru per execute), render tidak memakai jaringan. ' +
-  'Dahulukan kandidat CC0/PDM bila ada, lalu Pexels; CC BY hanya bila tidak ada pilihan lain. ' +
+  'Dahulukan kandidat CC0/Public Domain atau Pexels, lalu CC BY/CC BY-SA. ' +
   'credit = baris kredit siap pakai; atribusi (pembuat, lisensi, sumber) tercatat di metadata aset saat impor, jadi kredit tidak ditampilkan di UI kecuali pengguna memintanya; sebut kredit di ringkasan akhir. ' +
-  'Pakai kata kunci Inggris yang konkret (Openverse berindeks Inggris). orientation: landscape | portrait | square. ' +
+  'Pakai kata kunci Inggris yang konkret (Wikimedia Commons dan Openverse berindeks Inggris). orientation: landscape | portrait | square. ' +
   'Cari di awal (maks 2 pencarian per desain, paralel, sebelum execute pertama). Tidak ada hasil → NOT_FOUND; penyedia sibuk/gagal → EXEC_ERROR (retryable): satu percobaan saja, lalu pakai blok gambar pengganti.';
 
 export function createLakarMcpServer(daemonUrl: string): McpServer {

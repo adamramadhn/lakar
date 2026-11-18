@@ -13,14 +13,20 @@ export type FetchKind = 'api' | 'thumb' | 'image';
 /** Allowlist host per jenis (string = host persis, RegExp = pola host penuh). */
 export type HostAllowlist = Readonly<Record<FetchKind, readonly (string | RegExp)[]>>;
 
-const IMAGE_HOSTS = ['images.pexels.com', 'live.staticflickr.com', /^farm\d{1,2}\.staticflickr\.com$/, 'upload.wikimedia.org'] as const;
+const IMAGE_HOSTS = ['images.pexels.com', 'live.staticflickr.com', /^farm\d{1,2}\.staticflickr\.com$/, 'upload.wikimedia.org', 'thumb.wikimedia.org'] as const;
 
 /** Allowlist produksi (di-hardcode; tidak dibaca dari config). */
 export const DEFAULT_ALLOWLIST: HostAllowlist = {
-  api: ['api.pexels.com', 'api.openverse.org'],
+  api: ['api.pexels.com', 'commons.wikimedia.org', 'api.openverse.org'],
   thumb: [...IMAGE_HOSTS, 'api.openverse.org'],
   image: [...IMAGE_HOSTS],
 };
+
+/**
+ * User-Agent semua permintaan keluar (kebijakan User-Agent Wikimedia: deskriptif). Sengaja tanpa email, nama,
+ * hostname, atau data pribadi lain.
+ */
+export const USER_AGENT = 'Lakar/0.1 (internal design tool)';
 
 /** Satu-satunya host yang boleh menerima header `Authorization` (key Pexels). */
 export const AUTH_HOST = 'api.pexels.com';
@@ -244,7 +250,7 @@ export class SafeNet {
 
   #once(url: URL, opts: FetchOptions, signal: AbortSignal): Promise<{ status: number; location: string | undefined; contentType: string; stream: IncomingMessage }> {
     // Header Authorization hanya ke AUTH_HOST (setiap hop dicek ulang, jadi redirect tidak membawa key).
-    const headers: Record<string, string> = { 'user-agent': 'lakard/1 (+local)', accept: opts.kind === 'api' ? 'application/json' : IMAGE_ACCEPT };
+    const headers: Record<string, string> = { 'user-agent': USER_AGENT, accept: opts.kind === 'api' ? 'application/json' : IMAGE_ACCEPT };
     for (const [k, v] of Object.entries(opts.headers ?? {})) {
       if (k.toLowerCase() === 'authorization' && url.hostname !== AUTH_HOST) continue;
       headers[k] = v;
