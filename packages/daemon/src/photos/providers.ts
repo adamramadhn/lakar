@@ -355,15 +355,15 @@ function importBucket(width: number, max: number): number | undefined {
 }
 
 /**
- * URL impor: asli bila lebar ≤ 3840 dan ukuran ≤ 12 MiB; selain itu turunan path thumbnail pratinjau
- * (`/330px-` → `/3840px-` JPEG/WebP, `/1920px-` PNG). Turunan gagal → undefined.
+ * URL impor: selalu thumbnail bucket standar (turunan path thumbnail pratinjau, `/330px-` → bucket terbesar < lebar asli,
+ * maks 3840 JPEG/WebP, 1920 PNG). File asli `upload.wikimedia.org` tidak pernah diunduh: Wikimedia menjawab klien
+ * otomatis dengan 429 dan meminta thumbnail ukuran standar (https://w.wiki/GHai). Turunan gagal → undefined.
  */
 export function wikimediaImportUrl(info: { url: string; thumbUrl: string; width: number; size: number; mime: string }): string | undefined {
-  if (info.width > 0 && info.width <= WIKIMEDIA_IMPORT_MAX.jpeg && info.size > 0 && info.size <= IMAGE_MAX_BYTES) return info.url;
   const max = info.mime === 'image/png' ? WIKIMEDIA_IMPORT_MAX.png : WIKIMEDIA_IMPORT_MAX.jpeg;
   const bucket = importBucket(info.width, max);
   const seg = `/${WIKIMEDIA_PREVIEW_WIDTH}px-`;
-  if (!bucket || !info.thumbUrl.includes(seg)) return undefined;
+  if (!bucket || bucket < WIKIMEDIA_PREVIEW_WIDTH || !info.thumbUrl.includes(seg)) return undefined;
   const u = new URL(info.thumbUrl);
   const i = u.pathname.lastIndexOf(seg);
   if (i < 0) return undefined;

@@ -140,6 +140,15 @@ Catatan orkestrator lanjutan 2026-11-18 (iterasi 4–6; menggantikan butir "Iter
   (3) pen.dev TIDAK dijalankan ulang: iterasi 4–6 semua memakai `--reuse-pendev 2` (RAM VPS terbatas).
   Intent-contract, prompt latihan (sha 582c5d11…), dan aturan keputusan/juri v2.1 tidak diubah. Bila iterasi 6 belum
   lulus → HALT `blocked` dengan LOG; tidak ada iterasi ke-7.
+- 2026-11-18 — Iterasi 4 dihentikan implementer: semua unduhan `upload.wikimedia.org` (file asli) HTTP 429. Diagnosis
+  orkestrator: respons 429 Wikimedia sendiri berbunyi "use thumbnail images in sizes listed on https://w.wiki/GHai";
+  thumbnail bucket standar di `thumb.wikimedia.org` (1280/1920/3840) menjawab 200 dengan UA yang sama, file asli dan
+  thumbnail lewat `upload.wikimedia.org` menjawab 429. Keputusan: impor Wikimedia **selalu** memakai thumbnail bucket
+  standar (`wikimediaImportUrl`, maks 3840 JPEG/WebP, 1920 PNG), tidak pernah file asli — mengikuti arahan Wikimedia, bukan
+  mengakali batas; UA tetap tanpa kontak (tanpa data pribadi). Perubahan kecil di kode 1.18
+  (`packages/daemon/src/photos/providers.ts` + tes). Iterasi 4 tercatat `aborted` (tidak dijuri, P3 tidak selesai, P4
+  tidak dijalankan; biayanya tetap dihitung kumulatif); iterasi berikutnya = iterasi 5 baru dengan `--reuse-pendev 2`
+  (bukan `--resume` iterasi 4, karena P1/P2 iterasi 4 rusak oleh kegagalan infrastruktur foto). Sisa: iterasi 5 dan 6.
 
 ## Review Triage Log
 

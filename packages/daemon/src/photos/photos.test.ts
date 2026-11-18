@@ -451,7 +451,9 @@ describe('Wikimedia Commons', () => {
   it('URL impor: asli bila ≤ 3840 & ≤ 12 MiB; selain itu bucket 3840 (JPEG/WebP) / 1920 (PNG); turunan gagal → undefined', () => {
     const t = 'https://thumb.wikimedia.org/wikipedia/commons/thumb/8/81/X.jpg/330px-X.jpg';
     const url = 'https://upload.wikimedia.org/wikipedia/commons/8/81/X.jpg';
-    expect(wikimediaImportUrl({ url, thumbUrl: t, width: 2709, size: 3_000_000, mime: 'image/jpeg' })).toBe(url);
+    expect(wikimediaImportUrl({ url, thumbUrl: t, width: 2709, size: 3_000_000, mime: 'image/jpeg' })).toBe(t.replace('/330px-', '/1920px-'));
+    expect(wikimediaImportUrl({ url, thumbUrl: t, width: 1280, size: 300_000, mime: 'image/jpeg' })).toBe(t.replace('/330px-', '/960px-'));
+    expect(wikimediaImportUrl({ url, thumbUrl: t, width: 300, size: 30_000, mime: 'image/jpeg' })).toBeUndefined();
     expect(wikimediaImportUrl({ url, thumbUrl: t, width: 4668, size: 4_000_000, mime: 'image/jpeg' })).toBe(t.replace('/330px-', '/3840px-'));
     expect(wikimediaImportUrl({ url, thumbUrl: t, width: 3000, size: 20 * 1024 * 1024, mime: 'image/png' })).toBe(t.replace('/330px-', '/1920px-'));
     expect(wikimediaImportUrl({ url, thumbUrl: t, width: 6000, size: 2_000_000, mime: 'image/webp' })).toBe(t.replace('/330px-', '/3840px-'));
@@ -489,7 +491,7 @@ describe('Wikimedia Commons', () => {
     expect(e2.code).toBe('NOT_FOUND');
   });
 
-  it('impor dari hasil cari: URL asli (tanpa utm) / turunan 3840px / 1920px PNG; meta wikimedia lengkap', async () => {
+  it('impor dari hasil cari: selalu thumbnail bucket standar (tanpa utm, tanpa file asli) 1920px / 3840px / 1920px PNG; meta wikimedia lengkap', async () => {
     const { svc, dir } = await service('none');
     await svc.search({ query: 'shoes', limit: 12 });
     fake.requests.length = 0;
@@ -497,9 +499,10 @@ describe('Wikimedia Commons', () => {
     const paths = fake.requests.map((r) => `${r.host}${r.path}`).sort();
     expect(paths).toEqual([
       'thumb.wikimedia.org/wikipedia/commons/thumb/a/ab/Running_shoes_on_track.jpg/3840px-Running_shoes_on_track.jpg',
+      'thumb.wikimedia.org/wikipedia/commons/thumb/a/ab/Shoes_on_wooden_floor.jpg/1920px-Shoes_on_wooden_floor.jpg',
       'thumb.wikimedia.org/wikipedia/commons/thumb/a/ab/Sneaker_studio.png/1920px-Sneaker_studio.png',
-      'upload.wikimedia.org/wikipedia/commons/a/ab/Shoes_on_wooden_floor.jpg',
     ]);
+    expect(fake.requests.some((r) => r.host === 'upload.wikimedia.org')).toBe(false);
     expect(fake.requests.some((r) => r.host === 'commons.wikimedia.org')).toBe(false);
     const info = svc.resolve(W(WIKI.bySa))!;
     expect(info).toEqual({
@@ -528,7 +531,7 @@ describe('Wikimedia Commons', () => {
   it('cache miss → lookup pageids (serial) lalu impor; lisensi/mime tak aman atau hilang → NOT_FOUND; format → SCHEMA_INVALID', async () => {
     const { svc, dir } = await service('none');
     await svc.importRefs([W(WIKI.cc0)]);
-    expect(fake.requests.map((r) => r.host)).toEqual(['commons.wikimedia.org', 'upload.wikimedia.org']);
+    expect(fake.requests.map((r) => r.host)).toEqual(['commons.wikimedia.org', 'thumb.wikimedia.org']);
     expect(new URL(fake.requests[0]!.path, 'http://x').searchParams.get('pageids')).toBe(String(WIKI.cc0));
     const info = svc.resolve(W(WIKI.cc0))!;
     expect(await readAssetMeta(dir, info.assetId)).toMatchObject({
@@ -538,7 +541,7 @@ describe('Wikimedia Commons', () => {
       license: 'CC0',
       sourcePageUrl: 'https://commons.wikimedia.org/wiki/File%3AShoes_on_wooden_floor.jpg',
       attribution: '"Shoes on wooden floor" oleh Budi, CC0, via Wikimedia Commons',
-      downloadUrl: 'https://upload.wikimedia.org/wikipedia/commons/a/ab/Shoes_on_wooden_floor.jpg',
+      downloadUrl: 'https://thumb.wikimedia.org/wikipedia/commons/thumb/a/ab/Shoes_on_wooden_floor.jpg/1920px-Shoes_on_wooden_floor.jpg',
     });
     for (const id of [WIKI.nc, WIKI.svg, WIKI.nonFree, 999999]) expect((await errOf(svc.importRefs([W(id)]))).code, String(id)).toBe('NOT_FOUND');
     expect((await errOf(svc.importRefs(['wikimedia:abc']))).code).toBe('SCHEMA_INVALID');
