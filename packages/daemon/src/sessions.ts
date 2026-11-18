@@ -29,6 +29,12 @@ export type Session = {
   id: string;
   activeSlug?: string;
   createdAt: string;
+  /** Aktivitas terakhir (permintaan bersesi apa pun). */
+  lastAt?: string;
+  /** Jumlah panggilan execute (sukses + gagal), tidak terpotong seperti `log`. */
+  executes: number;
+  /** Klien yang membuat sesi (mis. `lakar-mcp`), bila dikirim. */
+  client?: string;
   /** `keep` snippet; diganti hanya oleh execute sukses. */
   keep: Record<string, unknown>;
   /** editId → snippet gagal (urutan sisip = urutan LRU). */
@@ -66,16 +72,25 @@ export function recallFailed(session: Session, editId: string): FailedSnippet | 
 }
 
 export function logExecute(session: Session, entry: ExecuteLogEntry): void {
+  session.executes++;
   session.log.push(entry);
   if (session.log.length > SESSION_LOG_MAX) session.log.splice(0, session.log.length - SESSION_LOG_MAX);
 }
 
 export class Sessions {
   readonly #map = new Map<string, Session>();
-  create(): Session {
-    const s: Session = { id: randomUUID(), createdAt: new Date().toISOString(), keep: {}, failed: new Map(), log: [] };
+  create(client?: string): Session {
+    const s: Session = { id: randomUUID(), createdAt: new Date().toISOString(), executes: 0, keep: {}, failed: new Map(), log: [], ...(client ? { client } : {}) };
     this.#map.set(s.id, s);
     return s;
+  }
+  get count(): number {
+    return this.#map.size;
+  }
+  /** Sesi urut aktivitas terbaru (`lastAt` atau `createdAt`), maks `limit`. */
+  recent(limit: number): Session[] {
+    const at = (s: Session) => s.lastAt ?? s.createdAt;
+    return [...this.#map.values()].sort((a, b) => (at(a) < at(b) ? 1 : at(a) > at(b) ? -1 : 0)).slice(0, limit);
   }
   /** Sesi dari header; tidak ada/tidak dikenal → NOT_FOUND (HTTP 401) agar klien membuat sesi baru. */
   require(header: string | string[] | undefined): Session {
@@ -86,6 +101,7 @@ export class Sessions {
         hint: 'buat sesi baru dengan POST /sessions lalu panggil open_doc lagi',
       });
     }
+    s.lastAt = new Date().toISOString();
     return s;
   }
 }

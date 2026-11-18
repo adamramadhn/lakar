@@ -8,23 +8,28 @@ export type BoardCheck = { id: string; name: string; summary: FindingSummary };
 export type CheckRun = { boards: BoardCheck[]; findings: Finding[]; measures: Map<string, BoardMeasure> };
 
 /**
- * Render + check board `boardIds` secara berurutan (satu halaman Chromium). Error render (FONT_MISSING,
- * NOT_FOUND, ICON_UNKNOWN, RENDER_FAILED) dilempar apa adanya. Temuan: error lalu warning, lalu urutan dokumen.
+ * Render + check board `boardIds`; board diukur paralel di pool render (AD-18). Error render (FONT_MISSING,
+ * NOT_FOUND, ICON_UNKNOWN, RENDER_FAILED) dilempar apa adanya: yang pertama menurut urutan board.
+ * Temuan: error lalu warning, lalu urutan dokumen (urutan hasil = urutan `boardIds`, bukan urutan selesai).
  */
 export async function runCheck(render: RenderPort<ResolvedDocument>, resolved: ResolvedDocument, boardIds: readonly string[]): Promise<CheckRun> {
   const boards: BoardCheck[] = [];
   const findings: Finding[] = [];
   const measures = new Map<string, BoardMeasure>();
-  for (const id of boardIds) {
+  const targets = boardIds.map((id) => {
     const board = findBoard(resolved, id);
     if (!board) throw new LakarError('NOT_FOUND', `board ${id} tidak ada`, { hint: 'pakai ID board dari created[] execute' });
-    const { allowGlyphs } = glyphScan(board);
-    const measure = await render.measure(resolved, id, { allowGlyphs });
+    return { id, board, allowGlyphs: glyphScan(board).allowGlyphs };
+  });
+  const settled = await Promise.allSettled(targets.map((t) => render.measure(resolved, t.id, { allowGlyphs: t.allowGlyphs })));
+  for (const r of settled) if (r.status === 'rejected') throw r.reason;
+  targets.forEach(({ id, board }, i) => {
+    const measure = (settled[i] as PromiseFulfilledResult<BoardMeasure>).value;
     measures.set(id, measure);
     const list = checkBoard({ doc: resolved, boardId: id, measure });
     boards.push({ id, name: board.name, summary: summarizeFindings(list) });
     findings.push(...list);
-  }
-  // Urutan dokumen antarboard sudah terjaga (board diproses urut); sort stabil hanya memisah level.
+  });
+  // Urutan dokumen antarboard terjaga (hasil disusun menurut boardIds); sort stabil hanya memisah level.
   return { boards, findings: sortFindings(findings), measures };
 }

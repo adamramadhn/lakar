@@ -227,7 +227,7 @@ describe('@lakar/daemon', () => {
       // teks 32px di kiri atas board, latar putih
       expect(countDarkPixels(img, 0, 0, 390, 60)).toBeGreaterThan(100);
       expect(countDarkPixels(img, 0, 200, 390, 844)).toBe(0);
-      // panggilan kedua memakai halaman yang sama (mutex) dan tetap benar
+      // panggilan kedua (halaman pool mana pun) memberi PNG identik
       const r2 = await call('/screenshot', { boardId: r.body.data.boardId }, s);
       expect(r2.body.data.png).toBe(r.body.data.png);
     }, 60_000);

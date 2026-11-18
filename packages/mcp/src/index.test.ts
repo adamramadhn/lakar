@@ -8,7 +8,8 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Client, InMemoryTransport } from '@modelcontextprotocol/client';
 import { StdioClientTransport } from '@modelcontextprotocol/client/stdio';
-import { PACKAGE, createLakarMcpServer } from './index.js';
+import { LAKAR_VERSION, SCHEMA_VERSION } from '@lakar/schema';
+import { PACKAGE, SERVER_VERSION, createLakarMcpServer, formatStatus } from './index.js';
 
 const PNG_B64 = Buffer.from('fake-png').toString('base64');
 
@@ -22,6 +23,8 @@ function fakeDaemon() {
   const seen: Seen[] = [];
   let sessions = 0;
   let restartOnce = false;
+  /** 'reject' = 409 VERSION_MISMATCH; 'old' = respons tanpa versi (lakard lama); undefined = cocok. */
+  let versionMode: 'reject' | 'old' | undefined;
   const server: Server = createServer(async (req: IncomingMessage, res) => {
     let raw = '';
     for await (const c of req) raw += c;
@@ -32,7 +35,33 @@ function fakeDaemon() {
       res.writeHead(status, { 'content-type': 'application/json' });
       res.end(JSON.stringify(payload));
     };
-    if (req.url === '/sessions') return send(200, { ok: true, data: { sessionId: `s${++sessions}` } });
+    if (req.url === '/status') {
+      return send(200, {
+        ok: true,
+        data: {
+          version: versionMode ? '0.0.9' : LAKAR_VERSION,
+          schemaVersion: SCHEMA_VERSION,
+          node: 'v26.1.0',
+          pid: 1234,
+          startedAt: '2026-11-18T00:00:00.000Z',
+          uptimeSec: 185,
+          host: '127.0.0.1',
+          port: 7466,
+          dataDir: '/data',
+          pool: { size: 2, ready: 2, idle: 2, busy: 0, waiting: 0, recreated: 0, peakBusy: 1, browserVersion: '140.0' },
+          fonts: { families: ['Inter', 'Manrope'], missing: [] },
+          icons: { lucide: '1.74.0', 'simple-icons': '16.38.0' },
+          sessions: { count: 1, active: [{ id: 'a1b2c3d4', activeSlug: 'landing-kopi', createdAt: 'x', executes: 3 }] },
+        },
+      });
+    }
+    if (req.url === '/sessions') {
+      if (versionMode === 'reject') {
+        return send(409, { ok: false, error: { code: 'VERSION_MISMATCH', message: `versi tidak cocok: lakard 0.0.9, lakar-mcp ${body.version}`, hint: 'systemctl --user restart lakard', retryable: false } });
+      }
+      if (versionMode === 'old') return send(200, { ok: true, data: { sessionId: `s${++sessions}` } });
+      return send(200, { ok: true, data: { sessionId: `s${++sessions}`, version: LAKAR_VERSION, schemaVersion: SCHEMA_VERSION } });
+    }
     if (restartOnce) {
       restartOnce = false;
       return send(401, { ok: false, error: { code: 'NOT_FOUND', message: 'sesi tidak dikenal', hint: '', retryable: false } });
@@ -66,6 +95,20 @@ function fakeDaemon() {
       const results = body.query === 'dumbbell' ? [{ lib: 'lucide', icon: 'dumbbell', tags: ['gym'] }] : [];
       return send(200, { ok: true, data: { query: body.query, results } });
     }
+    if (req.url === '/boards') return send(200, { ok: true, data: { docId: 'Dddddddd', slug: 'a', rev: 1, boards: [{ id: 'Bbbbbbbb', name: '[WIP] Home', wip: true }] } });
+    if (req.url === '/inspect') {
+      if (body.id === 'Zzzzzzzz') return send(404, { ok: false, error: { code: 'NOT_FOUND', message: 'node Zzzzzzzz tidak ada', hint: 'pakai ID', retryable: false } });
+      return send(200, { ok: true, data: { docId: 'Dddddddd', rev: 1, boardId: 'Bbbbbbbb', node: { id: body.id, bounds: [0, 0, 10, 10] } } });
+    }
+    if (req.url === '/export') {
+      if (body.scale === 3) return send(400, { ok: false, error: { code: 'SCHEMA_INVALID', message: 'scale: 1 atau 2', hint: 'kirim scale 1|2', retryable: false } });
+      return send(200, { ok: true, data: { path: '/data/exports/a/Bbbbbbbb-r1@2x.png', id: 'Bbbbbbbb', name: 'Home', rev: 1, scale: body.scale ?? 1, width: 780, height: 1688, bytes: 10 } });
+    }
+    if (req.url === '/skills/read') {
+      if (body.name === undefined) return send(200, { ok: true, data: { skills: [{ name: 'core', available: true }] } });
+      if (body.name === 'core') return send(200, { ok: true, data: { name: 'core', content: '# core\nisi' } });
+      return send(404, { ok: false, error: { code: 'NOT_FOUND', message: `skill "${body.name}" tidak ada`, hint: 'skill dikenal: core, landing, mobile, icons, api; tersedia: core', retryable: false } });
+    }
     if (req.url === '/screenshot') {
       if (body.boardId === 'ZZZZZZZZ') return send(404, { ok: false, error: { code: 'NOT_FOUND', message: 'board tidak ada', hint: 'pakai id', retryable: false } });
       return send(200, { ok: true, data: { boardId: 'Bbbbbbbb', width: 390, height: 844, mimeType: 'image/png', png: PNG_B64 } });
@@ -76,6 +119,7 @@ function fakeDaemon() {
     seen,
     server,
     restartOnce: () => (restartOnce = true),
+    setVersionMode: (m: 'reject' | 'old' | undefined) => (versionMode = m),
     async listen() {
       await new Promise<void>((r) => server.listen(0, '127.0.0.1', r));
       return `http://127.0.0.1:${(server.address() as { port: number }).port}`;
@@ -103,10 +147,136 @@ describe('@lakar/mcp', () => {
     expect(PACKAGE).toBe('@lakar/mcp');
   });
 
-  it('daftar tool: open_doc, execute, screenshot, icon_search, layout_check', async () => {
+  it('daftar tool v1 lengkap (10, AD-11); SERVER_VERSION = LAKAR_VERSION', async () => {
     const c = await connect(url);
     const { tools } = await c.listTools();
-    expect(tools.map((t) => t.name).sort()).toEqual(['execute', 'icon_search', 'layout_check', 'open_doc', 'screenshot']);
+    expect(tools.map((t) => t.name).sort()).toEqual(
+      ['execute', 'export', 'icon_search', 'inspect', 'layout_check', 'list_boards', 'open_doc', 'read_skill', 'screenshot', 'status'].sort(),
+    );
+    expect(SERVER_VERSION).toBe(LAKAR_VERSION);
+    expect(c.getServerVersion()?.version).toBe(LAKAR_VERSION);
+  });
+
+  it('sesi dibuat dengan versi mcp: POST /sessions {client, version, schemaVersion}', async () => {
+    fake.seen.length = 0;
+    const c = await connect(url);
+    await c.callTool({ name: 'open_doc', arguments: { slug: 'v' } });
+    expect(fake.seen[0]).toMatchObject({ path: '/sessions', body: { client: 'lakar-mcp', version: LAKAR_VERSION, schemaVersion: SCHEMA_VERSION } });
+  });
+
+  it('status → teks ringkas (versi cocok, pool, font, ikon, sesi) tanpa sesi', async () => {
+    fake.seen.length = 0;
+    const c = await connect(url);
+    const r = await c.callTool({ name: 'status', arguments: {} });
+    expect(r.isError).toBeFalsy();
+    const text = (r.content as any)[0].text as string;
+    expect(text.split('\n')).toEqual([
+      `lakard ${LAKAR_VERSION} (schema ${SCHEMA_VERSION}, node v26.1.0, pid 1234, uptime 3m) · mcp ${LAKAR_VERSION}: cocok`,
+      'pool: 2 halaman · 2 siap · 0 sibuk · 0 antre · dibuat ulang 0× · chromium 140.0',
+      'font: 2 keluarga, hilang: -',
+      'ikon: lucide 1.74.0, simple-icons 16.38.0',
+      'sesi: 1 (a1b2c3d4 landing-kopi, 3 execute)',
+    ]);
+    expect(fake.seen.map((x) => x.path)).toEqual(['/status']);
+  });
+
+  it.each(['reject', 'old'] as const)('versi beda (%s) → setiap tool VERSION_MISMATCH + hint restart; status tetap jalan; pulih setelah daemon cocok', async (mode) => {
+    fake.setVersionMode(mode);
+    try {
+      const c = await connect(url);
+      for (const [name, args] of [['open_doc', { slug: 'x' }], ['list_boards', {}], ['execute', { code: '1', description: 'uji versi beda mcp' }]] as const) {
+        const r = await c.callTool({ name, arguments: args });
+        expect(r.isError, name).toBe(true);
+        expect((r.content as any)[0].text).toMatch(/^VERSION_MISMATCH: versi tidak cocok/);
+        expect((r.content as any)[0].text).toContain('systemctl --user restart lakard');
+      }
+      const st = await c.callTool({ name: 'status', arguments: {} });
+      expect(st.isError).toBeFalsy();
+      expect((st.content as any)[0].text).toMatch(/mcp \S+: TIDAK cocok/);
+      fake.setVersionMode(undefined);
+      expect((await c.callTool({ name: 'open_doc', arguments: { slug: 'x' } })).isError).toBeFalsy();
+    } finally {
+      fake.setVersionMode(undefined);
+    }
+  });
+
+  it('lakard lama tanpa route (404 bawaan fastify, bukan bentuk AD-11) → status dan tool lain VERSION_MISMATCH terformat, bukan TypeError', async () => {
+    // Bentuk 404 bawaan fastify persis: {message, error, statusCode}.
+    const old = createServer((req, res) => {
+      req.resume();
+      req.on('end', () => {
+        if (req.url === '/sessions') {
+          res.writeHead(200, { 'content-type': 'application/json' });
+          return res.end(JSON.stringify({ ok: true, data: { sessionId: 'lama' } }));
+        }
+        res.writeHead(404, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ message: `Route ${req.method}:${req.url} not found`, error: 'Not Found', statusCode: 404 }));
+      });
+    });
+    await new Promise<void>((r) => old.listen(0, '127.0.0.1', r));
+    try {
+      const addr = old.address() as { port: number };
+      const c = await connect(`http://127.0.0.1:${addr.port}`);
+      const st = await c.callTool({ name: 'status', arguments: {} });
+      expect(st.isError).toBe(true);
+      const text = (st.content as any)[0].text as string;
+      expect(text).toMatch(/^VERSION_MISMATCH: lakard di http:\/\/127\.0\.0\.1:\d+ tidak mengenal GET \/status \(HTTP 404/);
+      expect(text).toContain('systemctl --user restart lakard');
+      expect(text).not.toMatch(/Cannot read|undefined/);
+    } finally {
+      await new Promise<void>((r) => old.close(() => r()));
+    }
+  });
+
+  it('formatStatus: lastError pool dan font hilang ditampilkan', () => {
+    const text = formatStatus({
+      version: LAKAR_VERSION,
+      schemaVersion: SCHEMA_VERSION,
+      uptimeSec: 30,
+      pool: { size: 2, ready: 0, busy: 0, waiting: 0, recreated: 0, lastError: 'browser gagal dijalankan' },
+      fonts: { families: [], missing: ['inter'] },
+      sessions: { count: 0, active: [] },
+    });
+    expect(text).toContain('uptime 30d');
+    expect(text).toContain('pool error terakhir: browser gagal dijalankan');
+    expect(text).toContain('hilang: inter');
+    expect(text).toContain('sesi: 0');
+  });
+
+  it('read_skill / list_boards / inspect / export / screenshot nodeId diteruskan ke endpoint daemon', async () => {
+    fake.seen.length = 0;
+    const c = await connect(url);
+    const list = await c.callTool({ name: 'read_skill', arguments: {} });
+    expect(JSON.parse((list.content as any)[0].text)).toEqual({ skills: [{ name: 'core', available: true }] });
+    const core = await c.callTool({ name: 'read_skill', arguments: { name: 'core' } });
+    expect((core.content as any)[0].text).toBe('# core\nisi');
+    const none = await c.callTool({ name: 'read_skill', arguments: { name: 'landing' } });
+    expect(none.isError).toBe(true);
+    expect((none.content as any)[0].text).toMatch(/^NOT_FOUND: .*\nhint: skill dikenal: core, landing, mobile, icons, api/);
+    const boards = await c.callTool({ name: 'list_boards', arguments: {} });
+    expect(JSON.parse((boards.content as any)[0].text).boards[0]).toMatchObject({ wip: true });
+    const ins = await c.callTool({ name: 'inspect', arguments: { id: 'Tttttttt', depth: 1 } });
+    expect(JSON.parse((ins.content as any)[0].text).node).toEqual({ id: 'Tttttttt', bounds: [0, 0, 10, 10] });
+    expect((await c.callTool({ name: 'inspect', arguments: { id: 'Zzzzzzzz' } })).isError).toBe(true);
+    const ex = await c.callTool({ name: 'export', arguments: { id: 'Bbbbbbbb', scale: 2 } });
+    expect(JSON.parse((ex.content as any)[0].text)).toMatchObject({ scale: 2, width: 780, height: 1688 });
+    expect((await c.callTool({ name: 'export', arguments: { scale: 3 } })).isError).toBe(true);
+    await c.callTool({ name: 'screenshot', arguments: { nodeId: 'Tttttttt' } });
+    const bodies = fake.seen.filter((x) => x.path !== '/sessions').map((x) => [x.path, x.body]);
+    expect(bodies).toEqual([
+      ['/skills/read', {}],
+      ['/skills/read', { name: 'core' }],
+      ['/skills/read', { name: 'landing' }],
+      ['/boards', {}],
+      ['/inspect', { id: 'Tttttttt', depth: 1 }],
+      ['/inspect', { id: 'Zzzzzzzz' }],
+      ['/export', { id: 'Bbbbbbbb', scale: 2 }],
+      ['/export', { scale: 3 }],
+      ['/screenshot', { nodeId: 'Tttttttt' }],
+    ]);
+    const { tools } = await c.listTools();
+    const shot = tools.find((t) => t.name === 'screenshot')!;
+    expect(Object.keys((shot.inputSchema as any).properties).sort()).toEqual(['boardId', 'nodeId']);
   });
 
   it('execute dengan check → JSON field lain + ringkasan + maks 20 baris temuan + baris sisa', async () => {
@@ -232,7 +402,10 @@ describe('@lakar/mcp', () => {
     expect(r.isError).toBe(true);
     const text = (r.content as any)[0].text as string;
     expect(text).toContain(deadUrl);
-    expect(text).toContain('lakard');
+    expect(text).toContain('systemctl --user start lakard');
+    const st = await c.callTool({ name: 'status', arguments: {} });
+    expect(st.isError).toBe(true);
+    expect((st.content as any)[0].text).toContain('systemctl --user start lakard');
     // panggilan berikutnya tetap dilayani
     expect((await c.callTool({ name: 'screenshot', arguments: {} })).isError).toBe(true);
   });
@@ -255,7 +428,7 @@ describe('@lakar/mcp', () => {
       const r = await c2.callTool({ name: 'execute', arguments: { code: '1' } });
       expect(r.isError).toBe(true);
       expect((r.content as any)[0].text).toContain('http://127.0.0.1:1');
-      expect((await c2.listTools()).tools).toHaveLength(5);
+      expect((await c2.listTools()).tools).toHaveLength(10);
     } finally {
       await c2.close();
     }
@@ -355,6 +528,17 @@ describe.skipIf(!browserInstalled)('layout_check dengan respons lakard asli', ()
     expect(lines[6]).toMatch(/^warning · LC-12 · Home · mobile \([A-Za-z0-9]{8}\) · ukuran 390×800 · 390×844$/);
     expect(text).not.toMatch(/golden|juri|rubrik|Lampiran B|skor|pen\.dev|benchmark/i);
     console.log(`[mcp] layout_check:\n${text}`);
+  }, 60_000);
+
+  it('status terhadap lakard asli: versi cocok, pool 2 halaman', async () => {
+    const c = await connect(proxyUrl);
+    const r = await c.callTool({ name: 'status', arguments: {} });
+    expect(r.isError).toBeFalsy();
+    const text = (r.content as any)[0].text as string;
+    expect(text).toMatch(new RegExp(`^lakard ${LAKAR_VERSION.replaceAll('.', '\\.')} \\(schema ${SCHEMA_VERSION}, .*\\) · mcp ${LAKAR_VERSION.replaceAll('.', '\\.')}: cocok`));
+    expect(text).toMatch(/\npool: 2 halaman · \d siap/);
+    expect(text).toMatch(/\nfont: 8 keluarga, hilang: -/);
+    console.log(`[mcp] status:\n${text}`);
   }, 60_000);
 });
 

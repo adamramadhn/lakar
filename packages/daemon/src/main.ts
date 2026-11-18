@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-// Entry `lakard`. Jalankan: /opt/node-26/bin/pnpm lakard  (atau /opt/node-26/bin/node packages/daemon/dist/main.js)
+// Entry `lakard`. Service: systemctl --user {start,restart,status} lakard (tools/lakard/install-service.sh).
+// Manual: /opt/node-26/bin/node packages/daemon/dist/main.js
 import { IconCatalog } from '@lakar/icons';
 import { loadConfig } from './config.js';
 import { FontRegistry } from './fonts.js';
@@ -36,6 +37,12 @@ try {
   // Baris kesiapan dicetak SETELAH handler sinyal terpasang: pengawas (tes, tracer-e2e) boleh
   // langsung mengirim SIGTERM begitu membaca baris ini tanpa membunuh proses lewat aksi default.
   console.log(`lakard: mendengarkan ${daemon.url} (data: ${config.dataDir})`);
+  if (config.configPath) console.log(`lakard: config ${config.configPath}`);
+  void daemon.warmed.then(() => {
+    const st = daemon.renderer.status();
+    if (st.ready === st.size) console.log(`lakard: pool render siap (${st.ready} halaman, chromium ${st.browserVersion ?? '?'})`);
+    else console.warn(`lakard: pool render belum siap (${st.ready}/${st.size}): ${st.lastError ?? 'tidak diketahui'}`);
+  });
 } catch (e) {
   const err = e as NodeJS.ErrnoException;
   if (err.code === 'EADDRINUSE') {

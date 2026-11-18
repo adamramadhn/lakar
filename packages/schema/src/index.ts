@@ -9,6 +9,7 @@ export * from './findings.js';
 export * from './icons.js';
 export * from './nodes.js';
 export * from './tokens.js';
+export * from './version.js';
 
 /** JSON Schema (draft 2020-12) yang dihasilkan dari zod — bukan ditulis tangan (AD-2). */
 export function jsonSchemas(): { document: Record<string, unknown>; node: Record<string, unknown> } {

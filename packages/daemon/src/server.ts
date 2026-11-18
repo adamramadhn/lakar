@@ -1,14 +1,17 @@
 // HTTP API lakard (fastify, 127.0.0.1). Bentuk respons AD-11: {ok:true,data} | {ok:false,error}.
 import Fastify, { type FastifyInstance, type FastifyReply } from 'fastify';
-import { changedNodeIds, touchedBoards, boundsOf } from '@lakar/check';
+import { changedNodeIds, touchedBoards, boundsOf, glyphScan } from '@lakar/check';
 import { DocumentLocks, createDocument, transact } from '@lakar/core';
 import { runSnippet } from '@lakar/exec';
 import { IconCatalog } from '@lakar/icons';
 import type { IconCatalogPort, RenderPort } from '@lakar/ports';
 import { findBoard, iconRefs } from '@lakar/render';
+import { SKILL_NAMES, SKILLS_DIR, listSkills, readSkill } from '@lakar/skills';
 import {
   ICON_LIBS,
+  LAKAR_VERSION,
   LakarError,
+  SCHEMA_VERSION,
   SLUG_PATTERN,
   resolveTokens,
   summarizeFindings,
@@ -19,12 +22,16 @@ import {
   type ResolvedDocument,
 } from '@lakar/schema';
 import { z } from 'zod';
-import { readFile } from 'node:fs/promises';
+import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
+import { randomBytes } from 'node:crypto';
 import { readAsset } from './assets.js';
 import { runCheck } from './check.js';
 import { readRenderModule, RENDER_PAGE_HTML } from './chromium.js';
 import type { DaemonConfig } from './config.js';
 import { FontRegistry } from './fonts.js';
+import { INSPECT_DEPTH_DEFAULT, INSPECT_DEPTH_MAX, WIP_PREFIX, boundsMap, inspectFit, locateNode } from './inspect.js';
+import { readPngSize } from './png.js';
 import { SESSION_HEADER, Sessions, UnknownSessionError, logExecute, recallFailed, rememberFailed } from './sessions.js';
 import { DocStore } from './store.js';
 
@@ -92,7 +99,18 @@ function applyEdits(code: string, edits: { find: string; replace: string }[]): s
   });
   return out;
 }
-const ScreenshotBody = z.object({ boardId: z.string().optional() }).optional();
+const ScreenshotBody = z.object({ boardId: z.string().optional(), nodeId: z.string().optional() }).strict().optional();
+const SCREENSHOT_HINT = 'kirim {boardId?} (board; kosong = board pertama) ATAU {nodeId} (potret satu node), bukan keduanya';
+const SessionBody = z.object({ client: z.string().max(64).optional(), version: z.string().max(64).optional(), schemaVersion: z.number().int().optional() }).strict().optional();
+const InspectBody = z.object({ id: z.string().min(1), depth: z.number().int().min(0).max(INSPECT_DEPTH_MAX).optional() }).strict();
+const ExportBody = z.object({ id: z.string().min(1).optional(), scale: z.union([z.literal(1), z.literal(2)]).optional() }).strict().optional();
+const BoardsBody = z.object({}).strict().optional();
+const SkillBody = z.object({ name: z.string().optional() }).strict().optional();
+/** Maks sesi yang ditampilkan di `/status`. */
+export const STATUS_SESSIONS_MAX = 10;
+/** Hint bila versi mcp/klien dan daemon berbeda. */
+export const VERSION_HINT =
+  'bangun ulang lalu restart service: /opt/node-26/bin/pnpm -C /root/lakar build && systemctl --user restart lakard (atau bash /root/lakar/scripts/release.sh)';
 const LayoutCheckBody = z.object({ boardId: z.string().optional() }).strict().optional();
 /** Batas entri `bounds` di respons execute. */
 export const BOUNDS_MAX = 60;
@@ -113,12 +131,22 @@ export type BuildOptions = {
   fonts?: FontRegistry;
   /** Katalog ikon (default: lucide-static + simple-icons terpasang). */
   icons?: IconCatalogPort<string, IconGlyph>;
+  /** Direktori file skill (default `SKILLS_DIR` @lakar/skills). */
+  skillsDir?: string;
 };
 
-export type Daemon = { app: FastifyInstance; store: DocStore; sessions: Sessions; fonts: FontRegistry; icons: IconCatalogPort<string, IconGlyph> };
+export type Daemon = {
+  app: FastifyInstance;
+  store: DocStore;
+  sessions: Sessions;
+  fonts: FontRegistry;
+  icons: IconCatalogPort<string, IconGlyph>;
+  startedAt: string;
+};
 
-export function buildServer({ config, render, fonts = FontRegistry.load(), icons = IconCatalog.load() }: BuildOptions): Daemon {
+export function buildServer({ config, render, fonts = FontRegistry.load(), icons = IconCatalog.load(), skillsDir = SKILLS_DIR }: BuildOptions): Daemon {
   const app = Fastify({ logger: false, bodyLimit: 1024 * 1024 });
+  const startedAt = new Date();
   const store = new DocStore(config.dataDir);
   const sessions = new Sessions();
   const docLocks = new DocumentLocks();
@@ -163,7 +191,59 @@ export function buildServer({ config, render, fonts = FontRegistry.load(), icons
     return { session, slug };
   };
 
-  app.post('/sessions', async (_req, reply) => ok(reply, { sessionId: sessions.create().id }));
+  const boardNotFound = (id: string, slug: string) =>
+    new LakarError('NOT_FOUND', `node ${id} tidak ada di dokumen ${slug}`, { hint: 'pakai ID dari created[] execute atau list_boards' });
+
+  /** Ikon dokumen lama yang tidak dikenal katalog → ICON_UNKNOWN + 3 saran sebelum render (AD-9). */
+  const assertIcons = (board: Parameters<typeof iconRefs>[0]) => {
+    for (const r of iconRefs(board)) icons.canonical(r.lib, r.icon);
+  };
+
+  // Status daemon tanpa sesi (AD-11 `status`): versi, pool render, font, ikon, sesi.
+  app.get('/status', async (_req, reply) => {
+    const addr = app.server.address();
+    const port = addr && typeof addr === 'object' ? addr.port : config.port;
+    return ok(reply, {
+      version: LAKAR_VERSION,
+      schemaVersion: SCHEMA_VERSION,
+      node: process.version,
+      pid: process.pid,
+      startedAt: startedAt.toISOString(),
+      uptimeSec: Math.floor((Date.now() - startedAt.getTime()) / 1000),
+      host: config.host,
+      port,
+      dataDir: config.dataDir,
+      pool: render.status?.() ?? null,
+      fonts: { families: fonts.families(), missing: [...fonts.missing] },
+      icons: { ...icons.versions },
+      sessions: {
+        count: sessions.count,
+        active: sessions.recent(STATUS_SESSIONS_MAX).map((x) => ({
+          id: x.id.slice(0, 8),
+          ...(x.activeSlug ? { activeSlug: x.activeSlug } : {}),
+          createdAt: x.createdAt,
+          ...(x.lastAt ? { lastAt: x.lastAt } : {}),
+          executes: x.executes,
+        })),
+      },
+    });
+  });
+
+  // Sesi baru (AD-17). Klien yang mengirim version/schemaVersion yang berbeda → VERSION_MISMATCH.
+  app.post('/sessions', async (req, reply) => {
+    const body = parse(SessionBody, req.body ?? undefined, 'kirim {client?, version?, schemaVersion?}');
+    const versionDiff = body?.version !== undefined && body.version !== LAKAR_VERSION;
+    const schemaDiff = body?.schemaVersion !== undefined && body.schemaVersion !== SCHEMA_VERSION;
+    if (versionDiff || schemaDiff) {
+      const who = body?.client ?? 'klien';
+      throw new LakarError(
+        'VERSION_MISMATCH',
+        `versi tidak cocok: lakard ${LAKAR_VERSION} (schema ${SCHEMA_VERSION}), ${who} ${body?.version ?? '?'} (schema ${body?.schemaVersion ?? '?'})`,
+        { hint: VERSION_HINT },
+      );
+    }
+    return ok(reply, { sessionId: sessions.create(body?.client).id, version: LAKAR_VERSION, schemaVersion: SCHEMA_VERSION });
+  });
 
   app.post('/docs/open', async (req, reply) => {
     const session = sessions.require(req.headers[SESSION_HEADER]);
@@ -312,9 +392,20 @@ export function buildServer({ config, render, fonts = FontRegistry.load(), icons
 
   app.post('/screenshot', async (req, reply) => {
     const { slug } = activeDoc(req.headers[SESSION_HEADER]);
-    const body = parse(ScreenshotBody, req.body ?? undefined, 'kirim {boardId?}');
+    const body = parse(ScreenshotBody, req.body ?? undefined, SCREENSHOT_HINT);
+    if (body?.boardId !== undefined && body.nodeId !== undefined) {
+      throw new LakarError('SCHEMA_INVALID', 'kirim boardId ATAU nodeId, bukan keduanya', { hint: SCREENSHOT_HINT });
+    }
     // AD-6/AD-16: render hanya menerima dokumen ter-resolve; token diselesaikan di daemon.
     const doc = resolveTokens(docs.get(slug)!);
+    if (body?.nodeId !== undefined) {
+      const hit = locateNode(doc, body.nodeId);
+      if (!hit) throw boardNotFound(body.nodeId, slug);
+      assertIcons(hit.board);
+      const png = await render.screenshot(doc, hit.board.id, hit.node.id === hit.board.id ? {} : { nodeId: hit.node.id });
+      const size = readPngSize(png);
+      return ok(reply, { boardId: hit.board.id, nodeId: hit.node.id, ...size, mimeType: 'image/png', png: Buffer.from(png).toString('base64') });
+    }
     const boardId = body?.boardId ?? doc.pages[0]?.children[0]?.id;
     const board = boardId ? findBoard(doc, boardId) : undefined;
     if (!boardId || !board) {
@@ -323,9 +414,96 @@ export function buildServer({ config, render, fonts = FontRegistry.load(), icons
       });
     }
     // AD-9: ikon yang tidak dikenal katalog (mis. dokumen lama di disk) → ICON_UNKNOWN + 3 saran sebelum render.
-    for (const r of iconRefs(board)) icons.canonical(r.lib, r.icon);
+    assertIcons(board);
     const png = await render.screenshot(doc, board.id);
     return ok(reply, { boardId: board.id, width: board.width, height: board.height, mimeType: 'image/png', png: Buffer.from(png).toString('base64') });
+  });
+
+  // Daftar board dokumen aktif (AD-11 `list_boards`).
+  app.post('/boards', async (req, reply) => {
+    const { slug } = activeDoc(req.headers[SESSION_HEADER]);
+    parse(BoardsBody, req.body ?? undefined, 'kirim {} (tanpa argumen)');
+    const stored = docs.get(slug)!;
+    const resolved = resolveTokens(stored);
+    const boards = resolved.pages.flatMap((p) =>
+      p.children.map((b) => ({
+        id: b.id,
+        name: b.name,
+        page: p.name,
+        screen: b.screen,
+        x: b.x,
+        y: b.y,
+        width: b.width,
+        height: b.height,
+        ...(b.expectedSize ? { expectedSize: b.expectedSize } : {}),
+        wip: b.name.startsWith(WIP_PREFIX),
+        childCount: b.children.length,
+      })),
+    );
+    return ok(reply, { docId: stored.id, slug, rev: stored.rev, boards });
+  });
+
+  // Inspect node/board (AD-11): properti tersimpan (token apa adanya) + bounds terukur + anak sampai depth.
+  app.post('/inspect', async (req, reply) => {
+    const { slug } = activeDoc(req.headers[SESSION_HEADER]);
+    const body = parse(InspectBody, req.body, `kirim {id, depth?} (depth 0–${INSPECT_DEPTH_MAX}, default ${INSPECT_DEPTH_DEFAULT})`);
+    const stored = docs.get(slug)!;
+    const resolved = resolveTokens(stored);
+    const hit = locateNode(stored, body.id);
+    const rBoard = hit ? findBoard(resolved, hit.board.id) : undefined;
+    if (!hit || !rBoard) throw boardNotFound(body.id, slug);
+    assertIcons(rBoard);
+    // allowGlyphs (AD-8): teks dengan emoji/glyph ikon tetap terukur; temuannya milik layout_check.
+    const measure = await render.measure(resolved, rBoard.id, { allowGlyphs: glyphScan(rBoard).allowGlyphs });
+    const fit = inspectFit(hit.node, boundsMap(rBoard.id, measure), body.depth ?? INSPECT_DEPTH_DEFAULT);
+    return ok(reply, { docId: stored.id, rev: stored.rev, boardId: rBoard.id, node: fit.node, ...(fit.truncated ? { truncated: true, depth: fit.depth } : {}) });
+  });
+
+  // Export PNG ke disk (AD-11 `export`): `<dataDir>/exports/<slug>/<id>-r<rev>@<scale>x.png`, tulis atomik.
+  app.post('/export', async (req, reply) => {
+    const { slug } = activeDoc(req.headers[SESSION_HEADER]);
+    const body = parse(ExportBody, req.body ?? undefined, 'kirim {id?, scale?}: id board/node (default board pertama), scale 1 atau 2 (default 1)');
+    const stored = docs.get(slug)!;
+    const doc = resolveTokens(stored);
+    const id = body?.id ?? doc.pages[0]?.children[0]?.id;
+    if (!id) throw new LakarError('NOT_FOUND', `dokumen ${slug} belum punya board`, { hint: 'buat board dulu lewat execute' });
+    const hit = locateNode(doc, id);
+    if (!hit) throw boardNotFound(id, slug);
+    assertIcons(hit.board);
+    const scale = body?.scale ?? 1;
+    const png = await render.screenshot(doc, hit.board.id, { scale, ...(hit.node.id !== hit.board.id ? { nodeId: hit.node.id } : {}) });
+    const { width, height } = readPngSize(png);
+    const dir = join(config.dataDir, 'exports', slug);
+    const path = join(dir, `${id}-r${stored.rev}@${scale}x.png`);
+    const tmp = `${path}.${randomBytes(4).toString('hex')}.tmp`;
+    try {
+      await mkdir(dir, { recursive: true });
+      await writeFile(tmp, png);
+      await rename(tmp, path);
+    } catch (e) {
+      await rm(tmp, { force: true }).catch(() => {});
+      throw new LakarError('EXPORT_FAILED', `gagal menulis ${path}: ${(e as Error).message}`, {
+        hint: `periksa izin dan ruang disk ${join(config.dataDir, 'exports')}; coba lagi`,
+        retryable: true,
+      });
+    }
+    return ok(reply, { path, id, name: hit.node.name, rev: stored.rev, scale, width, height, bytes: png.byteLength });
+  });
+
+  // Skill (AD-11 `read_skill`): tanpa name → daftar; nama di luar daftar / file belum ada → NOT_FOUND.
+  app.post('/skills/read', async (req, reply) => {
+    sessions.require(req.headers[SESSION_HEADER]);
+    const body = parse(SkillBody, req.body ?? undefined, `kirim {name?}; name salah satu: ${SKILL_NAMES.join(', ')}`);
+    const skills = listSkills(skillsDir);
+    if (body?.name === undefined) return ok(reply, { skills });
+    const content = await readSkill(body.name, skillsDir);
+    if (content === undefined) {
+      const available = skills.filter((x) => x.available).map((x) => x.name);
+      throw new LakarError('NOT_FOUND', `skill ${JSON.stringify(body.name)} tidak ada`, {
+        hint: `skill dikenal: ${SKILL_NAMES.join(', ')}; tersedia: ${available.length ? available.join(', ') : '-'}`,
+      });
+    }
+    return ok(reply, { name: body.name, content });
   });
 
   // Check G0 penuh (AD-8) pada board dokumen aktif. Dokumen immutable: dibaca tanpa kunci.
@@ -343,7 +521,7 @@ export function buildServer({ config, render, fonts = FontRegistry.load(), icons
       }
       boardIds = [body.boardId];
     } else boardIds = doc.pages.flatMap((p) => p.children.map((b) => b.id));
-    for (const id of boardIds) for (const r of iconRefs(findBoard(doc, id)!)) icons.canonical(r.lib, r.icon);
+    for (const id of boardIds) assertIcons(findBoard(doc, id)!);
     const ran = await runCheck(render, doc, boardIds);
     return ok(reply, { docId: stored.id, rev: stored.rev, boards: ran.boards, summary: summarizeFindings(ran.findings), findings: ran.findings });
   });
@@ -377,5 +555,5 @@ export function buildServer({ config, render, fonts = FontRegistry.load(), icons
     return reply.type(asset.type).header('cache-control', 'public, max-age=31536000, immutable').send(asset.body);
   });
 
-  return { app, store, sessions, fonts, icons };
+  return { app, store, sessions, fonts, icons, startedAt: startedAt.toISOString() };
 }

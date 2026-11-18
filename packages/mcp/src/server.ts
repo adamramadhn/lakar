@@ -1,11 +1,12 @@
-// Server MCP Lakar (v2): tool open_doc, execute, screenshot, icon_search, layout_check → HTTP lakard.
+// Server MCP Lakar: 10 tool v1 (AD-11) → HTTP lakard: status, read_skill, open_doc, list_boards, execute,
+// inspect, layout_check, screenshot, export, icon_search.
 import { McpServer, type CallToolResult } from '@modelcontextprotocol/server';
 import { z } from 'zod';
-import { findingLine, summaryText, type ApiResult, type Finding, type FindingSummary } from '@lakar/schema';
-import { DaemonClient, formatError } from './client.js';
+import { LAKAR_VERSION, SCHEMA_VERSION, findingLine, summaryText, type ApiResult, type Finding, type FindingSummary } from '@lakar/schema';
+import { DaemonClient, VERSION_HINT, formatError } from './client.js';
 
 export const SERVER_NAME = 'lakar';
-export const SERVER_VERSION = '0.0.0';
+export const SERVER_VERSION = LAKAR_VERSION;
 
 const errorResult = (text: string): CallToolResult => ({ isError: true, content: [{ type: 'text', text }] });
 
@@ -51,6 +52,68 @@ export function formatLayoutCheck(data: LayoutCheckData): string {
   const head = `layout_check rev ${data.rev}, ${data.boards.length} board${ids ? ` (${ids})` : ''}: ${summaryText(data.summary)}`;
   return [head, ...findingLines(data.findings, LAYOUT_CHECK_FINDING_LINES)].join('\n');
 }
+
+/** Bentuk `GET /status` lakard yang dipakai formatter. */
+export type StatusData = {
+  version?: string;
+  schemaVersion?: number;
+  node?: string;
+  pid?: number;
+  uptimeSec?: number;
+  pool?: { size: number; ready: number; busy: number; waiting: number; recreated: number; browserVersion?: string; lastError?: string } | null;
+  fonts?: { families: string[]; missing: string[] };
+  icons?: Record<string, string>;
+  sessions?: { count: number; active: { id: string; activeSlug?: string; executes: number }[] };
+};
+
+const uptime = (sec: number) => (sec < 60 ? `${sec}d` : sec < 3600 ? `${Math.floor(sec / 60)}m` : `${Math.floor(sec / 3600)}j ${Math.floor((sec % 3600) / 60)}m`);
+
+/** Teks ringkas tool `status` (beberapa baris). */
+export function formatStatus(st: StatusData): string {
+  const match = st.version === SERVER_VERSION && st.schemaVersion === SCHEMA_VERSION;
+  const head =
+    `lakard ${st.version ?? '?'} (schema ${st.schemaVersion ?? '?'}, node ${st.node ?? '?'}, pid ${st.pid ?? '?'}, uptime ${uptime(st.uptimeSec ?? 0)}) · ` +
+    `mcp ${SERVER_VERSION}: ${match ? 'cocok' : `TIDAK cocok (VERSION_MISMATCH; ${VERSION_HINT})`}`;
+  const p = st.pool;
+  const pool = p
+    ? `pool: ${p.size} halaman · ${p.ready} siap · ${p.busy} sibuk · ${p.waiting} antre · dibuat ulang ${p.recreated}× · chromium ${p.browserVersion ?? '-'}` +
+      (p.lastError ? `\npool error terakhir: ${p.lastError}` : '')
+    : 'pool: -';
+  const fonts = st.fonts ? `font: ${st.fonts.families.length} keluarga, hilang: ${st.fonts.missing.length ? st.fonts.missing.join(', ') : '-'}` : 'font: -';
+  const icons = st.icons ? `ikon: ${Object.entries(st.icons).map(([lib, v]) => `${lib} ${v}`).join(', ')}` : 'ikon: -';
+  const ss = st.sessions;
+  const sessions = ss
+    ? `sesi: ${ss.count}${ss.active.length ? ` (${ss.active.map((a) => `${a.id} ${a.activeSlug ?? '-'}, ${a.executes} execute`).join('; ')})` : ''}`
+    : 'sesi: -';
+  return [head, pool, fonts, icons, sessions].join('\n');
+}
+
+/** Deskripsi tool `status`. */
+export const STATUS_DESCRIPTION =
+  'Status lakard: versi daemon dan mcp (cocok/tidak), pool render (halaman siap/sibuk/antre, dibuat ulang), font hilang, versi ikon, sesi aktif. ' +
+  'Tetap bekerja walau versi tidak cocok. Daemon mati → error berisi cara menjalankan service (systemctl --user start lakard).';
+
+/** Deskripsi tool `read_skill`. */
+export const READ_SKILL_DESCRIPTION =
+  'Baca panduan skill Lakar (Markdown). Tanpa name → daftar {skills:[{name, available}]}; dengan name → isi skill. ' +
+  'Nama: core, landing, mobile, icons, api. Nama lain atau skill yang belum tersedia → NOT_FOUND dengan daftar yang tersedia.';
+
+/** Deskripsi tool `list_boards`. */
+export const LIST_BOARDS_DESCRIPTION =
+  'Daftar board dokumen aktif: {docId, slug, rev, boards:[{id, name, page, screen, x, y, width, height, expectedSize?, wip, childCount}]}. ' +
+  "wip = nama diawali '[WIP] '. Pakai id untuk screenshot, inspect, export, layout_check.";
+
+/** Deskripsi tool `inspect`. */
+export const INSPECT_DESCRIPTION =
+  'Lihat satu board/node dokumen aktif: {docId, rev, boardId, node}. node = properti tersimpan (token apa adanya, mis. {$token:...}) ' +
+  '+ bounds [x,y,w,h] hasil render (dibulatkan, relatif board) + children bersarang sampai depth (default 2, 0–6; lebih dalam → childCount). ' +
+  'Bila JSON > 32 KB depth diturunkan sampai muat dan truncated:true. ID tidak ada → NOT_FOUND; dokumen yang tidak bisa dirender → error yang sama dengan screenshot.';
+
+/** Deskripsi tool `export`. */
+export const EXPORT_DESCRIPTION =
+  'Ekspor board/node dokumen aktif ke file PNG di disk daemon: <dataDir>/exports/<slug>/<id>-r<rev>@<scale>x.png. ' +
+  'id = board atau node (default board pertama); scale 1 atau 2 (default 1; 2 = render asli 2× piksel). ' +
+  'Mengembalikan {path, id, name, rev, scale, width, height, bytes} (width/height = piksel PNG). Gagal menulis → EXPORT_FAILED.';
 
 /** Deskripsi tool `layout_check` (aturan gerbang G0). */
 export const LAYOUT_CHECK_DESCRIPTION =
@@ -118,6 +181,67 @@ export function createLakarMcpServer(daemonUrl: string): McpServer {
   const server = new McpServer({ name: SERVER_NAME, version: SERVER_VERSION });
 
   server.registerTool(
+    'status',
+    { description: STATUS_DESCRIPTION, inputSchema: z.object({}) },
+    () =>
+      guarded(async () => {
+        const r = await client.status<StatusData>();
+        if (!r.ok) return errorResult(formatError(r.error));
+        return { content: [{ type: 'text', text: formatStatus(r.data) }] };
+      }),
+  );
+
+  server.registerTool(
+    'read_skill',
+    {
+      description: READ_SKILL_DESCRIPTION,
+      inputSchema: z.object({ name: z.string().optional().describe('core | landing | mobile | icons | api; kosongkan untuk daftar') }),
+    },
+    ({ name }) =>
+      guarded(async () => {
+        const r = await client.call<{ name: string; content: string } | { skills: { name: string; available: boolean }[] }>('/skills/read', name !== undefined ? { name } : {});
+        if (!r.ok) return errorResult(formatError(r.error));
+        return { content: [{ type: 'text', text: 'content' in r.data ? r.data.content : JSON.stringify(r.data) }] };
+      }),
+  );
+
+  server.registerTool(
+    'list_boards',
+    { description: LIST_BOARDS_DESCRIPTION, inputSchema: z.object({}) },
+    () => guarded(async () => asText(await client.call('/boards', {}))),
+  );
+
+  server.registerTool(
+    'inspect',
+    {
+      description: INSPECT_DESCRIPTION,
+      inputSchema: z.object({
+        id: z.string().describe('ID board atau node'),
+        depth: z.number().int().optional().describe('kedalaman children 0–6 (default 2)'),
+      }),
+    },
+    ({ id, depth }) => guarded(async () => asText(await client.call('/inspect', depth !== undefined ? { id, depth } : { id }))),
+  );
+
+  server.registerTool(
+    'export',
+    {
+      description: EXPORT_DESCRIPTION,
+      inputSchema: z.object({
+        id: z.string().optional().describe('ID board/node; kosongkan untuk board pertama'),
+        scale: z.number().int().optional().describe('1 atau 2 (default 1)'),
+      }),
+    },
+    ({ id, scale }) =>
+      guarded(async () => {
+        const body: Record<string, unknown> = {};
+        if (id !== undefined) body.id = id;
+        if (scale !== undefined) body.scale = scale;
+        return asText(await client.call('/export', body));
+      }),
+  );
+
+  server.registerTool(
     'open_doc',
     {
       description:
@@ -158,15 +282,20 @@ export function createLakarMcpServer(daemonUrl: string): McpServer {
   server.registerTool(
     'screenshot',
     {
-      description: 'Render board dokumen aktif ke PNG (skala 1). Tanpa boardId → board pertama di halaman pertama.',
-      inputSchema: z.object({ boardId: z.string().optional().describe('ID board dari created[] execute') }),
+      description:
+        'Render board dokumen aktif ke PNG (skala 1). Tanpa argumen → board pertama di halaman pertama. ' +
+        'nodeId → potret satu node saja (ukuran bounds node). Kirim boardId ATAU nodeId, bukan keduanya (SCHEMA_INVALID).',
+      inputSchema: z.object({
+        boardId: z.string().optional().describe('ID board dari created[] execute atau list_boards'),
+        nodeId: z.string().optional().describe('ID node yang dipotret sendiri (bukan bersama boardId)'),
+      }),
     },
-    ({ boardId }) =>
+    ({ boardId, nodeId }) =>
       guarded(async () => {
-        const r = await client.call<{ boardId: string; width: number; height: number; mimeType: string; png: string }>(
-          '/screenshot',
-          boardId ? { boardId } : {},
-        );
+        const body: Record<string, unknown> = {};
+        if (boardId !== undefined) body.boardId = boardId;
+        if (nodeId !== undefined) body.nodeId = nodeId;
+        const r = await client.call<{ boardId: string; nodeId?: string; width: number; height: number; mimeType: string; png: string }>('/screenshot', body);
         if (!r.ok) return errorResult(formatError(r.error));
         const { png, ...meta } = r.data;
         return {

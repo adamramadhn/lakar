@@ -1,14 +1,14 @@
-// Adaptor RenderPort: satu chromium-headless-shell + SATU halaman, dibuat malas, diserialkan mutex.
-// Story 12 menggantinya dengan pool sewa eksklusif di balik RenderPort yang sama (AD-18).
+// Adaptor RenderPort: satu chromium-headless-shell + pool halaman hangat sewa eksklusif (AD-18, `pool.ts`).
+// Setiap screenshot/measure menyewa satu halaman sampai selesai; tidak ada mutex global.
 import { readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { BoardMeasure, IconCatalogPort, MeasureOptions, RenderPort } from '@lakar/ports';
-import { CHROMIUM_ARGS, findBoard, fontRequests, iconRefs, type FontFaceSource, type RenderResult } from '@lakar/render';
+import type { BoardMeasure, IconCatalogPort, MeasureOptions, RenderPort, RenderStatus, ScreenshotOptions } from '@lakar/ports';
+import { CHROMIUM_ARGS, NODE_ATTR, findBoard, fontRequests, iconRefs, type FontFaceSource, type RenderResult } from '@lakar/render';
 import { LakarError, type IconGlyph, type ResolvedDocument } from '@lakar/schema';
 import type { Browser, Page } from 'playwright-core';
 import type { FontRegistry } from './fonts.js';
-import { Mutex } from './mutex.js';
+import { RenderPool, type Lease } from './pool.js';
 
 /** Lokasi dist render (entry) yang disajikan apa adanya ke halaman Chromium. */
 export const RENDER_MODULE_PATH = fileURLToPath(import.meta.resolve('@lakar/render'));
@@ -44,65 +44,75 @@ export type ChromiumOptions = {
   browsersPath: string;
   /** URL halaman render (GET /render/page), diketahui setelah daemon listen. */
   pageUrl: () => string;
+  /** Batas waktu host per sewa (render + screenshot); antrean dibatasi 2× nilai ini. */
   timeoutMs: number;
+  /** Jumlah halaman pool (default 2). */
+  pages?: number;
   /** Registry font lokal: face board di-resolve sebelum render (AD-10). */
   fonts: FontRegistry;
   /** Katalog ikon: glyph node icon board di-resolve sebelum render (AD-9). */
   icons: IconCatalogPort<string, IconGlyph>;
+  /** Hook tes: dipanggil di awal setiap sewa (di dalam batas waktu) dengan halaman yang disewa. */
+  onLease?: (page: Page) => Promise<void> | void;
 };
 
 export class ChromiumRenderer implements RenderPort<ResolvedDocument> {
   readonly #opts: ChromiumOptions;
-  readonly #mutex = new Mutex();
-  #browser: Browser | undefined;
-  #page: Page | undefined;
+  readonly #pool: RenderPool;
 
   constructor(opts: ChromiumOptions) {
     this.#opts = opts;
+    this.#pool = new RenderPool({
+      size: opts.pages ?? 2,
+      timeoutMs: opts.timeoutMs,
+      launch: async () => {
+        // C9 (a): browser Lakar di cache khusus Lakar. Wajib di-set sebelum playwright-core dimuat.
+        process.env.PLAYWRIGHT_BROWSERS_PATH = this.#opts.browsersPath;
+        const { chromium } = await import('playwright-core');
+        return chromium.launch({ headless: true, timeout: this.#opts.timeoutMs, args: [...CHROMIUM_ARGS] });
+      },
+      openPage: async (browser: Browser, dpr) => {
+        const page = await browser.newPage({ deviceScaleFactor: dpr });
+        try {
+          page.setDefaultTimeout(this.#opts.timeoutMs);
+          await page.goto(this.#opts.pageUrl());
+          await page.waitForFunction('window.__lakarReady === true');
+          return page;
+        } catch (e) {
+          await page.context().close().catch(() => {});
+          throw e;
+        }
+      },
+    });
   }
 
-  async #ensurePage(): Promise<Page> {
-    if (this.#page && !this.#page.isClosed() && this.#browser?.isConnected()) return this.#page;
-    await this.close();
-    // C9 (a): browser Lakar di cache khusus Lakar. Wajib di-set sebelum playwright-core dimuat.
-    process.env.PLAYWRIGHT_BROWSERS_PATH = this.#opts.browsersPath;
-    const { chromium } = await import('playwright-core');
-    this.#browser = await chromium.launch({ headless: true, timeout: this.#opts.timeoutMs, args: [...CHROMIUM_ARGS] });
-    const page = await this.#browser.newPage({ deviceScaleFactor: 1 });
-    page.setDefaultTimeout(this.#opts.timeoutMs);
-    await page.goto(this.#opts.pageUrl());
-    await page.waitForFunction('window.__lakarReady === true');
-    this.#page = page;
-    return page;
+  /** Siapkan semua halaman hangat (tidak melempar; gagal → `status().lastError`). */
+  warm(): Promise<void> {
+    return this.#pool.warm();
+  }
+
+  status(): RenderStatus {
+    return this.#pool.status();
   }
 
   /**
-   * Render board di halaman bersama (dipanggil di dalam mutex). Error dokumen → LakarError non-retryable
-   * (FONT_MISSING / NOT_FOUND / ICON_UNKNOWN); kerusakan halaman → RENDER_FAILED retryable.
+   * Render board di halaman sewaan. Error dokumen → LakarError non-retryable (FONT_MISSING / NOT_FOUND /
+   * ICON_UNKNOWN; halaman tetap dipakai); kegagalan Playwright dilempar mentah → pool membuang halaman itu.
    */
-  async #renderOnPage(doc: ResolvedDocument, boardId: string, allowGlyphs: readonly number[]): Promise<{ page: Page; measure: BoardMeasure }> {
-    // FONT_MISSING di luar pembungkus RENDER_FAILED: kesalahan dokumen, bukan kerusakan halaman.
+  async #renderOnPage(page: Page, doc: ResolvedDocument, boardId: string, allowGlyphs: readonly number[]): Promise<BoardMeasure> {
     const board = findBoard(doc, boardId);
     const fonts: FontFaceSource[] = board ? this.#opts.fonts.resolveFaces(fontRequests(board)) : [];
     const icons: IconGlyph[] = board ? iconRefs(board).flatMap((r) => this.#opts.icons.glyph(r.lib, r.icon) ?? []) : [];
-    let result: RenderResult;
-    let page: Page;
-    try {
-      page = await this.#ensurePage();
-      // Viewport = ukuran board SEBELUM mount (stabilitas layout dan golden).
-      if (board) await page.setViewportSize({ width: Math.max(1, Math.ceil(board.width)), height: Math.max(1, Math.ceil(board.height)) });
-      // Fungsi ini berjalan di halaman Chromium (lihat RENDER_PAGE_HTML), bukan di Node.
-      result = await page.evaluate(
-        ({ doc, boardId, fonts, icons, allowGlyphs }) =>
-          (
-            globalThis as unknown as { __lakarRender(d: unknown, id: string, f: unknown, i: unknown, a: unknown): Promise<RenderResult> }
-          ).__lakarRender(doc, boardId, fonts, icons, allowGlyphs),
-        { doc, boardId, fonts, icons, allowGlyphs: [...allowGlyphs] },
-      );
-    } catch (e) {
-      throw await this.#failed(e);
-    }
-    // Halaman tetap dipakai: hanya dokumen yang salah.
+    // Viewport = ukuran board SEBELUM mount (stabilitas layout dan golden).
+    if (board) await page.setViewportSize({ width: Math.max(1, Math.ceil(board.width)), height: Math.max(1, Math.ceil(board.height)) });
+    // Fungsi ini berjalan di halaman Chromium (lihat RENDER_PAGE_HTML), bukan di Node.
+    const result: RenderResult = await page.evaluate(
+      ({ doc, boardId, fonts, icons, allowGlyphs }) =>
+        (
+          globalThis as unknown as { __lakarRender(d: unknown, id: string, f: unknown, i: unknown, a: unknown): Promise<RenderResult> }
+        ).__lakarRender(doc, boardId, fonts, icons, allowGlyphs),
+      { doc, boardId, fonts, icons, allowGlyphs: [...allowGlyphs] },
+    );
     if (!result.ok && result.code === 'NOT_FOUND') {
       throw new LakarError('NOT_FOUND', result.message, { hint: ASSET_HINT, retryable: false });
     }
@@ -120,39 +130,41 @@ export class ChromiumRenderer implements RenderPort<ResolvedDocument> {
         retryable: false,
       });
     }
-    return { page, measure: result.measure };
+    return result.measure;
   }
 
-  screenshot(doc: ResolvedDocument, boardId: string): Promise<Uint8Array> {
-    return this.#mutex.run(async () => {
+  async #hook(lease: Lease): Promise<void> {
+    if (this.#opts.onLease) await this.#opts.onLease(lease.page);
+  }
+
+  screenshot(doc: ResolvedDocument, boardId: string, opts: ScreenshotOptions = {}): Promise<Uint8Array> {
+    const scale = opts.scale ?? 1;
+    const target = opts.nodeId ?? boardId;
+    return this.#pool.lease(async (lease) => {
+      await this.#hook(lease);
+      const page = scale === 2 ? await lease.page2() : lease.page;
       // Screenshot tidak pernah memakai allowGlyphs: glyph di luar font tetap FONT_MISSING (AD-6).
-      const { page } = await this.#renderOnPage(doc, boardId, []);
-      try {
-        const buf = await page.locator(`[data-lakar-id="${boardId}"]`).screenshot({ type: 'png', scale: 'css', animations: 'disabled', caret: 'hide' });
-        return new Uint8Array(buf);
-      } catch (e) {
-        throw await this.#failed(e);
+      await this.#renderOnPage(page, doc, boardId, []);
+      const el = page.locator(`[${NODE_ATTR}="${target}"]`);
+      // Elemen tidak ada / tanpa luas: kesalahan permintaan, bukan kerusakan halaman (locator akan menunggu sampai timeout).
+      const box = (await el.count()) === 1 ? await el.boundingBox() : null;
+      if (!box) throw new LakarError('NOT_FOUND', `node ${target} tidak ada di board ${boardId}`, { hint: 'pakai ID dari created[] execute atau inspect' });
+      if (box.width < 0.5 || box.height < 0.5) {
+        throw new LakarError('SCHEMA_INVALID', `node ${target} berukuran ${box.width}×${box.height}, tidak bisa dipotret`, { hint: 'potret parent-nya atau board' });
       }
+      const buf = await el.screenshot({ type: 'png', scale: scale === 2 ? 'device' : 'css', animations: 'disabled', caret: 'hide' });
+      return new Uint8Array(buf);
     });
   }
 
   measure(doc: ResolvedDocument, boardId: string, opts: MeasureOptions = {}): Promise<BoardMeasure> {
-    return this.#mutex.run(async () => (await this.#renderOnPage(doc, boardId, opts.allowGlyphs ?? [])).measure);
-  }
-
-  /** Halaman/browser mungkin rusak: buang, permintaan berikutnya membuat ulang. */
-  async #failed(e: unknown): Promise<LakarError> {
-    await this.close().catch(() => {});
-    return new LakarError('RENDER_FAILED', `render Chromium gagal: ${(e as Error).message.split('\n')[0]}`, {
-      hint: 'coba lagi; bila terus gagal jalankan scripts/install-browser.sh',
-      retryable: true,
+    return this.#pool.lease(async (lease) => {
+      await this.#hook(lease);
+      return this.#renderOnPage(lease.page, doc, boardId, opts.allowGlyphs ?? []);
     });
   }
 
   async close(): Promise<void> {
-    const b = this.#browser;
-    this.#browser = undefined;
-    this.#page = undefined;
-    if (b) await b.close().catch(() => {});
+    await this.#pool.close();
   }
 }

@@ -12,7 +12,8 @@ snapshot(){
   md5sum /etc/environment /etc/profile /etc/profile.d/* /etc/bash.bashrc ~/.bashrc ~/.profile ~/.bash_profile ~/.zshrc 2>/dev/null
   ls -la /usr/bin/node /usr/local/bin 2>&1
   systemctl list-units --type=service --state=running --no-legend | awk '{print $1,$3,$4}'
-  systemctl --user list-units --type=service --state=running --no-legend | awk '{print $1,$3,$4}'
+  # Unit lakard* (service Lakar, story 12) dikecualikan dari snapshot; dicek eksplisit di bawah.
+  systemctl --user list-units --type=service --state=running --no-legend | awk '{print $1,$3,$4}' | grep -v '^lakard'
   docker ps --format '{{.Names}} {{.Status}}' 2>/dev/null | sed 's/Up .*/Up/'
   for name in n8n-mcp hostinger-dns-mcp; do pgrep -f "node .*${name}" >/dev/null && echo "proc $name hidup"; done
 }
@@ -50,6 +51,23 @@ for name in n8n-mcp hostinger-dns-mcp; do
   exe="$(readlink /proc/$pid/exe)"
   [[ "$exe" != /opt/node-26/* ]] && ok "$name (pid $pid) hidup, runtime $exe" || bad "$name memakai Node Lakar: $exe"
 done
+# Service lakard (story 12): aktif, hanya 127.0.0.1:7466 milik MainPID (atau turunannya), Node Lakar, Restart=on-failure.
+check "service --user lakard" "$(systemctl --user is-active lakard 2>&1)" "active"
+lakard_pid="$(systemctl --user show -p MainPID --value lakard 2>/dev/null || echo 0)"
+lakard_tree(){ local p="$1"; echo "$p"; for k in $(cat /proc/"$p"/task/*/children 2>/dev/null); do lakard_tree "$k"; done; }
+listeners="$(ss -ltnpH 'sport = :7466' 2>/dev/null)"
+if [[ -z "$listeners" ]]; then bad "tidak ada listener :7466"
+else
+  addrs="$(awk '{print $4}' <<<"$listeners" | sort -u | tr '\n' ' ')"
+  [[ "$addrs" == "127.0.0.1:7466 " ]] && ok "listener :7466 hanya 127.0.0.1" || bad "listener :7466: $addrs (harus hanya 127.0.0.1:7466)"
+  owned="$( [[ "$lakard_pid" != 0 ]] && lakard_tree "$lakard_pid")"
+  foreign=""
+  for pid in $(grep -oE 'pid=[0-9]+' <<<"$listeners" | cut -d= -f2 | sort -u); do grep -qx "$pid" <<<"$owned" || foreign+="$pid "; done
+  [[ -z "$foreign" ]] && ok "listener :7466 milik lakard (MainPID $lakard_pid)" || bad "listener :7466 milik proses lain: $foreign"
+fi
+lakard_exec="$(systemctl --user show -p ExecStart --value lakard 2>/dev/null)"
+[[ "$lakard_exec" == *"/opt/node-26/bin/node "*"/packages/daemon/dist/main.js"* ]] && ok "lakard ExecStart memakai /opt/node-26/bin/node" || bad "lakard ExecStart: $lakard_exec"
+check "lakard Restart" "$(systemctl --user show -p Restart --value lakard 2>/dev/null)" "on-failure"
 [[ -x /opt/pen/squashfs-root/resources/app.asar.unpacked/out/mcp-server-linux-arm64 ]] && ok "binari MCP pencil ada" || bad "binari MCP pencil hilang"
 
 if [[ -f "$BASELINE" ]]; then
