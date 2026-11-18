@@ -3,7 +3,7 @@ title: 'Skill polish dan disiplin spacing dari ui-skills'
 type: feature
 ticket: '23'
 created: '2026-11-18'
-status: in-review
+status: blocked
 baseline_revision: '7fce0c5b13eafef6df9ef04fa73644fe1092f6a3'
 route: full
 route_source: auto
@@ -19,6 +19,8 @@ context:
   - '{project-root}/bench/practice/LOG.md'
 warnings: [multiple-goals, oversized]
 deferred: []
+blocked_at: "2026-11-18"
+blocked_reason: "seri polish belum lulus: P7 Kalah karena gerbang waktu (Lakar 174,4 dtk > 1,5 × pen.dev 97,5 dtk; skor Lakar 14–12), sisa anggaran $2,26 < iterasi penuh $5,70; perlu keputusan Adam"
 ---
 
 <intent-contract>
@@ -165,3 +167,14 @@ Ketiganya memuat baris daftar berstatus, sumber kasus "Berikutnya". Ketiganya ju
 ## Auto Run Result
 
 Status: ready-for-dev — fase 1 (perencanaan saja, plan_checkpoint). Berhenti menunggu persetujuan orkestrator/Adam sebelum kode produk.
+
+Status: blocked (2026-11-18) — kode, review, dan verifikasi selesai; Done belum terpenuhi karena seri polish belum lulus.
+
+- **Ringkasan:** ink teks di render (`TextMeasure.ink`); aturan LC-02b/LC-04/LC-11 (error·gerbang) dan LC-18/LC-23–30 (warning, maks 3 per aturan per board); `summarizeFindings` menghitung gerbang hanya untuk temuan error; skill `polish.md` baru (2207 token) dipasang di read_skill/MCP; prelude `Badge` sm/md dengan tinta gelap + argumen permukaan gelap; revisi landing/mobile (overline, "·", grid 12); seri bench `polish` (P7–P9 beku, sha `b41ba79e…`).
+- **Commit:** `0347f15` (prompt beku + seri), `cb8a30f` (iterasi 1 baseline), `444c686` (catatan plan), `bab598c` (mesin/check/skill), `f267188` (perbaikan review), `8af53c0` (iterasi 2).
+- **Pindaian arsip (90 dok):** LC-04 579 error (0 positif palsu, cocok piksel), LC-02b 36 (sesudah satu perbaikan definisi; 0 positif palsu), LC-11 0; tidak ada aturan yang diturunkan. Rincian di `bench/practice/LOG.md` §1.23. Bukti B round-2: LC-02b `c2KYVEr1` + LC-24 `P2QitxDJ`.
+- **Review (quick):** 4 temuan — 3 dipatch (2 medium, 1 low), 1 low ditolak (lihat Review Triage Log). Follow-up review: false (tidak ada patch high; dua medium dipatch dan diverifikasi tes + contoh skill 0/0/0).
+- **Verifikasi:** `pnpm build` lulus; `pnpm test` 923/923; `systemctl --user restart lakard` active; `tools/node26/verify.sh` semua OK, snapshot C9 identik.
+- **Seri polish:** iterasi 1 (lama) P7 Kalah waktu / P8 Kalah / P9 Lebih baik ($7,54); iterasi 2 (baru, reuse pen.dev) P7 Kalah waktu 1,79× (skor 14–12) / P8 Setara 15–15 / P9 Setara 14–12 ($5,20; kumulatif $12,74). Emoji 0, gerbang layout 0.
+- **Blocking condition:** P7 gagal hanya gerbang waktu terhadap run pen.dev tunggal yang cepat (97,5 dtk, board 390×1177 melanggar ukuran). Sisa $2,26 tidak cukup untuk iterasi penuh; iterasi P7 saja tanpa perubahan yang menyasar waktu dianggap mengulang demi hasil (C8). Pilihan untuk Adam: terima seri dengan catatan, izinkan iterasi P7 saja (≈ $1,6) dengan anggaran tersisa, atau tetapkan baseline waktu P7 lain.
+- **Risiko sisa:** LC-04 kini gerbang dan memicu di 55/90 dokumen arsip — agen bisa butuh execute perbaikan tambahan (risiko waktu); warning LC-24/LC-25 sering muncul; core/landing/mobile di batas token; Lampiran A DESIGN.md belum memuat LC-23–30 dan level baru LC-02b/04/11 (follow-up Adam/Sofia); slip `npx -y true` sekali oleh implementer (gagal, tanpa instalasi; verify C9 bersih).
