@@ -1,17 +1,17 @@
 # Lakar: aplikasi web dan dashboard
 
-Board persis ukuran permintaan (default `1440 × 900`, `screen:'app'`); semua isi muat tanpa gulir. Anak board: satu `Row` `Aplikasi` (`width:'fill'`, `height:'fill'`, `align:'stretch'`) berisi sidebar + area kerja.
+Board persis ukuran permintaan (default `1440 × 900`, `screen:'app'`), isi muat tanpa gulir. Anak board: satu `Row` `Aplikasi` (`width:'fill'`, `height:'fill'`, `align:'stretch'`) berisi sidebar + area kerja.
 
 ## Struktur
 
-- **Latar halaman** netral digeser 2–4% ke hue aksen (mis. `#F3F6F5` untuk teal), bukan abu murni; kartu putih di atasnya. Kedalaman: garis 1 px + bayangan sm.
+- **Latar halaman** netral digeser 2–4% ke hue aksen (mis. `#F3F6F5` untuk teal); kartu putih bergaris 1 px + bayangan sm.
 - **Sidebar 248** (padding 16, putih, garis kanan): logo + nama, lalu grup navigasi berlabel `overline` t3. Item 40 (ikon 20 + label, radius 8); aktif = fill aksen solid + ikon/teks `C.on`, bukan sekadar tint atau tebal. Hitungan = `Badge` sm di kanan item. Bawah: organisasi/pengguna.
 - **Area kerja** padding 32, gap 24. **Header 48–64:** judul layar `title-lg` + baris konteks t2; kanan: pemilih konteks (periode, cabang) sebagai `Input /` 40 dengan `chevron-down`, pencarian, satu tombol primer.
 - **KPI** satu baris 3–4 kartu: satu KPI utama ber-fill `C.deep` (atau aksen) dengan teks terang, nilai terbesar, sparkline atau area kecil; lainnya putih atau ber-tint. Tiap KPI: label, `KPI / Nilai` tabular + satuan kecil t3, `Badge` delta + pembanding. Kartu KPI tidak kembar: ukuran, fill, atau grafik mininya berbeda.
 - **Grafik bervariasi,** bentuk mengikuti data: batang bertumpuk/berkelompok untuk komposisi (`rect`, sudut atas 4), area bergradasi untuk tren (aksen ke transparan di bawah garis), sparkline di KPI. Garis tipis tunggal hanya pelengkap. Label sumbu caption t3; nilai kini/puncak ditandai (batang hari ini penuh, lainnya lebih muda).
 - **Tabel** (struktur sel: `ui`): angka dengan satuan kecil; status = `Badge` bertitik (`dot`); baris bermasalah ber-tint warning/danger; waktu relatif ("2 jam lalu").
 - **Panel keadaan** (bila ada ruang): yang perlu tindakan (lewat tenggat, hampir habis, menunggu persetujuan) dengan ikon status dan waktu.
-- Grid kartu gap 24, padding kartu 20–24, radius 12. Isi seluruh tinggi board: baris bawah dan grafik `height:'fill'`.
+- Grid kartu gap 24, padding kartu 20–24, radius 12. Baris bawah dan grafik `height:'fill'` (isi seluruh tinggi).
 
 ## Tanda slop dashboard
 
@@ -19,7 +19,7 @@ Semua kartu putih + garis tipis + satu aksen biru; grafik garis tipis tanpa area
 
 ## Alur execute
 
-Execute 1 = board lengkap (sidebar, header, KPI, grafik, tabel); execute 2 = semua temuan `check` + kritik diri sekaligus.
+Execute 1 = board lengkap (sidebar, header, KPI, grafik, tabel); execute 2 = semua temuan `check` + review sekaligus.
 
 ## Contoh teruji
 

@@ -1,29 +1,22 @@
 # Lakar: review
 
-Review diri di akhir, sekali: tidak menambah execute selain satu execute perbaikan.
+Sekali di akhir; hanya menambah satu execute perbaikan.
 
 ## Langkah
 
-1. `screenshot` board (satu per board).
-2. Zoom: `screenshot({nodeId, scale:2})` satu area terpadat (tabel, daftar berbadge, kartu KPI, hero bertumpuk); ID dari `bounds`/`created`.
-3. Jawab delapan pertanyaan di bawah untuk board dan zoom; catat temuan.
-4. Satu execute perbaikan berisi semua temuan + sisa warning `check`.
+1. `screenshot` tiap board, lalu `screenshot({nodeId, scale:2})` satu area terpadat (tabel, daftar berbadge, kartu KPI, hero bertumpuk; ID dari `created`/`keep`).
+2. Jawab enam pertanyaan dari kedua gambar, singkat (`ok` atau temuan + node), tanpa prosa.
+3. Satu execute perbaikan: semua temuan + sisa warning `check`.
 
-## Delapan pertanyaan
+## Enam pertanyaan
 
-1. Ada teks terpotong, meluber dari induk, bertumpuk, atau judul/paragraf yatim?
-2. Tepi kiri sejajar dan jarak dalam grup < antar-grup? Ada ruang kosong mati atau seksi yang tidak penuh?
-3. Badge, ikon, dan tombol proporsional terhadap teks di barisnya dan sejajar tengah?
-4. Semua teks terbaca: teks kecil, teks di tint, teks di atas foto/efek?
-5. Angka cocok lintas elemen (total, persen, hitungan, tanggal ↔ hari)?
-6. Buram: hierarki dan satu titik fokus masih terbaca bila gambar dikaburkan?
-7. Kerangka: tanpa teks, struktur masih bercerita (keadaan, pembanding, bukti), tanpa bagian datar atau slot foto kosong?
-8. Tukar: terlihat sama dengan template biasa? Ubah satu hal khas produk.
+1. Utuh: ada teks terpotong, meluber, bertumpuk, atau kata yatim?
+2. Rapi: tepi kiri sejajar, grup jelas, badge/ikon/tombol proporsional dan sejajar tengah, tanpa ruang kosong mati?
+3. Terbaca: teks kecil, teks di tint, teks di atas foto/efek?
+4. Angka: total, persen, hitungan, tanggal ↔ hari cocok lintas elemen?
+5. Buram dan kerangka: satu fokus tetap terbaca bila dikaburkan; struktur bercerita (keadaan, pembanding, bukti), tanpa bagian datar atau slot kosong?
+6. Tukar: tampak seperti template biasa? Ubah satu hal khas produk.
 
-## 12 anti-pattern
+## Slop yang dicari
 
-1. Gradien ungu-biru/mesh hero tanpa alasan brand. 2. Tiga kartu kembar berikon bulat sebagai pola utama. 3. Kartu tiga lapis. 4. Headline umum tanpa klaim hasil. 5. Statistik bulat bombastis. 6. Emoji/simbol sebagai ikon. 7. Latar krem/off-white hangat. 8. Blur/kaca/glow di mana-mana. 9. Semua teks rata tengah. 10. Tombol umum di tiap kartu. 11. Ilustrasi/maskot dari path. 12. Kotak abu kosong pengganti konten.
-
-## Tanda slop visual
-
-Teks bergradien; garis aksen di sisi kartu > 1 px; glow berwarna tanpa offset; label 01/02/03 yang bukan urutan sungguhan; overline di setiap seksi; strip 3–4 angka di bawah hero; semua kartu sama panjang.
+Gradien ungu-biru/mesh tanpa alasan brand; tiga kartu kembar berikon bulat sebagai pola utama; headline umum tanpa klaim hasil; statistik bulat bombastis; latar krem hangat; blur/kaca/glow di mana-mana; tombol umum di tiap kartu; ilustrasi/maskot dari path; kotak abu pengganti konten; teks bergradien; garis aksen di sisi kartu > 1 px; glow tanpa offset; label 01/02/03 yang bukan urutan; overline di setiap seksi; strip 3–4 angka di bawah hero; semua kartu sama panjang.

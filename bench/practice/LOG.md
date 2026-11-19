@@ -1058,3 +1058,60 @@ Token (`estimateTokens`, total / prosa). Sebelum = `5e10f50`.
 | webapp | 8.764 | 10.186 | +16,2% |
 
 PNG contoh (pemeriksaan visual, tanpa luberan): `LAKAR_SKILL_PNG_DIR=<dir> vitest run packages/daemon/src/skills-examples.test.ts`.
+
+## Revisi iterasi 6 (sesi baru, C7): pangkas biaya berpikir
+
+**Diagnosis (run iterasi 5, hanya angka).** Skill domain menaikkan mutu, tetapi agen terlalu lambat. Gerbang waktu ≤ 1,5×
+gagal di mobile (149,9 dtk vs batas 146) dan landing (264,7 vs 242,9); dashboard lolos (192,5 vs 320).
+
+| Layar | Token berpikir it. 4 → 5 | Token keluaran it. 4 → 5 | Waktu ke execute pertama it. 4 → 5 | Putaran perbaikan it. 5 |
+|---|---|---|---|---|
+| mobile | 2.491 → 6.528 | 9.415 → 15.253 | 62 → 95 dtk | 5 execute (LC-02a/LC-20 zona bawah) |
+| dashboard | 5.052 → 8.772 | 16.058 → 19.552 | 112 → 136 dtk | 9 error LC-02c di execute pertama |
+| landing | 6.519 → 11.258 | 22.269 → 28.247 | 57 → 118 dtk (kode execute pertama sama, ±7.300 karakter) | 1–2 error (LC-04, LC-02c); warning LC-25/18/23 |
+
+Langkah zoom review murah (`screenshot scale 2` ±1–2 dtk + satu execute ±10–15 dtk); membaca 10 skill paralel ±6 dtk. Yang
+mahal adalah berpikir: delapan pertanyaan dijawab di kepala, aturan "hitung sebelum menaruh", dan menimbang tiap aturan skill
+sebelum menulis.
+
+**Perubahan.**
+- **Alur kerja `core` (saran 2):** langkah 2 = rencana singkat ≤ 5 baris (konten + angka berpembanding, langkah khas,
+  arketipe, slot foto), tanpa menimbang aturan satu per satu, mulai dari contoh teruji; langkah 3 = langsung tulis execute
+  pertama; langkah 4 = semua temuan `check` diperbaiki sekaligus. Instruksi MCP ikut: "open_doc, rencana singkat, dan langsung
+  bangun …". Proses anti-slop (6 butir berpenjelasan) dilebur menjadi templat blok `proses:` di Ringkasan akhir.
+- **Padatkan (saran 1):** angka yang sudah dilaporkan `check` beserta perbaikannya dihapus dari skill (DESIGN.md §Turunan):
+  LC-23 gap ≥ 8, LC-26 ritme judul, LC-11, LC-24 tinggi/teks badge, LC-18 penjelasan, LC-27/28/29 angka skala, LC-30 en dash
+  dan elipsis, LC-04/05/06/10 ambang angka, LC-09, LC-21 spacer. Duplikasi lintas skill dihapus: ritme jarak landing/mobile
+  (= tabel proximity `layout`), emoji/rata tengah/kartu tiga lapis di `review` (= `core`/`ui`), komentar efek di contoh (=
+  `color`). Daftar panjang → resep tindakan.
+- **Review (saran 3):** enam pertanyaan singkat (utuh; rapi; terbaca; angka; buram + kerangka; tukar), dijawab `ok` atau
+  temuan + node tanpa prosa; satu execute perbaikan. 12 anti-pattern + tanda slop visual → satu daftar "Slop yang dicari".
+- **Butir 1 dan 3 (saran 4):** geometri `layout` = satu kalimat resep; pasangan huruf `typography` = satu baris nada → pasangan.
+- **Pola yang sering gagal (saran 5):** LC-02c → kalimat geometri `layout` ("isi lebar tetap di kartu ≤ lebar isi kartu,
+  sisanya `width:'fill'`"); LC-20/LC-02a mobile → seksi baru "Tinggi dan zona bawah" di awal `mobile` (H dihitung sekali; isi
+  terakhir ≥ 24 di atas zona); LC-25 → satu kalimat `layout` ("dalam = luar − padding, min 6; tidak cukup → tanpa radius/cat").
+- Contoh teruji: hanya komentar dipersingkat (mobile, landing); kode sama. PNG diperiksa
+  (`LAKAR_SKILL_PNG_DIR=<scratchpad>/png6`). `LOAD_LIMIT` 11.500 → 9.600; batas per skill diturunkan.
+
+Token (`estimateTokens`, total / prosa). Sebelum = `a01fc67`.
+
+| Skill | Batas sebelum → sesudah (prosa / total) | Sebelum | Sesudah |
+|---|---|---|---|
+| core | – / 3200 → – / 2600 | 2578 / 1862 | 2461 / 1659 |
+| layout | – / 1000 → – / 600 | 689 | 500 |
+| typography | – / 800 → – / 400 | 416 | 288 |
+| color | – / 1000 → – / 550 | 583 | 448 |
+| accessibility | – / 700 → – / 400 | 410 | 302 |
+| ui | 1400 / 2600 → 800 / 1200 | 1199 / 810 | 1092 / 703 |
+| interface | – / 700 → – / 550 | 540 | 444 |
+| writing | – / 900 → – / 450 | 456 | 385 |
+| review | – / 900 → – / 550 | 570 | 455 |
+| landing | 1500 / 3500 → 1100 / 3200 | 3287 / 1212 | 3065 / 997 |
+| mobile | 1500 / 3500 → 1100 / 3000 | 2984 / 1086 | 2719 / 937 |
+| webapp | 1500 / 3500 → 1000 / 3000 | 2745 / 819 | 2729 / 802 |
+
+| Muat per jenis layar | Iterasi 4 (core + polish + layar) | Iterasi 5 (batas 11.500) | Iterasi 6 (batas 9.600) | Selisih 5 → 6 |
+|---|---|---|---|---|
+| landing | 9.114 | 10.728 | 9.440 | −12,0% |
+| mobile | 8.933 | 10.425 | 9.094 | −12,8% |
+| webapp | 8.764 | 10.186 | 9.104 | −10,6% |

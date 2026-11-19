@@ -3,14 +3,15 @@
 Mekanisme baca skill Lakar: file Markdown `skills/<name>.md` untuk tool `read_skill`. Isi skill ditulis terpisah; `api.md`
 dihasilkan dari `@lakar/exec`.
 
-- **Inti:** `core` (alur kerja, prelude, prinsip, proses anti-slop, arketipe, token ringkas, struktur).
+- **Inti:** `core` (alur kerja hemat waktu, prelude, prinsip, ringkasan + blok `proses:`, arketipe, token ringkas, struktur).
 - **Jenis layar:** `landing`, `mobile`, `webapp` (masing-masing berisi contoh teruji).
 - **Domain (story 2.16):** `layout`, `typography`, `color`, `accessibility`, `ui` (berisi contoh teruji), `interface`,
   `writing`, `review`. Menggantikan `polish` (dihapus; `read_skill('polish')` → NOT_FOUND dengan pesan pemecahannya).
 - **Rujukan:** `icons`, `api`.
 
 Aturan muat (instruksi MCP + deskripsi `read_skill`): core + 8 domain + 1 jenis layar dibaca paralel di satu giliran; total per
-jenis layar ≤ 11.500 token (lewat batas → padatkan, jangan naikkan). Setiap aturan diajarkan di tepat satu skill.
+jenis layar ≤ 9.600 token (iterasi 6; dulu 11.500; lewat batas → padatkan, jangan naikkan). Setiap aturan diajarkan di tepat
+satu skill; angka yang dilaporkan `check` beserta perbaikannya tidak diulang di skill.
 
 - **AD terkait:** AD-11 (`read_skill`), AD-12 (api.md dari kode).
 - **Arah dependensi:** tidak bergantung pada paket `@lakar/*` lain.

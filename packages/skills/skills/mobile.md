@@ -1,28 +1,29 @@
 # Lakar: mobile app
 
-Board lebar 390 (`screen:'mobile'`), tinggi 844 atau lebih (isi panjang = satu board panjang); anak board tersusun kolom (tanpa `layout`).
+Board lebar 390 (`screen:'mobile'`), tinggi 844 atau lebih; anak board tersusun kolom (tanpa `layout`).
 
-Mode gelap (Malam): `Object.assign(C,{bg,sub:surface,line,line2,t1,t2,t3` dari netral gelap bernuansa aksen`, acc` varian gelap`, tint, field:raised, deep, on:'#0B0C0F', ok:'#4ADE80', warn:'#FBBF24', bad:'#F87171', acc2, data})`; kartu = surface, latar besar bukan abu murni.
+Mode gelap (Malam): `Object.assign(C,{bg,sub:surface,line,line2,t1,t2,t3` dari netral gelap`, acc` varian gelap`, tint, field:raised, deep, on:'#0B0C0F', ok:'#4ADE80', warn:'#FBBF24', bad:'#F87171', acc2, data})`; kartu = surface.
+
+## Tinggi dan zona bawah (hitung sekali, saat merencanakan)
+
+`const H` = 54 status bar + isi (header, seksi, gap) + 24 + zona bawah (tab bar mengambang 98; bilah aksi = tingginya + 34; tanpa bilah 34), minimal 844. Isi muat 844 → `390 × 844`; lebih → SATU board `390 × H` (tanpa `duplicate`, `scrollY`, `Scroll /`). Zona dari H: `Overlay / Tab bar` y `H-98`, bilah aksi y `H-34-tinggi`, home indicator y `H-34`; isi terakhir berakhir ≥ 24 di atas zona itu.
 
 ## Struktur
 
-- **Status bar** 54 (nama persis `Status bar`): jam kiri, ikon `signal`/`wifi`/`battery-full` 16 kanan, padding horizontal 24.
-- **Satu wrapper** `Konten` (kolom, `width:'fill'`, padding horizontal 20; anak tanpa padding horizontal sendiri). Jarak: antar-seksi 24–32, judul seksi ↔ isi 12–16, antar-kartu 12–16, ikon ↔ teks 4–8.
-- **Header hemat ruang** ≤ 64: avatar foto 40 (bila ada pengguna) + sapaan `title` (atau judul layar `title-lg`) + maks dua `IconButton /` 44. Baris konteks hanya bila ada ruang; gaya judul sama di satu alur. Header seksi: h4 + `Link /` aksen di kanan.
-- **Kartu/list:** kartu padding 16–20; sorotan di bidang merek + `Badge` metrik. Baris list 56–72: thumbnail 48–56 (wadah ikon 40 hanya untuk aksi/pengaturan), judul label + meta body-sm, keadaan di kanan (selesai = `circle-check` success, mendatang = chevron).
-- **Foto:** sampul dan thumbnail isi nyata = foto; teks di atas foto diberi lapisan gelap. Visual puncak maks ±280 tinggi.
-- **Tanpa duplikasi:** satu butir tampil sekali per layar; bilah menempel memuat butir yang berjalan → sorotan memuat hal lain (berikutnya, ringkasan), daftar tidak mengulanginya.
-- **Ring/grafik** dari `ellipse` busur: jalur (`inner`, tint) + progres (`startDeg`, `sweepDeg` = persen × 360) di frame `layout:'none'`; beberapa seri = satu busur per seri + legenda nilai / sasaran.
-- **Tab bar** 3–5 item: ikon 24 + label `tab`; aktif = aksen + pil tint, lainnya muted. Bilah yang menempel di atasnya = `Overlay /` lapis raised + progres tipis aksen. Mengambang = `Overlay / Tab bar` absolut (lebar 350, x 20, di atas home indicator).
-- **Bilah bawah tetap** (aksi menetap): `Overlay / Bilah bawah` padding 16 20, total + tombol 56 lebar fill, tepat di atas home indicator.
-- **Atas hidup, akhir rapi:** 844 px pertama memuat inti permintaan (aksi utama, isi kunci, awal tiap bagian). Daftar ≥ 3 butir utuh; isi terakhir berakhir 24 di atas zona bawah; tanpa kartu setengah terlihat atau judul yatim.
-- **Bidang efek** (resep `color`): di onboarding, sampul, atau kartu sorotan; struktur gelombang `path`, cincin `ellipse`, atau partikel.
-- **Home indicator** 34 (nama persis `Home indicator`), garis 134 × 5 di tengah.
-- **Tinggi board (hitung saat merencanakan):** isi muat 844 → `390 × 844`. Lebih → SATU board `390 × H`, tanpa `duplicate`, `scrollY`, atau `Scroll /`. H = 54 status bar + header + seksi + gap + 24 + zona bawah (tab bar mengambang 98, bilah aksi = tingginya + 34, tanpa zona 34), minimal 844; simpan `const H=…`. Zona dari H: `Overlay / Tab bar` y `H-98`, bilah aksi y `H-34-tinggi`, home indicator y `H-34`.
+- **Status bar** 54 (nama persis `Status bar`): jam kiri, `signal`/`wifi`/`battery-full` 16 kanan, padding horizontal 24. **Home indicator** 34 (nama persis), garis 134 × 5 di tengah.
+- **Satu wrapper** `Konten` (kolom, `width:'fill'`, padding horizontal 20; anak tanpa padding horizontal sendiri).
+- **Header** ≤ 64: avatar foto 40 (bila ada pengguna) + sapaan `title` (atau judul layar `title-lg`) + maks dua `IconButton /` 44; gaya judul sama di satu alur. Header seksi: h4 + `Link /` aksen kanan.
+- **Kartu/list:** kartu padding 16–20; sorotan di bidang merek + `Badge` metrik. Baris list 56–72: thumbnail 48–56 (wadah ikon 40 hanya aksi/pengaturan), judul label + meta body-sm, keadaan di kanan (selesai = `circle-check` success, mendatang = chevron).
+- **Foto:** sampul/thumbnail isi nyata = foto; teks di atasnya diberi lapisan gelap. Visual puncak ≤ ±280 tinggi.
+- **Tanpa duplikasi:** satu butir tampil sekali per layar; bilah menempel memuat yang berjalan → sorotan memuat hal lain (berikutnya, ringkasan).
+- **Ring/grafik** dari `ellipse` busur: jalur (`inner`, tint) + progres (`startDeg`, `sweepDeg` = persen × 360) di frame `layout:'none'`; satu busur per seri + legenda nilai / sasaran.
+- **Tab bar** 3–5 item: ikon 24 + label `tab`; aktif = aksen + pil tint. Mengambang = `Overlay / Tab bar` absolut (lebar 350, x 20). Bilah menempel di atasnya = `Overlay /` raised + progres tipis aksen. **Bilah bawah tetap** = `Overlay / Bilah bawah` padding 16 20, total + tombol 56 fill.
+- **Layar pertama** (844) memuat inti permintaan: aksi utama, isi kunci, awal tiap bagian. Daftar ≥ 3 butir utuh; tanpa kartu setengah terlihat.
+- **Bidang efek** (`color`): di onboarding, sampul, atau kartu sorotan; gelombang `path`, cincin `ellipse`, atau partikel.
 
 ## Alur execute
 
-Execute 1 = satu board lengkap dengan H; execute 2 = semua temuan `check` sekaligus (`update`/`editId`); `LC-12` "tinggi pas = N" → `update(b,{height:N})` + geser zona ke N. Tanpa execute keempat.
+Execute 1 = satu board lengkap dengan H; execute 2 = semua temuan `check` sekaligus; `LC-12` "tinggi pas = N" → `update(b,{height:N})` + geser zona ke N. Tanpa execute keempat.
 
 ## Contoh teruji
 
@@ -47,16 +48,13 @@ T(hi,'Hari','Kamis, 14 Mei','body-sm',{color:C.t3});
 T(hi,'Judul','Halo, Sinta','title');
 const ib=Row(hd,'IconButton / Notifikasi',{width:44,height:44,radius:9999,justify:'center',stroke:line()});
 I(ib,'bell',20,C.t1);
-// Kartu sorotan di bidang merek: ring bersegmen (satu nada per keterampilan) + pembanding minggu lalu
-// Peragaan bidang efek (maks satu per layar): pakai hanya bila permintaan/merek minta suasana ekspresif (atau onboarding/
-// sampul); tanpa itu kartu ini cukup fill(C.field) polos, tanpa mesh/noise/Kontur. Onboarding/sampul gelap: latar netral gelap →
-// mesh (aksen, pendamping; terang di atas) → gelombang/cincin → noise 0.06 → satu cahaya merek.
+// Kartu sorotan: ring bersegmen + pembanding. Efek hanya bila diminta suasana ekspresif; tanpa itu fill(C.field) polos
 const card=F(w,'Kartu / Target mingguan',{width:'fill',padding:16,gap:16,radius:24,clip:true,shadows:[{x:0,y:4,blur:16,color:'#10182814'}],
  fills:[...fill(C.field),{type:'mesh',columns:2,rows:2,colors:['#DDE1FD',C.field,C.field,'#F5ECD7']},{type:'noise',opacity:0.05,seed:3}]});
 const fx=F(card,'Crop / Kontur',{position:'absolute',x:0,y:0,width:350,height:224,layout:'none',clip:true});
 for(let i=0;i<9;i++){const r=64+i*20;
  add(fx,{type:'ellipse',name:'Kontur / '+(i+1),position:'absolute',x:64-r,y:64-r,width:2*r,height:2*r,stroke:{color:C.acc+(48-i*4).toString(16).padStart(2,'0'),width:1,align:'center'}});}
-// Elips peredam di bawah semua teks kartu (zona tenang), anak terakhir Crop: kontur tetap tampak samar
+// Elips peredam (anak terakhir Crop) di bawah semua teks kartu
 add(fx,{type:'ellipse',name:'Peredam',position:'absolute',x:-56,y:-24,width:464,height:220,blur:32,fills:fill(C.field+'B3')});
 const top=Row(card,'Atas',{width:'fill',gap:20});
 const ring=F(top,'Ring / Target',{layout:'none',width:96,height:96});

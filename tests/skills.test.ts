@@ -17,20 +17,21 @@ const REGEN = 'regenerasi: /opt/node-26/bin/pnpm build && /opt/node-26/bin/node 
  * prosa + total. Total muat per jenis layar (core + 8 domain + 1 jenis layar) ≤ LOAD_LIMIT; lewat batas → padatkan.
  */
 const LIMITS = {
-  core: { total: 3200 },
-  layout: { total: 1000 },
-  typography: { total: 800 },
-  color: { total: 1000 },
-  accessibility: { total: 700 },
-  ui: { prose: 1400, total: 2600 },
-  interface: { total: 700 },
-  writing: { total: 900 },
-  review: { total: 900 },
-  landing: { prose: 1500, total: 3500 },
-  mobile: { prose: 1500, total: 3500 },
-  webapp: { prose: 1500, total: 3500 },
+  core: { total: 2600 },
+  layout: { total: 600 },
+  typography: { total: 400 },
+  color: { total: 550 },
+  accessibility: { total: 400 },
+  ui: { prose: 800, total: 1200 },
+  interface: { total: 550 },
+  writing: { total: 450 },
+  review: { total: 550 },
+  landing: { prose: 1100, total: 3200 },
+  mobile: { prose: 1100, total: 3000 },
+  webapp: { prose: 1000, total: 3000 },
 } as const;
-const LOAD_LIMIT = 11_500;
+/** Iterasi 6 story 2.16: 11.500 → 9.600 (biaya berpikir agen); turun saja, jangan naik. */
+const LOAD_LIMIT = 9_600;
 
 describe('skill: batas token (estimateTokens = karakter / 3.2)', () => {
   it.each(Object.entries(LIMITS))('%s', (name, lim) => {

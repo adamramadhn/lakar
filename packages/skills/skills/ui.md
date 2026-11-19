@@ -2,32 +2,28 @@
 
 ## Kontrol
 
-- Tombol primer 48 (toolbar 40); sekunder outline/latar sub; ghost teks aksen. IconButton 44 (desktop 40) radius full. Chip 32 radius full.
-- Badge `sm` (20) default di baris, daftar, tabel, meta; `md` (24) hanya di samping judul ≥ 18 atau di header kartu. Tinggi badge ≤ line-height teks terbesar di barisnya, teksnya lebih kecil, satu baris (`LC-24`). Di permukaan gelap pada board terang: arg ke-6 = warna permukaan itu (mis. `C.deep`).
-- Wadah ikon: tint + ikon aksen, atau solid aksen + ikon `C.on` (butir ditekankan).
-- Avatar 32/40/48 radius full = foto orang (inisial cadangan kecil). Logo: wadah 32 aksen + ikon + wordmark h4, bukan path.
+- Tombol primer 48 (toolbar 40); sekunder outline/latar sub; ghost teks aksen. IconButton 44 (desktop 40) dan chip 32, radius full.
+- `Badge` sm default (baris, daftar, tabel, meta); md hanya di samping judul ≥ 18 atau header kartu. Di permukaan gelap pada board terang: arg ke-6 = warna permukaan (mis. `C.deep`).
+- Wadah ikon: tint + ikon aksen, atau solid aksen + ikon `C.on` (ditekankan). Avatar 32/40/48 = foto orang (inisial cadangan kecil). Logo: wadah 32 aksen + ikon + wordmark h4, bukan path.
 
 ## Form
 
-- Label di atas field (`label`, gap 8), field `Input /` 48 radius 8, placeholder `t3`, bantuan `body-sm` `t2` di bawah; antar-field 16.
-- Error = garis danger + ikon `circle-exclamation-point` + pesan `body-sm` danger di bawah field.
+Label di atas field (`label`, gap 8); `Input /` 48 radius 8; placeholder `t3`; bantuan `body-sm` `t2` di bawah; antar-field 16. Error = garis danger + `circle-exclamation-point` + pesan `body-sm` danger di bawah.
 
 ## Kartu dan kedalaman
 
-- Kartu: padding 24 (mobile 16), radius 12, border; header boleh memuat `Badge` metrik.
-- Kartu tidak di dalam kartu bergaris/berbayang (`LC-18`): isi kartu = baris atau bidang tint tanpa garis dan bayangan; judul seksi di luar kartu.
-- Satu strategi kedalaman per board: garis, bayangan, atau tonal.
-- Bayangan berlapis, semua jatuh ke bawah: cincin 1 px alpha rendah (`spread:1`, blur 0) + 2–3 lapis dengan blur makin besar dan alpha makin kecil.
-- Kartu fitur: kartu → panel → fragmen produk; panel mengisi 60–65% bagian bawah dan terpotong tepi kartu (`Crop /`).
+- Kartu: padding 24 (mobile 16), radius 12, border; header boleh memuat `Badge` metrik. Isi kartu = baris atau bidang tint, bukan kartu lagi; judul seksi di luar kartu.
+- Satu strategi kedalaman per board: garis, bayangan, atau tonal. Bayangan berlapis jatuh ke bawah: cincin 1 px alpha rendah (`spread:1`) + 2–3 lapis blur makin besar, alpha makin kecil.
+- Kartu fitur: kartu → panel → fragmen produk; panel mengisi 60–65% bawah dan terpotong tepi kartu (`Crop /`).
 
 ## Tabel
 
-- Header 40 (`caption` `t3` di bidang `sub`), baris 56 (padat 44) bergaris bawah. Tiap sel = frame lebar tetap atau `width:'fill'` berisi teksnya, lebar kolom sama di header dan semua baris; kolom angka rata kanan, tabular.
+Header 40 (`caption` `t3` di `sub`), baris 56 (padat 44) bergaris bawah. Tiap sel = frame (lebar tetap atau `width:'fill'`) berisi teksnya, lebar kolom sama di header dan baris; angka rata kanan, tabular.
 
 ## Foto
 
-- Foto wajib untuk isi nyata (orang, tempat, makanan, produk, media) di hero, sampul, kartu konten, thumbnail, avatar; bukan untuk ikon fitur/UI abstrak. Kueri 2–3 kata benda Inggris yang visual (`coffee beans bag`); orang = `<peran> portrait`, bukan nama/rapat. Pilih dari pratinjau: subjek jelas, berwarna, kontemporer; beda per butir. `const p=photo('<ref>')` (literal) → `fills:[{type:'image',assetId:p.assetId,fit:'cover'}]` pada `Image / …` berukuran tetap; maks 6 foto baru per execute. Kredit hanya di ringkasan kecuali diminta.
-- Foto konten diberi garis dalam 1 px `#0000001A` (terang) atau `#FFFFFF1A` (gelap); logo tidak.
+- Wajib untuk isi nyata (orang, tempat, makanan, produk, media) di hero, sampul, kartu konten, thumbnail, avatar; bukan untuk ikon fitur. Kueri 2–3 kata benda Inggris yang visual (`coffee beans bag`; orang = `<peran> portrait`). Pilih dari pratinjau: subjek jelas, berwarna, kontemporer, beda per butir.
+- `const p=photo('<ref>')` (literal) → `fills:[{type:'image',assetId:p.assetId,fit:'cover'}]` pada `Image / …` berukuran tetap; maks 6 foto baru per execute; kredit hanya di ringkasan. Foto konten bergaris dalam 1 px `#0000001A` (terang) / `#FFFFFF1A` (gelap); logo tidak.
 
 ## Contoh teruji
 

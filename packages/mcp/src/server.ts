@@ -154,7 +154,7 @@ export const READ_SKILL_DESCRIPTION =
 export const SERVER_INSTRUCTIONS =
   'Lakar: canvas desain lewat kode. Sebelum menggambar, read_skill core + layout + typography + color + accessibility + ui + interface + writing + review ' +
   '+ landing/mobile/webapp di giliran yang sama (paralel); aplikasi desktop/dashboard → webapp. ' +
-  'Lalu open_doc dan bangun lewat sedikit execute besar (2–4 untuk landing, 1–2 untuk mobile dan webapp) yang diawali prelude dari skill core; ' +
+  'Lalu open_doc, rencana singkat, dan langsung bangun lewat sedikit execute besar (2–4 untuk landing, 1–2 untuk mobile dan webapp) yang diawali prelude dari skill core; ' +
   'baca check di respons execute, perbaiki dengan editId/edits atau update, akhiri dengan satu screenshot board + satu screenshot zoom (nodeId, scale 2) ' +
   'area terpadat (skill review), satu execute perbaikan, lalu export PNG.';
 

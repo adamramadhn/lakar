@@ -193,13 +193,13 @@ describe('@lakar/mcp', () => {
     expect(PHOTO_SEARCH_DESCRIPTION).toContain("photo('<ref>')");
   });
 
-  it('instructions server: read_skill core + 8 domain + skill jenis layar di giliran yang sama, sedikit execute besar, zoom review; deskripsi read_skill tanpa polish', async () => {
+  it('instructions server: read_skill core + 8 domain + skill jenis layar di giliran yang sama, rencana singkat lalu sedikit execute besar, zoom review; deskripsi read_skill tanpa polish', async () => {
     const c = await connect(url);
     const ins = c.getInstructions() ?? '';
     expect(ins).toBe(SERVER_INSTRUCTIONS);
     expect(ins).toContain('read_skill core + layout + typography + color + accessibility + ui + interface + writing + review + landing/mobile/webapp di giliran yang sama (paralel)');
     expect(ins).toMatch(/aplikasi desktop\/dashboard → webapp/);
-    expect(ins).toContain('sedikit execute besar');
+    expect(ins).toContain('rencana singkat, dan langsung bangun lewat sedikit execute besar');
     expect(ins).toContain('screenshot zoom (nodeId, scale 2)');
     expect(ins).not.toMatch(/\bpolish\b/);
     expect(READ_SKILL_DESCRIPTION).toMatch(/core .*\+ delapan skill domain \(layout, typography, color, accessibility, ui, interface, writing, review\) \+ skill jenis layar \(landing, mobile, atau webapp.*giliran yang sama/);

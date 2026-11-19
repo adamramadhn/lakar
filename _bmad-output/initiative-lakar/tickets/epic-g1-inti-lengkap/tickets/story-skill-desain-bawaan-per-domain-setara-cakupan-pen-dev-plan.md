@@ -100,6 +100,14 @@ Keputusan plan checkpoint (orkestrator, didelegasikan Adam, 2026-11-19):
 4. Target: LC-07 = 0 dan 0 warning di semua contoh skill (selain entri `api.md` yang menunggu 2.10).
 5. Seri latihan (dry-run dan run nyata) dijalankan **sesi utama**, bukan subagen implementasi. Subagen berhenti sesudah skill/kode/tes selesai dan di-commit, dan tidak pernah menjalankan proses di background.
 
+Revisi iterasi 6 (sesi baru C7, 2026-11-19): iterasi 5 gagal gerbang waktu di mobile dan landing karena biaya berpikir (token
+berpikir ±2× iterasi 4). Skill dipadatkan tanpa membuang domain atau butir 1/3/4/6: alur `core` = rencana singkat ≤ 5 baris lalu
+langsung execute pertama (tanpa menimbang aturan satu per satu), angka yang dilaporkan `check` beserta perbaikannya dihapus dari
+skill, review = enam pertanyaan singkat dijawab `ok`/temuan, geometri dan pasangan huruf masing-masing satu baris, resep satu
+kalimat untuk LC-02c, LC-25, dan zona bawah mobile. Muat per layar 10.728/10.425/10.186 → 9.440/9.094/9.104; `LOAD_LIMIT` →
+9.600 dan batas per skill diturunkan (DESIGN.md §Turunan diselaraskan; cadangan di scratchpad). Instruksi MCP: "rencana singkat,
+dan langsung bangun". Detail dan tabel: LOG §2.16 "Revisi iterasi 6".
+
 ## Plan Change Log
 
 - 2026-11-19 (implementasi, subagen): Design Notes §Badge ("tanpa mengubah frontmatter") digantikan keputusan Implementation
