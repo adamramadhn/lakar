@@ -1317,21 +1317,25 @@ export function lc30(ctx: BoardContext): Finding[] {
 
 export const MAX_WARNINGS_PER_RULE = 3;
 
-/** Maks 3 warning per aturan; sisanya dicatat di detail temuan ketiga sebagai `(+n serupa)`. Detail ≤ 120 karakter. */
+/**
+ * Maks 3 warning (dan maks 3 info) per aturan; sisanya dicatat di detail temuan ketiga sebagai `(+n serupa)`. Detail ≤ 120
+ * karakter. Error tidak dibatasi.
+ */
 export function capWarnings(findings: readonly Finding[]): Finding[] {
+  const key = (f: Finding) => `${f.level} ${f.rule}`;
   const count = new Map<string, number>();
-  for (const f of findings) if (f.level === 'warning') count.set(f.rule, (count.get(f.rule) ?? 0) + 1);
+  for (const f of findings) if (f.level !== 'error') count.set(key(f), (count.get(key(f)) ?? 0) + 1);
   const seen = new Map<string, number>();
   const out: Finding[] = [];
   for (const f of findings) {
-    if (f.level !== 'warning') {
+    if (f.level === 'error') {
       out.push(f);
       continue;
     }
-    const k = (seen.get(f.rule) ?? 0) + 1;
-    seen.set(f.rule, k);
+    const k = (seen.get(key(f)) ?? 0) + 1;
+    seen.set(key(f), k);
     if (k > MAX_WARNINGS_PER_RULE) continue;
-    const extra = k === MAX_WARNINGS_PER_RULE ? count.get(f.rule)! - MAX_WARNINGS_PER_RULE : 0;
+    const extra = k === MAX_WARNINGS_PER_RULE ? count.get(key(f))! - MAX_WARNINGS_PER_RULE : 0;
     const suffix = extra > 0 ? ` (+${extra} serupa)` : '';
     const room = 120 - [...suffix].length;
     const d = [...f.detail];
@@ -1402,4 +1406,312 @@ export function lc31(ctx: BoardContext, skip: ReadonlySet<string> = new Set()): 
   // Leluhur Scroll / dilewati seluruhnya (dok lama dengan posisi gulir).
   walk(ctx.board.children);
   return out;
+}
+
+// ===========================================================================
+// Aturan struktural G1 (story 4): LC-13, LC-14, LC-15, LC-16, LC-21, LC-22.
+// ===========================================================================
+
+// ---------------------------------------------------------------------------
+// LC-13 · nama layer default (info)
+// ---------------------------------------------------------------------------
+
+/** Nama default editor (Lampiran A) + padanan tipe node AD-15, opsional diikuti angka. */
+export const DEFAULT_LAYER_NAME = /^(rectangle|ellipse|path|group|board|image|svg|frame|rect|text|icon|vector)\s*\d*$/i;
+
+export function lc13(ctx: BoardContext): Finding[] {
+  return [ctx.board, ...ctx.nodes]
+    .filter((n) => DEFAULT_LAYER_NAME.test(n.name.trim()))
+    .map((n) => finding('LC-13', levelOf('LC-13'), n, clip120(`nama default ${quote(n.name)} (${n.type})`), 'nama bermakna sesuai peran (mis. "Kartu / Harga", "Image / Kamar", "Judul")'));
+}
+
+// ---------------------------------------------------------------------------
+// LC-14 · absolut di dalam flex tanpa Overlay / (warning)
+// ---------------------------------------------------------------------------
+
+/** Nama yang sah absolut: tumpukan sengaja dan bidang efek (`Overlay /`, `Crop /`) dan chrome perangkat. */
+const ABSOLUTE_OK = ['Overlay /', 'Crop /', 'Status bar', 'Home indicator'];
+
+export function lc14(ctx: BoardContext): Finding[] {
+  const out: Finding[] = [];
+  for (const n of ctx.nodes) {
+    if (n.position !== 'absolute' || ABSOLUTE_OK.some((p) => named(n, p))) continue;
+    const parent = ctx.parentOf.get(n.id)!;
+    const layout = parent.type === 'board' ? 'column' : (parent.layout ?? 'none');
+    if (layout === 'none') continue;
+    if (ancestors(ctx, n).some((a) => a.type === 'frame' && (named(a, 'Overlay /') || named(a, 'Crop /')))) continue;
+    out.push(
+      finding(
+        'LC-14',
+        levelOf('LC-14'),
+        n,
+        clip120(`absolut di dalam ${parent.type === 'board' ? 'board' : `layout ${layout}`} ${parent.name} (${parent.id})`),
+        'jadikan anak flow (gap/padding); tumpukan sengaja: nama "Overlay / …", bidang efek terpotong: "Crop / …"',
+      ),
+    );
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+// LC-15 · > 1 pustaka ikon UI (warning)
+// ---------------------------------------------------------------------------
+
+/** Pustaka logo merek, bukan ikon UI. */
+const BRAND_ICON_LIBS = new Set(['simple-icons']);
+
+export function lc15(ctx: BoardContext): Finding[] {
+  const libs = new Map<string, number>();
+  for (const n of ctx.nodes) if (n.type === 'icon' && !BRAND_ICON_LIBS.has(n.lib)) libs.set(n.lib, (libs.get(n.lib) ?? 0) + 1);
+  if (libs.size <= 1) return [];
+  const list = [...libs].map(([lib, k]) => `${lib} ${k}`).join(', ');
+  return [finding('LC-15', levelOf('LC-15'), ctx.board, clip120(`${libs.size} pustaka ikon UI: ${list}`), 'satu pustaka ikon UI per board (simple-icons untuk logo tidak dihitung)')];
+}
+
+// ---------------------------------------------------------------------------
+// LC-16 · ikon digambar manual (error, bukan gerbang)
+// ---------------------------------------------------------------------------
+
+/** Ukuran maksimal `path` yang dianggap ikon (px). */
+export const DRAWN_ICON_MAX = 32;
+
+export function lc16(ctx: BoardContext): Finding[] {
+  const out: Finding[] = [];
+  for (const n of ctx.nodes) {
+    if (n.type !== 'path' || named(n, 'Chart /') || named(n, 'Shape /')) continue;
+    const b = ctx.bounds.get(n.id);
+    const w = b?.width ?? (typeof n.width === 'number' ? n.width : n.viewBox[2]);
+    const h = b?.height ?? (typeof n.height === 'number' ? n.height : n.viewBox[3]);
+    if (w > DRAWN_ICON_MAX + TOLERANCE || h > DRAWN_ICON_MAX + TOLERANCE) continue;
+    out.push(
+      finding(
+        'LC-16',
+        levelOf('LC-16'),
+        n,
+        clip120(`path ${num(w)}×${num(h)} ${quote(n.name)} digambar manual`),
+        'pakai node icon (icon_search); bentuk sengaja: nama "Shape / …", bagian grafik: "Chart / …"',
+      ),
+    );
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+// LC-21 · pemeriksaan struktural murah (warning): radius, spacer kosong, padding ganda, teks di baris tabel, bidang efek
+// ---------------------------------------------------------------------------
+
+export const MAX_RADII = 3;
+/** Bidang efek: blur dekoratif minimal (px) dan luas gradien multi-hue minimal (rasio layar). */
+export const EFFECT_BLUR_MIN = 24;
+export const EFFECT_AREA_RATIO = 0.2;
+/** Tinggi layar untuk luas bidang efek: board panjang dihitung per layar. */
+const SCREEN_H = { mobile: 844, other: 900 };
+/** Rentang toleransi kesejajaran kolom tabel dan lebar isi induk (px). */
+const ALIGN_TOL = 1;
+
+/** Ber-cat: fill tak transparan, stroke, bayangan luar, atau backdrop blur. */
+const paintedAny = (n: ChildNode): boolean => paintedCard(n) || ((n as { backdropBlur?: number }).backdropBlur ?? 0) > 0;
+
+/** RGB [0,1] → [hue°, saturasi HSL]. */
+function hueSat(r: number, g: number, b: number): [number, number] {
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const d = max - min;
+  const l = (max + min) / 2;
+  if (d === 0) return [0, 0];
+  const sat = d / (1 - Math.abs(2 * l - 1));
+  let h = max === r ? ((g - b) / d) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
+  h *= 60;
+  return [h < 0 ? h + 360 : h, sat];
+}
+
+/** Gradien multi-hue: ≥ 2 stop kromatik (saturasi ≥ 0,2, alpha ≥ 0,15) dengan beda hue ≥ 30°. */
+function multiHue(f: ResolvedFill): boolean {
+  if (f.type !== 'linear' && f.type !== 'radial' && f.type !== 'conic') return false;
+  const hues: number[] = [];
+  for (const s of f.stops) {
+    const [r, g, b, a] = parseHex(s.color);
+    const [h, sat] = hueSat(r, g, b);
+    if (sat >= 0.2 && a >= 0.15) hues.push(h);
+  }
+  for (let i = 0; i < hues.length; i++)
+    for (let j = i + 1; j < hues.length; j++) {
+      const d = Math.abs(hues[i]! - hues[j]!);
+      if (Math.min(d, 360 - d) >= 30) return true;
+    }
+  return false;
+}
+
+function radiusIssue(ctx: BoardContext): Finding[] {
+  const values = new Set<number>();
+  for (const n of ctx.nodes) {
+    if ((n.type !== 'frame' && n.type !== 'rect') || (n.opacity ?? 1) <= 0) continue;
+    if (!(paintedAny(n) || (n.type === 'frame' && n.clip === true))) continue;
+    const v = visibleRect(ctx, n);
+    const r = ctx.bounds.get(n.id);
+    if (!v || !r || area(v) <= 0) continue;
+    const full = Math.min(r.width, r.height) / 2 - TOLERANCE;
+    const raw = n.radius ?? 0;
+    for (const x of typeof raw === 'number' ? [raw] : raw) if (x > 0 && x < full) values.add(x);
+  }
+  if (values.size <= MAX_RADII) return [];
+  const list = [...values].sort((a, b) => a - b).map(num).join(', ');
+  return [finding('LC-21', levelOf('LC-21'), ctx.board, clip120(`radius: ${values.size} nilai (${list})`), `≤ ${MAX_RADII} nilai radius per board (mis. kecil/sedang/besar) + pill/lingkaran`)];
+}
+
+function spacerIssue(ctx: BoardContext): Finding[] {
+  const out: Finding[] = [];
+  for (const n of ctx.nodes) {
+    if (n.type !== 'frame' && n.type !== 'rect') continue;
+    if ((n.type === 'frame' && n.children.length > 0) || paintedAny(n) || named(n, 'Image /')) continue;
+    const parent = ctx.parentOf.get(n.id)!;
+    if (!isFlowChild(parent, n)) continue;
+    const r = ctx.bounds.get(n.id);
+    // Node seukuran titik (0×0) tidak memakan ruang: bukan spacer.
+    if (r && r.width <= TOLERANCE && r.height <= TOLERANCE) continue;
+    const size = r ? ` ${num(r.width)}×${num(r.height)}` : '';
+    out.push(finding('LC-21', levelOf('LC-21'), n, clip120(`spacer kosong: ${n.type}${size} tanpa isi dan cat di ${parent.name} (${parent.id})`), 'hapus; jarak lewat gap/padding induk'));
+  }
+  return out;
+}
+
+function doublePaddingIssue(ctx: BoardContext): Finding[] {
+  if (ctx.board.screen !== 'mobile') return [];
+  const out: Finding[] = [];
+  for (const n of ctx.nodes) {
+    if (n.type !== 'frame' || !n.children.length || paintedAny(n) || inComponent(ctx, n)) continue;
+    const parent = ctx.parentOf.get(n.id)!;
+    if (!isFlowChild(parent, n)) continue;
+    const pad = paddingOf(n);
+    if (pad.l <= 0 && pad.r <= 0) continue;
+    const r = ctx.bounds.get(n.id);
+    const pr = parent.type === 'board' ? ctx.boardRect : ctx.bounds.get(parent.id);
+    if (!r || !pr) continue;
+    const pp = paddingOf(parent);
+    if (Math.abs(r.width - (pr.width - pp.l - pp.r)) > ALIGN_TOL) continue;
+    let hit: { side: 'kiri' | 'kanan'; own: number; outer: number; by: Container } | undefined;
+    for (const a of ancestors(ctx, n)) {
+      const ap = paddingOf(a);
+      if (pad.l > 0 && ap.l > 0) hit = { side: 'kiri', own: pad.l, outer: ap.l, by: a };
+      else if (pad.r > 0 && ap.r > 0) hit = { side: 'kanan', own: pad.r, outer: ap.r, by: a };
+      if (hit || a.type === 'board' || paintedAny(a)) break;
+    }
+    if (!hit) continue;
+    out.push(
+      finding(
+        'LC-21',
+        levelOf('LC-21'),
+        n,
+        clip120(`padding ganda: padding ${hit.side} ${num(hit.own)} di dalam padding ${hit.side} ${num(hit.outer)} ${hit.by.name} (${hit.by.id})`),
+        'satu lapis padding horizontal per layar (wadah luar); anak selebar isi tanpa padding sisi',
+      ),
+    );
+  }
+  return out;
+}
+
+function tableTextIssue(ctx: BoardContext): Finding[] {
+  const out: Finding[] = [];
+  const containers: Container[] = [ctx.board, ...ctx.nodes.filter((n): n is FrameNode => n.type === 'frame')];
+  for (const c of containers) {
+    const rows = c.children.flatMap((k) => {
+      if (k.type !== 'frame' || k.layout !== 'row') return [];
+      const kids = k.children.filter((x) => isFlowChild(k, x));
+      const xs = kids.map((x) => ctx.bounds.get(x.id)?.x);
+      if (kids.length < 3 || xs.some((x) => x === undefined)) return [];
+      return [{ row: k, kids, xs: xs as number[] }];
+    });
+    const grouped = new Set<string>();
+    for (const ref of rows) {
+      if (grouped.has(ref.row.id)) continue;
+      const group = rows.filter((o) => !grouped.has(o.row.id) && o.kids.length === ref.kids.length && o.xs.every((x, i) => Math.abs(x - ref.xs[i]!) <= ALIGN_TOL));
+      if (group.length < 3) continue;
+      for (const g of group) grouped.add(g.row.id);
+      for (const g of group) {
+        const withText = g.kids.filter((x) => textsIn(x).length > 0).length;
+        const direct = g.kids.filter((x) => x.type === 'text' && nonEmpty(x)).length;
+        // Daftar (nomor/meta + tumpukan teks + status) punya ≤ 1 teks lepas; baris tabel punya ≥ 2 sel teks lepas.
+        if (withText < 3 || direct < 2) continue;
+        out.push(
+          finding(
+            'LC-21',
+            levelOf('LC-21'),
+            g.row,
+            clip120(`teks di baris tabel: ${direct} teks langsung di baris (${group.length} baris sejajar di ${c.name})`),
+            'tiap sel = frame lebar tetap/fill (sel berisi teks), kolom sejajar antarbaris',
+          ),
+        );
+      }
+    }
+  }
+  return out;
+}
+
+function effectFieldIssue(ctx: BoardContext): Finding[] {
+  const screenH = Math.min(ctx.boardRect.height, ctx.board.screen === 'mobile' ? SCREEN_H.mobile : SCREEN_H.other);
+  const minArea = EFFECT_AREA_RATIO * ctx.boardRect.width * screenH;
+  const effects: { n: ChildNode; v: Rect }[] = [];
+  for (const n of ctx.nodes) {
+    const fills = fillsOf(n);
+    if (!fills.length || (n.opacity ?? 1) <= 0) continue;
+    const v = visibleRect(ctx, n);
+    if (!v || area(v) <= 0) continue;
+    const blur = (n as { blur?: number }).blur ?? 0;
+    const isEffect =
+      fills.some((f) => f.type === 'mesh') ||
+      (blur >= EFFECT_BLUR_MIN && fills.some((f) => f.type !== 'image')) ||
+      (fills.some(multiHue) && area(v) >= minArea);
+    if (isEffect) effects.push({ n, v });
+  }
+  if (effects.length < 2) return [];
+  // Union-find: node efek bersarang di node efek lain atau beririsan dengannya = satu bidang.
+  const root = effects.map((_, i) => i);
+  const find = (i: number): number => (root[i] === i ? i : (root[i] = find(root[i]!)));
+  for (let i = 0; i < effects.length; i++) {
+    const inside = new Set(descendants(effects[i]!.n).map((d) => d.id));
+    for (let j = i + 1; j < effects.length; j++) {
+      if (inside.has(effects[j]!.n.id) || intersect(effects[i]!.v, effects[j]!.v)) root[find(j)] = find(i);
+    }
+  }
+  // Label bidang = node efek terluas di bidang itu (urutan dokumen bidang dipertahankan).
+  const fields = new Map<number, { n: ChildNode; v: Rect }>();
+  effects.forEach((e, i) => {
+    const cur = fields.get(find(i));
+    if (!cur || area(e.v) > area(cur.v)) fields.set(find(i), e);
+  });
+  if (fields.size < 2) return [];
+  const names = [...fields.values()].map((e) => `"${e.n.name}"`).join(', ');
+  return [
+    finding(
+      'LC-21',
+      levelOf('LC-21'),
+      ctx.board,
+      clip120(`bidang efek: ${fields.size} bidang terpisah (${names})`),
+      'maks 1 bidang efek ekspresif per board (mesh, blur dekoratif, gradien multi-warna luas); sisanya solid',
+    ),
+  ];
+}
+
+export function lc21(ctx: BoardContext): Finding[] {
+  return [...radiusIssue(ctx), ...spacerIssue(ctx), ...doublePaddingIssue(ctx), ...tableTextIssue(ctx), ...effectFieldIssue(ctx)];
+}
+
+// ---------------------------------------------------------------------------
+// LC-22 · jumlah node berkonvensi (info)
+// ---------------------------------------------------------------------------
+
+export const CONVENTIONS = ['Crop', 'Overlay', 'Scroll', 'Ekstra'] as const;
+
+export function lc22(ctx: BoardContext): Finding[] {
+  const counts = CONVENTIONS.map((c) => ctx.nodes.filter((n) => named(n, `${c} /`)).length);
+  if (counts.every((k) => k === 0)) return [];
+  return [
+    finding(
+      'LC-22',
+      levelOf('LC-22'),
+      ctx.board,
+      CONVENTIONS.map((c, i) => `${c} ${counts[i]}`).join(', '),
+      'sebut di artefak konvensi: (batas Crop ≤ 2, Ekstra ≤ 1 per board)',
+    ),
+  ];
 }

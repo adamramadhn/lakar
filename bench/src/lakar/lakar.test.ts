@@ -117,7 +117,7 @@ async function fakeLakard(dataDir: string, boards: { id: string; width: number; 
       if (req.url === '/docs/open') return ok({ docId: 'd', slug: parsed.slug, rev: 3, created: false });
       if (req.url === '/boards') return ok({ docId: 'd', slug: 's', rev: 3, boards: boards.map((b, i) => ({ ...b, name: `Board ${i}`, page: 'P', x: 0, y: 0, wip: false })) });
       if (req.url === '/layout-check')
-        return ok({ docId: 'd', rev: 3, boards: [], summary: { error: 1, warning: 0, gate: 1 }, findings: [{ level: 'error', rule: 'LC-01a', nodeId: 'n', nodeName: 'T', detail: '👋', expected: 'x' }] });
+        return ok({ docId: 'd', rev: 3, boards: [], summary: { error: 1, warning: 0, gate: 1, info: 0 }, findings: [{ level: 'error', rule: 'LC-01a', nodeId: 'n', nodeName: 'T', detail: '👋', expected: 'x' }] });
       if (req.url === '/export') {
         const b = boards.find((x) => x.id === parsed.id)!;
         const p = join(dataDir, `${b.id}.png`);

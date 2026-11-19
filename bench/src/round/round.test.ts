@@ -267,7 +267,7 @@ describe('laporan (snapshot)', () => {
       slug: 'gerak-beranda',
       opened: ['gerak-beranda'],
       boards: [{ id: 'b1', name: 'Beranda', page: 'P', width: 390, height: 844, x: 0, y: 0, wip: false }],
-      layout: { rev: 4, summary: { error: 0, warning: 1, gate: 0 }, findings: [], boards: [] },
+      layout: { rev: 4, summary: { error: 0, warning: 1, gate: 0, info: 0 }, findings: [], boards: [] },
       docPath: 'bench/runs/rounds/uji-1/B-lakar/doc/gerak-beranda.lakar.json',
       historyPath: undefined,
       daemonBefore: undefined,
@@ -747,13 +747,13 @@ describe('round --resume dengan hasil juri rubrik lama', () => {
 });
 
 describe('daftar aturan R3/R7 yang belum dihitung diturunkan dari G0_RULES', () => {
-  it('G0_RULES saat ini: LC-11 dan LC-18 sudah ada', () => {
-    expect(r3r7Missing()).toBe('aturan LC-03/06/07/13/14/17/21 belum ada di `G0_RULES`.');
+  it('G0_RULES saat ini: LC-11, LC-13, LC-14, LC-18, LC-21 sudah ada', () => {
+    expect(r3r7Missing()).toBe('aturan LC-03/06/07/17 belum ada di `G0_RULES`.');
   });
   it('laporan memakai G0_RULES beku putaran (pra-1.23 tanpa LC-11/LC-18); tidak terbaca → aturan saat ini', () => {
     const pre = JSON.stringify({ 'LC-01a': {}, 'LC-02a': {}, 'LC-05': {}, 'LC-12': {}, 'LC-20': {} });
     expect(r3r7Missing(frozenG0Rules(pre))).toBe('aturan LC-03/06/07/11/13/14/17/18/21 belum ada di `G0_RULES`.');
-    for (const bad of [undefined, '[]', 'bukan json']) expect(r3r7Missing(frozenG0Rules(bad))).toBe('aturan LC-03/06/07/13/14/17/21 belum ada di `G0_RULES`.');
+    for (const bad of [undefined, '[]', 'bukan json']) expect(r3r7Missing(frozenG0Rules(bad))).toBe('aturan LC-03/06/07/17 belum ada di `G0_RULES`.');
   });
   it('tanpa aturan katalog / semua ada', () => {
     expect(r3r7Missing({})).toBe('aturan LC-03/06/07/11/13/14/17/18/21 belum ada di `G0_RULES`.');

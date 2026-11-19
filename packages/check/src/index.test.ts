@@ -74,10 +74,17 @@ function docOf(specs: BoardSpec[], tokens?: Record<string, string | number>): { 
   return { doc: doc as unknown as ResolvedDocument, boards: boards.map((b) => b.id), measures };
 }
 
-const run = (spec: BoardSpec | BoardSpec[], which = 0): Finding[] => {
+/** Semua temuan checkBoard (semua level dan aturan). */
+const runAll = (spec: BoardSpec | BoardSpec[], which = 0): Finding[] => {
   const { doc, boards, measures } = docOf(Array.isArray(spec) ? spec : [spec]);
   return checkBoard({ doc, boardId: boards[which]!, measure: measures.get(boards[which]!)! });
 };
+/**
+ * Aturan struktural G1 (story 4). Fixture aturan G0 sengaja sintetis (bar absolut, rect tanpa cat, nama bebas), jadi
+ * `run` menyaringnya; fixture G1 memakai `runAll`.
+ */
+const G1_STRUCTURAL = new Set(['LC-13', 'LC-14', 'LC-15', 'LC-16', 'LC-21', 'LC-22']);
+const run = (spec: BoardSpec | BoardSpec[], which = 0): Finding[] => runAll(spec, which).filter((f) => !G1_STRUCTURAL.has(f.rule));
 const rules = (f: Finding[]) => f.map((x) => x.rule);
 const only = (f: Finding[], rule: string) => f.filter((x) => x.rule === rule);
 /** Board mobile 390×844 bersih + anak tambahan. */
@@ -231,7 +238,7 @@ describe('LC-12 board', () => {
     expect(f).toEqual([
       { level: 'warning', rule: 'LC-12', nodeId: expect.any(String), nodeName: 'Home · mobile', detail: 'ukuran 390×800', expected: 'lebar 390, tinggi ≥ 844 (isi lebih panjang: satu board panjang)' },
     ]);
-    expect(summarizeFindings(f)).toEqual({ error: 0, warning: 1, gate: 0 });
+    expect(summarizeFindings(f)).toEqual({ error: 0, warning: 1, gate: 0, info: 0 });
   });
 
   it('app 1440×900 dan ×1024 lolos; 1440×800 tidak; landing tinggi bebas; expectedSize menang', () => {
@@ -635,7 +642,7 @@ describe('fixture enam aturan', () => {
     const f = run(spec);
     expect(rules(f)).toEqual(['LC-01a', 'LC-01b', 'LC-05', 'LC-02a', 'LC-20', 'LC-12']);
     expect(f.some((x) => x.nodeId === copy.id)).toBe(false);
-    expect(summarizeFindings(f)).toEqual({ error: 5, warning: 1, gate: 5 });
+    expect(summarizeFindings(f)).toEqual({ error: 5, warning: 1, gate: 5, info: 0 });
   });
 });
 
@@ -963,5 +970,232 @@ describe('batas warning per aturan per board', () => {
   it('error tidak dibatasi', () => {
     const kids = Array.from({ length: 5 }, (_, i) => text(`Abu ${i}`, [0, i * 24, 100, 20], { color: '#D0D5DD' }));
     expect(only(run(clean(kids)), 'LC-04')).toHaveLength(5);
+  });
+});
+
+// ===========================================================================
+// Aturan struktural G1 (story 4): LC-13, LC-14, LC-15, LC-16, LC-21, LC-22.
+// ===========================================================================
+
+const paint = (c = '#FFFFFF') => ({ fills: [{ type: 'solid', color: c }] });
+const icon = (lib: string, r: R, extra: Loose = {}): Loose => ({ type: 'icon', id: nid(), name: `Icon / ${lib}`, lib, icon: 'check', size: r[2], ...extra, _r: r });
+const path = (name: string, r: R, extra: Loose = {}): Loose => ({ type: 'path', id: nid(), name, d: 'M0 0L10 10', viewBox: [0, 0, 24, 24], ...paint('#111111'), ...extra, _r: r });
+
+describe('LC-13 nama layer default (info)', () => {
+  it.each(['Rectangle 2', 'Group', 'svg12', 'Frame', 'Ellipse 3', 'Path', 'Image', 'Vector 7'])('positif %j', (name) => {
+    const f = only(runAll(clean([rect(name, [0, 0, 100, 20], paint())])), 'LC-13');
+    expect(f).toHaveLength(1);
+    expect(f[0]).toMatchObject({ level: 'info', nodeName: name });
+  });
+  it.each(['Image / Kamar', 'Teks', 'Rectangle besar', 'Kartu / Harga', 'Icon / lucide / check'])('negatif %j', (name) => {
+    expect(only(runAll(clean([rect(name, [0, 0, 100, 20], paint())])), 'LC-13')).toEqual([]);
+  });
+  it('board bernama default juga dilaporkan', () => {
+    expect(only(runAll(clean([], { name: 'Board 1' })), 'LC-13').map((f) => f.nodeName)).toEqual(['Board 1']);
+  });
+  it('maks 3 info per board; ketiga "(+n serupa)"', () => {
+    const f = only(runAll(clean(Array.from({ length: 5 }, (_, i) => rect(`Rectangle ${i}`, [0, i * 30, 100, 20], paint())))), 'LC-13');
+    expect(f).toHaveLength(3);
+    expect(f[2]!.detail.endsWith('(+2 serupa)')).toBe(true);
+    expect(f[0]!.detail.endsWith('serupa)')).toBe(false);
+  });
+});
+
+describe('LC-14 absolut di dalam flex', () => {
+  const abs = { position: 'absolute' };
+  it('positif: anak absolut di frame row/column dan di board', () => {
+    const kids = [
+      frame('Baris', [0, 0, 390, 40], [rect('Titik', [10, 10, 8, 8], { ...paint('#F00000'), ...abs })], { layout: 'row' }),
+      frame('Kolom', [0, 40, 390, 200], [rect('Lencana', [10, 50, 20, 20], { ...paint('#F00000'), ...abs })]),
+      rect('Bar bawah', [0, 780, 390, 64], { ...paint(), ...abs }),
+    ];
+    const f = only(runAll(clean(kids)), 'LC-14');
+    expect(f.map((x) => x.nodeName)).toEqual(['Titik', 'Lencana', 'Bar bawah']);
+    expect(f.every((x) => x.level === 'warning')).toBe(true);
+    expect(f[0]!.detail).toContain('layout row Baris');
+    expect(f[2]!.detail).toContain('board');
+  });
+  it('negatif: Overlay /, Crop /, Status bar, Home indicator, induk layout none, leluhur Overlay/Crop', () => {
+    const kids = [
+      frame('Overlay / Tab bar', [0, 780, 390, 64], [rect('Isi', [0, 780, 10, 10], { ...paint(), ...abs })], { ...abs, ...paint() }),
+      frame('Crop / Efek', [0, 0, 390, 300], [rect('Blob', [0, 0, 200, 200], { ...paint('#FF0000'), ...abs })], { ...abs, clip: true }),
+      rect('Status bar', [0, 0, 390, 44], abs),
+      rect('Home indicator', [128, 830, 134, 5], { ...paint('#000000'), ...abs }),
+      frame('Avatar', [0, 300, 48, 48], [rect('Titik', [36, 300, 12, 12], { ...paint('#00AA00'), ...abs })], { layout: 'none' }),
+    ];
+    expect(only(runAll(clean(kids)), 'LC-14')).toEqual([]);
+  });
+});
+
+describe('LC-15 > 1 pustaka ikon UI', () => {
+  it('lucide + pustaka lain (fixture cast) → 1 warning di board', () => {
+    const f = only(runAll(clean([icon('lucide', [0, 0, 24, 24]), icon('lucide', [30, 0, 24, 24]), icon('phosphor', [60, 0, 24, 24])])), 'LC-15');
+    expect(f).toHaveLength(1);
+    expect(f[0]).toMatchObject({ level: 'warning', nodeName: 'Home', detail: '2 pustaka ikon UI: lucide 2, phosphor 1' });
+  });
+  it('lucide + simple-icons (logo) → tidak', () => {
+    expect(only(runAll(clean([icon('lucide', [0, 0, 24, 24]), icon('simple-icons', [30, 0, 24, 24])])), 'LC-15')).toEqual([]);
+  });
+});
+
+describe('LC-16 ikon digambar manual (error bukan gerbang)', () => {
+  it('path 24×24 bernama "Centang" → error, summary gate tidak bertambah', () => {
+    const f = runAll(clean([path('Centang', [0, 0, 24, 24])]));
+    const lc16 = only(f, 'LC-16');
+    expect(lc16).toHaveLength(1);
+    expect(lc16[0]).toMatchObject({ level: 'error', nodeName: 'Centang' });
+    expect(lc16[0]!.detail).toBe('path 24×24 "Centang" digambar manual');
+    const s = summarizeFindings(f);
+    expect(s.error).toBe(1);
+    expect(s.gate).toBe(0);
+  });
+  it('batas 32 × 32 (+0,5); tanpa ukuran terukur → width/height angka, lalu viewBox', () => {
+    expect(only(runAll(clean([path('Ikon kecil', [0, 0, 32.4, 32])])), 'LC-16')).toHaveLength(1);
+    expect(only(runAll(clean([path('Ikon besar', [0, 0, 33, 24])])), 'LC-16')).toEqual([]);
+  });
+  it('negatif: Chart /, Shape /, path 88×32', () => {
+    const kids = [path('Chart / Garis', [0, 0, 24, 24]), path('Shape / Gelombang', [0, 30, 24, 24]), path('Sparkline', [0, 60, 88, 32])];
+    expect(only(runAll(clean(kids)), 'LC-16')).toEqual([]);
+  });
+});
+
+describe('LC-21 struktural', () => {
+  const lc21 = (f: Finding[], prefix: string) => only(f, 'LC-21').filter((x) => x.detail.startsWith(prefix));
+  it('radius: 4 nilai terlihat di luar 0 dan full → 1 warning di board', () => {
+    const kids = [4, 8, 12, 20].map((r, i) => rect(`Kartu ${i}`, [0, i * 100, 200, 80], { ...paint('#EEEEEE'), radius: r }));
+    const f = lc21(runAll(clean(kids)), 'radius:');
+    expect(f).toHaveLength(1);
+    expect(f[0]).toMatchObject({ level: 'warning', nodeName: 'Home', detail: 'radius: 4 nilai (4, 8, 12, 20)' });
+  });
+  it('radius: 3 nilai + pill/lingkaran, tuple dipecah, node tak bercat → tidak', () => {
+    const kids = [
+      rect('Kartu', [0, 0, 200, 80], { ...paint('#EEEEEE'), radius: [8, 8, 0, 0] }),
+      rect('Panel', [0, 100, 200, 80], { ...paint('#EEEEEE'), radius: 12 }),
+      rect('Tombol', [0, 200, 200, 40], { ...paint('#EEEEEE'), radius: 16 }),
+      rect('Pill', [0, 300, 100, 32], { ...paint('#EEEEEE'), radius: 16 }),
+      rect('Avatar', [0, 400, 48, 48], { ...paint('#EEEEEE'), radius: 999 }),
+      frame('Tanpa cat', [0, 500, 200, 80], [text('Isi', [0, 500, 50, 20])], { radius: 6 }),
+    ];
+    expect(lc21(runAll(clean(kids)), 'radius:')).toEqual([]);
+  });
+  it('spacer kosong: frame tanpa anak dan tanpa cat, atau rect tanpa cat, anak flow → warning', () => {
+    const kids = [
+      text('Atas', [0, 0, 100, 20]),
+      frame('Jarak', [0, 20, 390, 24], []),
+      rect('Jarak 2', [0, 44, 390, 16], { fills: [{ type: 'solid', color: '#FFFFFF00' }] }),
+      text('Bawah', [0, 60, 100, 20]),
+      // Frame kosong 0×0 tidak memakan ruang: bukan spacer.
+      frame('Isi', [0, 80, 0, 0], [], { layout: 'row' }),
+    ];
+    const f = lc21(runAll(clean(kids)), 'spacer kosong:');
+    expect(f.map((x) => x.nodeName)).toEqual(['Jarak', 'Jarak 2']);
+  });
+  it('spacer kosong: Image /, absolut, frame ber-fill/stroke/bayangan → tidak', () => {
+    const kids = [
+      frame('Image / Kamar', [0, 0, 390, 200], []),
+      frame('Hiasan', [0, 200, 390, 24], [], { position: 'absolute' }),
+      frame('Garis', [0, 224, 390, 1], [], paint('#E5E7EB')),
+      frame('Bingkai', [0, 230, 390, 40], [], { stroke: { color: '#E5E7EB', width: 1, align: 'inside' } }),
+      frame('Bayang', [0, 280, 390, 40], [], { shadows: [{ x: 0, y: 2, blur: 8, color: '#0000001A' }] }),
+    ];
+    expect(lc21(runAll(clean(kids)), 'spacer kosong:')).toEqual([]);
+  });
+  it('padding ganda: board mobile, frame tak bercat selebar isi induk berpadding di dalam leluhur berpadding → warning', () => {
+    const inner = frame('Daftar', [20, 0, 350, 100], [text('Butir', [40, 0, 100, 20])], { padding: [0, 20] });
+    const kids = [frame('Layar', [0, 0, 390, 844], [inner], { padding: 20, ...paint('#F8F8F8') })];
+    const f = lc21(runAll(clean(kids)), 'padding ganda:');
+    expect(f).toHaveLength(1);
+    expect(f[0]!.nodeName).toBe('Daftar');
+    expect(f[0]!.detail).toContain('padding kiri 20 di dalam padding kiri 20 Layar');
+  });
+  it('padding ganda: leluhur di atas wadah bercat tidak dihitung; board app/landing, kartu bercat, komponen → tidak', () => {
+    const card = (name: string, extra: Loose) => frame(name, [20, 0, 350, 100], [text('Isi', [40, 0, 100, 20])], { padding: 16, ...extra });
+    const screen = (kid: Loose) => [frame('Layar', [0, 0, 390, 844], [kid], { padding: 20 })];
+    // Kartu bercat dan komponen: bukan padding ganda.
+    expect(lc21(runAll(clean(screen(card('Kartu', paint('#FFFFFF'))))), 'padding ganda:')).toEqual([]);
+    expect(lc21(runAll(clean(screen(card('Button / Utama', {})))), 'padding ganda:')).toEqual([]);
+    // Board app/landing.
+    expect(lc21(runAll(clean(screen(card('Daftar', {})), { screen: 'app', width: 1440, height: 900 })), 'padding ganda:')).toEqual([]);
+    // Frame selebar isi kartu bercat (padding 0) di layar berpadding: leluhur bercat pertama = kartu (tanpa padding sisi) → berhenti.
+    const inner = frame('Baris', [20, 0, 350, 40], [text('Isi', [36, 0, 50, 20])], { padding: [0, 16] });
+    const painted = frame('Kartu', [20, 0, 350, 100], [inner], paint('#FFFFFF'));
+    expect(lc21(runAll(clean(screen(painted))), 'padding ganda:')).toEqual([]);
+    // Frame lebih sempit dari isi induk → bukan selebar isi.
+    expect(lc21(runAll(clean(screen(frame('Sempit', [20, 0, 200, 100], [text('Isi', [40, 0, 50, 20])], { padding: 16 })))), 'padding ganda:')).toEqual([]);
+  });
+  it('teks di baris tabel: ≥ 3 baris row sejajar dengan teks langsung → warning per baris', () => {
+    const row = (y: number) =>
+      frame('Baris', [0, y, 390, 44], [text('Nama', [0, y, 120, 20]), text('Status', [130, y, 100, 20]), text('Rp 10.000', [240, y, 100, 20])], { layout: 'row' });
+    const f = lc21(runAll(clean([frame('Tabel', [0, 0, 390, 200], [row(0), row(44), row(88), row(132)])])), 'teks di baris tabel:');
+    expect(f).toHaveLength(3);
+    expect(f[2]!.detail.endsWith('(+1 serupa)')).toBe(true);
+    expect(f[0]!.detail).toContain('3 teks langsung di baris (4 baris sejajar di Tabel)');
+  });
+  it('teks di baris tabel: daftar ikon+teks+kontrol, sel ber-frame, kolom tidak sejajar, < 3 baris → tidak', () => {
+    const list = (y: number) =>
+      frame('Butir', [0, y, 390, 44], [icon('lucide', [0, y, 24, 24]), text('Notifikasi', [32, y, 200, 20]), rect('Toggle', [340, y, 44, 24], paint('#00AA00'))], { layout: 'row' });
+    const cells = (y: number) =>
+      frame('Baris', [0, y, 390, 44], ['Nama', 'Status', 'Harga'].map((t, i) => frame(`Sel / ${t}`, [i * 130, y, 120, 44], [text(t, [i * 130, y, 100, 20])])), { layout: 'row' });
+    const ragged = (y: number, dx: number) =>
+      frame('Baris', [0, y, 390, 44], [text('Nama', [0, y, 120, 20]), text('Status', [130 + dx, y, 100, 20]), text('Harga', [240, y, 100, 20])], { layout: 'row' });
+    // Daftar antrean: nomor (1 teks lepas) + avatar berinisial + tumpukan teks + status → bukan tabel.
+    const queue = (y: number) =>
+      frame('Antrean', [0, y, 390, 56], [
+        text('02', [0, y, 20, 20]),
+        frame('Avatar', [28, y, 40, 40], [text('FK', [36, y, 20, 20])], paint('#EEEEEE')),
+        frame('Teks', [76, y, 200, 40], [text('Fajar', [76, y, 100, 20]), text('11.30', [76, y + 20, 100, 20])]),
+        frame('Status', [290, y, 100, 40], [text('Menunggu', [290, y, 80, 20])]),
+      ], { layout: 'row' });
+    const check = (kids: Loose[]) => lc21(runAll(clean([frame('Daftar', [0, 0, 390, 400], kids)])), 'teks di baris tabel:');
+    expect(check([queue(0), queue(56), queue(112)])).toEqual([]);
+    expect(check([list(0), list(44), list(88)])).toEqual([]);
+    expect(check([cells(0), cells(44), cells(88)])).toEqual([]);
+    expect(check([ragged(0, 0), ragged(44, 6), ragged(88, 12)])).toEqual([]);
+    expect(check([ragged(0, 0), ragged(44, 0)])).toEqual([]);
+  });
+  it('bidang efek: dua bidang terpisah (mesh + blob blur) → 1 warning di board', () => {
+    const mesh = { fills: [{ type: 'mesh', columns: 2, rows: 2, colors: ['#FF0000', '#00FF00', '#0000FF', '#FFFF00'] }] };
+    const kids = [rect('Hero mesh', [0, 0, 390, 300], mesh), rect('Blob', [100, 500, 200, 200], { ...paint('#7C3AED'), blur: 60 })];
+    const f = lc21(runAll(clean(kids)), 'bidang efek:');
+    expect(f).toHaveLength(1);
+    expect(f[0]).toMatchObject({ nodeName: 'Home', detail: 'bidang efek: 2 bidang terpisah ("Hero mesh", "Blob")' });
+    // Label bidang = node efek terluas: blob kecil yang beririsan dengan mesh tidak menggantikan nama mesh.
+    const withSmall = [rect('Titik blur', [0, 0, 60, 60], { ...paint('#22C55E'), blur: 30 }), ...kids];
+    expect(lc21(runAll(clean(withSmall)), 'bidang efek:')[0]!.detail).toBe('bidang efek: 2 bidang terpisah ("Hero mesh", "Blob")');
+  });
+  it('bidang efek: gradien multi-hue luas = efek; satu bidang bertumpuk/bersarang, gradien satu hue/scrim, ring kecil → tidak', () => {
+    const conic = { fills: [{ type: 'conic', stops: [{ offset: 0, color: '#FF0000' }, { offset: 1, color: '#0000FF' }] }] };
+    const oneHue = { fills: [{ type: 'linear', angle: 90, stops: [{ offset: 0, color: '#2563EB' }, { offset: 1, color: '#1E40AF' }] }] };
+    const scrim = { fills: [{ type: 'linear', angle: 180, stops: [{ offset: 0, color: '#00000000' }, { offset: 1, color: '#000000CC' }] }] };
+    const mesh = { fills: [{ type: 'mesh', columns: 2, rows: 2, colors: ['#FF0000', '#00FF00', '#0000FF', '#FFFF00'] }] };
+    // Bidang efek bersarang + blob yang beririsan = satu bidang; gradien satu hue dan scrim di tempat lain bukan efek.
+    const field = frame('Crop / Efek', [0, 0, 390, 300], [rect('Mesh', [0, 0, 390, 300], mesh), rect('Blob', [200, 100, 150, 150], { ...paint('#F97316'), blur: 40, position: 'absolute' })], { clip: true, layout: 'none' });
+    const kids = [field, rect('Kartu biru', [0, 320, 390, 300], oneHue), rect('Scrim', [0, 640, 390, 200], scrim), rect('Ring', [10, 700, 40, 40], conic)];
+    expect(lc21(runAll(clean(kids)), 'bidang efek:')).toEqual([]);
+    // Conic multi-hue luas (≥ 20% layar) di luar bidang pertama → bidang kedua.
+    expect(lc21(runAll(clean([field, rect('Latar conic', [0, 400, 390, 300], conic)])), 'bidang efek:')).toHaveLength(1);
+  });
+});
+
+describe('LC-22 jumlah node berkonvensi (info)', () => {
+  it('board dengan Crop/Overlay/Scroll/Ekstra → satu info', () => {
+    const kids = [
+      frame('Scroll / Isi', [0, 0, 390, 700], [frame('Crop / Efek', [0, 0, 390, 200], [], paint('#EEEEEE')), frame('Ekstra / Testimoni', [0, 200, 390, 200], [text('Isi', [0, 200, 50, 20])])]),
+      frame('Overlay / Tab bar', [0, 780, 390, 64], [], { position: 'absolute', ...paint() }),
+    ];
+    const f = only(runAll(clean(kids)), 'LC-22');
+    expect(f).toEqual([
+      { level: 'info', rule: 'LC-22', nodeId: expect.any(String), nodeName: 'Home', detail: 'Crop 1, Overlay 1, Scroll 1, Ekstra 1', expected: 'sebut di artefak konvensi: (batas Crop ≤ 2, Ekstra ≤ 1 per board)' },
+    ]);
+  });
+  it('board tanpa node konvensi → tidak ada temuan', () => {
+    expect(only(runAll(clean([text('Halo', [0, 0, 100, 20])])), 'LC-22')).toEqual([]);
+  });
+  it('urutan level: error → warning → info', () => {
+    const f = runAll(clean([rect('Rectangle', [0, 0, 100, 20], { position: 'absolute', ...paint() }), path('Centang', [0, 40, 24, 24]), frame('Overlay / X', [0, 800, 390, 44], [], { position: 'absolute', ...paint() })]));
+    const levels = f.map((x) => x.level);
+    expect(levels).toEqual([...levels].sort((a, b) => ['error', 'warning', 'info'].indexOf(a) - ['error', 'warning', 'info'].indexOf(b)));
+    // Dalam level: urutan dokumen (board LC-22 sebelum node LC-13).
+    expect(rules(f)).toEqual(['LC-16', 'LC-14', 'LC-22', 'LC-13']);
   });
 });

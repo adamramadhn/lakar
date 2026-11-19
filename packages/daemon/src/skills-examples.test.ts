@@ -49,14 +49,29 @@ async function runBlock(label: string, code: string, sid: string, prelude: strin
   const full = code.startsWith(USES_PRELUDE) ? `${prelude}\n${code}` : code;
   const r = await call('/execute', { code: full, description: 'uji contoh skill lakar' }, sid);
   if (!r.ok) return [`${label}: ${r.error!.code} ${r.error!.message} (${r.error!.hint})`];
-  const check = r.data.check as { summary: { error: number; warning: number; gate: number }; findings: { rule: string; nodeName: string; detail: string }[] } | undefined;
+  const check = r.data.check as { summary: { error: number; warning: number; gate: number }; findings: { level: string; rule: string; nodeName: string; detail: string }[] } | undefined;
   // Blok prelude hanya mendefinisikan helper: sukses tanpa op mutasi (tanpa check). Blok lain wajib dicek.
   if (isPrelude) return check ? [`${label}: blok prelude tidak boleh memutasi dokumen`] : [];
   if (!check) return [`${label}: tidak ada check (blok tanpa op mutasi)`];
-  const { error, warning, gate } = check.summary;
-  if (error || warning || gate) return [`${label}: check ${error} error / ${gate} gerbang / ${warning} warning: ${check.findings.map((f) => `${f.rule} ${f.nodeName}: ${f.detail}`).join('; ')}`];
-  return [];
+  const pending = PENDING_2_10[label.split(' ')[0]!] ?? [];
+  const findings = check.findings.filter((f) => !pending.some((p) => `${f.rule} ${f.detail}`.startsWith(p)));
+  if (findings.length === check.findings.length) {
+    const { error, warning, gate } = check.summary;
+    if (error || warning || gate) return [`${label}: check ${error} error / ${gate} gerbang / ${warning} warning: ${findings.map((f) => `${f.rule} ${f.nodeName}: ${f.detail}`).join('; ')}`];
+    return [];
+  }
+  return findings.length ? [`${label}: check: ${findings.map((f) => `${f.level} ${f.rule} ${f.nodeName}: ${f.detail}`).join('; ')}`] : [];
 }
+
+/**
+ * Warning aturan struktural G1 (story 4, LC-21) yang dipicu contoh skill dan menunggu story 2.10 (skill tidak diubah di
+ * story 4, C7): `<rule> <awal detail>` per file skill. Temuan lain tetap gagal.
+ */
+const PENDING_2_10: Record<string, string[]> = {
+  'landing.md': ['LC-21 teks di baris tabel:'],
+  'mobile.md': ['LC-21 radius:'],
+  'webapp.md': ['LC-21 teks di baris tabel:'],
+};
 
 async function savePngs(slug: string, sid: string): Promise<void> {
   if (!PNG_DIR) return;

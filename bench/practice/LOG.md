@@ -771,3 +771,58 @@ Token (`estimateTokens`, total / prosa). Baseline `725a282`; seri iterasi 4 mema
 - P7 turun dari Lebih baik ke Setara. PNG pen.dev identik (iterasi 1), tetapi skornya naik 13 → 14 di juri ulang, dan T Lakar turun 16 → 15. Rubrik juga berubah 2.2 → 2.3, dan board Lakar 390×1354 sah di keduanya. Selisih ini dalam batas variasi juri. Lakar lebih cepat dan lebih murah di ketiga prompt (rata-rata −27% waktu, −25% biaya). Ini bisa karena skill lebih pendek, bisa juga karena derau run. Satu run tidak cukup untuk memisahkannya (C8).
 - Iterasi 5 tidak dijalankan karena iterasi 4 lulus.
 - Catatan C7: output `practice --dry-run` mencetak teks prompt latihan P7–P9 (argv agen), dan builder membacanya sesudah skill di-commit. Patch review sesudah itu hanya mengembalikan kata baseline, tanpa isi baru. Untuk story berikutnya: jalankan dry-run dengan output yang disaring.
+
+# §2.4 Check struktural LC-13, 14, 15, 16, 21, 22 (G1 story 4)
+
+Plan: `_bmad-output/initiative-lakar/tickets/epic-g1-inti-lengkap/tickets/story-check-struktural-lc-13-14-15-16-21-22-plan.md`.
+
+## Pindaian arsip layout_check
+
+Arsip: 120 dokumen (`bench/runs/**`, `~/.local/share/lakar/docs`, `~/.local/share/lakar/archive`), 157 board, 0 gagal;
+daemon dist sementara (port acak, dataDir salinan, tanpa key foto). Sebelum = dist `5d022b1`; sesudah = dist story 4.
+Temuan aturan lama identik per dokumen (rule, level, node, detail); dokumen dengan gate > 0 tetap 74.
+
+| Aturan | Level | Sesudah (temuan / dok) |
+|---|---|---|
+| LC-13 nama layer default | info | 0 |
+| LC-14 absolut di dalam flex | warning | 6 / 4 |
+| LC-15 > 1 pustaka ikon UI | warning | 0 (skema hanya punya `lucide` + `simple-icons`; aturan siaga) |
+| LC-16 ikon digambar manual | error (bukan gerbang) | **0** |
+| LC-21 radius | warning | 70 / 66 |
+| LC-21 spacer kosong | warning | 11 / 9 |
+| LC-21 padding ganda | warning | 0 |
+| LC-21 teks di baris tabel | warning | 22 / 12 |
+| LC-21 bidang efek | warning | 6 / 6 |
+| LC-22 jumlah node berkonvensi | info | 132 / 99 |
+
+Jumlah dihitung sesudah batas 3 temuan per aturan per board (LC-21 satu ID untuk kelima sub-cek; temuan board-level
+radius/bidang efek mendahului temuan node di urutan dokumen).
+
+Tinjauan (crop PNG `archcheck.mjs --shots LC-14,LC-21`):
+
+- **LC-16:** 0 temuan di arsip; tidak ada crop yang perlu diperiksa.
+- **LC-14:** `Mockup / Kelas live` absolut di kolom `Hero / Visual` (kartu melayang menumpuk mockup) dan `Latar / Cahaya
+  senja` / `Latar / Tekstur butir` absolut di board Senyap: tumpukan sengaja tanpa nama `Overlay /`/`Crop /` = sesuai
+  konvensi (temuan benar).
+- **LC-21 radius:** contoh Mejaku landing 6 (kursi denah), 8 (tombol, stat), 12 (wadah ikon, FAQ), 16 (kartu) = 4 nilai,
+  melanggar "maksimal tiga nilai radius per board" (DESIGN.md). Sebagian besar berasal dari pola skill (lihat di bawah).
+- **LC-21 bidang efek:** Lintas Arus landing: bidang efek di hero dan di ajakan akhir (dua bidang terpisah) = benar.
+- **LC-21 spacer kosong:** `Pengisi` 216×252 di sidebar, sel kosong `Kolom dokter`/`Sela` di sumbu jam, rect `Garis`
+  ber-fill transparan selebar baris = benar.
+- **Perbaikan definisi (umum, sekali):** (1) teks di baris tabel kini butuh ≥ 2 teks langsung: baris antrean Dentara
+  (nomor "02" + avatar berinisial + tumpukan teks + status) adalah daftar, bukan tabel (26 → 22 temuan). (2) spacer kosong
+  melewati node 0×0 (frame `Isi` kosong di baris kode Rakit Kode tidak memakan ruang; 15 → 11). (3) label bidang efek =
+  node efek terluas di bidang itu.
+
+## Pola skill yang memicu aturan baru (untuk story 2.10; skill tidak diubah, C7)
+
+`layout_check` atas contoh skill (daemon dist sementara):
+
+- `landing.md` (daftar mockup hero `Baris / <cabang>`): LC-21 teks di baris tabel ×3 (teks `Cabang`/`Biji`/`Jumlah`
+  langsung di baris), LC-22 info `Crop 1`.
+- `webapp.md` (tabel "Siap diambil"): LC-21 teks di baris tabel pada `Header tabel` (3 teks kolom langsung di baris).
+- `mobile.md`: LC-21 radius 4 nilai (8, 16, 20, 24), LC-22 info `Crop 1, Overlay 1`.
+- `core.md`, `polish.md`, `icons.md`: 0 temuan.
+- Arsip: radius 4–5 nilai di 66 dokumen (tombol 8, kartu 12/16, wadah ikon 12, sorotan 24).
+
+`packages/daemon/src/skills-examples.test.ts` mencatat tiga pola ini sebagai `PENDING_2_10` (warning lain tetap gagal).

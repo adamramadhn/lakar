@@ -411,9 +411,11 @@ export function buildServer({
         }
         const ids = [...touched, ...committed.created.map((c) => c.id), ...changedNodeIds(before, after, touched)];
         const { bounds, truncated } = boundsOf(ran.measures, ids, BOUNDS_MAX);
-        const summary = summarizeFindings(ran.findings);
+        // AD-8: execute memuat error dan warning; temuan info (nama layer, jumlah konvensi) hanya di layout_check.
+        const findings = ran.findings.filter((f) => f.level !== 'info');
+        const summary = summarizeFindings(findings);
         checked = {
-          check: { boards: touched, summary, findings: ran.findings },
+          check: { boards: touched, summary, findings },
           bounds,
           ...(truncated > 0 ? { boundsTruncated: truncated } : {}),
           checkMs: Math.round((performance.now() - t0) * 10) / 10,
@@ -561,7 +563,7 @@ export function buildServer({
     return ok(reply, { name: body.name, content });
   });
 
-  // Check G0 penuh (AD-8) pada board dokumen aktif. Dokumen immutable: dibaca tanpa kunci.
+  // Check penuh (AD-8) pada board dokumen aktif, termasuk temuan info. Dokumen immutable: dibaca tanpa kunci.
   app.post('/layout-check', async (req, reply) => {
     const { slug } = activeDoc(req.headers[SESSION_HEADER]);
     const body = parse(LayoutCheckBody, req.body ?? undefined, 'kirim {boardId?} (tanpa boardId = semua board dokumen aktif)');

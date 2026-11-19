@@ -85,7 +85,7 @@ function fakeDaemon() {
             docId: 'Dddddddd',
             rev: 4,
             created: [],
-            check: { boards: ['Bbbbbbbb'], summary: { error: 25, warning: 0, gate: 25 }, findings: manyFindings(25) },
+            check: { boards: ['Bbbbbbbb'], summary: { error: 25, warning: 0, gate: 25, info: 0 }, findings: manyFindings(25) },
             bounds: { Bbbbbbbb: [0, 0, 390, 844] },
           },
         });
@@ -95,7 +95,7 @@ function fakeDaemon() {
     }
     if (req.url === '/layout-check') {
       if (body.boardId === 'Zzzzzzzz') return send(404, { ok: false, error: { code: 'NOT_FOUND', message: 'board Zzzzzzzz tidak ada', hint: 'pakai ID board', retryable: false } });
-      return send(200, { ok: true, data: { docId: 'Dddddddd', rev: 3, boards: [{ id: 'Bbbbbbbb', name: 'Home', summary: { error: 70, warning: 0, gate: 70 } }], summary: { error: 70, warning: 0, gate: 70 }, findings: manyFindings(70) } });
+      return send(200, { ok: true, data: { docId: 'Dddddddd', rev: 3, boards: [{ id: 'Bbbbbbbb', name: 'Home', summary: { error: 70, warning: 0, gate: 70, info: 0 } }], summary: { error: 70, warning: 0, gate: 70, info: 0 }, findings: manyFindings(70) } });
     }
     if (req.url === '/icons/search') {
       if (!body.query) return send(400, { ok: false, error: { code: 'SCHEMA_INVALID', message: 'query: wajib', hint: 'kirim {query}', retryable: false } });
@@ -529,9 +529,9 @@ const FIXTURE = `
   add(b, {type:'text', name:'Caption', content:'Catatan kecil', size:11});
   add(b, {type:'text', name:'Hak cipta', content:'© 2026 Kopi', size:12});
   const k = add(b, {type:'frame', name:'Kartu', width:200, height:40, clip:true});
-  add(k, {type:'rect', name:'Lebar', width:260, height:20});
+  add(k, {type:'rect', name:'Lebar', width:260, height:20, fills:[{type:'solid', color:'#DDDDDD'}]});
   const c = add(b, {type:'frame', name:'Konten', layout:'column', width:390});
-  add(c, {type:'rect', name:'Isi', width:390, height:640});
+  add(c, {type:'rect', name:'Isi', width:390, height:640, fills:[{type:'solid', color:'#F0F0F0'}]});
   add(b, {type:'frame', name:'Overlay / Tab bar', position:'absolute', x:0, y:736, width:390, height:64});`;
 
 describe.skipIf(!browserInstalled)('layout_check dengan respons lakard asli', () => {
@@ -582,7 +582,7 @@ describe.skipIf(!browserInstalled)('layout_check dengan respons lakard asli', ()
     await rm(tmp, { recursive: true, force: true });
   });
 
-  it('execute fixture → ringkasan + 6 baris; layout_check → 1 ringkasan + 6 baris dengan ID sama, bahasa aturan produk', async () => {
+  it('execute fixture → ringkasan + 6 baris tanpa info; layout_check → 1 ringkasan + 6 baris dengan ID sama + 1 baris info, bahasa aturan produk', async () => {
     const c = await connect(proxyUrl);
     expect((await c.callTool({ name: 'open_doc', arguments: { slug: 'mcp-check' } })).isError).toBeFalsy();
     const e = await c.callTool({ name: 'execute', arguments: { code: FIXTURE, description: 'fixture enam aturan check' } });
@@ -598,11 +598,14 @@ describe.skipIf(!browserInstalled)('layout_check dengan respons lakard asli', ()
     const text = (r.content as any)[0].text as string;
     const lines = text.split('\n');
     const real = JSON.parse(forwarded.filter((f) => f.path === '/layout-check').at(-1)!.body);
-    expect(real.data.findings).toHaveLength(6);
-    expect(lines[0]).toBe(`layout_check rev 1, 1 board (${real.data.boards[0].id}): 5 error (5 gerbang), 1 warning`);
-    expect(lines.slice(1)).toHaveLength(6);
-    expect(lines.slice(1).map((l) => l.split(' · ')[1])).toEqual(['LC-01a', 'LC-01b', 'LC-05', 'LC-02a', 'LC-20', 'LC-12']);
-    expect(lines.slice(1)).toEqual(eLines.slice(2, -1));
+    // layout_check = 6 temuan execute + info LC-22 (board memuat `Overlay /`); execute tidak memuat info.
+    expect(real.data.findings).toHaveLength(7);
+    expect(lines[0]).toBe(`layout_check rev 1, 1 board (${real.data.boards[0].id}): 5 error (5 gerbang), 1 warning, 1 info`);
+    expect(lines.slice(1)).toHaveLength(7);
+    expect(lines.slice(1).map((l) => l.split(' · ')[1])).toEqual(['LC-01a', 'LC-01b', 'LC-05', 'LC-02a', 'LC-20', 'LC-12', 'LC-22']);
+    expect(lines.slice(1, 7)).toEqual(eLines.slice(2, -1));
+    expect(eLines.some((l) => l.startsWith('info · '))).toBe(false);
+    expect(lines[7]).toMatch(/^info · LC-22 · Home · mobile \([A-Za-z0-9]{8}\) · Crop 0, Overlay 1, Scroll 0, Ekstra 0 · sebut di artefak konvensi:/);
     expect(lines[1]).toMatch(/^error·gerbang · LC-01a · Sapaan \([A-Za-z0-9]{8}\) · emoji "👋" U\+1F44B di "Halo 👋" · hapus emoji; ikon pakai node icon \(icon_search\)$/);
     expect(lines[6]).toMatch(/^warning · LC-12 · Home · mobile \([A-Za-z0-9]{8}\) · ukuran 390×800 · lebar 390, tinggi ≥ 844 \(isi lebih panjang: satu board panjang\)$/);
     expect(text).not.toMatch(/golden|juri|rubrik|Lampiran B|skor|pen\.dev|benchmark/i);

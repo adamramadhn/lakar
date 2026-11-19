@@ -81,14 +81,14 @@ deferred: []
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `packages/schema/src/findings.ts`, `findings.test.ts` -- level `info`, enam aturan baru, `summary.info`, `summaryText` -- katalog sesuai Lampiran A.
-- [ ] `packages/check/src/rules.ts`, `index.ts` -- enam aturan (lihat Design Notes), cap info, urutan level -- R1.
-- [ ] `packages/check/src/index.test.ts` -- fixture positif dan negatif tiap baris matriks, termasuk lima sub-cek LC-21, cap `(+n serupa)` untuk info, LC-16 tidak menambah `gate` -- bukti R1.
-- [ ] `packages/daemon/src/server.ts` + tes daemon/mcp/bench terkait -- execute tanpa info; layout_check dengan info; tes daemon membuktikan keduanya -- AD-8.
-- [ ] Pindaian arsip: build, jalankan `archcheck.mjs /root/lakar <after.json> --shots LC-16 $(cat docs.txt)`, bandingkan dengan `base.json` per aturan per level. Aturan lama harus identik per dokumen. Setiap temuan LC-16 diperiksa lewat crop PNG; positif palsu → perbaiki definisi umum lalu ulang. Tinjau contoh warning/info per aturan baru (ambil crop untuk sampel LC-14/LC-21) dan perbaiki definisi bila jelas salah. Catat tabel di `bench/practice/LOG.md` §2.4 dan Implementation Notes.
-- [ ] `DESIGN.md` Lampiran A -- kalimat aturan berjalan + cara cek baris baru.
-- [ ] Temuan untuk 2.10: daftar pola `packages/skills/skills/*.md` yang memicu aturan baru (mis. teks langsung di baris tabel `webapp.md`), tanpa mengubah skill.
-- [ ] `pnpm build`, tes, `systemctl --user restart lakard` (dist berubah), `tools/node26/verify.sh`; commit.
+- [x] `packages/schema/src/findings.ts`, `findings.test.ts` -- level `info`, enam aturan baru, `summary.info`, `summaryText` -- katalog sesuai Lampiran A.
+- [x] `packages/check/src/rules.ts`, `index.ts` -- enam aturan (lihat Design Notes), cap info, urutan level -- R1.
+- [x] `packages/check/src/index.test.ts` -- fixture positif dan negatif tiap baris matriks, termasuk lima sub-cek LC-21, cap `(+n serupa)` untuk info, LC-16 tidak menambah `gate` -- bukti R1.
+- [x] `packages/daemon/src/server.ts` + tes daemon/mcp/bench terkait -- execute tanpa info; layout_check dengan info; tes daemon membuktikan keduanya -- AD-8.
+- [x] Pindaian arsip: build, jalankan `archcheck.mjs /root/lakar <after.json> --shots LC-16 $(cat docs.txt)`, bandingkan dengan `base.json` per aturan per level. Aturan lama harus identik per dokumen. Setiap temuan LC-16 diperiksa lewat crop PNG; positif palsu → perbaiki definisi umum lalu ulang. Tinjau contoh warning/info per aturan baru (ambil crop untuk sampel LC-14/LC-21) dan perbaiki definisi bila jelas salah. Catat tabel di `bench/practice/LOG.md` §2.4 dan Implementation Notes.
+- [x] `DESIGN.md` Lampiran A -- kalimat aturan berjalan + cara cek baris baru.
+- [x] Temuan untuk 2.10: daftar pola `packages/skills/skills/*.md` yang memicu aturan baru (mis. teks langsung di baris tabel `webapp.md`), tanpa mengubah skill.
+- [x] `pnpm build`, tes, `systemctl --user restart lakard` (dist berubah), `tools/node26/verify.sh`; commit.
 
 **Acceptance Criteria:**
 - Given build sesudah story, when `/opt/node-26/bin/pnpm --filter @lakar/check test` dijalankan, then semua fixture positif/negatif enam aturan (dan lima sub-cek LC-21) lulus.
@@ -98,7 +98,19 @@ deferred: []
 
 ## Implementation Notes
 
+- **Skema:** `FindingLevel` + `'info'`; `G0_RULES` + LC-13 (info), LC-14/15/21 (warning), LC-16 (error, `gate:false`), LC-22 (info); `FindingSummary.info` selalu ada; `summaryText` menambah `, n info` hanya bila > 0 (respons lama tanpa `info` tetap aman).
+- **Check:** enam fungsi di `rules.ts` (`lc13`…`lc22`, LC-21 = lima sub-cek berawalan `radius:`, `spacer kosong:`, `padding ganda:`, `teks di baris tabel:`, `bidang efek:`); `capWarnings` membatasi warning dan info per (level, aturan); `sortFindings` error → warning → info.
+- **Daemon:** execute menyaring info sebelum `summarizeFindings` (summary execute `info: 0`); `/layout-check` penuh.
+- **Tes:** helper `run()` di `packages/check/src/index.test.ts` kini menyaring aturan G1 (fixture G0 sintetis memakai bar absolut, rect tanpa cat); fixture G1 memakai `runAll()`. Tes daemon baru: board `Rectangle` + `Overlay /` → execute tanpa info, `layout_check` `info · LC-22`, `info · LC-13`, `summary.info 2`. Tes mcp lakard asli: baris `info · LC-22` hanya di layout_check, kepala `…, 1 info`; fixture mcp diberi fill pada `Isi`/`Lebar` (sama dengan fixture daemon) agar tidak memicu spacer.
+- **Pindaian arsip** (120 dok, 157 board, 0 gagal, gateDocs 74 = base): aturan lama identik per dokumen. LC-16 0, LC-13 0, LC-15 0, LC-14 6/4, LC-21 radius 70/66, spacer 11/9, padding ganda 0, teks di baris tabel 22/12, bidang efek 6/6, LC-22 132/99 (sesudah cap). Tabel + tinjauan crop di `bench/practice/LOG.md` §2.4.
+- **Temuan untuk 2.10 (skill tidak diubah):** `landing.md` daftar mockup `Baris /` (teks langsung di baris tabel ×3), `webapp.md` `Header tabel` (teks langsung), `mobile.md` radius 4 nilai (8, 16, 20, 24); LC-22 info di landing (Crop 1) dan mobile (Crop 1, Overlay 1). `skills-examples.test.ts` mencatatnya di `PENDING_2_10` (prefiks `<rule> <detail>` per file); temuan lain tetap gagal.
+- **Kegagalan tes yang sudah ada sebelum story:** `bench/src/practice/practice.test.ts` "laporan … di-render ulang tanpa perubahan byte" gagal untuk `polish-4` juga di HEAD `5d022b1` (polish-4.md diedit tangan di commit itu); tidak disentuh. `visual.test.ts` latensi gagal saat paralel, lulus sendiri.
+
 ## Plan Change Log
+
+- Teks di baris tabel: syarat teks langsung dinaikkan dari ≥ 1 ke ≥ 2 (baris antrean Dentara = daftar, bukan tabel; positif palsu arsip).
+- Spacer kosong: node seukuran titik (≤ 0,5 × 0,5) dilewati (frame `Isi` 0×0 di baris kode Rakit Kode).
+- Bidang efek: label bidang = node efek terluas (sebelumnya node pertama).
 
 ## Review Triage Log
 
