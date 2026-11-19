@@ -713,3 +713,9 @@ cacat nyata, kartu berisi teks yang terpotong rata di tepi bawah `Seksi / Hero`:
 - Aturan ukuran bench (`sizeRuleFor`) aktif hanya untuk run yang membekukan rubrik ≥ 2.2; polish-1/2 dan round-1/2 tetap persis.
 - Dry-run `practice --series polish --iter 3 --reuse-pendev P8=1,P9=1`: preflight lulus, rubrik 2.2, P7 pen.dev baru +
   restart pen-desktop, perkiraan $6,45 (kumulatif $12,74 + $6,45 ≤ $30,24). Seri iterasi 3–5 dijalankan sesi build sesudah review.
+
+## Seri polish iterasi 3 (story 24): dibatalkan — batas paket pen.dev tercapai (2026-11-19)
+
+- Perintah: `practice --series polish --iter 3 --reuse-pendev P8=1,P9=1` (HEAD `e14f0d1`, rubrik 2.2). Run pen.dev P7 baru gagal di `pen-newdoc`: MCP pencil menjawab bahwa batas pemakaian paket pen.dev periode tagihan ini tercapai dan semua tool desain diblokir. Harness berhenti sebelum run Lakar dan juri; biaya iterasi $0,00 (kumulatif seri tetap $12,74 dari $30,24).
+- Tidak ada upaya mengakali batas itu (tanpa menyentuh `.pen` di disk). Penjaga md5: 48 `.pen` lama tidak berubah atau hilang; 1 file baru dari percobaan newdoc. Restart pen-desktop dicoba harness (service active, MCP pencil tetap menjawab batas paket). lakard active.
+- Butuh keputusan Adam/orkestrator: upgrade paket pen.dev lalu `--iter 3 --resume`, atau ganti rencana (mis. pakai ulang pen.dev P7 iterasi 1 — 390×1177 kini sah di rubrik 2.2 — dengan `--reuse-pendev 1`).
