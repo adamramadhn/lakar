@@ -3,21 +3,28 @@ title: 'Check konten dan struktur seksi: LC-17 dan LC-19'
 type: feature
 ticket: '6'
 created: '2026-11-19'
-status: in-progress
+status: built
 baseline_revision: '0d3add5704d45e37e51ecd9918b02807ed075be2'
 route: full
 route_source: auto
 risk: medium
-review: ''
-review_source: ''
-lenses_ran: []
+review: quick
+review_source: pinned
+lenses_ran: [quick]
 review_loop_iteration: 0
 followup_review_recommended: false
 context:
   - '{project-root}/_bmad-output/initiative-lakar/tickets/epic-g1-inti-lengkap/tickets/story-check-konten-dan-struktur-seksi-lc-17-dan-lc-19.md'
   - '{project-root}/_bmad-output/initiative-lakar/tickets/epic-g1-inti-lengkap/tickets/story-check-tipografi-dan-spacing-lc-03-06-07-08-09-10-plan.md'
 warnings: [oversized]
-deferred: []
+deferred:
+  - summary: >-
+      Pengecualian LC-19 untuk layer bernama `Label` (sesuai DESIGN.md dan intent) juga membebaskan teks tombol/tab/nav dari helper skill (`Btn` di core.md menamai teks tombol `Label`), sehingga "Pelajari lebih lanjut" di tombol `Btn` tidak dilaporkan.
+    evidence: |-
+      core.md:36 `T(b,Label,label,...)`; webapp.md:44, mobile.md:95 juga `Label`. lc19 melewati teks bernama tepat `Label` atau berleluhur `Label`. Arsip 120 dok: 0 kemunculan frasa bahkan tanpa pengecualian (prototipe s6/p19.mjs), jadi hasil arsip tidak tersembunyi. Perbaikan (mis. pengecualian `Label` hanya untuk label form, bukan di dalam `Button /`/`Link /`/`Tab /`) mengubah spesifikasi DESIGN.md Lampiran A dan intent story → keputusan Adam.
+    location: >-
+      packages/check/src/rules.ts (exemptFromPhrases/lc19); packages/schema/src/content-rules.ts FORBIDDEN_EXEMPT
+    severity: medium
 ---
 
 <intent-contract>
@@ -108,6 +115,12 @@ deferred: []
 
 ## Review Triage Log
 
+### 2026-11-19 — Review pass
+- verdicts: 2 findings — high 0, medium 1, low 1, false 0, maybe-false 0
+- findings:
+  - `[medium]` `[defer]` LC-19 tidak memeriksa teks tombol helper skill karena teks tombol bernama `Label` — nyata (core.md:36 `Btn` menamai teks `Label`; webapp/mobile nav/tab juga). Kode mengikuti pengecualian eksplisit DESIGN.md ("layer `Label` dikecualikan") dan intent ("node bernama `Label`"); mempersempitnya mengubah spesifikasi, jadi dicatat di `deferred` untuk keputusan Adam. Arsip tidak terpengaruh: 0 kemunculan frasa bahkan tanpa pengecualian.
+  - `[low]` `[reject]` `LAYOUT_CHECK_DESCRIPTION` menulis "Jaccard ≥ 0,9" literal, bukan `SECTION_SIMILARITY_MIN` — nyata tetapi kecil: `@lakar/mcp` tidak bergantung pada `@lakar/check` (hanya `@lakar/schema`), jadi perbaikannya memindahkan konstanta ke schema atau menambah dependensi (bukan koreksi langsung); pola yang sama sudah ada untuk ambang lain (`≥ 6 kata`, `80 karakter`), dan tes deskripsi mengunci teks literal sehingga perubahan ambang akan terlihat.
+
 ## Design Notes
 
 **LC-17.** Kandidat seksi: frame terlihat bernama `Seksi /`; pasangan leluhur–keturunan dilewati. Bila board tidak punya `Seksi /`: tumpukan utama = turun dari board selama wadah hanya punya satu anak flow (selain `Overlay /`, `Status bar`, `Home indicator`) berupa frame; kandidat = anak flow frame wadah itu, hanya bila wadah kolom (board atau `layout:'column'`) — anak row/grid (kartu dalam grid, sidebar + main) bukan seksi. Multiset per seksi = semua keturunan terlihat (kedalaman penuh), token `text <size>` untuk teks, `type` untuk lainnya (`frame`, `icon`, `rect`, `ellipse`, `path`); jumlah dihitung (anak berulang tidak diciutkan), sehingga pola sama dengan jumlah isi berbeda (3 vs 4 baris) tidak dianggap mirip. Seksi < 6 node dilewati. Jaccard multiset = Σmin/Σmax ≥ 0,9 → satu temuan per seksi kedua (pasangan terbaik), detail `mirip <nama> (<id>): 93%`, expected `variasikan komposisi antar-seksi (tata letak, jenis isi), bukan judul + kartu identik berulang`. Prototipe arsip: 0 pasangan ≥ 0,9 untuk varian datar, dengan kedalaman, maupun diciutkan (maks 0,83 datar; diciutkan 52 pasangan ≥ 0,75 → lebih bising, ditolak). Golden B (Jadwal = daftar, Program = 2 kartu) dan A (kasku) di arsip ≤ 0,82.
@@ -122,3 +135,19 @@ deferred: []
 - `/opt/node-26/bin/pnpm test` -- expected: lulus (kecuali latensi `visual.test.ts`/kinerja 500 node saat paralel; ulang sendiri).
 - (dari `/root/lakar`) `/opt/node-26/bin/node <scratchpad>/archcheck.mjs /root/lakar <scratchpad>/after6.json $(cat <scratchpad>/docs.txt)` -- expected: 120 dok, 0 gagal, gateDocs 80.
 - `tools/node26/verify.sh` -- expected: semua OK, Node sistem v22.
+
+## Auto Run Result
+
+Status: built
+
+**Ringkasan:** Dua aturan warning tanpa gerbang. LC-17: pasangan `Seksi /` (atau, tanpa `Seksi /`, anak frame non-row dari tumpukan utama kolom — turun dari board selama hanya ada satu anak flow frame selain chrome), pasangan leluhur–keturunan dilewati; multiset = semua keturunan terlihat (kedalaman penuh, jumlah dihitung, tanpa diciutkan), token `text <size>` / tipe node; seksi < 6 node dilewati; Jaccard Σmin/Σmax ≥ 0,9 → satu temuan per seksi berikutnya (pasangan terbaik). LC-19: teks terlihat, frasa dari `FORBIDDEN_PHRASES` (`@lakar/schema` `content-rules.ts`, satu sumber, dijaga tes terhadap DESIGN.md dan baris `polish.md`), kata utuh Unicode, tanpa beda huruf, spasi fleksibel, tanda hubung Unicode; kecuali di dalam `Input /` dan layer bernama `Label`. Bench: `r3r7Missing()` tidak lagi melaporkan aturan hilang. Lampiran A DESIGN.md diperbarui di disk.
+
+**File:** `packages/schema/src/content-rules.ts` (baru, daftar frasa + pencocok), `packages/schema/src/index.ts` (ekspor), `packages/schema/src/findings.ts` (+test, LC-17/LC-19), `packages/check/src/rules.ts` (`lc17`, `lc19`), `packages/check/src/index.ts` (urutan + ekspor), `packages/check/src/index.test.ts` (12 fixture), `tests/content-rules.test.ts` (baru, kesesuaian frasa), `packages/mcp/src/server.ts` + `tests/execute-description.test.ts` (deskripsi), `bench/src/round/round.test.ts` (`r3r7Missing`), `bench/practice/LOG.md` §2.6.
+
+**Review:** 2 temuan — 0 patch, 1 ditunda (medium: pengecualian `Label` membebaskan teks tombol `Btn` skill; perubahan spesifikasi → Adam), 1 ditolak (low: ambang 0,9 literal di deskripsi MCP; mcp tidak bergantung pada check, pola literal sudah ada, tes mengunci teks).
+
+**Follow-up review:** tidak disarankan (tidak ada patch).
+
+**Verifikasi:** `pnpm build` lulus; check 210/210, schema 125/125, bench 213/213, `tests/content-rules.test.ts` + token + deskripsi 29/29; `pnpm test` 1076/1077 (gagal hanya latensi `visual.test.ts` saat paralel; sendiri 18/18). Pindaian arsip `after6.json` (120 dok, 157 board, 0 gagal): aturan lama identik per dokumen dengan `after5b.json`, gagal gerbang 80; LC-17 0, LC-19 0. lakard: execute landing dua `Seksi /` identik + "Pelajari lebih lanjut" → `warning · LC-17`, `warning · LC-19`, 0 gerbang; dok uji dihapus. `tools/node26/verify.sh` semua OK; Node sistem v22.23.5.
+
+**Risiko sisa:** kedua aturan tanpa contoh nyata di arsip (bukti hanya fixture); fallback tumpukan utama bisa membandingkan kartu daftar ber-`layout:'column'` bila board tanpa `Seksi /` hanya berisi satu daftar (arsip: 0); pengecualian `Label` (deferred).
