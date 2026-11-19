@@ -152,14 +152,57 @@ export function lc05(ctx: BoardContext): Finding[] {
 // LC-12 · ukuran dan posisi board (warning)
 // ---------------------------------------------------------------------------
 
-/** Ukuran default per `screen` bila `expectedSize` tidak ada. `heights` kosong = tinggi bebas. */
+/**
+ * Ukuran default per `screen` bila `expectedSize` tidak ada. `heights` kosong = tinggi bebas; `minHeight` = tinggi
+ * minimal (mobile: satu board panjang bergulir sah, tinggi ≥ 844).
+ */
 export const SCREEN_SIZES = {
-  mobile: { width: 390, heights: [844] },
-  app: { width: 1440, heights: [900, 1024] },
-  landing: { width: 1440, heights: [] },
-} as const satisfies Record<string, { width: number; heights: readonly number[] }>;
+  mobile: { width: 390, heights: [], minHeight: 844 },
+  app: { width: 1440, heights: [900, 1024], minHeight: 0 },
+  landing: { width: 1440, heights: [], minHeight: 0 },
+} as const satisfies Record<string, { width: number; heights: readonly number[]; minHeight: number }>;
+
+/** Board mobile panjang: sisa ruang di bawah isi utama (ke zona bawah atau tepi board) > 32 px → saran tinggi pas. */
+export const FIT_SLACK_MAX = 32;
+/** Jarak isi terakhir ke zona bawah / tepi board yang dipakai untuk menghitung tinggi pas (px). */
+export const FIT_CLEARANCE = 24;
 
 const near = (a: number, b: number) => Math.abs(a - b) <= TOLERANCE;
+
+/** Bawah isi utama board: anak flow terakhir wadah utama (anak flow terbesar board, atau board), turun lewat wadah transparan. */
+function contentBottom(ctx: BoardContext, zone: BottomZone | undefined): number | undefined {
+  const { board } = ctx;
+  const excluded = new Set<string>();
+  for (const n of [...(zone?.members.map((m) => m.node) ?? []), ...ctx.nodes.filter(isChrome)]) {
+    excluded.add(n.id);
+    for (const d of descendants(n)) excluded.add(d.id);
+  }
+  let best: { node: Container; rect: Rect } | undefined;
+  for (const c of board.children) {
+    if (c.type !== 'frame' || !isFlowChild(board, c) || excluded.has(c.id)) continue;
+    const r = ctx.bounds.get(c.id);
+    if (r && (!best || area(r) > area(best.rect))) best = { node: c, rect: r };
+  }
+  const lastOf = (c: Container): { node: ChildNode; rect: Rect } | undefined => {
+    let last: { node: ChildNode; rect: Rect } | undefined;
+    for (const k of c.children) {
+      if (!isFlowChild(c, k) || excluded.has(k.id)) continue;
+      const r = ctx.bounds.get(k.id);
+      if (!r || area(r) <= 0) continue;
+      if (!last || bottom(r) > bottom(last.rect)) last = { node: k, rect: r };
+    }
+    return last;
+  };
+  // Wadah utama setinggi board (latar layar) bukan isi: nilai anak-anaknya.
+  let last = best && best.rect.height >= ctx.boardRect.height - TOLERANCE ? lastOf(best.node) : lastOf(board);
+  for (let k = last?.node; last && k && k.type === 'frame' && !hasFills(k) && !hasStroke(k); ) {
+    const inner = lastOf(k);
+    if (!inner) break;
+    last = inner;
+    k = inner.node;
+  }
+  return last ? bottom(last.rect) : undefined;
+}
 
 export function lc12(ctx: BoardContext, doc: ResolvedDocument): Finding[] {
   const b = ctx.board;
@@ -177,9 +220,32 @@ export function lc12(ctx: BoardContext, doc: ResolvedDocument): Finding[] {
   } else {
     const d = SCREEN_SIZES[b.screen];
     const heights: readonly number[] = d.heights;
-    if (!near(w, d.width) || (heights.length > 0 && !heights.some((x) => near(h, x)))) {
+    if (!near(w, d.width) || (heights.length > 0 && !heights.some((x) => near(h, x))) || h < d.minHeight - TOLERANCE) {
       details.push(`ukuran ${size}`);
-      expected.push(heights.length ? heights.map((x) => `${d.width}×${x}`).join(' atau ') : `lebar ${d.width} (tinggi bebas)`);
+      expected.push(
+        heights.length
+          ? heights.map((x) => `${d.width}×${x}`).join(' atau ')
+          : d.minHeight
+            ? `lebar ${d.width}, tinggi ≥ ${d.minHeight} (isi lebih panjang: satu board panjang)`
+            : `lebar ${d.width} (tinggi bebas)`,
+      );
+    } else if (b.screen === 'mobile' && h > d.minHeight + TOLERANCE) {
+      // Board mobile panjang: tinggi harus pas dengan isi (tanpa ruang kosong besar di atas zona bawah / tepi bawah).
+      const zone = bottomZone(ctx);
+      const limit = zone ? zone.top : h;
+      const end = contentBottom(ctx, zone);
+      if (end !== undefined && limit - end > FIT_SLACK_MAX + TOLERANCE) {
+        const fit = Math.max(d.minHeight, Math.round(h - (limit - end) + FIT_CLEARANCE));
+        details.push(`tinggi ${num(h)}, isi berakhir ${num(limit - end)} px di atas ${zone ? 'zona bawah' : 'tepi bawah'}: tinggi pas = ${fit}`);
+        expected.push(`tinggi ${fit} (sisa ≤ ${FIT_SLACK_MAX} px); geser zona bawah ikut tinggi baru`);
+      }
+    }
+  }
+  if (b.screen === 'mobile') {
+    const legacy = ctx.nodes.find((n) => n.type === 'frame' && named(n, 'Scroll /') && (n.scrollY ?? 0) > 0);
+    if (legacy) {
+      details.push(`pola dua board usang (${legacy.name} scrollY ${num((legacy as FrameNode).scrollY ?? 0)})`);
+      expected.push('pakai satu board panjang 390 × H (tanpa duplicate/scrollY)');
     }
   }
   const page = doc.pages.find((p) => p.children.some((x) => x.id === b.id));
@@ -1268,5 +1334,69 @@ export function capWarnings(findings: readonly Finding[]): Finding[] {
     const d = [...f.detail];
     out.push({ ...f, detail: (d.length > room ? `${d.slice(0, room - 1).join('')}…` : f.detail) + suffix });
   }
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+// LC-31 · mockup terpotong rata di tepi bawah seksi
+// ---------------------------------------------------------------------------
+
+/** Luapan minimal di bawah tepi clip (px) dan toleransi "rata" tepi clip ↔ tepi bawah seksi/board (px). */
+export const CUT_OVER_MIN = 1;
+export const FLUSH_TOL = 2;
+/** Seksi = leluhur selebar ≥ 90% board. */
+const SECTION_MIN_W_RATIO = 0.9;
+
+/** Ber-cat: fill tak transparan, stroke, atau bayangan luar. */
+const paintedCard = (n: ChildNode): boolean =>
+  fillsOf(n).some((f) => f.type !== 'solid' || parseHex((f as { color: string }).color)[3] > 0) || (n as { stroke?: unknown }).stroke !== undefined || dropShadow(n);
+
+/**
+ * Frame ber-cat berisi teks yang melewati tepi bawah clip terdekat (frame `clip:true`, termasuk `Crop /`, atau board) > 1 px,
+ * dengan tepi bawah clip rata (≤ 2 px) dengan tepi bawah seksi (leluhur selebar ≥ 90% board) atau board. Hanya node terluar.
+ * Dikecualikan: leluhur `Scroll /`, rotasi, `Overlay /`, dan node yang sudah dilaporkan LC-02a (`skip`).
+ */
+export function lc31(ctx: BoardContext, skip: ReadonlySet<string> = new Set()): Finding[] {
+  const out: Finding[] = [];
+  const minW = SECTION_MIN_W_RATIO * ctx.boardRect.width;
+  const walk = (children: readonly ChildNode[]) => {
+    for (const n of children) {
+      if (skip.has(n.id) || rotated(n) || named(n, 'Overlay /') || named(n, 'Scroll /')) continue;
+      if (n.type !== 'frame') continue;
+      const r = ctx.bounds.get(n.id);
+      if (r && area(r) > 0 && paintedCard(n) && textsIn(n).length > 0) {
+        const anc = ancestors(ctx, n);
+        const clipIdx = anc.findIndex((a) => a.type === 'board' || a.clip === true);
+        const clip = anc[clipIdx]!;
+        const cr = clip.type === 'board' ? ctx.boardRect : ctx.bounds.get(clip.id);
+        const over = cr ? bottom(r) - bottom(cr) : 0;
+        if (cr && over > CUT_OVER_MIN && r.y < bottom(cr) - CUT_OVER_MIN && !anc.some((a) => a.type === 'frame' && rotated(a))) {
+          // Seksi rata: clip itu sendiri atau leluhurnya selebar ≥ 90% board yang tepi bawahnya rata dengan tepi clip; atau board.
+          let section: Container | undefined = Math.abs(ctx.boardRect.height - bottom(cr)) <= FLUSH_TOL ? ctx.board : undefined;
+          for (const a of anc.slice(clipIdx)) {
+            if (section) break;
+            if (a.type === 'board') continue;
+            const ar = ctx.bounds.get(a.id);
+            if (ar && ar.width >= minW - TOLERANCE && Math.abs(bottom(ar) - bottom(cr)) <= FLUSH_TOL) section = a;
+          }
+          if (section) {
+            out.push(
+              finding(
+                'LC-31',
+                levelOf('LC-31'),
+                n,
+                `terpotong rata ${num(over)}px di tepi bawah ${section.name}`,
+                'tampilkan utuh (padding bawah ≥ 64) atau kurangi isi',
+              ),
+            );
+            continue;
+          }
+        }
+      }
+      walk(n.children);
+    }
+  };
+  // Leluhur Scroll / dilewati seluruhnya (dok lama dengan posisi gulir).
+  walk(ctx.board.children);
   return out;
 }

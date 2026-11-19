@@ -3,7 +3,7 @@
 import type { BoardMeasure } from '@lakar/ports';
 import { findBoard, type Finding, type ResolvedBoardNode as BoardNode, type ResolvedDocument } from '@lakar/schema';
 import { codePoints, graphemes, isEmojiGrapheme, leadingIconGlyph, onlyIconGlyphs } from './glyphs.js';
-import { capWarnings, lc01a, lc01b, lc02a, lc02b, lc04, lc05, lc11, lc12, lc18, lc20, lc23, lc24, lc25, lc26, lc27, lc28, lc29, lc30 } from './rules.js';
+import { capWarnings, lc01a, lc01b, lc02a, lc02b, lc04, lc05, lc11, lc12, lc18, lc20, lc23, lc24, lc25, lc26, lc27, lc28, lc29, lc30, lc31 } from './rules.js';
 import { boardContext } from './tree.js';
 
 export const PACKAGE = '@lakar/check';
@@ -36,6 +36,8 @@ export {
   lc28,
   lc29,
   lc30,
+  lc31,
+  FIT_SLACK_MAX,
   MAX_WARNINGS_PER_RULE,
   MIN_TEXT_SIZE,
   ORPHAN_MIN_BODY,
@@ -76,7 +78,7 @@ export function glyphScan(board: BoardNode): { findings: Finding[]; allowGlyphs:
   return { findings: [...lc01a(ctx), ...lc01b(ctx)], allowGlyphs: [...allow].sort((a, b) => a - b) };
 }
 
-const RULE_ORDER = ['LC-01a', 'LC-01b', 'LC-02a', 'LC-02b', 'LC-04', 'LC-05', 'LC-11', 'LC-12', 'LC-18', 'LC-20', 'LC-23', 'LC-24', 'LC-25', 'LC-26', 'LC-27', 'LC-28', 'LC-29', 'LC-30'];
+const RULE_ORDER = ['LC-01a', 'LC-01b', 'LC-02a', 'LC-02b', 'LC-04', 'LC-05', 'LC-11', 'LC-12', 'LC-18', 'LC-20', 'LC-23', 'LC-24', 'LC-25', 'LC-26', 'LC-27', 'LC-28', 'LC-29', 'LC-30', 'LC-31'];
 
 /**
  * Urutan stabil: error lalu warning, lalu urutan dokumen (`order` id → indeks) dan urutan aturan.
@@ -121,6 +123,8 @@ export function checkBoard({ doc, boardId, measure }: { doc: ResolvedDocument; b
     ...lc28(ctx),
     ...lc29(ctx),
     ...lc30(ctx),
+    // Mockup yang elemennya sudah terpotong clip (LC-02a) tidak dilaporkan lagi.
+    ...lc31(ctx, cut),
   ];
   return capWarnings(sortFindings(all, ctx.order));
 }

@@ -22,6 +22,7 @@ export const G0_RULES = {
   'LC-28': { level: 'warning', gate: false, title: 'baris teks terlalu panjang' },
   'LC-29': { level: 'warning', gate: false, title: 'bobot tipis pada teks kecil' },
   'LC-30': { level: 'warning', gate: false, title: 'tanda baca' },
+  'LC-31': { level: 'error', gate: true, title: 'mockup terpotong rata di tepi bawah seksi' },
 } as const satisfies Record<string, { level: FindingLevel; gate: boolean; title: string }>;
 
 export type G0RuleId = keyof typeof G0_RULES;

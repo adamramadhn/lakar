@@ -200,7 +200,7 @@ describe('LC-02a terpotong', () => {
     expect(f[0]!.detail).toContain('maks 2');
 
     const scrollV = run(clean([frame('Scroll / Konten', [0, 100, 390, 300], [rect('Panjang', [0, -100, 390, 900])], { clip: true, scrollY: 200 })]));
-    expect(scrollV).toEqual([]);
+    expect(rules(scrollV)).toEqual(['LC-12']);
     const scrollH = run(clean([frame('Scroll / Konten', [0, 100, 390, 300], [rect('Lebar', [0, 100, 500, 10])], { clip: true })]));
     expect(rules(scrollH)).toEqual(['LC-02a']);
 
@@ -228,7 +228,9 @@ describe('LC-05 teks < 12', () => {
 describe('LC-12 board', () => {
   it('mobile 390×800 → warning ukuran (bukan gerbang)', () => {
     const f = run({ children: [], height: 800, name: 'Home · mobile' });
-    expect(f).toEqual([{ level: 'warning', rule: 'LC-12', nodeId: expect.any(String), nodeName: 'Home · mobile', detail: 'ukuran 390×800', expected: '390×844' }]);
+    expect(f).toEqual([
+      { level: 'warning', rule: 'LC-12', nodeId: expect.any(String), nodeName: 'Home · mobile', detail: 'ukuran 390×800', expected: 'lebar 390, tinggi ≥ 844 (isi lebih panjang: satu board panjang)' },
+    ]);
     expect(summarizeFindings(f)).toEqual({ error: 0, warning: 1, gate: 0 });
   });
 
@@ -239,6 +241,42 @@ describe('LC-12 board', () => {
     expect(run({ children: [], screen: 'landing', width: 1440, height: 5123 })).toEqual([]);
     expect(run({ children: [], screen: 'landing', width: 1280, height: 900 })[0]!.expected).toBe('lebar 1440 (tinggi bebas)');
     expect(run({ children: [], screen: 'app', width: 400, height: 300, expectedSize: { width: 400, height: 300 } })).toEqual([]);
+  });
+
+  const solidFill = { fills: [{ type: 'solid', color: '#FFFFFF' }] };
+  const long = (H: number, lastBottom: number, extra: Loose[] = []) => ({
+    height: H,
+    children: [
+      frame('Konten', [0, 0, 390, lastBottom], [rect('Atas', [16, 0, 358, lastBottom - 200], solidFill), rect('Akhir', [16, lastBottom - 190, 358, 190], solidFill)]),
+      ...extra,
+    ],
+  });
+  const tabAt = (H: number) => frame('Overlay / Tab bar', [0, H - 98, 390, 64], [], { position: 'absolute', layout: 'row', ...solidFill });
+
+  it('mobile panjang 390×1320 dengan tab bar di H−98, isi pas → tanpa temuan ukuran; lebar lain atau < 844 → temuan', () => {
+    expect(run(long(1320, 1222 - 24, [tabAt(1320)]))).toEqual([]);
+    expect(run(long(1177, 1177 - 24))).toEqual([]);
+    expect(run({ children: [], width: 400, height: 1320 })[0]!.detail).toBe('ukuran 400×1320');
+    expect(run({ children: [], height: 700 })[0]!.expected).toContain('tinggi ≥ 844');
+  });
+
+  it('mobile panjang tidak pas: isi berakhir 200 px di atas zona → warning "tinggi pas = N"', () => {
+    const f = only(run(long(1320, 1222 - 200, [tabAt(1320)])), 'LC-12');
+    expect(f).toHaveLength(1);
+    expect(f[0]!.detail).toBe('tinggi 1320, isi berakhir 200 px di atas zona bawah: tinggi pas = 1144');
+    expect(summarizeFindings(f).gate).toBe(0);
+    // Tanpa zona: dihitung ke tepi bawah board.
+    expect(only(run(long(1320, 1000)), 'LC-12')[0]!.detail).toBe('tinggi 1320, isi berakhir 320 px di atas tepi bawah: tinggi pas = 1024');
+    // Board 844 tidak dinilai tinggi pas.
+    expect(run(long(844, 600))).toEqual([]);
+  });
+
+  it('pola lama: Scroll / ber-scrollY > 0 → warning pola dua board usang', () => {
+    const s = frame('Scroll / Konten', [0, 0, 390, 844], [rect('Isi', [0, -300, 390, 1100])], { clip: true, scrollY: 300 });
+    const f = only(run(clean([s])), 'LC-12');
+    expect(f[0]!.detail).toBe('pola dua board usang (Scroll / Konten scrollY 300)');
+    expect(f[0]!.expected).toContain('satu board panjang');
+    expect(only(run(clean([frame('Scroll / Konten', [0, 0, 390, 844], [], { clip: true })])), 'LC-12')).toEqual([]);
   });
 
   it('tabrakan dengan board lain di halaman → detail nama+ID, expected place(w,h)', () => {
@@ -273,7 +311,7 @@ describe('LC-20 konten tertutup bar bawah', () => {
       frame('Scroll / Konten', [0, 0, 390, 844], [rect('Atas', [0, lastY - 600, 390, 600]), rect('Akhir', [0, lastY, 390, 200])], { clip: true, ...(scrollY ? { scrollY } : {}) });
     expect(run(clean([scroll(0, 700), tab()]))).toEqual([]);
     const f = run(clean([scroll(300, 600), tab()]));
-    expect(rules(f)).toEqual(['LC-20']);
+    expect(rules(f)).toEqual(['LC-20', 'LC-12']);
     expect(f[0]!.nodeName).toBe('Scroll / Konten');
   });
 
@@ -499,6 +537,78 @@ describe('LC-20 zona bawah struktural', () => {
 
   it('(L4) unit utuh di dalam celah antar-bar → tidak dilaporkan', () => {
     expect(lc20(run(clean([scroll([rect('Atas', [0, 0, 390, 666]), frame('Jeda', [0, 666, 390, 73], []), rect('Garis', [16, 739, 358, 6], solid), frame('Lanjut', [0, 745, 390, 400], [])]), mini(), tabs(), home()])))).toEqual([]);
+  });
+});
+
+describe('LC-20 board mobile panjang', () => {
+  const solid = { fills: [{ type: 'solid', color: '#FFFFFF' }] };
+  const H = 1320;
+  const tab = () => frame('Overlay / Tab bar', [0, H - 98, 390, 64], [], { position: 'absolute', layout: 'row', ...solid });
+  const home = () => rect('Home indicator', [128, H - 13, 134, 5], { position: 'absolute', ...solid });
+  const body = (padBottom: number) => {
+    const end = H - 98 - padBottom;
+    return frame('Konten', [0, 0, 390, end], [rect('Atas', [16, 60, 358, end - 260], solid), frame('Butir terakhir', [16, end - 190, 358, 190], [text('Ganti oli', [32, end - 170, 200, 20])], solid)]);
+  };
+
+  it('positif: butir terakhir di bawah tab bar yang menempel di bawah board', () => {
+    const f = only(run({ height: H, children: [body(-40), tab(), home()] }), 'LC-20');
+    expect(f).toHaveLength(1);
+    expect(f[0]!.detail).toContain(`mulai di y ${H - 98}`);
+  });
+
+  it('negatif: padding bawah cukup', () => {
+    expect(run({ height: H, children: [body(24), tab(), home()] })).toEqual([]);
+  });
+});
+
+describe('LC-31 mockup terpotong rata', () => {
+  const solid = { fills: [{ type: 'solid', color: '#FFFFFF' }] };
+  const card = (r: R) => frame('Dasbor', r, [text('Reservasi malam ini', [r[0] + 24, r[1] + 24, 300, 24])], { ...solid, radius: 16 });
+  const landing = (kids: Loose[]) => run({ screen: 'landing', width: 1440, height: 2000, children: kids });
+
+  it('positif: kartu di Crop / yang rata dengan tepi bawah hero → error gerbang', () => {
+    const k = card([680, 300, 680, 520]);
+    const crop = frame('Crop / Dasbor', [680, 300, 680, 420], [k], { clip: true, layout: 'none' });
+    const hero = frame('Hero', [0, 0, 1440, 720], [crop], { layout: 'row', ...solid });
+    const f = only(landing([hero, frame('Fitur', [0, 720, 1440, 1280], [], solid)]), 'LC-31');
+    expect(f.map((x) => [x.nodeId, x.level, x.detail])).toEqual([[k.id, 'error', 'terpotong rata 100px di tepi bawah Hero']]);
+    expect(f[0]!.expected).toBe('tampilkan utuh (padding bawah ≥ 64) atau kurangi isi');
+    expect(summarizeFindings(f).gate).toBe(1);
+  });
+
+  it('positif: hanya kartu terluar; tepi Crop rata dengan tepi bawah board mobile', () => {
+    const inner = frame('Baris', [32, 760, 326, 60], [text('Isi', [40, 770, 100, 20])], solid);
+    const k = frame('Kartu', [16, 700, 358, 200], [text('Judul', [32, 716, 200, 20]), inner], solid);
+    const crop = frame('Crop / Pratinjau', [16, 700, 358, 144], [k], { clip: true, layout: 'none' });
+    const f = only(run({ children: [frame('Konten', [0, 0, 390, 844], [rect('Atas', [0, 0, 390, 700]), crop])] }), 'LC-31');
+    expect(f.map((x) => [x.nodeId, x.detail])).toEqual([[k.id, 'terpotong rata 56px di tepi bawah Home']]);
+  });
+
+  it('negatif: hero utuh dengan padding bawah; kartu fitur ber-Crop / selebar < 90% board', () => {
+    const k = card([680, 300, 680, 320]);
+    const hero = frame('Hero', [0, 0, 1440, 720], [frame('Crop / Dasbor', [680, 300, 680, 356], [k], { clip: true, layout: 'none' })], solid);
+    expect(only(landing([hero]), 'LC-31')).toEqual([]);
+    const panel = frame('Panel', [120, 900, 400, 300], [text('Grafik', [140, 920, 100, 20])], solid);
+    const fitur = frame('Kartu fitur', [80, 800, 440, 300], [frame('Crop / Panel', [100, 880, 400, 220], [panel], { clip: true, layout: 'none' })], { ...solid, padding: [24, 20, 0, 20] });
+    expect(only(landing([frame('Fitur', [0, 760, 1440, 400], [fitur], solid)]), 'LC-31')).toEqual([]);
+  });
+
+  it('negatif: tanpa teks, transparan, di Scroll /, Overlay /, atau berotasi', () => {
+    const mk = (k: Loose) => only(landing([frame('Hero', [0, 0, 1440, 720], [frame('Crop / Dasbor', [680, 300, 680, 420], [k], { clip: true, layout: 'none' })], solid)]), 'LC-31');
+    expect(mk(frame('Foto', [680, 300, 680, 520], [], solid))).toEqual([]);
+    expect(mk(frame('Dasbor', [680, 300, 680, 520], [text('A', [700, 320, 100, 20])]))).toEqual([]);
+    expect(mk(frame('Overlay / Dasbor', [680, 300, 680, 520], [text('A', [700, 320, 100, 20])], solid))).toEqual([]);
+    expect(mk(frame('Dasbor', [680, 300, 680, 520], [text('A', [700, 320, 100, 20])], { ...solid, rotation: -4 }))).toEqual([]);
+    const s = frame('Scroll / Isi', [0, 0, 390, 844], [frame('Kartu', [16, 700, 358, 200], [text('A', [32, 716, 100, 20])], solid)], { clip: true });
+    expect(only(run(clean([s])), 'LC-31')).toEqual([]);
+  });
+
+  it('kartu yang sudah dilaporkan LC-02a (clip biasa) tidak dilaporkan lagi', () => {
+    const k = card([680, 300, 680, 520]);
+    const hero = frame('Hero', [0, 0, 1440, 720], [k], { ...solid, clip: true });
+    const f = landing([hero]);
+    expect(rules(f)).toContain('LC-02a');
+    expect(only(f, 'LC-31')).toEqual([]);
   });
 });
 
