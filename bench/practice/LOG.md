@@ -883,7 +883,7 @@ key foto). Sebelum = `after15b.json` (dist story 15); sesudah = dist story 5. Te
 
 | Aturan | Sesudah: temuan / dok (sesudah cap 3 per aturan per board) | Prototipe (tanpa render, tanpa cap) | Contoh |
 |---|---|---|---|
-| LC-03 teks berisiko meluber | 56 / 26 | 84 / 26 (ink > kotak) | `Sub` "Rata-rata tunggu 14 mnt (target 15 mnt)" 20,2px, `Judul` "Kekuatan tubuh atas" 16,5px, `Meta`/`Nama` sel tabel Dentara 1,1–7,5px — semua teks `auto` yang disusutkan flex; `wrap:'fixed'` ≥ 2 baris: 0 |
+| LC-03 teks berisiko meluber | 46 / 20 (sebelum patch review: 56 / 26) | 84 / 26 (ink > kotak) | `Sub` "Rata-rata tunggu 14 mnt (target 15 mnt)" 20,2px, `Judul` "Kekuatan tubuh atas" 16,5px, `Meta`/`Nama` sel tabel Dentara 1,1–7,5px — semua teks `auto` yang disusutkan flex; `wrap:'fixed'` ≥ 2 baris: 0 |
 | LC-06 paragraf di bawah minimum | 13 / 7 | 13 / 7 | metadata 12px 2 baris di kartu: `Peran` testimoni Kasku, `Meta` mentor Rakit Kode, `Meta` Dentara, `Kredit foto` |
 | LC-07 spacing di luar himpunan | 250 / 78 | 497 frame / 79 | padding 10 (67), `Tab /` height 52 (44), padding seksi 112 (27) / 120 (20), `Chip /` height 28 (20), gap 10 (18), padding 42/176/38/28/14…; padding bawah 34 `Overlay / Bilah bawah` bebas |
 | LC-08 skala / triple | 155 / 61 (ukuran 19 / 11, triple 137 / 57) | ukuran 57 / 9, triple 124 / 46 | `KPI / Nilai` 28/32 (58), 16/20 (18), `Jam`/`Kode` 13/20 (12), 12/14 (10), 32/39 tanpa lineHeight (8), `Display / Headline` 56/64 (7), 20/24 dan 20/30, 14/28 |
@@ -902,6 +902,10 @@ berisiko menimpa saudara; wajar sebagai warning. LC-10 — `Tab / Bahan` 169×40
 triple skala yang sah (28/36 = `mobile-title-lg`, 32/40 = `h2`) yang ditolak karena hanya size × 1,2 diterima. KPI kini
 menerima size × 1,2 **atau** line-height token berukuran sama; 28/32 (bukan keduanya) tetap temuan. Juga teks < 12px
 dilewati LC-08 (fixture daemon: `Caption` 11px sudah error LC-05). Pindaian ulang (`after5.json`): angka di tabel.
+
+**Patch review:** LC-03 melewati teks yang sudah error LC-02a/LC-02b (satu cacat, satu temuan); pindaian ulang
+(`after5b.json`): LC-03 56 → 46 temuan (26 → 20 dok), aturan lain identik dengan `after5.json`, aturan lama identik
+dengan `after15b.json`, gagal gerbang 80.
 
 ## Contoh skill
 

@@ -1417,6 +1417,12 @@ describe('LC-03 teks tetap berisiko meluber', () => {
     expect(f).toHaveLength(1);
     expect(f[0]!.detail.startsWith('wrap fixed')).toBe(true);
   });
+  it('teks yang sudah error LC-02b (ink meluap dari induk) tidak diberi LC-03 lagi', () => {
+    const t = text('Meta pesanan panjang', [0, 0, 100, 20], { _ink: [0, 2, 130, 16] });
+    const all = runAll(clean([frame('Kartu', [0, 0, 100, 20], [t], { layout: 'row', ...paint() })]));
+    expect(only(all, 'LC-02b').map((f) => f.nodeId)).toEqual([t.id]);
+    expect(only(all, 'LC-03')).toEqual([]);
+  });
   it('negatif: fixed 1 baris; ink lebih 1px; teks kosong; teks tak terlihat', () => {
     const kids = [
       text('Satu baris', [0, 0, 100, 20], { wrap: 'fixed', _lines: 1, _lh: 20 }),
@@ -1440,7 +1446,9 @@ describe('LC-06 paragraf di bawah minimum', () => {
     const inCard = only(runAll(landing([card])), 'LC-06');
     expect(inCard).toHaveLength(1);
     expect(inCard[0]!.expected).toBe('≥ 14px (body-sm di kartu)');
-    expect(only(runAll(app([text(PARA, [0, 0, 300, 32], { size: 12, _lines: 2 })])), 'LC-06')).toHaveLength(1);
+    const ap = only(runAll(app([text(PARA, [0, 0, 300, 32], { size: 12, _lines: 2 })])), 'LC-06');
+    expect(ap).toHaveLength(1);
+    expect(ap[0]!.expected).toBe('≥ 14px (body-sm)');
   });
   it('negatif: app 14px; landing 14px di kartu ber-cat; judul 600; < 6 kata; 1 baris; di dalam komponen', () => {
     expect(only(runAll(app([text(PARA, [0, 0, 300, 40], { _lines: 2 })])), 'LC-06')).toEqual([]);

@@ -8,9 +8,9 @@ baseline_revision: '69ae44de6ed0527d87ed4954cf725199212dc19d'
 route: full
 route_source: auto
 risk: medium
-review: ''
-review_source: ''
-lenses_ran: []
+review: quick
+review_source: pinned
+lenses_ran: [quick]
 review_loop_iteration: 0
 followup_review_recommended: false
 context:
@@ -117,6 +117,15 @@ deferred: []
 
 ## Review Triage Log
 
+### 2026-11-19 — Review pass
+- verdicts: 4 findings — high 0, medium 1, low 3, false 0, maybe-false 0
+- findings:
+  - `[medium]` `[patch]` `lc07`/`lc08` `expected` mengetik ulang angka token (`0/2/4/…/128; 44/56`, `12/16, 14/20, …`) di `rules.ts` — melanggar "angka hanya di design-tokens.ts"; teks saran akan menyimpang bila modul berubah. Diperbaiki: `LC07_EXPECTED` dari `SPACING_VALUES` + `COMPONENT_SIZES`, `LC08_EXPECTED` dari `TYPE_SCALE` (semua pasangan size/lineHeight).
+  - `[low]` `[patch]` `LAYOUT_CHECK_DESCRIPTION` (`packages/mcp/src/server.ts`) mengetik ulang angka LC-06/07/08/10 — diperbaiki: angka diinterpolasi dari impor `@lakar/schema` (`PARAGRAPH_MIN*`, `SPACING_VALUES`, `HOME_INDICATOR_INSET`, `COMPONENT_SIZES`, `KPI_*`, `DISPLAY_SIZES`, `TOUCH_MIN`); deskripsi kini juga memisah app 14 vs kartu 14.
+  - `[low]` `[patch]` `lc06` expected di board app menulis `≥ 14px (body)` padahal 14 = `body-sm` — diperbaiki: nama token dicari dari `TYPE_SCALE` (berat 400, ukuran = minimum); fixture app kini memeriksa `≥ 14px (body-sm)`.
+  - `[low]` `[patch]` LC-03 memberi warning pada teks yang sudah error LC-02b/LC-02a (satu cacat, dua temuan) — terverifikasi di arsip (LC-03 56 → 46 setelah perbaikan); `checkBoard` meneruskan id LC-02a ∪ LC-02b ke `lc03(ctx, skip)`; fixture baru (LC-02b ada, LC-03 tidak).
+- Perbaikan diterapkan langsung oleh orkestrator (patch kecil). Pindaian ulang `after5b.json`: aturan lama identik dengan `after15b.json`, gagal gerbang 80, aturan baru selain LC-03 identik dengan `after5.json`.
+
 ## Design Notes
 
 **LC-03.** Teks tidak kosong, terlihat (`visibleRect`). (a) `wrap:'fixed'` dengan `textMeasure.lines ≥ 2` → `wrap fixed: n baris terukur`. (b) Teks melewati kotaknya: ink (`ctx.ink`) melewati bounds-nya > 1px di kiri/kanan (teks `auto` yang disusutkan flex: prototipe 84 kasus / 26 dok, mis. `Meta`/`Nama` di sel tabel Dentara), atau `lines × lineHeight` > tinggi bounds + 1 (wrap/fixed dengan tinggi angka). Satu temuan per teks (a didahulukan). Expected: `wrap:'wrap' dengan lebar fill/angka, atau beri ruang`.
@@ -142,3 +151,19 @@ deferred: []
 
 **Manual checks (if no CLI):**
 - Crop `<scratchpad>/shots/LC-03-*`, `LC-10-*` (sampel) — cacat nyata atau definisi diperbaiki.
+
+## Auto Run Result
+
+Status: built
+
+**Ringkasan:** Modul token bersama `packages/schema/src/design-tokens.ts` (spacing, skala tipe, KPI/Display, ukuran komponen 44/56, inset 34, target sentuh 44, minimum paragraf) dijaga `tests/design-tokens.test.ts` terhadap prelude `core.md` (`TY`, baris "Jarak:") dan frontmatter DESIGN.md (dilewati bila file tidak ada). Enam aturan warning tanpa gerbang: LC-03 (`wrap:'fixed'` ≥ 2 baris, atau ink/baris melewati kotak teks; teks yang sudah LC-02a/LC-02b dilewati), LC-06 (paragraf = ≥ 2 baris, ≥ 6 kata, berat < 600, bukan komponen; < 16 landing/mobile, < 14 app, < 14 di kartu ber-cat), LC-07 (gap/padding per frame ∉ himpunan spacing, padding bawah 34 sah, `Status bar`/`Home indicator` bebas; ukuran komponen = `height` frame komponen + `width` kontrol persegi, sah juga 44/56), LC-08 (≥ 12px: ukuran ∉ skala atau line-height meleset > 0,5 dari token berukuran sama; `KPI / Nilai` 28/32/40 dengan ×1,2 atau token; `Display /` 72/80 tanpa cek line-height), LC-09 (> 2 keluarga non-mono), LC-10 (node interaktif < 44×44 di board mobile ≤ 430). Lampiran A DESIGN.md diperbarui di disk.
+
+**File:** `packages/schema/src/design-tokens.ts` (baru, token), `packages/schema/src/index.ts` (ekspor), `packages/schema/src/findings.ts` (+test, katalog 6 aturan), `packages/check/src/rules.ts` (6 aturan), `packages/check/src/index.ts` (urutan, skip LC-03, ekspor), `packages/check/src/index.test.ts` (fixture), `tests/design-tokens.test.ts` (baru, kesesuaian token), `packages/mcp/src/server.ts` + `tests/execute-description.test.ts` (deskripsi), `packages/daemon/src/index.test.ts`, `packages/mcp/src/index.test.ts` (fixture line-height token), `packages/daemon/src/skills-examples.test.ts` (`PENDING_2_10`), `bench/src/round/round.test.ts` (`r3r7Missing` = LC-17), `bench/practice/LOG.md` §2.5.
+
+**Review:** 4 temuan (1 medium, 3 low) — semua di-patch, 0 ditunda, 0 ditolak.
+
+**Follow-up review:** tidak disarankan (1 medium + 3 low di-patch; tidak ada high, < 2 medium).
+
+**Verifikasi:** `pnpm build` lulus; check 198/198, schema + token + deskripsi 148/148; `pnpm test` 1058/1059 — gagal hanya latensi `visual.test.ts` saat paralel (sendiri 18/18). Pindaian arsip `after5b.json` (120 dok, 157 board, 0 gagal): aturan lama identik per dokumen dengan `after15b.json`, gagal gerbang 80; LC-03 46/20 dok, LC-06 13/7, LC-07 250/78, LC-08 155/61, LC-09 0, LC-10 110/44 (sesudah cap). lakard di-restart (active); `tools/node26/verify.sh` semua OK; Node sistem v22.23.5.
+
+**Risiko sisa:** LC-07/LC-08/LC-10 banyak memicu di arsip (78/61/44 dok) dan menurunkan R3 bench (LC-07/LC-06) — sebagian besar pola skill (`Link / Semua` 20px, padding 10 sidebar, KPI 28/32) untuk story 2.10; entri `PENDING_2_10` LC-10 `82.2×20` bergantung pada render font; LC-09 tanpa contoh arsip (fixture saja); paragraf LC-06 memakai ambang 6 kata dan pengecualian kartu ber-cat (keputusan definisi dari arsip).

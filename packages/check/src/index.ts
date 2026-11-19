@@ -132,15 +132,18 @@ export function checkBoard({ doc, boardId, measure }: { doc: ResolvedDocument; b
   const ctx = boardContext(board, measure);
   const clipped = lc02a(ctx);
   const cut = new Set(clipped.map((f) => f.nodeId));
+  // Teks yang sudah error LC-02a/LC-02b tidak dilaporkan lagi sebagai warning LC-03.
+  const inkOver = lc02b(ctx).filter((f) => !cut.has(f.nodeId));
+  const textCut = new Set([...cut, ...inkOver.map((f) => f.nodeId)]);
   const all = [
     ...lc01a(ctx),
     ...lc01b(ctx),
     ...clipped,
     // Teks yang elemennya sudah terpotong clip (LC-02a) tidak dilaporkan lagi sebagai luapan ink.
-    ...lc02b(ctx).filter((f) => !cut.has(f.nodeId)),
+    ...inkOver,
     // Non-teks yang sudah terpotong clip (LC-02a) juga tidak dilaporkan lagi.
     ...lc02c(ctx, cut),
-    ...lc03(ctx),
+    ...lc03(ctx, textCut),
     ...lc04(ctx),
     ...lc05(ctx),
     ...lc06(ctx),

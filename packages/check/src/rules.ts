@@ -1428,10 +1428,11 @@ const visibleTexts = (ctx: BoardContext): TextNode[] => texts(ctx).filter((t) =>
 /** Ink melewati kotak teks (kiri/kanan) atau tinggi baris melewati tinggi kotak > 1 px. */
 export const TEXT_BOX_OVERFLOW_MIN = 1;
 
-export function lc03(ctx: BoardContext): Finding[] {
+export function lc03(ctx: BoardContext, skip: ReadonlySet<string> = new Set()): Finding[] {
   const out: Finding[] = [];
   const expected = `wrap:'wrap' dengan lebar fill/angka, atau beri ruang`;
   for (const t of visibleTexts(ctx)) {
+    if (skip.has(t.id)) continue;
     const tm = ctx.textMeasure.get(t.id);
     if (t.wrap === 'fixed' && tm && tm.lines >= 2) {
       out.push(finding('LC-03', levelOf('LC-03'), t, clip120(`wrap fixed: ${tm.lines} baris terukur di ${quote(t.content)}`), expected));
@@ -1462,6 +1463,9 @@ export function lc03(ctx: BoardContext): Finding[] {
 export const PARAGRAPH_MIN_WORDS = 6;
 const PARAGRAPH_MAX_WEIGHT = 600;
 
+/** Nama token skala berbobot 400 untuk ukuran minimum (16 → body, 14 → body-sm). */
+const tokenFor = (size: number): string => Object.entries(TYPE_SCALE).find(([, t]) => t.size === size && t.weight === 400)?.[0] ?? `${size}px`;
+
 export function lc06(ctx: BoardContext): Finding[] {
   const out: Finding[] = [];
   for (const t of visibleTexts(ctx)) {
@@ -1474,7 +1478,7 @@ export function lc06(ctx: BoardContext): Finding[] {
     const min = inCard ? PARAGRAPH_MIN_IN_CARD : PARAGRAPH_MIN[ctx.board.screen];
     if (t.size >= min) continue;
     const where = inCard ? 'di kartu' : `di board ${ctx.board.screen}`;
-    out.push(finding('LC-06', levelOf('LC-06'), t, clip120(`paragraf ${num(t.size)}px ${lines} baris ${where}: ${quote(t.content)}`), `≥ ${min}px (body${inCard ? '-sm di kartu' : ''})`));
+    out.push(finding('LC-06', levelOf('LC-06'), t, clip120(`paragraf ${num(t.size)}px ${lines} baris ${where}: ${quote(t.content)}`), `≥ ${min}px (${tokenFor(min)}${inCard ? ' di kartu' : ''})`));
   }
   return out;
 }
@@ -1484,6 +1488,7 @@ export function lc06(ctx: BoardContext): Finding[] {
 // ---------------------------------------------------------------------------
 
 const CHROME_FRAMES = ['Status bar', 'Home indicator'];
+const LC07_EXPECTED = `token spacing ${[...SPACING_VALUES].sort((a, b) => a - b).join('/')}; komponen juga ${COMPONENT_SIZES.join('/')}`;
 const componentSizeOk = (v: number): boolean => SPACING_VALUES.has(v) || COMPONENT_SIZES.includes(v);
 
 export function lc07(ctx: BoardContext): Finding[] {
@@ -1501,7 +1506,7 @@ export function lc07(ctx: BoardContext): Finding[] {
       if (typeof n.height === 'number' && !componentSizeOk(n.height)) bad.push(`height ${num(n.height)}`);
       if (namedAny(n, SQUARE_CONTROLS) && typeof n.width === 'number' && !componentSizeOk(n.width)) bad.push(`width ${num(n.width)}`);
     }
-    if (bad.length) out.push(finding('LC-07', levelOf('LC-07'), n, clip120(bad.join(', ')), 'token spacing 0/2/4/6/8/12/16/20/24/32/40/48/64/80/96/128; komponen juga 44/56'));
+    if (bad.length) out.push(finding('LC-07', levelOf('LC-07'), n, clip120(bad.join(', ')), LC07_EXPECTED));
   }
   return out;
 }
@@ -1514,10 +1519,11 @@ export function lc07(ctx: BoardContext): Finding[] {
 export const LINE_HEIGHT_TOL = 0.5;
 const SCALE = Object.values(TYPE_SCALE);
 const SCALE_SIZES: ReadonlySet<number> = new Set(SCALE.map((t) => t.size));
+const LC08_EXPECTED = `skala tipe DESIGN.md (TY): ${[...new Set(SCALE.map((t) => `${t.size}/${t.lineHeight}`))].sort((a, b) => parseFloat(a) - parseFloat(b)).join(', ')}`;
 
 export function lc08(ctx: BoardContext): Finding[] {
   const out: Finding[] = [];
-  const expected = 'skala tipe DESIGN.md (TY): mis. 12/16, 14/20, 16/24, 18/28, 20/28, 24/32';
+  const expected = LC08_EXPECTED;
   for (const t of visibleTexts(ctx)) {
     // < 12px sudah error LC-05; tidak dilaporkan ganda.
     if (t.size < MIN_TEXT_SIZE) continue;
