@@ -3,7 +3,7 @@ title: 'Putaran resmi 2 dijalankan dan diputuskan'
 type: feature
 ticket: '21'
 created: '2026-11-18'
-status: built
+status: done
 baseline_revision: '313e2334d22453dd91d56082783da608447314ae'
 route: full
 route_source: auto

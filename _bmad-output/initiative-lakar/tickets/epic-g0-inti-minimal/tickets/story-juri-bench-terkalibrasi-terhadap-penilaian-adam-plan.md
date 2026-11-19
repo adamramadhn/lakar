@@ -3,7 +3,7 @@ title: 'Juri bench terkalibrasi terhadap penilaian Adam'
 type: feature
 ticket: '17'
 created: '2026-11-18'
-status: built
+status: done
 baseline_revision: '9ee43d45187cefdceb74865cb7c301ccd53e1387'
 route: full
 route_source: auto

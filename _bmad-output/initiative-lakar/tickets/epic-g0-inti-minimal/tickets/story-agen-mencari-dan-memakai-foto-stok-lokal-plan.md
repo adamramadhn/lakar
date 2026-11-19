@@ -3,7 +3,7 @@ title: 'Agen mencari dan memakai foto stok lokal'
 type: feature
 ticket: '18'
 created: '2026-11-18'
-status: built
+status: done
 baseline_revision: '9bce4f0705c6710658e9b94649d976103ff87318'
 route: full
 route_source: auto

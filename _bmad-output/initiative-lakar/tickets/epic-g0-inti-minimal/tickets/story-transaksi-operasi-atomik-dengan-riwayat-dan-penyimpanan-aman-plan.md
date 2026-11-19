@@ -3,7 +3,7 @@ title: 'Transaksi operasi atomik dengan riwayat dan penyimpanan aman'
 type: feature
 ticket: '6'
 created: '2026-11-17'
-status: built
+status: done
 baseline_revision: 'eac37d12d0c9613f0a60bd585b60067b748324c5'
 route: full
 route_source: auto

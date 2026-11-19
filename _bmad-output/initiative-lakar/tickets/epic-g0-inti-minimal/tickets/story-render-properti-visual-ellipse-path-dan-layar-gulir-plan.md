@@ -3,7 +3,7 @@ title: 'Render properti visual, ellipse, path, dan layar gulir'
 type: feature
 ticket: '8'
 created: '2026-11-18'
-status: built
+status: done
 baseline_revision: '77f0a2b552dd096937f2d93265c66dcecd8eecd2'
 route: full
 route_source: auto

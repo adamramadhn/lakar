@@ -3,7 +3,7 @@ title: 'Skill lebih kaya diuji dengan prompt latihan'
 type: feature
 ticket: '19'
 created: '2026-11-18'
-status: built
+status: done
 baseline_revision: '97ec58176a5e8d7abf19dddc6f7d6ac79266cc85'
 route: full
 route_source: auto

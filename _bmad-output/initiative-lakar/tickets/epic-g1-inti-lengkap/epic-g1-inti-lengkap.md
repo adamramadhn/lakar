@@ -4,7 +4,7 @@ title: "G1: inti A lengkap lolos golden set"
 parent: initiative-lakar
 covers: [R5, R6, R7, R9, R11, R12]
 after: [epic-g0-inti-minimal]
-refined: false
+refined: true
 risk: high
 ---
 
@@ -25,6 +25,23 @@ Adam punya bukti bahwa Lakar setara atau lebih baik dari pen.dev di seluruh gold
 - Prompt D menghasilkan foto relevan dari aset lokal (mekanisme foto milik G0, story 1.18).
 - `bench/round-<n>.md` untuk A–E memutuskan G1, dan Adam sudah mengonfirmasi.
 - Rilis berjalan di service `lakard` di VPS.
+
+## Requirements
+
+- R1 (parent R5; DESIGN.md Lampiran A): `layout_check` menjalankan semua aturan Lampiran A, termasuk LC-03, LC-06–10, LC-13–17, LC-19, LC-21, dan LC-22 yang belum ada di G0. Terbukti bila setiap aturan punya fixture positif dan negatif, dan aturan berlevel error tidak memberi temuan pada arsip dokumen Lakar bench (`bench/runs/**/*.lakar.json`) kecuali cacat nyata yang tercatat.
+- R2 (parent R5; DESIGN.md §Ambang kontras): LC-04 menegakkan seluruh tabel Ambang kontras: ambang teks besar sama di DESIGN.md dan kode, stroke kontrol (`Input /`, `Radio /`, `Checkbox /`) dan ikon tanpa label ≥ 3:1, dan warning scrim untuk teks di atas foto/gradien/efek. Terbukti bila fixture tiap baris tabel lulus dan arsip bench tidak memberi positif palsu error.
+- R3 (parent R11): kelima desain target golden set (A–E) dibangun ulang di Lakar dan menjadi tes regresi `layout_check`: 0 error, LC-17/18/19 = 0. Terbukti bila tes regresi memuat kelima dokumen dan Adam menyetujui PNG-nya.
+- R4 (parent R7; Decision 2026-11-19): harness bench menjalankan dan menilai prompt A–E dengan runner, pembungkus, dan pengukuran waktu AD-13 yang sama, dengan rubrik v2.3 (golden B1: lebar 390, tinggi ≥ 844; D2: satu board panjang) yang di-snapshot sebelum putaran resmi. Terbukti bila `rubric-snapshot` mencatat v2.3 dan sha teks juri A–E, dan `round --dry-run` lulus untuk A–E.
+- R5 (parent R6; Decision 2026-11-19): skill dipadatkan sebelum revisi apa pun tanpa menaikkan batas token `tests/skills.test.ts`, lalu direvisi untuk pola G1 (sidebar webapp sesuai DESIGN.md, form/checkout mobile, tabel + panel detail). Terbukti lewat run latihan dengan prompt non-A–E, dan tanpa rubrik/kriteria golden di skill (C7).
+- R6 (parent R12): prompt D menghasilkan kartu kamar dengan foto relevan lewat rantai Unsplash → Wikimedia → Openverse (aset jarak jauh, AD-10). Terbukti di PNG putaran resmi D.
+- R7 (parent R7, R9): baseline pen.dev C, D, E diukur (median 3 run, runner G0), lalu putaran resmi A–E memutuskan G1: ≥ 4/5 Setara atau lebih baik, ≥ 1 Lebih baik, nol emoji, waktu ≤ 1,5× median baseline. Terbukti oleh `bench/round-<n>.md` dengan Konfirmasi Adam.
+- R8 (initiative Done when, `lakard`): rilis G1 berjalan di service `lakard` di VPS dan Claude Code memakainya lewat MCP. Terbukti oleh `status` lakard yang menunjukkan versi rilis G1 dan `tools/node26/verify.sh` lulus.
+
+## Constraints
+
+- C7, C8, C9 dan keputusan AD-13 dari initiative berlaku untuk setiap story. Setiap story diakhiri `tools/node26/verify.sh`. Restart lakard hanya lewat `systemctl --user restart lakard`.
+- pen.dev hanya lewat MCP pencil (`pen-newdoc.sh` + `get_app_state`), `.pen` yang ada tidak ditimpa, pen-desktop di-restart setelah setiap seri, dan batas paket tidak diakali.
+- Key Unsplash tidak pernah ditampilkan, dicatat, atau di-commit. Kuota demo 50 req/jam.
 
 ## Boundaries
 
@@ -47,3 +64,11 @@ Adam punya bukti bahwa Lakar setara atau lebih baik dari pen.dev di seluruh gold
   - Batas token skill hampir penuh: `landing.md` prosa 1500/1500 dan `core.md` 3967/4000. Setiap revisi skill di G1 harus diawali pemadatan teks (menghapus duplikasi core/polish/landing) tanpa menaikkan batas, dan dibuktikan lewat run latihan.
   - Batas paket pen.dev yang tercapai pada 2026-11-19 menghalangi run pen.dev baru (putaran A–E) sampai periode tagihan berikutnya atau sampai paket di-upgrade. Ini dicek sebelum G1 menjadwalkan putaran.
 - Decision: 2026-11-19 — perubahan kriteria golden B1 (lebar 390, tinggi ≥ 844) dan D2 (pola dua board → satu board panjang) mengubah sha teks juri. Karena itu keduanya ditunda dan dikerjakan bersamaan sebagai rubrik v2.3 (snapshot `rubric-snapshot` + versi Lampiran B) sebelum putaran resmi berikutnya. Rubrik v2.2 tetap sah sampai saat itu. DESIGN.md (Lampiran A, pola mobile, skill per jenis layar) sudah disinkronkan pada 2026-11-19. Sisa ketidaksesuaian: tabel Ambang kontras (18,66px/600 vs kode 19px/700, stroke kontrol/ikon/scrim belum dicek), sidebar webapp 240 vs DESIGN.md 248, dan LC yang belum diterapkan (LC-03, 06–10, 13–17, 19, 21, 22), yang termasuk cakupan G1.
+- Decision: 2026-11-19 — epic di-refine dari cakupan Adam (sesi G1): aturan LC sisa, golden set dibangun ulang, rubrik v2.3, sisa DESIGN.md, pemadatan skill, baseline C/D/E + putaran A–E, rilis lakard.
+- Decision: 2026-11-19 — pen.dev terblokir batas paket (dicek lewat `get_app_state` 2026-11-19). Story yang butuh run pen.dev baru (revisi skill dengan prompt latihan baru, baseline C/D/E, putaran resmi) diurut paling belakang agar story lain tidak menunggu.
+- Decision: 2026-11-19 — tracer bullet = story 1 (+2): jalur bench A–E dari prompt sampai keputusan G1, dibuktikan tanpa pen.dev lewat dry-run dan rejudge. Story pertama yang paling tidak pasti setelahnya: LC-04 lengkap (story 7, aturan gerbang).
+- Decision: 2026-11-19 — refactor sweep (12) dan rilis (13) sengaja menunggu story pen.dev (10, 11) agar sweep mencakup revisi skill; konsekuensinya keduanya ikut tertahan batas paket pen.dev. Putaran resmi (14) diperlakukan sebagai verifikasi penutup epic.
+- Decision: 2026-11-19 — golden set dibangun di dua story (8: A, B, D; 9: C, E + persetujuan Adam) karena lima desain terlalu besar untuk satu sesi.
+- Decision: 2026-11-19 — Adam menyetujui breakdown 14 story ("setuju semua") beserta empat keputusan: (1) hash protokol bench per prompt, baseline A/B G0 tetap sah; (2) bila versi pen.dev atau Claude Code berubah, baseline A–E diukur ulang (story 11) dan dilaporkan dulu; (3) teks besar = ≥ 24px atau ≥ 18,66px dengan berat ≥ 700; (4) golden set Lakar di G1 hanya regresi `layout_check`, tidak masuk teks atau input juri.
+- Decision: 2026-11-19 — plan_checkpoint dan done_checkpoint diputuskan orkestrator (Adam). Tetap berhenti untuk C9, status blocked, langkah hitl, dan konfirmasi putaran resmi.
+

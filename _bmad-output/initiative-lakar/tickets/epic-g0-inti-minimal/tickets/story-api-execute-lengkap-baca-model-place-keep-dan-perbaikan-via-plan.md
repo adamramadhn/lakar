@@ -3,7 +3,7 @@ title: 'API execute lengkap: baca model, place, keep, dan perbaikan via editId'
 type: feature
 ticket: '9'
 created: '2026-11-18'
-status: built
+status: done
 baseline_revision: '0d59c8fe19b76d22350fa92a520bcbe300870e39'
 route: full
 route_source: auto

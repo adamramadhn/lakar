@@ -3,7 +3,7 @@ title: 'Lakar memakai Node 26 LTS berdampingan, Node sistem tetap 22'
 type: chore
 ticket: '1'
 created: '2026-11-17'
-status: built
+status: done
 baseline_revision: '48bce48cf8b60f9e9082aa2eb705050ead5c2d73'
 route: oneshot
 route_source: auto
