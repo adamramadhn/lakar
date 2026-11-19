@@ -402,6 +402,7 @@ describe.skipIf(!browserInstalled)('pool render (AD-18) + endpoint story 12, Chr
     const zb = await c.call('/screenshot', { boardId, scale: 2 }, s);
     expect(zb.status, JSON.stringify(zb.body.error)).toBe(200);
     expect(readPngSize(Buffer.from(zb.body.data.png, 'base64'))).toEqual({ width: 780, height: 1688 });
+    expect({ width: zb.body.data.width, height: zb.body.data.height }).toEqual({ width: 780, height: 1688 });
     const s3 = await c.call('/screenshot', { nodeId: kotak, scale: 3 }, s);
     expect(s3.status).toBe(400);
     expect(s3.body.error!.code).toBe('SCHEMA_INVALID');

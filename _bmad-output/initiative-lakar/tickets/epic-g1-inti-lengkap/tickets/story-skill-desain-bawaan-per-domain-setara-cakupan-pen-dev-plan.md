@@ -3,19 +3,47 @@ title: 'Skill desain bawaan per domain setara cakupan pen.dev'
 type: feature
 ticket: 16
 created: '2026-11-19'
-status: in-progress
+status: built
 baseline_revision: '5e10f500e80399b98eb01d09c289952f45e331c1'
 route: full
 route_source: auto
 risk: high
-review: ''
-review_source: ''
-lenses_ran: []
+review: quick
+review_source: pinned
+lenses_ran: [quick]
 review_loop_iteration: 0
 followup_review_recommended: false
 context: ['{project-root}/packages/skills/README.md', '{project-root}/bench/README.md']
 warnings: ['oversized']
-deferred: []
+deferred:
+  - summary: >-
+      Contoh landing tidak mengikuti kalimat radius konsentris layout.md ("min 6; tidak cukup → tanpa radius/cat").
+    evidence: |-
+      Baris radius 8 + padding 12 memuat Ikon radius 8; Kartu / Jadwal radius 12 + padding 32 memuat Langkah radius 8; kartu samping radius 12 + padding 24 memuat Ikon radius 12. Check LC-25 tidak memberi temuan, jadi contohnya tetap 0/0/0, tetapi teksnya berlawanan dengan aturan. Skill dibekukan sesudah seri lulus (iterasi 6 = iterasi terakhir, anggaran sisa $0,77), jadi perubahan teks/contoh butuh bench ulang di 2.10.
+    location: >-
+      packages/skills/skills/landing.md (contoh hero/bento), packages/skills/skills/layout.md §Radius
+    severity: low
+  - summary: >-
+      Urutan alur webapp.md ("execute 2 = temuan check + review sekaligus") tidak sama dengan core langkah 4–5 (perbaiki check, lalu review + satu execute perbaikan).
+    evidence: |-
+      webapp.md §Alur execute vs core.md Alur kerja langkah 4–5; mobile.md mengikuti core. Skill beku sesudah seri; diselaraskan di 2.10 dengan bench.
+    location: >-
+      packages/skills/skills/webapp.md §Alur execute
+    severity: low
+  - summary: >-
+      SERVER_INSTRUCTIONS masih menyebut "1–2 execute untuk mobile dan webapp" ditambah perbaikan check dan satu execute review, sehingga bisa terbaca sampai 4 execute, padahal core maks 3 termasuk perbaikan.
+    evidence: |-
+      packages/mcp/src/server.ts SERVER_INSTRUCTIONS vs core.md langkah 3 dan mobile.md "Tanpa execute keempat". Instruksi ikut perilaku agen yang sudah di-bench; diselaraskan bersama revisi skill 2.10.
+    location: >-
+      packages/mcp/src/server.ts SERVER_INSTRUCTIONS
+    severity: low
+  - summary: >-
+      Aturan grid landing "blok utama mulai di awal kolom" hilang saat pemadatan iterasi 6, tanpa dipindah ke layout.md.
+    evidence: |-
+      Diff landing.md §Struktur: kalimat dihapus; tidak ada di layout.md atau skill lain. Pengembalian satu kalimat butuh bench ulang (skill beku sesudah seri lulus); dicatat untuk 2.10.
+    location: >-
+      packages/skills/skills/landing.md §Struktur
+    severity: low
 ---
 
 <intent-contract>
@@ -80,8 +108,8 @@ deferred: []
 - [x] `bench/src/practice/main.ts` + tes + README -- polish maks 6 iterasi, $34,58.
 - [x] DESIGN.md §Turunan -- daftar skill baru.
 - [x] build, tes terarah lalu `pnpm test`; PNG contoh (`LAKAR_SKILL_PNG_DIR`) diperiksa visual; commit di `g1`.
-- [ ] `practice --series polish --iter 5 --reuse-pendev 1 --dry-run` (disaring) lalu run nyata; iterasi 6 hanya bila 5 turun dari polish-4 atau rasio > 1,5, dengan sisa anggaran story cukup.
-- [ ] LOG §2.16 (token sebelum/sesudah per layar, tabel polish-4 vs iterasi, path PNG untuk penilaian cepat Adam) -- commit.
+- [x] `practice --series polish --iter 5 --reuse-pendev 1 --dry-run` (disaring) lalu run nyata; iterasi 6 hanya bila 5 turun dari polish-4 atau rasio > 1,5, dengan sisa anggaran story cukup.
+- [x] LOG §2.16 (token sebelum/sesudah per layar, tabel polish-4 vs iterasi, path PNG untuk penilaian cepat Adam) -- commit.
 - [x] `tools/node26/verify.sh`; cek tidak ada proses tertinggal.
 
 **Acceptance Criteria:**
@@ -124,6 +152,17 @@ dan langsung bangun". Detail dan tabel: LOG §2.16 "Revisi iterasi 6".
 
 ## Review Triage Log
 
+### 2026-11-19 — Review pass
+- verdicts: 7 findings — high 0, medium 0, low 6, false 0, maybe-false 0 (1 ditolak karena perbaikannya menyunting plan)
+- findings:
+  - `[low]` `[patch]` `/screenshot` board dengan `scale:2` melaporkan width/height 1× — diperbaiki: cabang board memakai `readPngSize(png)` bila scale 2 (scale 1 tetap ukuran board); `pool.test.ts` kini memeriksa `data.width/height` = 780×1688.
+  - `[low]` `[defer]` contoh landing berlawanan dengan kalimat radius konsentris `layout.md` — nyata (check tidak menandai), tetapi skill beku sesudah seri lulus dan anggaran seri habis; perbaikan teks/contoh butuh bench → 2.10.
+  - `[low]` `[defer]` urutan alur `webapp.md` vs core langkah 4–5 — nyata; skill beku sesudah seri → 2.10.
+  - `[low]` `[defer]` `SERVER_INSTRUCTIONS` bisa terbaca sampai 4 execute — nyata; instruksi agen ikut dibekukan bersama skill yang sudah di-bench → 2.10.
+  - `[low]` `[patch]` README atribusi `accessibility.md` menyebut ambang teks 1.4.3 dan 2.5.8 yang tidak ada lagi — diperbaiki: 1.4.3 sebagai rujukan (angka dari `check`), target 2.5.5 untuk 44 px.
+  - `[low]` `[reject]` catatan plan basi (checkbox, Auto Run Result, matriks 11.500, Design Notes 8 pertanyaan) — perbaikannya menyunting plan build ini; Auto Run Result dan checkbox diperbarui saat finalisasi. Iterasi 6 menurunkan batas ke 9.600 dan pertanyaan ke 6, keduanya dicatat di Implementation Notes dan LOG.
+  - `[low]` `[defer]` aturan grid landing "blok utama mulai di awal kolom" hilang saat pemadatan — nyata; mengembalikannya mengubah skill sesudah bench → 2.10.
+
 ## Design Notes
 
 **Isi domain (baru = tambahan 2.16; selain itu dipindah):**
@@ -154,12 +193,12 @@ dan langsung bangun". Detail dan tabel: LOG §2.16 "Revisi iterasi 6".
 
 ## Auto Run Result
 
-- **Status:** skill/kode/tes selesai dan di-commit di `g1` (subagen implementasi). Belum: dry-run + run nyata
-  `practice --series polish --iter 5 --reuse-pendev 1` (sesi utama, Implementation Notes 5), lalu LOG §2.16 bagian seri
-  (tabel polish-4 vs iterasi 5/6, path PNG). LOG §2.16 bagian pemecahan skill + token sudah ditulis.
-- **Token muat per layar:** landing 9.114 → 10.728, mobile 8.933 → 10.425, webapp 8.764 → 10.186 (batas 11.500).
-- **Verifikasi:** `pnpm build`; vitest terarah (skills, c7, content-rules, design-tokens, mcp, daemon, bench practice) lulus;
-  `skills-examples.test.ts` 0/0/0 dengan PENDING hanya `api.md`, PNG contoh diperiksa visual; `pnpm test` lulus kecuali flake
-  latensi `visual.test.ts` (lulus saat diulang sendiri); lakard di-restart (`systemctl --user restart lakard`): 14 skill
-  tersedia, isi 8 domain = file, `polish` NOT_FOUND dengan pesan pemecahan; `tools/node26/verify.sh` lulus, `/usr/bin/node`
-  v22.23.5, tanpa proses tes tertinggal.
+- **Status:** built. Commit: `a01fc67` (skill domain + kode + tes), `4284d82` (laporan iterasi 5), `ff56e47` (revisi iterasi 6: pemadatan + alur hemat waktu), `1f3f0bf` (laporan iterasi 6 + LOG), ditambah commit patch review + plan.
+- **Ringkasan:** `polish` dipecah, dan bagian lintas layar `core` dipindah, ke delapan skill domain (`layout`, `typography`, `color`, `accessibility`, `ui`, `interface`, `writing`, `review`). Arahan Adam butir 1/3/4/6 ditambahkan. Aturan muat: core + 8 domain + 1 skill layar paralel. `read_skill('polish')` → NOT_FOUND dengan pesan pemecahan. `screenshot` menerima `scale` 1|2. PENDING umum selesai (tinggal `api.md`). Seri polish maks 6 iterasi / $34,58. Token `badge.height-sm: 20px` ada di DESIGN.md.
+- **File:** `packages/skills/skills/*` (8 baru, `polish.md` dihapus, core/landing/mobile/webapp/icons direvisi); `packages/skills/src/index.ts` + README; daemon `server.ts` (`/screenshot` scale, NOT_FOUND polish), `photos/service.ts` (hint); MCP `server.ts` (instruksi, read_skill, screenshot); `bench/src/practice/main.ts` + README (config seri); tes (skills, c7, content-rules, design-tokens, skills-examples, pool, mcp, skills index, practice); `bench/practice/LOG.md` §2.16; `bench/polish-5|6.*` + strip PNG.
+- **Muat per layar (token):** landing 9.114 → 10.728 (it. 5) → 9.440 (it. 6); mobile 8.933 → 10.425 → 9.094; webapp 8.764 → 10.186 → 9.104; batas 9.600.
+- **Seri:** iterasi 5 gagal waktu (P7 1,54, P9 1,64; mutu naik); iterasi 6 lulus: P7 Setara 14–12 (120,8 dtk, 1,24), P8 Setara 16–14 (207,3, 0,97), P9 Lebih baik 16–12 (238,9, 1,48); emoji 0, gate 0. Biaya story $11,23; kumulatif seri $33,81/$34,58.
+- **Review:** 7 temuan: 2 patch (low), 4 defer (low, skill beku sesudah bench → 2.10), 1 ditolak (menyunting plan). Patch diterapkan oleh sesi utama karena subagen implementasi tidak bisa dilanjutkan secara sinkron.
+- **Follow-up review:** false (hanya patch low).
+- **Verifikasi:** build OK; vitest terarah lulus; `pnpm test` 1141/1142, dengan flake latensi `visual.test.ts` lulus 18/18 saat diulang sendiri; lakard di-restart sesudah patch; `tools/node26/verify.sh` semua OK; `/usr/bin/node` v22.23.5; tanpa proses tertinggal.
+- **Risiko sisa:** margin waktu P9 tipis (238,9 dari 242,9); variasi juri (T pen.dev bergeser 2–3 poin antar-iterasi); P8 iterasi 6 tidak memakai zoom review; 4 temuan skill ditunda ke 2.10; dua kebocoran C7 kecil (tercatat di LOG).

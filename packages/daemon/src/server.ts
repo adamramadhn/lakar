@@ -477,7 +477,8 @@ export function buildServer({
     // AD-9: ikon yang tidak dikenal katalog (mis. dokumen lama di disk) → ICON_UNKNOWN + 3 saran sebelum render.
     assertIcons(board);
     const png = await render.screenshot(doc, board.id, scaleOpt);
-    return ok(reply, { boardId: board.id, width: board.width, height: board.height, mimeType: 'image/png', png: Buffer.from(png).toString('base64'), ...placeholderNote(board) });
+    const dims = body?.scale === 2 ? readPngSize(png) : { width: board.width, height: board.height };
+    return ok(reply, { boardId: board.id, ...dims, mimeType: 'image/png', png: Buffer.from(png).toString('base64'), ...placeholderNote(board) });
   });
 
   // Daftar board dokumen aktif (AD-11 `list_boards`).
