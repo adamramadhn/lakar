@@ -739,7 +739,7 @@ cacat nyata, kartu berisi teks yang terpotong rata di tepi bawah `Seksi / Hero`:
 
 ## Pemadatan skill (sesi baru, C7)
 
-Token (`estimateTokens`, total / prosa). Baseline `725a282`; seri iterasi 4 memakai `ac4961c`; sesudah review `<lihat commit story 2.3>`.
+Token (`estimateTokens`, total / prosa). Baseline `725a282`; seri iterasi 4 memakai `ac4961c`; sesudah review `b89bb64`.
 
 | Skill | Batas (prosa / total) | Sebelum | `ac4961c` (diuji seri) | Sesudah review | Ruang sesudah |
 |---|---|---|---|---|---|
