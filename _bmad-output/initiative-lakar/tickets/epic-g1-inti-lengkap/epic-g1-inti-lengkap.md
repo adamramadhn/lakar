@@ -41,3 +41,8 @@ Adam punya bukti bahwa Lakar setara atau lebih baik dari pen.dev di seluruh gold
 - Waits on epic-g0-inti-minimal because: G0 harus lulus (C4), dan daemon, check, skill, serta bench dipakai ulang. Setelah putaran 1 gagal, G1 baru dimulai bila bench/round-2.md lolos dan dikonfirmasi Adam.
 - Gambar AI di luar inisiatif (Boundaries inisiatif, D). Penyedia foto stok diputuskan di G0 story 1.18.
 - Decision: 2026-11-18 — foto stok lokal pindah dari G1 ke G0 (keputusan Adam setelah putaran 1 gagal; bench/round-1.md §Evaluasi arah). G1 tetap memiliki bukti foto relevan di prompt D (R12).
+- Decision: 2026-11-19 — masukan dari penutupan G0:
+  - `webapp.md` sudah dibangun di G0 (story 1.24), jadi G1 cukup mengujinya di prompt dashboard.
+  - Foto prompt D memakai rantai Unsplash → Wikimedia → Openverse. Foto Unsplash adalah aset jarak jauh, bukan aset lokal (AD-10).
+  - Batas token skill hampir penuh: `landing.md` prosa 1500/1500 dan `core.md` 3967/4000. Setiap revisi skill di G1 harus diawali pemadatan teks (menghapus duplikasi core/polish/landing) tanpa menaikkan batas, dan dibuktikan lewat run latihan.
+  - Batas paket pen.dev yang tercapai pada 2026-11-19 menghalangi run pen.dev baru (putaran A–E) sampai periode tagihan berikutnya atau sampai paket di-upgrade. Ini dicek sebelum G1 menjadwalkan putaran.
