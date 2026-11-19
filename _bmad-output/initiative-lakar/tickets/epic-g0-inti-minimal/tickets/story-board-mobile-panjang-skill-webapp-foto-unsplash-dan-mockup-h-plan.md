@@ -3,7 +3,7 @@ title: 'Board mobile panjang, skill webapp, foto Unsplash, dan mockup hero'
 type: feature
 ticket: '24'
 created: '2026-11-19'
-status: ready-for-dev
+status: in-progress
 baseline_revision: '9b5652de1b71425b64d2855ac639328f560ab426'
 route: full
 route_source: auto
@@ -103,6 +103,9 @@ deferred: []
 - Given seri polish iterasi 3 (dan 4/5 bila perlu), when laporan `bench/polish-<k>.md` dibaca, then P7–P9 semuanya Setara/Lebih baik, emoji 0, gerbang 0, waktu ≤ 1,5× wall pen.dev prompt yang sama (AD-13), biaya 1.24 ≤ $17,50 (kumulatif seri ≤ $30,24), dan PNG tersedia untuk Adam. Bila tidak tercapai dalam batas, HALT `blocked`.
 
 ## Implementation Notes
+
+- Orkestrator (2026-11-19, plan disetujui, commit `2bedc7d`): (1) cache render daemon + placeholder offline disetujui sebagai bentuk hotlink, dengan syarat: URL yang tersimpan di meta adalah URL Unsplash dari API; byte foto Unsplash tidak pernah masuk `assets/` atau git; cache mengikuti Cache-Control, berbatas ukuran, dan boleh dihapus kapan saja. Catat sebagai follow-up arsitektur (AD-6/AD-10, R11) dan sebagai risiko kepatuhan yang perlu dikonfirmasi Adam. (2) `utm_source` default `lakar`, bisa dikonfigurasi (`unsplash_app_name`); Adam perlu menyamakannya dengan nama aplikasi di dashboard Unsplash. (3) Kriteria golden B tidak diubah (follow-up G1).
+- Pembagian kerja: implementer mengerjakan semua task kecuali menjalankan seri bench (task terakhir hanya sampai build/test/restart lakard/verify.sh dan `--dry-run`). Seri iterasi 3–5 dijalankan sesi build sesudah review. Implementer tidak membaca `bench/polish-*.md`, berkas juri, atau rubrik sebelum task rubrik; sesudah task rubrik tidak menyunting skill. Commit di `g0` per tahap (check, skill, foto, bench, rubrik), tanpa push.
 
 ## Plan Change Log
 
