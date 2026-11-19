@@ -91,7 +91,10 @@ describe('config.toml (kunci datar, env menang)', () => {
     expect(() => loadConfig({ LAKAR_CONFIG: join(dir, 'tidak-ada.toml') })).toThrow(/LAKAR_CONFIG menunjuk file yang tidak ada/);
     // Key Unsplash: default ~/.config/lakar/unsplash-access-key; config/env menimpa; utm_source divalidasi.
     expect(none.unsplashKeyFile).toMatch(/\/\.config\/lakar\/unsplash-access-key$/);
-    expect(none.unsplashAppName).toBe('lakar');
+    // Default bawaan diuji dengan file config kosong agar ~/.config/lakar/config.toml milik mesin tidak ikut terbaca.
+    const kosong = join(dir, 'kosong.toml');
+    await writeFile(kosong, '', 'utf8');
+    expect(loadConfig({ LAKAR_CONFIG: kosong }).unsplashAppName).toBe('lakar');
     const u = join(dir, 'unsplash.toml');
     await writeFile(u, 'unsplash_key_file = "/tmp/k"\nunsplash_app_name = "lakar_studio"\n', 'utf8');
     expect(loadConfig({ LAKAR_CONFIG: u })).toMatchObject({ unsplashKeyFile: '/tmp/k', unsplashAppName: 'lakar_studio' });
