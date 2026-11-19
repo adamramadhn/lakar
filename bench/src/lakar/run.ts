@@ -98,22 +98,54 @@ export type BoardSpec = { width: number; height: number | null };
 /** Spesifikasi ukuran prompt golden A/B (A lebar 1440, B 390×844). Prompt lain: tidak ada spesifikasi. */
 export const GOLDEN_BOARD_SPECS: Readonly<Record<string, BoardSpec>> = { A: { width: 1440, height: null }, B: { width: 390, height: 844 } };
 
+/**
+ * Aturan ukuran mengikat. `exact` = lebar dan tinggi sama persis (rubrik < 2.2). `mobile-min-height` (rubrik ≥ 2.2) =
+ * untuk spesifikasi layar mobile (tinggi tetap, lebar ≤ 480) lebar sama dan tinggi ≥ yang diminta (satu board panjang
+ * bergulir sah); spesifikasi lain tetap persis. Aturan yang sama dipakai untuk Lakar (gerbang) dan pen.dev (aturan 4).
+ */
+export type SizeRule = 'exact' | 'mobile-min-height';
+
+/** Versi rubrik pertama yang memakai aturan ukuran mobile simetris (tinggi ≥ yang diminta). */
+export const MOBILE_MIN_HEIGHT_RUBRIC = '2.2';
+/** Lebar maksimum spesifikasi yang dianggap layar mobile. */
+export const MOBILE_MAX_WIDTH = 480;
+
+/** `a` ≥ `b` untuk versi bertitik (`2.10` > `2.9`); versi tak terbaca → false. */
+export function versionAtLeast(a: string | undefined, b: string): boolean {
+  if (!a || !/^\d+(\.\d+)*$/.test(a)) return false;
+  const x = a.split('.').map(Number);
+  const y = b.split('.').map(Number);
+  for (let i = 0; i < Math.max(x.length, y.length); i++) {
+    const d = (x[i] ?? 0) - (y[i] ?? 0);
+    if (d !== 0) return d > 0;
+  }
+  return true;
+}
+
+/** Aturan ukuran untuk versi rubrik yang dibekukan run (murni): < 2.2 atau tak diketahui → `exact`. */
+export function sizeRuleFor(rubricVersion: string | undefined): SizeRule {
+  return versionAtLeast(rubricVersion, MOBILE_MIN_HEIGHT_RUBRIC) ? 'mobile-min-height' : 'exact';
+}
+
 /** Masalah ukuran board terhadap spesifikasi (murni). Tanpa board → masalah; tanpa spesifikasi → hanya cek ada board. */
-export function boardSizeProblemsFor(spec: BoardSpec | undefined, boards: readonly { id: string; width: number; height: number }[]): string[] {
+export function boardSizeProblemsFor(spec: BoardSpec | undefined, boards: readonly { id: string; width: number; height: number }[], rule: SizeRule = 'exact'): string[] {
   if (!boards.length) return ['tidak ada board'];
   if (!spec) return [];
   const out: string[] = [];
+  const mobileMin = rule === 'mobile-min-height' && spec.height !== null && spec.width <= MOBILE_MAX_WIDTH;
   for (const b of boards) {
     if (spec.height === null) {
       if (b.width !== spec.width) out.push(`board ${b.id} lebar ${b.width} ≠ ${spec.width}`);
+    } else if (mobileMin) {
+      if (b.width !== spec.width || b.height < spec.height) out.push(`board ${b.id} ${b.width}×${b.height} ≠ ${spec.width}×≥${spec.height}`);
     } else if (b.width !== spec.width || b.height !== spec.height) out.push(`board ${b.id} ${b.width}×${b.height} ≠ ${spec.width}×${spec.height}`);
   }
   return out;
 }
 
-/** Ukuran board mengikat (gerbang): A semua board lebar 1440; B semua board 390×844. */
-export function boardSizeProblems(promptId: string, boards: readonly { id: string; width: number; height: number }[]): string[] {
-  return boardSizeProblemsFor(GOLDEN_BOARD_SPECS[promptId], boards);
+/** Ukuran board mengikat (gerbang): A semua board lebar 1440; B semua board 390×844 (rubrik ≥ 2.2: 390 × ≥ 844). */
+export function boardSizeProblems(promptId: string, boards: readonly { id: string; width: number; height: number }[], rule: SizeRule = 'exact'): string[] {
+  return boardSizeProblemsFor(GOLDEN_BOARD_SPECS[promptId], boards, rule);
 }
 
 export type LakarExtra = {

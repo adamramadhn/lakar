@@ -13,7 +13,7 @@ import { buildJudgeTextWith, DESIGN_MD_PATH, JUDGE_CRITERIA, judgeC7Problems, ju
 import { lampiranB, readRubricJson, rubricVersionOf, type RubricJson } from '../judge/rubric.js';
 import { applyLakarArchive, benchLakarSources, describeLakarArchive, planLakarArchive } from '../lakar/archive.js';
 import { LakardClient, type LakardStatus } from '../lakar/lakard-client.js';
-import { boardSizeProblemsFor, LAKAR_ALLOWED_TOOLS, LAKAR_MCP_CONFIG, LAKARD_UNIT, lakarPreflightProblems, mcpServerNames, runLakar } from '../lakar/run.js';
+import { boardSizeProblemsFor, sizeRuleFor, versionAtLeast, LAKAR_ALLOWED_TOOLS, LAKAR_MCP_CONFIG, LAKARD_UNIT, lakarPreflightProblems, mcpServerNames, runLakar } from '../lakar/run.js';
 import { Abort, log, stamp } from '../log.js';
 import { emptyRecord, PENDEV_ALLOWED_TOOLS, PENDEV_MCP_CONFIG, penDesktopVersion, preflight, runOne, RUNS_ROOT } from '../pendev/run.js';
 import { readPngSizeFile } from '../png/codec.js';
@@ -66,8 +66,11 @@ export const MAX_ITER = 8;
 export const BUDGET_USD = 58.09;
 /** Perkiraan biaya atas per prompt (USD, dari putaran 1 + kalibrasi juri): run pen.dev, run Lakar, juri 3×. */
 export const COST_ESTIMATE = { pendev: 0.9, lakar: 1.1, judge: 0.8 } as const;
-/** Versi rubrik juri yang wajib (rubrik v2.1, `bench/rubric/rubric.json`). */
-export const PRACTICE_RUBRIC_VERSION = '2.1';
+export type CostEstimate = { readonly pendev: number; readonly lakar: number; readonly judge: number };
+/** Perkiraan seri polish (plan 1.24, dari polish-1/2: pen.dev P7 ≈ $0,6; Lakar +10% untuk skill webapp). */
+export const POLISH_COST_ESTIMATE: CostEstimate = { pendev: 0.6, lakar: 1.15, judge: 0.8 };
+/** Versi rubrik juri minimum (aturan keputusan v2 butuh ≥ 2.1); versi saat ini = `bench/rubric/rubric.json` = Lampiran B. */
+export const PRACTICE_RUBRIC_MIN = '2.1';
 /** Lulus iterasi: Lakar Setara/Lebih baik di ≥ PASS_MIN dari semua prompt. */
 export const PASS_MIN = 3;
 const SKILLS_DIR = join(REPO_ROOT, 'packages/skills/skills');
@@ -103,6 +106,8 @@ export type SeriesConfig = {
   restartPenDesktop: boolean;
   /** Laporan iterasi > 1 memuat perbandingan dengan iterasi 1 (sebelum perubahan). */
   compareWithFirst: boolean;
+  /** Perkiraan biaya per prompt (default `COST_ESTIMATE`). */
+  costEstimate?: CostEstimate;
 };
 
 export const PRACTICE_SERIES: SeriesConfig = {
@@ -138,15 +143,19 @@ export const EFFECTS_SERIES: SeriesConfig = {
   compareWithFirst: true,
 };
 
-/** Seri polish (story 23): iterasi 1 = baseline skill/check lama, iterasi 2 = sesudah perubahan (reuse pen.dev iterasi 1); maks 3, anggaran $15, P7–P9 wajib lulus. */
+/**
+ * Seri polish (story 23 + 24): iterasi 1 = baseline skill/check lama, iterasi 2 = sesudah story 23 (reuse pen.dev
+ * iterasi 1); iterasi 3–5 = story 24 (maks 3 iterasi tambahan, $17,50 → kumulatif seri ≤ $30,24), P7–P9 wajib lulus.
+ */
 export const POLISH_SERIES: SeriesConfig = {
   id: 'polish',
   title: 'Seri polish',
   promptsPath: POLISH_PROMPTS_PATH,
   sha: POLISH_PROMPTS_SHA256,
   ids: POLISH_ID,
-  maxIter: 3,
-  budgetUsd: 15,
+  maxIter: 5,
+  budgetUsd: 30.24,
+  costEstimate: POLISH_COST_ESTIMATE,
   passRule: 'all',
   reportPrefix: 'polish',
   runsRoot: POLISH_RUNS,
@@ -160,7 +169,20 @@ export const SERIES: Record<SeriesId, SeriesConfig> = { practice: PRACTICE_SERIE
 /** Jumlah minimum Setara/Lebih baik (murni). */
 export const passMinOf = (series: Pick<SeriesConfig, 'passRule'>, total: number): number => (series.passRule === 'all' ? total : series.passRule.min);
 
-export type PracticeArgs = { series: SeriesId; iter: number; only: string[] | undefined; reusePendev: number | undefined; resume: boolean; dryRun: boolean };
+/**
+ * Pakai ulang pen.dev: nomor iterasi untuk semua prompt (`--reuse-pendev 1`), atau peta per prompt
+ * (`--reuse-pendev P8=1,P9=1`): prompt di luar peta menjalankan pen.dev baru.
+ */
+export type ReuseSpec = number | Record<string, number>;
+
+/** Iterasi sumber pen.dev untuk prompt `id` (murni); undefined = pen.dev baru. */
+export const reuseFor = (spec: ReuseSpec | undefined, id: string): number | undefined => (typeof spec === 'number' ? spec : spec?.[id]);
+
+/** Teks pakai ulang untuk laporan/log (murni). */
+export const reuseText = (spec: ReuseSpec | undefined): string =>
+  spec === undefined ? 'tidak' : typeof spec === 'number' ? `iterasi ${spec}` : `${Object.entries(spec).map(([id, j]) => `${id} ← iterasi ${j}`).join(', ')}; prompt lain pen.dev baru`;
+
+export type PracticeArgs = { series: SeriesId; iter: number; only: string[] | undefined; reusePendev: ReuseSpec | undefined; resume: boolean; dryRun: boolean };
 
 const posInt = (s: string | undefined) => (s !== undefined && /^[1-9]\d*$/.test(s) ? Number(s) : undefined);
 
@@ -200,11 +222,28 @@ export function parsePracticeArgs(args: readonly string[]): { ok: true; value: P
     if (!only.length || only.some((x) => !series.ids.test(x))) return { ok: false, error: `--only ${JSON.stringify(onlyRaw)}: daftar ID prompt latihan (mis. ${series.id === 'practice' ? 'P1,P3' : series.id === 'polish' ? 'P7' : 'P5'})` };
     only = [...new Set(only)];
   }
-  let reusePendev: number | undefined;
+  let reusePendev: ReuseSpec | undefined;
   if (reuseRaw !== undefined) {
-    reusePendev = posInt(reuseRaw);
-    if (reusePendev === undefined) return { ok: false, error: `--reuse-pendev ${JSON.stringify(reuseRaw)}: nomor iterasi sumber` };
-    if (reusePendev >= iter) return { ok: false, error: `--reuse-pendev ${reusePendev} harus iterasi sebelum ${iter}` };
+    const n = posInt(reuseRaw);
+    if (n !== undefined) {
+      if (n >= iter) return { ok: false, error: `--reuse-pendev ${n} harus iterasi sebelum ${iter}` };
+      reusePendev = n;
+    } else {
+      const map: Record<string, number> = {};
+      const parts = reuseRaw.split(',').map((x) => x.trim()).filter(Boolean);
+      if (!parts.length) return { ok: false, error: `--reuse-pendev ${JSON.stringify(reuseRaw)}: nomor iterasi sumber atau peta per prompt (mis. P8=1,P9=1)` };
+      for (const part of parts) {
+        const m = /^([A-Za-z0-9]+)=([^=]+)$/.exec(part);
+        const j = m ? posInt(m[2]) : undefined;
+        if (!m || j === undefined) return { ok: false, error: `--reuse-pendev ${JSON.stringify(reuseRaw)}: nomor iterasi sumber atau peta per prompt (mis. P8=1,P9=1)` };
+        const id = m[1]!;
+        if (!series.ids.test(id)) return { ok: false, error: `--reuse-pendev: ${id} bukan ID prompt seri ${series.id}` };
+        if (id in map) return { ok: false, error: `--reuse-pendev: ${id} ditulis dua kali` };
+        if (j >= iter) return { ok: false, error: `--reuse-pendev ${id}=${j} harus iterasi sebelum ${iter}` };
+        map[id] = j;
+      }
+      reusePendev = map;
+    }
   }
   return { ok: true, value: { series: series.id, iter, only, reusePendev, resume, dryRun } };
 }
@@ -236,13 +275,24 @@ export function pendevReuseProblems(from: number, ids: readonly string[], read: 
   return out;
 }
 
-/** Perkiraan biaya sisa iterasi (murni): run yang belum final + juri yang belum lengkap. */
-export function estimateCost(i: { prompts: readonly string[]; reusePendev: boolean; doneRuns: ReadonlySet<string>; doneJudge: ReadonlySet<string> }): number {
+/**
+ * Perkiraan biaya sisa iterasi (murni): run yang belum final + juri yang belum lengkap. `reusePendev`: true = semua
+ * prompt memakai ulang pen.dev, atau himpunan ID prompt yang memakai ulang.
+ */
+export function estimateCost(i: {
+  prompts: readonly string[];
+  reusePendev: boolean | ReadonlySet<string>;
+  doneRuns: ReadonlySet<string>;
+  doneJudge: ReadonlySet<string>;
+  estimate?: CostEstimate;
+}): number {
+  const e = i.estimate ?? COST_ESTIMATE;
   let usd = 0;
   for (const p of i.prompts) {
-    if (!i.reusePendev && !i.doneRuns.has(`${p}-pendev`)) usd += COST_ESTIMATE.pendev;
-    if (!i.doneRuns.has(`${p}-lakar`)) usd += COST_ESTIMATE.lakar;
-    if (!i.doneJudge.has(p)) usd += COST_ESTIMATE.judge;
+    const reused = typeof i.reusePendev === 'boolean' ? i.reusePendev : i.reusePendev.has(p);
+    if (!reused && !i.doneRuns.has(`${p}-pendev`)) usd += e.pendev;
+    if (!i.doneRuns.has(`${p}-lakar`)) usd += e.lakar;
+    if (!i.doneJudge.has(p)) usd += e.judge;
   }
   return Math.round(usd * 100) / 100;
 }
@@ -339,7 +389,7 @@ export type PracticeFrozen = {
   distSha: Record<string, string>;
   rubric: { version: string | undefined; lampiranBSha256: string };
   judge: { model: string; argv: string; textSha256: Record<string, string> };
-  reusePendev: number | undefined;
+  reusePendev: ReuseSpec | undefined;
 };
 
 /** Field beku yang dibandingkan saat --resume (pid/startedAt lakard boleh berbeda karena restart). */
@@ -357,7 +407,7 @@ export function practiceDrift(first: PracticeFrozen, now: PracticeFrozen): strin
     distSha: JSON.stringify(f.distSha),
     rubric: JSON.stringify(f.rubric),
     judge: JSON.stringify(f.judge.textSha256),
-    reusePendev: String(f.reusePendev ?? ''),
+    reusePendev: typeof f.reusePendev === 'object' ? JSON.stringify(f.reusePendev) : String(f.reusePendev ?? ''),
   });
   const a = pick(first);
   const b = pick(now);
@@ -406,7 +456,21 @@ export type PracticeReport = {
   penDesktopRestart?: PenDesktopRestart | string;
   /** Seri efek iterasi > 1: Lakar iterasi 1 vs iterasi ini. */
   comparison?: BeforeAfter[];
+  /** Iterasi ≥ 3 (story 24): versi rubrik iterasi 1 vs iterasi ini dan wall pen.dev per prompt (lama vs baru). */
+  comparisonMeta?: ComparisonMeta;
 };
+
+export type ComparisonMeta = { rubricFirst: string | undefined; rubricNow: string | undefined; pendevWall: Record<string, { first: number | undefined; now: number | undefined }> };
+
+/** Meta perbandingan iterasi ≥ 3 (murni): versi rubrik beku + wall pen.dev iterasi 1 vs sekarang per prompt. */
+export function comparisonMeta(
+  first: Pick<PracticeReport, 'frozen' | 'results'> | undefined,
+  now: { rubricVersion: string | undefined; results: readonly Pick<PracticePromptResult, 'id' | 'runs'>[] },
+): ComparisonMeta {
+  const pendevWall: ComparisonMeta['pendevWall'] = {};
+  for (const r of now.results) pendevWall[r.id] = { first: first?.results.find((x) => x.id === r.id)?.runs.pendev?.record.wallMs, now: r.runs.pendev?.record.wallMs };
+  return { rubricFirst: first?.frozen.rubric.version, rubricNow: now.rubricVersion, pendevWall };
+}
 
 const sec = (ms: number | undefined) => (ms === undefined ? '–' : (ms / 1000).toFixed(1));
 const usd = (x: number | undefined) => (x === undefined ? '–' : `$${x.toFixed(2)}`);
@@ -451,7 +515,21 @@ export function renderPracticeMarkdown(r: PracticeReport): string {
     L.push('## Restart pen-desktop', '');
     L.push(typeof x === 'string' ? `- Tidak dijalankan: ${x}.` : `- Restart pen-desktop sesudah run pen.dev terakhir: **${x.ok ? 'berhasil' : 'GAGAL'}**, durasi ${sec(x.ms)} dtk (${cell(x.detail)}).`, '');
   }
-  if (r.comparison) {
+  if (r.comparison && r.comparisonMeta) {
+    const m = r.comparisonMeta;
+    L.push('## Sebelum (iterasi 1) vs sesudah (Lakar)', '');
+    L.push(`Rubrik juri iterasi 1: versi ${m.rubricFirst ?? '?'}; iterasi ini: versi ${m.rubricNow ?? '?'}${m.rubricFirst !== m.rubricNow ? ' (aturan ukuran mengikat bisa berbeda; lihat Versi beku)' : ''}.`, '');
+    L.push('| Prompt | Keputusan iter 1 | Keputusan sekarang | T iter 1 → sekarang | D iter 1 → sekarang | Rasio waktu iter 1 → sekarang | Rubrik iter 1 → sekarang | Wall pen.dev iter 1 → sekarang (dtk) |');
+    L.push('|---|---|---|---|---|---|---|---|');
+    const rt = (x: number | undefined) => (x === undefined ? '–' : x.toFixed(2));
+    for (const c of r.comparison) {
+      const w = m.pendevWall[c.id];
+      L.push(
+        `| ${c.id} | ${c.before?.decision ?? '–'} | ${c.after.decision} | ${num(c.before?.t)} → ${num(c.after.t)} | ${num(c.before?.d)} → ${num(c.after.d)} | ${rt(c.before?.ratio)} → ${rt(c.after.ratio)} | ${m.rubricFirst ?? '?'} → ${m.rubricNow ?? '?'} | ${sec(w?.first)} → ${sec(w?.now)} |`,
+      );
+    }
+    L.push('');
+  } else if (r.comparison) {
     L.push('## Sebelum (iterasi 1) vs sesudah (Lakar)', '');
     L.push('| Prompt | Keputusan iter 1 | Keputusan sekarang | T iter 1 → sekarang | D iter 1 → sekarang | Rasio waktu iter 1 → sekarang |');
     L.push('|---|---|---|---|---|---|');
@@ -504,7 +582,7 @@ export function renderPracticeMarkdown(r: PracticeReport): string {
   for (const [k, v] of Object.entries(f.skills)) L.push(`- skill \`${k}\` sha256 \`${v}\``);
   for (const [k, v] of Object.entries(f.distSha)) L.push(`- sha256 \`packages/${k}/dist\`: \`${v}\``);
   L.push(`- Rubrik juri: versi ${f.rubric.version ?? '?'}; sha256 Lampiran B \`${f.rubric.lampiranBSha256}\``);
-  L.push(`- Pakai ulang pen.dev: ${f.reusePendev ? `iterasi ${f.reusePendev}` : 'tidak'}`);
+  L.push(`- Pakai ulang pen.dev: ${reuseText(f.reusePendev)}`);
   L.push(`- Argv Lakar: \`${r.argv.lakar}\``);
   L.push(`- Argv pen.dev: \`${r.argv.pendev}\``);
   L.push(`- Argv juri: \`${r.argv.judge}\``, '');
@@ -540,12 +618,15 @@ export function practicePromptC7Problems(rendered: string, goldenMd: string): st
   return out;
 }
 
-/** Penjaga rubrik (murni): versi Lampiran B = rubric.json = 2.1 dan sha Lampiran B = snapshot. */
+/**
+ * Penjaga rubrik (murni): versi saat ini diterima bila versi Lampiran B = rubric.json (≥ 2.1, aturan keputusan v2) dan
+ * sha Lampiran B = snapshot. Versi dicatat di `frozen.json` dan menentukan aturan ukuran (`sizeRuleFor`).
+ */
 export function practiceRubricProblems(designMd: string, rubric: RubricJson | undefined): string[] {
   const out: string[] = [];
   const v = rubricVersionOf(designMd)?.version;
   if (!rubric) return ['bench/rubric/rubric.json tidak ada'];
-  if (rubric.version !== PRACTICE_RUBRIC_VERSION) out.push(`rubric.json versi ${rubric.version} ≠ ${PRACTICE_RUBRIC_VERSION}`);
+  if (!versionAtLeast(rubric.version, PRACTICE_RUBRIC_MIN)) out.push(`rubric.json versi ${rubric.version} < ${PRACTICE_RUBRIC_MIN}`);
   if (v !== rubric.version) out.push(`versi Lampiran B ${v ?? '(tanpa baris versi)'} ≠ rubric.json ${rubric.version}`);
   const s = sha256(lampiranB(designMd));
   if (s !== rubric.sourceSha256['lampiran-b.md']) out.push(`sha256 Lampiran B ${s} ≠ rubric.json ${rubric.sourceSha256['lampiran-b.md'] ?? '(tidak ada)'}`);
@@ -619,8 +700,19 @@ export async function practiceMain(argv: string[]): Promise<number> {
   if (sel.problems.length) throw new Abort(sel.problems.join('; '));
   const prompts = sel.prompts;
   log(`prompt latihan beku: sha256 ${promptsSha.slice(0, 12)}… = konstanta; ${prompts.map((p) => p.id).join(', ')}`);
-  // Mode pakai ulang: pen.dev tidak dijalankan atau disentuh, jadi pen-desktop tidak wajib hidup (penjaga md5 .pen tetap).
-  const pre = preflight({ requirePenDesktop: reusePendev === undefined });
+  // Pakai ulang pen.dev per prompt (`--reuse-pendev j` = semua; `P8=1,P9=1` = peta). Prompt tanpa sumber menjalankan
+  // pen.dev baru: hanya bila ada prompt seperti itu pen-desktop wajib hidup (penjaga md5 .pen selalu berjalan).
+  const reuseIter = (id: string) => reuseFor(reusePendev, id);
+  const reuseDirFor = (id: string) => {
+    const j = reuseIter(id);
+    return j ? join(series.runsRoot, String(j)) : undefined;
+  };
+  const freshPendev = prompts.filter((p) => !reuseIter(p.id)).map((p) => p.id);
+  if (reusePendev !== undefined && typeof reusePendev === 'object') {
+    const stray = Object.keys(reusePendev).filter((id) => !prompts.some((p) => p.id === id));
+    if (stray.length) throw new Abort(`--reuse-pendev: ${stray.join(', ')} tidak termasuk prompt yang dijalankan`);
+  }
+  const pre = preflight({ requirePenDesktop: freshPendev.length > 0 });
   const { protocol } = pre;
   const cfg = protocol.config;
   if (!existsSync(DESIGN_MD_PATH)) throw new Abort(`DESIGN.md tidak ada (${DESIGN_MD_PATH})`);
@@ -647,16 +739,25 @@ export async function practiceMain(argv: string[]): Promise<number> {
   const lp = lakarPreflightProblems(status, mcpServerNames());
   if (lp.length) throw new Abort(`preflight Lakar: ${lp.join('; ')}`);
 
-  // Pakai ulang pen.dev: iterasi sumber lengkap atau Abort sebelum spawn.
-  const reuseDir = reusePendev ? join(series.runsRoot, String(reusePendev)) : undefined;
-  if (reuseDir) {
-    const srcFrozen = readJson<{ frozen: PracticeFrozen }>(join(reuseDir, 'frozen.json'));
-    const problems = pendevReuseProblems(reusePendev!, prompts.map((p) => p.id), (id) => {
-      const rec = readJson<StoredRun>(join(reuseDir, `${id}-pendev`, 'run.json'));
-      return { exists: Boolean(rec), status: rec?.status, wallMs: rec?.wallMs, strip: existsSync(join(reuseDir, `${id}-pendev.png`)), ...(srcFrozen?.frozen.reusePendev ? { reusedFrom: srcFrozen.frozen.reusePendev } : {}) };
-    });
-    if (problems.length) throw new Abort(`iterasi sumber pen.dev tidak lengkap:\n  ${problems.join('\n  ')}`);
+  // Pakai ulang pen.dev: setiap iterasi sumber lengkap untuk promptnya, atau Abort sebelum spawn.
+  const reuseGroups = new Map<number, string[]>();
+  for (const p of prompts) {
+    const j = reuseIter(p.id);
+    if (j) reuseGroups.set(j, [...(reuseGroups.get(j) ?? []), p.id]);
   }
+  const reuseProblems: string[] = [];
+  for (const [j, ids] of reuseGroups) {
+    const dir = join(series.runsRoot, String(j));
+    const srcFrozen = readJson<{ frozen: PracticeFrozen }>(join(dir, 'frozen.json'));
+    reuseProblems.push(
+      ...pendevReuseProblems(j, ids, (id) => {
+        const rec = readJson<StoredRun>(join(dir, `${id}-pendev`, 'run.json'));
+        const chained = reuseFor(srcFrozen?.frozen.reusePendev, id);
+        return { exists: Boolean(rec), status: rec?.status, wallMs: rec?.wallMs, strip: existsSync(join(dir, `${id}-pendev.png`)), ...(chained ? { reusedFrom: chained } : {}) };
+      }),
+    );
+  }
+  if (reuseProblems.length) throw new Abort(`iterasi sumber pen.dev tidak lengkap:\n  ${reuseProblems.join('\n  ')}`);
 
   // Biaya: iterasi sebelumnya + yang sudah terpakai di iterasi ini (resume) + perkiraan sisa ≤ anggaran.
   const prev = previousCosts(iter, (j) => readJson(join(BENCH_ROOT, `${series.reportPrefix}-${j}.json`)), (j) => storedIterationCost(join(series.runsRoot, String(j))));
@@ -664,7 +765,7 @@ export async function practiceMain(argv: string[]): Promise<number> {
   let spentHere = 0;
   for (const p of prompts)
     for (const t of TOOLS) {
-      if (t === 'pendev' && reuseDir) continue;
+      if (t === 'pendev' && reuseDirFor(p.id)) continue;
       const rec = readJson<StoredRun>(runRecordPath(join(iterDir, `${p.id}-${t}`)));
       if (rec && isFinalRun(rec)) {
         doneRuns.add(`${p.id}-${t}`);
@@ -677,7 +778,8 @@ export async function practiceMain(argv: string[]): Promise<number> {
     spentHere += reps.reduce((s, x) => s + (x?.costUsd ?? 0), 0);
     if (reps.every((x) => x && x.status !== 'invalid')) doneJudge.add(p.id);
   }
-  const estimate = estimateCost({ prompts: prompts.map((p) => p.id), reusePendev: Boolean(reuseDir), doneRuns, doneJudge });
+  const costEst = series.costEstimate ?? COST_ESTIMATE;
+  const estimate = estimateCost({ prompts: prompts.map((p) => p.id), reusePendev: new Set(prompts.filter((p) => reuseIter(p.id)).map((p) => p.id)), doneRuns, doneJudge, estimate: costEst });
   const budget = budgetProblem(prev.total + spentHere, estimate, series.budgetUsd);
 
   const head = git(REPO_ROOT, ['rev-parse', 'HEAD']);
@@ -689,7 +791,7 @@ export async function practiceMain(argv: string[]): Promise<number> {
   const archiveSources = benchLakarSources([ROUNDS_RUNS, PRACTICE_RUNS, EFFECTS_RUNS, POLISH_RUNS], { root: series.runsRoot, id: String(iter) });
   const archivePlan = planLakarArchive(status.dataDir, [...new Set(archiveSources.map((x) => x.slug))], archiveDir);
 
-  console.log(`${series.id === 'practice' ? 'practice' : `practice seri ${series.id}`} iterasi ${iter}${reusePendev ? ` (pen.dev dipakai ulang dari iterasi ${reusePendev})` : ''}`);
+  console.log(`${series.id === 'practice' ? 'practice' : `practice seri ${series.id}`} iterasi ${iter}${reusePendev !== undefined ? ` (pen.dev dipakai ulang: ${reuseText(reusePendev)})` : ''}`);
   console.log(`prompts.json sha256 ${promptsSha} (beku: sama); protocolHash ${protocol.hash}; rubrik ${rubric!.version} (Lampiran B = snapshot)`);
   console.log(`C7 prompt latihan: lulus; C7 juri: lulus\ngit HEAD ${head}; porcelain packages/tools/bench: ${porcelain ? `TIDAK KOSONG\n${porcelain}` : 'kosong'}`);
   for (const p of prompts) {
@@ -697,17 +799,18 @@ export async function practiceMain(argv: string[]): Promise<number> {
     console.log(`\n=== ${p.id} ${p.name} (${p.kind}, ${sizeText(p.size)}) ===`);
     console.log(`teks juri sha256 ${judgeTexts[p.id]!.sha256}`);
     console.log(`argv Lakar:\n${argvFor(LAKAR_MCP_CONFIG, LAKAR_ALLOWED_TOOLS, rendered)}`);
-    console.log(reuseDir ? `pen.dev: dipakai ulang dari ${relative(REPO_ROOT, join(reuseDir, `${p.id}-pendev`))}` : `argv pen.dev:\n${argvFor(PENDEV_MCP_CONFIG, PENDEV_ALLOWED_TOOLS, rendered)}`);
+    const rd = reuseDirFor(p.id);
+    console.log(rd ? `pen.dev: dipakai ulang dari ${relative(REPO_ROOT, join(rd, `${p.id}-pendev`))}` : `pen.dev baru; argv pen.dev:\n${argvFor(PENDEV_MCP_CONFIG, PENDEV_ALLOWED_TOOLS, rendered)}`);
   }
   console.log(`\n=== argv juri (stdin: satu pesan stream-json teks + gambar) ===\n${judgeArgv}`);
   console.log(
-    `\nbiaya: iterasi sebelumnya ${Object.entries(prev.byIter).map(([j, c]) => `${j}: $${c.toFixed(2)}`).join(', ') || '–'}; terpakai di iterasi ini $${spentHere.toFixed(2)}; perkiraan sisa $${estimate.toFixed(2)} (per prompt: pen.dev $${COST_ESTIMATE.pendev}, Lakar $${COST_ESTIMATE.lakar}, juri $${COST_ESTIMATE.judge}); anggaran $${series.budgetUsd}: ${budget ?? 'cukup'}`,
+    `\nbiaya: iterasi sebelumnya ${Object.entries(prev.byIter).map(([j, c]) => `${j}: $${c.toFixed(2)}`).join(', ') || '–'}; terpakai di iterasi ini $${spentHere.toFixed(2)}; perkiraan sisa $${estimate.toFixed(2)} (per prompt: pen.dev $${costEst.pendev}, Lakar $${costEst.lakar}, juri $${costEst.judge}); anggaran $${series.budgetUsd}: ${budget ?? 'cukup'}`,
   );
   if (series.restartPenDesktop)
     console.log(
-      reuseDir
+      !freshPendev.length
         ? '\nrestart pen-desktop: tidak (pen.dev dipakai ulang)'
-        : `\nrestart pen-desktop: sekali sesudah run pen.dev terakhir iterasi ini, sebelum juri; tunggu active + MCP pencil menjawab (maks ${PEN_RESTART_LIMIT_S} dtk); hasil dicatat di laporan${dryRun ? ' (dry-run: tidak dijalankan)' : ''}`,
+        : `\npen.dev baru: ${freshPendev.join(', ')} (preflight pen-desktop wajib; penjaga md5 .pen berjalan)\nrestart pen-desktop: sekali sesudah run pen.dev terakhir iterasi ini, sebelum juri; tunggu active + MCP pencil menjawab (maks ${PEN_RESTART_LIMIT_S} dtk); hasil dicatat di laporan${dryRun ? ' (dry-run: tidak dijalankan)' : ''}`,
     );
   console.log(`\narsip dokumen Lakar bench lama (lalu restart lakard, wajib): ${describeLakarArchive(status.dataDir, archivePlan, archiveSources)}`);
   if (dryRun) return 0;
@@ -779,7 +882,8 @@ export async function practiceMain(argv: string[]): Promise<number> {
   outer: for (const p of prompts) {
     for (const tool of ['pendev', 'lakar'] as const) {
       const key = `${p.id}-${tool}`;
-      if (tool === 'pendev' && reuseDir) {
+      const reuseDir = tool === 'pendev' ? reuseDirFor(p.id) : undefined;
+      if (reuseDir) {
         const rec = readJson<StoredRun>(runRecordPath(join(reuseDir, key)))!;
         if (rec.uri) prevUris.push(rec.uri);
         runs.set(key, roundRunFrom(reuseDir, key, p.id, tool, rec, []));
@@ -841,7 +945,7 @@ export async function practiceMain(argv: string[]): Promise<number> {
   if (series.restartPenDesktop) {
     const step = await penDesktopRestartStep({
       pendevRan,
-      reusedFrom: reuseDir ? `iterasi ${reusePendev}` : undefined,
+      reusedFrom: !freshPendev.length && reusePendev !== undefined ? reuseText(reusePendev) : undefined,
       file: join(iterDir, 'pen-desktop-restart.json'),
       restart: () => {
         log('restart pen-desktop (sesudah run pen.dev terakhir)');
@@ -867,7 +971,10 @@ export async function practiceMain(argv: string[]): Promise<number> {
   // ---------- strip + juri + keputusan ----------
   const results: PracticePromptResult[] = [];
   let judgeCost = 0;
+  // Aturan ukuran mengikat dari versi rubrik yang dibekukan iterasi ini (simetris untuk Lakar dan pen.dev).
+  const sizeRule = sizeRuleFor(frozenFirst.frozen.rubric.version);
   for (const p of prompts) {
+    const reuseDir = reuseDirFor(p.id);
     const r: Partial<Record<Tool, RoundRun>> = { lakar: runs.get(`${p.id}-lakar`), pendev: runs.get(`${p.id}-pendev`) };
     const images: Partial<Record<Tool, DesignImages>> = {};
     const pngs: Record<Tool, string | undefined> = { lakar: undefined, pendev: undefined };
@@ -900,8 +1007,8 @@ export async function practiceMain(argv: string[]): Promise<number> {
     }
     const lakarRec = r.lakar?.record;
     const pendevRec = r.pendev?.record;
-    const sizeProblems = lakarRec?.lakar ? boardSizeProblemsFor(p.size, lakarRec.lakar.boards) : [];
-    const pendevSizeProblems = pendevRec ? boardSizeProblemsFor(p.size, pendevRec.frames) : [];
+    const sizeProblems = lakarRec?.lakar ? boardSizeProblemsFor(p.size, lakarRec.lakar.boards, sizeRule) : [];
+    const pendevSizeProblems = pendevRec ? boardSizeProblemsFor(p.size, pendevRec.frames, sizeRule) : [];
     const gate = lakarRec ? lakarGate({ promptId: p.id, layoutGate: lakarRec.lakar?.layout?.summary.gate, sizeProblems, wallMs: lakarRec.wallMs, baselineMedianMs: pendevRec?.wallMs }) : undefined;
     let reps: JudgeRepRecord[] = [];
     if (!fatal && images.lakar && images.pendev)
@@ -936,7 +1043,7 @@ export async function practiceMain(argv: string[]): Promise<number> {
       size: p.size,
       judgeTextSha256: judgeTexts[p.id]?.sha256,
       runs: r,
-      pendevReusedFrom: reusePendev,
+      pendevReusedFrom: reuseIter(p.id),
       gate,
       sizeProblems,
       pendevSizeProblems,
@@ -980,6 +1087,7 @@ export async function practiceMain(argv: string[]): Promise<number> {
     notes,
     ...(penDesktopRestart !== undefined ? { penDesktopRestart } : {}),
     ...(series.compareWithFirst && iter > 1 ? { comparison: beforeAfter(firstReport?.results, results) } : {}),
+    ...(series.compareWithFirst && iter >= 3 ? { comparisonMeta: comparisonMeta(firstReport, { rubricVersion: frozenFirst.frozen.rubric.version, results }) } : {}),
   };
   writeFileSync(mdPath, renderPracticeMarkdown(report));
   writeFileSync(join(BENCH_ROOT, `${series.reportPrefix}-${iter}.json`), renderPracticeJson(report));

@@ -14,7 +14,7 @@ dan laporan `bench/round-<id>.md|json`, `bench/score-<prompt>.md|json` (putaran 
 /opt/node-26/bin/node bench/dist/cli.js round --round <uji-k|n> [--dry-run] [--resume]
 /opt/node-26/bin/node bench/dist/cli.js rejudge --from <uji-k|n> --label <slug> [--resume] [--dry-run]
 /opt/node-26/bin/node bench/dist/cli.js rubric-snapshot [--version <v>]
-/opt/node-26/bin/node bench/dist/cli.js practice [--series practice|effects|polish] --iter <k> [--only P1,P3] [--reuse-pendev <j>] [--resume] [--dry-run]
+/opt/node-26/bin/node bench/dist/cli.js practice [--series practice|effects|polish] --iter <k> [--only P1,P3] [--reuse-pendev <j>|P8=1,P9=1] [--resume] [--dry-run]
 ```
 
 ## Rubrik juri (v2) dan snapshot
@@ -31,6 +31,11 @@ Riwayatnya disimpan tracked di `bench/rubric/`:
   (D_L ≤ D_P − 2 atau R9/R10 0 vs 2) dinetralkan menjadi Setara hanya bila pen.dev melanggar brief mengikat
   (`boardSizeProblems` frame pen.dev, atau median R1 pen.dev = 0); Lebih baik butuh T_L ≥ T_P + 3 dan D_L ≥ D_P.
   Juri tidak melihat aturan keputusan.
+- **Aturan ukuran mengikat (story 24):** `sizeRuleFor(<versi rubrik beku run>)`. Rubrik < 2.2 (atau tak diketahui) =
+  persis. Rubrik ≥ 2.2 = untuk spesifikasi layar mobile (tinggi tetap, lebar ≤ 480) lebar sama dan tinggi ≥ yang diminta
+  (satu board panjang bergulir sah); landing tetap hanya lebar, app tetap persis. Aturan yang sama dipakai untuk gerbang
+  Lakar dan pelanggaran brief pen.dev (simetris). Versi diambil dari `frozen.json` run (putaran: `judge.rubricVersion`,
+  latihan: `rubric.version`; `rejudge`: versi beku putaran sumber), jadi laporan lama yang di-render ulang tidak bergeser.
 - **Penjaga sha:** setiap laporan `round`/`rejudge` mencatat versi rubrik dan sha256 teks juri per prompt; teks juri
   juga disalin ke `<run>/judge/<prompt>/judge-text.md`. Putaran resmi di-abort (`officialFreezeProblems`) dan
   `rejudge` menolak berjalan bila sha teks juri saat ini ≠ `bench/rubric/rubric.json` (DESIGN.md/golden-set.md
@@ -54,7 +59,7 @@ rubrik saat ini, tanpa agen desain: hanya `claude -p` juri (3 ulangan per prompt
 ## Latihan skill (`practice`)
 
 Latihan menguji revisi skill Lakar pada empat prompt latihan (`bench/practice/prompts.json`, P1–P4, bukan A–E) dengan
-runner, pembungkus (`bench/protocol/wrapper.txt`, read-only), dan juri rubrik v2.1 yang sama dengan `round`.
+runner, pembungkus (`bench/protocol/wrapper.txt`, read-only), dan juri rubrik saat ini yang sama dengan `round`.
 **Latihan bukan gerbang G0**: keputusan G0 hanya dari putaran resmi A/B. Hasilnya dipakai untuk mengiterasi skill.
 
 - **Prompt beku:** sha256 `prompts.json` dikunci di `bench/src/practice/prompts.ts` (`PRACTICE_PROMPTS_SHA256`);
@@ -62,7 +67,7 @@ runner, pembungkus (`bench/protocol/wrapper.txt`, read-only), dan juri rubrik v2
   dibuang), tanpa frasa Kriteria/Prosedur/Risiko golden atau token terlarang, nama produk tidak ada di golden-set.
   `tests/skills-c7.test.ts` memperlakukan teks dan nama produk latihan sebagai sumber/token terlarang untuk skill.
 - **Juri:** teks juri dibangun tanpa kriteria golden (`buildJudgeTextWith(design, undefined, prompt)`: bagian kriteria
-  diganti satu kalimat netral). Preflight mewajibkan rubrik `rubric.json` = 2.1 = baris versi Lampiran B dan sha
+  diganti satu kalimat netral). Preflight mewajibkan rubrik `rubric.json` (≥ 2.1, versi dicatat di `frozen.json`) = baris versi Lampiran B dan sha
   Lampiran B = snapshot, lalu penjaga bocor + C7 juri (target `c7Targets` + prompt latihan hasil render).
 - **Run:** per prompt pen.dev (lewat `runOne`, dokumen baru terverifikasi) lalu Lakar; satu run per alat per prompt per
   iterasi (C8). Sebelum run, dokumen Lakar bench lain (`runs/rounds` + `runs/practice`) diarsip dan lakard **selalu**
@@ -72,9 +77,11 @@ runner, pembungkus (`bench/protocol/wrapper.txt`, read-only), dan juri rubrik v2
   sama sebagai baseline waktu (≤ 1,5×) dan ukuran dari spesifikasi prompt (`boardSizeProblemsFor`). Iterasi lulus bila
   Lakar Setara/Lebih baik di ≥ 3 dari 4 prompt dan di setiap prompt waktu ≤ 1,5 × pen.dev, emoji Lakar (a)/(b)/(c) = 0,
   layout_check gate = 0.
-- **`--reuse-pendev <j>`:** run pen.dev iterasi j dipakai apa adanya (tercatat di laporan, biayanya tidak dihitung ulang);
-  iterasi sumber tidak lengkap → Abort sebelum spawn. Mode ini tidak menjalankan pen.dev, jadi preflight tidak mewajibkan
-  service pen-desktop aktif (penjaga md5 `.pen` tetap berjalan). `--resume` hanya mengulang run `aborted`/`invalid`.
+- **`--reuse-pendev <j>` atau `--reuse-pendev P8=1,P9=1`:** run pen.dev iterasi j dipakai apa adanya untuk semua prompt,
+  atau per prompt menurut peta (tercatat per prompt di laporan, biayanya tidak dihitung ulang); prompt di luar peta
+  menjalankan pen.dev baru. Iterasi sumber tidak lengkap → Abort sebelum spawn. Bila semua prompt memakai ulang, preflight
+  tidak mewajibkan service pen-desktop aktif; bila ada pen.dev baru, preflight pen-desktop dan restart pen-desktop sesudah
+  seri berlaku (penjaga md5 `.pen` selalu berjalan). `--resume` hanya mengulang run `aborted`/`invalid`.
 - **Anggaran:** iterasi maks 8 (iterasi 4–6, iterasi konfirmasi 7, lalu iterasi 8 = ulang penuh iterasi 7 yang batal karena
   cacat harness; dibuka Adam 2026-11-18); biaya kumulatif (dari `bench/practice-<j>.json`) + perkiraan sisa > $58,09 → Abort.
 - **Keluaran:** `bench/practice-<k>.md|json` (tracked), strip Lakar `bench/practice/<k>/<P>-lakar.png` (tracked,
@@ -103,9 +110,12 @@ md5 `.pen` sama dengan seri `practice`; tanpa `--series` perilaku seri P1–P4 t
 
 Seri ketiga untuk disiplin spacing dan komponen: tiga prompt hold-out beku `bench/practice/polish/prompts.json` (P7 mobile
 terang, P8 dashboard 1440×900, P9 landing; sha `POLISH_PROMPTS_SHA256`, penjaga n-gram juga terhadap P1–P6). Config:
-maks 3 iterasi, anggaran kumulatif $15 (`bench/polish-<j>.json`), semua prompt wajib Setara/Lebih baik. Iterasi 1 =
-baseline skill/check lama (pen.dev + Lakar + juri); iterasi 2 = sesudah perubahan dengan `--reuse-pendev 1` (C8), laporan
-memuat tabel iterasi 1 vs sesudah. Run di `bench/runs/practice-polish/<k>/`, strip Lakar `bench/practice/polish/<k>/`.
+maks 5 iterasi, anggaran kumulatif $30,24 (`bench/polish-<j>.json`; story 23 $15 + story 24 $17,50 sesudah iterasi 2),
+perkiraan biaya per prompt pen.dev $0,6 / Lakar $1,15 / juri $0,8, semua prompt wajib Setara/Lebih baik. Iterasi 1 =
+baseline skill/check lama (pen.dev + Lakar + juri); iterasi 2 = sesudah story 23 dengan `--reuse-pendev 1` (C8);
+iterasi 3–5 = story 24 (`--reuse-pendev P8=1,P9=1`: P7 pen.dev baru). Laporan memuat tabel iterasi 1 vs sesudah; iterasi
+≥ 3 menambah versi rubrik per iterasi dan wall pen.dev iterasi 1 vs sekarang. Run di `bench/runs/practice-polish/<k>/`,
+strip Lakar `bench/practice/polish/<k>/`.
 
 ## Batasan
 
@@ -123,10 +133,10 @@ kode produk + harness (`packages tools scripts bench/src bench/protocol bench/mc
 pnpm-lock.yaml .mcp.json`) tidak kosong; protocolHash, model, Claude Code, atau pen.dev desktop ≠
 `bench/baseline-pendev.json`; `fonts.missing` tidak kosong atau pool belum siap; sha256 teks juri ≠
 `bench/rubric/rubric.json`; `schemaVersion` lakard ≠ `SCHEMA_VERSION` bench (f); penyedia foto `/status.photos` bukan
-`wikimedia` (g); atau, sesudah restart lakard yang wajib (juga saat arsip kosong), `startedAt` lakard tidak lebih baru
+`unsplash` (g; key Unsplash terpasang, plan 1.24); atau, sesudah restart lakard yang wajib (juga saat arsip kosong), `startedAt` lakard tidak lebih baru
 dari file `packages/*/dist` terbaru. Sesudah restart, harness menjalankan satu probe rate limit foto (`POST
-/photos/search` kueri netral lewat sesi baru): penyedia harus `wikimedia`, ≥ 1 hasil, dan `fallbackReason` tidak
-diawali `wikimedia-`. Probe gagal → abort sebelum `frozen.json` dan run, tanpa retry otomatis. Penyedia, key, dan hasil
+/photos/search` kueri netral lewat sesi baru): penyedia harus `unsplash`, ≥ 1 hasil, dan `fallbackReason` tidak
+diawali `unsplash-`. Probe gagal → abort sebelum `frozen.json` dan run, tanpa retry otomatis. Penyedia, key, dan hasil
 probe dicatat di Versi beku. `--dry-run` hanya mencetak hasil cek serta rencana probe dan restart. Kode di-commit sebelum putaran agar SHA beku memuat produk dan harness.
 Laporan memuat keputusan G0 sementara (`decideG0`), evaluasi arah bila belum lolos, dan bagian "Konfirmasi Adam" yang
 hanya diisi Adam. Strip Lakar disalin ke `bench/round-<n>/<prompt>-lakar.png` (tracked, eksklusif); strip dan `.pen`

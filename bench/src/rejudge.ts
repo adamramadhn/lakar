@@ -10,7 +10,7 @@ import { shellQuote } from './claude-runner.js';
 import { buildJudgeArgs, EMPTY_MCP, JUDGE_REPS, type DesignImages, type JudgeRepRecord, type Tool } from './judge/run.js';
 import { APPEAL_CRITERIA, JUDGE_CRITERIA } from './judge/prompt.js';
 import { readRubricJson, rubricShaProblems, type RubricJson } from './judge/rubric.js';
-import { boardSizeProblems } from './lakar/run.js';
+import { boardSizeProblems, sizeRuleFor } from './lakar/run.js';
 import { Abort, log } from './log.js';
 import { RUNS_ROOT } from './pendev/run.js';
 import { judgeImagesFromStripPng } from './png/strip.js';
@@ -59,9 +59,12 @@ export type RejudgeSource = {
   strips: Record<Tool, string>;
   sourceDecision: { decision: string; why: string } | undefined;
   sourceTotals: Record<Tool, number | undefined>;
+  /** Versi rubrik yang dibekukan putaran sumber: menentukan aturan ukuran mengikat (`sizeRuleFor`). */
+  sourceRubricVersion?: string | undefined;
 };
 
 type SourceJson = {
+  frozen?: { judge?: { rubricVersion?: string } };
   results?: {
     prompt: string;
     gate?: GateResult;
@@ -96,6 +99,7 @@ export function loadRejudgeSources(from: string, benchRoot: string, repoRoot: st
       strips,
       sourceDecision: r.decision,
       sourceTotals: { lakar: r.score?.tools?.lakar?.total, pendev: r.score?.tools?.pendev?.total },
+      ...(src.frozen?.judge?.rubricVersion ? { sourceRubricVersion: src.frozen.judge.rubricVersion } : {}),
     });
   }
   return { sources, problems };
@@ -360,7 +364,8 @@ export async function runRejudge(o: RejudgeOptions): Promise<number> {
   const notes: string[] = [];
   let fatal: string | undefined;
   for (const s of sources) {
-    const pendevSizeProblems = boardSizeProblems(s.prompt, s.pendevFrames);
+    // Aturan ukuran putaran sumber (round-1/2: persis), bukan rubrik saat ini: keputusan lama tidak bergeser.
+    const pendevSizeProblems = boardSizeProblems(s.prompt, s.pendevFrames, sizeRuleFor(s.sourceRubricVersion));
     let reps: JudgeRepRecord[] = [];
     if (!fatal) {
       try {

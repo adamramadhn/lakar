@@ -8,7 +8,7 @@ import { buildArgs, buildEnv, shellQuote } from '../claude-runner.js';
 import { assignLabels, buildJudgeArgs, buildJudgeBlocks, EMPTY_MCP, JUDGE_REPS, runJudgeRep, type Assignment, type DesignImages, type JudgeRepRecord, type Tool } from '../judge/run.js';
 import { buildJudgeText, DESIGN_MD_PATH, JUDGE_CRITERIA, judgeC7Problems, judgeLeaks } from '../judge/prompt.js';
 import { readRubricJson, rubricShaProblems, type RubricJson } from '../judge/rubric.js';
-import { boardSizeProblems, LAKAR_ALLOWED_TOOLS, LAKAR_MCP_CONFIG, LAKARD_UNIT, lakarPreflightProblems, mcpServerNames, runLakar } from '../lakar/run.js';
+import { boardSizeProblems, sizeRuleFor, LAKAR_ALLOWED_TOOLS, LAKAR_MCP_CONFIG, LAKARD_UNIT, lakarPreflightProblems, mcpServerNames, runLakar } from '../lakar/run.js';
 import { LakardClient, type LakardStatus, type PhotoSearchResult } from '../lakar/lakard-client.js';
 import { Abort, log, sleep, stamp } from '../log.js';
 import { emptyRecord, PENDEV_ALLOWED_TOOLS, PENDEV_MCP_CONFIG, penDesktopVersion, preflight, runOne, RUNS_ROOT, type Preflight } from '../pendev/run.js';
@@ -83,7 +83,7 @@ export type OfficialFreezeInput = {
  * (a) kode bersih, (b) protokol/model/claude/pen.dev = baseline (C9: tidak di-upgrade/downgrade),
  * (c) lakard startedAt > mtime dist terbaru (sesudah restart), (d) font lengkap dan pool siap,
  * (e) sha256 teks juri dan versi rubrik = `bench/rubric/rubric.json` (snapshot tracked),
- * (f) `schemaVersion` lakard = `SCHEMA_VERSION` bench, (g) penyedia foto lakard = `wikimedia` (tanpa key Pexels, plan 1.18).
+ * (f) `schemaVersion` lakard = `SCHEMA_VERSION` bench, (g) penyedia foto lakard = `unsplash` (key Unsplash terpasang, keputusan Adam plan 1.24).
  */
 export function officialFreezeProblems(i: OfficialFreezeInput): string[] {
   const out: string[] = [];
@@ -109,27 +109,27 @@ export function officialFreezeProblems(i: OfficialFreezeInput): string[] {
     if (!((i.lakard.pool?.ready ?? 0) >= 1)) out.push(`pool render belum siap (ready=${i.lakard.pool?.ready ?? '?'})`);
     if (i.lakard.schemaVersion !== SCHEMA_VERSION) out.push(`schemaVersion lakard ${i.lakard.schemaVersion ?? '(tidak ada)'} ≠ ${SCHEMA_VERSION} (bench)`);
     if (i.lakard.photos?.provider !== EXPECTED_PHOTO_PROVIDER)
-      out.push(`penyedia foto lakard ${i.lakard.photos?.provider ?? '(tidak ada di /status)'} ≠ ${EXPECTED_PHOTO_PROVIDER} (keputusan Adam plan 1.18: tanpa key Pexels)`);
+      out.push(`penyedia foto lakard ${i.lakard.photos?.provider ?? '(tidak ada di /status)'} ≠ ${EXPECTED_PHOTO_PROVIDER} (keputusan Adam plan 1.24: key Unsplash terpasang)`);
   }
   out.push(...rubricShaProblems({ version: i.judgeText.rubricVersion, sha: i.judgeText.textSha256 }, i.rubric).map((p) => `rubrik juri: ${p}`));
   return out;
 }
 
 /** Penyedia foto yang wajib aktif di putaran resmi (g). */
-export const EXPECTED_PHOTO_PROVIDER = 'wikimedia';
+export const EXPECTED_PHOTO_PROVIDER = 'unsplash';
 /** Probe rate limit foto sebelum run berbayar: kueri netral (tidak terkait prompt A/B). */
 export const PHOTO_PROBE = { query: 'mountain lake landscape', limit: 3, preview: true } as const;
 
 /**
- * Masalah hasil probe foto (murni). Lulus bila penyedia `wikimedia`, ≥ 1 hasil, dan `fallbackReason` tidak diawali
- * `wikimedia-` (`no-key` normal). Error → masalah. Tanpa retry otomatis (plan 1.18).
+ * Masalah hasil probe foto (murni). Lulus bila penyedia `unsplash`, ≥ 1 hasil, dan `fallbackReason` tidak diawali
+ * `unsplash-`. Error → masalah. Tanpa retry otomatis (plan 1.18, penyedia plan 1.24).
  */
 export function photoProbeProblems(r: { res: PhotoSearchResult } | { error: string }): string[] {
   if ('error' in r) return [`probe foto gagal: ${r.error}`];
   const out: string[] = [];
   const { res } = r;
   if (res.provider !== EXPECTED_PHOTO_PROVIDER) out.push(`probe foto: penyedia ${res.provider} ≠ ${EXPECTED_PHOTO_PROVIDER}${res.fallbackReason ? ` (fallbackReason ${res.fallbackReason})` : ''}`);
-  else if (res.fallbackReason?.startsWith('wikimedia-')) out.push(`probe foto: fallbackReason ${res.fallbackReason}`);
+  else if (res.fallbackReason?.startsWith(`${EXPECTED_PHOTO_PROVIDER}-`)) out.push(`probe foto: fallbackReason ${res.fallbackReason}`);
   if (!res.results.length) out.push('probe foto: 0 hasil');
   return out;
 }
@@ -305,7 +305,7 @@ const CONVENTION = [
   'Sebelum run, dokumen Lakar yang dibuat/dibuka agen di putaran bench lain (`run.json` → `lakar.slug`/`lakar.opened`; run terhenti tanpa `run.json` lewat `docs-before.json` + `lakar-docs.jsonl`/`stream.jsonl`; slug di `docs-before.json` run itu tidak dihitung) dipindah dari dataDir lakard ke `bench/runs/lakar-archive/<round>-<stamp>/`, lalu lakard di-restart (salinan dokumen di memori), agar slug pilihan agen tidak bentrok (`dokumen lama`). Dokumen non-bench tidak disentuh; pembungkus dan prompt tidak berubah.',
   'Versi beku dicatat sekali di awal putaran (`frozen.json`); `--resume` memakainya dan melaporkan perbedaan.',
   'Artefak di `bench/runs/rounds/<round>/` (gitignored): dir run per `<prompt>-<alat>`, strip `<prompt>-<alat>.png`, dan `judge/<prompt>/rep-<k>/` (pemetaan X/Y, transkrip juri).',
-  'Putaran resmi (ID angka) dibekukan ketat sebelum run: `git status --porcelain` kode produk + harness kosong; protocolHash, model, Claude Code, dan pen.dev desktop = `bench/baseline-pendev.json`; lakard selalu di-restart dan `startedAt` harus lebih baru dari file `packages/*/dist` terbaru; font lengkap dan pool siap; sha256 teks juri = `bench/rubric/rubric.json`; `schemaVersion` lakard = bench; penyedia foto `wikimedia`. Sesudah restart lakard, satu probe `POST /photos/search` (kueri netral, tanpa retry otomatis) wajib dijawab Wikimedia dengan ≥ 1 hasil; gagal → abort sebelum `frozen.json` dan run. Strip Lakar disalin ke `bench/round-<n>/` (tracked); strip dan `.pen` pen.dev tetap lokal di `bench/runs/` (EULA). Putaran resmi ≥ 2 menulis skor ke `bench/round-<n>/score-<prompt>.md|json`; putaran 1 dan uji ke `bench/score-<prompt>.md|json`.',
+  'Putaran resmi (ID angka) dibekukan ketat sebelum run: `git status --porcelain` kode produk + harness kosong; protocolHash, model, Claude Code, dan pen.dev desktop = `bench/baseline-pendev.json`; lakard selalu di-restart dan `startedAt` harus lebih baru dari file `packages/*/dist` terbaru; font lengkap dan pool siap; sha256 teks juri = `bench/rubric/rubric.json`; `schemaVersion` lakard = bench; penyedia foto `unsplash`. Sesudah restart lakard, satu probe `POST /photos/search` (kueri netral, tanpa retry otomatis) wajib dijawab Unsplash dengan ≥ 1 hasil; gagal → abort sebelum `frozen.json` dan run. Strip Lakar disalin ke `bench/round-<n>/` (tracked); strip dan `.pen` pen.dev tetap lokal di `bench/runs/` (EULA). Putaran resmi ≥ 2 menulis skor ke `bench/round-<n>/score-<prompt>.md|json`; putaran 1 dan uji ke `bench/score-<prompt>.md|json`.',
 ];
 
 const DEFINITIONS = [
@@ -617,7 +617,7 @@ export async function roundMain(argv: string[]): Promise<number> {
         `- font missing: ${JSON.stringify(status.fonts?.missing ?? null)}; pool ready ${status.pool?.ready ?? '?'}\n` +
         `- schemaVersion lakard ${status.schemaVersion} (bench ${SCHEMA_VERSION}); penyedia foto ${status.photos?.provider ?? '(tidak ada di /status)'} (wajib ${EXPECTED_PHOTO_PROVIDER}), key ${status.photos?.keyFile ?? '?'}\n` +
         `- rencana: restart lakard (wajib untuk putaran resmi${archivePlan.length ? ', sesudah arsip' : ''}), lalu startedAt harus > mtime dist terbaru ${distMs === undefined ? '(dist tidak ada)' : new Date(distMs).toISOString()} (lakard sekarang: startedAt ${status.startedAt}, ${fresh ? 'sudah lebih baru' : 'lebih tua; restart akan memuat build ini'})\n` +
-        `- rencana probe foto (sesudah restart lakard, sebelum frozen.json/run): satu POST /photos/search ${JSON.stringify(PHOTO_PROBE)} lewat sesi baru; wajib penyedia ${EXPECTED_PHOTO_PROVIDER}, ≥ 1 hasil, fallbackReason bukan wikimedia-*; gagal → abort tanpa retry${dryRun ? ' (dry-run: tidak dijalankan)' : ''}\n` +
+        `- rencana probe foto (sesudah restart lakard, sebelum frozen.json/run): satu POST /photos/search ${JSON.stringify(PHOTO_PROBE)} lewat sesi baru; wajib penyedia ${EXPECTED_PHOTO_PROVIDER}, ≥ 1 hasil, fallbackReason bukan ${EXPECTED_PHOTO_PROVIDER}-*; gagal → abort tanpa retry${dryRun ? ' (dry-run: tidak dijalankan)' : ''}\n` +
         `- masalah: ${preFreeze.length ? `\n  ${preFreeze.join('\n  ')}` : 'tidak ada'}`,
     );
   }
@@ -799,6 +799,8 @@ export async function roundMain(argv: string[]): Promise<number> {
   const judgeablePrompts = new Set<string>();
   const pngCopies = new Map<string, string>();
   let judgeCost = 0;
+  // Aturan ukuran mengikat dari versi rubrik yang dibekukan putaran ini (laporan lama yang di-render ulang tetap persis).
+  const sizeRule = sizeRuleFor(frozenFirst.frozen.judge?.rubricVersion);
   for (const p of cfg.promptIds) {
     const r: Partial<Record<Tool, RoundRun>> = { lakar: runs.get(`${p}-lakar`), pendev: runs.get(`${p}-pendev`) };
     const images: Partial<Record<Tool, DesignImages>> = {};
@@ -826,13 +828,13 @@ export async function roundMain(argv: string[]): Promise<number> {
       }
     }
     const lakarRec = r.lakar?.record;
-    const sizeProblems = lakarRec?.lakar ? boardSizeProblems(p, lakarRec.lakar.boards) : [];
+    const sizeProblems = lakarRec?.lakar ? boardSizeProblems(p, lakarRec.lakar.boards, sizeRule) : [];
     const gate = lakarRec
       ? lakarGate({ promptId: p, layoutGate: lakarRec.lakar?.layout?.summary.gate, sizeProblems, wallMs: lakarRec.wallMs, baselineMedianMs: baseline.medians[p] })
       : undefined;
 
     const pendevRec = r.pendev?.record;
-    const pendevSizeProblems = pendevRec ? boardSizeProblems(p, pendevRec.frames) : [];
+    const pendevSizeProblems = pendevRec ? boardSizeProblems(p, pendevRec.frames, sizeRule) : [];
     let reps: JudgeRepRecord[] = [];
     const judgeable = Boolean(images.lakar && images.pendev);
     if (judgeable) judgeablePrompts.add(p);

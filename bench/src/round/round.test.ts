@@ -459,7 +459,7 @@ describe('pembekuan putaran resmi', () => {
     claude: '2.1.325 (Claude Code)',
     pendevDesktop: '1.2.23',
     baseline: { protocolHash: 'h', model: 'claude-opus-5-5', claude: '2.1.325', pendevDesktop: '1.2.23' },
-    lakard: { startedAt: '2026-11-18T06:00:00.000Z', fonts: { families: ['Inter'], missing: [] }, pool: { size: 2, ready: 2, recreated: 0 }, schemaVersion: SCHEMA_VERSION, photos: { provider: 'wikimedia', keyFile: 'absent', imported: 0 } },
+    lakard: { startedAt: '2026-11-18T06:00:00.000Z', fonts: { families: ['Inter'], missing: [] }, pool: { size: 2, ready: 2, recreated: 0 }, schemaVersion: SCHEMA_VERSION, photos: { provider: 'unsplash', keyFile: 'present', imported: 0 } },
     newestDistMtimeMs: Date.parse('2026-11-18T05:00:00.000Z'),
     checkLakardFresh: true,
     judgeText: { rubricVersion: '2', textSha256: { A: 'aa', B: 'bb' } },
@@ -494,21 +494,20 @@ describe('pembekuan putaran resmi', () => {
     expect(officialFreezeProblems({ ...base, lakard: { ...base.lakard!, pool: { size: 2, ready: 0, recreated: 0 } } })[0]).toContain('pool');
     expect(officialFreezeProblems({ ...base, lakard: undefined })[0]).toContain('lakard');
   });
-  it('(f) schemaVersion lakard ≠ bench / (g) penyedia foto bukan wikimedia → masalah', () => {
+  it('(f) schemaVersion lakard ≠ bench / (g) penyedia foto bukan unsplash → masalah', () => {
     expect(officialFreezeProblems({ ...base, lakard: { ...base.lakard!, schemaVersion: 1 } })).toEqual([`schemaVersion lakard 1 ≠ ${SCHEMA_VERSION} (bench)`]);
     expect(SCHEMA_VERSION).toBe(2);
     const g = (photos: NonNullable<OfficialFreezeInput['lakard']>['photos']) => officialFreezeProblems({ ...base, lakard: { ...base.lakard!, photos } });
-    expect(g({ provider: 'pexels', keyFile: 'present', imported: 0 })[0]).toContain('penyedia foto lakard pexels ≠ wikimedia');
-    expect(g(undefined)[0]).toContain('penyedia foto lakard (tidak ada di /status) ≠ wikimedia');
+    expect(g({ provider: 'wikimedia', keyFile: 'absent', imported: 0 })[0]).toContain('penyedia foto lakard wikimedia ≠ unsplash');
+    expect(g(undefined)[0]).toContain('penyedia foto lakard (tidak ada di /status) ≠ unsplash');
   });
-  it('probe foto: wikimedia ok / no-key ok; openverse wikimedia-429, 0 hasil, error → masalah', () => {
+  it('probe foto: unsplash ok; wikimedia (unsplash-429), fallbackReason unsplash-*, 0 hasil, error → masalah', () => {
     const res = (x: Partial<{ provider: string; fallbackReason: string; n: number }>) => ({
-      res: { provider: x.provider ?? 'wikimedia', ...(x.fallbackReason ? { fallbackReason: x.fallbackReason } : {}), query: 'q', results: Array.from({ length: x.n ?? 3 }, (_, i) => ({ ref: `wikimedia:${i}` })), thumbnails: [] },
+      res: { provider: x.provider ?? 'unsplash', ...(x.fallbackReason ? { fallbackReason: x.fallbackReason } : {}), query: 'q', results: Array.from({ length: x.n ?? 3 }, (_, i) => ({ ref: `unsplash:abcdef${i}` })), thumbnails: [] },
     });
     expect(photoProbeProblems(res({}))).toEqual([]);
-    expect(photoProbeProblems(res({ fallbackReason: 'no-key' }))).toEqual([]);
-    expect(photoProbeProblems(res({ provider: 'openverse', fallbackReason: 'wikimedia-429' }))).toEqual(['probe foto: penyedia openverse ≠ wikimedia (fallbackReason wikimedia-429)']);
-    expect(photoProbeProblems(res({ fallbackReason: 'wikimedia-maxlag' }))).toEqual(['probe foto: fallbackReason wikimedia-maxlag']);
+    expect(photoProbeProblems(res({ provider: 'wikimedia', fallbackReason: 'unsplash-429' }))).toEqual(['probe foto: penyedia wikimedia ≠ unsplash (fallbackReason unsplash-429)']);
+    expect(photoProbeProblems(res({ fallbackReason: 'unsplash-empty' }))).toEqual(['probe foto: fallbackReason unsplash-empty']);
     expect(photoProbeProblems(res({ n: 0 }))).toEqual(['probe foto: 0 hasil']);
     expect(photoProbeProblems({ error: 'EXEC_ERROR: pencarian foto gagal' })).toEqual(['probe foto gagal: EXEC_ERROR: pencarian foto gagal']);
   });

@@ -6,10 +6,15 @@ import { buildJudgeText, buildJudgeTextWith, DESIGN_MD_PATH, judgeC7Problems, ju
 import { readRubricJson } from '../judge/rubric.js';
 import { GOLDEN_SET_PATH, loadProtocol } from '../protocol.js';
 import type { RoundRun } from '../round/report.js';
+import { boardSizeProblems, boardSizeProblemsFor, sizeRuleFor } from '../lakar/run.js';
+import { BENCH_ROOT } from '../protocol.js';
 import { penDesktopRestartStep, restartPenDesktopAfterSeries, sha256, type PenDesktopRestartDeps } from '../sys.js';
 import {
   beforeAfter,
   budgetProblem,
+  comparisonMeta,
+  reuseFor,
+  reuseText,
   EFFECTS_SERIES,
   POLISH_RUNS,
   POLISH_SERIES,
@@ -177,12 +182,12 @@ describe('practice: penjaga', () => {
     expect(practiceDrift(frozen, { ...frozen, skills: { 'core.md': 'b' }, promptsSha256: 't' })).toEqual(['promptsSha256: s → t', 'skills: {"core.md":"a"} → {"core.md":"b"}']);
   });
 
-  it.skipIf(!HAVE_SOURCES)('rubrik bergeser → masalah; rubrik saat ini (2.1) lulus', () => {
+  it.skipIf(!HAVE_SOURCES)('rubrik bergeser → masalah; rubrik saat ini (= rubric.json = Lampiran B, ≥ 2.1) lulus', () => {
     const design = readFileSync(DESIGN_MD_PATH, 'utf8');
     const rj = readRubricJson()!;
     expect(practiceRubricProblems(design, rj)).toEqual([]);
-    expect(practiceRubricProblems(design, { ...rj, version: '2' })).toEqual(expect.arrayContaining([expect.stringContaining('rubric.json versi 2 ≠ 2.1')]));
-    expect(practiceRubricProblems(design.replace('Versi rubrik: 2.1', 'Versi rubrik: 2.2'), rj).length).toBeGreaterThan(0);
+    expect(practiceRubricProblems(design, { ...rj, version: '2' })).toEqual(expect.arrayContaining([expect.stringContaining('rubric.json versi 2 < 2.1')]));
+    expect(practiceRubricProblems(design.replace(`Versi rubrik: ${rj.version}`, 'Versi rubrik: 9.9'), rj).length).toBeGreaterThan(0);
     expect(practiceRubricProblems(design, undefined)).toEqual(['bench/rubric/rubric.json tidak ada']);
   });
 
@@ -319,8 +324,10 @@ describe('practice: seri (story 22)', () => {
     expect(passMinOf(EFFECTS_SERIES, 2)).toBe(2);
   });
 
-  it('config polish: P7–P9 beku, $15, semua prompt wajib lulus, banding iterasi 1, laporan/run/PNG terpisah', () => {
-    expect(POLISH_SERIES).toMatchObject({ id: 'polish', promptsPath: POLISH_PROMPTS_PATH, sha: POLISH_PROMPTS_SHA256, maxIter: 3, budgetUsd: 15, passRule: 'all', reportPrefix: 'polish', runsRoot: POLISH_RUNS, restartPenDesktop: true, compareWithFirst: true });
+  it('config polish: P7–P9 beku, maks 5 iterasi, $30,24 kumulatif, perkiraan biaya sendiri, semua prompt wajib lulus, banding iterasi 1, laporan/run/PNG terpisah', () => {
+    expect(POLISH_SERIES).toMatchObject({ id: 'polish', promptsPath: POLISH_PROMPTS_PATH, sha: POLISH_PROMPTS_SHA256, maxIter: 5, budgetUsd: 30.24, passRule: 'all', reportPrefix: 'polish', runsRoot: POLISH_RUNS, restartPenDesktop: true, compareWithFirst: true });
+    expect(POLISH_SERIES.costEstimate).toEqual({ pendev: 0.6, lakar: 1.15, judge: 0.8 });
+    expect(parsePracticeArgs(['--series', 'polish', '--iter', '6'])).toMatchObject({ ok: false, error: '--iter 6 > 5: iterasi seri polish maksimal 5' });
     expect(POLISH_SERIES.runsRoot.endsWith('bench/runs/practice-polish')).toBe(true);
     expect(POLISH_SERIES.pngDir.endsWith('bench/practice/polish')).toBe(true);
     expect(SERIES.polish).toBe(POLISH_SERIES);
@@ -355,6 +362,98 @@ describe('practice: seri (story 22)', () => {
       ['P5', 'Kalah', 'Setara', 2, 1.2],
       ['P6', undefined, 'Setara', undefined, 1],
     ]);
+  });
+});
+
+describe('story 24: pakai ulang pen.dev per prompt, biaya seri, perbandingan iterasi ≥ 3', () => {
+  it('--reuse-pendev: angka (semua prompt) atau peta per prompt; ID/iterasi tidak valid ditolak', () => {
+    expect(parsePracticeArgs(['--series', 'polish', '--iter', '3', '--reuse-pendev', 'P8=1,P9=1'])).toMatchObject({ ok: true, value: { reusePendev: { P8: 1, P9: 1 } } });
+    expect(parsePracticeArgs(['--series', 'polish', '--iter', '4', '--reuse-pendev', 'P7=3,P8=1,P9=1'])).toMatchObject({ ok: true, value: { reusePendev: { P7: 3, P8: 1, P9: 1 } } });
+    expect(parsePracticeArgs(['--series', 'polish', '--iter', '3', '--reuse-pendev=2'])).toMatchObject({ ok: true, value: { reusePendev: 2 } });
+    for (const bad of ['P8=3', 'P1=1', 'P8=1,P8=1', 'P8', 'P8=0', 'P8=x', ',']) expect(parsePracticeArgs(['--series', 'polish', '--iter', '3', '--reuse-pendev', bad]).ok, bad).toBe(false);
+    expect(reuseFor(1, 'P7')).toBe(1);
+    expect(reuseFor({ P8: 1 }, 'P7')).toBeUndefined();
+    expect(reuseFor({ P8: 1 }, 'P8')).toBe(1);
+    expect(reuseFor(undefined, 'P8')).toBeUndefined();
+    expect(reuseText(1)).toBe('iterasi 1');
+    expect(reuseText(undefined)).toBe('tidak');
+    expect(reuseText({ P8: 1, P9: 1 })).toBe('P8 ← iterasi 1, P9 ← iterasi 1; prompt lain pen.dev baru');
+  });
+
+  it('perkiraan biaya: pen.dev dihitung hanya untuk prompt tanpa sumber; perkiraan seri polish', () => {
+    const ids = ['P7', 'P8', 'P9'];
+    const est = POLISH_SERIES.costEstimate!;
+    // Iterasi 3 polish: P7 pen.dev baru + Lakar P7–P9 + juri = 0,6 + 3 × 1,15 + 3 × 0,8 = 6,45.
+    expect(estimateCost({ prompts: ids, reusePendev: new Set(['P8', 'P9']), doneRuns: new Set(), doneJudge: new Set(), estimate: est })).toBe(6.45);
+    expect(estimateCost({ prompts: ids, reusePendev: new Set(ids), doneRuns: new Set(), doneJudge: new Set(), estimate: est })).toBe(5.85);
+    expect(budgetProblem(12.74, 6.45, POLISH_SERIES.budgetUsd)).toBeUndefined();
+    expect(budgetProblem(25, 5.85, POLISH_SERIES.budgetUsd)).toMatch(/> \$30\.24/);
+  });
+
+  it('frozen.reusePendev peta: drift terbaca; Versi beku menyebut sumber per prompt', () => {
+    const f = { reusePendev: { P8: 1, P9: 1 } } as unknown as PracticeFrozen;
+    const base = { head: 'h', porcelain: '', protocolHash: 'p', wrapperSha256: 'w', promptsSha256: 's', model: 'm', claude: 'c', pendevDesktop: '1', lakard: {}, skills: {}, distSha: {}, rubric: { version: '2.2', lampiranBSha256: 'l' }, judge: { model: 'm', argv: 'x', textSha256: {} } };
+    expect(practiceDrift({ ...base, ...f }, { ...base, reusePendev: { P8: 1 } })).toEqual(['reusePendev: {"P8":1,"P9":1} → {"P8":1}']);
+  });
+
+  it('comparisonMeta: versi rubrik iterasi 1 vs sekarang + wall pen.dev lama vs baru per prompt; tabel diperluas hanya bila ada', () => {
+    const first = { frozen: { rubric: { version: '2.1' } }, results: [result('P7', 'Kalah', { pendevMs: 97_500 })] } as unknown as PracticeReport;
+    const now = [result('P7', 'Setara', { pendevMs: 140_000 }), result('P8', 'Setara', { pendevMs: 200_000 })];
+    const m = comparisonMeta(first, { rubricVersion: '2.2', results: now });
+    expect(m).toEqual({ rubricFirst: '2.1', rubricNow: '2.2', pendevWall: { P7: { first: 97_500, now: 140_000 }, P8: { first: undefined, now: 200_000 } } });
+  });
+});
+
+describe('story 24: aturan ukuran simetris (rubrik ≥ 2.2)', () => {
+  const b = (id: string, width: number, height: number) => ({ id, width, height });
+  it('sizeRuleFor: < 2.2 atau tak diketahui → persis; ≥ 2.2 → mobile tinggi ≥ yang diminta', () => {
+    expect(sizeRuleFor(undefined)).toBe('exact');
+    expect(sizeRuleFor('2')).toBe('exact');
+    expect(sizeRuleFor('2.1')).toBe('exact');
+    expect(sizeRuleFor('2.2')).toBe('mobile-min-height');
+    expect(sizeRuleFor('2.10')).toBe('mobile-min-height');
+    expect(sizeRuleFor('3')).toBe('mobile-min-height');
+  });
+
+  it('P7 390×844: pen.dev 390×1177 dan Lakar 390×1320 sah di 2.2, masalah di 2.1; lebar lain atau tinggi < 844 tetap masalah; landing/app tidak berubah', () => {
+    const p7 = { width: 390, height: 844 };
+    const r22 = sizeRuleFor('2.2');
+    const r21 = sizeRuleFor('2.1');
+    expect(boardSizeProblemsFor(p7, [b('pen', 390, 1177)], r22)).toEqual([]);
+    expect(boardSizeProblemsFor(p7, [b('lak', 390, 1320)], r22)).toEqual([]);
+    expect(boardSizeProblemsFor(p7, [b('pen', 390, 1177)], r21)).toEqual(['board pen 390×1177 ≠ 390×844']);
+    expect(boardSizeProblemsFor(p7, [b('x', 390, 800)], r22)).toEqual(['board x 390×800 ≠ 390×≥844']);
+    expect(boardSizeProblemsFor(p7, [b('x', 400, 1000)], r22)).toEqual(['board x 400×1000 ≠ 390×≥844']);
+    expect(boardSizeProblemsFor({ width: 1440, height: 900 }, [b('d', 1440, 1000)], r22)).toEqual(['board d 1440×1000 ≠ 1440×900']);
+    expect(boardSizeProblemsFor({ width: 1440, height: null }, [b('l', 1440, 5000)], r22)).toEqual([]);
+    expect(boardSizeProblemsFor(p7, [], r22)).toEqual(['tidak ada board']);
+  });
+
+  it('putaran round-1/2 (rubrik beku < 2.2): pelanggaran ukuran pen.dev B tetap sama persis dengan laporan tersimpan', () => {
+    for (const r of ['round-1', 'round-2']) {
+      const j = JSON.parse(readFileSync(join(BENCH_ROOT, `${r}.json`), 'utf8')) as {
+        frozen?: { judge?: { rubricVersion?: string } };
+        results: { prompt: string; pendevSizeProblems?: string[]; runs: { pendev?: { record?: { frames?: { id: string; width: number; height: number }[] } } } }[];
+      };
+      const rule = sizeRuleFor(j.frozen?.judge?.rubricVersion);
+      expect(rule, r).toBe('exact');
+      for (const x of j.results) {
+        if (!x.pendevSizeProblems) continue;
+        expect(boardSizeProblems(x.prompt, x.runs.pendev?.record?.frames ?? [], rule), `${r} ${x.prompt}`).toEqual(x.pendevSizeProblems);
+      }
+    }
+    const r2 = JSON.parse(readFileSync(join(BENCH_ROOT, 'round-2.json'), 'utf8'));
+    expect(r2.results.find((x: { prompt: string }) => x.prompt === 'B').pendevSizeProblems).toEqual(['board rgCT3 390×1044 ≠ 390×844']);
+  });
+
+  it('laporan latihan/efek/polish tersimpan di-render ulang tanpa perubahan byte', () => {
+    for (const prefix of ['practice', 'effects', 'polish'])
+      for (let k = 1; k <= 8; k++) {
+        const json = join(BENCH_ROOT, `${prefix}-${k}.json`);
+        if (!existsSync(json)) continue;
+        const md = readFileSync(join(BENCH_ROOT, `${prefix}-${k}.md`), 'utf8');
+        expect(renderPracticeMarkdown(JSON.parse(readFileSync(json, 'utf8'))) === md, `${prefix}-${k}`).toBe(true);
+      }
   });
 });
 
