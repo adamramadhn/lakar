@@ -724,3 +724,13 @@ cacat nyata, kartu berisi teks yang terpotong rata di tepi bawah `Seksi / Hero`:
 
 - Karena batas paket pen.dev tercapai, rencana awal (rerun pen.dev P7) tidak bisa dijalankan. Atas keputusan Adam, iterasi 3 memakai ulang pen.dev iterasi 1 untuk P7–P9 (`--reuse-pendev 1`). P7 pen.dev 390×1177 sah menurut rubrik 2.2, dan patokan waktu P7 tetap 97,5 dtk (target Lakar ≤ 146 dtk). MCP pencil tidak dipanggil.
 - Pilihan harness: `--iter 3 --resume`. Iterasi 3 yang dibatalkan belum menjalankan Lakar atau juri (biaya $0), jadi tidak ada run yang diulang dan C8 tetap utuh. Laporan `polish-3` yang dibatalkan ditimpa oleh hasil resume; versi dibatalkannya ada di commit `7c0f29c`.
+
+### Hasil iterasi 3 (`bench/polish-3.md`, rubrik 2.2, pen.dev dipakai ulang dari iterasi 1): **lulus**
+
+| Prompt | T L–P | D L–P | Keputusan | Waktu L / P (dtk), rasio | Emoji | Gerbang |
+|---|---|---|---|---|---|---|
+| P7 | 16–13 | 4–4 | Lebih baik | 123,3 / 97,5, 1,27 | 0 | 0 |
+| P8 | 16–16 | 4–4 | Setara | 216,1 / 213,6, 1,01 | 0 | 0 |
+| P9 | 14–9 | 4–3 | Lebih baik | 221,6 / 161,9, 1,37 | 0 | 0 |
+
+- Biaya iterasi $5,34; kumulatif seri $18,08 (1.24: $5,34 dari $17,50). P7 Lakar kini satu board 390×1442 dan 51 dtk lebih cepat dari iterasi 2. pen.dev P7 R1 0 → 2 karena rubrik 2.2; pen.dev P9 T 12 → 9 di juri ulang (PNG sama, variasi juri).

@@ -3,7 +3,7 @@ title: 'Board mobile panjang, skill webapp, foto Unsplash, dan mockup hero'
 type: feature
 ticket: '24'
 created: '2026-11-19'
-status: blocked
+status: built
 baseline_revision: '9b5652de1b71425b64d2855ac639328f560ab426'
 route: full
 route_source: auto
@@ -19,8 +19,7 @@ context:
   - '{project-root}/_bmad-output/initiative-lakar/tickets/epic-g0-inti-minimal/tickets/story-skill-polish-dan-disiplin-spacing-dari-ui-skills-plan.md'
 warnings: [multiple-goals, oversized]
 deferred: []
-blocked_at: "2026-11-19"
-blocked_reason: "seri polish iterasi 3 tidak bisa jalan: batas paket pen.dev (MCP pencil) tercapai untuk periode tagihan ini; rerun P7 pen.dev mustahil tanpa upgrade; butuh keputusan Adam (upgrade, atau pakai ulang pen.dev P7 iterasi 1)"
+prior_blocked_reason: "batas paket pen.dev tercapai saat rerun P7 iterasi 3; diselesaikan dengan keputusan Adam: pakai ulang pen.dev iterasi 1"
 ---
 
 <intent-contract>
@@ -179,3 +178,10 @@ Status: blocked (2026-11-19) — kode, review, dan verifikasi selesai; seri poli
 - **Verifikasi:** `pnpm build` lulus; `pnpm test` 959/959; api.md mutakhir; lakard active (`/status` foto `unsplash`, `keyFile present`); cek key nyata tanpa kebocoran (implementer); `tools/node26/verify.sh` semua OK, snapshot C9 identik.
 - **Blocking condition:** run pen.dev P7 iterasi 3 gagal di `pen-newdoc`: MCP pencil melaporkan batas paket pen.dev periode tagihan ini tercapai (semua tool desain diblokir). Tidak ada upaya mengakali; harness berhenti sebelum Lakar/juri, biaya $0, kumulatif seri $12,74. `.pen` lama utuh (48/48). Pilihan untuk Adam: upgrade paket lalu `practice --series polish --iter 3 --reuse-pendev P8=1,P9=1 --resume`, atau ubah rencana (pakai ulang pen.dev P7 iterasi 1 = 390×1177, sah di rubrik 2.2, dengan `--reuse-pendev 1`).
 - **Risiko sisa / follow-up:** kepatuhan cache render Unsplash perlu konfirmasi Adam; `utm_source` default `lakar` harus disamakan dengan nama aplikasi di dashboard Unsplash (`unsplash_app_name`); follow-up arsitektur AD-6/AD-10, §Deferred foto, R11 dan Decision epic (Unsplash), AD-15 (pola dua board/`scrollY`); DESIGN.md (pola mobile, Lampiran A LC-12/LC-31) dan kriteria golden B belum diperbarui; landing prosa 1500/1500 dan core 3967/4000 di batas token; LC-31 menambah beban gerbang.
+
+Status: built (2026-11-19) — seri polish iterasi 3 lulus (keputusan Adam: pen.dev iterasi 1 dipakai ulang untuk P7–P9, `--iter 3 --resume --reuse-pendev 1`).
+
+- P7: Lebih baik (T 16–13, D 4–4), Lakar 123,3 dtk vs pen.dev 97,5 dtk (rasio 1,27), board tunggal 390×1442. P8: Setara (16–16, 4–4), 216,1 vs 213,6 (1,01). P9: Lebih baik (14–9, 4–3), 221,6 vs 161,9 (1,37). Emoji 0/0/0, layout_check gate 0 di ketiganya. Rubrik 2.2.
+- Biaya iterasi 3 $5,34 (Lakar $3,07, juri $2,27); biaya 1.24 $5,34 dari $17,50; kumulatif seri $18,08 dari $30,24.
+- Catatan perbandingan: P7 pen.dev naik 12 → 13 (R1 0 → 2) karena rubrik 2.2 mengesahkan board 390×1177; pen.dev P9 turun 12 → 9 pada juri ulang (variasi juri, PNG sama). Rerun pen.dev P7 tidak terjadi (batas paket), sehingga patokan waktu tetap run tunggal 97,5 dtk.
+- Follow-up tetap terbuka: konfirmasi Adam atas pola cache render Unsplash dan `utm_source`; follow-up arsitektur/DESIGN.md seperti di atas. Adam perlu melihat PNG (done_checkpoint).
