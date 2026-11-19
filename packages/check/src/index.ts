@@ -22,10 +22,7 @@ export {
   EFFECT_BLUR_MIN,
   MAX_RADII,
   capWarnings,
-  CONTRAST_MIN,
-  CONTRAST_MIN_LARGE,
   contrastRatio,
-  isLargeText,
   lc01a,
   lc01b,
   lc02a,
@@ -78,6 +75,7 @@ export {
   SECTION_SIMILARITY_MIN,
   type BottomZone,
 } from './rules.js';
+export { CONTRAST_MIN, isLargeText, LARGE_TEXT } from '@lakar/schema';
 export { changedNodeIds, touchedBoards } from './touched.js';
 export { TOLERANCE, visibleRect } from './tree.js';
 

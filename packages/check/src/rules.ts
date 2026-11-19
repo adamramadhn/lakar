@@ -1,6 +1,8 @@
 // Aturan G0 (AD-8): satu fungsi per aturan. Masukan: board ter-resolve + hasil ukur render. Murni.
 import {
   COMPONENT_SIZES,
+  CONTRAST_MIN,
+  CONTROL_PREFIXES,
   DISPLAY_SIZES,
   FORBIDDEN_EXEMPT,
   forbiddenPhrasesIn,
@@ -10,7 +12,9 @@ import {
   KPI_SIZES,
   PARAGRAPH_MIN,
   PARAGRAPH_MIN_IN_CARD,
+  SCRIM_MIN_ALPHA,
   SPACING_VALUES,
+  textContrastMin,
   TOUCH_MIN,
   TYPE_SCALE,
   type Finding,
@@ -995,135 +999,382 @@ export function contrastRatio(a: RGB, b: RGB): number {
 }
 const toHex = (c: RGB) => `#${c.map((v) => Math.round(v * 255).toString(16).padStart(2, '0')).join('').toUpperCase()}`;
 
-export const CONTRAST_MIN = 4.5;
-export const CONTRAST_MIN_LARGE = 3;
-/** Teks besar: ≥ 24px, atau ≥ 19px dengan bobot ≥ 700. */
-export const isLargeText = (t: { size: number; weight?: number | undefined }): boolean => t.size >= 24 || (t.size >= 19 && (t.weight ?? 400) >= 700);
 const MAX_CANDIDATES = 64;
 type Effects = { opacity?: number | undefined; blend?: string | undefined; backdropBlur?: number | undefined };
 const effectsOf = (n: unknown): Effects => n as Effects;
+const isPainter = (n: ChildNode): boolean => (n.type === 'frame' || n.type === 'rect' || n.type === 'ellipse' || n.type === 'path') && fillsOf(n).length > 0;
+const stopsOf = (f: ResolvedFill): string[] => (f.type === 'solid' ? [f.color] : (f as { stops: { color: string }[] }).stops.map((s) => s.color));
+const busyFill = (f: ResolvedFill): boolean => f.type === 'image' || f.type === 'noise' || f.type === 'mesh';
+
+/** Opacity jalur node + frame leluhurnya (alpha) dan apakah opacity < 1 / blend ada di jalur (perkiraan). */
+function pathAlpha(ctx: BoardContext, n: ChildNode): { alpha: number; warn: boolean } {
+  let alpha = 1;
+  let warn = false;
+  for (const x of [n, ...ancestors(ctx, n).filter((a): a is FrameNode => a.type === 'frame')]) {
+    const e = effectsOf(x);
+    if (e.opacity !== undefined && e.opacity < 1) {
+      alpha *= e.opacity;
+      warn = true;
+    }
+    if (e.blend && e.blend !== 'normal') warn = true;
+  }
+  return { alpha, warn };
+}
+
+/** Latar efektif di belakang `rect`: kandidat warna (stop gradien → beberapa) atau alasan dilewati (tak tentu). */
+type Backdrop = { cands: RGB[]; warn: boolean } | { skip: 'image' | 'partial' | 'cover' | 'many' };
+
+/**
+ * Latar efektif LC-04 untuk persegi target (ink teks, bounds ikon/kontrol) dengan urutan dokumen `order`. Lapisan = node
+ * ber-fill sebelum `order` yang beririsan `rect` (leluhur target, atau memuat `rect` penuh; sebagian/ellipse/path → tak
+ * tentu), kecuali id di `exclude`; node ber-fill sesudah `order` yang beririsan → tak tentu; gambar/noise/mesh → tak tentu;
+ * gradien/opacity/blend/backdrop blur → `warn`. Dikomposit dari lapisan teratas sampai fill opak (tanpa fill: board, lalu putih).
+ */
+function backdrop(ctx: BoardContext, painters: readonly ChildNode[], rect: Rect, order: number, ancIds: ReadonlySet<string>, exclude: ReadonlySet<string>): Backdrop {
+  let warn = false;
+  for (const p of painters) {
+    if (ctx.order.get(p.id)! <= order || exclude.has(p.id)) continue;
+    const v = visibleRect(ctx, p);
+    if (v && intersect(v, rect)) return { skip: 'cover' };
+  }
+  type Layer = { node: ChildNode | Container; partial: boolean; alpha: number };
+  const layers: Layer[] = [];
+  for (const p of painters) {
+    if (ctx.order.get(p.id)! >= order || exclude.has(p.id)) continue;
+    const isAnc = ancIds.has(p.id);
+    const v = visibleRect(ctx, p);
+    if (!v || !intersect(v, rect)) continue;
+    const shape = p.type === 'ellipse' || p.type === 'path';
+    const partial = shape || (!isAnc && !contains(v, rect));
+    let alpha = 1;
+    for (const n of [p, ...ancestors(ctx, p).filter((a) => a.type === 'frame' && !ancIds.has(a.id))]) {
+      const e = effectsOf(n);
+      if (e.opacity !== undefined && e.opacity < 1) alpha *= e.opacity;
+      if ((e.opacity !== undefined && e.opacity < 1) || (e.blend && e.blend !== 'normal') || (e.backdropBlur ?? 0) > 0) warn = true;
+    }
+    layers.push({ node: p, partial, alpha });
+  }
+  layers.sort((a, b) => (ctx.order.get(a.node.id) ?? 0) - (ctx.order.get(b.node.id) ?? 0));
+  // Turun dari lapisan teratas sampai fill opak penuh (dasar).
+  type Paint = { fill: ResolvedFill; alpha: number };
+  const above: Paint[] = [];
+  let base: RGB[] | undefined;
+  scan: for (let i = layers.length - 1; i >= 0; i--) {
+    const l = layers[i]!;
+    if (l.partial) return { skip: 'partial' };
+    const fills = fillsOf(l.node);
+    for (let j = fills.length - 1; j >= 0; j--) {
+      const f = fills[j]!;
+      if (busyFill(f)) return { skip: 'image' };
+      const stops = stopsOf(f);
+      if (f.type !== 'solid') warn = true;
+      if (l.alpha >= 1 && stops.every((c) => parseHex(c)[3] >= 1)) {
+        base = stops.map((c) => parseHex(c).slice(0, 3) as RGB);
+        break scan;
+      }
+      above.push({ fill: f, alpha: l.alpha });
+    }
+  }
+  if (!base) {
+    const bf = fillsOf(ctx.board);
+    if (bf.some(busyFill)) return { skip: 'image' };
+    base = [[1, 1, 1]];
+    for (const f of bf) {
+      if (f.type !== 'solid') warn = true;
+      const stops = stopsOf(f);
+      base = base.flatMap((c) => stops.map((s) => over(parseHex(s), c)));
+    }
+  }
+  let cands = base;
+  for (let k = above.length - 1; k >= 0; k--) {
+    const { fill: f, alpha } = above[k]!;
+    const stops = stopsOf(f);
+    cands = cands.flatMap((c) => stops.map((s) => over(parseHex(s), c, alpha)));
+    if (cands.length > MAX_CANDIDATES) return { skip: 'many' };
+  }
+  return { cands, warn };
+}
+
+/** Rasio terburuk warna `fg` (alpha × `alpha`) dikomposit di atas setiap kandidat latar. */
+function worstOver(fg: RGBA, alpha: number, cands: readonly RGB[]): { ratio: number; fg: RGB; bg: RGB } | undefined {
+  let worst: { ratio: number; fg: RGB; bg: RGB } | undefined;
+  for (const bg of cands) {
+    const c = over(fg, bg, alpha);
+    const ratio = contrastRatio(c, bg);
+    if (!worst || ratio < worst.ratio) worst = { ratio, fg: c, bg };
+  }
+  return worst;
+}
+
+const floor2 = (r: number): number => Math.floor(r * 100) / 100;
+const idsOf = (n: ChildNode): Set<string> => new Set([n.id, ...descendants(n).map((d) => d.id)]);
+
+const CONTROL_EXPECTED = `≥ ${CONTRAST_MIN.nonText}:1 terhadap latar: stroke border-input (#7D8798) atau fill kontrol yang kontras`;
+
+/** Batas kontrol `Input /`, `Radio /`, `Checkbox /` (terluar) ≥ 3:1 terhadap latar. */
+function controlIssues(ctx: BoardContext, painters: readonly ChildNode[]): Finding[] {
+  const out: Finding[] = [];
+  for (const k of ctx.nodes) {
+    if (k.type !== 'frame' || !namedAny(k, CONTROL_PREFIXES)) continue;
+    const anc = ancestors(ctx, k);
+    if (anc.some((a) => a.type === 'frame' && namedAny(a, CONTROL_PREFIXES))) continue;
+    const v = visibleRect(ctx, k);
+    if (!v || area(v) <= 0) continue;
+    const path = pathAlpha(ctx, k);
+    if (path.alpha <= 0) continue;
+    const bd = backdrop(ctx, painters, v, ctx.order.get(k.id)!, new Set(anc.map((a) => a.id)), idsOf(k));
+    if ('skip' in bd) continue;
+    // Cat batas: stroke + fill kontrol; tanpa keduanya → keturunan frame/rect/ellipse bercat (bukan teks/ikon).
+    type BorderPaint = { colors: string[]; alpha: number };
+    const own = (n: ChildNode, alpha: number): BorderPaint[] | undefined => {
+      const paints: BorderPaint[] = [];
+      const s = (n as { stroke?: { color: string } }).stroke;
+      if (s) paints.push({ colors: [s.color], alpha });
+      for (const f of fillsOf(n)) {
+        if (busyFill(f)) return undefined;
+        const colors = stopsOf(f);
+        if (colors.some((c) => parseHex(c)[3] > 0)) paints.push({ colors, alpha });
+      }
+      return paints;
+    };
+    let paints = own(k, path.alpha);
+    if (paints === undefined) continue;
+    let warn = path.warn || bd.warn;
+    if (paints.length === 0) {
+      for (const d of descendants(k)) {
+        if ((d.type !== 'frame' && d.type !== 'rect' && d.type !== 'ellipse') || !visibleRect(ctx, d)) continue;
+        const dp = pathAlpha(ctx, d);
+        if (dp.alpha <= 0) continue;
+        const p = own(d, dp.alpha);
+        if (p === undefined) {
+          paints = undefined;
+          break;
+        }
+        if (p.length) warn ||= dp.warn;
+        paints.push(...p);
+      }
+      if (paints === undefined) continue;
+    }
+    const level = warn ? 'warning' : levelOf('LC-04');
+    if (paints.length === 0) {
+      out.push(finding('LC-04', level, k, 'batas kontrol: tanpa batas terlihat (tanpa stroke dan fill)', CONTROL_EXPECTED));
+      continue;
+    }
+    // Rasio = maksimum atas cat batas; tiap cat dinilai terhadap kandidat latar terburuk (stop gradien terburuk).
+    let best: { ratio: number; fg: RGB; bg: RGB } | undefined;
+    for (const p of paints) {
+      let worst: { ratio: number; fg: RGB; bg: RGB } | undefined;
+      for (const c of p.colors) {
+        const w = worstOver(parseHex(c), p.alpha, bd.cands);
+        if (w && (!worst || w.ratio < worst.ratio)) worst = w;
+      }
+      if (worst && (!best || worst.ratio > best.ratio)) best = worst;
+    }
+    if (!best || best.ratio >= CONTRAST_MIN.nonText) continue;
+    out.push(
+      finding(
+        'LC-04',
+        level,
+        k,
+        clip120(`batas kontrol ${floor2(best.ratio)}:1 (${toHex(best.fg)} di atas ${toHex(best.bg)}${warn ? ', gradien/opacity/blend: perkiraan' : ''})`),
+        CONTROL_EXPECTED,
+      ),
+    );
+  }
+  return out;
+}
+
+/** Komponen yang labelnya = teks di dalam komponen terdekat. */
+const LABEL_COMPONENTS = ['Button /', 'IconButton /', 'Tab /', 'Link /', 'Chip /', 'Badge /', 'Input /', 'Radio /', 'Checkbox /', 'Stepper /'];
+/** Chrome sistem (dirender OS di atas apa pun): ikon dan teks di dalamnya tidak dinilai ikon tanpa label/scrim. */
+const SYSTEM_CHROME = ['Status bar', 'Home indicator'];
+const ICON_BRAND_LIBS = new Set(['simple-icons']);
+
+/** Isi tampak untuk pencarian label ikon: teks tak kosong, ikon, path, node bercat, atau frame berisi itu. */
+const hasContent = (n: ChildNode): boolean =>
+  n.type === 'text'
+    ? nonEmpty(n)
+    : n.type === 'icon' || n.type === 'path' || fillsOf(n).length > 0 || (n as { stroke?: unknown }).stroke !== undefined || (n.type === 'frame' && n.children.some(hasContent));
+const hasVisibleText = (ctx: BoardContext, scope: Container): boolean =>
+  (scope.type === 'board' ? ctx.nodes : [scope, ...descendants(scope)]).some((t) => t.type === 'text' && nonEmpty(t) && (t.opacity ?? 1) > 0 && visibleRect(ctx, t) !== undefined);
+
+/** Panjang maksimum teks nilai yang melabeli deretan ikon (mis. "4,8 dari 312 ulasan"). */
+export const ICON_GROUP_LABEL_MAX = 40;
+const iconOnly = (n: ChildNode): boolean => n.type === 'icon' || (n.type === 'frame' && n.children.length > 0 && n.children.every(iconOnly));
+/** Teks nilai pendek: terlihat, berangka, ≤ ICON_GROUP_LABEL_MAX karakter. */
+const valueLabel = (ctx: BoardContext, c: ChildNode): boolean =>
+  c.type === 'text' && nonEmpty(c) && /\d/.test(c.content) && [...c.content.trim()].length <= ICON_GROUP_LABEL_MAX && (c.opacity ?? 1) > 0 && visibleRect(ctx, c) !== undefined;
+
+/**
+ * Ikon berlabel: komponen terdekat memuat teks; tanpa komponen, leluhur pertama yang punya anak lain berisi konten memuat teks.
+ * Deretan ikon saja (anak lain di leluhur itu hanya ikon, mis. baris bintang rating) berlabel bila di leluhur pertama dengan
+ * konten bukan-ikon ada teks nilai pendek bersebelahan (anak langsung, berangka, ≤ 40 karakter: "4,8", "1.284 ulasan").
+ */
+function iconLabeled(ctx: BoardContext, n: ChildNode, anc: readonly Container[]): boolean {
+  const comp = anc.find((a) => a.type === 'frame' && namedAny(a, LABEL_COMPONENTS));
+  if (comp) return hasVisibleText(ctx, comp);
+  let cur: { id: string } = n;
+  let group = false;
+  for (const a of anc) {
+    const others = a.children.filter((c) => c.id !== cur.id && hasContent(c));
+    cur = a;
+    if (!others.length) continue;
+    if (!group) {
+      if (hasVisibleText(ctx, a)) return true;
+      if (!others.every(iconOnly)) return false;
+      group = true;
+      continue;
+    }
+    if (others.every(iconOnly)) continue;
+    return others.some((c) => valueLabel(ctx, c));
+  }
+  return false;
+}
+
+const ICON_EXPECTED = `≥ ${CONTRAST_MIN.nonText}:1 terhadap latar (mis. amber gelap untuk bintang), atau beri label teks (mis. nilai rating di baris itu)`;
+
+/** Ikon UI tanpa label teks ≥ 3:1 terhadap latar (logo `simple-icons` dan ikon chrome dilewati). */
+function iconIssues(ctx: BoardContext, painters: readonly ChildNode[]): Finding[] {
+  const out: Finding[] = [];
+  for (const n of ctx.nodes) {
+    if (n.type !== 'icon' || ICON_BRAND_LIBS.has(n.lib)) continue;
+    const v = visibleRect(ctx, n);
+    if (!v || area(v) <= 0) continue;
+    const anc = ancestors(ctx, n);
+    if (anc.some((a) => namedAny(a, SYSTEM_CHROME))) continue;
+    const path = pathAlpha(ctx, n);
+    if (path.alpha <= 0 || iconLabeled(ctx, n, anc)) continue;
+    const bd = backdrop(ctx, painters, v, ctx.order.get(n.id)!, new Set(anc.map((a) => a.id)), new Set([n.id]));
+    if ('skip' in bd) continue;
+    const worst = worstOver(parseHex(n.color ?? '#000000'), path.alpha, bd.cands);
+    if (!worst || worst.ratio >= CONTRAST_MIN.nonText) continue;
+    const warn = path.warn || bd.warn;
+    out.push(
+      finding(
+        'LC-04',
+        warn ? 'warning' : levelOf('LC-04'),
+        n,
+        clip120(`ikon tanpa label ${floor2(worst.ratio)}:1 (${toHex(worst.fg)} di atas ${toHex(worst.bg)}${warn ? ', gradien/opacity/blend: perkiraan' : ''})`),
+        ICON_EXPECTED,
+      ),
+    );
+  }
+  return out;
+}
+
+/** Keempat sudut `r` di dalam elips yang mengisi `v`. */
+const inEllipse = (v: Rect, r: Rect): boolean => {
+  const cx = v.x + v.width / 2;
+  const cy = v.y + v.height / 2;
+  const rx = v.width / 2;
+  const ry = v.height / 2;
+  if (rx <= 0 || ry <= 0) return false;
+  return [
+    [r.x, r.y],
+    [right(r), r.y],
+    [r.x, bottom(r)],
+    [right(r), bottom(r)],
+  ].every(([x, y]) => ((x! - cx) / rx) ** 2 + ((y! - cy) / ry) ** 2 <= 1);
+};
+
+const SCRIM_EXPECTED = `taruh scrim fill solid opacity ≥ ${String(SCRIM_MIN_ALPHA).replace('.', ',')} di antara gambar/efek dan teks, atau pindah ke zona tenang`;
+
+/** Teks di atas foto/gradien multi-hue/efek blur tanpa scrim (fill solid alpha × opacity ≥ 0,5 yang memuat ink) → warning; chrome sistem dilewati. */
+function scrimIssues(ctx: BoardContext): Finding[] {
+  const out: Finding[] = [];
+  const layersAll = ctx.nodes.filter((p) => (p.type === 'frame' || p.type === 'rect' || p.type === 'ellipse' || p.type === 'path') && (fillsOf(p).length > 0 || ((p as { blur?: number }).blur ?? 0) > 0));
+  for (const t of texts(ctx)) {
+    if (!nonEmpty(t) || (t.opacity ?? 1) <= 0 || !visibleRect(ctx, t)) continue;
+    const ink = inkRect(ctx, t);
+    if (!ink || area(ink) <= 0) continue;
+    const anc = ancestors(ctx, t);
+    if (anc.some((a) => namedAny(a, SYSTEM_CHROME))) continue;
+    const order = ctx.order.get(t.id)!;
+    const ancIds = new Set(anc.map((a) => a.id));
+    const under: (ChildNode | Container)[] = [ctx.board];
+    for (const p of layersAll) {
+      if (ctx.order.get(p.id)! >= order) continue;
+      const v = visibleRect(ctx, p);
+      if (v && intersect(v, ink)) under.push(p);
+    }
+    // Fill solid ≥ SCRIM_MIN_ALPHA (alpha warna × opacity jalur di luar leluhur teks) yang memuat ink; `from` = indeks fill pertama.
+    const scrimFill = (p: ChildNode | Container, from = 0): boolean => {
+      if (p.type === 'path') return false;
+      const v = p.type === 'board' ? ctx.boardRect : visibleRect(ctx, p);
+      if (!v || !contains(v, ink)) return false;
+      if (p.type === 'ellipse' && !inEllipse(v, ink)) return false;
+      let a = 1;
+      if (p.type !== 'board')
+        for (const q of [p, ...ancestors(ctx, p)]) {
+          const o = effectsOf(q).opacity;
+          if (o !== undefined && !ancIds.has(q.id)) a *= o;
+        }
+      return fillsOf(p)
+        .slice(from)
+        .some((f) => f.type === 'solid' && parseHex(f.color)[3] * a >= SCRIM_MIN_ALPHA);
+    };
+    let busy = -1;
+    let busyAt = 0;
+    let kind = '';
+    under.forEach((p, i) => {
+      const fills = fillsOf(p);
+      const img = fills.findLastIndex((f) => f.type === 'image');
+      const fx = fills.findLastIndex((f) => f.type === 'noise' || f.type === 'mesh');
+      const grad = fills.findLastIndex(multiHue);
+      const top = Math.max(img, fx, grad);
+      if (top >= 0) {
+        busy = i;
+        busyAt = top + 1;
+        kind = top === img ? 'foto' : top === grad ? 'gradien' : 'efek';
+      } else if (p.type !== 'board' && ((p as { blur?: number }).blur ?? 0) >= EFFECT_BLUR_MIN && !scrimFill(p)) {
+        busy = i;
+        busyAt = fills.length;
+        kind = 'efek';
+      }
+    });
+    if (busy < 0) continue;
+    // Scrim: fill solid di atas lapisan sibuk (di node yang sama sesudah fill sibuk, atau lapisan sesudahnya).
+    if (scrimFill(under[busy]!, busyAt) || under.slice(busy + 1).some((p) => scrimFill(p))) continue;
+    out.push(
+      finding(
+        'LC-04',
+        'warning',
+        t,
+        clip120(`scrim: teks di atas ${kind} tanpa scrim (fill solid ≥ ${String(SCRIM_MIN_ALPHA).replace('.', ',')}) ${quote(t.content)}`),
+        SCRIM_EXPECTED,
+      ),
+    );
+  }
+  return out;
+}
 
 export function lc04(ctx: BoardContext): Finding[] {
   const out: Finding[] = [];
-  const painters = ctx.nodes.filter((n) => (n.type === 'frame' || n.type === 'rect' || n.type === 'ellipse' || n.type === 'path') && fillsOf(n).length > 0);
+  const painters = ctx.nodes.filter(isPainter);
   for (const t of texts(ctx)) {
     if (!nonEmpty(t) || (t.opacity ?? 1) <= 0) continue;
     const ink = inkRect(ctx, t);
     if (!ink || area(ink) <= 0 || !visibleRect(ctx, t)) continue;
-    const order = ctx.order.get(t.id)!;
     const anc = ancestors(ctx, t);
-    const ancIds = new Set(anc.map((a) => a.id));
-    let warn = false;
-    let alphaText = 1;
-    for (const n of [t, ...anc.filter((a): a is FrameNode => a.type === 'frame')]) {
-      const e = effectsOf(n);
-      if (e.opacity !== undefined && e.opacity < 1) {
-        alphaText *= e.opacity;
-        warn = true;
-      }
-      if (e.blend && e.blend !== 'normal') warn = true;
-    }
-    // Penutup di atas teks (urutan sesudahnya) → tak tentu.
-    let indeterminate = false;
-    for (const p of painters) {
-      if (ctx.order.get(p.id)! <= order) continue;
-      const v = visibleRect(ctx, p);
-      if (v && intersect(v, ink)) {
-        indeterminate = true;
-        break;
-      }
-    }
-    if (indeterminate) continue;
-    // Lapisan di bawah teks: leluhur + node sebelumnya yang memuat penuh ink (lainnya yang beririsan = sebagian).
-    type Layer = { node: ChildNode | Container; partial: boolean; alpha: number };
-    const layers: Layer[] = [];
-    for (const p of painters) {
-      if (ctx.order.get(p.id)! >= order) continue;
-      const isAnc = ancIds.has(p.id);
-      const v = visibleRect(ctx, p);
-      if (!v || !intersect(v, ink)) continue;
-      const shape = p.type === 'ellipse' || p.type === 'path';
-      const partial = shape || (!isAnc && !contains(v, ink));
-      let alpha = 1;
-      for (const n of [p, ...ancestors(ctx, p).filter((a) => a.type === 'frame' && !ancIds.has(a.id))]) {
-        const e = effectsOf(n);
-        if (e.opacity !== undefined && e.opacity < 1) alpha *= e.opacity;
-        if ((e.opacity !== undefined && e.opacity < 1) || (e.blend && e.blend !== 'normal') || (e.backdropBlur ?? 0) > 0) warn = true;
-      }
-      layers.push({ node: p, partial, alpha });
-    }
-    layers.sort((a, b) => (ctx.order.get(a.node.id) ?? 0) - (ctx.order.get(b.node.id) ?? 0));
-    // Turun dari lapisan teratas sampai fill opak penuh (dasar).
-    type Paint = { fill: ResolvedFill; alpha: number };
-    const above: Paint[] = [];
-    let base: RGB[] | undefined;
-    let skip = false;
-    scan: for (let i = layers.length - 1; i >= 0; i--) {
-      const l = layers[i]!;
-      if (l.partial) {
-        skip = true;
-        break;
-      }
-      const fills = fillsOf(l.node);
-      for (let j = fills.length - 1; j >= 0; j--) {
-        const f = fills[j]!;
-        if (f.type === 'image' || f.type === 'noise' || f.type === 'mesh') {
-          skip = true;
-          break scan;
-        }
-        const stops = f.type === 'solid' ? [f.color] : f.stops.map((s) => s.color);
-        if (f.type !== 'solid') warn = true;
-        if (l.alpha >= 1 && stops.every((c) => parseHex(c)[3] >= 1)) {
-          base = stops.map((c) => parseHex(c).slice(0, 3) as RGB);
-          break scan;
-        }
-        above.push({ fill: f, alpha: l.alpha });
-      }
-    }
-    if (skip) continue;
-    if (!base) {
-      const bf = fillsOf(ctx.board);
-      if (bf.some((f) => f.type === 'image' || f.type === 'noise' || f.type === 'mesh')) continue;
-      base = [[1, 1, 1]];
-      for (const f of bf) {
-        const stops = f.type === 'solid' ? [f.color] : (f as { stops: { color: string }[] }).stops.map((s) => s.color);
-        if (f.type !== 'solid') warn = true;
-        base = base.flatMap((c) => stops.map((s) => over(parseHex(s), c)));
-      }
-    }
-    let cands = base;
-    for (let k = above.length - 1; k >= 0; k--) {
-      const { fill: f, alpha } = above[k]!;
-      const stops = f.type === 'solid' ? [f.color] : (f as { stops: { color: string }[] }).stops.map((s) => s.color);
-      cands = cands.flatMap((c) => stops.map((s) => over(parseHex(s), c, alpha)));
-      if (cands.length > MAX_CANDIDATES) {
-        skip = true;
-        break;
-      }
-    }
-    if (skip) continue;
-    const fg = parseHex(t.color ?? '#000000');
-    let worst: { ratio: number; text: RGB; bg: RGB } | undefined;
-    for (const bg of cands) {
-      const text = over(fg, bg, alphaText);
-      const ratio = contrastRatio(text, bg);
-      if (!worst || ratio < worst.ratio) worst = { ratio, text, bg };
-    }
+    const path = pathAlpha(ctx, t);
+    const bd = backdrop(ctx, painters, ink, ctx.order.get(t.id)!, new Set(anc.map((a) => a.id)), new Set());
+    if ('skip' in bd) continue;
+    const warn = path.warn || bd.warn;
+    const worst = worstOver(parseHex(t.color ?? '#000000'), path.alpha, bd.cands);
     if (!worst) continue;
-    const min = isLargeText(t) ? CONTRAST_MIN_LARGE : CONTRAST_MIN;
+    const min = textContrastMin(t);
     if (worst.ratio >= min) continue;
-    const ratio = Math.floor(worst.ratio * 100) / 100;
     out.push(
       finding(
         'LC-04',
         warn ? 'warning' : levelOf('LC-04'),
         t,
-        clip120(`kontras ${ratio}:1 (${toHex(worst.text)} di atas ${toHex(worst.bg)}${warn ? ', gradien/opacity/blend: perkiraan' : ''}) ${quote(t.content)}`),
+        clip120(`kontras ${floor2(worst.ratio)}:1 (${toHex(worst.fg)} di atas ${toHex(worst.bg)}${warn ? ', gradien/opacity/blend: perkiraan' : ''}) ${quote(t.content)}`),
         `≥ ${min}:1 setelah komposit: teks lebih gelap/terang atau latar lebih kontras; acc2/kuning bukan teks kecil`,
       ),
     );
   }
-  return out;
+  return [...out, ...controlIssues(ctx, painters), ...iconIssues(ctx, painters), ...scrimIssues(ctx)];
 }
 
 // ---------------------------------------------------------------------------

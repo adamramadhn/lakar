@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { API, API_GLOBALS } from '../packages/exec/src/api.ts';
 import { EXECUTE_DESCRIPTION, ICON_SEARCH_DESCRIPTION, LAYOUT_CHECK_DESCRIPTION } from '../packages/mcp/src/server.ts';
 import { FORBIDDEN_PHRASES } from '../packages/schema/src/content-rules.ts';
+import { CONTRAST_MIN, CONTROL_PREFIXES, LARGE_TEXT } from '../packages/schema/src/contrast-rules.ts';
 
 describe('deskripsi tool execute', () => {
   it.each(Object.keys(API))('menyebut %s(', (name) => {
@@ -33,6 +34,21 @@ describe('deskripsi tool execute', () => {
 
   it('layout_check menyebut LC-03, LC-06, LC-07, LC-08, LC-09, LC-10 (tipografi dan spacing)', () => {
     for (const s of ['LC-03 teks', 'LC-06 paragraf', 'LC-07 gap/padding', 'LC-08 ukuran', 'LC-09 > 2 keluarga', 'LC-10 target sentuh < 44×44']) expect(LAYOUT_CHECK_DESCRIPTION).toContain(s);
+  });
+
+  it('layout_check menyebut LC-04 dengan ambang dari modul: teks besar, placeholder, batas kontrol, ikon tanpa label, scrim', () => {
+    for (const s of [
+      `< ${CONTRAST_MIN.text}:1`,
+      `≥ ${LARGE_TEXT.size} atau ≥ ${LARGE_TEXT.boldSize} berat ≥ ${LARGE_TEXT.boldWeight}: < ${CONTRAST_MIN.large}:1`,
+      `'Placeholder' selalu ${CONTRAST_MIN.placeholder}:1`,
+      'batas kontrol',
+      'ikon tanpa label',
+      'warning scrim',
+      'opacity ≥ 0,5',
+    ])
+      expect(LAYOUT_CHECK_DESCRIPTION).toContain(s);
+    for (const p of CONTROL_PREFIXES) expect(LAYOUT_CHECK_DESCRIPTION).toContain(`'${p} …'`);
+    expect(LAYOUT_CHECK_DESCRIPTION).not.toContain('≥ 19 tebal');
   });
 
   it('layout_check menyebut LC-17 (seksi mirip) dan LC-19 dengan setiap frasa terlarang dari modul', () => {

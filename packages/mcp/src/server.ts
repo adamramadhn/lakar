@@ -4,13 +4,17 @@ import { McpServer, type CallToolResult } from '@modelcontextprotocol/server';
 import { z } from 'zod';
 import {
   COMPONENT_SIZES,
+  CONTRAST_MIN,
+  CONTROL_PREFIXES,
   DISPLAY_SIZES,
   FORBIDDEN_PHRASES,
   HOME_INDICATOR_INSET,
   KPI_LINE_HEIGHT_RATIO,
   KPI_SIZES,
+  LARGE_TEXT,
   PARAGRAPH_MIN,
   PARAGRAPH_MIN_IN_CARD,
+  SCRIM_MIN_ALPHA,
   SPACING_VALUES,
   TOUCH_MIN,
   LAKAR_VERSION, SCHEMA_VERSION, VERSION_HINT, errorMessage, findingLine, summaryText, type ApiResult, type Finding, type FindingSummary } from '@lakar/schema';
@@ -180,7 +184,10 @@ export const LAYOUT_CHECK_DESCRIPTION =
   'LC-02c non-teks (frame, rect, ikon, gambar) anak flow meluap dari isi induk ke padding/tepi wadah ber-cat terdekat dengan sisa < min(8, padding/2) atau tumpah keluar; ' +
   'LC-31 kartu ber-cat berisi teks terpotong atau rata di tepi bawah seksi/board (mockup di Crop, kartu tanpa ruang bawah), dan baris terakhir daftar/tabel rata di tepi bawah kartunya tanpa ruang bawah padahal ada ruang atas; ' +
   "LC-11 saudara tumpang tindih sebagian (kecuali 'Overlay / …', 'Crop / …', gap negatif); " +
-  'LC-04 kontras teks setelah komposit < 4.5:1 (teks ≥ 24 atau ≥ 19 tebal: < 3:1; di atas gradien/opacity/blend = warning, di atas foto/noise/mesh dilewati); ' +
+  `LC-04 kontras teks setelah komposit < ${CONTRAST_MIN.text}:1 (teks ≥ ${LARGE_TEXT.size} atau ≥ ${LARGE_TEXT.boldSize} berat ≥ ${LARGE_TEXT.boldWeight}: < ${CONTRAST_MIN.large}:1; layer 'Placeholder' selalu ${CONTRAST_MIN.placeholder}:1; di atas gradien/opacity/blend = warning, di atas foto/noise/mesh dilewati), ` +
+  `batas kontrol ${CONTROL_PREFIXES.map((p) => `'${p} …'`).join('/')} (stroke/fill, atau keturunan bercat) < ${CONTRAST_MIN.nonText}:1 terhadap latar, ` +
+  `ikon tanpa label teks (di komponen tanpa teks, atau deretan ikon seperti bintang rating tanpa nilai) < ${CONTRAST_MIN.nonText}:1, ` +
+  `dan warning scrim: teks di atas foto/gradien multi-hue/efek blur tanpa fill solid opacity ≥ ${String(SCRIM_MIN_ALPHA).replace('.', ',')} di antaranya; ` +
   'LC-12 (warning) ukuran board (mobile 390×844, app 1440×900 atau 1440×1024, landing lebar 1440, atau expectedSize) dan tabrakan antarboard (pakai place). ' +
   'Warning polesan: LC-18 kartu bersarang, LC-23 celah teks ↔ badge/tombol/ikon < 8, LC-24 proporsi badge di baris, LC-25 radius tidak konsentris, ' +
   'LC-26 ruang di atas judul ≤ bawah, LC-27 > 6 ukuran huruf, LC-28 baris > 80 karakter, LC-29 bobot < 400 di < 18px, LC-30 tanda baca (... dan tanda hubung rentang). ' +

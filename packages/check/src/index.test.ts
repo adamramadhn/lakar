@@ -978,9 +978,10 @@ describe('LC-04 kontras teks', () => {
     expect(only(run(clean([frame('Badge / Selesai', [0, 0, 62, 20], [t], { layout: 'row', ...solidFill('#15803D1F') })])), 'LC-04')).toEqual([]);
   });
 
-  it('dilewati: teks di atas foto tanpa scrim, atau tertutup sebagian lapisan', () => {
+  it('dilewati: teks di atas foto tanpa scrim (hanya warning scrim), atau tertutup sebagian lapisan', () => {
     const img = { fills: [{ type: 'image', assetId: 'a'.repeat(64), fit: 'cover' }] };
-    expect(only(run(clean([frame('Image / Sampul', [0, 0, 200, 100], [text('Judul', [10, 10, 100, 20], { color: '#FFFFFF' })], img)])), 'LC-04')).toEqual([]);
+    const onPhoto = only(run(clean([frame('Image / Sampul', [0, 0, 200, 100], [text('Judul', [10, 10, 100, 20], { color: '#FFFFFF' })], img)])), 'LC-04');
+    expect(onPhoto.map((f) => [f.level, f.detail.split(' ')[0]])).toEqual([['warning', 'scrim:']]);
     const partial = frame('Kartu', [0, 0, 200, 100], [rect('Pita', [0, 0, 50, 100], { position: 'absolute', ...solidFill('#000000') }), text('Judul', [10, 10, 100, 20], { color: '#FFFFFF', position: 'absolute' })], { layout: 'none', ...solidFill('#FFFFFF') });
     expect(only(run(clean([partial])), 'LC-04')).toEqual([]);
   });
@@ -994,6 +995,157 @@ describe('LC-04 kontras teks', () => {
     expect(summarizeFindings(f).gate).toBe(0);
     const op = only(run(clean([text('Redup', [0, 0, 100, 20], { color: '#667085', opacity: 0.6 })])), 'LC-04');
     expect(op.map((x) => x.level)).toEqual(['warning']);
+  });
+});
+
+describe('LC-04 lengkap: ambang, batas kontrol, ikon tanpa label, scrim', () => {
+  const lc04 = (kids: Loose[]) => only(run(clean(kids)), 'LC-04');
+  const sub = (f: Finding[], prefix: string) => f.filter((x) => x.detail.startsWith(prefix));
+  const white = { fills: [{ type: 'solid', color: '#FFFFFF' }] };
+  const stroke = (color: string) => ({ stroke: { color, width: 1, align: 'inside' } });
+  const img = { fills: [{ type: 'image', assetId: 'b'.repeat(64), fit: 'cover' }] };
+  const t = (size: number, weight?: number, extra: Loose = {}) => text('Keterangan', [16, 16, 200, Math.ceil(size * 1.3)], { size, color: '#949494', ...(weight ? { weight } : {}), ...extra });
+
+  it('teks kecil 16px #949494 di #FFF (3,03:1) → error gerbang ≥ 4.5', () => {
+    const f = lc04([t(16)]);
+    expect(f).toHaveLength(1);
+    expect(f[0]).toMatchObject({ level: 'error' });
+    expect(f[0]!.detail).toMatch(/^kontras 3\.0\d:1 \(#949494 di atas #FFFFFF\)/);
+    expect(f[0]!.expected).toMatch(/^≥ 4\.5:1/);
+    expect(summarizeFindings(f).gate).toBe(1);
+  });
+
+  it('teks besar: ≥ 24px berat 400 lulus 3:1; 23px error', () => {
+    expect(lc04([t(24)])).toEqual([]);
+    expect(lc04([t(23)])).toHaveLength(1);
+  });
+
+  it('teks besar tebal: 18,66px 700 lulus; 18,66px 600 dan 18px 700 error', () => {
+    expect(lc04([t(18.66, 700)])).toEqual([]);
+    expect(lc04([t(18.66, 600)])).toHaveLength(1);
+    expect(lc04([t(18, 700)])).toHaveLength(1);
+  });
+
+  it('layer Placeholder 24px dinilai 4.5:1, bukan 3:1', () => {
+    const f = lc04([t(24, undefined, { name: 'Placeholder' })]);
+    expect(f).toHaveLength(1);
+    expect(f[0]!.level).toBe('error');
+    expect(f[0]!.expected).toMatch(/^≥ 4\.5:1/);
+  });
+
+  const input = (extra: Loose, kids: Loose[] = [text('Cari pesanan', [28, 28, 200, 20], { name: 'Placeholder', color: '#475467' })]) =>
+    frame('Input / Cari', [16, 16, 300, 44], kids, { layout: 'row', ...extra });
+
+  it('batas kontrol gagal: Input / stroke #D0D5DD di board #FFF → error gerbang 1.47:1', () => {
+    const k = input({ ...white, ...stroke('#D0D5DD') });
+    const f = sub(lc04([k]), 'batas kontrol');
+    expect(f).toHaveLength(1);
+    expect(f[0]).toMatchObject({ level: 'error', nodeId: k.id, detail: 'batas kontrol 1.47:1 (#D0D5DD di atas #FFFFFF)' });
+    expect(f[0]!.expected).toContain('border-input (#7D8798)');
+    expect(summarizeFindings(f).gate).toBe(1);
+  });
+
+  it('batas kontrol lulus: stroke border-input; fill aksen tanpa stroke; keturunan bercat ≥ 3:1', () => {
+    expect(sub(lc04([input({ ...white, ...stroke('#7D8798') })]), 'batas kontrol')).toEqual([]);
+    const checked = frame('Checkbox / Setuju', [16, 16, 20, 20], [icon('lucide', [18, 18, 16, 16], { color: '#FFFFFF' })], { layout: 'row', fills: [{ type: 'solid', color: '#2563EB' }] });
+    expect(sub(lc04([checked]), 'batas kontrol')).toEqual([]);
+    const radio = frame('Radio / Kirim', [16, 16, 200, 24], [frame('Lingkaran', [16, 16, 20, 20], [], { ...stroke('#7D8798') }), text('Kirim', [44, 18, 100, 20], { color: '#101828' })], { layout: 'row' });
+    expect(sub(lc04([radio]), 'batas kontrol')).toEqual([]);
+  });
+
+  it('kontrol tanpa batas: fill #F6F7F9 tanpa stroke, keturunan tak bercat → error 1.07:1 (fill)', () => {
+    const f = sub(lc04([input({ fills: [{ type: 'solid', color: '#F6F7F9' }] })]), 'batas kontrol');
+    expect(f).toHaveLength(1);
+    expect(f[0]).toMatchObject({ level: 'error', detail: 'batas kontrol 1.07:1 (#F6F7F9 di atas #FFFFFF)' });
+  });
+
+  it('kontrol tanpa cat sama sekali → error "tanpa batas terlihat"; kontrol bersarang dinilai sekali (terluar)', () => {
+    const f = sub(lc04([input({})]), 'batas kontrol');
+    expect(f.map((x) => x.detail)).toEqual(['batas kontrol: tanpa batas terlihat (tanpa stroke dan fill)']);
+    const nested = frame('Input / Tanggal', [16, 16, 300, 44], [frame('Checkbox / Sepanjang hari', [24, 24, 20, 20], [], { ...stroke('#D0D5DD') })], { layout: 'row', ...stroke('#7D8798') });
+    expect(sub(lc04([nested]), 'batas kontrol')).toEqual([]);
+  });
+
+  it('kontrol di latar komposit (gradien / opacity) → warning; di atas foto → dilewati', () => {
+    const grad = { fills: [{ type: 'linear', angle: 90, stops: [{ offset: 0, color: '#FFFFFF' }, { offset: 1, color: '#F2F4F7' }] }] };
+    const onGrad = sub(lc04([frame('Panel', [0, 0, 390, 100], [input({ ...white, ...stroke('#D0D5DD') })], { layout: 'column', ...grad })]), 'batas kontrol');
+    expect(onGrad.map((x) => x.level)).toEqual(['warning']);
+    expect(onGrad[0]!.detail).toContain('perkiraan');
+    const faded = sub(lc04([input({ ...white, ...stroke('#98A2B3'), opacity: 0.5 })]), 'batas kontrol');
+    expect(faded.map((x) => x.level)).toEqual(['warning']);
+    expect(sub(lc04([frame('Image / Latar', [0, 0, 390, 100], [input({ ...white, ...stroke('#D0D5DD') })], { layout: 'column', ...img })]), 'batas kontrol')).toEqual([]);
+  });
+
+  it('ikon tanpa label gagal: IconButton / Tutup #D0D5DD; baris Bintang 5 ikon #F5B700 → error per ikon', () => {
+    const ib = frame('IconButton / Tutup', [16, 16, 44, 44], [icon('lucide', [26, 26, 24, 24], { color: '#D0D5DD' })], { layout: 'row' });
+    const f = sub(lc04([ib]), 'ikon tanpa label');
+    expect(f).toHaveLength(1);
+    expect(f[0]).toMatchObject({ level: 'error', detail: 'ikon tanpa label 1.47:1 (#D0D5DD di atas #FFFFFF)' });
+    expect(f[0]!.expected).toContain('beri label teks');
+    const stars = frame('Bintang', [16, 80, 120, 20], [0, 1, 2, 3, 4].map((i) => icon('lucide', [16 + i * 24, 80, 20, 20], { color: '#F5B700' })), { layout: 'row' });
+    const card = frame('Kartu / Ulasan', [0, 60, 390, 120], [text('Ulasan Rina', [16, 60, 200, 20], { color: '#101828' }), stars], { layout: 'column', ...white });
+    const sf = sub(lc04([card]), 'ikon tanpa label');
+    expect(sf).toHaveLength(5);
+    expect(sf.every((x) => x.level === 'error' && x.detail.startsWith('ikon tanpa label 1.'))).toBe(true);
+  });
+
+  it('deretan ikon: berlabel oleh teks nilai pendek bersebelahan ("4,8 dari 312 ulasan"); kalimat panjang atau nama tanpa angka bukan label', () => {
+    const stars = (y: number) => frame('Bintang', [16, y, 120, 20], [0, 1, 2, 3, 4].map((i) => icon('lucide', [16 + i * 24, y, 20, 20], { color: '#F5B700' })), { layout: 'row' });
+    const rating = frame('Rating', [16, 16, 360, 20], [stars(16), text('4,8 dari 312 ulasan pemilik', [144, 16, 200, 20], { color: '#101828' })], { layout: 'row' });
+    expect(sub(lc04([rating]), 'ikon tanpa label')).toEqual([]);
+    const skor = frame('Skor', [16, 16, 120, 90], [text('4,8', [16, 16, 60, 40], { size: 32, color: '#101828' }), stars(60), text('1.284 ulasan', [16, 84, 100, 20], { color: '#475467' })], { layout: 'column' });
+    expect(sub(lc04([skor]), 'ikon tanpa label')).toEqual([]);
+    const quote = 'Langganan bulanan bikin pengeluaran laundry saya tetap Rp 165.000 per bulan.';
+    const card = frame('Kartu / Testimoni', [0, 0, 390, 200], [stars(16), text(quote, [16, 44, 358, 60], { color: '#101828' }), text('Bima Prasetyo', [16, 120, 200, 20], { color: '#101828' })], { layout: 'column', ...white });
+    expect(sub(lc04([card]), 'ikon tanpa label')).toHaveLength(5);
+  });
+
+  it('ikon berlabel atau dikecualikan: Button / ikon + teks; wadah tint + judul; simple-icons; Status bar', () => {
+    const btn = frame('Button / Simpan', [16, 16, 120, 44], [icon('lucide', [28, 28, 20, 20], { color: '#D0D5DD' }), text('Simpan', [52, 28, 60, 20], { color: '#101828' })], { layout: 'row' });
+    const tint = frame('Wadah ikon', [16, 16, 40, 40], [icon('lucide', [24, 24, 24, 24], { color: '#D0D5DD' })], { layout: 'row', fills: [{ type: 'solid', color: '#F2F4F7' }] });
+    const card = frame('Kartu', [0, 0, 390, 120], [tint, text('Pengiriman', [16, 64, 200, 20], { color: '#101828' })], { layout: 'column', ...white });
+    const logo = icon('simple-icons', [16, 200, 24, 24], { color: '#D0D5DD' });
+    const bar = frame('Status bar', [0, 300, 390, 44], [icon('lucide', [350, 310, 20, 20], { color: '#D0D5DD' })], { layout: 'row' });
+    expect(sub(lc04([btn, card, logo, bar]), 'ikon tanpa label')).toEqual([]);
+  });
+
+  it('scrim tidak ada: teks di foto, gradien multi-hue, dan di atas blob blur ≥ 24 → warning; jam Status bar dilewati', () => {
+    const onPhoto = frame('Image / Hero', [0, 0, 390, 200], [text('Kopi pagi', [16, 16, 200, 30], { color: '#FFFFFF' })], { layout: 'column', ...img });
+    const f = sub(lc04([onPhoto]), 'scrim:');
+    expect(f).toHaveLength(1);
+    expect(f[0]).toMatchObject({ level: 'warning', detail: 'scrim: teks di atas foto tanpa scrim (fill solid ≥ 0,5) "Kopi pagi"' });
+    expect(summarizeFindings(f).gate).toBe(0);
+    const multi = { fills: [{ type: 'linear', angle: 90, stops: [{ offset: 0, color: '#2563EB' }, { offset: 1, color: '#F97316' }] }] };
+    expect(sub(lc04([frame('Hero', [0, 0, 390, 200], [text('Judul', [16, 16, 200, 30], { color: '#FFFFFF' })], { layout: 'column', ...multi })]), 'scrim:').map((x) => x.detail)).toEqual([
+      'scrim: teks di atas gradien tanpa scrim (fill solid ≥ 0,5) "Judul"',
+    ]);
+    const blob = rect('Blob', [0, 0, 120, 300], { position: 'absolute', fills: [{ type: 'solid', color: '#7C3AED' }], blur: 40 });
+    const fx = frame('Hero', [0, 0, 390, 300], [blob, text('Judul', [100, 100, 100, 20], { color: '#101828', position: 'absolute' })], { layout: 'none' });
+    expect(sub(lc04([fx]), 'scrim:').map((x) => x.detail)).toEqual(['scrim: teks di atas efek tanpa scrim (fill solid ≥ 0,5) "Judul"']);
+    const bar = frame('Status bar', [0, 0, 390, 44], [text('09:41', [24, 12, 50, 20], { color: '#FFFFFF' })], { layout: 'row' });
+    expect(sub(lc04([frame('Image / Hero', [0, 0, 390, 300], [bar], { layout: 'column', ...img })]), 'scrim:')).toEqual([]);
+  });
+
+  it('scrim ada: rect solid alpha ≥ 0,5 memuat ink; fill solid di atas foto di node yang sama; ellipse memuat keempat sudut ink', () => {
+    const scrim = rect('Scrim', [0, 100, 390, 100], { position: 'absolute', fills: [{ type: 'solid', color: '#00000080' }] });
+    const hero = frame('Image / Hero', [0, 0, 390, 200], [scrim, text('Kopi pagi', [16, 150, 200, 30], { color: '#FFFFFF', position: 'absolute' })], { layout: 'none', ...img });
+    expect(sub(lc04([hero]), 'scrim:')).toEqual([]);
+    const faint = rect('Scrim', [0, 100, 390, 100], { position: 'absolute', fills: [{ type: 'solid', color: '#000000' }], opacity: 0.3 });
+    expect(sub(lc04([frame('Image / Hero', [0, 0, 390, 200], [faint, text('Kopi pagi', [16, 150, 200, 30], { color: '#FFFFFF', position: 'absolute' })], { layout: 'none', ...img })]), 'scrim:')).toHaveLength(1);
+    const layered = { fills: [img.fills[0], { type: 'solid', color: '#0000008C' }] };
+    expect(sub(lc04([frame('Image / Hero', [0, 0, 390, 200], [text('Kopi pagi', [16, 16, 200, 30], { color: '#FFFFFF' })], { layout: 'column', ...layered })]), 'scrim:')).toEqual([]);
+    const disc = (r: R) => ({ type: 'ellipse', id: nid(), name: 'Cakram', position: 'absolute', fills: [{ type: 'solid', color: '#000000B3' }], _r: r });
+    const inDisc = frame('Image / Hero', [0, 0, 390, 300], [disc([50, 50, 300, 200]), text('Kopi', [150, 135, 100, 30], { color: '#FFFFFF', position: 'absolute' })], { layout: 'none', ...img });
+    expect(sub(lc04([inDisc]), 'scrim:')).toEqual([]);
+    const edgeDisc = frame('Image / Hero', [0, 0, 390, 300], [disc([50, 50, 300, 200]), text('Kopi', [55, 55, 100, 30], { color: '#FFFFFF', position: 'absolute' })], { layout: 'none', ...img });
+    expect(sub(lc04([edgeDisc]), 'scrim:')).toHaveLength(1);
+  });
+
+  it('gradien satu hue: tanpa warning scrim, kontras stop terburuk tetap dinilai', () => {
+    const tint = { fills: [{ type: 'linear', angle: 90, stops: [{ offset: 0, color: '#1E3A8A' }, { offset: 1, color: '#93C5FD' }] }] };
+    const f = lc04([frame('Hero', [0, 0, 390, 200], [text('Judul', [16, 16, 200, 30], { color: '#FFFFFF' })], { layout: 'column', ...tint })]);
+    expect(sub(f, 'scrim:')).toEqual([]);
+    expect(sub(f, 'kontras').map((x) => x.level)).toEqual(['warning']);
   });
 });
 

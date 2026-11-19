@@ -5,6 +5,7 @@ import { LakarDocument, NodeInput } from './nodes.js';
 export const PACKAGE = '@lakar/schema';
 
 export * from './content-rules.js';
+export * from './contrast-rules.js';
 export * from './design-tokens.js';
 export * from './errors.js';
 export * from './findings.js';

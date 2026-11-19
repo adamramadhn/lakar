@@ -946,3 +946,55 @@ Pindaian arsip tidak berubah (0; pasangan ≥ 0,75 tetap 18 / 14 dok).
 ## Contoh skill
 
 `skills-examples.test.ts` lulus tanpa entri `PENDING_2_10` baru (sesudah perbaikan definisi di atas).
+
+# §2.7 LC-04 lengkap: ambang kontras satu sumber, batas kontrol, ikon tanpa label, scrim (G1 story 7)
+
+Plan: `_bmad-output/initiative-lakar/tickets/epic-g1-inti-lengkap/tickets/story-lc-04-lengkap-dan-ambang-kontras-selaras-dengan-design-md-plan.md`.
+Ambang dari `packages/schema/src/contrast-rules.ts` (dijaga `tests/contrast-rules.test.ts` terhadap tabel Ambang kontras
+dan baris LC-04 Lampiran A DESIGN.md): teks 4.5:1; teks besar (≥ 24px, atau ≥ 18,66px berat ≥ 700) 3:1; layer
+`Placeholder` selalu 4.5:1; batas kontrol dan ikon tanpa label 3:1; scrim = fill solid alpha × opacity ≥ 0,5.
+
+## Pindaian arsip layout_check
+
+Arsip sama dengan §2.4/§2.15/§2.5/§2.6: 120 dokumen, 157 board, 0 gagal; daemon dist sementara (port acak, dataDir
+salinan, tanpa key foto). Sebelum = `after6.json` (dist story 6); sesudah = `after7b.json` (dist story 7). Aturan lain
+identik per dokumen (rule, level, node, detail). Temuan LC-04 teks lama identik (619 → 619; error dan warning per
+dokumen sama): arsip tidak memuat teks tebal 18,66–19px atau `Placeholder` ≥ 24px yang berubah ambang.
+
+| Sub-cek LC-04 (awalan detail) | Sesudah: temuan / dok | Kasus unik |
+|---|---|---|
+| `batas kontrol …` (error · gerbang) | 5 / 5 | `Input / Gudang` stroke #D0D5DD di #F3F5F9 1,35:1 (Lumbung polish-3/4, 2 dok); `Input / Cari pasien` stroke #D0D5DD 1,47:1 (Dentara, 2 dok); `Input / Cari` fill #F6F7F9 tanpa stroke 1,07:1 (Pustaka Kampus) |
+| `ikon tanpa label …` (error · gerbang) | 62 / 8 | semuanya baris bintang rating tanpa nilai: testimoni Lapak Cuci #F5B700 1,8:1; testimoni Mejaku #D99A1E 2,11–2,44:1 (4 dok); ulasan Dapur Wening #E09B0E 2,36:1 dan bintang kosong #D0D5DD 1,47:1 (3 dok) |
+| `scrim: …` (warning) | 34 / 14 (+92 di "+n serupa") | teks di atas mesh/efek tanpa scrim: Lintas Arus landing (nav, hero) dan Senyap onboarding (efek-1..3 + salinan practice-effects); gradien multi-hue: sampul podcast Siaru "Obrolan Senja" (2 dok) |
+
+Dokumen gagal gerbang: **80 → 86** (+6). Karena bintang rating (dicatat terpisah, keputusan checkpoint plan): Mejaku
+`~/.local/share/lakar/docs` dan practice-polish/4 P9, Dapur Wening resep effects-1 dan practice/8 P3 (4 dok). Karena
+batas kontrol: dua salinan Lumbung (polish-4 arsip, practice-polish/3 P8). Dokumen lain dengan error baru (Lapak Cuci,
+Pustaka Kampus, Dentara ×2, Mejaku polish-3 dan practice-polish/2) sudah gagal gerbang sebelumnya.
+
+Tinjauan crop (`archcheck.mjs --shots LC-04` + crop leluhur per kasus unik, `shots.mjs`): batas `Input /` pucat nyaris
+tak terlihat di latar abu/putih (WCAG 1.4.11); baris bintang testimoni/ulasan tanpa nilai rating di baris/komponennya
+(keputusan checkpoint: cacat nyata). **0 positif palsu** sesudah dua perbaikan definisi:
+
+1. **Deretan ikon berlabel teks nilai.** Pindaian pertama (`after7.json`): ikon 99 / 12 dok, termasuk bintang yang
+   jelas berlabel — Mejaku hero/header `Rating` [`Bintang`, "4,8 dari 312 ulasan pemilik"], Dapur Wening `Skor`
+   ["4,8", `Bintang`, "1.284 ulasan"] dan `Ringkasan` ["4,8", [`Baris bintang`, "1.284 ulasan · 94% …"]]: bintang
+   dikelompokkan di frame sendiri sehingga "leluhur pertama dengan konten lain" hanya berisi ikon. Definisi umum: deretan
+   ikon saja (anak lain hanya ikon) berlabel bila di leluhur pertama dengan konten bukan-ikon ada teks nilai pendek
+   bersebelahan (anak langsung, berangka, ≤ 40 karakter). Kutipan testimoni (panjang) dan nama/tanggal di frame lain
+   bukan label → bintang testimoni tetap temuan. Hasil: 62 / 8 dok.
+2. **Chrome sistem dilewati scrim.** Pindaian pertama memberi warning scrim pada jam `Status bar` ("09:41", "21:47")
+   di atas foto/efek; status bar dirender OS di atas apa pun, jadi teks di `Status bar`/`Home indicator` dilewati
+   (sama dengan pengecualian ikon). Scrim 40 / 20 → 34 / 14.
+
+Prototipe plan (99 ikon gagal di 10 dok) memakai definisi tanpa perbaikan 1; kontrol (5) sesuai prototipe.
+
+## Contoh skill
+
+`skills-examples.test.ts`: entri `PENDING_2_10` baru (pencocokan persis aturan + nama node + awal detail), untuk revisi skill:
+
+- `landing.md` (`Overline`, `Headline`, `Subjudul`), `mobile.md` (`Label`, `Nilai`, `Teks` kartu target), `api.md`
+  (`Judul` "Malam yang tenang"): warning scrim, teks langsung di atas mesh tanpa scrim.
+- `webapp.md`: `Input / Outlet` stroke `C.line2` #D0D5DD di #F3F6F5 → batas kontrol 1,35:1 (error · gerbang).
+- `icons.md`: `Bintang 1–5` #F5B700 tanpa nilai rating → ikon tanpa label 1,8:1 (error · gerbang ×5).
+- `polish.md` baris kontras masih "≥ 19 tebal" dan "ikon" tanpa syarat label: dicatat untuk revisi skill (tidak diubah, C7).
