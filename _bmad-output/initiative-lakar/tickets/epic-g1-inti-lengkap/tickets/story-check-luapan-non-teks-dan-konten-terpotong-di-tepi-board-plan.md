@@ -3,7 +3,7 @@ title: 'Check luapan non-teks (LC-02c) dan konten terpotong rata (LC-31 diperlua
 type: feature
 ticket: '15'
 created: '2026-11-19'
-status: in-review
+status: built
 baseline_revision: 'e5e4bcc87ca3a1572b7dc48a04bfdf06ee882047'
 route: full
 route_source: auto
@@ -12,7 +12,7 @@ review: quick
 review_source: pinned
 lenses_ran: [quick]
 review_loop_iteration: 0
-followup_review_recommended: false
+followup_review_recommended: true
 context:
   - '{project-root}/_bmad-output/initiative-lakar/tickets/epic-g1-inti-lengkap/tickets/story-check-luapan-non-teks-dan-konten-terpotong-di-tepi-board.md'
   - '{project-root}/_bmad-output/initiative-lakar/tickets/epic-g1-inti-lengkap/tickets/story-check-struktural-lc-13-14-15-16-21-22-plan.md'
@@ -105,6 +105,15 @@ deferred: []
 
 ## Review Triage Log
 
+### 2026-11-19 — Review pass
+- verdicts: 5 findings — high 0, medium 2, low 3, false 0, maybe-false 0
+- findings:
+  - `[medium]` `[patch]` `lc02c` hanya melewati node LC-02a itu sendiri; keturunannya (dibungkam lc02a, tidak ada di `cut`) bisa kena LC-02c → dua error gerbang untuk satu cacat — terverifikasi di `lc02a` (walk `suppressed || reported`); diperbaiki di `3fbe553`: lewati node bila leluhur ada di `skip`, fixture baru.
+  - `[medium]` `[patch]` LC-31 (b) hanya mengecualikan node yang mulai di tepi atas clip; sidebar/area kerja ber-cat di bawah header selebar board (y 64) rata tepi bawah board → positif palsu gerbang — terverifikasi dari kondisi `r.y > cr.y + FLUSH_TOL`; diperbaiki di `3fbe553`: panel juga = menempel tepi kiri/kanan board atau mulai di tepi atas isi induk; fixture negatif sidebar/area kerja/kolom di bawah header; Lampiran A + Implementation Notes diselaraskan.
+  - `[low]` `[patch]` `flushListRow` tanpa batas bawah `below`: baris menggantung 30px di kartu tanpa clip disebut "rata" dan juga kena LC-02c — diperbaiki di `3fbe553` (`below >= -FLUSH_TOL`), fixture baris menggantung → LC-02c saja.
+  - `[low]` `[reject]` LC-02c menilai frame transparan dari bounds, bukan isi terlihat (frame lebar tetap sedikit lebih lebar dari isi kartu dengan anak rata kiri) — benar secara teori, tetapi butuh luapan yang memakan > separuh padding (sisa < min(8, padding/2)); pindaian 120 dok + crop setiap kasus unik tidak menemukan contoh, dan perbaikannya (union bounds keturunan terlihat) menambah cabang. Dicatat sebagai risiko sisa.
+  - `[low]` `[patch]` Fixture negatif LC-02c belum mencakup leluhur `Overlay /` dan leluhur berotasi (baris matriks) — ditambahkan di `3fbe553`.
+
 ## Design Notes
 
 **LC-02c (error · gerbang).** Node `n` non-teks (frame, rect, ellipse, path, icon; gambar = frame/rect ber-fill image) yang anak flow induk `P`. `W` = leluhur terdekat (mulai `P`) yang ber-cat (`paintedCard`: fill tak transparan, stroke, bayangan luar); setiap node dari `n` sampai anak `W` harus anak flow (rantai flow), dan board bukan `W`. Temuan di sisi `s` bila (1) `n` melewati content box `P` (bounds − padding) > 1px (asal luapan), (2) `n` melewati content box `W` > 1px, dan (3) sisa jarak `n` ke tepi `W` di sisi `s` < min(8, padding `W` di sisi `s` / 2) (negatif = tumpah keluar). Pengecualian: `n` atau leluhur `Overlay /`/`Crop /`, rotasi di rantai, induk gap negatif, sisi atas/bawah bila ada leluhur `Scroll /` atau `scrollY` > 0, node yang kena LC-02a. Hanya node terluar (keturunan node yang sudah dilaporkan dilewati).
@@ -128,3 +137,19 @@ deferred: []
 
 **Manual checks (if no CLI):**
 - Crop di `<scratchpad>/shots/` untuk setiap error LC-02c/LC-31 baru.
+
+## Auto Run Result
+
+Status: built
+
+**Ringkasan:** LC-02c baru (error · gerbang): anak flow non-teks melewati content box induk > 1px dan content box wadah ber-cat terdekat (lewat rantai flow) > 1px dengan sisa ke tepi wadah < min(8, padding/2) atau tumpah; pengecualian `Overlay /`/`Crop /`, rotasi, gap negatif, sumbu vertikal `Scroll /`/`scrollY`, LC-02a beserta keturunannya; hanya node terluar. LC-31 diperluas: (b) kartu ber-cat berisi teks rata (−2..+1px) di tepi bawah board/seksi, bukan panel (lebar ≥ 90%, mulai di tepi atas clip/isi induk, menempel tepi kiri/kanan board); (c) baris terakhir daftar ber-cat rata ±2px di tepi bawah kartunya dengan ruang atas ≥ 8. Lampiran A DESIGN.md diperbarui di disk (di-exclude git).
+
+**File:** `packages/schema/src/findings.ts` (+test) katalog LC-02c, judul LC-31; `packages/check/src/rules.ts` `lc02c`, `lc31`, `flushListRow`; `packages/check/src/index.ts` urutan/ekspor; `packages/check/src/index.test.ts` fixture; `packages/daemon/src/index.test.ts` + `packages/daemon/test/fixtures/p8-polish-4-lumbung.lakar.json` dokumen P8 asli; `packages/mcp/src/server.ts` + `tests/execute-description.test.ts` deskripsi `layout_check`; `bench/practice/LOG.md` §2.15.
+
+**Review:** 5 temuan — 4 di-patch (2 medium, 2 low; commit `3fbe553`), 0 ditunda, 1 ditolak (low: frame transparan dinilai dari bounds; tidak ada contoh arsip, perbaikan menambah cabang).
+
+**Follow-up review:** disarankan (2 medium di-patch). Risiko yang belum terverifikasi: pengecualian panel LC-31 (b) dan kasus (b) secara umum hanya dibuktikan fixture sintetis — arsip tidak punya contoh (b).
+
+**Verifikasi:** `pnpm build` lulus; check 181/181, schema lulus; `pnpm test` 1034/1036 — gagal hanya latensi `visual.test.ts` (lulus sendiri 18/18) dan kinerja check 500 node di bawah beban paralel (lulus sendiri 3×; LC-02c+LC-31 median 0,35 ms/board, checkBoard penuh median 6,6 ms di 157 board arsip). Pindaian arsip `after15b.json` = `after15.json` per dokumen; aturan lain = `after2.json`; LC-02c 32 temuan/14 dok, LC-31 (c) 2/2, (b) 0; gagal gerbang 74 → 80; 0 positif palsu (crop). `tools/node26/verify.sh` semua OK, Node sistem v22.23.5, lakard active.
+
+**Risiko sisa:** ambang LC-02c (kasus batas sisa 9–12px tidak dilaporkan, lihat LOG.md §2.15); frame transparan berlebar tetap dinilai dari bounds; LC-31 (b) tanpa contoh arsip.
