@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "model": "claude-opus-5-5",
+  "timeoutMs": 1800000,
+  "runsPerPrompt": 3,
+  "maxAttemptsPerPrompt": 4,
+  "promptIds": ["A", "B"],
+  "claudeArgs": [
+    "--strict-mcp-config",
+    "--tools",
+    "",
+    "--output-format",
+    "stream-json",
+    "--verbose",
+    "--disable-slash-commands",
+    "--no-session-persistence"
+  ],
+  "env": {
+    "ENABLE_TOOL_SEARCH": "false"
+  },
+  "envScrubPrefixes": ["CLAUDE", "AI_AGENT"]
+}

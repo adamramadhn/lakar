@@ -1,0 +1,8 @@
+packages:
+  - 'packages/*'
+  - 'bench'
+
+engineStrict: true
+
+minimumReleaseAgeExclude:
+  - lucide-static@1.74.0

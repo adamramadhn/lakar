@@ -1,0 +1,81 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`report > markdown memuat versi, pembungkus, argv, tabel run (snapshot) 1`] = `
+"# Baseline waktu pen.dev
+
+Status: **tidak lengkap** (target 3 run sukses per prompt).
+
+## Ringkasan
+
+| Prompt | Sukses / percobaan | Waktu median (dtk) | Rentang waktu (dtk) | Biaya median | Rentang biaya |
+|---|---|---|---|---|---|
+| A | 3 / 3 | 100.0 | 90.0–120.0 | $1.00 | $0.90–$1.10 |
+| B | 2 / 3 | 65.0 | 60.0–70.0 | $0.55 | $0.50–$0.60 |
+
+## Versi dan protokol
+
+- Tanggal: 2026-11-17T12:30:00.000Z
+- Hash protokol (sha256 wrapper.txt + prompts.json + protocol.json): \`abc123\`
+- Model (pin \`--model\`): \`claude-opus-5-5\`; kunci \`modelUsage\`: \`claude-opus-5-5\`
+- Claude Code: 2.1.325
+- pen.dev desktop: 1.2.23
+- Effort: default
+- Env proses claude: \`ENABLE_TOOL_SEARCH=false\`; dibuang dari env pemanggil: \`CLAUDE_EFFORT\`
+
+### Argumen claude
+
+\`\`\`
+claude -p '<prompt>' --model claude-opus-5-5
+\`\`\`
+
+### Pembungkus (bench/protocol/wrapper.txt, kata per kata)
+
+\`\`\`
+Mode benchmark.
+
+{{PROMPT}}
+\`\`\`
+
+### Prompt A
+
+\`\`\`
+Prompt A
+\`\`\`
+
+### Prompt B
+
+\`\`\`
+Prompt B
+\`\`\`
+
+## Run
+
+| Run | Prompt | Status | Wall (dtk) | duration_ms | Biaya | Turns | Tool call | Frame | Transkrip | .pen / PNG |
+|---|---|---|---|---|---|---|---|---|---|---|
+| S-A1 | A | success | 90.0 | 89500 | $0.90 | 6 | 5 | 1440×4000 | 200 KB | \`bench/runs/pendev/S-A1/design.pen\`<br>\`bench/runs/pendev/S-A1/png/F1.png\` |
+| S-B1 | B | success | 60.0 | 59500 | $0.50 | 6 | 5 | 1440×4000 | 200 KB | \`bench/runs/pendev/S-B1/design.pen\`<br>\`bench/runs/pendev/S-B1/png/F1.png\` |
+| S-A2 | A | success | 120.0 | 119500 | $1.10 | 6 | 5 | 1440×4000 | 200 KB | \`bench/runs/pendev/S-A2/design.pen\`<br>\`bench/runs/pendev/S-A2/png/F1.png\` |
+| S-B2 | B | failed (no_result) | – | – | $0.20 | 6 | 5 | 0 | 200 KB | \`bench/runs/pendev/S-B2/design.pen\` |
+| S-A3 | A | success | 100.0 | 99500 | $1.00 | 6 | 5 | 1440×4000 | 200 KB | \`bench/runs/pendev/S-A3/design.pen\`<br>\`bench/runs/pendev/S-A3/png/F1.png\` |
+| S-B3 | B | success | 70.0 | 69500 | $0.60 | 6 | 5 | 1440×4000 | 200 KB | \`bench/runs/pendev/S-B3/design.pen\`<br>\`bench/runs/pendev/S-B3/png/F1.png\` |
+
+### Diagnostik (bukan waktu gerbang)
+
+| Run | spawn → event pertama (dtk) | tool_use pertama (dtk) | tool_result terakhir (dtk) |
+|---|---|---|---|
+| S-A1 | 1.5 | 4.0 | 87.0 |
+| S-B1 | 1.5 | 4.0 | 57.0 |
+| S-A2 | 1.5 | 4.0 | 117.0 |
+| S-B2 | 1.5 | 4.0 | – |
+| S-A3 | 1.5 | 4.0 | 97.0 |
+| S-B3 | 1.5 | 4.0 | 67.0 |
+
+## Run gagal / tidak dihitung
+
+- S-B2 (failed: no_result)
+
+## Catatan pengukuran
+
+- AD-13
+"
+`;

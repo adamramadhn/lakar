@@ -1,0 +1,16 @@
+[
+  {
+    "id": "P5",
+    "name": "Lintas Arus",
+    "kind": "landing",
+    "text": "Desain landing page desktop dengan lebar 1440px untuk \"Lintas Arus\", platform pemantauan jaringan listrik pintar bagi operator energi. Bagian: menu atas; hero berlatar efek visual abstrak yang ekspresif seperti aliran cahaya atau medan warna, dengan judul besar, subjudul, sepasang tombol aksi, serta cuplikan panel status jaringan; tiga kemampuan utama; angka kinerja; testimoni operator; seksi ajakan akhir berlatar efek yang senada; footer. Mode gelap, aksen hijau elektrik. Bahasa Indonesia. Kualitas setara desainer produk senior: hierarki tipografi jelas, spacing konsisten (grid 8px), kontras baik, auto/flex layout.",
+    "size": { "width": 1440, "height": null }
+  },
+  {
+    "id": "P6",
+    "name": "Senyap",
+    "kind": "mobile",
+    "text": "Desain layar onboarding pertama aplikasi mobile meditasi dan tidur \"Senyap\" (390x844). Isi: latar gradasi ekspresif seperti langit senja dengan tekstur halus, bentuk cahaya abstrak di bagian atas, judul sambutan, kalimat penjelas singkat, indikator 3 langkah, tombol mulai, dan tautan masuk untuk yang sudah punya akun. Mode gelap, aksen oranye senja. Bahasa Indonesia. Kualitas setara desainer produk senior: hierarki tipografi jelas, spacing konsisten (grid 8px), kontras baik, auto/flex layout.",
+    "size": { "width": 390, "height": 844 }
+  }
+]

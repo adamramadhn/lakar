@@ -186,3 +186,119 @@ hitl = true
 risk = "high"
 plan_checkpoint = true
 done_checkpoint = true
+
+# ---- Putaran perbaikan G0 (keputusan Adam 2026-11-18, bench/round-1.md §Evaluasi arah), urut build satu-satu ----
+
+[[entry]]
+id = 17
+type = "story"
+title = "Juri bench terkalibrasi terhadap penilaian Adam"
+description = "Lampiran B DESIGN.md (sumber teks juri) ditambah dua kriteria yang dinilai juri dari PNG: kekayaan informasi & detail (metrik kontekstual, variasi status, microcopy yang memberi makna pada angka, kepadatan informasi yang terbaca) dan polesan warna & komponen (bidang ber-tint, warna kedua semantik, badge/chip berwarna, ikon dan foto/gambar yang matang, bukan datar). Kriteria ditulis umum, tidak menyebut isi prompt A/B. Ambang keputusan per prompt disesuaikan dengan skala skor baru dan dicatat. Rubrik dan ambang baru ditinjau Adam di plan_checkpoint. bench/src/judge memakai rubrik baru, juri tetap buta (label X/Y acak, penjaga kebocoran), dan versi rubrik serta sha256 teks juri tercatat di setiap laporan. Karena ux-lakar di-exclude git, salinan teks juri disimpan per putaran di bench/runs/ (gitignored). Perintah bench bisa menilai ulang pasangan PNG yang sudah ada tanpa menjalankan agen (biaya hanya juri). Juri ini dipakai story 19 (latihan) dan 21 (putaran 2)."
+verify = "Juri baru dijalankan 3x pada pasangan PNG bench/runs/rounds/1 dan bench/runs/rounds/uji-1. Laporannya menunjukkan putaran 1 A = pen.dev unggul (Lakar Kalah, paling baik Setara) dan putaran 1 B = Setara, dengan bukti per kriteria baru. Hasil uji-1 dilaporkan untuk dilihat Adam. Teks kriteria baru tidak memuat kata khas A/B (streak, target harian, Kasku, Gerak, invoice, avatar foto) menurut tes. Laporan mencatat versi rubrik dan sha256 teks juri. pnpm --filter @lakar/bench test lulus, dan protocolHash tetap 907cb36f."
+covers = ["R10", "R7"]
+after = [16]
+hitl = false
+risk = "high"
+references = ["bench/round-1.md#konfirmasi-adam", "_bmad-output/initiative-lakar/ux-lakar/DESIGN.md#lampiran-b--rubrik-benchmark"]
+notes = ["Arahan Adam: waspadai overfit ke 2 contoh; kriteria harus umum. Biaya hanya juri.", "ux-lakar di-exclude git lokal: perubahan Lampiran B tidak punya riwayat git, sehingga versi dan hash teks juri wajib tercatat di laporan."]
+plan_checkpoint = true
+
+[[entry]]
+id = 18
+type = "story"
+title = "Agen mencari dan memakai foto stok lokal"
+description = "Daemon mengimpor foto sekali dari penyedia (default Pexels, cadangan Openverse CC0/PDM/CC BY; pilihan final di plan) ke asset store <dataDir>/assets/<sha256>, dengan metadata sumber, URL halaman, pembuat, lisensi, dan ukuran. Tool MCP photo_search mengembalikan kandidat dengan pratinjau dan atribusi. api.ts mendapat operasi impor/pakai foto yang mengembalikan assetId untuk fill gambar (fit cover/contain), dan api.md dihasilkan ulang. Render memakai aset lokal saja. Foto ini dipakai skill di story 19. API key (bila perlu) diberikan Adam lewat mekanisme secret, disimpan di ~/.config/lakar/ mode 600, tidak di-commit atau dilog. C9: tanpa paket global, port, atau service baru di luar lakard."
+verify = "Dari sesi Claude Code baru, photo_search 'kamar hotel' mengembalikan kandidat beratribusi. Satu execute memakai foto terpilih sebagai fill kartu, dan screenshot menampilkan foto itu. Screenshot ulang dengan akses jaringan keluar diblokir hanya di halaman render Lakar (intersepsi request di Chromium, bukan firewall VPS) tetap menampilkan foto. File metadata aset mencatat sumber, pembuat, dan lisensi. git grep atas key kosong. pnpm build dan pnpm test lulus. Aplikasi lain (pen, MCP pencil, n8n-mcp, t3code) tetap berjalan."
+covers = ["R11"]
+after = [17]
+hitl = true
+risk = "high"
+references = ["_bmad-output/initiative-lakar/architecture-lakar-core/architecture-lakar-core.md#deferred"]
+notes = ["Arahan Adam: foto stok ditarik dari G1 ke G0; lisensi aman untuk pemakaian internal non-komersial; key lewat mekanisme secret, bukan chat, simpan di ~/.config/lakar.", "after 17 hanya untuk urutan build satu-satu, bukan kebutuhan fungsi."]
+plan_checkpoint = true
+
+[[entry]]
+id = 19
+type = "story"
+title = "Skill lebih kaya diuji dengan prompt latihan"
+description = "Revisi core.md, landing.md, dan mobile.md, serta panduan foto di skill. Isinya: tint merek pada bidang gelap, warna kedua semantik untuk status, chip/badge metrik, microcopy konteks, variasi status di daftar, ring/chart multi-warna, dan pemakaian foto. Anti-slop tetap berlaku tetapi tidak berarti datar. C7 keras: skill tidak memuat rubrik, kriteria juri, kriteria golden, atau prompt A/B. Iterasi memakai 3–4 prompt latihan baru di bench/practice/ (landing, mobile, dan minimal satu jenis lain, salah satunya memakai foto), bukan A–E. Lakar dan pen.dev dijalankan pada prompt latihan yang sama dengan runner dan pembungkus resmi, lalu dinilai juri terkalibrasi dari story 17. Bagian hitl: Adam melihat PNG latihan sebelum story ditutup."
+verify = "bench/practice-<n>.md berisi PNG kedua alat, skor juri terkalibrasi, waktu, dan biaya untuk setiap prompt latihan. Lakar Setara atau Lebih baik di ≥ 3 dari 4 prompt latihan (≥ 2 dari 3 bila 3 prompt). Waktu Lakar ≤ 1,5x waktu pen.dev pada prompt yang sama. Nol emoji dan 0 error gerbang. Tes skill lulus: contoh lolos terhadap api.ts, core.md ≤ 4k token, dan pencarian frasa rubrik/kriteria juri baru, kata khas prompt A/B, serta teks prompt latihan di skill kosong. Adam sudah melihat PNG latihan."
+covers = ["R12", "R6"]
+after = [17, 18]
+hitl = true
+references = ["bench/round-1.md#evaluasi-arah-setelah-konfirmasi-adam"]
+risk = "high"
+notes = ["Arahan Adam: anti-slop tetap berlaku tapi bukan 'datar'; C7 keras; target Lakar setara atau lebih baik di sebagian besar prompt latihan dan Adam melihat PNG; waktu tetap <= 1,5x baseline."]
+plan_checkpoint = true
+done_checkpoint = true
+
+[[entry]]
+id = 22
+type = "story"
+title = "Efek visual gradien dan shader setara pen.dev"
+description = "pen.dev mengklaim efek visual memukau dengan shader; Lakar baru punya gradien linear/radial berlapis (story 8) tanpa conic, grain/noise, mesh, atau shader, dan skill hanya mendokumentasikan API gradien tanpa panduan kapan gradien membuat desain matang. Langkah: (1) investigasi read-only kemampuan efek/shader pen.dev lewat MCP pencil (read_skill, get_style, panduan; tanpa menimpa .pen), diringkas di dokumen story: efek apa, statis atau parametrik; (2) prompt latihan efek baru P5 (dan P6 bila perlu, mis. hero landing produk teknologi berlatar efek abstrak ekspresif, layar onboarding mobile bergradasi) di bench/practice/, bukan turunan A/B, tanpa teks rubrik (C7), dibekukan dengan sha256 sebelum perubahan mesin atau skill; harness latihan diperluas untuk seri efek ini (set prompt efek terpisah dari P1–P4 yang ber-sha, batas iterasi dan penghitung anggaran sendiri dengan batas $15, aturan lulus semua prompt efek) karena batas iterasi 8 dan anggaran $58,09 story 19 sudah terpakai; (3) baseline P5/P6 di kedua alat (pen.dev lewat pen-newdoc.sh dengan verifikasi dokumen baru; restart pen-desktop setelah seri untuk melepas RAM, diizinkan Adam), juri buta v2.1, PNG ditinjau; (4) peningkatan Lakar dengan kedalaman yang ditetapkan dari investigasi di plan_checkpoint: minimal conic gradient, grain/noise, dan panduan gradien di skill (tint bidang merek, glow, scrim foto, sorot kartu unggulan, ring/donut bergradasi) dalam batas anti-slop; bila gap berasal dari shader sungguhan, ditambah shader fill statis berupa preset efek parametrik (mis. mesh gradient, aurora, noise flow, blob blur) yang dirender WebGL di Chromium menjadi bitmap saat render, render tetap murni browser (AD-6), skema berubah lewat schemaVersion/migrasi (AD-1–AD-4, AD-15), golden render teruji (grain/noise deterministik dengan seed tetap), latensi terukur, dan WebGL dipastikan jalan di chromium-headless-shell sebelum dipilih; panduan skill tetap di dalam DESIGN.md (glow dilarang, maks satu gradien per board, mesh di hero hanya dengan alasan merek) kecuali Adam menyetujui amandemen DESIGN.md di plan_checkpoint; (5) run ulang Lakar pada P5/P6 dengan PNG pen.dev dipakai ulang dari langkah 3 (C8: satu run per alat per prompt, tanpa memilih run terbaik). Bagian per requirement: R3 = fill efek baru di render, R6 = panduan gradien di skill, R7 = perluasan harness latihan untuk seri efek, R13 = seluruhnya. Temuan review dan plan yang ditunda diserahkan ke refactor sweep (20)."
+verify = "Dokumen story memuat ringkasan investigasi pen.dev dan sha256 prompt P5/P6 yang tercatat sebelum commit perubahan mesin/skill pertama. bench/practice-<n>.md berisi PNG kedua alat, skor juri v2.1, waktu, dan biaya untuk P5/P6 baseline dan run ulang. Lakar Setara atau Lebih baik di semua prompt efek, waktu Lakar <= 1,5x pen.dev per prompt, nol emoji, 0 error gerbang. pnpm --filter @lakar/render test lulus untuk golden render conic gradient dan grain dengan seed tetap, dua kali render menghasilkan PNG identik (dan tiap preset shader fill bila dibangun, beserta latensi render terukur); modul render tetap termuat di browser biasa tanpa API Node; tes skill lulus (contoh lolos terhadap api.ts, core.md <= 4k token, pencarian frasa rubrik, kata khas A/B, dan teks P5/P6 di skill kosong). pnpm build dan pnpm test lulus. Biaya kumulatif tercatat (anggaran sekitar $10-15). Adam sudah melihat PNG."
+covers = ["R13", "R3", "R6", "R7"]
+after = [19]
+hitl = true
+risk = "high"
+references = ["_bmad-output/initiative-lakar/architecture-lakar-core/architecture-lakar-core.md", "bench/README.md", "bench/practice/LOG.md"]
+notes = ["Keputusan Adam 2026-11-18: story efek visual gradien dan shader setara pen.dev ditambahkan sebelum refactor sweep (20) dan putaran 2 (21); anggaran sekitar $10-15, dicatat.", "C7, C8, C9 berlaku: tidak ada rubrik atau prompt latihan di skill; satu run per alat per prompt; tanpa paket global, port, atau service baru di luar lakard; restart pen-desktop hanya setelah seri pen.dev selesai.", "Kedalaman (cukup conic + grain + panduan skill, atau ditambah shader fill WebGL) diputuskan di plan_checkpoint dari hasil investigasi dan baseline."]
+plan_checkpoint = true
+done_checkpoint = true
+
+[[entry]]
+id = 20
+type = "story"
+title = "Refactor sweep putaran perbaikan"
+description = "Pembersihan saja. Cakupannya ditetapkan saat mulai dari temuan review dan plan yang ditunda di story 17–19 dan 22, lalu di-commit sebelum putaran 2 dibekukan."
+verify = "pnpm build dan pnpm test lulus. Setiap temuan tunda yang dipilih tertutup atau dicatat alasannya. git status --porcelain untuk kode produk dan harness kosong setelah commit."
+covers = []
+after = [17, 18, 19, 22]
+hitl = false
+risk = "low"
+
+[[entry]]
+id = 21
+type = "story"
+title = "Putaran resmi 2 dijalankan dan diputuskan"
+description = "Membekukan versi lalu menjalankan putaran resmi 2 untuk A dan B di Lakar dan pen.dev. Protokol beku sama: pembungkus dan prompt dengan protocolHash 907cb36f4674d422feded4506851b6391082b40b918dd46841edae607bedb85d, baseline pen.dev yang sama, satu run per alat per prompt tanpa memilih run terbaik (C8). Penilaian memakai juri terkalibrasi (versi dan sha256 teks juri tercatat). Hasilnya bench/round-2.md dengan keputusan sementara. Bagian Konfirmasi Adam diisi dari jawaban Adam, bukan oleh agen. Bila model, Claude Code, atau pen.dev desktop berbeda dari baseline, run berhenti dan Adam memutuskan (ukur ulang baseline atau tunda)."
+verify = "bench/round-2.md berisi versi beku, protocolHash 907cb36f…, versi dan sha256 juri, waktu, biaya, skor, jumlah emoji, keputusan A dan B, keputusan G0, dan bagian Konfirmasi Adam yang berasal dari Adam. Strip Lakar ada di bench/round-2/. G1 hanya dimulai bila round-2 lolos dan dikonfirmasi."
+covers = ["R7", "R8"]
+after = [19, 20]
+hitl = true
+references = ["bench/round-1.md#protokol"]
+risk = "high"
+notes = ["Arahan Adam: protokol beku yang sama; satu run per alat per prompt (C8); agen tidak mengisi konfirmasi Adam; G1 hanya dimulai bila round-2 lolos dan dikonfirmasi."]
+plan_checkpoint = true
+done_checkpoint = true
+
+[[entry]]
+id = 23
+type = "story"
+title = "Skill polish dan disiplin spacing dari ui-skills"
+description = "Adam mengonfirmasi round-2 (A Setara, B Setara) dengan catatan spacing: lencana \"Berikutnya\" di B terlalu besar dan menempel ke judul. Akar masalahnya ada tiga: prelude Badge tetap 24 px, teks judul dalam Row tanpa width fill, dan tidak ada aturan check untuk luapan atau tumpang tindih. Hasil analisis seluruh registry ui-skills.com yang disetujui Adam ada di _bmad-output/initiative-lakar/analisis-ui-skills-polish.md. Lingkupnya: (1) prelude Badge berukuran sm/md dengan teks yang lulus kontras; (2) skill baru polish.md, dibaca setelah core, berisi struktur dan spacing, komponen, tipografi, warna, kekayaan informasi, tanda slop baru, dan kritik diri (parafrase, atribusi untuk sumber Apache/MIT); (3) revisi kecil landing.md dan mobile.md (overline maks 2, pembatasan \"·\", grid 12 kolom); (4) aturan layout_check baru: error untuk teks meluap, tumpang tindih saudara, dan kontras setelah komposit; warning untuk proporsi badge, gap < 8, kartu bersarang, radius konsentris, ritme judul, jumlah ukuran huruf, panjang baris, bobot tipis, dan tanda baca; (5) uji lewat seri latihan non-A/B dibanding pen.dev dengan juri v2.1."
+verify = "pnpm build dan pnpm test lulus. Setiap aturan check baru punya fixture positif dan negatif, dan aturan berstatus error tidak memberi positif palsu pada arsip dokumen bench (>= 80 dokumen, hasilnya tercatat). Dokumen B-lakar round-2 memicu aturan luapan/tumpang tindih atau proporsi badge. Tes skill lulus: contoh lolos terhadap api.ts, batas token core, read_skill polish tersedia, dan tidak ada frasa rubrik, kata khas A/B, atau teks prompt latihan di skill (C7). Seri latihan non-A/B (Lakar vs pen.dev, juri v2.1, satu run per alat per prompt) tercatat dengan PNG, skor, waktu, dan biaya kumulatif <= $15. Lakar Setara atau Lebih baik di semua prompt seri, nol emoji, 0 error gerbang. Adam sudah melihat PNG."
+covers = ["R6", "R5"]
+after = [21]
+hitl = true
+risk = "medium"
+references = ["_bmad-output/initiative-lakar/analisis-ui-skills-polish.md", "bench/round-2.md#konfirmasi-adam", "bench/practice/LOG.md"]
+notes = ["Keputusan Adam 2026-11-18: skill polish yang diperkaya dari analisis ui-skills.com disetujui (\"setuju\"); dikerjakan di g0 sebelum G1.", "C7, C8, C9 berlaku; restart pen-desktop hanya setelah seri pen.dev selesai; jangan menyalin teks sumber tanpa lisensi.", "Keputusan Adam 2026-11-19: ditutup sebagai built. Tujuan spacing/lencana/polish tercapai (P8, P9 Setara; emoji 0; gerbang 0). P7 kalah hanya karena waktu (174,4 dtk vs 97,5 dtk) dan ditangani di story 24."]
+plan_checkpoint = true
+done_checkpoint = true
+
+[[entry]]
+id = 24
+type = "story"
+title = "Board mobile panjang, skill webapp, foto Unsplash, dan mockup hero"
+description = "Dari tinjauan Adam atas PNG seri polish P7–P9 (2026-11-19). (a) Mobile satu board panjang: bila konten lebih panjang dari 844, agen membuat SATU board selebar 390 dengan tinggi mengikuti konten (minimal 844). Status bar ada di atas, tab bar/bilah aksi menempel di bawah board. Board \"(akhir)\" hasil duplikasi dan scrollY dihapus. Ubah mobile.md, contoh skill, LC-12, dan LC-20 (zona bawah = bawah board). Kriteria ukuran R1 di juri diubah secara simetris untuk kedua alat (board mobile panjang berlebar 390 tidak dihukum) sebagai versi rubrik baru (versi + sha dicatat); putaran yang sudah diputuskan tidak berubah. (b) Skill baru webapp.md untuk dashboard/aplikasi web: satu kartu KPI utama ber-fill warna merek, permukaan ber-tint, variasi grafik (batang bertumpuk, area, sparkline), aksen tegas di sidebar, tabel, dan chip delta berwarna; pola semua kartu putih + garis tipis + aksen biru masuk daftar slop. Dipasang di read_skill, instruksi MCP, dan tes (batas token, C7). (c) Foto: tangga kata kunci otomatis saat NOT_FOUND, panduan kata kunci di skill, adaptor Unsplash API (key di ~/.config/lakar/unsplash-access-key, header Client-ID, User-Agent generik), patuh pedoman Unsplash (hotlink, download_location saat dipakai, kredit di metadata aset), cache pencarian, dan urutan penyedia Unsplash → Wikimedia → Openverse. Konflik hotlink dengan AD-6/determinisme render diputuskan di plan dan dicatat sebagai follow-up arsitektur. (d) Mockup hero landing tidak lagi terpotong rata di bawah hero, lewat skill dan/atau aturan check."
+verify = "pnpm build dan pnpm test lulus. Tes skill lulus: contoh lolos terhadap api.ts, batas token, read_skill webapp tersedia, dan C7 (tanpa rubrik, kata khas A/B, atau teks prompt latihan di skill). LC-12/LC-20 dan aturan mockup hero punya fixture positif dan negatif. Adaptor foto teruji dengan tangga kata kunci, cache, dan urutan penyedia (tes tanpa jaringan). Key tidak pernah muncul di git, log, atau output. Rubrik juri versi baru dengan sha tercatat, simetris untuk kedua alat. Seri latihan P7–P9 (prompt beku 1.23, juri buta, C8): Lakar dijalankan ulang di ketiganya, pen.dev dijalankan ulang hanya untuk P7, P8/P9 memakai PNG pen.dev iterasi 1. Lulus bila P7–P9 semuanya Setara atau Lebih baik, emoji 0, gerbang 0, dan waktu <= 1,5x pen.dev. Biaya kumulatif tercatat dalam batas di plan. tools/node26/verify.sh lulus. Adam sudah melihat PNG."
+covers = ["R6", "R5", "R13"]
+after = [23]
+hitl = true
+risk = "high"
+references = ["bench/polish-2.md", "bench/practice/LOG.md", "_bmad-output/initiative-lakar/tickets/epic-g0-inti-minimal/tickets/story-skill-polish-dan-disiplin-spacing-dari-ui-skills-plan.md"]
+notes = ["Keputusan Adam 2026-11-19: board mobile panjang tunggal disetujui, termasuk perubahan LC-12 dan R1 juri yang simetris; anggaran tidak kaku tetapi tidak terlalu longgar (batas ditetapkan di plan, mis. <= 3 iterasi); Access Key Unsplash sudah tersedia dan isinya tidak boleh ditampilkan, dicatat, atau di-commit.", "C7, C8, C9 berlaku. pen.dev hanya lewat MCP pencil (pen-newdoc.sh + get_app_state), restart pen-desktop setelah seri. Plan checkpoint diserahkan ke orkestrator."]
+plan_checkpoint = true
+done_checkpoint = true

@@ -1,0 +1,30 @@
+[
+  {
+    "id": "P1",
+    "name": "Rakit Kode",
+    "kind": "landing",
+    "text": "Desain halaman landing desktop selebar 1440px untuk \"Rakit Kode\", bootcamp pemrograman web daring bagi pemula. Bagian: menu atas, hero dengan judul besar, subjudul, dua tombol aksi, dan foto suasana belajar; alur belajar 3 tahap; profil 3 mentor dengan foto; cerita alumni beserta pekerjaan mereka sekarang; jadwal angkatan dan biaya; FAQ; footer. Gaya modern, bersemangat, tepercaya, aksen biru. Bahasa Indonesia. Kualitas setara desainer produk senior: hierarki tipografi jelas, spacing konsisten (grid 8px), kontras baik, auto/flex layout.",
+    "size": { "width": 1440, "height": null }
+  },
+  {
+    "id": "P2",
+    "name": "Siaru",
+    "kind": "mobile",
+    "text": "Desain layar utama aplikasi mobile musik dan podcast \"Siaru\" (390x844). Isi: header dengan sapaan dan foto profil, kartu lanjutkan mendengarkan (episode terakhir dan sisa waktunya), 6 tile mix harian, daftar 4 episode baru dengan durasi dan status unduhan, mini player yang menempel di atas tab bar berisi 4 ikon. Mode gelap, aksen ungu. Bahasa Indonesia. Kualitas setara desainer produk senior: hierarki tipografi jelas, spacing konsisten (grid 8px), kontras baik, auto/flex layout.",
+    "size": { "width": 390, "height": 844 }
+  },
+  {
+    "id": "P3",
+    "name": "Dapur Wening",
+    "kind": "mobile",
+    "text": "Desain layar detail resep untuk aplikasi masak \"Dapur Wening\" (mobile 390x844). Isi: foto hidangan lebar di bagian atas dengan tombol kembali dan simpan, nama resep, waktu masak, porsi, tingkat kesulitan, ulasan pengguna, tab Bahan dan Langkah, daftar bahan dengan takaran dan tanda sudah disiapkan, serta tombol mulai memasak yang tetap di bagian bawah. Mode terang, aksen merah tomat. Bahasa Indonesia. Kualitas setara desainer produk senior: hierarki tipografi jelas, spacing konsisten (grid 8px), kontras baik, auto/flex layout.",
+    "size": { "width": 390, "height": 844 }
+  },
+  {
+    "id": "P4",
+    "name": "Dentara",
+    "kind": "dashboard",
+    "text": "Desain halaman dashboard desktop (1440x900) untuk \"Dentara\", sistem jadwal klinik gigi. Isi: sidebar navigasi, header berisi tanggal hari ini dan pencarian pasien, 3 kartu ringkasan (janji hari ini, pasien baru, pendapatan) dibanding minggu lalu, linimasa janji per dokter untuk hari ini, antrean pasien di ruang tunggu dengan status, dan panel bahan habis pakai yang hampir habis. Mode terang, aksen teal. Bahasa Indonesia. Kualitas setara desainer produk senior: hierarki tipografi jelas, spacing konsisten (grid 8px), kontras baik, auto/flex layout.",
+    "size": { "width": 1440, "height": 900 }
+  }
+]

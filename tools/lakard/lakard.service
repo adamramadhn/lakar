@@ -1,0 +1,21 @@
+# Template unit systemd --user untuk lakard (AD-14, C9). Dipasang oleh tools/lakard/install-service.sh
+# ke ~/.config/systemd/user/lakard.service (@ROOT@ diganti root repo Lakar). Jangan edit salinan terpasang.
+[Unit]
+Description=Lakar daemon (lakard) - 127.0.0.1:7466
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=@ROOT@
+ExecStart=/opt/node-26/bin/node @ROOT@/packages/daemon/dist/main.js
+Restart=on-failure
+RestartSec=2
+# Env Lakar HANYA di unit ini (tidak di profil shell / env global).
+Environment=LAKAR_PORT=7466
+Environment=LAKAR_BROWSERS_PATH=%h/.cache/lakar/ms-playwright
+Environment=PLAYWRIGHT_BROWSERS_PATH=%h/.cache/lakar/ms-playwright
+KillSignal=SIGTERM
+TimeoutStopSec=10
+
+[Install]
+WantedBy=default.target

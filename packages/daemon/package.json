@@ -1,0 +1,46 @@
+{
+  "name": "@lakar/daemon",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=26"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "test": "vitest run --root ../.. packages/daemon/"
+  },
+  "dependencies": {
+    "@fontsource/bricolage-grotesque": "5.3.0",
+    "@fontsource/dm-mono": "5.3.0",
+    "@fontsource/dm-sans": "5.3.0",
+    "@fontsource/ibm-plex-mono": "5.3.0",
+    "@fontsource/inter": "5.3.0",
+    "@fontsource/jetbrains-mono": "5.3.0",
+    "@fontsource/manrope": "5.3.0",
+    "@fontsource/plus-jakarta-sans": "5.3.0",
+    "@lakar/check": "workspace:*",
+    "@lakar/core": "workspace:*",
+    "@lakar/exec": "workspace:*",
+    "@lakar/icons": "workspace:*",
+    "@lakar/ports": "workspace:*",
+    "@lakar/render": "workspace:*",
+    "@lakar/schema": "workspace:*",
+    "@lakar/skills": "workspace:*",
+    "fastify": "5.12.8",
+    "playwright-core": "1.65.1",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "26.6.6"
+  }
+}

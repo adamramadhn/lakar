@@ -66,7 +66,7 @@ Adam bisa meminta desain UI dari Claude Code dan mendapat hasil setara atau lebi
 - Di luar: Penpot (http://127.0.0.1:9101) dan bridge/tab Penpot dari EXPERIENCE.md.
 - Touch point: pen.dev — hanya untuk menjalankan baseline benchmark; owner: epic-g0-inti-minimal (A, B), epic-g1-inti-lengkap (C, D, E).
 - Touch point: Claude Code (`claude -p`) — klien MCP dan sumber waktu/biaya benchmark; owner: epic-g0-inti-minimal.
-- Touch point: Fontsource dan penyedia foto — impor sekali ke aset lokal; owner: epic-g0-inti-minimal (font), epic-g1-inti-lengkap (foto).
+- Touch point: Fontsource dan penyedia foto — impor sekali ke aset lokal; owner: epic-g0-inti-minimal (font dan foto; foto pindah dari G1, keputusan Adam 2026-11-18).
 - Jalur tracer lintas epic: prompt di Claude Code → MCP → `lakard execute` → core → render → `layout_check` → PNG → juri bench → keputusan gerbang, lalu canvas B memakai render dan daemon yang sama.
 
 ## References
@@ -80,7 +80,7 @@ Adam bisa meminta desain UI dari Claude Code dan mendapat hasil setara atau lebi
 
 - Source conflict: cara ukur waktu — golden-set §Prosedur langkah 3 (panggilan tool pertama sampai terakhir) vs architecture AD-13 (event pertama sampai `result` stream-json).
 - Decision: 2026-11-17 — waktu benchmark diukur sesuai AD-13, dari event pertama sampai `result` stream-json, untuk kedua alat. Langkah 3 golden-set tidak dipakai untuk waktu. Keputusan diserahkan Adam ke Sofia.
-- Open question: penyedia foto stok dan AI image (architecture §Deferred, sebelum G1). Yang menunggu: epic G1.
+- Open question: penyedia foto stok (architecture §Deferred). Yang menunggu: epic G0 story 1.18 (default Pexels, lihat Notes epic G0). Gambar AI tetap di luar (Boundaries, D).
 - Open question: spesifikasi UX untuk UI B belum ada, karena EXPERIENCE.md superseded. Yang menunggu: epic B (run `bmad-ux` setelah G1).
 - Decision: 2026-11-17 — baseline waktu pen.dev untuk A diukur ulang (median 3 run) dan untuk B diukur pertama kali di epic G0.
 - Decision: 2026-11-17 — ukuran board yang salah membuat hasil gagal otomatis di bench (Lampiran B, Gerbang), meskipun LC-12 berlevel warning.
@@ -88,3 +88,4 @@ Adam bisa meminta desain UI dari Claude Code dan mendapat hasil setara atau lebi
 - Decision: 2026-11-17 — epic dibagi per gerbang: G0, lalu G1, lalu B (arahan Adam).
 - Decision: 2026-11-17 — story pertama G0 menyiapkan Node 26 LTS (arahan Adam). Node 26 dipasang berdampingan khusus Lakar, sementara `/usr/bin/node` tetap v22 karena dipakai pen, n8n-mcp, dan aplikasi lain. Docker tidak dipakai: menambah latensi MCP stdio dan bertentangan dengan spine (systemd).
 - Decision: 2026-11-17 — tidak ada epic platform-baseline terpisah. Upgrade Node dan scaffold menjadi story pertama epic G0.
+- Decision: 2026-11-18 — putaran 1 G0 gagal (A Kalah, B Setara; konfirmasi Adam di bench/round-1.md). Arah editor sendiri dipertahankan (Adam). Epic G0 mendapat putaran perbaikan sebelum G1: kalibrasi juri, foto stok lokal ditarik dari G1, skill lebih kaya, dan putaran resmi 2. G1 baru dimulai bila putaran 2 lolos dan dikonfirmasi. Detail ada di epic G0.

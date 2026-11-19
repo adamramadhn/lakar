@@ -1,0 +1,736 @@
+# Log latihan skill (story 19)
+
+Latihan mengiterasi skill Lakar (`core.md`, `landing.md`, `mobile.md`) terhadap empat prompt non-A–E. Latihan bukan
+gerbang G0: keputusan G0 hanya dari putaran resmi A/B (story 21).
+
+## Pembekuan prompt (2026-11-18, sebelum skill diubah dan sebelum run apa pun)
+
+- `bench/practice/prompts.json` sha256 `582c5d117b05c93dff3b2335d0eb55f24b499e261ebc453c65eaaf32a453a1da`
+  (= `PRACTICE_PROMPTS_SHA256` di `bench/src/practice/prompts.ts`). Loader menolak isi lain.
+- Teks dari plan story 19 (Design Notes), dengan dua perubahan kata (bukan makna) yang diizinkan plan sebelum
+  iterasi 1, karena penjaga n-gram 6 kata (b) menemukan tumpang tindih dengan prompt golden:
+  - P2: "tab bar 4 ikon. Mode gelap, aksen …" → "tab bar berisi 4 ikon. Mode gelap, aksen …"
+    (n-gram "tab bar 4 ikon mode gelap" dan "bar 4 ikon mode gelap aksen" sama dengan prompt B).
+  - P3: "tombol mulai memasak yang tetap di bawah. Mode terang" → "… yang tetap di bagian bawah. Mode terang"
+    (n-gram "yang tetap di bawah mode terang" dan "tetap di bawah mode terang aksen" sama dengan prompt D).
+- Sesudah perubahan: 0 n-gram 6 kata sama dengan prompt A–E (kalimat penutup baku dibuang), 0 frasa
+  Kriteria/Prosedur/Risiko golden, 0 token terlarang, nama produk tidak ada di golden-set (`tests/practice-prompts.test.ts`).
+- Mulai sekarang prompt tidak diubah. Setiap iterasi mencatat sha `prompts.json` di `frozen.json`.
+
+## Iterasi 1: skill v1 dari diagnosis (sebelum run apa pun)
+
+Skill: `core.md` `97b295de0a084ee5`, `landing.md` `3daa5de39ffc37ac`, `mobile.md` `d6baefe94e5498a2` (sha256, 16 heksadesimal awal).
+Diubah sebagai prinsip umum (berlaku untuk jenis layar apa pun), dari diagnosis putaran 1:
+
+- **Peran warna menggantikan "satu aksen".** Aksen tetap memimpin aksi, state aktif, tautan, seri utama; tiga peran sah
+  lain: bidang merek (`field` tint muda / `deep` aksen tua) untuk latar seksi dan kartu sorotan, satu warna pendamping
+  `acc2` dengan satu makna tetap, dan warna status untuk arah dan keadaan. Uji baru: setiap warna non-netral bisa disebut
+  maknanya; maks 2 hue non-status. Alasan: aturan lama dijalankan harfiah → satu aksen di atas abu polos (datar).
+- **Gelap bernuansa merek.** Netral gelap digeser 4–8% ke hue aksen, tiga lapis (dasar/kartu/terangkat), status gelap.
+  Alasan: abu murni + "seksi gelap untuk ritme" menghasilkan permukaan polos.
+- **Kaya informasi, miskin hiasan** (menggantikan "Reduksi", prinsip dan langkah proses): angka kunci berpembanding +
+  arah berwarna status; daftar memperlihatkan keadaan (selesai/berikutnya/mendatang/terkunci); seri data bernada `C.data`
+  dengan legenda bernada sama. Alasan: reduksi harfiah membuang konteks yang justru isi.
+- **Komponen:** helper `Badge(p, label, tone, icon?)` bernada (accent/success/warning/danger/neutral/extra) di prelude
+  (+4 baris prelude); wadah ikon solid aksen untuk butir ditekankan; rating `star` filled `acc2`; kartu sorotan =
+  bidang tint + bayangan md (terang) / lapis raised (gelap); avatar foto orang, inisial cadangan.
+- **Foto:** untuk isi nyata (orang/tempat/makanan/produk), bukan ikon fitur; CC0/PDM → Pexels → CC BY; kata kunci
+  Inggris; maks 2 `photo_search` paralel sebelum execute pertama; gagal sekali → blok pengganti; kredit tidak tampil di
+  UI kecuali diminta (atribusi di metadata aset) dan disebut di ringkasan akhir. Teks foto di `api.ts`/`api.md` dan
+  `PHOTO_SEARCH_DESCRIPTION`/deskripsi execute diselaraskan (contoh `photo` tanpa node kredit).
+- **Layar app desktop:** satu baris struktur di core (board persis ukuran, sidebar, header, grid kartu), karena belum
+  ada skill jenis layar app (milik G1).
+- `landing.md`/`mobile.md`: prinsip per jenis layar (hero di bidang merek atau foto nyata, ritme latar seksi, kartu
+  orang tidak kembar, pilihan/tier dengan keadaan; list dengan keadaan, ring multi-seri, pil tab aktif, mode gelap
+  bernuansa merek). Contoh teruji (Biji Pagi, Tutur) memperagakan badge bernada, baris berkeadaan, bidang merek, kartu
+  ditekankan, ring bersegmen; lulus 0 error/warning/gerbang.
+
+### Hasil iterasi 1 (`bench/practice-1.md`, HEAD `bf5462d`)
+
+| Prompt | Waktu Lakar / pen.dev | T L–P | D L–P | Keputusan | Kelemahan Lakar menurut bukti juri |
+|---|---|---|---|---|---|
+| P1 | 265.9 / 227.4 dtk (1,17) | 13–14 | 3–4 | Kalah (R5 0 vs 2) | foto hero dan mentor = placeholder ikon + label "Foto …" → visual utama dinilai hilang |
+| P2 | 175.2 / 179.0 dtk (0,98) | 12–15 | 3–3 | Kalah (T < P − 1) | avatar inisial, sampul tanpa artwork; tile mix sebagian tertutup mini player; tile ungu jenuh bersaing dengan fokus |
+| P3 | 159.8 / 130.8 dtk (1,22) | 13–12 | 3–2 | Setara | hero placeholder ikon (R5 1) |
+| P4 | 252.1 / 191.3 dtk (1,32) | – | – | tidak dapat dinilai | run pen.dev `failed` di pasca-run harness ("referencing the wrong .pen file", 0 frame); tidak diulang (C8) |
+
+- Emoji Lakar (a)/(b)/(c) = 0 di P1–P3; layout_check gate 0 di keempat prompt; waktu ≤ 1,5× di keempat prompt.
+- R9 Lakar = 2 di P1–P3 (prinsip kaya informasi bekerja). R10 Lakar = 1 di semua prompt: permukaan berlapis, warna
+  kedua, dan badge diakui juri, tetapi "visual matang" gagal karena tidak ada foto.
+- Penyebab utama: **Openverse tidak tersedia** selama iterasi (setiap `photo_search` → NOT_FOUND untuk kata kunci panjang
+  atau EXEC_ERROR timeout 8 dtk; `curl` langsung: 504 setelah 9 dtk). Agen juga melanggar batas 2 pencarian (4–6
+  panggilan, mengganti kata kunci setelah gagal), menambah waktu.
+- Biaya iterasi 1: $9,92 (pen.dev $3,47, Lakar $4,29, juri $2,16); kumulatif $9,92.
+
+## Iterasi 2: skill v2
+
+Pakai ulang pen.dev iterasi 1 tidak mungkin (P4 pen.dev `failed` → `--reuse-pendev 1` Abort sebelum spawn, sesuai
+plan), jadi iterasi 2 menjalankan pen.dev baru untuk keempat prompt. Perubahan (prinsip umum, dikelompokkan dari bukti
+lintas prompt, bukan per prompt):
+
+- **Disiplin pencarian foto:** satu giliran bersama `open_doc`, maks 2 panggilan per desain, 1–3 kata benda Inggris
+  tanpa `orientation`; kosong/error → langsung visual pengganti, tidak mengganti kata kunci atau mengulang. Alasan:
+  4–6 panggilan gagal per run (waktu terbuang, melanggar batas plan).
+- **Visual pengganti tampak selesai, bukan placeholder:** tanpa label "Foto …" dan tanpa ikon kecil di bidang kosong;
+  hero = komposisi produk (mockup UI, kartu data bertumpuk), sampul/thumbnail = bidang bernada berbeda per item +
+  judul tipografis tebal + ikon besar transparan, avatar = inisial bernada berbeda per orang. Alasan: R5/R10 di P1–P3
+  menghukum placeholder sebagai "visual hilang".
+- **Bidang jenuh hanya untuk fokus:** koleksi (tile, sampul) memakai nada redup agar tidak bersaing dengan fokus utama
+  (R2 P2).
+- **Bagian yang diminta tampil utuh (mobile):** tidak ada bagian yang terpotong atau tertutup overlay di board pertama;
+  ringkas isi bila tidak muat (R1/R2 P2).
+- Teks core dipadatkan agar tetap ≤ 4000 token (tanpa mengubah aturan lain).
+
+Skill: `core.md` `5bee1a4981adba9f`, `landing.md` `3daa5de39ffc37ac`, `mobile.md` `d3c210ef78fab03d`.
+
+### Hasil iterasi 2 (`bench/practice-2.md`, HEAD `6057545`)
+
+| Prompt | Waktu Lakar / pen.dev | T L–P | D L–P | Keputusan | Kelemahan Lakar menurut bukti juri |
+|---|---|---|---|---|---|
+| P1 | 265.7 / 219.5 dtk (1,21) | 12–12 | 3–4 | Setara | foto hero/mentor yang diminta tidak ada (R1 0–1); satu judul yatim |
+| P2 | 142.9 / 147.7 dtk (0,97) | 11–12 | 3–2 | Setara | skala tipografi agak datar; tanpa artwork (R5/R10 1) |
+| P3 | 238.9 / 129.9 dtk (**1,84**) | 11–16 | 3–4 | Kalah (gerbang waktu) | 4 screenshot + `layout_check` + 5 execute (alur akhir dilanggar), 3 `photo_search` gagal; hero dirakit dari ikon (slop "ilustrasi dari path"); angka rating 4,7 bersaing dengan judul |
+| P4 | 187.6 / 231.5 dtk (0,81) | 16–12 | 4–4 | Lebih baik | – |
+
+- 3 dari 4 Setara/Lebih baik, emoji 0, gate 0, tetapi P3 waktu 1,84× → **belum lulus**.
+- Openverse masih tidak tersedia (semua `photo_search` timeout 8 dtk / NOT_FOUND).
+- Biaya iterasi 2: $10,55; kumulatif $20,48.
+
+## Iterasi 3: skill v3
+
+Perkiraan iterasi 3 dengan `--reuse-pendev 2`: $7,60 → $28,08 ≤ $30 (boleh). Perubahan (prinsip umum):
+
+- **Alur akhir tepat:** satu screenshot → satu execute perbaikan → export, tanpa screenshot atau `layout_check`
+  tambahan. Alasan: putaran kritik diri berulang membuat P3 1,84× (gerbang waktu).
+- **Visual pengganti tanpa ilustrasi rakitan:** sampul/thumbnail/hero isi = bidang bernada + tipografi tebal (judul,
+  angka); tidak merakit ilustrasi dari ikon/bentuk (dibaca juri sebagai maskot dari path, R8) dan tanpa ikon besar
+  transparan (dicabut dari v2).
+- **Satu elemen terbesar:** angka sekunder (rating, nilai ringkas) tidak lebih besar dari judul layar (R2 P3; skala
+  datar P2).
+
+Skill: `core.md` `c74a5de318365869`, `landing.md` `3daa5de39ffc37ac`, `mobile.md` `d3c210ef78fab03d`.
+
+### Hasil iterasi 3 (`bench/practice-3.md`, HEAD `43f0cc5`, pen.dev dipakai ulang dari iterasi 2)
+
+| Prompt | Waktu Lakar / pen.dev | T L–P | D L–P | Keputusan | Kelemahan Lakar menurut bukti juri |
+|---|---|---|---|---|---|
+| P1 | 286.5 / 219.5 dtk (1,31) | 10–12 | 3–4 | Kalah (T < P − 1) | R1 0/0/0: foto hero dan mentor yang diminta tidak ada; R5/R10 visual lemah; 1 warna tanpa makna (R4) |
+| P2 | 125.6 / 147.7 dtk (0,85) | 12–14 | 3–3 | Kalah (T < P − 1) | sampul/avatar inisial tanpa artwork (R5 1); tanpa langkah khas yang menonjol (R8 1); hijau hanya sekali (R10 1) |
+| P3 | 155.0 / 129.9 dtk (1,19) | 15–15 | 4–4 | Setara | – (alur akhir v3 menurunkan waktu dari 1,84× ke 1,19×) |
+| P4 | 225.8 / 231.5 dtk (0,98) | 14–12 | 4–4 | Setara | – |
+
+- 2 dari 4 Setara/Lebih baik → **belum lulus**. Waktu ≤ 1,5×, emoji 0, gate 0 di keempat prompt.
+- Catatan derau juri: strip pen.dev P2 identik dengan iterasi 2 (dipakai ulang), tetapi T pen.dev naik 12 → 14.
+- Biaya iterasi 3: $7,32; kumulatif **$27,80** dari $30.
+
+## Status: HALT `blocked` (3 iterasi, belum lulus)
+
+Sesuai plan §Iterasi butir 4, tidak ada iterasi ke-4 (juga sisa anggaran $2,20 < perkiraan iterasi). Ringkasan:
+
+- Lulus per iterasi: 1/4 (iter 1, P4 pen.dev gagal), 3/4 tetapi P3 1,84× (iter 2), 2/4 (iter 3).
+- Yang terbukti membaik: R9 Lakar 2 hampir di semua prompt (kaya informasi), R10 naik ke 2 di P3/P4 iterasi 3
+  (permukaan berlapis, warna kedua bermakna, badge bernada), waktu dalam gerbang di iterasi 3, nol emoji/gate.
+- Penghambat utama yang bukan skill: **foto stok tidak tersedia sepanjang latihan.** Openverse (penyedia aktif tanpa
+  key Pexels) menjawab 504 atau > 8 dtk untuk hampir semua kueri (cek terakhir: 200 setelah 21 dtk), sehingga setiap
+  prompt yang meminta foto (P1 hero + mentor, P2 foto profil/sampul, P3 foto hidangan) kehilangan R1/R5/R10 terhadap
+  pen.dev yang punya gambar sendiri. Ini mengenai A dan B putaran resmi dengan cara yang sama.
+- Butuh keputusan Adam: (a) key Pexels (bila tersedia) atau penyedia foto lain/timeout Openverse lebih panjang di
+  luar story ini; (b) apakah iterasi skill dilanjutkan dengan anggaran baru; (c) penilaian PNG
+  `bench/practice/<k>/<P>-lakar.png` vs `bench/runs/practice/<k>/<P>-pendev.png`.
+
+## Blokir dibuka (2026-11-18, keputusan Adam)
+
+Penyedia foto utama kini Wikimedia Commons (`wikimedia:<pageid>`, commit da36b22); anggaran tambahan ≤ $30 untuk
+maksimal 3 iterasi lagi (4–6; batas kumulatif $57,80); semua iterasi 4–6 memakai `--reuse-pendev 2` (pen.dev tidak
+dijalankan ulang). Harness: `MAX_ITER` 6, `BUDGET_USD` 57,8, preflight mode reuse tidak mewajibkan service pen-desktop
+aktif (penjaga md5 `.pen` tetap). Prompt beku dan aturan juri/keputusan v2.1 tidak berubah.
+
+## Iterasi 4: skill v4
+
+Perubahan (prinsip umum, dari bukti iterasi 3 lintas prompt):
+
+- **Foto benar-benar dipakai.** Foto wajib untuk isi nyata (orang, tempat, makanan, produk, media) di hero, sampul,
+  kartu konten, avatar. Satu pencarian `limit:12` mengisi semua slot sejenis (maks 2 pencarian paralel bersama
+  `open_doc`, tanpa pengulangan). Kueri 2–3 kata benda Inggris yang visual (tempat/objek/suasana); orang = kueri potret
+  stok umum, bukan nama/jabatan/rapat. Pilih foto berwarna, kontemporer, subjek jelas, berbeda per butir. Alasan: R1/R5/R10
+  di P1/P2 jatuh karena foto yang diminta tidak ada (sampul/avatar inisial dibaca placeholder); Wikimedia kini andal
+  (diuji: hasil relevan untuk makanan, tempat, objek, dan potret stok CC0).
+- **Koleksi cerah dan bermakna, bukan redup.** Aturan v2 "koleksi memakai nada redup" dicabut. Tile/kategori tanpa foto
+  memakai bidang cerah `C.data` dengan teks kontras, nada = kategori tertulis; bukan kusam, bukan pelangi acak. Fokus
+  dijaga lewat ukuran/posisi. Alasan: juri menyebut "tile mix kusam" (P2 R10).
+- **Pendamping dan status berulang.** `acc2` dan warna status masing-masing muncul di ≥ 2 bagian dengan makna sama.
+  Alasan: "hijau hanya muncul sekali" (P2 R10).
+- **Tanpa potongan/luberan.** Kartu berteks tinggi `hug` (baris `align:'stretch'`), lebar isi bar = persen × lebar induk;
+  kritik diri screenshot memeriksa teks terpotong, bar meluber, dan slot foto kosong. Alasan: kartu mentor terpotong dan
+  bar meluber di P1 (R10).
+- Pengganti saat pencarian gagal: tidak lagi inisial di area foto besar.
+- `core.md` dipadatkan agar ≤ 4000 token (3999); detail jenis layar ke `landing.md` (foto hero/potret mentor) dan
+  `mobile.md` (sampul/tile/thumbnail foto, avatar foto).
+
+Skill: `core.md` `39be8af8dcb0ad25`, `landing.md` `f0049a9b76822eea`, `mobile.md` `0e06e3ff150f7560` (HEAD `bdd7d04`).
+
+### Iterasi 4 dihentikan (2026-11-18, sebelum juri): unduhan foto Wikimedia ditolak 429
+
+- Run: P1 Lakar `success` (272,0 dtk = 1,24× pen.dev, $1,79), P2 Lakar `success` (140,0 dtk = 0,95×, $0,87), P3 Lakar
+  dihentikan di tengah run (belum ada `run.json`; biaya tidak tercatat, perkiraan < $0,30), P4 dan juri belum
+  dijalankan. Belum ada `bench/practice-4.md`. Terpakai iterasi 4 ≈ $2,66 (+ P3 parsial); kumulatif ≈ $30,5–30,8.
+- Skill v4 bekerja sesuai niat: agen memanggil `photo_search` paralel bersama `open_doc` dengan `limit:12`, memilih
+  foto untuk hero, mentor, sampul, dan avatar. Pencarian (API `commons.wikimedia.org`) berhasil.
+- **Penghambat (bukan skill):** setiap **unduhan** gambar ke `upload.wikimedia.org` dari daemon dijawab
+  `HTTP 429 Too many requests` (`retry-after: 120`), untuk file asli maupun thumbnail 1280/1920/3840. Di P1 hanya 2
+  foto yang sempat terimpor; agen menghabiskan 6 execute gagal (waktu + biaya). Di P2 semua foto gagal → sampul inisial.
+- Diagnosis (diuji dengan `curl` dan `SafeNet` daemon, URL sama): HTTP/1.1 + User-Agent tanpa info kontak
+  (`Lakar/0.1 (internal design tool)`, juga `curl/8.5.0`) → 429; User-Agent yang memuat URL kontak → 200; HTTP/2 → 200.
+  Kebijakan User-Agent Wikimedia meminta info kontak (URL atau email) untuk klien otomatis; klien tanpa kontak
+  dibatasi keras. Pada story 1.18 batas ini belum terpicu (volume kecil).
+- Tidak diakali: mengisi URL/email kontak palsu atau mengganti protokol hanya untuk lolos pembatas sama dengan
+  mengakali rate limit (dilarang plan 1.18), dan info kontak asli adalah data Adam (tidak boleh diisi tanpa izin).
+  Iterasi dihentikan agar anggaran tidak terbuang pada run tanpa foto.
+- **Butuh keputusan Adam:** info kontak untuk User-Agent Lakar (URL repo/proyek atau email operasional) yang boleh
+  dikirim ke Wikimedia, atau penyedia foto lain. Sesudah itu: lanjutkan iterasi 4 (`--resume` hanya mengulang P3; P1/P2
+  tetap dengan foto gagal) atau mulai iterasi 5 baru (`--iter 5 --reuse-pendev 2`, disarankan; sisa iterasi 5–6,
+  sisa anggaran ≈ $27).
+
+### Perbaikan orkestrator setelah iterasi 4 (commit fada52e)
+
+- Respons 429 Wikimedia sendiri meminta "use thumbnail images in sizes listed on https://w.wiki/GHai". Uji ulang: file
+  asli dan thumbnail lewat host `upload.wikimedia.org` → 429; thumbnail bucket standar lewat host `thumb.wikimedia.org`
+  (1280/1920/3840) → 200 dengan UA yang sama (HTTP/1.1, tanpa kontak).
+- Perbaikan sesuai arahan Wikimedia (bukan mengakali batas, UA tetap tanpa data pribadi): `wikimediaImportUrl` selalu
+  memakai thumbnail bucket standar dari path pratinjau `thumb.wikimedia.org` (maks 3840 JPEG/WebP, 1920 PNG); file asli
+  tidak pernah diunduh. Uji langsung lewat `PhotoService` hasil build: 3/3 foto `wikimedia:` terimpor (1920 px).
+- Iterasi 4 tercatat `aborted` (tidak dijuri). Lanjut iterasi 5 baru `--iter 5 --reuse-pendev 2`; iterasi 6 terakhir.
+
+## Iterasi 5: skill v4 (tanpa perubahan), foto Wikimedia berfungsi — **lulus**
+
+Perubahan skill: tidak ada. Skill v4 (iterasi 4) belum pernah dijuri karena iterasi 4 dihentikan oleh kegagalan unduhan
+foto, jadi iterasi 5 menguji v4 apa adanya dengan impor Wikimedia lewat thumbnail standar (commit fada52e). Alasan: hanya
+infrastruktur foto yang berubah sejak iterasi 4; mengubah skill sebelum v4 dinilai berarti menebak tanpa bukti.
+
+Harness (commit 0747216): biaya kumulatif kini menghitung iterasi tanpa laporan dari `run.json`/`rep.json` tersimpan,
+sehingga iterasi 4 ($2,66 = P1 $1,79 + P2 $0,87) ikut terhitung. P3 parsial iterasi 4 tidak punya catatan biaya
+(perkiraan < $0,30) dan tidak terhitung.
+
+Skill: `core.md` `39be8af8dcb0ad25`, `landing.md` `f0049a9b76822eea`, `mobile.md` `0e06e3ff150f7560` (HEAD `0747216`).
+Run: `practice --iter 5 --reuse-pendev 2`. Prompt sha di frozen.json = `582c5d11…` (beku).
+
+| Prompt | Rasio waktu | T Lakar / pen.dev | D Lakar / pen.dev | Emoji | Gate | Keputusan |
+|---|---|---|---|---|---|---|
+| P1 | 1,22× | 15 / 13 | 4 / 4 | 0/0/0 | 0 | Setara |
+| P2 | 1,01× | 13 / 12 | 3 / 3 | 0/0/0 | 0 | Setara |
+| P3 | 1,26× | 14 / 15 | 3 / 4 | 0/0/0 | 0 | Setara |
+| P4 | 1,29× | 15 / 12 | 4 / 4 | 0/0/0 | 0 | Lebih baik |
+
+- Foto: impor Wikimedia berhasil (tanpa 429). Foto hero/mentor (P1), foto hidangan + avatar pengulas (P3), avatar
+  dokter (P4). Satu pencarian NOT_FOUND di P1 tidak diulang. Tidak ada teks kredit/atribusi di UI dokumen Lakar.
+- Kelemahan yang tersisa (catatan untuk story berikut, bukan diperbaiki di sini): P2 sampul episode masih monogram
+  dan permukaan gelap netral tanpa tint aksen (R10 = 1); P3 permukaan putih berbingkai dengan warna kedua hanya di satu
+  bagian (R10 = 1).
+- Penjaga `.pen`: berubah 0, hilang 0. lakard active.
+- Biaya iterasi 5: $7,35 (Lakar $4,39, juri $2,96); kumulatif **$37,81** dari $57,80.
+
+## Status: **lulus** di iterasi 5 (4 dari 4 Setara/Lebih baik)
+
+Iterasi 6 tidak dijalankan. Menunggu Adam melihat PNG (done_checkpoint): Lakar `bench/practice/5/<P>-lakar.png`,
+pen.dev lokal `bench/runs/practice/2/<P>-pendev.png`.
+
+## Iterasi 6: skill v5 (validasi skill akhir setelah review)
+
+Review (lensa quick) atas iterasi 5 menemukan beberapa contoh/rincian skill v4 yang terlalu dekat dengan prompt latihan
+(contoh kueri foto bertema makanan/musik, "angkatan", "mentor", "tile 2 × 3", "pemutar"). Walau lolos penjaga C7, ini
+melanggar semangat "tanpa tambalan per prompt". Perubahan v5 (bukan perbaikan mutu, hanya menetralkan):
+
+- Contoh kueri foto diganti domain contoh skill sendiri (kopi/roti); orang = "testimoni, tim, profil"; pricing "tier atau
+  slot jadwal" dengan keadaan "sisa kuota, tanggal, habis/tersedia"; bilah menempel "keranjang, proses berjalan"; "tile
+  lebih kecil" tanpa ukuran grid.
+- Bug prelude: `Badge` dengan nada tak dikenal (mis. `info`) jatuh ke aksen, bukan `undefined`.
+
+Iterasi 6 (`--reuse-pendev 2`) menguji skill akhir ini agar hasil yang dilaporkan berasal dari skill yang di-commit.
+Skill: `core.md` 8f2fe336bcb1c7dc, `landing.md` b953c1b2bae4a8d4, `mobile.md` 38aa49528f9c464f.
+
+### Hasil iterasi 6 (`bench/practice-6.md`, HEAD `07ab5c6`, pen.dev dipakai ulang dari iterasi 2)
+
+| Prompt | Waktu Lakar / pen.dev | T L–P | D L–P | Keputusan | Catatan |
+|---|---|---|---|---|---|
+| P1 | 216,1 / 219,5 dtk (0,98) | 14–12 | 4–4 | Setara | foto hero + 3 mentor + avatar alumni |
+| P2 | 121,9 / 147,7 dtk (0,83) | 13–13 | 3–3 | Setara | thumbnail episode kini foto; tile satu keluarga ungu |
+| P3 | 222,2 / 129,9 dtk (**1,71**) | 14–14 | 3–4 | Kalah (gerbang waktu) | proses: 1 SCHEMA_INVALID + 2 screenshot + 6 execute (board gulir dibangun terpisah); iterasi 5 P3 = 1,26× dengan alur 4 execute |
+| P4 | 271,0 / 231,5 dtk (1,17) | 15–11 | 4–4 | Lebih baik | – |
+
+- 3 dari 4 Setara/Lebih baik, emoji 0, gate 0, tetapi P3 waktu 1,71× → **belum lulus** (AC: waktu ≤ 1,5× di keempat
+  prompt). Perubahan v5 tidak menyentuh alur proses mobile; kelambatan P3 berasal dari variasi proses agen (galat skema
+  + putaran screenshot tambahan), bukan foto (2 pencarian paralel, 0 galat foto).
+- Biaya iterasi 6: $7,37; kumulatif **$45,18** dari $57,80.
+
+## Status: HALT `blocked` (iterasi 6 = batas, belum lulus)
+
+- Iterasi 5 (skill v4) lulus 4/4; iterasi 6 (skill v5 = v4 yang dinetralkan setelah review + perbaikan `Badge`) 3/4 dengan
+  gerbang waktu P3 gagal. Tidak ada iterasi ke-7 (batas Adam).
+- Butuh keputusan Adam: (a) menerima hasil iterasi 5 sebagai bukti lulus walau skill akhir v5 hanya teruji di iterasi 6
+  (gagal hanya karena waktu P3), atau (b) dana/iterasi tambahan untuk mengukur ulang v5 dan/atau mengencangkan disiplin
+  alur akhir mobile; serta (c) tinjauan PNG.
+
+## Iterasi 7 (konfirmasi): skill v6 — prinsip mobile, keragaman hue koleksi, disiplin alur akhir
+
+Dibuka Adam 2026-11-18 setelah HALT iterasi 6: satu iterasi konfirmasi, `--reuse-pendev 2` (pen.dev tidak dijalankan),
+anggaran iterasi ≤ $10 (batas kumulatif $55,18; `MAX_ITER` 7). Check LC-20 kini menandai konten terpotong/tertutup zona
+bawah dan judul seksi yatim sebagai error gerbang (commit db1df37).
+
+Harness: `MAX_ITER` 7, `BUDGET_USD` 55,18 (+ tes); README diperbarui.
+
+Perubahan skill v6 (prinsip umum, berlaku untuk layar apa pun):
+
+- **Layar pertama mobile padat dan selesai rapi** (`mobile.md`). Alasan: di iterasi 6 layar pertama berakhir dengan judul
+  seksi yang isinya tertutup bilah bawah dan kartu terpotong (kini LC-20). Prinsip: header satu blok ≤ 64 (baris konteks
+  hanya bila ruang tersisa), visual puncak ≤ ±280, anggaran tinggi dihitung sebelum menulis kode terhadap y atas zona
+  bawah, butir terakhir berakhir ≥ 8 di atas zona, seksi yang tidak muat mulai utuh di balik zona atau di board posisi
+  akhir; layar panjang diputuskan saat merencanakan, `scrollY` posisi akhir jatuh di awal seksi/butir.
+- **Keragaman hue koleksi** (`core.md` Prinsip 5, peran warna; `mobile.md` tile). Alasan: tile koleksi tanpa foto di
+  iterasi 6 menjadi gradasi satu hue (aturan lama "satu keluarga"). Prinsip: satu hue per kategori (4–6 hue serasi,
+  terang/jenuh setara), kesatuan dari bentuk/ikon/tipografi; palet kategori dihitung sebagai satu peran sehingga batas
+  "maks 2 hue non-status" berlaku di luar palet itu.
+- **Disiplin alur akhir** (`core.md` langkah 6, `mobile.md` §Alur execute). Alasan: P3 iterasi 6 = 1,71× karena galat
+  skema (`layout` pada board), board posisi akhir dibangun setelah screenshot, `inspect` dan screenshot tambahan
+  (6 execute). Prinsip: semua board (termasuk posisi akhir) di execute pertama; temuan `check` diperbaiki sekaligus dalam
+  satu execute; satu screenshot per board → satu execute perbaikan semua temuan → export; tanpa `inspect`/screenshot
+  tambahan; board sudah kolom (tanpa `layout`). Biasanya 2, maks 3 execute.
+- Penghematan token `core.md` (3994/4000): kalimat yang mengulang prelude dihapus (`F`/`Row`, padding/radius tombol,
+  `place` pada revisi), kalimat pengganti foto dipadatkan.
+
+Skill: `core.md` 38e5bdecbeb86cfd, `landing.md` b953c1b2bae4a8d4 (tidak berubah), `mobile.md` 292380fd57fe8f8a.
+Verifikasi sebelum run: build OK, 793/793 tes (48 file; termasuk C7, batas token, contoh skill 0 error/warning/gate),
+api.md sama, protocolHash 907cb36f…edb85d, bench/protocol & bench/rubric tidak berubah sejak 97ec581, lakard active.
+
+### Hasil iterasi 7 (`bench/practice-7.md`, HEAD `d82dbcf`, pen.dev dipakai ulang dari iterasi 2): **dibatalkan**
+
+| Prompt | Waktu Lakar / pen.dev | Rasio | Gate | Emoji (a/b) | Keputusan | Catatan |
+|---|---|---|---|---|---|---|
+| P1 | 239,6 / 219,5 dtk | 1,09 | 0 | 0/0 | tidak dinilai | 5 execute + 1 FONT_MISSING (`≤`) + 1 `inspect` |
+| P2 | 132,2 / 147,7 dtk | 0,89 | 0 | 0/0 | tidak dinilai | dua board dibangun di execute pertama; tile koleksi kini 6 hue berbeda; 5 execute (3 perapatan berurutan) |
+| P3 | 150,5 / 129,9 dtk | 1,16 | – | 0/– | Kalah (run `invalid`) | `dokumen lama: dapur-wening-resep sudah ada sebelum run` |
+| P4 | – | – | – | – | tidak dijalankan | iterasi berhenti setelah P3 |
+
+- Penyebab: dokumen `dapur-wening-resep` (172 byte, 12:25 UTC) tertinggal dari run P3 iterasi 4 yang dihentikan. Run itu
+  tidak punya `run.json`, sehingga `benchLakarSlugs` (yang membaca slug dari `run.json`) tidak mengarsipkannya. Agen
+  iterasi 7 kebetulan memilih slug yang sama → `invalid` (`dokumen lama`).
+- Run `invalid` karena `dokumen lama` bersifat final menurut `isFinalRun` (agen sudah bekerja penuh; C8: tidak diulang untuk
+  memilih hasil), jadi `--resume` tidak boleh mengulang P3. Juri tidak dijalankan untuk prompt mana pun. Iterasi 8 tidak
+  diizinkan.
+- Kesan dari PNG P2 (tanpa juri, bukan keputusan): keragaman hue koleksi tercapai; layar pertama memuat semua bagian dan
+  board posisi akhir rapi; masih ada sisa butir daftar yang terlihat di celah antara tab bar mengambang dan home indicator
+  (tidak ditandai LC-20).
+- Disiplin alur akhir belum tercapai penuh: P2 3 execute perapatan berurutan setelah execute pertama, P3 2 SCHEMA_INVALID
+  + `layout_check` terpisah, P1 `inspect` tambahan; waktu tetap ≤ 1,16×.
+- Penjaga `.pen`: 41 file, berubah 0, hilang 0. lakard active.
+- Biaya iterasi 7: $2,91 (Lakar saja); kumulatif **$48,09** dari $55,18.
+
+## Status: HALT `blocked` (iterasi 7 = iterasi konfirmasi terakhir, dibatalkan karena run P3 `invalid`)
+
+- Butuh keputusan Adam: (a) izin satu run ulang P3 iterasi 7 (atau iterasi 8) setelah dokumen sisa iterasi 4 diarsip —
+  menyimpang dari aturan C8 `isFinalRun`, walau penyebabnya kegagalan setup harness, bukan pemilihan hasil; anggaran
+  sisa $7,09 cukup untuk P3 + P4 + juri 4 prompt (perkiraan $5,10); (b) perbaikan harness: `benchLakarSlugs` juga membaca
+  slug `open_doc` dari `stream.jsonl` run tanpa `run.json` (run yang dihentikan), agar sisa seperti ini selalu diarsip.
+- Catatan: dokumen `dapur-wening-resep` sekarang tercatat di `run.json` P3 iterasi 7, jadi arsip berikutnya akan
+  memindahkannya otomatis.
+
+### Catatan review iterasi 7 (2026-11-18)
+
+- Review quick: prelude `core.md` memakai warna yang sama untuk pendamping (`acc2`, seri data ketiga) dan status warning
+  (`#B45309`), sehingga badge `extra` = `warning`. Diganti `#CA8A04` (prinsip: pendamping dan status = peran berbeda, warna
+  berbeda). core.md sha 6ce0eace7c3f255c; belum diuji di run latihan (tidak ada iterasi lagi).
+- Ditunda: arsip dokumen run tanpa `run.json` (penyebab pembatalan iterasi 7); celah LC-20 di bawah tab bar mengambang.
+
+## Iterasi 8: ulang penuh iterasi 7 dengan skill v7 — layar pertama tanpa duplikasi, thumbnail berfoto, disiplin execute
+
+Dibuka Adam 2026-11-18 setelah HALT iterasi 7. Iterasi 7 batal karena **cacat harness** (dokumen sisa run P3 iterasi 4 yang
+dihentikan tidak diarsip → P3 `invalid`, juri tidak berjalan, P4 tidak dijalankan), bukan karena hasil desain. Pengecualian
+C8 atas keputusan Adam: iterasi 7 diulang **penuh** sebagai iterasi 8 (keempat prompt + juri), `--reuse-pendev 2`
+(pen.dev tidak dijalankan). Tidak ada pemilihan hasil: semua run iterasi 7 tetap tercatat di `bench/practice-7.*`.
+
+Harness: `MAX_ITER` 8, `BUDGET_USD` 58,09 ($48,09 terpakai iterasi 1–7 + $10 iterasi 8) + tes; README diperbarui. Arsip
+run terhenti (commit cb88e3e): `--dry-run` iterasi 8 menunjukkan `dapur-wening-resep` ← `practice/4/P3-lakar (terhenti)`
+ikut diarsip sebelum run. LC-20 kini juga menandai konten di celah di bawah tab bar mengambang (cb88e3e).
+
+Perubahan skill v7 (prinsip umum, berlaku untuk layar apa pun):
+
+- **Tanpa duplikasi di satu layar** (`mobile.md`). Alasan: PNG P2 iterasi 7 menampilkan butir yang sama di kartu sorotan
+  dan di bilah yang menempel, sehingga ruang layar pertama terbuang. Prinsip: satu butir konten tampil sekali per layar;
+  bila bilah yang menempel memuat butir yang sedang berjalan, kartu sorotan memuat hal lain (butir berikutnya, ringkasan,
+  rekomendasi) dan daftar tidak mengulanginya.
+- **Thumbnail konten nyata = foto** (`mobile.md` "Foto untuk isi nyata", `core.md` Komponen Foto: + thumbnail daftar).
+  Alasan: thumbnail daftar iterasi 7 berupa bidang warna berteks, padahal foto tersedia. Prinsip: sampul dan thumbnail yang
+  mewakili konten (media, produk, makanan, tempat, orang) memakai foto dari pencarian `limit:12`; bidang warna berlabel
+  hanya bila pencarian gagal atau untuk tile kategori abstrak (tetap satu hue per kategori). Wadah ikon 40 hanya untuk
+  baris aksi/pengaturan.
+- **Layar pertama hidup** (`mobile.md`). Alasan: layar pertama iterasi 7 hanya memuat satu butir daftar. Prinsip: daftar
+  menampilkan ≥ 3 butir utuh; bila tidak muat, rapatkan header, visual puncak, dan sorotan lebih dulu, baru kurangi butir;
+  baris list ringkas 56–72.
+- **Disiplin execute** (`core.md` langkah 3 dan 6, `mobile.md` §Alur execute (maks 3)). Alasan: iterasi 7 P1 memakai
+  `inspect` + 5 execute, P2 3 execute perapatan berurutan. Prinsip: total execute termasuk perbaikan mobile/app maks 3,
+  landing maks 4; tanpa `inspect`; satu screenshot per board → satu execute perbaikan semua temuan → `export`; sisa
+  non-error disebut di ringkasan, bukan execute tambahan.
+- Penghematan token: prosa `mobile.md` dipadatkan (ring, tab bar, bilah bawah, anggaran tinggi) agar muat (1481/1500);
+  `core.md` 3999/4000 (kalimat alur dipadatkan).
+
+Skill: `core.md` 56f70449dbed0f12, `landing.md` b953c1b2bae4a8d4 (tidak berubah), `mobile.md` 49ae74fcd2dd37b4.
+Verifikasi sebelum run: build OK, 801/801 tes (48 file; termasuk C7, batas token, contoh skill 0 error/warning/gate),
+api.md sama, `practice --iter 8 --reuse-pendev 2 --dry-run` OK (prompt sha 582c5d11… beku, rubrik 2.1, C7 lulus,
+perkiraan $7,60, anggaran cukup), lakard di-restart dan active.
+
+### Hasil iterasi 8 (`bench/practice-8.md`, HEAD `70a2a5e`, pen.dev dipakai ulang dari iterasi 2): **lulus**
+
+| Prompt | Waktu Lakar / pen.dev | Rasio | T L–P | D L–P | Gate | Emoji (a/b/c) | Keputusan | Catatan proses |
+|---|---|---|---|---|---|---|---|---|
+| P1 | 221,9 / 219,5 dtk | 1,01 | 13–11 | 4–4 | 0 | 0/0/0 | Setara | 9 execute (FONT_MISSING `≤`, ICON_UNKNOWN, 3 execute pangkas tinggi) + 1 `inspect`; pencarian foto suasana kosong |
+| P2 | 177,7 / 147,7 dtk | 1,20 | 13–12 | 3–2 | 0 | 0/0/0 | Setara | 3 execute + 1 `layout_check`; tanpa duplikasi kartu/bilah; tile mix berfoto; thumbnail episode masih bidang warna; 4 episode di board posisi akhir |
+| P3 | 139,7 / 129,9 dtk | 1,08 | 16–15 | 4–4 | 0 | 0/0/0 | Setara | 2 execute + 1 `layout_check` |
+| P4 | 223,4 / 231,5 dtk | 0,96 | 14–13 | 4–4 | 0 | 0/0/0 | Setara | 7 execute |
+
+- 4 dari 4 Setara, waktu ≤ 1,20× di keempat prompt, emoji Lakar 0, layout_check gate 0 → **lulus** (AC). Prompt sha di
+  frozen.json = `582c5d11…` (beku). Arsip pra-run memindahkan dokumen sisa iterasi 4 (`dapur-wening-resep`, terhenti).
+- Disiplin execute baru tercapai di mobile (P2 3, P3 2); P1 (landing) dan P4 (dashboard) masih 7–9 execute, tetapi waktu
+  tetap ≤ 1,01×. Thumbnail daftar P2 belum berfoto (foto dipakai untuk tile koleksi); avatar header P2 masih inisial.
+- Prinsip v7 yang **tidak** terwujud (catatan review): (a) layar pertama P2 (board `zsVQi7E1`) tidak memuat satu pun
+  butir "Episode baru" utuh — daftar seluruhnya di balik mini player, hanya irisan terpotong "Kopi Pagi · Hari ini" terlihat
+  di celah 8 px antara mini player (y 674–738) dan tab bar (y 746–810); LC-20 tidak menandainya (celah di antara dua bar
+  bertumpuk tidak diperiksa, hanya celah di bawah bar terbawah) sehingga gate 0 walau cacat terlihat; (b) batasan
+  intent-contract "alur 2–4 execute besar (mobile 1–2)" dilanggar P1 (9 execute + `inspect`) dan P4 (7 execute) —
+  lulus AC karena gerbang waktu, bukan karena disiplin execute.
+- Penjaga `.pen`: 41 file, berubah 0, hilang 0, baru 0. lakard active.
+- Biaya iterasi 8: $6,85 (Lakar $3,78 + juri $3,07); kumulatif **$54,94** dari $58,09.
+
+## Status: lulus di iterasi 8 — menunggu done_checkpoint (Adam melihat PNG)
+
+PNG Lakar: `bench/practice/8/P{1..4}-lakar.png` (tracked); PNG pen.dev lokal: `bench/runs/practice/2/P{1..4}-pendev.png` (EULA).
+
+---
+
+# Seri efek (story 22): efek visual gradien dan shader
+
+Seri latihan tersendiri untuk efek visual (P5 landing gelap berlatar efek, P6 onboarding mobile gelap bergradasi), dengan
+runner, pembungkus, dan juri rubrik v2.1 yang sama. Anggaran seri ≤ $15, maks 3 iterasi; lulus bila P5 **dan** P6
+Setara/Lebih baik, waktu ≤ 1,5× pen.dev, emoji 0, gate 0. Laporan `bench/effects-<k>.md|json`.
+
+## Seri efek: prompt beku (2026-11-18, sebelum mesin, skill, atau DESIGN.md diubah)
+
+- `bench/practice/effects/prompts.json` sha256 `5f0c23a7fb411f4fcf15e3f88f2e2f7b0f0f6b64f54d955e15fe22ecc834e441`
+  (= `EFFECT_PROMPTS_SHA256` di `bench/src/practice/prompts.ts`). Loader yang sama menolak isi lain.
+- Teks dari plan story 22 (Design Notes), dengan dua perubahan kata (bukan makna) yang diizinkan plan sebelum run pertama,
+  karena penjaga n-gram 6 kata menemukan tumpang tindih dengan P1:
+  - P5: "Desain halaman landing desktop selebar 1440px untuk" → "Desain landing page desktop dengan lebar 1440px untuk"
+    (n-gram "desain halaman landing desktop selebar 1440px" dan "halaman landing desktop selebar 1440px untuk").
+  - P5: "dengan judul besar, subjudul, dua tombol aksi, dan cuplikan" → "… subjudul, sepasang tombol aksi, serta cuplikan"
+    (n-gram "dengan judul besar subjudul dua tombol", "judul besar subjudul dua tombol aksi", "besar subjudul dua tombol aksi dan").
+- Sesudah perubahan: 0 n-gram 6 kata sama dengan prompt A–E maupun P1–P4 (kalimat penutup baku dibuang), 0 frasa
+  Kriteria/Prosedur/Risiko golden, 0 token terlarang, nama produk tidak ada di golden-set (`tests/practice-prompts.test.ts`).
+  Penjaga C7 skill (`tests/skills-c7.test.ts`) kini juga memakai teks dan nama produk P5/P6.
+- Mulai sekarang prompt efek tidak diubah. Setiap iterasi seri efek mencatat sha `prompts.json` di `frozen.json`.
+
+## Seri efek iterasi 1: baseline (skill v7 apa adanya, mesin sebelum fill efek)
+
+Run `practice --series effects --iter 1` (pen.dev 1× + Lakar + juri 3×/prompt), HEAD `dd66120` (harness seri efek belum
+di-commit, tercatat di porcelain `frozen.json`). Skill: `core.md` 56f70449dbed0f12, `landing.md` b953c1b2bae4a8d4,
+`mobile.md` 49ae74fcd2dd37b4 (sama dengan iterasi 8 seri P1–P4). Prompt sha di frozen.json = `5f0c23a7…` (beku).
+
+| Prompt | Waktu Lakar / pen.dev | Rasio | T L–P | D L–P | Gate | Emoji (a/b/c) | Keputusan |
+|---|---|---|---|---|---|---|---|
+| P5 | 273,6 / 195,6 dtk | 1,40 | 16–11 | 4–2 | 0 | 0/0/0 | Lebih baik |
+| P6 | 104,3 / 133,3 dtk | 0,78 | 14–14 | 3–2 | 0 | 0/0/0 | Setara |
+
+- Pemakaian efek di stream pen.dev (tool_use agen): **`shader` 0** (agen membaca `scripts-and-shaders.md` di P5 tetapi
+  menulis di ringkasan bahwa ia tidak bisa membuat file shader), `mesh_gradient` P5 3 / P6 2, `angular` 0,
+  `gradientType` linear P5 2 / P6 6, radial P5 1 / P6 3, `Generate("ai")` P5 0 / P6 1, `Generate("stock")` P5 2 / P6 0,
+  `blur` P5 6 / P6 6 (`background_blur` 3 / 1), blend P5 0 / P6 1. Tanpa shader → tidak HALT; kedalaman "lantai + mesh"
+  tetap.
+- Kesan PNG (bukan keputusan): P5 Lakar sudah memakai garis aliran dari path + gradien di hero dan seksi ajakan akhir;
+  pen.dev memakai mesh hijau + garis gelombang. P6 Lakar: matahari dan cincin baik, tetapi "awan" berupa batang gelap
+  berblur yang terbaca sebagai garis keras, tanpa tekstur; pen.dev: langit senja ungu–oranye dengan grain halus.
+- Restart pen-desktop sesudah run pen.dev terakhir: **berhasil**, 16,9 dtk (active + MCP pencil menjawab `get_app_state`).
+  `bash tools/node26/verify.sh` sesudahnya (setelah iterasi 2 dan lagi saat verifikasi build orkestrator): exit 0
+  (pen-desktop active, snapshot C9 identik, lakard active).
+- Penjaga `.pen`: 41 file, berubah 0, hilang 0 (2 dokumen baru pen.dev).
+- Biaya iterasi 1: $5,02 (pen.dev $1,55, Lakar $2,08, juri $1,38); kumulatif seri $5,02 dari $15.
+
+## Seri efek iterasi 2: mesin fill efek + skill v8 (efek ekspresif)
+
+Perubahan (cabang A, DESIGN.md diamandemen setelah persetujuan Adam; §Anti-pattern dan Lampiran B tidak berubah, sha teks
+juri A/B tetap = `bench/rubric/rubric.json`):
+
+- **Mesin:** skema v2 (`conic`, `noise` ber-seed, `mesh` titik kendali) + migrasi identitas 1→2; render conic CSS, noise
+  ubin SVG feTurbulence + `background-blend-mode`, mesh bitmap canvas 2D (sisi ≤ 320) diskalakan ke kotak, ikut mask pada
+  ellipse/path. API `Fill efek` (api.md) + deskripsi execute MCP.
+- **Skill v8 (prinsip, kata sendiri):** `core.md` mengganti "maks satu gradien per board" dengan "efek ekspresif maks satu
+  bidang per board (fokus merek), teks di zona tenang/scrim, tidak di teks"; `landing.md` bidang efek berlapis (netral →
+  mesh dari aksen + ≤ 1 pendamping + netral, titik terang menjauhi teks → grain 0.04–0.08), panel solid untuk cuplikan
+  produk di atas efek, efek seksi lain = palet sama berintensitas lebih rendah, glow hanya satu cahaya lembut merek di latar
+  gelap; `mobile.md` satu bidang mesh + noise ≤ 0.08 untuk onboarding/sampul/sorotan. Contoh teruji landing (hero) dan
+  mobile (kartu sorotan) memperagakan satu bidang mesh + grain; lulus 0 error/warning/gate. Alasan: baseline Lakar tidak
+  punya grain/medan warna (P6 tanpa tekstur, efek dirakit dari batang berblur).
+- Skill: `core.md` 1137e13ea25db9b2 (4000/4000 token), `landing.md` ac8fb9e801fbc903 (prosa 1409), `mobile.md`
+  fe5abeead7a609a8 (prosa 1500/1500).
+
+Run `practice --series effects --iter 2 --reuse-pendev 1` (pen.dev iterasi 1 dipakai ulang; tanpa restart pen-desktop).
+
+| Prompt | Waktu Lakar / pen.dev | Rasio | T L–P | D L–P | Gate | Emoji (a/b/c) | Keputusan |
+|---|---|---|---|---|---|---|---|
+| P5 | 177,1 / 195,6 dtk | 0,91 | 13–12 | 3–3 | 0 | 0/0/0 | Setara |
+| P6 | 114,8 / 133,3 dtk | 0,86 | 13–14 | 3–2 | 0 | 0/0/0 | Setara |
+
+- **Lulus** (P5 dan P6 Setara, waktu ≤ 0,91×, emoji 0, gate 0). Prompt sha di frozen.json = `5f0c23a7…` (beku).
+- Catatan jujur: **baseline juga sudah lulus**, dan P5 turun dari Lebih baik (16–11) ke Setara (13–12). Strip pen.dev sama
+  (dipakai ulang) tetapi skornya 11 → 12, jadi sebagian selisih adalah derau juri; tetapi dari PNG, hero P5 iterasi 2
+  (mesh hijau lembut di pojok + panel status) memang kurang ekspresif dibanding garis aliran iterasi 1. P6 iterasi 2 lebih
+  rapi (langit senja bergradasi, siluet bukit, bulan, tanpa batang gelap keras), skor setara. Agen memakai `mesh` (P5 dan
+  P6) dan `noise` (keduanya); `conic` tidak dipakai. Iterasi 3 tidak dijalankan (sudah lulus).
+- Penjaga `.pen`: 43 file, berubah 0, hilang 0. lakard active.
+- Biaya iterasi 2: $2,97 (Lakar $1,61, juri $1,37); kumulatif seri **$7,99** dari $15.
+
+## Status seri efek: lulus di iterasi 2 — menunggu done_checkpoint (Adam melihat PNG)
+
+PNG Lakar: `bench/practice/effects/{1,2}/P{5,6}-lakar.png` (tracked); PNG pen.dev lokal: `bench/runs/practice-effects/1/P{5,6}-pendev.png` (EULA).
+
+## Seri efek iterasi 3: skill v9 — bidang efek berstruktur (keputusan Adam sesudah melihat PNG iterasi 2)
+
+Alasan (Plan Change Log story 22): iterasi 2 lulus angka juri, tetapi hero P5 terlalu datar (mesh hijau lembut di pojok),
+sedangkan iterasi 1 (garis aliran melintasi hero) hampir setara pen.dev. Mesin, juri v2.1, aturan keputusan, dan prompt
+beku (sha `5f0c23a7…`) tidak diubah.
+
+Perubahan skill v9 (prinsip umum, kata sendiri, berlaku untuk jenis layar apa pun):
+
+- **`landing.md`:** bidang efek = empat lapis: (1) netral → `mesh` dari aksen + ≤ 1 pendamping; (2) **struktur** yang
+  bermakna bagi merek dan berulang (12–24 garis aliran/gelombang `path` dari loop dengan alpha bertingkat, 1–2 garis
+  tegas; atau cincin/kontur konsentris; atau kisi/partikel) di `Crop /` absolut seukuran bidang (bidang `clip:true`),
+  melintasi ≥ ⅔ lebar; sapuan kecil di pojok terbaca datar; (3) `noise` 0.04–0.08; (4) di latar gelap satu cahaya lembut
+  merek. Teks di zona tenang (struktur merunduk/menipis, atau elips gelap ber-blur sebagai peredam), kontras ≥ 4.5:1;
+  seksi lain berefek = palet dan struktur sama, intensitas lebih rendah. Contoh teruji hero kini memperagakan struktur
+  (16 garis kontur dari loop, merunduk di tengah agar zona teks tenang); baris mockup ke-4 dan satu komentar dihapus agar
+  total ≤ 3500.
+- **`mobile.md`:** bidang efek = `mesh` dasar → struktur bermakna berulang melintasi bidang (gelombang `path`, cincin/kontur
+  `ellipse`, partikel; alpha bertingkat) → `noise` ≤ 0.08 → di gelap satu cahaya merek; teks di zona tenang/panel solid,
+  kontras ≥ 4.5:1. Contoh teruji: kartu sorotan diberi kontur gema dari ring (9 `ellipse` stroke, alpha menurun) di
+  `Crop /` + `clip:true`. Prosa dipadatkan (tile kategori merujuk palet `core`, anggaran tinggi, tanpa duplikasi, alur execute); koreksi
+  review: pemadatan ini MENGHAPUS "kesatuan dari bentuk/ikon/tipografi" (tile), mengubah langkah 2 alur execute dari
+  "Error `check`" ke "Semua temuan `check`", dan kalimat efek `core.md` tidak lagi menyebut `conic` hiasan/gradien luas
+  dan "tidak di teks" — belum diukur pada P1–P4.
+- **`core.md`:** kalimat efek ekspresif: "≤ 1 bidang per board (fokus merek) = `mesh`/gradien + pola berulang bermakna
+  (aliran, kontur, kisi) + `noise`; teks di zona tenang/scrim".
+- Stroke Lakar hanya warna solid (tanpa gradien stroke), jadi "opacity bertingkat" diwujudkan dengan alpha warna stroke
+  per garis.
+- Skill: `core.md` ef90b5bd1e8c5801 (4000/4000 token), `landing.md` 2052748bd339c612 (total 3492, prosa 1459),
+  `mobile.md` a58df31c071230f3 (total 3141, prosa 1495). Contoh teruji lulus 0 error/warning/gate (dicek mata: garis
+  kontur melintasi lebar hero dan merunduk di belakang mockup; zona teks tenang). `pnpm build` exit 0, `pnpm test`
+  852/852 (termasuk C7 P1–P6, batas token, contoh skill).
+
+Run `practice --series effects --iter 3 --reuse-pendev 1` (pen.dev iterasi 1 dipakai ulang; pen-desktop tidak dijalankan,
+tidak di-restart, tidak disentuh). HEAD `7588a9a` + skill v9 di porcelain `frozen.json`; prompt sha = `5f0c23a7…` (beku).
+
+| Prompt | Waktu Lakar / pen.dev | Rasio | T L–P | D L–P | Gate | Emoji (a/b/c) | Keputusan |
+|---|---|---|---|---|---|---|---|
+| P5 | 214,4 / 195,6 dtk | 1,10 | 15–10 | 4–2 | 0 | 0/0/0 | Lebih baik |
+| P6 | 81,2 / 133,3 dtk | 0,61 | 14–14 | 2–2 | 0 | 0/0/0 | Setara |
+
+- **Lulus** (P5 Lebih baik, P6 Setara, waktu ≤ 1,10×, emoji 0, gate 0).
+- Penilaian PNG sendiri (jujur): **P5** hero iterasi 3 kembali ekspresif: pita 20 garis gelombang (loop, alpha bertingkat, beberapa
+  garis tegas) melintasi seluruh lebar hero (dari tepi kiri ke kanan, menebal di bawah CTA dan di belakang panel status) + cahaya hijau lembut di belakang
+  panel + mesh gelap; teks di zona tenang atas. Dibanding iterasi 2 (mesh di pojok kanan atas saja) jelas lebih hidup;
+  dibanding iterasi 1 (garis aliran tegak di kedua sisi judul) setara, kini lebih mirip komposisi pen.dev (gelombang
+  melintang + cahaya merek). pen.dev masih punya gelombang yang lebih tegas dan menyilang di belakang judul. Kekurangan:
+  garis aliran lewat di belakang baris penguat kecil di bawah CTA (teks muted di atas garis, masih terbaca) dan efek seksi
+  ajakan akhir (14 garis, palet sama) sangat redup. **P6** iterasi 3: langit senja marun→oranye, matahari dengan cincin kontur konsentris,
+  siluet bukit berlapis, bintang, grain, cahaya pada tombol; teks dan indikator di zona tenang bawah. Setara dengan
+  pen.dev (pen.dev lebih ungu dan punya chip "Lewati"; Lakar punya label "Langkah 1 dari 3"). Juri: R9/R10 sama 1–1.
+- Skor pen.dev pada strip yang sama bergeser lagi (P5 11 → 12 → 10), jadi selisih T antariterasi sebagian derau juri.
+- Agen memakai `mesh` (P5 6×, P6 4×), `noise` (8×, 4×), `path` (10×, 6×), `ellipse` (18×, 34×); `conic` tidak dipakai.
+- Catatan proses: P5 8 execute (3 gagal: SCHEMA_INVALID `x/y` pada `ellipse` di frame `layout:'none'` tanpa
+  `position:'absolute'`, FONT_MISSING "→", ICON_UNKNOWN `linkedin`), melebihi batas skill landing 4; P6 4 execute (1 gagal,
+  SCHEMA_INVALID yang sama), melebihi batas mobile 3. Waktu tetap ≤ 1,10×. Galat `x/y` tanpa `position` muncul di kedua
+  prompt (anak frame `layout:'none'` dianggap absolut oleh agen); kandidat perbaikan mesin/API di luar story ini.
+- Penjaga `.pen`: 43 file, berubah 0, hilang 0, baru 0. lakard active; pen-desktop active; `bash tools/node26/verify.sh`
+  exit 0 sesudah run.
+- Biaya iterasi 3: $3,00 (Lakar $1,71, juri $1,29); kumulatif seri **$10,99** dari $15. Tidak ada iterasi ke-4.
+- Penilaian orkestrator (Read sendiri hero P5 iterasi 1, 2, 3 dan pen.dev): iterasi 3 jelas lebih hidup dari iterasi 2,
+  tetapi gelombangnya terkumpul di pita bawah hero (di bawah CTA, di belakang panel status), tipis dan redup; iterasi 1 dan
+  pen.dev punya sapuan cahaya yang lebih terang dan tegas melintasi area judul. Jadi iterasi 3 belum "setara iterasi 1";
+  arah benar, intensitas/penempatan struktur masih kurang. P6 setara pen.dev.
+- Review quick sesudah run (patch kata/batas, bukan prinsip; skill yang di-commit berbeda tipis dari yang diukur):
+  `mobile.md` cahaya merek kini "di balik fokus (blur ≥ 40, opacity ≤ 35%), bukan di tombol" (juri P6 mencatat glow pada
+  tombol); `landing.md` seksi lain berefek = "gema palet yang sama, jauh lebih tipis, bukan bidang kedua"; rentang alpha
+  prosa ±6–50%; contoh memakai `.padStart(2,'0')` untuk akhiran alpha. sha16 sesudah patch: core ef90b5bd1e8c5801,
+  landing cc9ec3fa06c9116b (total 3500/3500, prosa 1462), mobile e3605b6c5babec32 (prosa 1500/1500).
+
+## Status seri efek: lulus di iterasi 3 (skill v9) — menunggu done_checkpoint (Adam melihat PNG)
+
+PNG Lakar: `bench/practice/effects/{1,2,3}/P{5,6}-lakar.png` (tracked); PNG pen.dev lokal:
+`bench/runs/practice-effects/1/P{5,6}-pendev.png` (EULA). Iterasi 2 tetap tercatat lulus.
+
+---
+
+# §1.23 Seri polish (story 23): disiplin spacing, komponen, kontras
+
+Prompt beku P7–P9 (sha `b41ba79e…`, commit `0347f15`) dan iterasi 1 baseline skill/check lama (commit `cb8a30f`) dicatat
+di plan story 23 (Implementation Notes). Bagian ini mencatat perubahan mesin/skill dan pindaian arsip sebelum seri iterasi 2.
+
+## Pindaian arsip layout_check (sebelum seri iterasi 2)
+
+Arsip: 90 dokumen (`bench/runs/**` 80 + `~/.local/share/lakar/docs` 10), 126 board; daemon dist sementara (port acak,
+dataDir salinan). Sebelum = dist baseline (`7fce0c5`, check/render belum berubah); sesudah = dist story 23.
+
+| Aturan | Level akhir | Sebelum | Sesudah (temuan / dok) |
+|---|---|---|---|
+| LC-20 | error·gerbang | 34 | 34 (tidak berubah) |
+| LC-02b ink teks meluap | error·gerbang | – | 36 / 16 |
+| LC-04 kontras setelah komposit | error·gerbang | – | 579 / 55 (+36 warning gradien/opacity/blend di 18 dok) |
+| LC-11 saudara tumpang tindih sebagian | error·gerbang | – | 0 |
+| LC-18 kartu bersarang | warning | – | 26 / 10 |
+| LC-23 celah teks ↔ badge/tombol/ikon < 8 | warning | – | 42 / 26 |
+| LC-24 proporsi badge di baris | warning | – | 125 / 53 |
+| LC-25 radius tidak konsentris | warning | – | 110 / 45 |
+| LC-26 ritme judul | warning | – | 26 / 12 |
+| LC-27 > 6 ukuran huruf | warning | – | 30 / 30 |
+| LC-28 baris > 80 karakter | warning | – | 10 / 10 |
+| LC-29 bobot < 400 di < 18px | warning | – | 0 |
+| LC-30 tanda baca | warning | – | 0 |
+
+Warning dihitung sesudah batas 3 per aturan per board. Dokumen dengan gate > 0: 16 → 65 (hampir seluruhnya LC-04).
+
+Klasifikasi setiap temuan error baru (skrip scratchpad `cls23.mjs`):
+
+- **LC-04 (579):** untuk setiap temuan, elemen teks dipotret dan warna latar modus pikselnya dibandingkan dengan latar
+  hasil komposit aturan: 579/579 cocok (selisih kanal 0 di 406, 1 di 173). Rasio yang dilaporkan = rasio piksel nyata,
+  jadi 0 positif palsu. Kasus terbanyak: teks badge nada terang di atas tint (#15803D di #E3F0E7 4,25; #B45309 4,25;
+  #DC2626 3,99; #2563EB 3,98), `t3` di atas `field` (4,34), `acc2` sebagai teks (2,6).
+- **LC-02b:** definisi awal (ink keluar dari content box > 1 px) menghasilkan 92 temuan; crop PNG memperlihatkan luapan
+  1–4 px ke padding yang masih lega (mis. "Tambal" 1,2 px, "Gilang Ramadhan" 1,1 px, "Ruang" 1,8 px, "Selamat malam,
+  Nadia" 2 px, "Mix Nostalgia" 3,9 px di padding 16) tidak terlihat sebagai cacat = positif palsu. Definisi diperbaiki
+  sekali (umum): luapan juga harus menyisakan < 4 px ke batas tampak terdekat di sisi itu (tepi wadah ber-cat/ber-clip,
+  tepi board, atau saudara yang menghadang). Sesudahnya 36 temuan (18 unik); semua crop memperlihatkan cacat nyata: teks
+  menabrak lencana/ikon/spinner (B round-2 "Kekuatan tubuh atas" −4,5 px, "PO-2611-102 …" −8,3 px, "Rata-rata tunggu
+  14 mnt …" −12,2 px, "Resepsionis · Kemang" −2 px, "Hari ini · 36 mnt …" −1,8 px), teks menyentuh tepi chip kalender
+  ("Fluoride"/"Retainer" sisa 1,2–1,8 px) atau tepi bawah kartu janji (sisa 2,5 px), dan "Tiba 10:05 · 35 mnt" yang
+  melewati kolomnya sampai 2,4 px dari sudut lencana. 0 positif palsu → tetap error.
+- **LC-11:** 0 temuan di arsip (aturan diuji fixture).
+
+Ketiga aturan error tetap `error·gerbang`; tidak ada yang diturunkan ke warning.
+
+Bukti B round-2 (`bench/runs/rounds/2/B-lakar/doc/gerak-beranda.lakar.json`): `LC-02b` Judul `c2KYVEr1` (meluap 16,5 px
+dari isi `QlUl5ORY`, sisa −4,5 px ke lencana) dan `LC-24` `P2QitxDJ` (tinggi 24 > line-height 20), ditambah `LC-23`
+(celah −4,5 px).
+
+## Perubahan mesin dan skill (story 23)
+
+- `TextMeasure.ink` (render): gabungan kotak Range rangkaian non-spasi, vertikal = kotak baris; spasi di ujung/pembungkus
+  tidak menambah lebar.
+- `@lakar/check`: LC-02b, LC-04, LC-11 (error·gerbang) dan LC-18, LC-23–LC-30 (warning), maks 3 warning per aturan per
+  board (`(+n serupa)`), detail ≤ 120. Temuan LC-04 level warning (gradien/opacity/blend) tidak dihitung gerbang.
+- Skill: `polish.md` baru (dibaca paralel dengan `core` + jenis layar); `core.md` `Badge(p,label,tone,icon,size='sm')`
+  sm 20 / md 24 dengan teks nada gelap (fg × 0,5; board gelap tetap fg terang; arg ke-6 = permukaan gelap di board terang,
+  mis. `C.deep` → teks `C.on` di atas `C.on`+1F), alur langkah 1 membaca `polish`, frasa
+  terlarang dan detail spacing/radius dipindah ke `polish`; `landing.md`/`mobile.md` overline maks 2, "·" maks 2 per meta,
+  grid 12 kolom landing; contoh disesuaikan (Badge sm, radius konsentris, kelompok judul + daftar, ≤ 6 ukuran huruf).
+- Skill sha16 / token: `core.md` a12fcb7624abcbe6 (3988/4000), `polish.md` cfc47f389dbe80cd (total 2207, prosa 1818),
+  `landing.md` 5be5eaa2102a22eb (3500/3500, prosa 1490), `mobile.md` bdf73b6f372d6857 (total 3209, prosa 1500/1500).
+  Contoh teruji (core/polish/landing/mobile/icons/api) lulus 0 error / 0 gerbang / 0 warning; `pnpm test` 922/922.
+- Seri iterasi 2 (`--iter 2 --reuse-pendev 1`) dijalankan sesi orkestrasi sesudah review; hasilnya dicatat di bawah.
+
+## Seri polish iterasi 2 (skill/check story 23, pen.dev dipakai ulang dari iterasi 1)
+
+Commit kode `f267188`; laporan `bench/polish-2.md`; strip Lakar `bench/practice/polish/2/`.
+
+| Prompt | Iter 1 (lama) | Iter 2 (baru) | T Lakar–pen.dev iter 1 → 2 | D | Waktu Lakar dtk (pen.dev) | Gerbang |
+|---|---|---|---|---|---|---|
+| P7 Rodaku (mobile) | Kalah (waktu 1,85×) | Kalah (waktu 1,79×) | 14–13 → 14–12 | 4–4 | 180,7 → 174,4 (97,5) | waktu gagal; layout gate 0 |
+| P8 Lumbung (dashboard) | Kalah (14–16) | **Setara** | 14–16 → 15–15 | 4–4 | 161,2 → 200,4 (213,6) | lolos |
+| P9 Mejaku (landing) | Lebih baik | **Setara** | 15–11 → 14–12 | 4–4 | 214,0 → 213,0 (161,9) | lolos |
+
+Emoji 0 di semua run. Biaya iterasi 2 $5,20; kumulatif $12,74 dari $15. Seri **belum lulus**: P7 kalah hanya karena
+gerbang waktu terhadap run pen.dev P7 yang cepat (97,5 dtk; board pen.dev 390×1177 melanggar ukuran 390×844), skor Lakar
+unggul. Sisa $2,26 tidak cukup untuk iterasi 3 penuh (perkiraan $5,70); iterasi P7 saja tanpa perubahan yang menyasar
+waktu = mengulang demi hasil (C8), jadi tidak dijalankan. Story berhenti `blocked` menunggu keputusan Adam.
+
+# §1.24 Board mobile panjang, skill webapp, foto Unsplash, mockup hero (story 24)
+
+Plan: `_bmad-output/initiative-lakar/tickets/epic-g0-inti-minimal/tickets/story-board-mobile-panjang-skill-webapp-foto-unsplash-dan-mockup-h-plan.md`.
+
+## Pindaian arsip layout_check (sebelum seri iterasi 3)
+
+Arsip: 96 dokumen (`bench/runs/**` + `~/.local/share/lakar/docs`), 134 board; daemon dist sementara (port acak, dataDir
+salinan, tanpa key foto). Sebelum = dist baseline `9b5652d`; sesudah = dist story 24 (check).
+
+| Aturan | Level akhir | Sebelum | Sesudah (temuan / dok) |
+|---|---|---|---|
+| LC-12 ukuran/posisi board | warning | 0 | 33 / 33: semuanya "pola dua board usang" (board "(akhir)" ber-`Scroll /` + `scrollY`); 0 temuan ukuran atau "tinggi pas" (arsip belum punya board mobile panjang) |
+| LC-20 tertutup zona bawah | error·gerbang | 34 | 34 (identik per dokumen) |
+| LC-31 mockup terpotong rata | error·gerbang | – | 10 / 10 (5 kasus unik: dokumen yang sama muncul di arsip slug dan di run) |
+
+Temuan aturan lain tidak berubah di satu dokumen pun. Dokumen dengan gate > 0: 65 → 71 (seluruh tambahan dari LC-31).
+
+Klasifikasi LC-31 lewat potret node (crop PNG, skrip scratchpad `archcheck.mjs --shots LC-31`): kelima kasus unik adalah
+cacat nyata, kartu berisi teks yang terpotong rata di tepi bawah `Seksi / Hero`:
+
+- A round-1 `Mockup / Dasbor` (120 px; juga `practice-1` P1 di arsip) dan A round-2 `Mockup / Dasbor` (200 px; juga
+  `polish-1` arsip): kartu transaksi/grafik terpotong di tengah baris.
+- A uji-1 `Mockup / Dasbor` (80 px): grafik dan baris "Listrik toko" terpotong.
+- P9 iterasi 2 `Mockup / Reservasi malam ini` (116 px; juga dok P9 di `~/.local/share/lakar/docs`): baris "Putu Ardana"
+  terpotong di tengah teks.
+- P5 effects-3 `Mockup / Panel status` (28 px): bingkai bawah panel grafik dan daftar gardu terpotong.
+
+0 positif palsu → LC-31 tetap `error·gerbang`. Catatan: P9 iterasi 1 tidak memicu LC-31 karena heronya memakai foto + kartu
+`Overlay /` dengan padding bawah 96 (tidak ada potongan), jadi perkiraan plan "P9 iterasi 1/2" ternyata hanya iterasi 2.
+
+## Perubahan mesin dan skill (story 24)
+
+- `@lakar/check`: LC-12 mobile tanpa `expectedSize` = lebar 390, tinggi ≥ 844; board mobile > 844 diberi warning "tinggi
+  pas = N" bila isi utama berakhir > 32 px di atas zona bawah (atau tepi board); board mobile dengan `Scroll /` ber-`scrollY`
+  > 0 diberi warning pola dua board usang. LC-20 kini punya fixture board panjang (positif/negatif; kode tidak berubah).
+  LC-31 baru (error·gerbang): frame ber-cat berisi teks yang melewati tepi bawah clip terdekat > 1 px, tepi clip rata
+  (≤ 2 px) dengan tepi bawah seksi selebar ≥ 90% board atau board; dikecualikan `Scroll /`, rotasi, `Overlay /`, dan node
+  yang sudah dilaporkan LC-02a.
+- Skill: `mobile.md` satu board `390 × H` (tanpa `duplicate`/`scrollY`/`Scroll /`, zona dari H, perbaikan "tinggi pas" di
+  execute perbaikan; contoh 390 × 1114 lolos 0/0/0); `landing.md` mockup hero utuh (padding bawah ≥ 64, kurangi baris, tanpa
+  `Crop /`; contoh hero tanpa crop lolos LC-31); `webapp.md` baru (sidebar dengan item aktif ber-fill aksen, KPI utama di
+  bidang gelap merek + sparkline, chip delta, batang bertumpuk, tabel berkeadaan, daftar slop dashboard; contoh 0/0/0);
+  `core.md` alur langkah 1 membaca `webapp` untuk aplikasi desktop/dashboard, panduan kata kunci foto (`<peran> portrait`,
+  daemon menyederhanakan sendiri, "subjek jelas, berwarna").
+- Skill sha16 / token: `core.md` cb031f00432a42ab (3967/4000), `landing.md` 0216f99bfeb2fae7 (3486, prosa 1500/1500),
+  `mobile.md` a751e436a20eb6c4 (3176, prosa 1369), `webapp.md` b4acb85ec3fb0cb3 (2819, prosa 924), `polish.md` tetap.
+- Foto: rantai Unsplash (key `~/.config/lakar/unsplash-access-key`) → Wikimedia → Openverse; Pexels keluar dari rantai cari
+  (lookup ref lama tetap). Tangga kata kunci (maks 3 anak tangga per penyedia; respons memuat `query` yang dipakai dan
+  `tried`), cache cari disk `<dataDir>/cache/photo-search/` (24 jam, 500 entri). Foto Unsplash = aset jarak jauh (meta
+  tanpa byte di `assets/`, disajikan lewat cache render `<dataDir>/cache/remote-images/`, placeholder berwarna foto bila
+  cache dingin + jaringan gagal, catatan `photos.placeholders` di screenshot/export), `download_location` sekali per
+  (ref, docId).
+
+## Rubrik 2.2 (task terakhir sebelum seri; sesudah semua skill di-commit)
+
+- Lampiran B DESIGN.md: `Versi rubrik: 2.2 (2026-11-19)`. R1 kolom 2/0: ukuran mengikat = lebar tepat; untuk layar
+  mobile tinggi ≥ yang diminta sah (satu board panjang bergulir), lebih pendek atau lebar lain = salah. Aturan 4 dan alasan
+  "board lebih tinggi" disesuaikan (aturan ukuran yang sama untuk Lakar dan pembanding).
+- Snapshot `bench/rubric/v2.2/` + `rubric.json`: sha256 Lampiran B `4d228aa68e7c2026cbe40744b0809656cc73a49e99f17ac297cf9a9075d3b0a2`;
+  teks juri A `e3213b0bfccaf09eaab9d317ede5b961a1081b67feaf748e2d60474bb95aa7d7`, B
+  `e098f100c8561f809ac6c238fd701d62bd8b2777145c148e414685ec73891e06`; teks juri latihan (dry-run iterasi 3) P7
+  `610fe324cb82be62b0351d74f8f5c3e63ae3a6eca26d417deaeae2dc8e028924`, P8 `8ef484ce58dde8e0d216a384543781d5978623528afa685cc95476a128a82ffa`,
+  P9 `a8ed7128cf4282f7d933009cfdc8a7d8aed4b9700f164939f7e615ebeee3453c`.
+- Aturan ukuran bench (`sizeRuleFor`) aktif hanya untuk run yang membekukan rubrik ≥ 2.2; polish-1/2 dan round-1/2 tetap persis.
+- Dry-run `practice --series polish --iter 3 --reuse-pendev P8=1,P9=1`: preflight lulus, rubrik 2.2, P7 pen.dev baru +
+  restart pen-desktop, perkiraan $6,45 (kumulatif $12,74 + $6,45 ≤ $30,24). Seri iterasi 3–5 dijalankan sesi build sesudah review.
+
+## Seri polish iterasi 3 (story 24): dibatalkan — batas paket pen.dev tercapai (2026-11-19)
+
+- Perintah: `practice --series polish --iter 3 --reuse-pendev P8=1,P9=1` (HEAD `e14f0d1`, rubrik 2.2). Run pen.dev P7 baru gagal di `pen-newdoc`: MCP pencil menjawab bahwa batas pemakaian paket pen.dev periode tagihan ini tercapai dan semua tool desain diblokir. Harness berhenti sebelum run Lakar dan juri; biaya iterasi $0,00 (kumulatif seri tetap $12,74 dari $30,24).
+- Tidak ada upaya mengakali batas itu (tanpa menyentuh `.pen` di disk). Penjaga md5: 48 `.pen` lama tidak berubah atau hilang; 1 file baru dari percobaan newdoc. Restart pen-desktop dicoba harness (service active, MCP pencil tetap menjawab batas paket). lakard active.
+- Butuh keputusan Adam/orkestrator: upgrade paket pen.dev lalu `--iter 3 --resume`, atau ganti rencana (mis. pakai ulang pen.dev P7 iterasi 1 — 390×1177 kini sah di rubrik 2.2 — dengan `--reuse-pendev 1`).
+
+### Keputusan Adam: iterasi 3 memakai ulang pen.dev iterasi 1 (2026-11-19)
+
+- Karena batas paket pen.dev tercapai, rencana awal (rerun pen.dev P7) tidak bisa dijalankan. Atas keputusan Adam, iterasi 3 memakai ulang pen.dev iterasi 1 untuk P7–P9 (`--reuse-pendev 1`). P7 pen.dev 390×1177 sah menurut rubrik 2.2, dan patokan waktu P7 tetap 97,5 dtk (target Lakar ≤ 146 dtk). MCP pencil tidak dipanggil.
+- Pilihan harness: `--iter 3 --resume`. Iterasi 3 yang dibatalkan belum menjalankan Lakar atau juri (biaya $0), jadi tidak ada run yang diulang dan C8 tetap utuh. Laporan `polish-3` yang dibatalkan ditimpa oleh hasil resume; versi dibatalkannya ada di commit `7c0f29c`.
+
+### Hasil iterasi 3 (`bench/polish-3.md`, rubrik 2.2, pen.dev dipakai ulang dari iterasi 1): **lulus**
+
+| Prompt | T L–P | D L–P | Keputusan | Waktu L / P (dtk), rasio | Emoji | Gerbang |
+|---|---|---|---|---|---|---|
+| P7 | 16–13 | 4–4 | Lebih baik | 123,3 / 97,5, 1,27 | 0 | 0 |
+| P8 | 16–16 | 4–4 | Setara | 216,1 / 213,6, 1,01 | 0 | 0 |
+| P9 | 14–9 | 4–3 | Lebih baik | 221,6 / 161,9, 1,37 | 0 | 0 |
+
+- Biaya iterasi $5,34; kumulatif seri $18,08 (1.24: $5,34 dari $17,50). P7 Lakar kini satu board 390×1442 dan 51 dtk lebih cepat dari iterasi 2. pen.dev P7 R1 0 → 2 karena rubrik 2.2; pen.dev P9 T 12 → 9 di juri ulang (PNG sama, variasi juri).

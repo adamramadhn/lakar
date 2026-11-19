@@ -1,0 +1,25 @@
+{
+  "compilerOptions": {
+    "strict": true,
+    "noEmit": true,
+    "composite": false,
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "target": "ES2024",
+    "lib": ["ES2024"],
+    "types": ["node"],
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
+    "isolatedModules": true,
+    "noUncheckedIndexedAccess": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true
+  },
+  "include": [
+    "packages/*/src/**/*.test.ts",
+    "packages/render/test/**/*.ts",
+    "bench/src/**/*.test.ts",
+    "tests/**/*.ts",
+    "vitest.config.ts"
+  ]
+}

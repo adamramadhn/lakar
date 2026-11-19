@@ -1,0 +1,24 @@
+{
+  "name": "lakar",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@12.21.0",
+  "engines": {
+    "node": ">=26"
+  },
+  "scripts": {
+    "build": "node scripts/assert-node.mjs && tsc -b",
+    "test": "node scripts/assert-node.mjs && tsc -p tsconfig.test.json && vitest run",
+    "clean": "tsc -b --clean",
+    "lakard": "node packages/daemon/dist/main.js",
+    "install-browser": "bash scripts/install-browser.sh",
+    "bench:pendev": "node scripts/assert-node.mjs && node bench/dist/cli.js pendev-baseline",
+    "bench:round": "node scripts/assert-node.mjs && node bench/dist/cli.js round"
+  },
+  "devDependencies": {
+    "@types/node": "26.6.6",
+    "playwright-core": "1.65.1",
+    "typescript": "7.0.2",
+    "vitest": "5.1.0"
+  }
+}
