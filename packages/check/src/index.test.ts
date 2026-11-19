@@ -269,6 +269,11 @@ describe('LC-12 board', () => {
     expect(only(run(long(1320, 1000)), 'LC-12')[0]!.detail).toBe('tinggi 1320, isi berakhir 320 px di atas tepi bawah: tinggi pas = 1024');
     // Board 844 tidak dinilai tinggi pas.
     expect(run(long(844, 600))).toEqual([]);
+    // Tanpa zona, dengan Home indicator: isi berakhir 24 di atas home indicator → pas (tanpa temuan).
+    const home = rect('Home indicator', [0, 1320 - 34, 390, 34], { position: 'absolute' });
+    expect(only(run(long(1320, 1320 - 34 - 24, [home])), 'LC-12')).toEqual([]);
+    const home2 = rect('Home indicator', [0, 1320 - 34, 390, 34], { position: 'absolute' });
+    expect(only(run(long(1320, 1000, [home2])), 'LC-12')[0]!.detail).toBe('tinggi 1320, isi berakhir 286 px di atas Home indicator: tinggi pas = 1058');
   });
 
   it('pola lama: Scroll / ber-scrollY > 0 → warning pola dua board usang', () => {

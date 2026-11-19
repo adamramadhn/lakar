@@ -60,7 +60,6 @@ const STATUS: Record<ErrorCode, number> = {
 /** Route statis (modul render, font, aset): `<what> tidak ada`. */
 const fileNotFound = (what: string) => notFound(`${what} tidak ada`, 'periksa path');
 
-/** Board pertama di halaman pertama: default screenshot/export tanpa id. */
 /** assetId fill gambar di subtree `n` (untuk catatan placeholder aset jarak jauh). */
 function imageAssetIds(n: unknown, out: Set<string> = new Set()): Set<string> {
   const node = n as { fills?: { type?: string; assetId?: string }[]; children?: unknown[] };
@@ -69,6 +68,7 @@ function imageAssetIds(n: unknown, out: Set<string> = new Set()): Set<string> {
   return out;
 }
 
+/** Board pertama di halaman pertama: default screenshot/export tanpa id. */
 const firstBoardId = (doc: { pages: readonly { children: readonly { id: string }[] }[] }): string | undefined => doc.pages[0]?.children[0]?.id;
 
 const OpenBody = z.object({ slug: z.string() });

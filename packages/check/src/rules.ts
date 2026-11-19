@@ -232,11 +232,14 @@ export function lc12(ctx: BoardContext, doc: ResolvedDocument): Finding[] {
     } else if (b.screen === 'mobile' && h > d.minHeight + TOLERANCE) {
       // Board mobile panjang: tinggi harus pas dengan isi (tanpa ruang kosong besar di atas zona bawah / tepi bawah).
       const zone = bottomZone(ctx);
-      const limit = zone ? zone.top : h;
+      // Tanpa zona bawah: batasnya tepi atas `Home indicator` (bila ada), bukan tepi board.
+      const home = zone ? undefined : ctx.nodes.find((n) => named(n, 'Home indicator'));
+      const homeRect = home ? ctx.bounds.get(home.id) : undefined;
+      const limit = zone ? zone.top : homeRect ? homeRect.y : h;
       const end = contentBottom(ctx, zone);
       if (end !== undefined && limit - end > FIT_SLACK_MAX + TOLERANCE) {
         const fit = Math.max(d.minHeight, Math.round(h - (limit - end) + FIT_CLEARANCE));
-        details.push(`tinggi ${num(h)}, isi berakhir ${num(limit - end)} px di atas ${zone ? 'zona bawah' : 'tepi bawah'}: tinggi pas = ${fit}`);
+        details.push(`tinggi ${num(h)}, isi berakhir ${num(limit - end)} px di atas ${zone ? 'zona bawah' : homeRect ? 'Home indicator' : 'tepi bawah'}: tinggi pas = ${fit}`);
         expected.push(`tinggi ${fit} (sisa ≤ ${FIT_SLACK_MAX} px); geser zona bawah ikut tinggi baru`);
       }
     }

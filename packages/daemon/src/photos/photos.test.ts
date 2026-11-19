@@ -281,6 +281,45 @@ describe('PhotoService.search', () => {
     expect((await svc.search({ query: 'baker portrait', preview: false })).provider).toBe('unsplash');
   });
 
+  it('TTL cache cari 24 jam tidak diperbarui oleh hit (memori maupun disk sesudah restart)', async () => {
+    let now = 5_000_000;
+    const keyFile = join(tmp, `key${++n}`);
+    await writeFile(keyFile, `${KEY}\n`);
+    await chmod(keyFile, 0o600);
+    const dir = join(tmp, `d${++n}`);
+    const mk = () => new PhotoService({ dataDir: dir, keyFile: join(tmp, 'tidak-ada'), unsplashKeyFile: keyFile, net: new SafeNet(fake.netOptions()), now: () => now });
+    const svc = mk();
+    const api = () => fake.requests.filter((x) => x.host === 'api.unsplash.com').length;
+    await svc.search({ query: 'chef portrait', limit: 3, preview: false });
+    expect(api()).toBe(1);
+    now += 23 * 3600 * 1000;
+    await svc.search({ query: 'chef portrait', limit: 3, preview: false });
+    await mk().search({ query: 'chef portrait', limit: 3, preview: false });
+    expect(api()).toBe(1);
+    // 25 jam sesudah simpan: miss walau sudah di-hit 2 jam sebelumnya (memori dan disk).
+    now += 2 * 3600 * 1000;
+    await svc.search({ query: 'chef portrait', limit: 3, preview: false });
+    expect(api()).toBe(2);
+  });
+
+  it('remaining 0 dipakai sekali: sesudah masa tunggu, hit cache tidak memblokir ulang dan cari baru ke Unsplash', async () => {
+    let now = 9_000_000;
+    const keyFile = join(tmp, `key${++n}`);
+    await writeFile(keyFile, `${KEY}\n`);
+    await chmod(keyFile, 0o600);
+    const svc = new PhotoService({ dataDir: join(tmp, `d${++n}`), keyFile: join(tmp, 'tidak-ada'), unsplashKeyFile: keyFile, net: new SafeNet(fake.netOptions()), now: () => now });
+    fake.unsplashRemaining.value = 0;
+    await svc.search({ query: 'chef portrait', preview: false });
+    fake.unsplashRemaining.value = undefined;
+    now += 61 * 60 * 1000;
+    expect((await svc.search({ query: 'chef portrait', preview: false })).provider).toBe('unsplash');
+    fake.requests.length = 0;
+    const r = await svc.search({ query: 'barista portrait', preview: false });
+    expect(r.provider).toBe('unsplash');
+    expect(r.fallbackReason).toBeUndefined();
+    expect(fake.requests.some((x) => x.host === 'api.unsplash.com')).toBe(true);
+  });
+
   it('tanpa key → wikimedia no-key; key mode 644 → key-insecure, key tidak dikirim; key dibaca ulang saat file berubah', async () => {
     const none = await service('none');
     expect(none.svc.status()).toEqual({ provider: 'wikimedia', keyFile: 'absent', imported: 0 });

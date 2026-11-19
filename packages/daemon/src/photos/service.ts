@@ -420,12 +420,13 @@ export class PhotoService implements PhotoLibraryPort {
   // Cache cari (memori + disk)
   // -------------------------------------------------------------------------
 
-  async #diskGet(key: string): Promise<PhotoCandidate[] | undefined> {
+  /** Entri cache disk (hasil + saat disimpan, agar TTL tidak diperbarui saat dibaca). */
+  async #diskGet(key: string): Promise<{ results: PhotoCandidate[]; at: number } | undefined> {
     try {
       const e = JSON.parse(await readFile(join(this.#searchDir, `${sha256(key)}.json`), 'utf8')) as DiskSearchEntry;
       if (e.v !== 1 || e.key !== key || !Array.isArray(e.results) || typeof e.at !== 'number') return undefined;
       if (this.#now() - e.at > SEARCH_CACHE_TTL_MS) return undefined;
-      return e.results.filter((c) => c && typeof c.ref === 'string' && parseRef(c.ref));
+      return { results: e.results.filter((c) => c && typeof c.ref === 'string' && parseRef(c.ref)), at: e.at };
     } catch {
       return undefined;
     }
@@ -449,12 +450,19 @@ export class PhotoService implements PhotoLibraryPort {
 
   async #cachedSearch(p: PhotoProvider, query: string, orientation: Orientation | undefined, limit: number): Promise<PhotoCandidate[]> {
     const key = `${p.name}|${orientation ?? ''}|${limit}|${query.trim().toLowerCase()}`;
-    let res = this.#search.get(key) ?? (await this.#diskGet(key));
-    if (!res) {
+    // Hit memori dikembalikan apa adanya; hit disk memakai saat simpan aslinya: TTL 24 jam tidak diperbarui oleh pembacaan.
+    const mem = this.#search.get(key);
+    if (mem) return mem;
+    const disk = await this.#diskGet(key);
+    let res: PhotoCandidate[];
+    if (disk) {
+      res = disk.results;
+      this.#search.set(key, res, disk.at);
+    } else {
       res = await p.search({ query: query.trim(), ...(orientation ? { orientation } : {}), limit });
       await this.#diskSet(key, res);
+      this.#search.set(key, res);
     }
-    this.#search.set(key, res);
     for (const c of res) this.#candidates.set(c.ref, c);
     return res;
   }
@@ -496,7 +504,11 @@ export class PhotoService implements PhotoLibraryPort {
           if (!last) fallbackReason = p.name === 'unsplash' ? unsplashReason(e) : wikimediaReason(e);
           continue outer;
         } finally {
-          if (p instanceof UnsplashProvider && p.remaining === 0) this.#unsplashBlockedUntil = this.#now() + UNSPLASH_COOLDOWN_MS;
+          // `remaining` 0 dipakai sekali: hit cache sesudah masa tunggu tidak memblokir ulang.
+          if (p instanceof UnsplashProvider && p.remaining === 0) {
+            this.#unsplashBlockedUntil = this.#now() + UNSPLASH_COOLDOWN_MS;
+            p.remaining = undefined;
+          }
         }
         if (res.length) {
           found = { results: res, query: step.query };
