@@ -1861,4 +1861,10 @@ describe('LC-19 frasa terlarang', () => {
     ];
     expect(only(runAll(landing(kids)), 'LC-19')).toEqual([]);
   });
+  it('positif: Label di dalam Button / Link / Tab tidak dikecualikan (keputusan Adam 2026-11-19)', () => {
+    const btn = frame('Button / Info', [0, 0, 200, 44], [text('Pelajari lebih lanjut', [16, 12, 168, 20], { name: 'Label' })], { layout: 'row' });
+    const link = frame('Link / Info', [0, 60, 200, 20], [frame('Label', [0, 60, 200, 20], [text('Learn more', [0, 60, 200, 20])], { layout: 'row' })], { layout: 'row' });
+    const f = only(runAll(landing([btn, link])), 'LC-19');
+    expect(f.map((x) => x.detail)).toEqual(['frasa terlarang "pelajari lebih lanjut" (id) di "Pelajari lebih lanjut"', 'frasa terlarang "learn more" (en) di "Learn more"']);
+  });
 });

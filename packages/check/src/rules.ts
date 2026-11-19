@@ -1945,12 +1945,17 @@ export function lc17(ctx: BoardContext): Finding[] {
 // LC-19 · frasa terlarang (warning)
 // ---------------------------------------------------------------------------
 
-const exemptFromPhrases = (n: { name: string }): boolean => named(n, FORBIDDEN_EXEMPT.inside) || n.name === FORBIDDEN_EXEMPT.layer;
+function exemptFromPhrases(ctx: BoardContext, t: TextNode): boolean {
+  const chain: { name: string }[] = [t, ...ancestorFrames(ctx, t)];
+  if (chain.some((n) => named(n, FORBIDDEN_EXEMPT.inside))) return true;
+  const label = chain.some((n) => n.name === FORBIDDEN_EXEMPT.layer);
+  return label && !chain.some((n) => namedAny(n, FORBIDDEN_EXEMPT.labelNotInside));
+}
 
 export function lc19(ctx: BoardContext): Finding[] {
   const out: Finding[] = [];
   for (const t of visibleTexts(ctx)) {
-    if (exemptFromPhrases(t) || ancestorFrames(ctx, t).some(exemptFromPhrases)) continue;
+    if (exemptFromPhrases(ctx, t)) continue;
     const hits = forbiddenPhrasesIn(t.content);
     if (!hits.length) continue;
     const list = hits.map((h) => `"${h.phrase}" (${h.lang})`).join(', ');

@@ -14,7 +14,12 @@ export type ForbiddenLang = keyof typeof FORBIDDEN_PHRASES;
  * Pengecualian (diterapkan di check LC-19, bukan di sini): teks di dalam `Input /` (placeholder/isian) dan teks bernama
  * tepat `Label` atau berleluhur `Label` (DESIGN.md: "Teks di dalam `Input /` dan layer `Label` dikecualikan").
  */
-export const FORBIDDEN_EXEMPT = { inside: 'Input /', layer: 'Label' } as const;
+/**
+ * Pengecualian LC-19: teks di dalam `Input /`, dan layer `Label` (label form). Keputusan Adam 2026-11-19 (G1):
+ * pengecualian `Label` tidak berlaku di dalam komponen aksi (`Button /`, `IconButton /`, `Link /`, `Tab /`),
+ * karena teks tombol generik justru anti-pattern yang ingin ditangkap.
+ */
+export const FORBIDDEN_EXEMPT = { inside: 'Input /', layer: 'Label', labelNotInside: ['Button /', 'IconButton /', 'Link /', 'Tab /'] } as const;
 
 const escape = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 /** Spasi dalam frasa = satu atau lebih whitespace; tanda hubung = hyphen ASCII, U+2010, atau U+2011. */
