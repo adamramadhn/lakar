@@ -1115,3 +1115,34 @@ Token (`estimateTokens`, total / prosa). Sebelum = `a01fc67`.
 | landing | 9.114 | 10.728 | 9.440 | −12,0% |
 | mobile | 8.933 | 10.425 | 9.094 | −12,8% |
 | webapp | 8.764 | 10.186 | 9.104 | −10,6% |
+
+## Seri polish iterasi 5 dan 6 (`bench/polish-5.md`, `bench/polish-6.md`, rubrik 2.3, pen.dev dipakai ulang dari iterasi 1)
+
+- Perintah: `practice --series polish --iter <5|6> --reuse-pendev 1` (sesi utama). Satu run per alat per prompt per iterasi
+  (C8), tanpa run pen.dev baru, tanpa MCP pencil, tanpa restart pen-desktop. Iterasi 5 = skill `a01fc67`; iterasi 6 = skill
+  `ff56e47`. Iterasi 6 dijalankan karena iterasi 5 gagal gerbang waktu (syarat plan).
+
+| Prompt | polish-4: T L–P, D L–P, keputusan, waktu L / P (rasio), biaya L | iterasi 5 | iterasi 6 |
+|---|---|---|---|
+| P7 mobile | 15–14, 4–4, Setara, 89,0 / 97,5 (0,91), $0,58 | 16–13, 4–4, **Kalah** (waktu), 149,9 (1,54), $0,92 | 14–12, 4–4, **Setara**, 120,8 (1,24), $0,75 |
+| P8 dashboard | 16–16, 4–4, Setara, 153,6 / 213,6 (0,72), $0,69 | 16–15, 4–4, **Setara**, 192,5 (0,90), $0,86 | 16–14, 4–4, **Setara**, 207,3 (0,97), $0,98 |
+| P9 landing | 15–12, 4–4, Lebih baik, 204,5 / 161,9 (1,26), $1,02 | 14–10, 4–3, **Kalah** (waktu), 264,7 (1,64), $1,55 | 16–12, 4–4, **Lebih baik**, 238,9 (1,48), $1,44 |
+
+- **Iterasi 6 lulus**: P7 Setara, P8 Setara, P9 Lebih baik (tidak turun dari polish-4), rasio ≤ 1,5, emoji 0, gate 0. Margin
+  waktu P9 tipis (238,9 dari batas 242,9 dtk). Skor T pen.dev untuk PNG yang sama bergeser antar-juri (P7 14 → 13 → 12,
+  P8 16 → 15 → 14, P9 12 → 10 → 12); selisih Lakar–pen.dev naik, tetapi sebagian karena variasi juri.
+- **Biaya:** iterasi 5 $5,64, iterasi 6 $5,59; story 2.16 **$11,23** (≤ $12). Kumulatif seri $33,81 dari $34,58.
+- **Token agen (keluaran / berpikir):** P7 9.415/2.491 (it. 4) → 15.253/6.528 (it. 5) → 13.041/3.998 (it. 6); P8 16.058/5.052 →
+  19.552/8.772 → 21.718/9.959; P9 22.269/6.519 → 28.247/11.258 → 25.977/10.169.
+- **Dampak langkah review zoom:** `screenshot scale 2` sendiri 0,4–1,4 dtk. Jeda screenshot → execute perbaikan: it. 4
+  (tanpa zoom) P7 3 dtk, P8 16 dtk, P9 27 dtk (termasuk `inspect`); it. 6 P7 11 dtk, P9 22 dtk; P8 it. 6 tidak memakai zoom
+  (hanya screenshot board, lalu dua execute perbaikan). Dampak zoom ±0–10 dtk per run; kenaikan waktu iterasi 5 terutama
+  dari berpikir sebelum execute pertama (lihat diagnosis di atas), bukan dari zoom.
+- **PNG untuk penilaian cepat Adam** (Setara/Kalah/Lebih baik per prompt): Lakar iterasi 5 `bench/practice/polish/5/P{7,8,9}-lakar.png`,
+  iterasi 6 `bench/practice/polish/6/P{7,8,9}-lakar.png` (tracked); pen.dev yang dipakai ulang
+  `bench/runs/practice-polish/1/P{7,8,9}-pendev.png` (lokal, EULA).
+- **Catatan C7:** (1) dry-run iterasi 5 disaring dengan pola yang kurang ketat, sehingga satu baris teks prompt P7 tercetak ke
+  sesi utama. Sesi utama tidak menyunting skill; revisi iterasi 6 ditulis subagen baru yang tidak melihatnya, dan dry-run
+  iterasi 6 disaring dengan pola berjangkar (`^(biaya:|bench: rubrik|Abort|masalah)`). (2) Subagen implementasi pertama
+  sempat melihat satu baris tabel Lampiran B lewat `grep badge` di DESIGN.md; tidak dipakai, isi skill terkait sudah ada
+  sebelum story ini.
