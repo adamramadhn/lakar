@@ -3,7 +3,7 @@ title: 'Check struktural: LC-13, 14, 15, 16, 21, 22'
 type: feature
 ticket: '4'
 created: '2026-11-19'
-status: in-review
+status: built
 baseline_revision: '5d022b1b834d62f5b110793a611e5d56eedba0f0'
 route: full
 route_source: auto
@@ -12,7 +12,7 @@ review: quick
 review_source: pinned
 lenses_ran: [quick]
 review_loop_iteration: 0
-followup_review_recommended: false
+followup_review_recommended: true
 context:
   - '{project-root}/_bmad-output/initiative-lakar/tickets/epic-g1-inti-lengkap/tickets/story-check-struktural-lc-13-14-15-16-21-22.md'
 warnings: [oversized]
@@ -115,6 +115,16 @@ deferred: []
 
 ## Review Triage Log
 
+### 2026-11-19 — Review pass
+- verdicts: 5 findings — high 0, medium 2, low 3, false 0, maybe-false 0
+- findings:
+  - `[medium]` `[patch]` Deskripsi tool MCP `layout_check`/`execute` (`packages/mcp/src/server.ts`) belum menyebut LC-13/14/15/16/21/22, level info, dan `summary.info` — terverifikasi di server.ts baris ~162–214; diperbaiki di `7975819` (frasa per aturan, info hanya di layout_check, summary `info`), `tests/execute-description.test.ts` disesuaikan.
+  - `[medium]` `[patch]` `effectFieldIssue`: dua node efek tak beririsan di satu `Crop /`/frame ber-clip dihitung 2 bidang (positif palsu pola hero) — benar menurut kode union-find lama; diperbaiki: union juga bila leluhur `Crop /`/`clip:true` terdekat (bukan board) sama, fixture negatif baru; pindaian ulang arsip tidak berubah (6/6).
+  - `[low]` `[patch]` `PENDING_2_10` di `skills-examples.test.ts` mengecualikan per prefiks detail saja — dipersempit ke aturan + nama node + awal detail yang diketahui.
+  - `[low]` `[patch]` Fallback ukuran LC-16 (width/height angka → viewBox) tanpa fixture — `docOf` kini mendukung node tanpa `_r`; 4 kasus fallback ditambahkan.
+  - `[low]` `[patch]` LC-16 memberi error untuk path tak terlihat (opacity 0/terpotong habis) — dilewati sekarang (path tanpa bounds tetap fallback); fixture negatif ditambahkan.
+- Perbaikan sisi orkestrator: `index.test.ts` baris 53 `r[3]` → `r?.[3] ?? 0` (tsc `tsconfig.test.json` gagal TS18048 setelah patch).
+
 ## Design Notes
 
 - **LC-13:** nama (board atau node) cocok `/^(rectangle|ellipse|path|group|board|image|svg|frame|rect|text|icon|vector)\s*\d*$/i` (daftar Lampiran A + padanan tipe node AD-15). Satu temuan per node.
@@ -136,3 +146,19 @@ deferred: []
 
 **Manual checks (if no CLI):**
 - Crop PNG di `<scratchpad>/shots/` untuk setiap LC-16 dan sampel LC-14/LC-21.
+
+## Auto Run Result
+
+Status: built
+
+**Ringkasan:** `@lakar/check` kini menjalankan LC-13 (info, nama layer default), LC-14 (warning, absolut di flex tanpa `Overlay /`), LC-15 (warning, > 1 pustaka ikon UI), LC-16 (error bukan gerbang, path ≤ 32×32 tanpa `Chart /`/`Shape /`), LC-21 (warning, lima sub-cek) dan LC-22 (info, jumlah node konvensi). Level `info` baru: dibatasi 3 per aturan per board seperti warning, diurut sesudah warning, tidak dikirim di execute (temuan dan summary), muncul di `layout_check` dengan `summary.info`. Lampiran A DESIGN.md diperbarui (file di-exclude git; perubahan di disk).
+
+**File:** `packages/schema/src/findings.ts` (level info, 6 aturan, summary.info); `packages/check/src/rules.ts` (6 aturan, cap info); `packages/check/src/index.ts` (urutan level/aturan); `packages/check/src/index.test.ts` (fixture); `packages/daemon/src/server.ts` (execute tanpa info); `packages/mcp/src/server.ts` (deskripsi tool); tes daemon/mcp/bench/schema/`tests/execute-description.test.ts`; `packages/daemon/src/skills-examples.test.ts` (`PENDING_2_10`); `bench/practice/LOG.md` §2.4.
+
+**Review:** 5 temuan (2 medium, 3 low), semua di-patch; 0 ditunda, 0 ditolak.
+
+**Follow-up review:** disarankan (2 medium di-patch). Risiko yang belum terverifikasi: penggabungan bidang efek per wadah potong hanya dibuktikan fixture sintetis — tidak ada kasus arsip yang memakainya.
+
+**Verifikasi:** `pnpm build` lulus; `pnpm test` 1021/1023 — gagal hanya `visual.test.ts` latensi (paralel; lulus sendiri 18/18) dan `practice.test.ts` render ulang polish-4 (sudah gagal di `5d022b1`). Tes kinerja check 500 node sempat 100,6 ms di bawah beban paralel sekali; pengukuran langsung median 4,7 ms (dist baru) vs 6,1 ms (dist base), lulus di run ulang. Pindaian arsip 120 dok/157 board: aturan lama identik per dokumen, LC-16 0, LC-13 0, LC-15 0, LC-14 6, LC-21 radius 70 / spacer 11 / padding ganda 0 / teks tabel 22 / bidang efek 6, LC-22 132. `tools/node26/verify.sh` semua OK, Node sistem v22.23.5, lakard active.
+
+**Risiko sisa:** sub-cek radius LC-21 memicu di 66/120 dok (sebagian besar dari pola skill) sampai story 2.10; helper `run()` tes lama menyaring aturan G1; LC-15 siaga (skema hanya lucide + simple-icons).

@@ -50,7 +50,7 @@ function docOf(specs: BoardSpec[], tokens?: Record<string, string | number>): { 
         if (r) nodes.push({ id: n.id as string, x: r[0], y: r[1], width: r[2], height: r[3] });
         if (_ink || _lines || _lh) {
           const ink = _ink as R | undefined;
-          texts.push({ id: n.id as string, lines: (_lines as number) ?? 1, lineHeight: (_lh as number) ?? r[3], ...(ink ? { ink: { x: ink[0], y: ink[1], width: ink[2], height: ink[3] } } : {}) });
+          texts.push({ id: n.id as string, lines: (_lines as number) ?? 1, lineHeight: (_lh as number) ?? r?.[3] ?? 0, ...(ink ? { ink: { x: ink[0], y: ink[1], width: ink[2], height: ink[3] } } : {}) });
         }
         return kids ? { ...n, children: strip(kids as Loose[]) } : n;
       });
