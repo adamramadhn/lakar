@@ -252,8 +252,11 @@ else w({type:'result',subtype:'success',is_error:false,result:${JSON.stringify(v
 
 const RUBRIC = readRubricJson();
 const RUBRIC_V = RUBRIC ? join(BENCH_ROOT, 'rubric', `v${RUBRIC.version}`) : '';
-/** Kata yang menyebut isi prompt A/B: tidak boleh ada di teks R4/R9/R10 (kriteria umum). */
-const FORBIDDEN_IN_GENERAL = ['streak', 'target harian', 'Kasku', 'Gerak', 'invoice', 'avatar foto', 'avatar', 'langkah', 'kalori', 'UMKM', 'pembukuan', 'kebugaran', 'hijau', 'oranye'];
+/** Kata yang menyebut isi prompt A–E: tidak boleh ada di teks R4/R9/R10 (kriteria umum). */
+const FORBIDDEN_IN_GENERAL = [
+  ...['streak', 'target harian', 'Kasku', 'Gerak', 'invoice', 'avatar foto', 'avatar', 'langkah', 'kalori', 'UMKM', 'pembukuan', 'kebugaran', 'hijau', 'oranye'],
+  ...['Arus', 'Singgah', 'Gudangku', 'penjualan', 'pesanan', 'checkout', 'penginapan', 'kamar', 'inventaris', 'gudang', 'teal', 'biru', 'amber'],
+];
 /** Bagian rahasia (rubrik + kriteria + bukti) dari teks juri: dari "## Aturan skor" sampai "## Checklist slop". */
 const secretOf = (text: string) => text.slice(text.indexOf('## Aturan skor'), text.indexOf('## Checklist slop')).trim();
 
@@ -264,7 +267,7 @@ describe('rubrik v2 (snapshot tracked bench/rubric/)', () => {
     expect(readdirSync(join(BENCH_ROOT, 'rubric', 'v1')).sort()).toEqual(['golden-kriteria.md', 'judge-text-A.md', 'judge-text-B.md', 'lampiran-b.md']);
   });
 
-  it('(b) teks R4/R9/R10 di lampiran-b.md tanpa kata isi prompt A/B', () => {
+  it('(b) teks R4/R9/R10 di lampiran-b.md tanpa kata isi prompt A–E', () => {
     const lb = readFileSync(join(RUBRIC_V, 'lampiran-b.md'), 'utf8');
     expect(rubricVersionOf(lb)?.version).toBe(RUBRIC!.version);
     const rows = ['R4', 'R9', 'R10'].map((r) => {

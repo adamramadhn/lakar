@@ -62,8 +62,9 @@ Riwayatnya disimpan tracked di `bench/rubric/`:
   persis. Rubrik ≥ 2.2 = untuk spesifikasi layar mobile (tinggi tetap, lebar ≤ 480) lebar sama dan tinggi ≥ yang diminta
   (satu board panjang bergulir sah); landing tetap hanya lebar, app tetap persis. Aturan yang sama dipakai untuk gerbang
   Lakar dan pelanggaran brief pen.dev (simetris). Golden B1/D2 v2.3 sejalan dengan aturan ini (tes `lakar.test.ts`); gerbang
-  ukuran tidak menghitung jumlah board, jadi D2 (satu board panjang) dinilai juri lewat R1. Versi diambil dari `frozen.json` run (putaran: `judge.rubricVersion`,
-  latihan: `rubric.version`; `rejudge`: versi beku putaran sumber), jadi laporan lama yang di-render ulang tidak bergeser.
+  ukuran tidak menghitung jumlah board, jadi D2 (satu board panjang) dinilai juri lewat R1. Versi diambil dari
+  `frozen.json` run (putaran: `judge.rubricVersion`, latihan: `rubric.version`; `rejudge`: versi beku putaran sumber), jadi
+  laporan lama yang di-render ulang tidak bergeser.
 - **Penjaga sha:** setiap laporan `round`/`rejudge` mencatat versi rubrik dan sha256 teks juri per prompt; teks juri
   juga disalin ke `<run>/judge/<prompt>/judge-text.md`. Putaran resmi di-abort (`officialFreezeProblems`) dan
   `rejudge` menolak berjalan bila sha teks juri saat ini ≠ `bench/rubric/rubric.json` (DESIGN.md/golden-set.md
