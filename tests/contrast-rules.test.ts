@@ -2,7 +2,8 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { CONTRAST_MIN, CONTROL_PREFIXES, isLargeText, LARGE_TEXT, SCRIM_MIN_ALPHA, textContrastMin } from '../packages/schema/src/contrast-rules.ts';
+import { EFFECT_BLUR_MIN } from '../packages/check/src/rules.ts';
+import { CONTRAST_MIN, CONTROL_PREFIXES, ICON_GROUP_LABEL_MAX, isLargeText, LARGE_TEXT, SCRIM_MIN_ALPHA, textContrastMin } from '../packages/schema/src/contrast-rules.ts';
 
 const root = (p: string) => fileURLToPath(new URL(`../${p}`, import.meta.url));
 const DESIGN = root('_bmad-output/initiative-lakar/ux-lakar/DESIGN.md');
@@ -74,6 +75,8 @@ describe.skipIf(!existsSync(DESIGN))('ambang kontras = DESIGN.md', () => {
     expect(how).toContain(`< ${CONTRAST_MIN.nonText}:1`);
     expect(how).toContain(`≥ ${String(SCRIM_MIN_ALPHA).replace('.', ',')}`);
     for (const p of CONTROL_PREFIXES) expect(how).toContain(`\`${p}\``);
+    expect(how).toContain(`≤ ${ICON_GROUP_LABEL_MAX} karakter`);
+    expect(how).toContain(`blur ≥ ${EFFECT_BLUR_MIN}`);
     expect(how).not.toMatch(/belum dicek/);
   });
 });

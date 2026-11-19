@@ -1100,6 +1100,20 @@ describe('LC-04 lengkap: ambang, batas kontrol, ikon tanpa label, scrim', () => 
     expect(sub(lc04([card]), 'ikon tanpa label')).toHaveLength(5);
   });
 
+  it('bintang tanpa pembungkus langsung di baris: nama bukan label (error per ikon); teks nilai "4,8" di baris itu → berlabel', () => {
+    const starsAt = () => [0, 1, 2, 3, 4].map((i) => icon('lucide', [16 + i * 24, 16, 20, 20], { icon: 'star', color: '#F5B700' }));
+    const row = frame('Baris ulasan', [16, 16, 360, 20], [...starsAt(), text('Bima Prasetyo', [140, 16, 120, 20], { color: '#101828' })], { layout: 'row' });
+    expect(sub(lc04([row]), 'ikon tanpa label')).toHaveLength(5);
+    const rated = frame('Baris ulasan', [16, 16, 360, 20], [...starsAt(), text('4,8', [140, 16, 40, 20], { color: '#101828' })], { layout: 'row' });
+    expect(sub(lc04([rated]), 'ikon tanpa label')).toEqual([]);
+  });
+
+  it('Checkbox / digambar dengan ikon square: ikon = batas (#7D8798 lulus, #D0D5DD 1.47:1)', () => {
+    const cb = (c: string) => frame('Checkbox / Setuju', [16, 16, 200, 24], [icon('lucide', [16, 16, 24, 24], { icon: 'square', color: c }), text('Setuju', [48, 18, 100, 20], { color: '#101828' })], { layout: 'row' });
+    expect(sub(lc04([cb('#7D8798')]), 'batas kontrol')).toEqual([]);
+    expect(sub(lc04([cb('#D0D5DD')]), 'batas kontrol').map((x) => x.detail)).toEqual(['batas kontrol 1.47:1 (#D0D5DD di atas #FFFFFF)']);
+  });
+
   it('ikon berlabel atau dikecualikan: Button / ikon + teks; wadah tint + judul; simple-icons; Status bar', () => {
     const btn = frame('Button / Simpan', [16, 16, 120, 44], [icon('lucide', [28, 28, 20, 20], { color: '#D0D5DD' }), text('Simpan', [52, 28, 60, 20], { color: '#101828' })], { layout: 'row' });
     const tint = frame('Wadah ikon', [16, 16, 40, 40], [icon('lucide', [24, 24, 24, 24], { color: '#D0D5DD' })], { layout: 'row', fills: [{ type: 'solid', color: '#F2F4F7' }] });
@@ -1115,10 +1129,14 @@ describe('LC-04 lengkap: ambang, batas kontrol, ikon tanpa label, scrim', () => 
     expect(f).toHaveLength(1);
     expect(f[0]).toMatchObject({ level: 'warning', detail: 'scrim: teks di atas foto tanpa scrim (fill solid ≥ 0,5) "Kopi pagi"' });
     expect(summarizeFindings(f).gate).toBe(0);
-    const multi = { fills: [{ type: 'linear', angle: 90, stops: [{ offset: 0, color: '#2563EB' }, { offset: 1, color: '#F97316' }] }] };
+    const multi = { fills: [{ type: 'linear', angle: 90, stops: [{ offset: 0, color: '#1D4ED8' }, { offset: 1, color: '#7E22CE' }] }] };
     expect(sub(lc04([frame('Hero', [0, 0, 390, 200], [text('Judul', [16, 16, 200, 30], { color: '#FFFFFF' })], { layout: 'column', ...multi })]), 'scrim:').map((x) => x.detail)).toEqual([
       'scrim: teks di atas gradien tanpa scrim (fill solid ≥ 0,5) "Judul"',
     ]);
+    // Kontras gagal di gradien multi-hue → satu temuan LC-04 (kontras), tanpa warning scrim ganda.
+    const orange = { fills: [{ type: 'linear', angle: 90, stops: [{ offset: 0, color: '#2563EB' }, { offset: 1, color: '#F97316' }] }] };
+    const once = lc04([frame('Hero', [0, 0, 390, 200], [text('Judul', [16, 16, 200, 30], { color: '#FFFFFF' })], { layout: 'column', ...orange })]);
+    expect(once.map((x) => [x.level, x.detail.split(' ')[0]])).toEqual([['warning', 'kontras']]);
     const blob = rect('Blob', [0, 0, 120, 300], { position: 'absolute', fills: [{ type: 'solid', color: '#7C3AED' }], blur: 40 });
     const fx = frame('Hero', [0, 0, 390, 300], [blob, text('Judul', [100, 100, 100, 20], { color: '#101828', position: 'absolute' })], { layout: 'none' });
     expect(sub(lc04([fx]), 'scrim:').map((x) => x.detail)).toEqual(['scrim: teks di atas efek tanpa scrim (fill solid ≥ 0,5) "Judul"']);

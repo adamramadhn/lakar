@@ -4,6 +4,7 @@ import {
   CONTRAST_MIN,
   CONTROL_PREFIXES,
   DISPLAY_SIZES,
+  ICON_GROUP_LABEL_MAX,
   FORBIDDEN_EXEMPT,
   forbiddenPhrasesIn,
   G0_RULES,
@@ -1141,7 +1142,16 @@ function controlIssues(ctx: BoardContext, painters: readonly ChildNode[]): Findi
     if (paints === undefined) continue;
     let warn = path.warn || bd.warn;
     if (paints.length === 0) {
+      const iconBorder = namedAny(k, ['Checkbox /', 'Radio /']);
       for (const d of descendants(k)) {
+        // Checkbox/Radio digambar dengan ikon (mis. lucide square/circle): ikon = batas.
+        if (iconBorder && d.type === 'icon' && visibleRect(ctx, d)) {
+          const dp = pathAlpha(ctx, d);
+          if (dp.alpha <= 0) continue;
+          warn ||= dp.warn;
+          paints.push({ colors: [d.color ?? '#000000'], alpha: dp.alpha });
+          continue;
+        }
         if ((d.type !== 'frame' && d.type !== 'rect' && d.type !== 'ellipse') || !visibleRect(ctx, d)) continue;
         const dp = pathAlpha(ctx, d);
         if (dp.alpha <= 0) continue;
@@ -1198,8 +1208,6 @@ const hasContent = (n: ChildNode): boolean =>
 const hasVisibleText = (ctx: BoardContext, scope: Container): boolean =>
   (scope.type === 'board' ? ctx.nodes : [scope, ...descendants(scope)]).some((t) => t.type === 'text' && nonEmpty(t) && (t.opacity ?? 1) > 0 && visibleRect(ctx, t) !== undefined);
 
-/** Panjang maksimum teks nilai yang melabeli deretan ikon (mis. "4,8 dari 312 ulasan"). */
-export const ICON_GROUP_LABEL_MAX = 40;
 const iconOnly = (n: ChildNode): boolean => n.type === 'icon' || (n.type === 'frame' && n.children.length > 0 && n.children.every(iconOnly));
 /** Teks nilai pendek: terlihat, berangka, ≤ ICON_GROUP_LABEL_MAX karakter. */
 const valueLabel = (ctx: BoardContext, c: ChildNode): boolean =>
@@ -1220,10 +1228,13 @@ function iconLabeled(ctx: BoardContext, n: ChildNode, anc: readonly Container[])
     cur = a;
     if (!others.length) continue;
     if (!group) {
-      if (hasVisibleText(ctx, a)) return true;
-      if (!others.every(iconOnly)) return false;
-      group = true;
-      continue;
+      if (others.every(iconOnly)) {
+        group = true;
+        continue;
+      }
+      // Deretan ikon sama tanpa pembungkus (mis. bintang langsung di baris): berlabel hanya oleh teks nilai, sama dengan deretan berbungkus.
+      if (n.type === 'icon' && others.some((c) => c.type === 'icon' && c.lib === n.lib && c.icon === n.icon)) return others.some((c) => valueLabel(ctx, c));
+      return hasVisibleText(ctx, a);
     }
     if (others.every(iconOnly)) continue;
     return others.some((c) => valueLabel(ctx, c));
@@ -1302,7 +1313,7 @@ function scrimIssues(ctx: BoardContext): Finding[] {
       if (p.type === 'path') return false;
       const v = p.type === 'board' ? ctx.boardRect : visibleRect(ctx, p);
       if (!v || !contains(v, ink)) return false;
-      if (p.type === 'ellipse' && !inEllipse(v, ink)) return false;
+      if (p.type === 'ellipse' && !inEllipse(ctx.bounds.get(p.id) ?? v, ink)) return false;
       let a = 1;
       if (p.type !== 'board')
         for (const q of [p, ...ancestors(ctx, p)]) {
@@ -1374,7 +1385,9 @@ export function lc04(ctx: BoardContext): Finding[] {
       ),
     );
   }
-  return [...out, ...controlIssues(ctx, painters), ...iconIssues(ctx, painters), ...scrimIssues(ctx)];
+  // Teks yang sudah punya temuan kontras tidak diberi warning scrim lagi (satu slot cap per teks).
+  const flagged = new Set(out.map((f) => f.nodeId));
+  return [...out, ...controlIssues(ctx, painters), ...iconIssues(ctx, painters), ...scrimIssues(ctx).filter((f) => !flagged.has(f.nodeId))];
 }
 
 // ---------------------------------------------------------------------------

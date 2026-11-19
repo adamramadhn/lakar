@@ -3,16 +3,16 @@ title: 'LC-04 lengkap: ambang kontras satu sumber, batas kontrol, ikon tanpa lab
 type: feature
 ticket: '7'
 created: '2026-11-19'
-status: in-progress
+status: built
 baseline_revision: '091d5ad9b279c6de33657cb28a4a9af73ffd1442'
 route: full
 route_source: auto
 risk: high
-review: ''
-review_source: ''
-lenses_ran: []
+review: quick
+review_source: pinned
+lenses_ran: [quick]
 review_loop_iteration: 0
-followup_review_recommended: false
+followup_review_recommended: true
 context:
   - '{project-root}/_bmad-output/initiative-lakar/tickets/epic-g1-inti-lengkap/tickets/story-lc-04-lengkap-dan-ambang-kontras-selaras-dengan-design-md.md'
   - '{project-root}/_bmad-output/initiative-lakar/tickets/epic-g1-inti-lengkap/tickets/story-check-luapan-non-teks-dan-konten-terpotong-di-tepi-board-plan.md'
@@ -104,10 +104,20 @@ deferred: []
 - **DESIGN.md** (di disk, cadangan `<scratchpad>/DESIGN.before7.md`): tabel Ambang kontras (teks biasa / teks besar 24 / 18,66 / 700, placeholder berapa pun ukurannya); baris LC-04 Lampiran A (judul + level scrim, 18,66/700, placeholder, cara cek batas kontrol/ikon tanpa label/scrim, "belum dicek" dihapus).
 - **Verifikasi:** `pnpm build` lulus; check 225/225, schema 125/125, bench 213/213; `vitest tests/contrast-rules.test.ts tests/execute-description.test.ts` 26/26; `pnpm test` 1098/1099 (gagal hanya latensi `visual.test.ts` saat paralel; lulus sendiri 18/18). lakard di-restart; `execute` dok uji → `error·gerbang · LC-04` batas kontrol 1.47:1, `error·gerbang · LC-04` ikon tanpa label 1.47:1, `warning · LC-04` scrim foto; dok uji dihapus, lakard di-restart. `verify.sh` semua OK, Node sistem v22.23.5.
 - **Risiko sisa:** warning scrim ikut cap 3 per aturan per board bersama warning kontras LC-04 (di arsip tidak menggeser warning teks lama, tetapi bisa di dokumen lain); mesh "zona tenang" tetap memicu warning scrim (tidak bisa dibedakan tanpa piksel); label deretan ikon bisa terlalu longgar (teks berangka pendek di sebelah deretan ikon sosial dianggap label); `polish.md` masih "≥ 19 tebal" (C7, untuk revisi skill).
+- **Patch review (orkestrator, 1 putaran):** `iconLabeled` — ikon berulang sama (`lib`+`icon`) langsung di baris tanpa bungkus juga hanya berlabel oleh teks nilai pendek; `controlIssues` — `Checkbox /`/`Radio /` tanpa cat memakai ikon keturunan sebagai batas; `scrimFill` — elips dari bounds node; `lc04` — scrim dilewati untuk teks yang sudah kena temuan kontras; `ICON_GROUP_LABEL_MAX` pindah ke `contrast-rules.ts` + tes Lampiran A (`≤ 40 karakter`, `blur ≥ 24`). DESIGN.md baris LC-04 dan LOG.md §2.7 diselaraskan. Pindaian `after7c.json` vs `after7b.json`: identik kecuali scrim 34 → 32 (Siaru ×2 kini hanya warning kontras); gagal gerbang tetap 86. lakard: `execute` dok uji `uji-g1-7-kontras-b` → 2 error·gerbang (batas kontrol, ikon tanpa label) + warning scrim; `Checkbox /` berikon #7D8798 lulus; dok uji dihapus (file + history), lakard di-restart. `pnpm test` 1100/1101 (latensi `visual.test.ts` paralel; sendiri lulus), `verify.sh` semua OK.
 
 ## Plan Change Log
 
 ## Review Triage Log
+
+### 2026-11-19 — Review pass
+- verdicts: 5 findings — high 0, medium 3, low 2, false 0, maybe-false 0
+- findings:
+  - `[medium]` `[patch]` `iconLabeled`: bintang langsung di baris/kartu (tanpa frame `Bintang`) dinilai berlabel oleh teks apa pun, sedangkan versi berbungkus hanya oleh teks nilai — terverifikasi (cabang `hasVisibleText` didahulukan); diperbaiki: ikon berulang sama di `others` → label hanya `valueLabel`; fixture baru; arsip tidak berubah.
+  - `[medium]` `[patch]` `controlIssues`: `Checkbox /`/`Radio /` digambar dengan ikon `square`/`circle` tanpa cat → error gerbang palsu "tanpa batas terlihat" — terverifikasi (fallback hanya frame/rect/ellipse); diperbaiki: ikon keturunan dihitung sebagai batas untuk Checkbox/Radio (bukan Input); fixture lulus/gagal; dikonfirmasi di lakard.
+  - `[low]` `[patch]` `scrimFill`/`inEllipse` memakai `visibleRect` terpotong untuk geometri elips — terverifikasi; diperbaiki: geometri dari `ctx.bounds`.
+  - `[medium]` `[patch]` teks di gradien multi-hue mendapat warning kontras + warning scrim (dua slot cap LC-04 untuk satu node) — terverifikasi (fixture lama menyaring dengan `sub`); diperbaiki: scrim dilewati bila node sudah kena temuan kontras; arsip: Siaru ×2 scrim → hanya kontras.
+  - `[low]` `[patch]` `ICON_GROUP_LABEL_MAX` dan ambang blur di luar modul dan tak dijaga tes DESIGN.md — terverifikasi; diperbaiki: konstanta pindah ke `contrast-rules.ts`, tes Lampiran A memeriksa `≤ 40 karakter` dan `blur ≥ ${EFFECT_BLUR_MIN}`.
 
 ## Design Notes
 
@@ -137,3 +147,19 @@ deferred: []
 
 **Manual checks (if no CLI):**
 - Crop `<scratchpad>/shots/LC-04-*` untuk setiap error LC-04 baru (kasus unik).
+
+## Auto Run Result
+
+Status: built
+
+**Ringkasan:** Ambang kontras satu sumber (`@lakar/schema` `contrast-rules.ts`, dijaga tes terhadap tabel Ambang kontras + baris LC-04 DESIGN.md): teks 4.5:1; teks besar ≥ 24px atau ≥ 18,66px berat ≥ 700 → 3:1; `Placeholder` selalu 4.5:1. LC-04 kini juga menilai batas kontrol `Input /`/`Radio /`/`Checkbox /` (stroke/fill/keturunan bercat, ikon untuk Checkbox/Radio) ≥ 3:1, ikon UI tanpa label ≥ 3:1 (bintang rating tanpa nilai = cacat), dan warning scrim untuk teks di atas foto/noise/mesh/gradien multi-hue/blur ≥ 24 tanpa fill solid ≥ 0,5. Level: latar solid error·gerbang, komposit warning, scrim selalu warning. Lampiran A tanpa catatan "belum dicek".
+
+**File:** `packages/schema/src/contrast-rules.ts` (baru, ambang), `packages/schema/src/index.ts` (ekspor), `packages/check/src/rules.ts` (`backdrop` bersama, `controlIssues`/`iconIssues`/`scrimIssues`), `packages/check/src/index.ts` (ekspor ulang), `packages/check/src/index.test.ts` (fixture tiap baris matriks + patch review), `tests/contrast-rules.test.ts` (baru), `packages/mcp/src/server.ts` + `tests/execute-description.test.ts` (deskripsi `layout_check`), `packages/daemon/src/skills-examples.test.ts` (`PENDING_2_10`), `bench/practice/LOG.md` §2.7. DESIGN.md di disk (di-exclude git; cadangan `<scratchpad>/DESIGN.before7.md`).
+
+**Review:** 5 temuan — 5 di-patch (3 medium, 2 low), 0 ditunda, 0 ditolak.
+
+**Follow-up review:** disarankan (3 medium di-patch). Risiko belum terverifikasi: label deretan ikon tanpa bungkus dan batas kontrol berikon hanya dibuktikan fixture + satu uji lakard — arsip tidak punya contohnya.
+
+**Verifikasi:** `pnpm build` lulus; check 227/227, schema 125/125, bench 213/213, contrast + deskripsi lulus; `pnpm test` 1100/1101 (gagal hanya latensi `visual.test.ts` saat paralel; sendiri lulus). Arsip `after7c.json` (120 dok, 0 gagal): aturan lain dan LC-04 teks identik dengan `after6.json`; batas kontrol 5/5 dok, ikon tanpa label 62/8 dok, scrim 32 warning/12 dok; gagal gerbang 80 → 86; crop setiap kasus unik = cacat nyata. lakard: uji execute sesuai AC, dok uji dihapus. `tools/node26/verify.sh` semua OK, Node sistem v22.23.5.
+
+**Risiko sisa:** warning scrim berbagi cap 3 per board dengan warning kontras; mesh "zona tenang" tetap memicu scrim (tanpa piksel); label teks nilai pendek bisa terlalu longgar (mis. "© 2026" di samping deretan ikon sosial); `polish.md` masih "≥ 19 tebal" dan "ikon" tanpa syarat label (C7, untuk 2.10).

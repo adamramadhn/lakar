@@ -26,6 +26,9 @@ export const SCRIM_MIN_ALPHA = 0.5;
 /** Kontrol yang batasnya harus ≥ `CONTRAST_MIN.nonText` terhadap latar. */
 export const CONTROL_PREFIXES = ['Input /', 'Radio /', 'Checkbox /'] as const;
 
+/** Deretan ikon (mis. bintang rating) berlabel oleh teks nilai bersebelahan: berangka, panjang ≤ nilai ini (karakter). */
+export const ICON_GROUP_LABEL_MAX = 40;
+
 /** Nama layer placeholder (selalu `CONTRAST_MIN.placeholder`). */
 export const PLACEHOLDER_LAYER = 'Placeholder';
 

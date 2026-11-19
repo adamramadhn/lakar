@@ -998,3 +998,12 @@ Prototipe plan (99 ikon gagal di 10 dok) memakai definisi tanpa perbaikan 1; kon
 - `webapp.md`: `Input / Outlet` stroke `C.line2` #D0D5DD di #F3F6F5 → batas kontrol 1,35:1 (error · gerbang).
 - `icons.md`: `Bintang 1–5` #F5B700 tanpa nilai rating → ikon tanpa label 1,8:1 (error · gerbang ×5).
 - `polish.md` baris kontras masih "≥ 19 tebal" dan "ikon" tanpa syarat label: dicatat untuk revisi skill (tidak diubah, C7).
+
+## Patch review (2.7)
+
+Lima patch review (quick): deretan ikon berulang tanpa bungkus frame (mis. bintang langsung di baris bersama nama)
+juga hanya berlabel oleh teks nilai pendek; ikon `square`/`circle` di `Checkbox /`/`Radio /` tanpa cat dihitung sebagai
+batas; elips scrim dari bounds node (bukan persegi terpotong); teks yang sudah kena temuan kontras tidak diberi scrim;
+`ICON_GROUP_LABEL_MAX` pindah ke `contrast-rules.ts` (dijaga tes terhadap Lampiran A). Pindaian ulang `after7c.json`
+(120 dok, 0 gagal) vs `after7b.json`: aturan lain, LC-04 teks, batas kontrol, ikon tanpa label identik; scrim 34 → 32
+(Siaru "Obrolan Senja" ×2 kini hanya warning kontras 4,23:1); gagal gerbang tetap **86**; tidak ada error baru.
