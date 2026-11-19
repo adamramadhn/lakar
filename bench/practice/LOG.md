@@ -699,3 +699,17 @@ cacat nyata, kartu berisi teks yang terpotong rata di tepi bawah `Seksi / Hero`:
   tanpa byte di `assets/`, disajikan lewat cache render `<dataDir>/cache/remote-images/`, placeholder berwarna foto bila
   cache dingin + jaringan gagal, catatan `photos.placeholders` di screenshot/export), `download_location` sekali per
   (ref, docId).
+
+## Rubrik 2.2 (task terakhir sebelum seri; sesudah semua skill di-commit)
+
+- Lampiran B DESIGN.md: `Versi rubrik: 2.2 (2026-11-19)`. R1 kolom 2/0: ukuran mengikat = lebar tepat; untuk layar
+  mobile tinggi ≥ yang diminta sah (satu board panjang bergulir), lebih pendek atau lebar lain = salah. Aturan 4 dan alasan
+  "board lebih tinggi" disesuaikan (aturan ukuran yang sama untuk Lakar dan pembanding).
+- Snapshot `bench/rubric/v2.2/` + `rubric.json`: sha256 Lampiran B `4d228aa68e7c2026cbe40744b0809656cc73a49e99f17ac297cf9a9075d3b0a2`;
+  teks juri A `e3213b0bfccaf09eaab9d317ede5b961a1081b67feaf748e2d60474bb95aa7d7`, B
+  `e098f100c8561f809ac6c238fd701d62bd8b2777145c148e414685ec73891e06`; teks juri latihan (dry-run iterasi 3) P7
+  `610fe324cb82be62b0351d74f8f5c3e63ae3a6eca26d417deaeae2dc8e028924`, P8 `8ef484ce58dde8e0d216a384543781d5978623528afa685cc95476a128a82ffa`,
+  P9 `a8ed7128cf4282f7d933009cfdc8a7d8aed4b9700f164939f7e615ebeee3453c`.
+- Aturan ukuran bench (`sizeRuleFor`) aktif hanya untuk run yang membekukan rubrik ≥ 2.2; polish-1/2 dan round-1/2 tetap persis.
+- Dry-run `practice --series polish --iter 3 --reuse-pendev P8=1,P9=1`: preflight lulus, rubrik 2.2, P7 pen.dev baru +
+  restart pen-desktop, perkiraan $6,45 (kumulatif $12,74 + $6,45 ≤ $30,24). Seri iterasi 3–5 dijalankan sesi build sesudah review.

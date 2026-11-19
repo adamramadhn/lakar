@@ -203,7 +203,7 @@ describe('practice: penjaga', () => {
       expect(t.text).not.toContain('## Kriteria golden untuk prompt ini');
       expect(t.text).toContain('| R10 |');
       expect(judgeLeaks(t.text)).toEqual([]);
-      expect(t.rubricVersion).toBe('2.1');
+      expect(t.rubricVersion).toBe(readRubricJson()!.version);
       expect(practicePromptC7Problems(renderPractice(protocol, p), golden)).toEqual([]);
     }
     // Penjaga hidup: kalimat rahasia di skill palsu terdeteksi.

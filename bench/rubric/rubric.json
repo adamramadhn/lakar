@@ -1,12 +1,12 @@
 {
-  "version": "2.1",
-  "date": "2026-11-18",
+  "version": "2.2",
+  "date": "2026-11-19",
   "judgeTextSha256": {
-    "A": "f6d68640c1d174c57b4604087d7bd495cceb538236aa22a074f8033466d6faad",
-    "B": "7c1727857d1061128aa17673ce7a751093860f2009fe3867c276708b6ba2545e"
+    "A": "e3213b0bfccaf09eaab9d317ede5b961a1081b67feaf748e2d60474bb95aa7d7",
+    "B": "e098f100c8561f809ac6c238fd701d62bd8b2777145c148e414685ec73891e06"
   },
   "sourceSha256": {
-    "lampiran-b.md": "cdba3dde5fccaaabbccdf8e0e4060c4cb2c9b4534bcae1fb67eee2fd26e387be",
+    "lampiran-b.md": "4d228aa68e7c2026cbe40744b0809656cc73a49e99f17ac297cf9a9075d3b0a2",
     "golden-kriteria.md": "46de49e3a77602a39cf33bf45dbade5da155c73544c9e92b8ae1d90211cb7d5b"
   }
 }
