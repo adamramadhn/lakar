@@ -62,7 +62,7 @@ Peran `T` = kunci `TY`. Paragraf `width:'fill'`/angka agar dibungkus. `Badge` to
 3. `check` tiap execute. → `check: <error>/<warning>`
 4. Cek angka: total, persen, tanggal ↔ hari, busur = persen × 360°. → `cek angka: <n relasi>, <selisih>`
 5. Angka tanpa pembanding dan daftar seragam dilengkapi. → `isi: <n berpembanding>, <n keadaan>; foto: <n>`
-6. Kritik diri di screenshot. → `kritik diri: <n tersisa>, warna: <peran>`
+6. Screenshot vs 12 anti-pattern + kritik diri. → `kritik diri: <n tersisa>, warna: <peran>`
 
 Plus `konvensi: Crop n, Overlay n, Scroll n, Ekstra n`.
 

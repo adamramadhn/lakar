@@ -12,11 +12,11 @@ Mode gelap (Malam): `Object.assign(C,{bg,sub:surface,line,line2,t1,t2,t3` dari n
 - **Kartu/list:** kartu padding 16–20; sorotan di bidang merek + `Badge` metrik. Baris list 56–72: thumbnail 48–56 (wadah ikon 40 hanya untuk aksi/pengaturan), judul label + meta body-sm, keadaan di kanan (selesai = `circle-check` success, mendatang = chevron). Target sentuh ≥ 44, jarak ≥ 8.
 - **Foto:** sampul dan thumbnail isi nyata = foto; teks di atas foto diberi lapisan gelap. Visual puncak maks ±280 tinggi.
 - **Tanpa duplikasi:** satu butir tampil sekali per layar; bilah menempel memuat butir yang berjalan → sorotan memuat hal lain (berikutnya, ringkasan), daftar tidak mengulanginya.
-- **Ring/grafik** dari `ellipse` busur: jalur (`inner`, tint) + progres (`startDeg`, `sweepDeg` = persen × 360) di frame `layout:'none'`; beberapa seri = busur berurutan + legenda nilai / sasaran.
+- **Ring/grafik** dari `ellipse` busur: jalur (`inner`, tint) + progres (`startDeg`, `sweepDeg` = persen × 360) di frame `layout:'none'`; beberapa seri = satu busur per seri + legenda nilai / sasaran.
 - **Tab bar** 3–5 item: ikon 24 + label `tab`; aktif = aksen + pil tint, lainnya muted. Bilah yang menempel di atasnya = `Overlay /` lapis raised + progres tipis aksen. Mengambang = `Overlay / Tab bar` absolut (lebar 350, x 20, di atas home indicator).
 - **Bilah bawah tetap** (aksi menetap): `Overlay / Bilah bawah` padding 16 20, total + tombol 56 lebar fill, tepat di atas home indicator.
 - **Atas hidup, akhir rapi:** 844 px pertama memuat inti permintaan (aksi utama, isi kunci, awal tiap bagian). Daftar ≥ 3 butir utuh; isi terakhir berakhir 24 di atas zona bawah; tanpa kartu setengah terlihat atau judul yatim.
-- **Bidang efek** (resep `polish`): hanya onboarding, sampul, atau kartu sorotan; struktur gelombang `path` atau cincin `ellipse`.
+- **Bidang efek** (resep `polish`): di onboarding, sampul, atau kartu sorotan; struktur gelombang `path`, cincin `ellipse`, atau partikel.
 - **Home indicator** 34 (nama persis `Home indicator`), garis 134 × 5 di tengah.
 - **Tinggi board (hitung saat merencanakan):** isi muat 844 → `390 × 844`. Lebih → SATU board `390 × H`, tanpa `duplicate`, `scrollY`, atau `Scroll /`. H = 54 status bar + header + seksi + gap + 24 + zona bawah (tab bar mengambang 98, bilah aksi = tingginya + 34, tanpa zona 34), minimal 844; simpan `const H=…`. Zona dari H: `Overlay / Tab bar` y `H-98`, bilah aksi y `H-34-tinggi`, home indicator y `H-34`.
 

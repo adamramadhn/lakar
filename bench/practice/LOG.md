@@ -734,3 +734,40 @@ cacat nyata, kartu berisi teks yang terpotong rata di tepi bawah `Seksi / Hero`:
 | P9 | 14–9 | 4–3 | Lebih baik | 221,6 / 161,9, 1,37 | 0 | 0 |
 
 - Biaya iterasi $5,34; kumulatif seri $18,08 (1.24: $5,34 dari $17,50). P7 Lakar kini satu board 390×1442 dan 51 dtk lebih cepat dari iterasi 2. pen.dev P7 R1 0 → 2 karena rubrik 2.2; pen.dev P9 T 12 → 9 di juri ulang (PNG sama, variasi juri).
+
+# §2.3 Skill dipadatkan dan sidebar webapp 248 (G1 story 3)
+
+## Pemadatan skill (sesi baru, C7)
+
+Token (`estimateTokens`, total / prosa). Baseline `725a282`; seri iterasi 4 memakai `ac4961c`; sesudah review `<lihat commit story 2.3>`.
+
+| Skill | Batas (prosa / total) | Sebelum | `ac4961c` (diuji seri) | Sesudah review | Ruang sesudah |
+|---|---|---|---|---|---|
+| core | – / 4000 | 3967 / 3251 | 3571 / 2855 | 3576 / 2861 | 424 total (10,6%) |
+| polish | 3000 / 3200 | 2207 / 1818 | 2454 / 2064 | 2453 / 2064 | 747 total, 936 prosa |
+| landing | 1500 / 3500 | 3486 / 1500 | 3073 / 1087 | 3085 / 1099 | 401 prosa (26,7%), 415 total |
+| mobile | 1500 / 3500 | 3176 / 1369 | 2900 / 1093 | 2904 / 1096 | 404 prosa, 596 total |
+| webapp | 1500 / 3500 | 2825 / 930 | 2735 / 840 | 2735 / 840 | 660 prosa, 765 total |
+
+- `LIMITS` di `tests/skills.test.ts` tidak berubah. Kode contoh tidak diubah, kecuali sidebar webapp `width:240` → `248`.
+- Aturan lintas layar kini ditulis sekali. **polish:** seksi baru Bidang efek (resep lapis mesh → struktur → noise → cahaya gelap, zona tenang, kontras, panel solid; sebelumnya ditulis di core, landing, dan mobile), aturan overline maks 2 dan maks 2 "·" per baris, arg ke-6 `Badge` di permukaan gelap, kartu sederet satu tinggi (sebelumnya dua kali), dan glow (sebelumnya dua kali).
+- **core:** pointer yang duplikat dihapus (`webapp`, frasa terlarang, foto gagal, konsentris/ritme). Hex netral terang dan status kini merujuk `C` prelude (nilainya identik). Prosa dirapatkan. Prelude dan baris `Font terpasang` byte-identik.
+- **landing, mobile, webapp:** aturan yang sudah diajarkan core/polish dihapus (kontras, overline, rating, logo/wadah ikon, sorotan, foto `limit:12`, tile kategori, seri `C.data`, delta, alur ganda). Yang khas per layar tetap.
+- Sidebar webapp 240 → 248 sesuai DESIGN.md §Web app/dashboard. Contoh tetap 0/0/0 dan PNG diperiksa tanpa luberan.
+- Patch review (sesudah seri, mengembalikan kata asli): proses 6 kembali "Screenshot vs 12 anti-pattern"; landing struktur efek kembali menyebut kontur, kisi, dan partikel; mobile efek kembali menyebut partikel, dan "busur berurutan" diganti "satu busur per seri"; "·" kembali berlaku per baris (bukan hanya baris meta). Kelima patch ini mengembalikan perilaku baseline (`725a282`, sudah diuji di polish-3) dan tidak di-bench ulang.
+
+## Seri polish iterasi 4 (`bench/polish-4.md`, rubrik 2.3, pen.dev dipakai ulang dari iterasi 1): **lulus**
+
+- Perintah: `practice --series polish --iter 4 --reuse-pendev 1`. Peta reuse disesuaikan dari `P7=3,P8=1,P9=1`: iterasi 3 tidak punya run pen.dev P7 yang sah (batal di `pen-newdoc`), dan polish-3 memakai iterasi 1 untuk P7–P9. Tidak ada run pen.dev baru, MCP pencil tidak dipanggil, dan pen-desktop tidak di-restart.
+- Percobaan pertama P7 Lakar terhenti setelah ±27 dtk (baca skill + `open_doc`, belum ada board) karena proses harness mati bersama sesi subagen yang menjalankannya. Penyebabnya infrastruktur, bukan hasil desain. `--resume` mengulang run `aborted` sesuai README, dan percobaan lama disimpan harness di `bench/runs/practice-polish/4/P7-lakar.prev-20261119T033213Z` (salinan juga di `bench/runs/aborted-killed/`). Percobaan itu tidak dinilai juri. Biayanya tidak tercatat karena tidak ada event result (perkiraan < $0,10).
+
+| Prompt | polish-3 (rubrik 2.2): T L–P, D L–P, keputusan, waktu L / P (rasio), biaya L | polish-4 (rubrik 2.3): T L–P, D L–P, keputusan, waktu L / P (rasio), biaya L |
+|---|---|---|
+| P7 | 16–13, 4–4, Lebih baik, 123,3 / 97,5 (1,27), $0,77 | 15–14, 4–4, **Setara**, 89,0 / 97,5 (0,91), $0,58 |
+| P8 | 16–16, 4–4, Setara, 216,1 / 213,6 (1,01), $0,91 | 16–16, 4–4, **Setara**, 153,6 / 213,6 (0,72), $0,69 |
+| P9 | 14–9, 4–3, Lebih baik, 221,6 / 161,9 (1,37), $1,39 | 15–12, 4–4, **Lebih baik**, 204,5 / 161,9 (1,26), $1,02 |
+
+- Emoji 0 dan gate 0 di ketiga prompt. Biaya iterasi $4,50 (Lakar $2,29, juri $2,21). Kumulatif seri $22,58 dari $30,24.
+- P7 turun dari Lebih baik ke Setara. PNG pen.dev identik (iterasi 1), tetapi skornya naik 13 → 14 di juri ulang, dan T Lakar turun 16 → 15. Rubrik juga berubah 2.2 → 2.3, dan board Lakar 390×1354 sah di keduanya. Selisih ini dalam batas variasi juri. Lakar lebih cepat dan lebih murah di ketiga prompt (rata-rata −27% waktu, −25% biaya). Ini bisa karena skill lebih pendek, bisa juga karena derau run. Satu run tidak cukup untuk memisahkannya (C8).
+- Iterasi 5 tidak dijalankan karena iterasi 4 lulus.
+- Catatan C7: output `practice --dry-run` mencetak teks prompt latihan P7–P9 (argv agen), dan builder membacanya sesudah skill di-commit. Patch review sesudah itu hanya mengembalikan kata baseline, tanpa isi baru. Untuk story berikutnya: jalankan dry-run dengan output yang disaring.

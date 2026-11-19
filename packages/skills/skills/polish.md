@@ -33,7 +33,7 @@ Tempat tunggal aturan polesan untuk semua jenis layar. Tidak menambah execute: t
 - `numeric:'tabular'` untuk harga, jam, hitungan, kolom angka.
 - Tanda baca (`LC-30`): rentang memakai en dash (`09.00–10.00`, `5–10`), elipsis `…`, kutip lengkung “…” pada testimoni, spasi tak-putus ` ` antara angka dan satuan agar tidak terpisah.
 - Judul dan paragraf tidak berakhir satu kata sendirian. Satu kata berwarna/tebal di headline paling banyak sekali per halaman.
-- Overline aksen maks 2 per halaman/layar, hanya bila membawa informasi (kategori, langkah). Baris meta maks 2 "·".
+- Overline aksen maks 2 per halaman/layar, hanya bila membawa informasi (kategori, langkah). Maks 2 "·" per baris.
 
 ## Warna dan kontras
 
