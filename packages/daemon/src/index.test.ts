@@ -689,6 +689,49 @@ describe.skipIf(!browserInstalled)('check G0 (AD-8): execute + /layout-check', (
     expect(lc.body.data.summary.gate).toBeGreaterThanOrEqual(2);
   }, 60_000);
 
+  // Regresi golden (story G1 2.8, R3): desain target A, B, D dibangun ulang di Lakar; foto = byte lokal (tanpa Unsplash, AD-10).
+  describe('regresi golden A, B, D (dokumen nyata)', () => {
+    const GOLDEN = new URL('../test/fixtures/golden/', import.meta.url);
+    const cases = [
+      // Tinggi = tinggi pas hasil build (landing: bawah footer; mobile: satu board panjang ≥ 844, zona bawah menempel).
+      { file: 'A-kasku.lakar.json', board: 'Kasku / Beranda · landing · Jernih', screen: 'landing', width: 1440, height: 3954, assets: 0 },
+      { file: 'B-gerak.lakar.json', board: 'Gerak / Beranda · mobile · Malam', screen: 'mobile', width: 390, height: 1292, assets: 3 },
+      { file: 'D-singgah.lakar.json', board: 'Singgah / Checkout · mobile · Ramah', screen: 'mobile', width: 390, height: 1974, assets: 1 },
+    ];
+    beforeAll(async () => {
+      const { mkdir, copyFile } = await import('node:fs/promises');
+      await mkdir(join(dataDir, 'assets'), { recursive: true });
+      await mkdir(join(dataDir, 'docs'), { recursive: true });
+      for (const f of readdirSync(fileURLToPath(new URL('assets/', GOLDEN)))) {
+        if (/^[0-9a-f]{64}$/.test(f)) await copyFile(fileURLToPath(new URL(`assets/${f}`, GOLDEN)), join(dataDir, 'assets', f));
+      }
+    });
+    for (const c of cases) {
+      it(`${c.file}: 0 error, LC-17/18/19 = 0, satu board ${c.width} × ${c.height}, aset lokal saja`, async () => {
+        const raw = await readFile(fileURLToPath(new URL(c.file, GOLDEN)), 'utf8');
+        // Aset jarak jauh (Unsplash) tidak punya byte di store: setiap assetId harus berupa file byte di fixture.
+        const assets = [...raw.matchAll(/"assetId":\s*"([^"]*)"/g)].map((m) => m[1]!);
+        expect(assets).toHaveLength(c.assets);
+        for (const a of assets) expect(existsSync(fileURLToPath(new URL(`assets/${a}`, GOLDEN))), `aset ${a} ada di fixture`).toBe(true);
+        const slug = `golden-${c.file.slice(0, 1).toLowerCase()}`;
+        await writeFile(join(dataDir, 'docs', `${slug}.lakar.json`), raw, 'utf8');
+        const sid = await newSession();
+        expect((await call('/docs/open', { slug }, sid)).body.ok).toBe(true);
+        const boards = (await call('/boards', {}, sid)).body.data.boards as { name: string; screen: string; width: number; height: number }[];
+        expect(boards.map((b) => [b.name, b.screen, b.width, b.height])).toEqual([[c.board, c.screen, c.width, c.height]]);
+        if (c.screen === 'mobile') expect(c.height).toBeGreaterThanOrEqual(844);
+        const lc = await call('/layout-check', {}, sid);
+        expect(lc.status, JSON.stringify(lc.body.error)).toBe(200);
+        const findings = lc.body.data.findings as Parameters<typeof findingLine>[0][];
+        expect(findings.filter((f) => f.level === 'error').map(findingLine)).toEqual([]);
+        expect(findings.filter((f) => ['LC-17', 'LC-18', 'LC-19'].includes(f.rule)).map(findingLine)).toEqual([]);
+        expect(lc.body.data.summary).toMatchObject({ error: 0, gate: 0 });
+        // Dibangun dengan 0 warning; warning baru = regresi aturan atau render yang perlu diperiksa.
+        expect(findings.filter((f) => f.level === 'warning').map(findingLine)).toEqual([]);
+      }, 120_000);
+    }
+  });
+
   it('/layout-check: board tak ada → 404 NOT_FOUND + hint; body asing → 400; tanpa dokumen aktif → NO_ACTIVE_DOC', async () => {
     const r = await call('/layout-check', { boardId: 'Zzzzzzzz' }, s);
     expect(r.status).toBe(404);
