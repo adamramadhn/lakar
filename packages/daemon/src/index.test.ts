@@ -689,14 +689,17 @@ describe.skipIf(!browserInstalled)('check G0 (AD-8): execute + /layout-check', (
     expect(lc.body.data.summary.gate).toBeGreaterThanOrEqual(2);
   }, 60_000);
 
-  // Regresi golden (story G1 2.8, R3): desain target A, B, D dibangun ulang di Lakar; foto = byte lokal (tanpa Unsplash, AD-10).
-  describe('regresi golden A, B, D (dokumen nyata)', () => {
+  // Regresi golden (story G1 2.8 + 2.9, R3): desain target A–E dibangun ulang di Lakar; foto = byte lokal (tanpa Unsplash, AD-10).
+  describe('regresi golden A–E (dokumen nyata)', () => {
     const GOLDEN = new URL('../test/fixtures/golden/', import.meta.url);
     const cases = [
       // Tinggi = tinggi pas hasil build (landing: bawah footer; mobile: satu board panjang ≥ 844, zona bawah menempel).
       { file: 'A-kasku.lakar.json', board: 'Kasku / Beranda · landing · Jernih', screen: 'landing', width: 1440, height: 3954, assets: 0 },
       { file: 'B-gerak.lakar.json', board: 'Gerak / Beranda · mobile · Malam', screen: 'mobile', width: 390, height: 1292, assets: 3 },
       { file: 'D-singgah.lakar.json', board: 'Singgah / Checkout · mobile · Ramah', screen: 'mobile', width: 390, height: 1974, assets: 1 },
+      // Web app: ukuran board persis permintaan (C 1440 × 1024 sidebar 248; E 1440 × 900 sidebar 72 + panel detail).
+      { file: 'C-arus.lakar.json', board: 'Arus / Ringkasan penjualan · app · Padat', screen: 'app', width: 1440, height: 1024, assets: 0 },
+      { file: 'E-gudangku.lakar.json', board: 'Gudangku / Inventaris barang · app · Padat', screen: 'app', width: 1440, height: 900, assets: 0 },
     ];
     beforeAll(async () => {
       const { mkdir, copyFile } = await import('node:fs/promises');
