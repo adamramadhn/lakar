@@ -44,13 +44,14 @@ mengubah semuanya. `protocolHash` (byte ketiga file) tetap dicatat sebagai info.
 ## Rubrik juri (v2) dan snapshot
 
 Rubrik juri dibangun saat runtime dari DESIGN.md Lampiran B dan kriteria golden prompt protokol (`promptIds`, kini A–E;
-keduanya di-exclude git). Karena teks juri kini mencakup C–E, `rubric-snapshot` pada v2.2 gagal sebagai "isi berbeda" sampai
-snapshot v2.3 (story 2.2).
+keduanya di-exclude git). Rubrik saat ini **v2.3** (story 2.2, 2026-11-19): golden B1 = board lebar 390 dan tinggi ≥ 844
+(bukan persis 390×844); D2 = satu board panjang selebar 390 (tinggi mengikuti konten, min 844), header di atas dan bilah
+bayar menempel di bawah, bukan dua board/strip gabungan. Snapshot v1–v2.2 hanya memuat teks juri A/B dan tidak diubah.
 Riwayatnya disimpan tracked di `bench/rubric/`:
 
-- `rubric-snapshot` menulis `bench/rubric/v<ver>/{lampiran-b.md, golden-kriteria.md, judge-text-A.md, judge-text-B.md}`
-  secara eksklusif (dir sudah ada dan identik → no-op; berbeda → error, naikkan versi) dan memperbarui
-  `bench/rubric/rubric.json` `{version, date, judgeTextSha256:{A,B}, sourceSha256}`. Versi dibaca dari baris
+- `rubric-snapshot` menulis `bench/rubric/v<ver>/{lampiran-b.md, golden-kriteria.md, judge-text-<id>.md}` untuk setiap
+  `promptIds` protokol (v2.3: A–E) secara eksklusif (dir sudah ada dan identik → no-op; berbeda → error, naikkan versi) dan
+  memperbarui `bench/rubric/rubric.json` `{version, date, judgeTextSha256:{A..E}, sourceSha256}`. Versi dibaca dari baris
   `Versi rubrik: <v> (<tanggal>)` di Lampiran B; `--version` hanya untuk v1 (belum ada baris versi).
 - Rubrik v2: delapan kriteria juri (R1, R2, R4, R5, R6, R8, R9 kekayaan informasi & detail, R10 polesan warna &
   komponen), skor maks 16. Aturan keputusan v2 (`decide`): T = total median, D = R9 + R10; Kalah-daya-tarik
@@ -60,7 +61,8 @@ Riwayatnya disimpan tracked di `bench/rubric/`:
 - **Aturan ukuran mengikat (story 24):** `sizeRuleFor(<versi rubrik beku run>)`. Rubrik < 2.2 (atau tak diketahui) =
   persis. Rubrik ≥ 2.2 = untuk spesifikasi layar mobile (tinggi tetap, lebar ≤ 480) lebar sama dan tinggi ≥ yang diminta
   (satu board panjang bergulir sah); landing tetap hanya lebar, app tetap persis. Aturan yang sama dipakai untuk gerbang
-  Lakar dan pelanggaran brief pen.dev (simetris). Versi diambil dari `frozen.json` run (putaran: `judge.rubricVersion`,
+  Lakar dan pelanggaran brief pen.dev (simetris). Golden B1/D2 v2.3 sejalan dengan aturan ini (tes `lakar.test.ts`); gerbang
+  ukuran tidak menghitung jumlah board, jadi D2 (satu board panjang) dinilai juri lewat R1. Versi diambil dari `frozen.json` run (putaran: `judge.rubricVersion`,
   latihan: `rubric.version`; `rejudge`: versi beku putaran sumber), jadi laporan lama yang di-render ulang tidak bergeser.
 - **Penjaga sha:** setiap laporan `round`/`rejudge` mencatat versi rubrik dan sha256 teks juri per prompt; teks juri
   juga disalin ke `<run>/judge/<prompt>/judge-text.md`. Putaran resmi di-abort (`officialFreezeProblems`) dan
@@ -182,8 +184,9 @@ Putaran A/B lama (G0) memakai `decideG0` dan dirender ulang tanpa perubahan. Put
   (a) input agen, (b) LC-01a + LC-01b, (c) median juri = 0, dan rasio waktu ≤ 1,5 di semua prompt; gagal bila ada emoji > 0,
   rasio > 1,5, atau jumlah itu tidak bisa tercapai lagi walau prompt yang belum pasti berakhir Lebih baik (mis. 2 Kalah);
   selebihnya (prompt hilang/tidak dapat dinilai yang masih bisa mengubah hasil, waktu/emoji tak terukur) → tidak dapat diputuskan.
-- `rejudge` membangun dan mengecek sha teks juri hanya untuk prompt putaran sumber (A/B untuk putaran G0), jadi teks juri C–E
-  yang belum di-snapshot tidak memblokirnya. Putaran A–E resmi tetap mewajibkan sha teks juri A–E = `bench/rubric/rubric.json`. Strip Lakar disalin ke `bench/round-<n>/<prompt>-lakar.png` (tracked, eksklusif); strip dan `.pen`
+- `rejudge` membangun dan mengecek sha teks juri hanya untuk prompt putaran sumber (A/B untuk putaran G0); sejak v2.3
+  (story 2.2) teks juri A–E sudah di-snapshot. `rejudge` tetap memakai aturan ukuran versi beku putaran sumber untuk
+  pelanggaran brief pen.dev (mis. round-2 = v2.1 → persis). Putaran A–E resmi tetap mewajibkan sha teks juri A–E = `bench/rubric/rubric.json`. Strip Lakar disalin ke `bench/round-<n>/<prompt>-lakar.png` (tracked, eksklusif); strip dan `.pen`
 pen.dev tetap lokal di `bench/runs/rounds/<n>/` (EULA, tidak di-commit).
 Putaran resmi ≥ 2 menulis skor ke `bench/round-<n>/score-<prompt>.md|json` agar bukti juri putaran 1
 (`bench/score-<prompt>.*`, dirujuk `bench/round-1.md`) tidak tertimpa. Laporan juga memuat rasio wall pen.dev putaran

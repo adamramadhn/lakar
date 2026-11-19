@@ -71,7 +71,8 @@ describe('teks juri', () => {
   it.skipIf(!HAVE_SOURCES && process.env.LAKAR_C7_ALLOW_MISSING_SOURCES === '1')('teks juri nyata: rubrik 8 kriteria, slop 12, prompt tanpa pembungkus, tanpa [G], tanpa nama alat', () => {
     const design = readFileSync(DESIGN_MD_PATH, 'utf8');
     const golden = readFileSync(GOLDEN_SET_PATH, 'utf8');
-    for (const id of ['A', 'B'] as const) {
+    expect(protocol.config.promptIds).toEqual(['A', 'B', 'C', 'D', 'E']);
+    for (const id of protocol.config.promptIds) {
       const t = buildJudgeText(design, golden, id, protocol.prompts[id]);
       expect(judgeLeaks(t.text)).toEqual([]);
       expect(t.text).toContain(protocol.prompts[id]);
@@ -281,7 +282,7 @@ describe('rubrik v2 (snapshot tracked bench/rubric/)', () => {
     const targets = c7Targets(protocol);
     for (const n of ['packages/mcp/src/server.ts', 'bench/protocol/wrapper.txt', 'prompt agen A (hasil render)', 'prompt agen B (hasil render)']) expect(targets.map((t) => t.name)).toContain(n);
     expect(targets.some((t) => t.name.startsWith('packages/skills/skills/'))).toBe(true);
-    for (const id of ['A', 'B']) {
+    for (const id of Object.keys(RUBRIC!.judgeTextSha256)) {
       const secret = secretOf(readFileSync(join(RUBRIC_V, `judge-text-${id}.md`), 'utf8'));
       expect(secret).toContain('| R9 |');
       expect(judgeC7Problems(secret, targets)).toEqual([]);
@@ -289,7 +290,9 @@ describe('rubrik v2 (snapshot tracked bench/rubric/)', () => {
   });
 
   it('(d) sha256 judge-text-*.md snapshot = rubric.json; teks juri saat ini = snapshot', () => {
-    for (const id of ['A', 'B']) {
+    expect(Object.keys(RUBRIC!.judgeTextSha256).sort()).toEqual([...protocol.config.promptIds].sort());
+    expect(readdirSync(RUBRIC_V).sort()).toEqual(['golden-kriteria.md', ...protocol.config.promptIds.map((id) => `judge-text-${id}.md`), 'lampiran-b.md'].sort());
+    for (const id of protocol.config.promptIds) {
       const text = readFileSync(join(RUBRIC_V, `judge-text-${id}.md`), 'utf8');
       expect(sha256(text), id).toBe(RUBRIC!.judgeTextSha256[id]);
       expect(judgeLeaks(text)).toEqual([]);
@@ -298,13 +301,35 @@ describe('rubrik v2 (snapshot tracked bench/rubric/)', () => {
     if (HAVE_SOURCES) {
       const design = readFileSync(DESIGN_MD_PATH, 'utf8');
       const golden = readFileSync(GOLDEN_SET_PATH, 'utf8');
-      for (const id of ['A', 'B'] as const) {
+      for (const id of protocol.config.promptIds) {
         const t = buildJudgeText(design, golden, id, protocol.prompts[id]);
         expect(t.text, `teks juri ${id} berubah tanpa rubric-snapshot`).toBe(readFileSync(join(RUBRIC_V, `judge-text-${id}.md`), 'utf8'));
         expect(t.text).toContain(t.secret);
       }
       expect(lampiranB(design)).toBe(readFileSync(join(RUBRIC_V, 'lampiran-b.md'), 'utf8'));
     }
+  });
+
+  it('v2.2 beku (A/B, sha lama); v2.3 = golden B1 lebar 390 × tinggi ≥ 844 dan D2 satu board panjang', () => {
+    const v22 = join(BENCH_ROOT, 'rubric', 'v2.2');
+    expect(readdirSync(v22).sort()).toEqual(['golden-kriteria.md', 'judge-text-A.md', 'judge-text-B.md', 'lampiran-b.md']);
+    expect(sha256(readFileSync(join(v22, 'judge-text-A.md'), 'utf8'))).toBe('e3213b0bfccaf09eaab9d317ede5b961a1081b67feaf748e2d60474bb95aa7d7');
+    expect(sha256(readFileSync(join(v22, 'judge-text-B.md'), 'utf8'))).toBe('e098f100c8561f809ac6c238fd701d62bd8b2777145c148e414685ec73891e06');
+    expect(sha256(readFileSync(join(v22, 'lampiran-b.md'), 'utf8'))).toBe('4d228aa68e7c2026cbe40744b0809656cc73a49e99f17ac297cf9a9075d3b0a2');
+    expect(sha256(readFileSync(join(v22, 'golden-kriteria.md'), 'utf8'))).toBe('46de49e3a77602a39cf33bf45dbade5da155c73544c9e92b8ae1d90211cb7d5b');
+    const v23 = join(BENCH_ROOT, 'rubric', 'v2.3');
+    expect(rubricVersionOf(readFileSync(join(v23, 'lampiran-b.md'), 'utf8'))).toEqual({ version: '2.3', date: '2026-11-19' });
+    const gk = readFileSync(join(v23, 'golden-kriteria.md'), 'utf8');
+    expect(gk).toContain('1. [R1] Board lebar 390 dan tinggi ≥ 844, status bar 54, dan home indicator.');
+    expect(gk).toMatch(/^2\. \[R1\] Isi melebihi 844 → satu board panjang selebar 390 \(tinggi mengikuti konten, minimal 844\), header di atas dan bilah bayar menempel di bawah board; bukan dua board/m);
+    expect(gk).not.toMatch(/persis 390×844|board posisi awal|digabung menjadi satu strip/);
+    const jb = readFileSync(join(v23, 'judge-text-B.md'), 'utf8');
+    expect(jb).toContain('1. [R1] Artboard lebar 390 dan tinggi ≥ 844, status bar 54, dan home indicator.');
+    const jd = readFileSync(join(v23, 'judge-text-D.md'), 'utf8');
+    expect(jd).toContain('satu artboard panjang selebar 390 (tinggi mengikuti konten, minimal 844)');
+    expect(jd).not.toMatch(/posisi awal|digabung menjadi satu strip/);
+    // Teks juri A tidak bergantung pada B1/D2: sha A v2.3 = v2.2.
+    expect(readFileSync(join(v23, 'judge-text-A.md'), 'utf8')).toBe(readFileSync(join(v22, 'judge-text-A.md'), 'utf8'));
   });
 
   it('snapshot eksklusif: baru → ditulis; identik → no-op; berbeda → error; versi wajib/cocok', () => {
