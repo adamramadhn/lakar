@@ -114,6 +114,8 @@ blocked_reason: "seri polish iterasi 3 tidak bisa jalan: batas paket pen.dev (MC
 - Verifikasi key nyata: `photo_search "chef portrait"` lewat lakard → `unsplash`, 3 hasil, tanpa fallbackReason; `/status` hanya `keyFile: present`; grep isi key (dibaca ke variabel, tidak dicetak) di repo (termasuk `bench/runs`), `~/.local/share/lakar`, dan journal lakard = 0.
 - Rubrik 2.2: sha256 Lampiran B `4d228aa68e7c2026cbe40744b0809656cc73a49e99f17ac297cf9a9075d3b0a2`; teks juri A `e3213b0bfccaf09eaab9d317ede5b961a1081b67feaf748e2d60474bb95aa7d7`, B `e098f100c8561f809ac6c238fd701d62bd8b2777145c148e414685ec73891e06`; latihan P7 `610fe324…`, P8 `8ef484ce…`, P9 `a8ed7128…` (lengkap di LOG.md). Cadangan DESIGN.md sebelum edit: scratchpad sesi (`DESIGN.md.bak-1.24`).
 
+- Keputusan Adam (2026-11-19, lewat orkestrator): batas paket pen.dev tercapai, sehingga rencana awal (rerun pen.dev P7) tidak bisa dijalankan. Seri polish iterasi 3 memakai ulang pen.dev iterasi 1 untuk P7, P8, dan P9 (`--reuse-pendev 1`). P7 pen.dev 390×1177 sah di rubrik 2.2; patokan waktu P7 tetap 97,5 dtk (target Lakar ≤ 146 dtk). Tanpa run pen.dev baru dan tanpa memanggil MCP pencil. Pilihan harness: `--iter 3 --resume` (iterasi 3 yang dibatalkan belum punya run Lakar/juri dan biaya $0, jadi tidak ada run yang diulang; C8 utuh). Batas 1.24 tetap: maks 3 iterasi (3–5), $17,50.
+
 ## Plan Change Log
 
 - 2026-11-19 (implementer): commit tahap skill dan foto digabung (`73bfa5e`) karena tes daemon/MCP yang sama memuat perubahan keduanya; check, bench, dan rubrik tetap commit terpisah.

@@ -719,3 +719,8 @@ cacat nyata, kartu berisi teks yang terpotong rata di tepi bawah `Seksi / Hero`:
 - Perintah: `practice --series polish --iter 3 --reuse-pendev P8=1,P9=1` (HEAD `e14f0d1`, rubrik 2.2). Run pen.dev P7 baru gagal di `pen-newdoc`: MCP pencil menjawab bahwa batas pemakaian paket pen.dev periode tagihan ini tercapai dan semua tool desain diblokir. Harness berhenti sebelum run Lakar dan juri; biaya iterasi $0,00 (kumulatif seri tetap $12,74 dari $30,24).
 - Tidak ada upaya mengakali batas itu (tanpa menyentuh `.pen` di disk). Penjaga md5: 48 `.pen` lama tidak berubah atau hilang; 1 file baru dari percobaan newdoc. Restart pen-desktop dicoba harness (service active, MCP pencil tetap menjawab batas paket). lakard active.
 - Butuh keputusan Adam/orkestrator: upgrade paket pen.dev lalu `--iter 3 --resume`, atau ganti rencana (mis. pakai ulang pen.dev P7 iterasi 1 — 390×1177 kini sah di rubrik 2.2 — dengan `--reuse-pendev 1`).
+
+### Keputusan Adam: iterasi 3 memakai ulang pen.dev iterasi 1 (2026-11-19)
+
+- Karena batas paket pen.dev tercapai, rencana awal (rerun pen.dev P7) tidak bisa dijalankan. Atas keputusan Adam, iterasi 3 memakai ulang pen.dev iterasi 1 untuk P7–P9 (`--reuse-pendev 1`). P7 pen.dev 390×1177 sah menurut rubrik 2.2, dan patokan waktu P7 tetap 97,5 dtk (target Lakar ≤ 146 dtk). MCP pencil tidak dipanggil.
+- Pilihan harness: `--iter 3 --resume`. Iterasi 3 yang dibatalkan belum menjalankan Lakar atau juri (biaya $0), jadi tidak ada run yang diulang dan C8 tetap utuh. Laporan `polish-3` yang dibatalkan ditimpa oleh hasil resume; versi dibatalkannya ada di commit `7c0f29c`.
