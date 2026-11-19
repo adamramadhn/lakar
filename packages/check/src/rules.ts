@@ -1,5 +1,21 @@
 // Aturan G0 (AD-8): satu fungsi per aturan. Masukan: board ter-resolve + hasil ukur render. Murni.
-import { G0_RULES, type Finding, type ResolvedDocument, type ResolvedFill, type ResolvedTextNode as TextNode } from '@lakar/schema';
+import {
+  COMPONENT_SIZES,
+  DISPLAY_SIZES,
+  G0_RULES,
+  HOME_INDICATOR_INSET,
+  KPI_LINE_HEIGHT_RATIO,
+  KPI_SIZES,
+  PARAGRAPH_MIN,
+  PARAGRAPH_MIN_IN_CARD,
+  SPACING_VALUES,
+  TOUCH_MIN,
+  TYPE_SCALE,
+  type Finding,
+  type ResolvedDocument,
+  type ResolvedFill,
+  type ResolvedTextNode as TextNode,
+} from '@lakar/schema';
 import { cpLabel, codePoints, emojiIn, GLYPH_ICON, leadingIconGlyph } from './glyphs.js';
 import {
   ancestors,
@@ -1387,6 +1403,181 @@ export function lc30(ctx: BoardContext): Finding[] {
     const m = RANGE_HYPHEN.exec(t.content);
     if (m) issues.push(`tanda hubung di rentang ${JSON.stringify(m[0])} (pakai "–")`);
     if (issues.length) out.push(finding('LC-30', 'warning', t, `${issues.join('; ')} di ${quote(t.content)}`, 'en dash untuk rentang (09.00–10.00), karakter … untuk elipsis'));
+  }
+  return out;
+}
+
+// ===========================================================================
+// Tipografi dan spacing (story G1 5): LC-03, LC-06, LC-07, LC-08, LC-09, LC-10 (warning). Angka dari design-tokens.
+// ===========================================================================
+
+/** Komponen kecil: isinya bukan paragraf (LC-06) dan tingginya dinilai terhadap token (LC-07). */
+const SMALL_COMPONENTS = ['Button /', 'IconButton /', 'Badge /', 'Chip /', 'Tab /', 'Link /', 'Input /', 'Radio /', 'Checkbox /', 'Stepper /'];
+/** Kontrol persegi: lebar juga dinilai (LC-07). */
+const SQUARE_CONTROLS = ['IconButton /', 'Checkbox /', 'Radio /'];
+/** Komponen interaktif yang dinilai target sentuhnya (LC-10). */
+const TOUCH_COMPONENTS = ['Button /', 'IconButton /', 'Tab /', 'Input /', 'Radio /', 'Checkbox /', 'Stepper /', 'Link /'];
+const namedAny = (n: { name: string }, prefixes: readonly string[]): boolean => prefixes.some((p) => named(n, p));
+const ancestorFrames = (ctx: BoardContext, n: ChildNode): FrameNode[] => ancestors(ctx, n).filter((a): a is FrameNode => a.type === 'frame');
+const visibleTexts = (ctx: BoardContext): TextNode[] => texts(ctx).filter((t) => nonEmpty(t) && visibleRect(ctx, t) !== undefined);
+
+// ---------------------------------------------------------------------------
+// LC-03 · teks tetap berisiko meluber (warning)
+// ---------------------------------------------------------------------------
+
+/** Ink melewati kotak teks (kiri/kanan) atau tinggi baris melewati tinggi kotak > 1 px. */
+export const TEXT_BOX_OVERFLOW_MIN = 1;
+
+export function lc03(ctx: BoardContext): Finding[] {
+  const out: Finding[] = [];
+  const expected = `wrap:'wrap' dengan lebar fill/angka, atau beri ruang`;
+  for (const t of visibleTexts(ctx)) {
+    const tm = ctx.textMeasure.get(t.id);
+    if (t.wrap === 'fixed' && tm && tm.lines >= 2) {
+      out.push(finding('LC-03', levelOf('LC-03'), t, clip120(`wrap fixed: ${tm.lines} baris terukur di ${quote(t.content)}`), expected));
+      continue;
+    }
+    const b = ctx.bounds.get(t.id);
+    if (!b) continue;
+    const ink = ctx.ink.get(t.id);
+    const ox = ink ? Math.max(b.x - ink.x, right(ink) - right(b)) : 0;
+    if (ox > TEXT_BOX_OVERFLOW_MIN) {
+      out.push(finding('LC-03', levelOf('LC-03'), t, clip120(`teks melewati kotaknya ${num(ox)}px (wrap ${t.wrap ?? 'auto'}) di ${quote(t.content)}`), expected));
+      continue;
+    }
+    if (tm && tm.lines * tm.lineHeight > b.height + TEXT_BOX_OVERFLOW_MIN) {
+      out.push(
+        finding('LC-03', levelOf('LC-03'), t, clip120(`${tm.lines} baris × ${num(tm.lineHeight)} > tinggi kotak ${num(b.height)} di ${quote(t.content)}`), expected),
+      );
+    }
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+// LC-06 · paragraf di bawah minimum (warning)
+// ---------------------------------------------------------------------------
+
+/** Paragraf = ≥ 2 baris terukur, ≥ 6 kata, bobot < 600. */
+export const PARAGRAPH_MIN_WORDS = 6;
+const PARAGRAPH_MAX_WEIGHT = 600;
+
+export function lc06(ctx: BoardContext): Finding[] {
+  const out: Finding[] = [];
+  for (const t of visibleTexts(ctx)) {
+    const lines = ctx.textMeasure.get(t.id)?.lines ?? 0;
+    if (lines < 2 || (t.weight ?? 400) >= PARAGRAPH_MAX_WEIGHT) continue;
+    if (t.content.trim().split(/\s+/).length < PARAGRAPH_MIN_WORDS) continue;
+    const frames = ancestorFrames(ctx, t);
+    if (namedAny(t, SMALL_COMPONENTS) || frames.some((a) => namedAny(a, SMALL_COMPONENTS))) continue;
+    const inCard = frames.some((a) => paintedCard(a));
+    const min = inCard ? PARAGRAPH_MIN_IN_CARD : PARAGRAPH_MIN[ctx.board.screen];
+    if (t.size >= min) continue;
+    const where = inCard ? 'di kartu' : `di board ${ctx.board.screen}`;
+    out.push(finding('LC-06', levelOf('LC-06'), t, clip120(`paragraf ${num(t.size)}px ${lines} baris ${where}: ${quote(t.content)}`), `≥ ${min}px (body${inCard ? '-sm di kartu' : ''})`));
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+// LC-07 · spacing dan ukuran komponen di luar himpunan token (warning)
+// ---------------------------------------------------------------------------
+
+const CHROME_FRAMES = ['Status bar', 'Home indicator'];
+const componentSizeOk = (v: number): boolean => SPACING_VALUES.has(v) || COMPONENT_SIZES.includes(v);
+
+export function lc07(ctx: BoardContext): Finding[] {
+  const out: Finding[] = [];
+  for (const n of ctx.nodes) {
+    if (n.type !== 'frame') continue;
+    if (namedAny(n, CHROME_FRAMES) || ancestorFrames(ctx, n).some((a) => namedAny(a, CHROME_FRAMES))) continue;
+    const bad: string[] = [];
+    if (typeof n.gap === 'number' && n.gap >= 0 && !SPACING_VALUES.has(n.gap)) bad.push(`gap ${num(n.gap)}`);
+    const p = paddingOf(n);
+    const pads = [p.t, p.r, p.l, ...(p.b === HOME_INDICATOR_INSET ? [] : [p.b])];
+    const off = [...new Set(pads.filter((v) => !SPACING_VALUES.has(v)))];
+    if (off.length) bad.push(`padding ${off.map(num).join('/')}`);
+    if (namedAny(n, SMALL_COMPONENTS)) {
+      if (typeof n.height === 'number' && !componentSizeOk(n.height)) bad.push(`height ${num(n.height)}`);
+      if (namedAny(n, SQUARE_CONTROLS) && typeof n.width === 'number' && !componentSizeOk(n.width)) bad.push(`width ${num(n.width)}`);
+    }
+    if (bad.length) out.push(finding('LC-07', levelOf('LC-07'), n, clip120(bad.join(', ')), 'token spacing 0/2/4/6/8/12/16/20/24/32/40/48/64/80/96/128; komponen juga 44/56'));
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+// LC-08 · ukuran di luar skala atau triple tidak cocok (warning)
+// ---------------------------------------------------------------------------
+
+/** Toleransi line-height terhadap token (px). */
+export const LINE_HEIGHT_TOL = 0.5;
+const SCALE = Object.values(TYPE_SCALE);
+const SCALE_SIZES: ReadonlySet<number> = new Set(SCALE.map((t) => t.size));
+
+export function lc08(ctx: BoardContext): Finding[] {
+  const out: Finding[] = [];
+  const expected = 'skala tipe DESIGN.md (TY): mis. 12/16, 14/20, 16/24, 18/28, 20/28, 24/32';
+  for (const t of visibleTexts(ctx)) {
+    // < 12px sudah error LC-05; tidak dilaporkan ganda.
+    if (t.size < MIN_TEXT_SIZE) continue;
+    const lh = t.lineHeight ?? ctx.textMeasure.get(t.id)?.lineHeight;
+    const triple = `${num(t.size)}/${lh === undefined ? '?' : num(lh)}`;
+    const kpi = named(t, 'KPI / Nilai');
+    if (named(t, 'Display /')) {
+      if (!SCALE_SIZES.has(t.size) && !DISPLAY_SIZES.includes(t.size)) out.push(finding('LC-08', levelOf('LC-08'), t, `${triple} di luar skala`, `Display: skala tipe atau ${DISPLAY_SIZES.join('/')}`));
+      continue;
+    }
+    const tokens = [...new Set(SCALE.filter((s) => s.size === t.size).map((s) => s.lineHeight))];
+    const fits = (x: number) => lh !== undefined && Math.abs(x - lh) <= LINE_HEIGHT_TOL;
+    if (kpi && KPI_SIZES.includes(t.size)) {
+      // KPI: size × 1,2, atau triple skala tipe berukuran sama (mis. 28/36, 32/40) juga sah.
+      const want = t.size * KPI_LINE_HEIGHT_RATIO;
+      if (lh !== undefined && !fits(want) && !tokens.some(fits)) {
+        out.push(finding('LC-08', levelOf('LC-08'), t, `${triple} (KPI ${[num(want), ...tokens.map(num)].map((x) => `${num(t.size)}/${x}`).join(' atau ')})`, `KPI / Nilai: line-height = size × ${KPI_LINE_HEIGHT_RATIO} atau token skala`));
+      }
+      continue;
+    }
+    if (!SCALE_SIZES.has(t.size)) {
+      out.push(finding('LC-08', levelOf('LC-08'), t, `${triple} di luar skala`, kpi ? `KPI / Nilai: ${KPI_SIZES.join('/')} atau skala tipe` : expected));
+      continue;
+    }
+    if (lh !== undefined && !tokens.some(fits)) {
+      out.push(finding('LC-08', levelOf('LC-08'), t, `${triple} (token ${tokens.map((x) => `${num(t.size)}/${x}`).join(' atau ')})`, expected));
+    }
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+// LC-09 · lebih dari 2 keluarga font (warning)
+// ---------------------------------------------------------------------------
+
+export const MAX_FONT_FAMILIES = 2;
+/** Keluarga default renderer bila `family` tidak diisi. */
+const DEFAULT_FAMILY = 'Inter';
+
+export function lc09(ctx: BoardContext): Finding[] {
+  const fams = [...new Set(visibleTexts(ctx).map((t) => t.family ?? DEFAULT_FAMILY))].filter((f) => !/mono/i.test(f));
+  if (fams.length <= MAX_FONT_FAMILIES) return [];
+  return [finding('LC-09', levelOf('LC-09'), ctx.board, clip120(`${fams.length} keluarga font: ${fams.join(', ')}`), `≤ ${MAX_FONT_FAMILIES} keluarga (judul + isi); mono hanya untuk kode/SKU`)];
+}
+
+// ---------------------------------------------------------------------------
+// LC-10 · target sentuh kecil di board mobile (warning)
+// ---------------------------------------------------------------------------
+
+/** Board mobile = `screen:'mobile'` dengan lebar terukur ≤ 430 (bukan tablet). */
+export const MOBILE_MAX_WIDTH = 430;
+
+export function lc10(ctx: BoardContext): Finding[] {
+  if (ctx.board.screen !== 'mobile' || ctx.boardRect.width > MOBILE_MAX_WIDTH) return [];
+  const out: Finding[] = [];
+  for (const n of ctx.nodes) {
+    if (!namedAny(n, TOUCH_COMPONENTS) || !visibleRect(ctx, n)) continue;
+    const b = ctx.bounds.get(n.id)!;
+    if (b.width >= TOUCH_MIN - TOLERANCE && b.height >= TOUCH_MIN - TOLERANCE) continue;
+    out.push(finding('LC-10', levelOf('LC-10'), n, `${num(b.width)}×${num(b.height)} < ${TOUCH_MIN}×${TOUCH_MIN}`, `target sentuh ≥ ${TOUCH_MIN}×${TOUCH_MIN}: perbesar tinggi/lebar atau padding`));
   }
   return out;
 }

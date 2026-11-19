@@ -590,10 +590,10 @@ describe.skipIf(!browserInstalled)('check G0 (AD-8): execute + /layout-check', (
   const file = () => join(dataDir, 'docs', `${slug}.lakar.json`);
   const FIXTURE = `
     const b = add(null, {type:'board', name:'Home · mobile', x:0, y:0, width:390, height:800, screen:'mobile'});
-    add(b, {type:'text', name:'Sapaan', content:'Halo 👋', size:16});
-    add(b, {type:'text', name:'Rating', content:'★★★★★', size:16});
+    add(b, {type:'text', name:'Sapaan', content:'Halo 👋', size:16, lineHeight:24});
+    add(b, {type:'text', name:'Rating', content:'★★★★★', size:16, lineHeight:24});
     add(b, {type:'text', name:'Caption', content:'Catatan kecil', size:11});
-    add(b, {type:'text', name:'Hak cipta', content:'© 2026 Kopi', size:12});
+    add(b, {type:'text', name:'Hak cipta', content:'© 2026 Kopi', size:12, lineHeight:16});
     const k = add(b, {type:'frame', name:'Kartu', width:200, height:40, clip:true});
     add(k, {type:'rect', name:'Lebar', width:260, height:20, fills:[{type:'solid', color:'#DDDDDD'}]});
     const c = add(b, {type:'frame', name:'Konten', layout:'column', width:390});
@@ -701,7 +701,7 @@ describe.skipIf(!browserInstalled)('check G0 (AD-8): execute + /layout-check', (
   it('board bersih: summary 0, findings [], bounds = board + node baru; get() saja → tanpa check/bounds', async () => {
     const r = await call(
       '/execute',
-      { code: `const b = add(null, {type:'board', name:'Bersih', x:500, y:0, width:390, height:844, screen:'mobile'}); add(b, {type:'text', name:'Judul', content:'Kopi pagi', size:24}); b`, description: 'board bersih tanpa temuan' },
+      { code: `const b = add(null, {type:'board', name:'Bersih', x:500, y:0, width:390, height:844, screen:'mobile'}); add(b, {type:'text', name:'Judul', content:'Kopi pagi', size:24, lineHeight:32}); b`, description: 'board bersih tanpa temuan' },
       s,
     );
     expect(r.status, JSON.stringify(r.body.error)).toBe(200);
@@ -711,7 +711,7 @@ describe.skipIf(!browserInstalled)('check G0 (AD-8): execute + /layout-check', (
     expect(ro.body.data).toEqual({ docId: r.body.data.docId, rev: r.body.data.rev, created: [], value: 'Bersih' });
     // update satu node → bounds memuat board + node yang berubah
     const judul = r.body.data.created[1].id;
-    const u = await call('/execute', { code: `update('${judul}', {size: 28})`, description: 'perbesar judul board bersih' }, s);
+    const u = await call('/execute', { code: `update('${judul}', {size: 28, lineHeight: 36})`, description: 'perbesar judul board bersih' }, s);
     expect(Object.keys(u.body.data.bounds)).toEqual([r.body.data.value, judul]);
   }, 60_000);
 
@@ -769,8 +769,8 @@ describe.skipIf(!browserInstalled)('check G0 (AD-8): execute + /layout-check', (
     const before = await readFile(path, 'utf8');
     const code = `
       const b = add(null, {type:'board', name:'Campur', x:500, y:0, width:390, height:844, screen:'mobile'});
-      add(b, {type:'text', name:'Favorit', content:'❤️ Favorit', size:16});
-      add(b, {type:'text', name:'Suka', content:'Suka ❤', size:16});
+      add(b, {type:'text', name:'Favorit', content:'❤️ Favorit', size:16, lineHeight:24});
+      add(b, {type:'text', name:'Suka', content:'Suka ❤', size:16, lineHeight:24});
       b`;
     const r = await call('/execute', { code, description: 'emoji dan glyph sama di satu board' }, sid);
     expect(r.status, JSON.stringify(r.body)).toBe(422);
@@ -825,8 +825,8 @@ describe.skipIf(!browserInstalled)('check G0 (AD-8): execute + /layout-check', (
       for (let i = 0; i < 30; i++) {
         const row = add(list, {type:'frame', name:'Baris ' + i, layout:'row', gap:8, padding:[4, 16], width:'fill', align:'center'});
         add(row, {type:'icon', lib:'lucide', icon:'coffee', size:20});
-        keep.items.push(add(row, {type:'text', name:'Nama', content:'Kopi susu ' + i, size:14}));
-        add(row, {type:'text', name:'Harga', content:'Rp 25.000', size:13, color:'#555555'});
+        keep.items.push(add(row, {type:'text', name:'Nama', content:'Kopi susu ' + i, size:14, lineHeight:20}));
+        add(row, {type:'text', name:'Harga', content:'Rp 25.000', size:12, lineHeight:16, color:'#555555'});
         add(row, {type:'rect', name:'Garis', width:40, height:1, fills:[{type:'solid', color:'#E5E5E5'}]});
       }
       b`;
@@ -1035,7 +1035,7 @@ describe('font lokal (registry + FONT_MISSING)', () => {
     expect(arrow.message).toContain('U+2192');
     expect(arrow.hint).toContain('Inter');
     expect(arrow.hint).toMatch(/node icon/);
-    const cmd = await expectFontMissing(`add(b,{type:'text',name:'Pintasan',content:'⌘K cari',size:14})`, 'Pintasan');
+    const cmd = await expectFontMissing(`add(b,{type:'text',name:'Pintasan',content:'⌘K cari',size:14,lineHeight:20})`, 'Pintasan');
     expect(cmd.message).toContain('U+2318');
     const heart = await expectFontMissing(`add(b,{type:'text',name:'Suka',content:'Suka ❤',size:14})`, 'Suka');
     expect(heart.message).toContain('U+2764');

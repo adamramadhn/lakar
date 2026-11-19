@@ -64,14 +64,26 @@ async function runBlock(label: string, code: string, sid: string, prelude: strin
 }
 
 /**
- * Warning aturan struktural G1 (story 4, LC-21) yang dipicu contoh skill dan menunggu story 2.10 (skill tidak diubah di
- * story 4, C7): aturan + nama node yang diketahui + awal detail per file skill. Temuan lain (termasuk pola sejenis di node
- * lain) tetap gagal.
+ * Warning aturan G1 yang dipicu contoh skill dan menunggu story 2.10 (skill tidak diubah di story 4/5, C7): aturan + nama
+ * node yang diketahui + awal detail per file skill. Temuan lain (termasuk pola sejenis di node lain) tetap gagal.
+ * Story 4: LC-21. Story 5: LC-10 `Link / Semua` (mobile.md), LC-07 padding 10 sidebar (webapp.md), LC-08 `Judul` tanpa
+ * lineHeight / 16/20 (api.md).
  */
 const PENDING_2_10: Record<string, { rule: string; node: RegExp; detail: string }[]> = {
   'landing.md': [{ rule: 'LC-21', node: /^Baris \/ (Kafe Teras, Bandung|Ruang Seduh, Jakarta|Pojok Arang, Bogor)$/, detail: 'teks di baris tabel: 3 teks langsung di baris (3 baris sejajar di Daftar)' }],
-  'mobile.md': [{ rule: 'LC-21', node: /^\[WIP\] Tutur \/ Beranda · mobile · Ramah$/, detail: 'radius: 4 nilai (8, 16, 20, 24)' }],
-  'webapp.md': [{ rule: 'LC-21', node: /^Header tabel$/, detail: 'teks di baris tabel: 3 teks langsung di baris (7 baris sejajar di Kartu / Siap diambil)' }],
+  'mobile.md': [
+    { rule: 'LC-21', node: /^\[WIP\] Tutur \/ Beranda · mobile · Ramah$/, detail: 'radius: 4 nilai (8, 16, 20, 24)' },
+    { rule: 'LC-10', node: /^Link \/ Semua$/, detail: '82.2×20 < 44×44' },
+  ],
+  'webapp.md': [
+    { rule: 'LC-21', node: /^Header tabel$/, detail: 'teks di baris tabel: 3 teks langsung di baris (7 baris sejajar di Kartu / Siap diambil)' },
+    { rule: 'LC-07', node: /^(Grup label|Nav \/ (Ringkasan|Pesanan|Antar-jemput|Pendapatan|Pelanggan))$/, detail: 'padding 10' },
+  ],
+  'api.md': [
+    { rule: 'LC-08', node: /^Judul$/, detail: '32/39 (token 32/40)' },
+    { rule: 'LC-08', node: /^Judul$/, detail: '40/49 (token 40/48)' },
+    { rule: 'LC-08', node: /^Judul$/, detail: '16/20 (token 16/24)' },
+  ],
 };
 
 async function savePngs(slug: string, sid: string): Promise<void> {

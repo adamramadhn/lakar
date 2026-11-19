@@ -747,13 +747,13 @@ describe('round --resume dengan hasil juri rubrik lama', () => {
 });
 
 describe('daftar aturan R3/R7 yang belum dihitung diturunkan dari G0_RULES', () => {
-  it('G0_RULES saat ini: LC-11, LC-13, LC-14, LC-18, LC-21 sudah ada', () => {
-    expect(r3r7Missing()).toBe('aturan LC-03/06/07/17 belum ada di `G0_RULES`.');
+  it('G0_RULES saat ini: LC-03, LC-06, LC-07, LC-11, LC-13, LC-14, LC-18, LC-21 sudah ada', () => {
+    expect(r3r7Missing()).toBe('aturan LC-17 belum ada di `G0_RULES`.');
   });
   it('laporan memakai G0_RULES beku putaran (pra-1.23 tanpa LC-11/LC-18); tidak terbaca → aturan saat ini', () => {
     const pre = JSON.stringify({ 'LC-01a': {}, 'LC-02a': {}, 'LC-05': {}, 'LC-12': {}, 'LC-20': {} });
     expect(r3r7Missing(frozenG0Rules(pre))).toBe('aturan LC-03/06/07/11/13/14/17/18/21 belum ada di `G0_RULES`.');
-    for (const bad of [undefined, '[]', 'bukan json']) expect(r3r7Missing(frozenG0Rules(bad))).toBe('aturan LC-03/06/07/17 belum ada di `G0_RULES`.');
+    for (const bad of [undefined, '[]', 'bukan json']) expect(r3r7Missing(frozenG0Rules(bad))).toBe('aturan LC-17 belum ada di `G0_RULES`.');
   });
   it('tanpa aturan katalog / semua ada', () => {
     expect(r3r7Missing({})).toBe('aturan LC-03/06/07/11/13/14/17/18/21 belum ada di `G0_RULES`.');

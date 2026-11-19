@@ -524,10 +524,10 @@ const browserInstalled = chromiumInstalled(browsersPath);
 
 const FIXTURE = `
   const b = add(null, {type:'board', name:'Home · mobile', x:0, y:0, width:390, height:800, screen:'mobile'});
-  add(b, {type:'text', name:'Sapaan', content:'Halo 👋', size:16});
-  add(b, {type:'text', name:'Rating', content:'★★★★★', size:16});
+  add(b, {type:'text', name:'Sapaan', content:'Halo 👋', size:16, lineHeight:24});
+  add(b, {type:'text', name:'Rating', content:'★★★★★', size:16, lineHeight:24});
   add(b, {type:'text', name:'Caption', content:'Catatan kecil', size:11});
-  add(b, {type:'text', name:'Hak cipta', content:'© 2026 Kopi', size:12});
+  add(b, {type:'text', name:'Hak cipta', content:'© 2026 Kopi', size:12, lineHeight:16});
   const k = add(b, {type:'frame', name:'Kartu', width:200, height:40, clip:true});
   add(k, {type:'rect', name:'Lebar', width:260, height:20, fills:[{type:'solid', color:'#DDDDDD'}]});
   const c = add(b, {type:'frame', name:'Konten', layout:'column', width:390});

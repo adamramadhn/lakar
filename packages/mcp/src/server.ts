@@ -173,6 +173,9 @@ export const LAYOUT_CHECK_DESCRIPTION =
   'LC-12 (warning) ukuran board (mobile 390×844, app 1440×900 atau 1440×1024, landing lebar 1440, atau expectedSize) dan tabrakan antarboard (pakai place). ' +
   'Warning polesan: LC-18 kartu bersarang, LC-23 celah teks ↔ badge/tombol/ikon < 8, LC-24 proporsi badge di baris, LC-25 radius tidak konsentris, ' +
   'LC-26 ruang di atas judul ≤ bawah, LC-27 > 6 ukuran huruf, LC-28 baris > 80 karakter, LC-29 bobot < 400 di < 18px, LC-30 tanda baca (... dan tanda hubung rentang). ' +
+  "Warning tipografi/spacing (token DESIGN.md): LC-03 teks wrap 'fixed' ≥ 2 baris atau teks melewati kotaknya, LC-06 paragraf (≥ 2 baris, ≥ 6 kata) < 16px di landing/mobile, < 14px di app atau kartu ber-cat, " +
+  'LC-07 gap/padding di luar 0/2/4/6/8/12/16/20/24/32/40/48/64/80/96/128 (padding bawah 34 sah) dan tinggi komponen di luar token atau 44/56, ' +
+  "LC-08 ukuran di luar skala tipe atau line-height tak cocok token (KPI / Nilai 28/32/40 dengan line-height × 1.2 atau token, 'Display / …' 72/80; < 12px = LC-05), LC-09 > 2 keluarga font (mono tidak dihitung), LC-10 target sentuh < 44×44 di board mobile. " +
   "Struktural: LC-16 (error bukan gerbang) path ≤ 32×32 sebagai ikon (pakai node icon; bentuk sengaja 'Shape / …', grafik 'Chart / …'); " +
   "warning LC-14 absolut di dalam flex tanpa 'Overlay / …', LC-15 > 1 pustaka ikon UI, LC-21 radius > 3 nilai / spacer kosong / padding ganda mobile / teks langsung di baris tabel / > 1 bidang efek; " +
   'info (hanya di layout_check, tidak di execute) LC-13 nama layer default, LC-22 jumlah node Crop/Overlay/Scroll/Ekstra. ' +

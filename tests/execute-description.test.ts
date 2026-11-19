@@ -29,4 +29,8 @@ describe('deskripsi tool execute', () => {
   it('layout_check menyebut LC-02c (non-teks meluap) dan LC-31 (rata di tepi bawah, daftar rata)', () => {
     for (const s of ['LC-02c non-teks', 'min(8, padding/2)', 'LC-31', 'baris terakhir daftar/tabel']) expect(LAYOUT_CHECK_DESCRIPTION).toContain(s);
   });
+
+  it('layout_check menyebut LC-03, LC-06, LC-07, LC-08, LC-09, LC-10 (tipografi dan spacing)', () => {
+    for (const s of ['LC-03 teks', 'LC-06 paragraf', 'LC-07 gap/padding', 'LC-08 ukuran', 'LC-09 > 2 keluarga', 'LC-10 target sentuh < 44×44']) expect(LAYOUT_CHECK_DESCRIPTION).toContain(s);
+  });
 });
