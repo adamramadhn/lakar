@@ -1478,8 +1478,10 @@ export const DRAWN_ICON_MAX = 32;
 export function lc16(ctx: BoardContext): Finding[] {
   const out: Finding[] = [];
   for (const n of ctx.nodes) {
-    if (n.type !== 'path' || named(n, 'Chart /') || named(n, 'Shape /')) continue;
+    if (n.type !== 'path' || named(n, 'Chart /') || named(n, 'Shape /') || (n.opacity ?? 1) <= 0) continue;
     const b = ctx.bounds.get(n.id);
+    // Punya bounds tetapi tidak terlihat sama sekali (di luar clip/board): bukan ikon yang tampil.
+    if (b && !visibleRect(ctx, n)) continue;
     const w = b?.width ?? (typeof n.width === 'number' ? n.width : n.viewBox[2]);
     const h = b?.height ?? (typeof n.height === 'number' ? n.height : n.viewBox[3]);
     if (w > DRAWN_ICON_MAX + TOLERANCE || h > DRAWN_ICON_MAX + TOLERANCE) continue;
@@ -1667,10 +1669,13 @@ function effectFieldIssue(ctx: BoardContext): Finding[] {
   // Union-find: node efek bersarang di node efek lain atau beririsan dengannya = satu bidang.
   const root = effects.map((_, i) => i);
   const find = (i: number): number => (root[i] === i ? i : (root[i] = find(root[i]!)));
+  // Juga satu bidang: node efek dengan wadah potong terdekat yang sama (leluhur `Crop /` atau frame `clip:true`, bukan board).
+  const holder = effects.map((e) => ancestors(ctx, e.n).find((a) => a.type === 'frame' && (named(a, 'Crop /') || a.clip === true))?.id);
   for (let i = 0; i < effects.length; i++) {
     const inside = new Set(descendants(effects[i]!.n).map((d) => d.id));
     for (let j = i + 1; j < effects.length; j++) {
-      if (inside.has(effects[j]!.n.id) || intersect(effects[i]!.v, effects[j]!.v)) root[find(j)] = find(i);
+      const same = holder[i] !== undefined && holder[i] === holder[j];
+      if (same || inside.has(effects[j]!.n.id) || intersect(effects[i]!.v, effects[j]!.v)) root[find(j)] = find(i);
     }
   }
   // Label bidang = node efek terluas di bidang itu (urutan dokumen bidang dipertahankan).

@@ -812,7 +812,9 @@ Tinjauan (crop PNG `archcheck.mjs --shots LC-14,LC-21`):
 - **Perbaikan definisi (umum, sekali):** (1) teks di baris tabel kini butuh ≥ 2 teks langsung: baris antrean Dentara
   (nomor "02" + avatar berinisial + tumpukan teks + status) adalah daftar, bukan tabel (26 → 22 temuan). (2) spacer kosong
   melewati node 0×0 (frame `Isi` kosong di baris kode Rakit Kode tidak memakan ruang; 15 → 11). (3) label bidang efek =
-  node efek terluas di bidang itu.
+  node efek terluas di bidang itu. (4, sesudah review) node efek dengan wadah potong terdekat yang sama (`Crop /` atau
+  frame `clip:true`, bukan board) = satu bidang; LC-16 melewati path tersembunyi (opacity 0 atau tidak terlihat sama
+  sekali). Pindaian ulang (`after2.json`): semua angka di tabel tidak berubah, aturan lama tetap identik per dokumen.
 
 ## Pola skill yang memicu aturan baru (untuk story 2.10; skill tidak diubah, C7)
 

@@ -45,8 +45,9 @@ function docOf(specs: BoardSpec[], tokens?: Record<string, string | number>): { 
     const texts: TextMeasure[] = [];
     const strip = (children: Loose[]): Loose[] =>
       children.map(({ _r, _ink, _lines, _lh, children: kids, ...n }) => {
-        const r = _r as R;
-        nodes.push({ id: n.id as string, x: r[0], y: r[1], width: r[2], height: r[3] });
+        const r = _r as R | undefined;
+        // Tanpa `_r`: node tanpa entri bounds terukur (menguji fallback aturan).
+        if (r) nodes.push({ id: n.id as string, x: r[0], y: r[1], width: r[2], height: r[3] });
         if (_ink || _lines || _lh) {
           const ink = _ink as R | undefined;
           texts.push({ id: n.id as string, lines: (_lines as number) ?? 1, lineHeight: (_lh as number) ?? r[3], ...(ink ? { ink: { x: ink[0], y: ink[1], width: ink[2], height: ink[3] } } : {}) });
@@ -1052,6 +1053,24 @@ describe('LC-16 ikon digambar manual (error bukan gerbang)', () => {
   it('batas 32 × 32 (+0,5); tanpa ukuran terukur → width/height angka, lalu viewBox', () => {
     expect(only(runAll(clean([path('Ikon kecil', [0, 0, 32.4, 32])])), 'LC-16')).toHaveLength(1);
     expect(only(runAll(clean([path('Ikon besar', [0, 0, 33, 24])])), 'LC-16')).toEqual([]);
+    const unmeasured = (extra: Loose) => {
+      const { _r, ...p } = path('Tanpa ukur', [0, 0, 0, 0], extra);
+      return only(runAll(clean([p])), 'LC-16').map((f) => f.detail);
+    };
+    // Fallback 1: width/height angka (menang atas viewBox).
+    expect(unmeasured({ width: 20, height: 20, viewBox: [0, 0, 100, 100] })).toEqual(['path 20×20 "Tanpa ukur" digambar manual']);
+    expect(unmeasured({ width: 48, height: 48, viewBox: [0, 0, 24, 24] })).toEqual([]);
+    // Fallback 2: viewBox bila width/height bukan angka.
+    expect(unmeasured({ width: 'hug', viewBox: [0, 0, 24, 24] })).toEqual(['path 24×24 "Tanpa ukur" digambar manual']);
+    expect(unmeasured({ viewBox: [0, 0, 64, 64] })).toEqual([]);
+  });
+  it('negatif: path tersembunyi (opacity 0, atau di luar clip/board sama sekali)', () => {
+    const kids = [
+      path('Centang 0', [0, 0, 24, 24], { opacity: 0 }),
+      path('Di luar board', [500, 0, 24, 24], { position: 'absolute' }),
+      frame('Kotak', [0, 40, 40, 40], [path('Terpotong habis', [60, 40, 24, 24], { position: 'absolute' })], { clip: true, layout: 'none' }),
+    ];
+    expect(only(runAll(clean(kids)), 'LC-16')).toEqual([]);
   });
   it('negatif: Chart /, Shape /, path 88×32', () => {
     const kids = [path('Chart / Garis', [0, 0, 24, 24]), path('Shape / Gelombang', [0, 30, 24, 24]), path('Sparkline', [0, 60, 88, 32])];
@@ -1172,6 +1191,12 @@ describe('LC-21 struktural', () => {
     const field = frame('Crop / Efek', [0, 0, 390, 300], [rect('Mesh', [0, 0, 390, 300], mesh), rect('Blob', [200, 100, 150, 150], { ...paint('#F97316'), blur: 40, position: 'absolute' })], { clip: true, layout: 'none' });
     const kids = [field, rect('Kartu biru', [0, 320, 390, 300], oneHue), rect('Scrim', [0, 640, 390, 200], scrim), rect('Ring', [10, 700, 40, 40], conic)];
     expect(lc21(runAll(clean(kids)), 'bidang efek:')).toEqual([]);
+    // Dua blob blur tak beririsan di sudut berlawanan satu `Crop /` atau satu frame clip = satu bidang.
+    const blob = (name: string, r: R) => rect(name, r, { ...paint('#F97316'), blur: 40, position: 'absolute' });
+    for (const wrap of [{ name: 'Crop / Efek', extra: { clip: true } }, { name: 'Hero', extra: { clip: true } }]) {
+      const box = frame(wrap.name, [0, 0, 390, 400], [blob('Blob kiri atas', [0, 0, 100, 100]), blob('Blob kanan bawah', [290, 300, 100, 100])], { layout: 'none', ...wrap.extra });
+      expect(lc21(runAll(clean([box])), 'bidang efek:'), wrap.name).toEqual([]);
+    }
     // Conic multi-hue luas (≥ 20% layar) di luar bidang pertama → bidang kedua.
     expect(lc21(runAll(clean([field, rect('Latar conic', [0, 400, 390, 300], conic)])), 'bidang efek:')).toHaveLength(1);
   });

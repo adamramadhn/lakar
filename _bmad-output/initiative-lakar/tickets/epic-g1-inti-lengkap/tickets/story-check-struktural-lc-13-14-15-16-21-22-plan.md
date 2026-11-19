@@ -3,14 +3,14 @@ title: 'Check struktural: LC-13, 14, 15, 16, 21, 22'
 type: feature
 ticket: '4'
 created: '2026-11-19'
-status: in-progress
+status: in-review
 baseline_revision: '5d022b1b834d62f5b110793a611e5d56eedba0f0'
 route: full
 route_source: auto
 risk: medium
-review: ''
-review_source: ''
-lenses_ran: []
+review: quick
+review_source: pinned
+lenses_ran: [quick]
 review_loop_iteration: 0
 followup_review_recommended: false
 context:
@@ -111,6 +111,7 @@ deferred: []
 - Teks di baris tabel: syarat teks langsung dinaikkan dari ≥ 1 ke ≥ 2 (baris antrean Dentara = daftar, bukan tabel; positif palsu arsip).
 - Spacer kosong: node seukuran titik (≤ 0,5 × 0,5) dilewati (frame `Isi` 0×0 di baris kode Rakit Kode).
 - Bidang efek: label bidang = node efek terluas (sebelumnya node pertama).
+- Review: bidang efek juga menyatukan node efek dengan wadah potong terdekat yang sama (`Crop /` atau frame `clip:true`, bukan board); LC-16 melewati path ber-opacity 0 atau ber-bounds tetapi tidak terlihat (`visibleRect`); `PENDING_2_10` dipersempit ke aturan + nama node + detail yang diketahui; deskripsi MCP `layout_check`/`execute` menyebut aturan baru, info, dan `summary.info`. Pindaian ulang `after2.json`: angka sama (LC-21 bidang efek 6/6, LC-16 0), aturan lama identik.
 
 ## Review Triage Log
 

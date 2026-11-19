@@ -54,7 +54,7 @@ async function runBlock(label: string, code: string, sid: string, prelude: strin
   if (isPrelude) return check ? [`${label}: blok prelude tidak boleh memutasi dokumen`] : [];
   if (!check) return [`${label}: tidak ada check (blok tanpa op mutasi)`];
   const pending = PENDING_2_10[label.split(' ')[0]!] ?? [];
-  const findings = check.findings.filter((f) => !pending.some((p) => `${f.rule} ${f.detail}`.startsWith(p)));
+  const findings = check.findings.filter((f) => !pending.some((p) => f.rule === p.rule && p.node.test(f.nodeName) && f.detail.startsWith(p.detail)));
   if (findings.length === check.findings.length) {
     const { error, warning, gate } = check.summary;
     if (error || warning || gate) return [`${label}: check ${error} error / ${gate} gerbang / ${warning} warning: ${findings.map((f) => `${f.rule} ${f.nodeName}: ${f.detail}`).join('; ')}`];
@@ -65,12 +65,13 @@ async function runBlock(label: string, code: string, sid: string, prelude: strin
 
 /**
  * Warning aturan struktural G1 (story 4, LC-21) yang dipicu contoh skill dan menunggu story 2.10 (skill tidak diubah di
- * story 4, C7): `<rule> <awal detail>` per file skill. Temuan lain tetap gagal.
+ * story 4, C7): aturan + nama node yang diketahui + awal detail per file skill. Temuan lain (termasuk pola sejenis di node
+ * lain) tetap gagal.
  */
-const PENDING_2_10: Record<string, string[]> = {
-  'landing.md': ['LC-21 teks di baris tabel:'],
-  'mobile.md': ['LC-21 radius:'],
-  'webapp.md': ['LC-21 teks di baris tabel:'],
+const PENDING_2_10: Record<string, { rule: string; node: RegExp; detail: string }[]> = {
+  'landing.md': [{ rule: 'LC-21', node: /^Baris \/ (Kafe Teras, Bandung|Ruang Seduh, Jakarta|Pojok Arang, Bogor)$/, detail: 'teks di baris tabel: 3 teks langsung di baris (3 baris sejajar di Daftar)' }],
+  'mobile.md': [{ rule: 'LC-21', node: /^\[WIP\] Tutur \/ Beranda · mobile · Ramah$/, detail: 'radius: 4 nilai (8, 16, 20, 24)' }],
+  'webapp.md': [{ rule: 'LC-21', node: /^Header tabel$/, detail: 'teks di baris tabel: 3 teks langsung di baris (7 baris sejajar di Kartu / Siap diambil)' }],
 };
 
 async function savePngs(slug: string, sid: string): Promise<void> {
