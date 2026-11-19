@@ -828,3 +828,39 @@ Tinjauan (crop PNG `archcheck.mjs --shots LC-14,LC-21`):
 - Arsip: radius 4–5 nilai di 66 dokumen (tombol 8, kartu 12/16, wadah ikon 12, sorotan 24).
 
 `packages/daemon/src/skills-examples.test.ts` mencatat tiga pola ini sebagai `PENDING_2_10` (warning lain tetap gagal).
+
+# §2.15 Check luapan non-teks (LC-02c) dan konten terpotong rata (LC-31 diperluas) (G1 story 15)
+
+Plan: `_bmad-output/initiative-lakar/tickets/epic-g1-inti-lengkap/tickets/story-check-luapan-non-teks-dan-konten-terpotong-di-tepi-board-plan.md`.
+
+## Pindaian arsip layout_check
+
+Arsip sama dengan §2.4: 120 dokumen, 0 gagal; daemon dist sementara (port acak, dataDir salinan, tanpa key foto).
+Sebelum = `after2.json` (dist story 4); sesudah = dist story 15. Temuan aturan lain identik per dokumen (rule, level,
+node, detail); temuan LC-31 lama (12 dokumen, mockup hero di `Crop /`) identik.
+
+| Aturan | Sesudah: temuan / dok (baru) | Kasus unik (nilai `sisa` = jarak ke tepi wadah tampak) |
+|---|---|---|
+| LC-02c non-teks meluap | 32 / 14 | KPI P8 `Batang mini` 19,5px kanan, sisa 4,5 (2 dok); badge Kasku sisa 6 (2 dok); `Orang`/`Hasil` testimoni sisa 0 (4 dok); `Ikon baris` di kartu gambar Gerak sisa 0 (2 dok); badge/`Orang /` Lintas Arus tumpah −4/−24 (2 dok); `Bawah` mentor Rakit Kode tumpah −2 dan segmen `Status alumni` tumpah −31 (2 dok, keduanya) |
+| LC-31 (b) rata tepi bawah board/seksi | 0 | belum ada contoh arsip (fixture sintetis) |
+| LC-31 (c) daftar rata | 2 / 2 | P8 `Kartu / Pesanan keluar`: baris `Pasar Induk Cipinang Kios 14B` rata (bawah 0, atas 20) — salinan bench + `~/.local/share/lakar/docs` |
+
+Dokumen gagal gerbang: **74 → 80** (+6: dua salinan P8 polish-4 Lumbung, Lintas Arus effects-3 dan practice-effects/2,
+Gerak verifikasi-review dan rounds/uji-1/B). 8 dokumen LC-02c lain sudah gagal gerbang sebelumnya.
+
+Tinjauan crop (wadah `W` per kasus, `archcheck.mjs --shots LC-02c,LC-31` + crop wadah): setiap kasus unik di atas
+cacat nyata (batang menempel tepi kanan kartu KPI; badge/baris orang menempel atau keluar tepi bawah kartu; bar segmen
+keluar kartu; baris tabel terakhir tanpa ruang bawah). **0 positif palsu.** Tanpa perubahan definisi dari plan.
+
+Kasus batas yang **tidak** dilaporkan (sisa ≥ min(8, padding/2)), crop diperiksa — terlihat wajar atau sempit tanpa cacat:
+
+| Node | Wadah (padding sisi) | Luapan / sisa |
+|---|---|---|
+| `Orang` (Bayu Hasibuan, Mejaku polish-3) | kartu testimoni (24) | 15 / **9** (terdekat ke ambang; sempit, tidak dipilih agar 0 positif palsu) |
+| `Daftar` (Ruang tunggu, Dentara practice-6) | kartu (24) | 14 / 10 |
+| `Teks` (`Info / Porsi`, Dapur Wening) | info (12) | 1,1 / 10,9 (ambang padding/2 = 6) |
+| `Daftar` (Kartu / Bahan, Dentara), `Detail` (Kasku umkm), `Daftar` (Pemasok terlambat, Lumbung polish-3) | kartu (24, 24, 20) | 12 / 12 |
+
+## Contoh skill
+
+`skills-examples.test.ts` lulus tanpa entri `PENDING_2_10` baru: contoh skill tidak memicu LC-02c atau LC-31.

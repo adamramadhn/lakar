@@ -742,6 +742,10 @@ const strokeAll = (n: ChildNode): boolean => {
 };
 const dropShadow = (n: ChildNode): boolean => ((n as { shadows?: readonly { type?: string }[] }).shadows ?? []).some((s) => s.type !== 'inner');
 
+/** Ber-cat: fill tak transparan, stroke, atau bayangan luar. */
+const paintedCard = (n: ChildNode): boolean =>
+  fillsOf(n).some((f) => f.type !== 'solid' || parseHex((f as { color: string }).color)[3] > 0) || (n as { stroke?: unknown }).stroke !== undefined || dropShadow(n);
+
 /** Batasi detail warning ≤ 120 karakter. */
 const clip120 = (s: string): string => ([...s].length > 120 ? `${[...s].slice(0, 119).join('')}…` : s);
 
@@ -824,6 +828,81 @@ export function lc02b(ctx: BoardContext): Finding[] {
         t,
         `teks ${quote(t.content)} meluap ${hits.map(({ s, c }) => `${num(o[s])}px di ${s} (sisa ${num(c.gap)}px ke ${c.by})`).join(', ')} dari isi ${parent.name} (${parent.id})`,
         `di dalam isi induk: teks width:'fill' (dibungkus) atau perlebar/perpendek; di Row, teks fill dan badge/ikon hug`,
+      ),
+    );
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+// LC-02c · non-teks meluap dari isi wadah tampak
+// ---------------------------------------------------------------------------
+
+/** Luapan > 1 px dari content box dihitung. */
+export const BOX_OVERFLOW_MIN = 1;
+/**
+ * Luapan non-teks baru cacat bila sisa jarak ke tepi wadah tampak di sisi itu < min(8, padding wadah di sisi itu / 2)
+ * (negatif = tumpah keluar). Luapan kecil ke padding yang masih lega tidak terlihat sebagai cacat.
+ */
+export const BOX_CLEARANCE_MAX = 8;
+
+const padSide = (p: Pad, s: Side): number => (s === 'kiri' ? p.l : s === 'kanan' ? p.r : s === 'atas' ? p.t : p.b);
+const contentBox = (r: Rect, p: Pad): Rect => ({ x: r.x + p.l, y: r.y + p.t, width: r.width - p.l - p.r, height: r.height - p.t - p.b });
+
+/**
+ * Anak flow non-teks `n` (induk `P`) yang melewati content box `P` > 1 px dan content box wadah tampak `W` > 1 px, dengan
+ * sisa jarak ke tepi `W` < min(8, padding `W` / 2). `W` = leluhur ber-cat terdekat (mulai `P`, bukan board) yang dicapai
+ * lewat rantai anak flow. Dikecualikan: `Overlay /`/`Crop /` (node/leluhur), rotasi di rantai, induk gap negatif, sisi
+ * atas/bawah di bawah `Scroll /`/`scrollY`, dan node LC-02a (`skip`). Hanya node terluar.
+ */
+export function lc02c(ctx: BoardContext, skip: ReadonlySet<string> = new Set()): Finding[] {
+  const out: Finding[] = [];
+  const reported = new Set<string>();
+  for (const n of ctx.nodes) {
+    if (n.type === 'text' || skip.has(n.id) || rotated(n) || named(n, 'Overlay /') || named(n, 'Crop /')) continue;
+    const r = ctx.bounds.get(n.id);
+    if (!r || area(r) <= 0) continue;
+    const anc = ancestors(ctx, n);
+    if (anc.some((a) => reported.has(a.id))) continue;
+    const parent = anc[0]!;
+    if (parent.type === 'board' || !isFlowChild(parent, n) || ((parent.gap ?? 0) as number) < 0) continue;
+    if (anc.some((a) => a.type === 'frame' && (named(a, 'Overlay /') || named(a, 'Crop /') || rotated(a)))) continue;
+    // Wadah tampak: leluhur ber-cat terdekat lewat rantai anak flow.
+    let wrap: FrameNode | undefined;
+    for (let i = 0; i < anc.length; i++) {
+      const a = anc[i]!;
+      if (a.type === 'board') break;
+      if (paintedCard(a)) {
+        wrap = a;
+        break;
+      }
+      if (!isFlowChild(anc[i + 1]!, a)) break;
+    }
+    if (!wrap) continue;
+    const pr = ctx.bounds.get(parent.id);
+    const wr = ctx.bounds.get(wrap.id);
+    if (!pr || !wr) continue;
+    const wp = paddingOf(wrap);
+    const fromP = overflow(r, contentBox(pr, paddingOf(parent)));
+    const fromW = overflow(r, contentBox(wr, wp));
+    const edge = overflow(r, wr);
+    const scrolled = anc.some((a) => a.type === 'frame' && (named(a, 'Scroll /') || (a.scrollY ?? 0) > 0));
+    const hits = SIDES.filter(
+      (s) =>
+        !(scrolled && (s === 'atas' || s === 'bawah')) &&
+        fromP[s] > BOX_OVERFLOW_MIN &&
+        fromW[s] > BOX_OVERFLOW_MIN &&
+        -edge[s] < Math.min(BOX_CLEARANCE_MAX, padSide(wp, s) / 2),
+    );
+    if (!hits.length) continue;
+    reported.add(n.id);
+    out.push(
+      finding(
+        'LC-02c',
+        levelOf('LC-02c'),
+        n,
+        clip120(`meluap ${hits.map((s) => `${num(fromW[s])}px di ${s} (sisa ${num(-edge[s])}px ke tepi ${wrap.name})`).join(', ')} dari isi ${parent.name}`),
+        'di dalam isi wadah: kecilkan, bungkus, atau beri ruang (sisa ke tepi ≥ 8 atau ≥ separuh padding)',
       ),
     );
   }
@@ -1345,7 +1424,7 @@ export function capWarnings(findings: readonly Finding[]): Finding[] {
 }
 
 // ---------------------------------------------------------------------------
-// LC-31 · mockup terpotong rata di tepi bawah seksi
+// LC-31 · konten terpotong rata di tepi bawah
 // ---------------------------------------------------------------------------
 
 /** Luapan minimal di bawah tepi clip (px) dan toleransi "rata" tepi clip ↔ tepi bawah seksi/board (px). */
@@ -1353,31 +1432,52 @@ export const CUT_OVER_MIN = 1;
 export const FLUSH_TOL = 2;
 /** Seksi = leluhur selebar ≥ 90% board. */
 const SECTION_MIN_W_RATIO = 0.9;
-
-/** Ber-cat: fill tak transparan, stroke, atau bayangan luar. */
-const paintedCard = (n: ChildNode): boolean =>
-  fillsOf(n).some((f) => f.type !== 'solid' || parseHex((f as { color: string }).color)[3] > 0) || (n as { stroke?: unknown }).stroke !== undefined || dropShadow(n);
+/** Daftar rata: ruang atas minimal (px) yang menandakan ruang bawah memang diharapkan. */
+export const LIST_TOP_MIN = 8;
 
 /**
- * Frame ber-cat berisi teks yang melewati tepi bawah clip terdekat (frame `clip:true`, termasuk `Crop /`, atau board) > 1 px,
- * dengan tepi bawah clip rata (≤ 2 px) dengan tepi bawah seksi (leluhur selebar ≥ 90% board) atau board. Hanya node terluar.
+ * Daftar rata: `k` frame ber-cat `layout:'column'` (bukan di `Crop /`) yang dua anak flow terakhirnya frame ber-cat berisi
+ * teks, baris terakhir berakhir ≤ 2 px dari tepi bawah `k`, sedangkan anak flow pertama mulai ≥ 8 px dari tepi atas.
+ */
+function flushListRow(ctx: BoardContext, k: FrameNode, kr: Rect): { row: FrameNode; below: number; above: number } | undefined {
+  if (k.layout !== 'column' || ancestors(ctx, k).some((a) => a.type === 'frame' && named(a, 'Crop /'))) return undefined;
+  const flow = k.children.filter((c) => isFlowChild(k, c) && (ctx.bounds.get(c.id)?.height ?? 0) > 0);
+  if (flow.length < 2) return undefined;
+  const isRow = (c: ChildNode): c is FrameNode => c.type === 'frame' && paintedCard(c) && textsIn(c).length > 0;
+  const last = flow[flow.length - 1]!;
+  if (!isRow(last) || !isRow(flow[flow.length - 2]!)) return undefined;
+  const below = bottom(kr) - bottom(ctx.bounds.get(last.id)!);
+  const above = ctx.bounds.get(flow[0]!.id)!.y - kr.y;
+  return below <= FLUSH_TOL && above >= LIST_TOP_MIN ? { row: last, below, above } : undefined;
+}
+
+/**
+ * Frame ber-cat berisi teks (hanya node terluar) yang terpotong atau rata di tepi bawah:
+ * (a) melewati tepi bawah clip terdekat (frame `clip:true`, termasuk `Crop /`, atau board) > 1 px, dengan tepi bawah clip
+ * rata (≤ 2 px) dengan tepi bawah seksi (leluhur selebar ≥ 90% board) atau board;
+ * (b) sama, tetapi tepi bawah node rata dengan tepi clip (−2..+1 px), node lebar < 90% board dan tidak mulai dari tepi atas
+ * clip (bukan sidebar, footer, tab bar, atau panel penuh);
+ * (c) daftar rata (`flushListRow`): temuan pada baris terakhir.
  * Dikecualikan: leluhur `Scroll /`, rotasi, `Overlay /`, dan node yang sudah dilaporkan LC-02a (`skip`).
  */
 export function lc31(ctx: BoardContext, skip: ReadonlySet<string> = new Set()): Finding[] {
   const out: Finding[] = [];
+  const done = new Set<string>();
   const minW = SECTION_MIN_W_RATIO * ctx.boardRect.width;
   const walk = (children: readonly ChildNode[]) => {
     for (const n of children) {
-      if (skip.has(n.id) || rotated(n) || named(n, 'Overlay /') || named(n, 'Scroll /')) continue;
+      if (skip.has(n.id) || done.has(n.id) || rotated(n) || named(n, 'Overlay /') || named(n, 'Scroll /')) continue;
       if (n.type !== 'frame') continue;
       const r = ctx.bounds.get(n.id);
-      if (r && area(r) > 0 && paintedCard(n) && textsIn(n).length > 0) {
-        const anc = ancestors(ctx, n);
+      const anc = ancestors(ctx, n);
+      if (r && area(r) > 0 && paintedCard(n) && textsIn(n).length > 0 && !anc.some((a) => a.type === 'frame' && rotated(a))) {
         const clipIdx = anc.findIndex((a) => a.type === 'board' || a.clip === true);
         const clip = anc[clipIdx]!;
         const cr = clip.type === 'board' ? ctx.boardRect : ctx.bounds.get(clip.id);
         const over = cr ? bottom(r) - bottom(cr) : 0;
-        if (cr && over > CUT_OVER_MIN && r.y < bottom(cr) - CUT_OVER_MIN && !anc.some((a) => a.type === 'frame' && rotated(a))) {
+        const cut = over > CUT_OVER_MIN;
+        const flush = !cut && over >= -FLUSH_TOL && r.width < minW - TOLERANCE && cr !== undefined && r.y > cr.y + FLUSH_TOL;
+        if (cr && (cut || flush) && r.y < bottom(cr) - CUT_OVER_MIN) {
           // Seksi rata: clip itu sendiri atau leluhurnya selebar ≥ 90% board yang tepi bawahnya rata dengan tepi clip; atau board.
           let section: Container | undefined = Math.abs(ctx.boardRect.height - bottom(cr)) <= FLUSH_TOL ? ctx.board : undefined;
           for (const a of anc.slice(clipIdx)) {
@@ -1388,16 +1488,31 @@ export function lc31(ctx: BoardContext, skip: ReadonlySet<string> = new Set()): 
           }
           if (section) {
             out.push(
-              finding(
-                'LC-31',
-                levelOf('LC-31'),
-                n,
-                `terpotong rata ${num(over)}px di tepi bawah ${section.name}`,
-                'tampilkan utuh (padding bawah ≥ 64) atau kurangi isi',
-              ),
+              cut
+                ? finding('LC-31', levelOf('LC-31'), n, `terpotong rata ${num(over)}px di tepi bawah ${section.name}`, 'tampilkan utuh (padding bawah ≥ 64) atau kurangi isi')
+                : finding(
+                    'LC-31',
+                    levelOf('LC-31'),
+                    n,
+                    clip120(`rata di tepi bawah ${section.name} tanpa ruang bawah (sisa ${num(-over)}px)`),
+                    'beri ruang bawah (padding atau margin ≥ 24) atau tampilkan utuh',
+                  ),
             );
             continue;
           }
+        }
+        const list = flushListRow(ctx, n, r);
+        if (list && !skip.has(list.row.id)) {
+          done.add(list.row.id);
+          out.push(
+            finding(
+              'LC-31',
+              levelOf('LC-31'),
+              list.row,
+              clip120(`baris terakhir rata di tepi bawah ${n.name} (bawah ${num(list.below)}px, atas ${num(list.above)}px)`),
+              'padding bawah setara padding atas, atau tampilkan baris utuh',
+            ),
+          );
         }
       }
       walk(n.children);

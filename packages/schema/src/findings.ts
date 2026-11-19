@@ -12,6 +12,7 @@ export const G0_RULES = {
   'LC-01b': { level: 'error', gate: true, title: 'glyph Unicode sebagai ikon' },
   'LC-02a': { level: 'error', gate: true, title: 'node terpotong clip' },
   'LC-02b': { level: 'error', gate: true, title: 'teks meluap dari induknya' },
+  'LC-02c': { level: 'error', gate: true, title: 'non-teks meluap dari isi wadah' },
   'LC-04': { level: 'error', gate: true, title: 'kontras teks kurang' },
   'LC-05': { level: 'error', gate: true, title: 'teks lebih kecil dari 12px' },
   'LC-11': { level: 'error', gate: true, title: 'saudara tumpang tindih sebagian' },
@@ -32,7 +33,7 @@ export const G0_RULES = {
   'LC-28': { level: 'warning', gate: false, title: 'baris teks terlalu panjang' },
   'LC-29': { level: 'warning', gate: false, title: 'bobot tipis pada teks kecil' },
   'LC-30': { level: 'warning', gate: false, title: 'tanda baca' },
-  'LC-31': { level: 'error', gate: true, title: 'mockup terpotong rata di tepi bawah seksi' },
+  'LC-31': { level: 'error', gate: true, title: 'konten terpotong rata di tepi bawah' },
 } as const satisfies Record<string, { level: FindingLevel; gate: boolean; title: string }>;
 
 export type G0RuleId = keyof typeof G0_RULES;

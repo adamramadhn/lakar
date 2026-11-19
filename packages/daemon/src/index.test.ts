@@ -10,7 +10,7 @@ import { crc32, deflateSync } from 'node:zlib';
 import { fileURLToPath } from 'node:url';
 import { ChromiumRenderer, FontRegistry, IconCatalog, PACKAGE, PhotoService, RENDER_DIST_DIR, SafeNet, buildServer, loadConfig, startDaemon, type RunningDaemon } from './index.js';
 import { API } from '@lakar/exec';
-import { LakarError, SCHEMA_VERSION } from '@lakar/schema';
+import { LakarError, SCHEMA_VERSION, findingLine } from '@lakar/schema';
 import { countDarkPixels, decodePng, readPngSize } from './png.js';
 import { chromiumInstalled } from '../../../tests/support/browser.ts';
 import { postJson } from '../../../tests/support/http.ts';
@@ -664,6 +664,29 @@ describe.skipIf(!browserInstalled)('check G0 (AD-8): execute + /layout-check', (
       ['info', 'LC-22', 'Info · mobile'],
       ['info', 'LC-13', 'Rectangle'],
     ]);
+  }, 60_000);
+
+  it('dokumen asli P8 polish-4: LC-02c pada Batang mini dan LC-31 pada baris terakhir tabel (error gerbang)', async () => {
+    const { mkdir } = await import('node:fs/promises');
+    await mkdir(join(dataDir, 'docs'), { recursive: true });
+    const src = fileURLToPath(new URL('../test/fixtures/p8-polish-4-lumbung.lakar.json', import.meta.url));
+    await writeFile(join(dataDir, 'docs', 'p8-polish-4.lakar.json'), await readFile(src, 'utf8'), 'utf8');
+    const sid = await newSession();
+    expect((await call('/docs/open', { slug: 'p8-polish-4' }, sid)).body.ok).toBe(true);
+    const lc = await call('/layout-check', {}, sid);
+    expect(lc.status, JSON.stringify(lc.body.error)).toBe(200);
+    const found = lc.body.data.findings.filter((f: { rule: string }) => f.rule === 'LC-02c' || f.rule === 'LC-31');
+    expect(found.map((f: { level: string; rule: string; nodeName: string }) => [f.level, f.rule, f.nodeName])).toEqual([
+      ['error', 'LC-02c', 'Batang mini'],
+      ['error', 'LC-31', 'Baris / Pasar Induk Cipinang Kios 14B'],
+    ]);
+    expect(found[0].detail).toMatch(/^meluap 19\.5px di kanan \(sisa 4\.5px ke tepi Kartu \/ Pengiriman\)/);
+    expect(found[1].detail).toBe('baris terakhir rata di tepi bawah Kartu / Pesanan keluar (bawah 0px, atas 20px)');
+    expect(found.map((f: Parameters<typeof findingLine>[0]) => findingLine(f).split(' (')[0])).toEqual([
+      'error·gerbang · LC-02c · Batang mini',
+      'error·gerbang · LC-31 · Baris / Pasar Induk Cipinang Kios 14B',
+    ]);
+    expect(lc.body.data.summary.gate).toBeGreaterThanOrEqual(2);
   }, 60_000);
 
   it('/layout-check: board tak ada → 404 NOT_FOUND + hint; body asing → 400; tanpa dokumen aktif → NO_ACTIVE_DOC', async () => {

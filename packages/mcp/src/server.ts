@@ -165,7 +165,10 @@ export const LAYOUT_CHECK_DESCRIPTION =
   "LC-20 konten tertutup zona bawah (bar 'Overlay / …' atau frame/rect absolut ber-fill yang menempel bawah atau mengambang, termasuk kapsul ber-fill di dalam pembungkus absolut transparan, ditumpuk): " +
   'konten terakhir posisi akhir scroll berakhir ≤ y zona − 8, tidak ada kartu/teks/gambar terpotong di tepi atas zona, ' +
   'tidak ada judul seksi yang isinya tertutup zona, dan tidak ada konten terlihat terpotong di celah di bawah bar mengambang atau mengintip di celah antar-bar bertumpuk; ' +
-  "LC-02b teks (ink terukur) meluap dari isi induk dan menabrak tepi/saudara (< 4px); LC-11 saudara tumpang tindih sebagian (kecuali 'Overlay / …', 'Crop / …', gap negatif); " +
+  "LC-02b teks (ink terukur) meluap dari isi induk dan menabrak tepi/saudara (< 4px); " +
+  'LC-02c non-teks (frame, rect, ikon, gambar) anak flow meluap dari isi induk ke padding/tepi wadah ber-cat terdekat dengan sisa < min(8, padding/2) atau tumpah keluar; ' +
+  'LC-31 kartu ber-cat berisi teks terpotong atau rata di tepi bawah seksi/board (mockup di Crop, kartu tanpa ruang bawah), dan baris terakhir daftar/tabel rata di tepi bawah kartunya tanpa ruang bawah padahal ada ruang atas; ' +
+  "LC-11 saudara tumpang tindih sebagian (kecuali 'Overlay / …', 'Crop / …', gap negatif); " +
   'LC-04 kontras teks setelah komposit < 4.5:1 (teks ≥ 24 atau ≥ 19 tebal: < 3:1; di atas gradien/opacity/blend = warning, di atas foto/noise/mesh dilewati); ' +
   'LC-12 (warning) ukuran board (mobile 390×844, app 1440×900 atau 1440×1024, landing lebar 1440, atau expectedSize) dan tabrakan antarboard (pakai place). ' +
   'Warning polesan: LC-18 kartu bersarang, LC-23 celah teks ↔ badge/tombol/ikon < 8, LC-24 proporsi badge di baris, LC-25 radius tidak konsentris, ' +

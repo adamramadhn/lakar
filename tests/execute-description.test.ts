@@ -1,7 +1,7 @@
 // Deskripsi tool `execute` di mcp harus menyebut setiap fungsi API exec (api.ts = satu-satunya sumber).
 import { describe, expect, it } from 'vitest';
 import { API, API_GLOBALS } from '../packages/exec/src/api.ts';
-import { EXECUTE_DESCRIPTION, ICON_SEARCH_DESCRIPTION } from '../packages/mcp/src/server.ts';
+import { EXECUTE_DESCRIPTION, ICON_SEARCH_DESCRIPTION, LAYOUT_CHECK_DESCRIPTION } from '../packages/mcp/src/server.ts';
 
 describe('deskripsi tool execute', () => {
   it.each(Object.keys(API))('menyebut %s(', (name) => {
@@ -24,5 +24,9 @@ describe('deskripsi tool execute', () => {
     for (const s of ['check {boards, summary:{error, warning, gate, info', 'temuan info hanya di layout_check', 'bounds {id:[x,y,w,h]}', 'boundsTruncated', 'Temuan tidak membatalkan commit; perbaiki lalu execute lagi', 'layout_check', 'tidak di-commit']) {
       expect(EXECUTE_DESCRIPTION).toContain(s);
     }
+  });
+
+  it('layout_check menyebut LC-02c (non-teks meluap) dan LC-31 (rata di tepi bawah, daftar rata)', () => {
+    for (const s of ['LC-02c non-teks', 'min(8, padding/2)', 'LC-31', 'baris terakhir daftar/tabel']) expect(LAYOUT_CHECK_DESCRIPTION).toContain(s);
   });
 });

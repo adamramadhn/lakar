@@ -625,6 +625,140 @@ describe('LC-31 mockup terpotong rata', () => {
   });
 });
 
+describe('LC-02c non-teks meluap dari isi wadah', () => {
+  const card = { fills: [{ type: 'solid', color: '#FFFFFF' }], stroke: { color: '#E4E7EC', width: 1, align: 'inside' } };
+  const app = (kids: Loose[]) => run({ screen: 'app', width: 1440, height: 900, children: kids });
+  /** Kartu KPI P8 polish-4: `Batang mini` (7×8, gap 4) di baris `Nilai` space-between masuk padding kanan kartu. */
+  const kpi = (barsX = 811.5) => {
+    const bars = frame('Batang mini', [barsX, 168, 80, 40], [0, 1, 2, 3, 4, 5, 6].map((i) => rect('Hari', [barsX + 12 * i, 180, 8, 28], { fills: [{ type: 'solid', color: '#9DB4E6' }] })), { layout: 'row', gap: 4 });
+    const angka = frame('Angka', [688, 160, 107.5, 48], [text('186', [688, 160, 76.4, 48], { size: 40 }), text('trip', [770.4, 184, 25.1, 24], { size: 16 })], { layout: 'row', gap: 6 });
+    const nilai = frame('Nilai', [688, 160, 184, 48], [angka, bars], { layout: 'row', gap: 16, justify: 'space-between' });
+    const k = frame('Kartu / Pengiriman', [664, 104, 232, 160], [text('Pengiriman minggu ini', [688, 128, 184, 20]), nilai], { padding: 24, gap: 12, ...card });
+    return { bars, k };
+  };
+
+  it('positif: kartu KPI P8 minimal → error gerbang pada Batang mini (luapan kanan 19.5, sisa 4.5)', () => {
+    const { bars, k } = kpi();
+    const f = only(app([k]), 'LC-02c');
+    expect(f.map((x) => [x.level, x.nodeId, x.detail])).toEqual([
+      ['error', bars.id, 'meluap 19.5px di kanan (sisa 4.5px ke tepi Kartu / Pengiriman) dari isi Nilai'],
+    ]);
+    expect(f[0]!.expected).toBe('di dalam isi wadah: kecilkan, bungkus, atau beri ruang (sisa ke tepi ≥ 8 atau ≥ separuh padding)');
+    expect(summarizeFindings(f).gate).toBe(1);
+    // batang di dalam isi kartu → bersih
+    expect(only(app([kpi(792).k]), 'LC-02c')).toEqual([]);
+  });
+
+  it('positif: anak flow tumpah keluar kartu (sisa negatif); padding kecil memakai batas padding/2', () => {
+    const r = rect('Bar', [16, 16, 220, 20], { fills: [{ type: 'solid', color: '#2563EB' }] });
+    const f = only(app([frame('Kartu', [0, 0, 200, 52], [r], { padding: 16, ...card })]), 'LC-02c');
+    expect(f.map((x) => [x.nodeId, x.detail])).toEqual([[r.id, 'meluap 52px di kanan (sisa -36px ke tepi Kartu) dari isi Kartu']]);
+    // padding 8: sisa 3 < 4 → temuan; sisa 5 ≥ 4 → bukan
+    const tight = rect('Bar', [8, 8, 189, 20], { fills: [{ type: 'solid', color: '#2563EB' }] });
+    expect(only(app([frame('Kartu', [0, 0, 200, 36], [tight], { padding: 8, ...card })]), 'LC-02c').map((x) => x.nodeId)).toEqual([tight.id]);
+    const ok = rect('Bar', [8, 8, 187, 20], { fills: [{ type: 'solid', color: '#2563EB' }] });
+    expect(only(app([frame('Kartu', [0, 0, 200, 36], [ok], { padding: 8, ...card })]), 'LC-02c')).toEqual([]);
+  });
+
+  it('bersarang: frame meluap beserta anaknya → satu temuan (node terluar)', () => {
+    const inner = rect('Isi', [24, 24, 200, 20], { fills: [{ type: 'solid', color: '#2563EB' }] });
+    const outer = frame('Baris', [24, 24, 200, 20], [inner], { layout: 'row' });
+    const f = only(app([frame('Kartu', [0, 0, 220, 68], [outer], { padding: 24, ...card })]), 'LC-02c');
+    expect(f.map((x) => x.nodeId)).toEqual([outer.id]);
+  });
+
+  it('negatif: luapan kecil ke padding lega, wadah tanpa cat, Overlay /, Crop /, rotasi, gap negatif, Scroll /, absolut, LC-02a, teks', () => {
+    const blue = { fills: [{ type: 'solid', color: '#2563EB' }] };
+    const k = (kids: Loose[], extra: Loose = {}) => frame('Kartu', [0, 0, 200, 100], kids, { padding: 24, ...card, ...extra });
+    const wide = (extra: Loose = {}) => rect('Bar', [24, 24, 190, 20], { ...blue, ...extra });
+    // 2px ke padding 24 (sisa 22)
+    expect(only(app([k([rect('Bar', [24, 24, 154, 20], blue)])]), 'LC-02c')).toEqual([]);
+    // induk dan leluhur tanpa cat (board bukan wadah tampak)
+    expect(only(app([frame('Grup', [0, 0, 200, 100], [wide()], { padding: 24 })]), 'LC-02c')).toEqual([]);
+    expect(only(app([k([wide({ name: 'Overlay / Sorot' })])]), 'LC-02c')).toEqual([]);
+    expect(only(app([frame('Crop / Foto', [0, 0, 200, 100], [wide()], { padding: 24, ...card })]), 'LC-02c')).toEqual([]);
+    expect(only(app([k([frame('Crop / Pratinjau', [24, 24, 152, 52], [wide()], { layout: 'column' })])]), 'LC-02c')).toEqual([]);
+    expect(only(app([k([wide({ rotation: 4 })])]), 'LC-02c')).toEqual([]);
+    expect(only(app([k([wide()], { layout: 'row', gap: -8 })]), 'LC-02c')).toEqual([]);
+    // sumbu vertikal di Scroll / atau scrollY (sisi kiri/kanan tetap dinilai)
+    const tall = () => rect('Daftar', [24, 24, 152, 120], blue);
+    expect(only(app([frame('Scroll / Isi', [0, 0, 200, 100], [tall()], { padding: 24, ...card })]), 'LC-02c')).toEqual([]);
+    expect(only(app([k([tall()], { scrollY: 40 })]), 'LC-02c')).toEqual([]);
+    expect(only(app([k([tall()])]), 'LC-02c')).toHaveLength(1);
+    expect(only(app([k([wide({ position: 'absolute' })])]), 'LC-02c')).toEqual([]);
+    // tumpah dari kartu ber-clip → LC-02a, bukan LC-02c
+    const cut = rect('Bar', [24, 24, 220, 20], blue);
+    const f = app([k([cut], { clip: true })]);
+    expect(f.filter((x) => x.nodeId === cut.id).map((x) => x.rule)).toEqual(['LC-02a']);
+    // teks dinilai LC-02b
+    expect(only(app([k([text('Judul yang sangat panjang', [24, 24, 190, 20])])]), 'LC-02c')).toEqual([]);
+  });
+});
+
+describe('LC-31 konten rata di tepi bawah board/seksi dan daftar rata', () => {
+  const card = { fills: [{ type: 'solid', color: '#FFFFFF' }], stroke: { color: '#E4E7EC', width: 1, align: 'inside' } };
+  const app = (kids: Loose[]) => run({ screen: 'app', width: 1440, height: 900, children: kids });
+  const kartu = (r: R, extra: Loose = {}) => frame('Kartu / Stok', r, [text('Stok gudang', [r[0] + 20, r[1] + 20, 200, 20])], { padding: 20, ...card, ...extra });
+
+  it('positif: kartu berakhir rata di tepi bawah board (−2..+1) → error gerbang', () => {
+    const k = kartu([300, 700, 600, 200]);
+    const f = only(app([frame('Area', [0, 0, 1440, 900], [k], { layout: 'none' })]), 'LC-31');
+    expect(f.map((x) => [x.nodeId, x.level, x.detail])).toEqual([[k.id, 'error', 'rata di tepi bawah Home tanpa ruang bawah (sisa 0px)']]);
+    expect(summarizeFindings(f).gate).toBe(1);
+    const k2 = kartu([300, 700, 600, 198.5]);
+    expect(only(app([frame('Area', [0, 0, 1440, 900], [k2], { layout: 'none' })]), 'LC-31').map((x) => x.detail)).toEqual(['rata di tepi bawah Home tanpa ruang bawah (sisa 1.5px)']);
+  });
+
+  it('positif: kartu rata di tepi bawah seksi ber-clip selebar board', () => {
+    const k = kartu([300, 500, 600, 300]);
+    const seksi = frame('Seksi / Ringkasan', [0, 400, 1440, 400], [k], { layout: 'none', clip: true, fills: [{ type: 'solid', color: '#F6F7F9' }] });
+    const f = only(app([frame('Isi', [0, 0, 1440, 900], [seksi], { layout: 'none' })]), 'LC-31');
+    expect(f.map((x) => [x.nodeId, x.detail])).toEqual([[k.id, 'rata di tepi bawah Seksi / Ringkasan tanpa ruang bawah (sisa 0px)']]);
+  });
+
+  it('negatif: sidebar penuh tinggi, footer/tab bar selebar board, kartu dengan margin bawah ≥ 3px', () => {
+    const side = frame('Sidebar', [0, 0, 240, 900], [text('Menu', [20, 20, 100, 20])], card);
+    const footer = frame('Footer', [0, 820, 1440, 80], [text('© Lumbung', [20, 840, 100, 20])], card);
+    const k = kartu([300, 697, 600, 200]);
+    expect(only(app([frame('Area', [0, 0, 1440, 900], [side, footer, k], { layout: 'none' })]), 'LC-31')).toEqual([]);
+  });
+
+  /** Tabel P8 polish-4: kartu ber-clip padding [20,0,0,0], baris terakhir rata di tepi bawah kartu. */
+  const table = (pad: number | number[], lastFill = true) => {
+    const x = 280;
+    const row = (name: string, y: number, fill = true) =>
+      frame(name, [x, y, 744, 48], [text(name.slice(8), [x + 24, y + 6, 272, 20])], {
+        layout: 'row',
+        padding: [0, 24],
+        ...(fill ? { fills: [{ type: 'solid', color: '#FFFFFF' }], stroke: { color: '#E4E7EC', width: 1, align: 'inside', sides: ['bottom'] } } : {}),
+      });
+    const top = typeof pad === 'number' ? pad : pad[0]!;
+    const kepala = frame('Kepala', [x, 536 + top, 744, 28], [text('Pesanan keluar', [x + 24, 536 + top, 150, 28], { size: 20 })], { layout: 'row', padding: [0, 24] });
+    const y0 = 536 + top + 40;
+    const header = frame('Header tabel', [x, y0, 744, 32], [text('Pelanggan', [x + 24, y0 + 8, 272, 16], { size: 12 })], { layout: 'row', padding: [0, 24], fills: [{ type: 'solid', color: '#F2F4F8' }] });
+    const rows = [0, 1, 2, 3].map((i) => row(`Baris / Pelanggan ${i + 1}`, y0 + 44 + 60 * i, i < 3 || lastFill));
+    const bottomPad = typeof pad === 'number' ? pad : pad[2]!;
+    const h = bottom(rows[3]!._r) + bottomPad - 536;
+    const k = frame('Kartu / Pesanan keluar', [x, 536, 744, h], [kepala, header, ...rows], { padding: pad, gap: 12, clip: true, ...card });
+    return { k, last: rows[3]! };
+  };
+  const bottom = (r: R) => r[1] + r[3];
+
+  it('positif: daftar rata P8 minimal → error pada baris terakhir', () => {
+    const { k, last } = table([20, 0, 0, 0]);
+    const f = only(app([frame('Area kerja', [240, 0, 1200, 900], [k], { layout: 'column', padding: 32 })]), 'LC-31');
+    expect(f.map((x) => [x.nodeId, x.level, x.detail])).toEqual([[last.id, 'error', 'baris terakhir rata di tepi bawah Kartu / Pesanan keluar (bawah 0px, atas 20px)']]);
+    expect(f[0]!.expected).toBe('padding bawah setara padding atas, atau tampilkan baris utuh');
+  });
+
+  it('negatif: daftar bergaris tanpa ruang atas, kartu dengan padding bawah, baris terakhir tak ber-cat', () => {
+    const wrap = (k: Loose) => only(app([frame('Area kerja', [240, 0, 1200, 900], [k], { layout: 'column', padding: 32 })]), 'LC-31');
+    expect(wrap(table(0).k)).toEqual([]);
+    expect(wrap(table(20).k)).toEqual([]);
+    expect(wrap(table([20, 0, 0, 0], false).k)).toEqual([]);
+  });
+});
+
 describe('fixture enam aturan', () => {
   it('tepat 6 temuan: LC-01a, LC-01b, LC-02a, LC-05, LC-20 (error) lalu LC-12 (warning); © bukan temuan', () => {
     const copy = text('© 2026 Kopi', [0, 80, 100, 15], { size: 12, name: 'Hak cipta' });
