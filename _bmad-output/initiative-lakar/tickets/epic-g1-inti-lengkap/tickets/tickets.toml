@@ -51,6 +51,19 @@ hitl = false
 risk = "medium"
 
 [[entry]]
+id = 15
+type = "story"
+title = "Check luapan non-teks dan konten terpotong di tepi board"
+description = "Menambah LC-02c (error · gerbang): anak flow non-teks (frame, rect, ellipse, path, icon, gambar) melewati content box induk ber-fill/stroke > 1px di sisi mana pun, dengan pengecualian setara LC-02b; dan memperluas LC-31 dari mockup hero ke tabel dan kartu yang terpotong rata di tepi bawah board atau seksi; Lampiran A diperbarui."
+verify = "pnpm --filter @lakar/check test lulus dengan fixture positif/negatif, termasuk kartu KPI P8 polish-4 (batang mini masuk padding kanan) dan tabel P8 yang terpotong di tepi board sebagai positif; pemindaian arsip bench memberi 0 positif palsu error (cacat nyata dicatat); verify.sh lulus."
+covers = ["R1"]
+after = [4]
+hitl = false
+risk = "high"
+plan_checkpoint = true
+notes = ["Permintaan Adam 2026-11-19 setelah melihat kartu KPI P8 polish-4 (spacing kanan ±6px vs kiri 24px) yang lolos layout_check."]
+
+[[entry]]
 id = 5
 type = "story"
 title = "Check tipografi dan spacing: LC-03, 06, 07, 08, 09, 10"
@@ -111,13 +124,26 @@ done_checkpoint = true
 notes = ["Langkah Adam: meninjau dan menyetujui kelima PNG.", "Anggaran: sesi builder saja; maks 3 putaran perbaikan per desain."]
 
 [[entry]]
+id = 16
+type = "story"
+title = "Skill desain bawaan per domain setara cakupan pen.dev"
+description = "Sesi baru (C7) menyusun skill desain bawaan Lakar per domain dengan cakupan setara daftar built-in design skills pen.dev (aksesibilitas, warna, interface, layout, tipografi, UI, penulisan, dan review antarmuka), ditulis sendiri dari DESIGN.md dan sumber publik (C1, tanpa membaca atau menyalin isi skill pen.dev), dipasang lewat read_skill dengan batas token per skill dan aturan muat yang menjaga waktu run tetap ≤ 1,5× pen.dev."
+verify = "read_skill mengembalikan skill domain baru; tests/skills.test.ts (dengan batas untuk skill baru) dan skills-c7 lulus; seri latihan dengan run pen.dev yang dipakai ulang tidak turun dari polish-4 dan waktu Lakar tetap ≤ 1,5× pen.dev; verify.sh lulus."
+covers = ["R5"]
+after = [3, 7]
+hitl = false
+risk = "high"
+plan_checkpoint = true
+notes = ["Arahan Adam 2026-11-19: fokus ke built-in design skills, samakan dengan yang ada di pen.dev; fondasi UI library (shadcn/ui) tidak dulu.", "Anggaran: maks 2 iterasi latihan, ≤ $12."]
+
+[[entry]]
 id = 10
 type = "story"
 title = "Skill direvisi untuk pola G1 dan diuji dengan prompt latihan baru"
 description = "Sesi baru (C7) merevisi skill yang sudah dipadatkan untuk pola form/checkout mobile (stepper, field error, radio-card, bilah aksi tetap), tabel + panel detail gelap, dan foto relevan per konteks, lalu mengujinya dengan seri latihan hold-out baru (prompt bukan A–E, sha beku, penjaga n-gram) melawan run pen.dev baru; langkah Adam: memastikan paket pen.dev aktif kembali sebelum seri dijalankan."
 verify = "tests/skills.test.ts dan skills-c7 lulus tanpa menaikkan batas; seri latihan G1 lulus (setiap prompt Setara/Lebih baik, waktu ≤ 1,5× pen.dev, emoji 0, gate 0) dalam anggaran; verify.sh lulus."
 covers = ["R5", "R6"]
-after = [1, 3, 7]
+after = [1, 3, 7, 16]
 hitl = true
 risk = "high"
 plan_checkpoint = true
@@ -141,10 +167,10 @@ notes = ["Menunggu batas paket pen.dev (cek get_app_state dulu).", "Anggaran: �
 id = 12
 type = "story"
 title = "Refactor sweep G1"
-description = "Pembersihan saja dari temuan review dan scope tunda di plan story 1–11; scope baru menjadi story baru."
+description = "Pembersihan saja dari temuan review dan scope tunda di plan story 1–11, 15, dan 16; scope baru menjadi story baru."
 verify = "pnpm build dan pnpm test lulus; round --dry-run A–E tidak berubah (teks juri dan argv sama); verify.sh lulus."
 covers = []
-after = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+after = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 15, 16]
 hitl = false
 risk = "low"
 

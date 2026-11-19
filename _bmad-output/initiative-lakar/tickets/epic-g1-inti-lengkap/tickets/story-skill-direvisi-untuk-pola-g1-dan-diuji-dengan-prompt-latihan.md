@@ -4,7 +4,7 @@ type: story
 title: "Skill direvisi untuk pola G1 dan diuji dengan prompt latihan baru"
 parent: epic-g1-inti-lengkap
 covers: [R5, R6]
-after: [1, 3, 7]
+after: [1, 3, 7, 16]
 hitl: true
 risk: high
 ---
