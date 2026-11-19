@@ -284,6 +284,21 @@ after = [21]
 hitl = true
 risk = "medium"
 references = ["_bmad-output/initiative-lakar/analisis-ui-skills-polish.md", "bench/round-2.md#konfirmasi-adam", "bench/practice/LOG.md"]
-notes = ["Keputusan Adam 2026-11-18: skill polish yang diperkaya dari analisis ui-skills.com disetujui (\"setuju\"); dikerjakan di g0 sebelum G1.", "C7, C8, C9 berlaku; restart pen-desktop hanya setelah seri pen.dev selesai; jangan menyalin teks sumber tanpa lisensi."]
+notes = ["Keputusan Adam 2026-11-18: skill polish yang diperkaya dari analisis ui-skills.com disetujui (\"setuju\"); dikerjakan di g0 sebelum G1.", "C7, C8, C9 berlaku; restart pen-desktop hanya setelah seri pen.dev selesai; jangan menyalin teks sumber tanpa lisensi.", "Keputusan Adam 2026-11-19: ditutup sebagai built. Tujuan spacing/lencana/polish tercapai (P8, P9 Setara; emoji 0; gerbang 0). P7 kalah hanya karena waktu (174,4 dtk vs 97,5 dtk) dan ditangani di story 24."]
+plan_checkpoint = true
+done_checkpoint = true
+
+[[entry]]
+id = 24
+type = "story"
+title = "Board mobile panjang, skill webapp, foto Unsplash, dan mockup hero"
+description = "Dari tinjauan Adam atas PNG seri polish P7–P9 (2026-11-19). (a) Mobile satu board panjang: bila konten lebih panjang dari 844, agen membuat SATU board selebar 390 dengan tinggi mengikuti konten (minimal 844). Status bar ada di atas, tab bar/bilah aksi menempel di bawah board. Board \"(akhir)\" hasil duplikasi dan scrollY dihapus. Ubah mobile.md, contoh skill, LC-12, dan LC-20 (zona bawah = bawah board). Kriteria ukuran R1 di juri diubah secara simetris untuk kedua alat (board mobile panjang berlebar 390 tidak dihukum) sebagai versi rubrik baru (versi + sha dicatat); putaran yang sudah diputuskan tidak berubah. (b) Skill baru webapp.md untuk dashboard/aplikasi web: satu kartu KPI utama ber-fill warna merek, permukaan ber-tint, variasi grafik (batang bertumpuk, area, sparkline), aksen tegas di sidebar, tabel, dan chip delta berwarna; pola semua kartu putih + garis tipis + aksen biru masuk daftar slop. Dipasang di read_skill, instruksi MCP, dan tes (batas token, C7). (c) Foto: tangga kata kunci otomatis saat NOT_FOUND, panduan kata kunci di skill, adaptor Unsplash API (key di ~/.config/lakar/unsplash-access-key, header Client-ID, User-Agent generik), patuh pedoman Unsplash (hotlink, download_location saat dipakai, kredit di metadata aset), cache pencarian, dan urutan penyedia Unsplash → Wikimedia → Openverse. Konflik hotlink dengan AD-6/determinisme render diputuskan di plan dan dicatat sebagai follow-up arsitektur. (d) Mockup hero landing tidak lagi terpotong rata di bawah hero, lewat skill dan/atau aturan check."
+verify = "pnpm build dan pnpm test lulus. Tes skill lulus: contoh lolos terhadap api.ts, batas token, read_skill webapp tersedia, dan C7 (tanpa rubrik, kata khas A/B, atau teks prompt latihan di skill). LC-12/LC-20 dan aturan mockup hero punya fixture positif dan negatif. Adaptor foto teruji dengan tangga kata kunci, cache, dan urutan penyedia (tes tanpa jaringan). Key tidak pernah muncul di git, log, atau output. Rubrik juri versi baru dengan sha tercatat, simetris untuk kedua alat. Seri latihan P7–P9 (prompt beku 1.23, juri buta, C8): Lakar dijalankan ulang di ketiganya, pen.dev dijalankan ulang hanya untuk P7, P8/P9 memakai PNG pen.dev iterasi 1. Lulus bila P7–P9 semuanya Setara atau Lebih baik, emoji 0, gerbang 0, dan waktu <= 1,5x pen.dev. Biaya kumulatif tercatat dalam batas di plan. tools/node26/verify.sh lulus. Adam sudah melihat PNG."
+covers = ["R6", "R5", "R13"]
+after = [23]
+hitl = true
+risk = "high"
+references = ["bench/polish-2.md", "bench/practice/LOG.md", "_bmad-output/initiative-lakar/tickets/epic-g0-inti-minimal/tickets/story-skill-polish-dan-disiplin-spacing-dari-ui-skills-plan.md"]
+notes = ["Keputusan Adam 2026-11-19: board mobile panjang tunggal disetujui, termasuk perubahan LC-12 dan R1 juri yang simetris; anggaran tidak kaku tetapi tidak terlalu longgar (batas ditetapkan di plan, mis. <= 3 iterasi); Access Key Unsplash sudah tersedia dan isinya tidak boleh ditampilkan, dicatat, atau di-commit.", "C7, C8, C9 berlaku. pen.dev hanya lewat MCP pencil (pen-newdoc.sh + get_app_state), restart pen-desktop setelah seri. Plan checkpoint diserahkan ke orkestrator."]
 plan_checkpoint = true
 done_checkpoint = true

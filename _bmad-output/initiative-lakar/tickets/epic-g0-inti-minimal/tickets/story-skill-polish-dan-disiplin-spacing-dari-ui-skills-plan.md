@@ -3,7 +3,7 @@ title: 'Skill polish dan disiplin spacing dari ui-skills'
 type: feature
 ticket: '23'
 created: '2026-11-18'
-status: blocked
+status: built
 baseline_revision: '7fce0c5b13eafef6df9ef04fa73644fe1092f6a3'
 route: full
 route_source: auto
@@ -19,8 +19,9 @@ context:
   - '{project-root}/bench/practice/LOG.md'
 warnings: [multiple-goals, oversized]
 deferred: []
-blocked_at: "2026-11-18"
-blocked_reason: "seri polish belum lulus: P7 Kalah karena gerbang waktu (Lakar 174,4 dtk > 1,5 × pen.dev 97,5 dtk; skor Lakar 14–12), sisa anggaran $2,26 < iterasi penuh $5,70; perlu keputusan Adam"
+closed_at: "2026-11-19"
+closed_by: "keputusan Adam 2026-11-19"
+prior_blocked_reason: "seri polish belum lulus: P7 Kalah karena gerbang waktu (Lakar 174,4 dtk > 1,5 × pen.dev 97,5 dtk; skor Lakar 14–12), sisa anggaran $2,26 < iterasi penuh $5,70; perlu keputusan Adam"
 ---
 
 <intent-contract>
@@ -178,3 +179,8 @@ Status: blocked (2026-11-18) — kode, review, dan verifikasi selesai; Done belu
 - **Seri polish:** iterasi 1 (lama) P7 Kalah waktu / P8 Kalah / P9 Lebih baik ($7,54); iterasi 2 (baru, reuse pen.dev) P7 Kalah waktu 1,79× (skor 14–12) / P8 Setara 15–15 / P9 Setara 14–12 ($5,20; kumulatif $12,74). Emoji 0, gerbang layout 0.
 - **Blocking condition:** P7 gagal hanya gerbang waktu terhadap run pen.dev tunggal yang cepat (97,5 dtk, board 390×1177 melanggar ukuran). Sisa $2,26 tidak cukup untuk iterasi penuh; iterasi P7 saja tanpa perubahan yang menyasar waktu dianggap mengulang demi hasil (C8). Pilihan untuk Adam: terima seri dengan catatan, izinkan iterasi P7 saja (≈ $1,6) dengan anggaran tersisa, atau tetapkan baseline waktu P7 lain.
 - **Risiko sisa:** LC-04 kini gerbang dan memicu di 55/90 dokumen arsip — agen bisa butuh execute perbaikan tambahan (risiko waktu); warning LC-24/LC-25 sering muncul; core/landing/mobile di batas token; Lampiran A DESIGN.md belum memuat LC-23–30 dan level baru LC-02b/04/11 (follow-up Adam/Sofia); slip `npx -y true` sekali oleh implementer (gagal, tanpa instalasi; verify C9 bersih).
+
+Status: built (2026-11-19) — ditutup atas keputusan Adam.
+
+- **Keputusan Adam (2026-11-19):** 1.23 ditutup sebagai `built`. Tujuan story (disiplin spacing, proporsi lencana, aturan check luapan/tumpang tindih/kontras, skill polish) tercapai: P8 dan P9 Setara, emoji 0, gerbang 0. Kekalahan P7 hanya karena gerbang waktu (Lakar 174,4 dtk vs pen.dev 97,5 dtk; skor 14–12 untuk Lakar). Penyebabnya mobile.md memerintahkan dua board (layar + "(akhir)"), sedangkan pen.dev membuat satu board panjang. Ini ditangani di story 24 (board mobile panjang tunggal, aturan ukuran R1 simetris, skill webapp, foto Unsplash, mockup hero).
+- Tidak ada iterasi tambahan untuk 1.23; anggaran 1.23 ditutup pada kumulatif $12,74.
