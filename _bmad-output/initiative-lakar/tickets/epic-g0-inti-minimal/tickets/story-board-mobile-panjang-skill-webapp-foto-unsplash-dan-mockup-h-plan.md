@@ -185,3 +185,5 @@ Status: built (2026-11-19) — seri polish iterasi 3 lulus (keputusan Adam: pen.
 - Biaya iterasi 3 $5,34 (Lakar $3,07, juri $2,27); biaya 1.24 $5,34 dari $17,50; kumulatif seri $18,08 dari $30,24.
 - Catatan perbandingan: P7 pen.dev naik 12 → 13 (R1 0 → 2) karena rubrik 2.2 mengesahkan board 390×1177; pen.dev P9 turun 12 → 9 pada juri ulang (variasi juri, PNG sama). Rerun pen.dev P7 tidak terjadi (batas paket), sehingga patokan waktu tetap run tunggal 97,5 dtk.
 - Follow-up tetap terbuka: konfirmasi Adam atas pola cache render Unsplash dan `utm_source`; follow-up arsitektur/DESIGN.md seperti di atas. Adam perlu melihat PNG (done_checkpoint).
+
+- **Konfirmasi Adam (2026-11-19):** Adam sudah melihat PNG iterasi 3 dan menyetujuinya ("sudah setuju dan mantap"). Bagian hitl/done_checkpoint selesai. Branch `g0` di-merge ke `main` atas keputusan Adam. Putaran resmi 3 sebelum G1 tidak diperlukan untuk saat ini ("cukup dulu").
