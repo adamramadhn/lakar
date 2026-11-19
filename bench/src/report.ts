@@ -37,6 +37,8 @@ export type BaselineReport = {
   date: string;
   status: 'lengkap' | 'tidak lengkap' | 'dibatalkan';
   protocolHash: string;
+  /** Hash per prompt (`promptHash`) untuk prompt yang diukur; penjaga baseline (baseline tanpa field ini = masalah). */
+  promptHashes?: Record<string, string>;
   model: string;
   modelUsageKeys: string[];
   claudeVersion: string | undefined;
@@ -89,6 +91,7 @@ export function renderMarkdown(r: BaselineReport): string {
   L.push('## Versi dan protokol', '');
   L.push(`- Tanggal: ${r.date}`);
   L.push(`- Hash protokol (sha256 wrapper.txt + prompts.json + protocol.json): \`${r.protocolHash}\``);
+  if (r.promptHashes) for (const [id, h] of Object.entries(r.promptHashes)) L.push(`- Hash prompt ${id} (pembungkus + config tanpa promptIds + prompt; penjaga baseline): \`${h}\``);
   L.push(`- Model (pin \`--model\`): \`${r.model}\`; kunci \`modelUsage\`: ${r.modelUsageKeys.map((k) => `\`${k}\``).join(', ') || '–'}`);
   L.push(`- Claude Code: ${r.claudeVersion ?? '–'}`);
   for (const [k, v] of Object.entries(r.toolVersions)) L.push(`- ${k}: ${v ?? '–'}`);

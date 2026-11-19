@@ -3,8 +3,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { encodePngRgb } from './png/codec.js';
-import { loadProtocol, protocolHash } from './protocol.js';
-import { adamDecisions, calibrationCheck, loadRejudgeSources, parseRejudgeArgs, runRejudge, type RejudgeOptions, type RejudgePrompt } from './rejudge.js';
+import { LEGACY_G0_DIR, loadProtocol, promptHashes, protocolHash } from './protocol.js';
+import { adamDecisions, calibrationCheck, loadRejudgeSources, parseRejudgeArgs, runRejudge, sourceJudgeTexts, type RejudgeOptions, type RejudgePrompt } from './rejudge.js';
 import { aggregateScores, decide } from './round/score.js';
 import { sha256 } from './sys.js';
 import type { JudgeRepRecord } from './judge/run.js';
@@ -12,8 +12,9 @@ import type { JudgeRepRecord } from './judge/run.js';
 const protocol = loadProtocol();
 
 describe('protokol beku', () => {
-  it('(g) protocolHash tetap 907cb36f…', () => {
-    expect(protocolHash()).toBe('907cb36f4674d422feded4506851b6391082b40b918dd46841edae607bedb85d');
+  it('(g) protokol G0 beku 907cb36f… (snapshot legacy) dan hash per prompt A/B tidak bergeser', () => {
+    expect(protocolHash(LEGACY_G0_DIR)).toBe('907cb36f4674d422feded4506851b6391082b40b918dd46841edae607bedb85d');
+    expect(promptHashes(protocol, ['A', 'B'])).toEqual(promptHashes(loadProtocol(LEGACY_G0_DIR)));
   });
 });
 
@@ -125,6 +126,16 @@ describe('rejudge (claude palsu)', () => {
     expect(json).toMatchObject({ status: 'lengkap', from: 'uji-9', judge: { rubricVersion: '2', matchesRubricJson: true }, prompts: [{ prompt: 'B', adamDecision: 'Setara' }] });
     expect(json.judgeCostUsd).toBeCloseTo(0.03);
     expect(json.prompts[0].score.validReps).toBe(3);
+  });
+
+  it('teks juri prompt di luar putaran sumber (C–E belum di-snapshot) tidak memblokir dan tidak tercatat', async () => {
+    const c = 'teks juri C (belum di-snapshot)';
+    const withC = { ...opts, judgeTexts: { ...opts.judgeTexts, C: { text: c, secret: '', sha256: sha256(c), rubricVersion: '2' } } };
+    expect(sourceJudgeTexts(withC.judgeTexts, ['B'])).toEqual(opts.judgeTexts);
+    expect(await runRejudge(withC)).toBe(0);
+    const json = JSON.parse(readFileSync(join(root, 'bench/rejudge-uji9-v2-1.json'), 'utf8'));
+    expect(Object.keys(json.judge.textSha256)).toEqual(['B']);
+    expect(json.judge.matchesRubricJson).toBe(true);
   });
 
   it('label sudah ada → 64 tanpa menimpa; --resume memakai ulang ulangan ok tanpa spawn', async () => {

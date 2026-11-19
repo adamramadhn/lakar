@@ -1,6 +1,6 @@
 # @lakar/bench
 
-Harness benchmark Lakar vs pen.dev: baseline pen.dev, putaran A/B (agen `claude -p` per alat), juri buta 3×,
+Harness benchmark Lakar vs pen.dev: baseline pen.dev per prompt, putaran A–E (agen `claude -p` per alat), juri buta 3×,
 dan laporan `bench/round-<id>.md|json`, `bench/score-<prompt>.md|json` (putaran resmi ≥ 2:
 `bench/round-<n>/score-<prompt>.md|json`).
 
@@ -10,16 +10,42 @@ dan laporan `bench/round-<id>.md|json`, `bench/score-<prompt>.md|json` (putaran 
 ## Perintah
 
 ```bash
-/opt/node-26/bin/node bench/dist/cli.js pendev-baseline [--dry-run]
+/opt/node-26/bin/node bench/dist/cli.js pendev-baseline [--prompts X,Y] [--dry-run]
 /opt/node-26/bin/node bench/dist/cli.js round --round <uji-k|n> [--dry-run] [--resume]
 /opt/node-26/bin/node bench/dist/cli.js rejudge --from <uji-k|n> --label <slug> [--resume] [--dry-run]
 /opt/node-26/bin/node bench/dist/cli.js rubric-snapshot [--version <v>]
 /opt/node-26/bin/node bench/dist/cli.js practice [--series practice|effects|polish] --iter <k> [--only P1,P3] [--reuse-pendev <j>|P8=1,P9=1] [--resume] [--dry-run]
 ```
 
+## Protokol A–E dan hash per prompt
+
+`bench/protocol/` memuat pembungkus, prompt golden A–E (`prompts.json` = blockquote golden-set persis, C7 (a)), dan config
+(`protocol.json`, `promptIds` A–E). Penjaga baseline memakai **hash per prompt** (`promptHash`): sha256 JSON kanonik (kunci
+terurut) `{scheme: "lakar-bench-prompt/1", wrapper, config (protocol.json tanpa promptIds), prompt}`. Menambah prompt tidak
+mengubah hash prompt lain; mengubah teks satu prompt hanya mengubah hash prompt itu; mengubah pembungkus atau field config lain
+mengubah semuanya. `protocolHash` (byte ketiga file) tetap dicatat sebagai info. `bench/mcp/pencil.json` tidak ikut hash
+(versi alat dicek terpisah).
+
+- **Migrasi G0:** `bench/protocol/legacy/907cb36f/` = snapshot beku protokol G0 (`git show 925c66d:bench/protocol/*`).
+  `bench/baseline-pendev.json` menambah `promptHashes {A, B}` (dihitung kode dari snapshot itu) dan `promptHashMigration
+  {fromProtocolHash, legacyDir, date}`; field lain tidak disentuh. Tes membuktikan `protocolHash(legacy)` = `907cb36f…`,
+  pembungkus/prompt legacy = isi baseline lama, dan hash per prompt A/B dari legacy = dari protokol baru = yang tercatat.
+- **Baseline per prompt** (`bench/src/baselines.ts`): indeks `bench/baseline-pendev.json` + `bench/baseline-pendev-<IDS>-<tanggal>.json`.
+  Prompt yang dicakup beberapa file memakai `date` terbaru; yang lain dicatat tergantikan. Prompt dengan sukses < `runsPerPrompt`
+  tidak dipakai. File tanpa `promptHashes` = masalah (tanpa fallback ke hash utuh).
+- **`pendev-baseline [--prompts X,Y] [--dry-run]`:** default = prompt tanpa baseline sah (belum diukur, atau hash prompt, model,
+  Claude Code, pen.dev desktop ≠ baseline). Seri berselang hanya prompt terpilih (C1 D1 E1 C2 …; `seriesOutcome` dengan prompt
+  terpilih). Keluaran eksklusif `bench/baseline-pendev-<IDS>-<YYYY-MM-DD>.{md,json}` dengan `promptHashes` (sudah ada → exit 64,
+  juga saat dry-run); `bench/baseline-pendev.{md,json}` G0 tidak pernah ditimpa. `--dry-run` mencetak status baseline, hash, dan
+  argv per prompt tanpa spawn.
+- **Ukuran mengikat C–E** (`GOLDEN_BOARD_SPECS`): C 1440×1024 dan E 1440×900 persis; D lebar 390 dengan tinggi ≥ 844
+  (`heightMode: 'min'`, apa pun versi rubrik). A/B tetap mengikuti `sizeRuleFor`.
+
 ## Rubrik juri (v2) dan snapshot
 
-Rubrik juri dibangun saat runtime dari DESIGN.md Lampiran B dan kriteria golden A/B (keduanya di-exclude git).
+Rubrik juri dibangun saat runtime dari DESIGN.md Lampiran B dan kriteria golden prompt protokol (`promptIds`, kini A–E;
+keduanya di-exclude git). Karena teks juri kini mencakup C–E, `rubric-snapshot` pada v2.2 gagal sebagai "isi berbeda" sampai
+snapshot v2.3 (story 2.2).
 Riwayatnya disimpan tracked di `bench/rubric/`:
 
 - `rubric-snapshot` menulis `bench/rubric/v<ver>/{lampiran-b.md, golden-kriteria.md, judge-text-A.md, judge-text-B.md}`
@@ -119,27 +145,45 @@ strip Lakar `bench/practice/polish/<k>/`.
 
 ## Batasan
 
-- `bench/protocol/*` (hash protokol) dan `bench/mcp/pencil.json` beku; teks juri dan argv agen/juri dari
-  `round --dry-run` tidak boleh berubah tanpa keputusan baru.
+- `bench/protocol/*` (hash per prompt; snapshot `legacy/`) dan `bench/mcp/pencil.json` beku; teks juri dan argv agen/juri dari
+  `round --dry-run` tidak boleh berubah tanpa keputusan baru. Menambah prompt hanya lewat `prompts.json` + `promptIds`.
 - Perilaku proses `claude` (spawn, argumen, env) dan perhitungan skor/emoji/metrik adalah bagian dari hasil;
   refactor tidak boleh mengubahnya.
 - Artefak run di `bench/runs/` (gitignored). Fixture transkrip tes ada di `tests/support/stream.ts`.
 
 ## Putaran resmi
 
+Satu putaran = semua `promptIds` protokol (A–E): urutan run per prompt pen.dev lalu Lakar (10 run), lalu juri 3× per prompt.
+Semua putaran non-dry-run (uji dan resmi) di-abort sebelum run bila ada prompt tanpa baseline sah per hash (belum diukur, hash
+prompt ≠ baseline, file baseline tanpa `promptHashes`); `--dry-run` hanya mencetaknya.
+
 ID angka polos (`--round 1`, …) adalah putaran resmi; `uji-<k>` adalah putaran uji dan tidak memakai cek di bawah.
 Sebelum run apa pun, putaran resmi di-abort bila `officialFreezeProblems` menemukan masalah: `git status --porcelain`
 kode produk + harness (`packages tools scripts bench/src bench/protocol bench/mcp bench/package.json package.json
-pnpm-lock.yaml .mcp.json`) tidak kosong; protocolHash, model, Claude Code, atau pen.dev desktop ≠
-`bench/baseline-pendev.json`; `fonts.missing` tidak kosong atau pool belum siap; sha256 teks juri ≠
+pnpm-lock.yaml .mcp.json`) tidak kosong; per prompt: baseline belum ada, atau hash prompt, model, Claude Code, atau pen.dev
+desktop ≠ baseline terbaru yang mencakup prompt itu (Claude Code/pen.dev berubah → pembekuan gagal sampai baseline diukur ulang); `fonts.missing` tidak kosong atau pool belum siap; sha256 teks juri ≠
 `bench/rubric/rubric.json`; `schemaVersion` lakard ≠ `SCHEMA_VERSION` bench (f); penyedia foto `/status.photos` bukan
 `unsplash` (g; key Unsplash terpasang, plan 1.24); atau, sesudah restart lakard yang wajib (juga saat arsip kosong), `startedAt` lakard tidak lebih baru
 dari file `packages/*/dist` terbaru. Sesudah restart, harness menjalankan satu probe rate limit foto (`POST
 /photos/search` kueri netral lewat sesi baru): penyedia harus `unsplash`, ≥ 1 hasil, dan `fallbackReason` tidak
 diawali `unsplash-`. Probe gagal → abort sebelum `frozen.json` dan run, tanpa retry otomatis. Penyedia, key, dan hasil
 probe dicatat di Versi beku. `--dry-run` hanya mencetak hasil cek serta rencana probe dan restart. Kode di-commit sebelum putaran agar SHA beku memuat produk dan harness.
-Laporan memuat keputusan G0 sementara (`decideG0`), evaluasi arah bila belum lolos, dan bagian "Konfirmasi Adam" yang
-hanya diisi Adam. Strip Lakar disalin ke `bench/round-<n>/<prompt>-lakar.png` (tracked, eksklusif); strip dan `.pen`
+Laporan memuat keputusan sementara, evaluasi arah bila belum lolos, dan bagian "Konfirmasi Adam" yang hanya diisi Adam.
+Putaran A/B lama (G0) memakai `decideG0` dan dirender ulang tanpa perubahan. Putaran A–E (G1) memakai bagian **Keputusan G1**
+(`decideG1`) menggantikan bagian G0:
+
+- **Gerbang Lakar G1** = gerbang G0 (layout_check gate = 0, ukuran, waktu ≤ 1,5 × median baseline prompt itu) + R3/R7 mekanis
+  (`technicalScores`, Lampiran B §Kualitas teknis) dari temuan `layout_check` final board Lakar per ID aturan. R3 = 2 bila
+  LC-07, LC-11, LC-06 semuanya 0; 1 bila totalnya ≤ 5; 0 bila > 5. R7 = 2 bila 0 error non-gerbang (aturan bukan gerbang
+  menurut katalog `@lakar/schema`) dan ≤ 3 warning struktural (LC-03/13/14/17/18/21); 1 bila ≤ 2 error non-gerbang dan ≤ 8
+  warning struktural (error non-gerbang > 0 ditandai "periksa Adam: false positive?"); 0 selebihnya. Aturan yang belum ada = 0
+  temuan. R3 = 0 atau R7 = 0 → gerbang gagal (prompt Kalah). Putaran A/B dan latihan tidak menghitung R3/R7.
+- **`decideG1`:** dibatalkan → tidak dapat diputuskan; lolos bila ≥ 4 dari A–E Setara/Lebih baik, ≥ 1 Lebih baik, emoji Lakar
+  (a) input agen, (b) LC-01a + LC-01b, (c) median juri = 0, dan rasio waktu ≤ 1,5 di semua prompt; gagal bila ada emoji > 0,
+  rasio > 1,5, atau jumlah itu tidak bisa tercapai lagi walau prompt yang belum pasti berakhir Lebih baik (mis. 2 Kalah);
+  selebihnya (prompt hilang/tidak dapat dinilai yang masih bisa mengubah hasil, waktu/emoji tak terukur) → tidak dapat diputuskan.
+- `rejudge` membangun dan mengecek sha teks juri hanya untuk prompt putaran sumber (A/B untuk putaran G0), jadi teks juri C–E
+  yang belum di-snapshot tidak memblokirnya. Putaran A–E resmi tetap mewajibkan sha teks juri A–E = `bench/rubric/rubric.json`. Strip Lakar disalin ke `bench/round-<n>/<prompt>-lakar.png` (tracked, eksklusif); strip dan `.pen`
 pen.dev tetap lokal di `bench/runs/rounds/<n>/` (EULA, tidak di-commit).
 Putaran resmi ≥ 2 menulis skor ke `bench/round-<n>/score-<prompt>.md|json` agar bukti juri putaran 1
 (`bench/score-<prompt>.*`, dirujuk `bench/round-1.md`) tidak tertimpa. Laporan juga memuat rasio wall pen.dev putaran

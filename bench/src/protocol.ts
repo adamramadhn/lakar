@@ -1,5 +1,6 @@
 // Protokol benchmark yang dibekukan (AD-13, C7): pembungkus netral + teks prompt + argumen claude.
-// Dipakai bench pen.dev dan putaran Lakar vs pen.dev. Hash protokol mengikat ketiga file.
+// Dipakai bench pen.dev dan putaran Lakar vs pen.dev. Penjaga baseline memakai hash per prompt (`promptHash`):
+// pembungkus + config tanpa `promptIds` + teks prompt itu. `protocolHash` (byte ketiga file) tetap ada untuk info/legacy.
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
@@ -13,8 +14,13 @@ export const PROTOCOL_DIR = join(BENCH_ROOT, 'protocol');
 export const GOLDEN_SET_PATH = join(REPO_ROOT, '_bmad-output/initiative-lakar/ux-lakar/golden-set.md');
 export const PROTOCOL_FILES = ['wrapper.txt', 'prompts.json', 'protocol.json'] as const;
 export const PLACEHOLDER = '{{PROMPT}}';
+/** Snapshot beku protokol G0 (`git show 925c66d:bench/protocol/*`), bukti migrasi baseline A/B ke hash per prompt. */
+export const LEGACY_G0_DIR = join(PROTOCOL_DIR, 'legacy', '907cb36f');
+/** Skema hash per prompt; mengganti nilai ini membatalkan semua baseline. */
+export const PROMPT_HASH_SCHEME = 'lakar-bench-prompt/1';
 
-export type PromptId = 'A' | 'B';
+export const PROMPT_IDS = ['A', 'B', 'C', 'D', 'E'] as const;
+export type PromptId = (typeof PROMPT_IDS)[number];
 
 export type ProtocolConfig = {
   version: number;
@@ -45,12 +51,43 @@ export function protocolHash(dir = PROTOCOL_DIR): string {
   return h.digest('hex');
 }
 
+/** JSON kanonik: kunci objek terurut (rekursif), tanpa spasi. */
+export function canonicalJson(v: unknown): string {
+  if (Array.isArray(v)) return `[${v.map(canonicalJson).join(',')}]`;
+  if (v && typeof v === 'object')
+    return `{${Object.keys(v as Record<string, unknown>)
+      .sort()
+      .filter((k) => (v as Record<string, unknown>)[k] !== undefined)
+      .map((k) => `${JSON.stringify(k)}:${canonicalJson((v as Record<string, unknown>)[k])}`)
+      .join(',')}}`;
+  return JSON.stringify(v);
+}
+
+/**
+ * Hash per prompt (murni): sha256 JSON kanonik `{scheme, wrapper, config (protocol.json tanpa promptIds), prompt}`.
+ * Menambah/menghapus prompt lain tidak mengubah hash prompt ini; wrapper atau field config lain mengubah semuanya.
+ */
+export function promptHash(protocol: Pick<Protocol, 'wrapper' | 'prompts' | 'config'>, id: string): string {
+  const prompt = (protocol.prompts as Record<string, string | undefined>)[id];
+  if (typeof prompt !== 'string') throw new Error(`prompt ${id} tidak ada`);
+  const { promptIds: _ids, ...config } = protocol.config;
+  return createHash('sha256').update(canonicalJson({ scheme: PROMPT_HASH_SCHEME, wrapper: protocol.wrapper, config, prompt })).digest('hex');
+}
+
+/** Hash per prompt untuk `ids` (default: semua `promptIds` protokol). */
+export function promptHashes(protocol: Pick<Protocol, 'wrapper' | 'prompts' | 'config'>, ids: readonly string[] = protocol.config.promptIds): Record<string, string> {
+  return Object.fromEntries(ids.map((id) => [id, promptHash(protocol, id)]));
+}
+
 export function loadProtocol(dir = PROTOCOL_DIR): Protocol {
   const wrapper = readFileSync(join(dir, 'wrapper.txt'), 'utf8');
   const prompts = JSON.parse(readFileSync(join(dir, 'prompts.json'), 'utf8')) as Record<PromptId, string>;
   const config = JSON.parse(readFileSync(join(dir, 'protocol.json'), 'utf8')) as ProtocolConfig;
   if (wrapper.split(PLACEHOLDER).length !== 2) throw new Error(`wrapper.txt harus berisi tepat satu ${PLACEHOLDER}`);
-  for (const id of config.promptIds) if (typeof prompts[id] !== 'string') throw new Error(`prompts.json tidak punya prompt ${id}`);
+  for (const id of config.promptIds) {
+    if (!(PROMPT_IDS as readonly string[]).includes(id)) throw new Error(`protocol.json: promptIds ${id} bukan salah satu ${PROMPT_IDS.join('/')}`);
+    if (typeof prompts[id] !== 'string') throw new Error(`prompts.json tidak punya prompt ${id}`);
+  }
   return { dir, wrapper, prompts, config, hash: protocolHash(dir) };
 }
 
@@ -141,7 +178,7 @@ export const FORBIDDEN_TOKENS: readonly RegExp[] = [
 ];
 
 /** Butir "Kriteria target" prompt ini selalu terlarang, apa pun prompt yang dicek. */
-export const C7_CRITERIA_IDS: readonly string[] = ['A', 'B'];
+export const C7_CRITERIA_IDS: readonly string[] = PROMPT_IDS;
 
 export type C7Result = { ok: boolean; problems: string[] };
 
