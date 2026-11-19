@@ -914,3 +914,35 @@ dengan `after15b.json`, gagal gerbang 80.
 - `mobile.md`: LC-10 `Link / Semua` 82.2×20 (link teks "Lihat semua" tanpa area sentuh 44).
 - `webapp.md`: LC-07 padding 10 di `Grup label` dan `Nav / Ringkasan|Pesanan|Antar-jemput|Pendapatan|Pelanggan` (sidebar).
 - `api.md`: LC-08 `Judul` contoh API minimal tanpa `lineHeight` (32/39, 40/49) dan 16 tanpa lineHeight (16/20).
+
+# §2.6 Check konten dan struktur seksi LC-17, LC-19 (G1 story 6)
+
+Plan: `_bmad-output/initiative-lakar/tickets/epic-g1-inti-lengkap/tickets/story-check-konten-dan-struktur-seksi-lc-17-dan-lc-19-plan.md`.
+Daftar frasa dari `packages/schema/src/content-rules.ts` (dijaga `tests/content-rules.test.ts` terhadap DESIGN.md dan
+baris "Frasa terlarang" `polish.md`).
+
+## Pindaian arsip layout_check
+
+Arsip sama dengan §2.4/§2.15/§2.5: 120 dokumen, 157 board, 0 gagal; daemon dist sementara (port acak, dataDir salinan,
+tanpa key foto). Sebelum = `after5b.json` (dist story 5); sesudah = `after6.json` (dist story 6). Temuan aturan lama
+identik per dokumen (rule, level, node, detail), ringkasan error/gerbang sama; dokumen gagal gerbang tetap **80**.
+
+| Aturan | Sesudah: temuan / dok | Prototipe | Contoh terdekat (tidak dilaporkan) |
+|---|---|---|---|
+| LC-17 struktur seksi mirip (Jaccard ≥ 0,9) | 0 | 0 pasangan ≥ 0,9 | Rakit Kode `Seksi / Alur belajar` ~ `Seksi / Alumni` 0,83; Dapur Wening `Grup / Bahan utama` ~ `Grup / Bumbu halus` 0,82 (fallback tumpukan `Bahan`); Kasku `Seksi / Fitur` ~ `Seksi / Testimoni` 0,82 (golden A); 18 pasangan / 14 dok ≥ 0,75 |
+| LC-19 frasa terlarang | 0 | 0 (substring sekalipun) | — |
+
+Penilaian: keduanya siaga di arsip, sesuai prototipe. LC-17 tidak memicu pada seksi landing arsip yang berbeda jumlah
+atau jenis isi (pasangan teratas 0,83 berbeda 6–8 node dari 61–67); ambang 0,9 hanya menangkap pengulangan judul + kartu
+yang hampir identik (fixture). LC-19: arsip tidak memuat satu pun frasa daftar; perilaku dibuktikan fixture (kata
+utuh, tanpa beda huruf, spasi ganda, tanda hubung, pengecualian `Input /` dan `Label`). Uji execute lakard: board landing
+dengan dua `Seksi /` identik dan tombol "Pelajari lebih lanjut" → `warning · LC-17` dan `warning · LC-19`, 0 gerbang.
+
+**Perbaikan definisi (umum, sekali):** contoh `polish.md` (daftar pinjaman, tanpa `Seksi /`) memicu LC-17 pada
+`Item / …`: tumpukan utama `Daftar pinjaman` (kolom) berisi baris daftar `layout:'row'` berpola sama, yang bukan seksi.
+Fallback tumpukan utama kini melewati anak `layout:'row'` (baris daftar), sejalan dengan "anak row/grid bukan seksi".
+Pindaian arsip tidak berubah (0; pasangan ≥ 0,75 tetap 18 / 14 dok).
+
+## Contoh skill
+
+`skills-examples.test.ts` lulus tanpa entri `PENDING_2_10` baru (sesudah perbaikan definisi di atas).

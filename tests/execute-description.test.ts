@@ -2,6 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import { API, API_GLOBALS } from '../packages/exec/src/api.ts';
 import { EXECUTE_DESCRIPTION, ICON_SEARCH_DESCRIPTION, LAYOUT_CHECK_DESCRIPTION } from '../packages/mcp/src/server.ts';
+import { FORBIDDEN_PHRASES } from '../packages/schema/src/content-rules.ts';
 
 describe('deskripsi tool execute', () => {
   it.each(Object.keys(API))('menyebut %s(', (name) => {
@@ -32,5 +33,10 @@ describe('deskripsi tool execute', () => {
 
   it('layout_check menyebut LC-03, LC-06, LC-07, LC-08, LC-09, LC-10 (tipografi dan spacing)', () => {
     for (const s of ['LC-03 teks', 'LC-06 paragraf', 'LC-07 gap/padding', 'LC-08 ukuran', 'LC-09 > 2 keluarga', 'LC-10 target sentuh < 44×44']) expect(LAYOUT_CHECK_DESCRIPTION).toContain(s);
+  });
+
+  it('layout_check menyebut LC-17 (seksi mirip) dan LC-19 dengan setiap frasa terlarang dari modul', () => {
+    for (const s of ['LC-17 struktur seksi mirip', 'Jaccard ≥ 0,9', 'LC-19 frasa terlarang', "'Input / …' dan layer 'Label'"]) expect(LAYOUT_CHECK_DESCRIPTION).toContain(s);
+    for (const p of [...FORBIDDEN_PHRASES.id, ...FORBIDDEN_PHRASES.en]) expect(LAYOUT_CHECK_DESCRIPTION).toContain(`"${p}"`);
   });
 });

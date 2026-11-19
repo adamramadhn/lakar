@@ -5,6 +5,7 @@ import { z } from 'zod';
 import {
   COMPONENT_SIZES,
   DISPLAY_SIZES,
+  FORBIDDEN_PHRASES,
   HOME_INDICATOR_INSET,
   KPI_LINE_HEIGHT_RATIO,
   KPI_SIZES,
@@ -186,6 +187,8 @@ export const LAYOUT_CHECK_DESCRIPTION =
   `Warning tipografi/spacing (token DESIGN.md): LC-03 teks wrap 'fixed' ≥ 2 baris atau teks melewati kotaknya, LC-06 paragraf (≥ 2 baris, ≥ 6 kata) < ${PARAGRAPH_MIN.landing}px di landing/mobile, < ${PARAGRAPH_MIN.app}px di app, < ${PARAGRAPH_MIN_IN_CARD}px di kartu ber-cat, ` +
   `LC-07 gap/padding di luar ${[...SPACING_VALUES].sort((a, b) => a - b).join('/')} (padding bawah ${HOME_INDICATOR_INSET} sah) dan tinggi komponen di luar token atau ${COMPONENT_SIZES.join('/')}, ` +
   `LC-08 ukuran di luar skala tipe atau line-height tak cocok token (KPI / Nilai ${KPI_SIZES.join('/')} dengan line-height × ${KPI_LINE_HEIGHT_RATIO} atau token, 'Display / …' ${DISPLAY_SIZES.join('/')}; < 12px = LC-05), LC-09 > 2 keluarga font (mono tidak dihitung), LC-10 target sentuh < ${TOUCH_MIN}×${TOUCH_MIN} di board mobile. ` +
+  `Warning konten/seksi: LC-17 struktur seksi mirip (pasangan 'Seksi / …', atau anak tumpukan utama kolom, dengan multiset tipe node + ukuran font Jaccard ≥ 0,9; variasikan komposisi), ` +
+  `LC-19 frasa terlarang (kata utuh, tanpa beda huruf; kecuali di 'Input / …' dan layer 'Label'): ${[...FORBIDDEN_PHRASES.id, ...FORBIDDEN_PHRASES.en].map((p) => `"${p}"`).join(', ')}. ` +
   "Struktural: LC-16 (error bukan gerbang) path ≤ 32×32 sebagai ikon (pakai node icon; bentuk sengaja 'Shape / …', grafik 'Chart / …'); " +
   "warning LC-14 absolut di dalam flex tanpa 'Overlay / …', LC-15 > 1 pustaka ikon UI, LC-21 radius > 3 nilai / spacer kosong / padding ganda mobile / teks langsung di baris tabel / > 1 bidang efek; " +
   'info (hanya di layout_check, tidak di execute) LC-13 nama layer default, LC-22 jumlah node Crop/Overlay/Scroll/Ekstra. ' +

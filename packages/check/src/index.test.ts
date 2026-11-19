@@ -81,10 +81,10 @@ const runAll = (spec: BoardSpec | BoardSpec[], which = 0): Finding[] => {
   return checkBoard({ doc, boardId: boards[which]!, measure: measures.get(boards[which]!)! });
 };
 /**
- * Aturan G1: struktural (story 4) dan tipografi/spacing (story 5). Fixture aturan G0 sengaja sintetis (bar absolut, rect
+ * Aturan G1: struktural (story 4), tipografi/spacing (story 5), konten/seksi (story 6). Fixture aturan G0 sengaja sintetis (bar absolut, rect
  * tanpa cat, nama bebas, ukuran huruf/padding bebas), jadi `run` menyaringnya; fixture G1 memakai `runAll`.
  */
-const G1_FILTERED = new Set(['LC-13', 'LC-14', 'LC-15', 'LC-16', 'LC-21', 'LC-22', 'LC-03', 'LC-06', 'LC-07', 'LC-08', 'LC-09', 'LC-10']);
+const G1_FILTERED = new Set(['LC-13', 'LC-14', 'LC-15', 'LC-16', 'LC-21', 'LC-22', 'LC-03', 'LC-06', 'LC-07', 'LC-08', 'LC-09', 'LC-10', 'LC-17', 'LC-19']);
 const run = (spec: BoardSpec | BoardSpec[], which = 0): Finding[] => runAll(spec, which).filter((f) => !G1_FILTERED.has(f.rule));
 const rules = (f: Finding[]) => f.map((x) => x.rule);
 const only = (f: Finding[], rule: string) => f.filter((x) => x.rule === rule);
@@ -1581,5 +1581,114 @@ describe('LC-10 target sentuh di board mobile', () => {
       frame('IconButton / Jauh', [0, 900, 40, 40], [], { width: 40, height: 40 }),
     ];
     expect(only(runAll(clean(kids)), 'LC-10')).toEqual([]);
+  });
+});
+
+// ---- Konten dan struktur seksi (story G1 6)
+
+/** Seksi landing: judul 32 + grid `layout:'row'` berisi `n` kartu (frame + judul 20 + isi 16) = 2 + 3n node. */
+const section = (name: string, y: number, n: number, extra: Loose = {}): Loose =>
+  frame(name, [0, y, 1440, 200], [
+    text('Judul seksi', [80, y + 24, 600, 40], { size: 32, name: 'Judul' }),
+    frame('Grid', [80, y + 80, 1280, 100], Array.from({ length: n }, (_, i) => frame(`Kartu ${i + 1}`, [80 + i * 300, y + 80, 280, 100], [
+      text('Judul kartu', [96 + i * 300, y + 96, 240, 28], { size: 20, name: 'Judul kartu' }),
+      text('Isi kartu singkat', [96 + i * 300, y + 132, 240, 24], { size: 16, name: 'Isi' }),
+    ])), { layout: 'row', gap: 16 }),
+  ], extra);
+
+describe('LC-17 struktur seksi mirip', () => {
+  it('positif: dua Seksi / judul + 3 kartu identik → 1 warning pada seksi kedua', () => {
+    const a = section('Seksi / Fitur', 0, 3);
+    const b = section('Seksi / Manfaat', 220, 3);
+    const f = only(runAll(landing([a, b])), 'LC-17');
+    expect(f).toHaveLength(1);
+    expect(f[0]).toMatchObject({ level: 'warning', nodeId: b.id, nodeName: 'Seksi / Manfaat', detail: `mirip Seksi / Fitur (${a.id}): 100%` });
+    expect(f[0]!.expected).toBe('variasikan komposisi antar-seksi (tata letak, jenis isi), bukan judul + kartu identik berulang');
+    expect(summarizeFindings(f).gate).toBe(0);
+  });
+  it('tiga seksi identik → satu temuan per seksi kedua dan ketiga (pasangan terbaik = seksi pertama)', () => {
+    const [a, b, c] = [section('Seksi / A', 0, 3), section('Seksi / B', 220, 3), section('Seksi / C', 440, 3)];
+    const f = only(runAll(landing([a, b, c])), 'LC-17');
+    expect(f.map((x) => [x.nodeId, x.detail])).toEqual([
+      [b.id, `mirip Seksi / A (${a.id}): 100%`],
+      [c.id, `mirip Seksi / A (${a.id}): 100%`],
+    ]);
+  });
+  it('fallback tanpa Seksi /: board → Halaman (satu-satunya anak flow, kolom) → dua anak frame berpola sama', () => {
+    const a = section('Fitur', 0, 3);
+    const b = section('Harga', 220, 3);
+    const f = only(runAll(landing([frame('Halaman', [0, 0, 1440, 900], [a, b])])), 'LC-17');
+    expect(f).toHaveLength(1);
+    expect(f[0]).toMatchObject({ nodeId: b.id, detail: `mirip Fitur (${a.id}): 100%` });
+  });
+  it('negatif: 3 vs 4 kartu (Jaccard < 0,9)', () => {
+    expect(only(runAll(landing([section('Seksi / A', 0, 3), section('Seksi / B', 220, 4)])), 'LC-17')).toEqual([]);
+  });
+  it('negatif: kartu dalam satu grid (anak row) tanpa Seksi /', () => {
+    const card = (i: number) => frame(`Kartu ${i}`, [i * 300, 0, 280, 300], [
+      text('Judul', [i * 300, 0, 200, 28], { size: 20 }),
+      text('Isi', [i * 300, 40, 200, 24], { size: 16 }),
+      text('Isi', [i * 300, 70, 200, 24], { size: 16 }),
+      text('Isi', [i * 300, 100, 200, 24], { size: 16 }),
+      frame('Button / Pesan', [i * 300, 140, 120, 44], [text('Pesan', [i * 300 + 16, 150, 80, 24], { size: 16 })], { layout: 'row' }),
+    ]);
+    expect(only(runAll(landing([frame('Grid', [0, 0, 1440, 300], [card(0), card(1), card(2)], { layout: 'row' })])), 'LC-17')).toEqual([]);
+  });
+  it('negatif: baris daftar (anak layout row) di tumpukan utama kolom tanpa Seksi /', () => {
+    const row = (y: number) => frame(`Item / ${y}`, [20, y, 350, 64], [
+      frame('Ikon', [32, y + 12, 40, 40], [{ type: 'icon', id: nid(), name: 'Ikon', lib: 'lucide', icon: 'book', size: 20, _r: [42, y + 22, 20, 20] }], { layout: 'row' }),
+      frame('Teks', [84, y + 12, 200, 40], [text('Judul', [84, y + 12, 200, 20], { size: 16 }), text('Meta', [84, y + 34, 200, 18], { size: 14 })]),
+      frame('Badge / Status', [290, y + 20, 70, 24], [text('Dipinjam', [298, y + 22, 54, 20], { size: 12 })], { layout: 'row' }),
+    ], { layout: 'row' });
+    expect(only(runAll(clean([frame('Daftar', [0, 0, 390, 300], [row(20), row(92), row(164)], { padding: 20, gap: 8 })])), 'LC-17')).toEqual([]);
+  });
+  it('negatif: seksi bersarang (leluhur–keturunan)', () => {
+    const inner = section('Seksi / Dalam', 0, 3);
+    const outer = frame('Seksi / Luar', [0, 0, 1440, 220], [inner]);
+    expect(only(runAll(landing([outer])), 'LC-17')).toEqual([]);
+  });
+  it('negatif: seksi < 6 node terlihat', () => {
+    expect(only(runAll(landing([section('Seksi / A', 0, 1), section('Seksi / B', 220, 1)])), 'LC-17')).toEqual([]);
+  });
+  it('negatif: tumpukan utama berupa row (sidebar + main)', () => {
+    const side = section('Sidebar', 0, 3);
+    const main = section('Main', 0, 3);
+    expect(only(runAll(app([frame('Layar', [0, 0, 1440, 900], [side, main], { layout: 'row' })])), 'LC-17')).toEqual([]);
+  });
+});
+
+describe('LC-19 frasa terlarang', () => {
+  it('positif: kata utuh, tanpa beda huruf, spasi ganda, tanda hubung', () => {
+    const kids = [
+      text('Pelajari Lebih Lanjut →', [0, 0, 300, 20], { name: 'Tautan' }),
+      text('Unlock your data.', [0, 30, 300, 20]),
+      text('Klik  di sini', [0, 60, 300, 20]),
+      text('Analitik next-level untuk warung', [0, 90, 300, 20]),
+    ];
+    const f = only(runAll(landing(kids)), 'LC-19');
+    expect(f).toHaveLength(3);
+    expect(f[0]).toMatchObject({ level: 'warning', nodeId: kids[0]!.id, detail: 'frasa terlarang "pelajari lebih lanjut" (id) di "Pelajari Lebih Lanjut →"', expected: 'ganti dengan aksi/klaim spesifik dari konten' });
+    expect(f[1]!.detail).toBe('frasa terlarang "unlock" (en) di "Unlock your data."');
+    expect(f[2]!.detail).toBe('frasa terlarang "klik di sini" (id) di "Klik  di sini" (+1 serupa)');
+    const all = only(runAll(landing([kids[3]!])), 'LC-19');
+    expect(all[0]!.detail).toBe('frasa terlarang "next-level" (en) di "Analitik next-level untuk warung"');
+    expect(summarizeFindings(f).gate).toBe(0);
+  });
+  it('beberapa frasa dalam satu teks → satu temuan', () => {
+    const f = only(runAll(landing([text('Seamless and next-level. Learn more', [0, 0, 400, 20])])), 'LC-19');
+    expect(f).toHaveLength(1);
+    expect(f[0]!.detail).toBe('frasa terlarang "learn more" (en), "seamless" (en), "next-level" (en) di "Seamless and next-level. Learn more"');
+  });
+  it('negatif: bukan kata utuh; di dalam Input /; bernama atau berleluhur Label; tak terlihat', () => {
+    const kids = [
+      text('unlocked', [0, 0, 300, 20]),
+      text('Seamlessly', [0, 30, 300, 20]),
+      text('pelajari lebih lanjutan', [0, 60, 300, 20]),
+      frame('Input / Cari', [0, 90, 300, 44], [text('Klik di sini untuk mencari', [12, 100, 260, 20], { name: 'Placeholder' })], { layout: 'row' }),
+      text('Learn more', [0, 140, 300, 20], { name: 'Label' }),
+      frame('Label', [0, 170, 300, 20], [text('Lorem ipsum', [0, 170, 300, 20])], { layout: 'row' }),
+      text('Click here', [0, 1000, 300, 20]),
+    ];
+    expect(only(runAll(landing(kids)), 'LC-19')).toEqual([]);
   });
 });

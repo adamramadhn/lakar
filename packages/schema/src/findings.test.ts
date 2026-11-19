@@ -6,12 +6,12 @@ const f = (rule: Finding['rule'], level: Finding['level']): Finding => ({ level,
 describe('temuan G0 (AD-8)', () => {
   it('katalog: error ber-gerbang kecuali LC-16; warning dan info tanpa gerbang', () => {
     expect(G0_RULE_IDS).toEqual([
-      'LC-01a', 'LC-01b', 'LC-02a', 'LC-02b', 'LC-02c', 'LC-03', 'LC-04', 'LC-05', 'LC-06', 'LC-07', 'LC-08', 'LC-09', 'LC-10', 'LC-11', 'LC-12', 'LC-13', 'LC-14', 'LC-15', 'LC-16', 'LC-18', 'LC-20',
+      'LC-01a', 'LC-01b', 'LC-02a', 'LC-02b', 'LC-02c', 'LC-03', 'LC-04', 'LC-05', 'LC-06', 'LC-07', 'LC-08', 'LC-09', 'LC-10', 'LC-11', 'LC-12', 'LC-13', 'LC-14', 'LC-15', 'LC-16', 'LC-17', 'LC-18', 'LC-19', 'LC-20',
       'LC-21', 'LC-22', 'LC-23', 'LC-24', 'LC-25', 'LC-26', 'LC-27', 'LC-28', 'LC-29', 'LC-30', 'LC-31',
     ]);
     for (const id of G0_RULE_IDS) expect(G0_RULES[id].gate, id).toBe(G0_RULES[id].level === 'error' && id !== 'LC-16');
     const warnings = G0_RULE_IDS.filter((id) => G0_RULES[id].level === 'warning');
-    expect(warnings).toEqual(['LC-03', 'LC-06', 'LC-07', 'LC-08', 'LC-09', 'LC-10', 'LC-12', 'LC-14', 'LC-15', 'LC-18', 'LC-21', 'LC-23', 'LC-24', 'LC-25', 'LC-26', 'LC-27', 'LC-28', 'LC-29', 'LC-30']);
+    expect(warnings).toEqual(['LC-03', 'LC-06', 'LC-07', 'LC-08', 'LC-09', 'LC-10', 'LC-12', 'LC-14', 'LC-15', 'LC-17', 'LC-18', 'LC-19', 'LC-21', 'LC-23', 'LC-24', 'LC-25', 'LC-26', 'LC-27', 'LC-28', 'LC-29', 'LC-30']);
     expect(G0_RULE_IDS.filter((id) => G0_RULES[id].level === 'info')).toEqual(['LC-13', 'LC-22']);
   });
 

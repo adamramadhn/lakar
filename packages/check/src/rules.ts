@@ -2,6 +2,8 @@
 import {
   COMPONENT_SIZES,
   DISPLAY_SIZES,
+  FORBIDDEN_EXEMPT,
+  forbiddenPhrasesIn,
   G0_RULES,
   HOME_INDICATOR_INSET,
   KPI_LINE_HEIGHT_RATIO,
@@ -1584,6 +1586,111 @@ export function lc10(ctx: BoardContext): Finding[] {
     const b = ctx.bounds.get(n.id)!;
     if (b.width >= TOUCH_MIN - TOLERANCE && b.height >= TOUCH_MIN - TOLERANCE) continue;
     out.push(finding('LC-10', levelOf('LC-10'), n, `${num(b.width)}×${num(b.height)} < ${TOUCH_MIN}×${TOUCH_MIN}`, `target sentuh ≥ ${TOUCH_MIN}×${TOUCH_MIN}: perbesar tinggi/lebar atau padding`));
+  }
+  return out;
+}
+
+// ===========================================================================
+// Konten dan struktur seksi (story G1 6): LC-17, LC-19 (warning). Frasa dari content-rules.
+// ===========================================================================
+
+// ---------------------------------------------------------------------------
+// LC-17 · struktur seksi mirip (warning)
+// ---------------------------------------------------------------------------
+
+/** Kemiripan multiset (Jaccard Σmin/Σmax) minimum antarseksi, dan jumlah node terlihat minimum per seksi. */
+export const SECTION_SIMILARITY_MIN = 0.9;
+export const SECTION_MIN_NODES = 6;
+
+/**
+ * Tumpukan utama board tanpa `Seksi /`: turun dari board selama wadah hanya punya satu anak flow terlihat (selain chrome)
+ * berupa frame. Kandidat seksi = anak flow frame wadah itu yang bukan `layout:'row'` (baris daftar, bukan seksi), hanya
+ * bila wadah kolom (board atau `layout:'column'`).
+ */
+function stackSections(ctx: BoardContext): FrameNode[] {
+  let c: Container = ctx.board;
+  for (;;) {
+    const flow: ChildNode[] = c.children.filter((k) => isFlowChild(c, k) && !isChrome(k) && visibleRect(ctx, k));
+    if (flow.length === 1 && flow[0]!.type === 'frame') {
+      c = flow[0]!;
+      continue;
+    }
+    const column = c.type === 'board' || c.layout === 'column';
+    return column ? flow.filter((k): k is FrameNode => k.type === 'frame' && k.layout !== 'row') : [];
+  }
+}
+
+/** Multiset keturunan terlihat (kedalaman penuh; anak berulang dihitung): `text <size>` untuk teks, tipe untuk lainnya. */
+function sectionBag(ctx: BoardContext, sec: FrameNode): Map<string, number> {
+  const bag = new Map<string, number>();
+  const walk = (n: Container) => {
+    for (const c of n.children) {
+      if (!visibleRect(ctx, c)) continue;
+      const k = c.type === 'text' ? `text ${num(c.size)}` : c.type;
+      bag.set(k, (bag.get(k) ?? 0) + 1);
+      if (c.type === 'frame') walk(c);
+    }
+  };
+  walk(sec);
+  return bag;
+}
+
+function jaccard(a: ReadonlyMap<string, number>, b: ReadonlyMap<string, number>): number {
+  let min = 0;
+  let max = 0;
+  for (const k of new Set([...a.keys(), ...b.keys()])) {
+    const x = a.get(k) ?? 0;
+    const y = b.get(k) ?? 0;
+    min += Math.min(x, y);
+    max += Math.max(x, y);
+  }
+  return max > 0 ? min / max : 0;
+}
+
+export function lc17(ctx: BoardContext): Finding[] {
+  const named17 = ctx.nodes.filter((n): n is FrameNode => n.type === 'frame' && named(n, 'Seksi /') && visibleRect(ctx, n) !== undefined);
+  const secs = (named17.length ? named17 : stackSections(ctx))
+    .map((s) => ({ s, bag: sectionBag(ctx, s) }))
+    .filter((x) => [...x.bag.values()].reduce((a, b) => a + b, 0) >= SECTION_MIN_NODES);
+  const nested = (a: FrameNode, b: FrameNode) => ancestors(ctx, b).includes(a) || ancestors(ctx, a).includes(b);
+  const out: Finding[] = [];
+  for (let j = 1; j < secs.length; j++) {
+    const B = secs[j]!;
+    let best: { s: FrameNode; sim: number } | undefined;
+    for (let i = 0; i < j; i++) {
+      const A = secs[i]!;
+      if (nested(A.s, B.s)) continue;
+      const sim = jaccard(A.bag, B.bag);
+      if (sim >= SECTION_SIMILARITY_MIN && sim > (best?.sim ?? -1)) best = { s: A.s, sim };
+    }
+    if (!best) continue;
+    out.push(
+      finding(
+        'LC-17',
+        levelOf('LC-17'),
+        B.s,
+        clip120(`mirip ${best.s.name} (${best.s.id}): ${Math.round(best.sim * 100)}%`),
+        'variasikan komposisi antar-seksi (tata letak, jenis isi), bukan judul + kartu identik berulang',
+      ),
+    );
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+// LC-19 · frasa terlarang (warning)
+// ---------------------------------------------------------------------------
+
+const exemptFromPhrases = (n: { name: string }): boolean => named(n, FORBIDDEN_EXEMPT.inside) || n.name === FORBIDDEN_EXEMPT.layer;
+
+export function lc19(ctx: BoardContext): Finding[] {
+  const out: Finding[] = [];
+  for (const t of visibleTexts(ctx)) {
+    if (exemptFromPhrases(t) || ancestorFrames(ctx, t).some(exemptFromPhrases)) continue;
+    const hits = forbiddenPhrasesIn(t.content);
+    if (!hits.length) continue;
+    const list = hits.map((h) => `"${h.phrase}" (${h.lang})`).join(', ');
+    out.push(finding('LC-19', levelOf('LC-19'), t, clip120(`frasa terlarang ${list} di ${quote(t.content)}`), 'ganti dengan aksi/klaim spesifik dari konten'));
   }
   return out;
 }
