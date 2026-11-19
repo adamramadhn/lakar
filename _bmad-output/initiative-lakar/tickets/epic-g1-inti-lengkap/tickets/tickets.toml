@@ -131,10 +131,10 @@ description = "Sesi baru (C7) menyusun skill desain bawaan Lakar per domain deng
 verify = "read_skill mengembalikan skill domain baru; tests/skills.test.ts (dengan batas untuk skill baru) dan skills-c7 lulus; seri latihan dengan run pen.dev yang dipakai ulang tidak turun dari polish-4 dan waktu Lakar tetap ≤ 1,5× pen.dev; verify.sh lulus."
 covers = ["R5"]
 after = [3, 7]
-hitl = false
+hitl = true
 risk = "high"
 plan_checkpoint = true
-notes = ["Arahan Adam 2026-11-19: fokus ke built-in design skills, samakan dengan yang ada di pen.dev; fondasi UI library (shadcn/ui) dibatalkan.", "Anggaran: maks 2 iterasi latihan, ≤ $12."]
+notes = ["Arahan Adam 2026-11-19: fokus ke built-in design skills, samakan dengan yang ada di pen.dev; fondasi UI library (shadcn/ui) dibatalkan.", "Anggaran: maks 2 iterasi latihan, ≤ $12.", "Arahan Adam 2026-11-19 (menyetujui usulan orkestrator, dari cacat PNG Lakar, bukan dari rubrik/golden): (1) disiplin geometri sebelum menggambar: hitung lebar konten − gap sebelum elemen lebar tetap sebaris, visual samping fill + maks, padding bawah = atas, warning spacing ikut dibereskan; (3) karakter tipografi landing: pasangan font display + teks per nada brief, satu seksi kontras dan satu momen angka besar, tanpa ruang kosong mati; (4) review diri: screenshot ulang area padat skala 2 + 6–8 pertanyaan tetap; (6) copy: angka saling konsisten, nama/lokasi Indonesia wajar, tanpa frasa generik.", "Arahan Adam 2026-11-19: Adam menilai cepat PNG setiap iterasi latihan (Setara/Kalah/Lebih baik per prompt); bila berulang berbeda dengan juri, juri dikalibrasi ulang sebelum putaran resmi."]
 
 [[entry]]
 id = 10
@@ -148,7 +148,7 @@ hitl = true
 risk = "high"
 plan_checkpoint = true
 done_checkpoint = true
-notes = ["Butuh run pen.dev baru; menunggu batas paket pen.dev.", "Anggaran: maks 3 iterasi, ≤ $30."]
+notes = ["Butuh run pen.dev baru; menunggu batas paket pen.dev.", "Anggaran: maks 3 iterasi, ≤ $30.", "Arahan Adam 2026-11-19: (2) kelengkapan per pola — tabel (ID mono, angka kanan, badge status, aksi baris, header kecil, footer/pagination, filter), grafik (sumbu + 3–5 gridline, label nilai penting, legenda bernilai, penanda hari ini), KPI (ikon konteks, delta + pembanding, satu elemen pendukung), form (label, helper, error spesifik, state terpilih); (6) foto: tangga kata kunci Unsplash spesifik konteks Indonesia + cek relevansi dari screenshot, ganti bila tidak cocok; (7) mode gelap: 3 lapis permukaan tanpa bayangan, muted ≥ 4.5:1, aksen varian gelap, status teks + titik.", "Arahan Adam 2026-11-19: Adam menilai cepat PNG setiap iterasi latihan (Setara/Kalah/Lebih baik per prompt); bila berulang berbeda dengan juri, juri dikalibrasi ulang sebelum putaran resmi."]
 
 [[entry]]
 id = 11
@@ -173,6 +173,7 @@ covers = []
 after = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 15, 16]
 hitl = false
 risk = "low"
+notes = ["Arahan Adam 2026-11-19: (5) ringkas keluaran execute untuk node besar (round-2 B: 53 ribu karakter melebihi batas tool result) tanpa menghilangkan temuan check."]
 
 [[entry]]
 id = 13

@@ -27,3 +27,5 @@ Verify: tests/skills.test.ts dan skills-c7 lulus tanpa menaikkan batas; seri lat
 
 - Butuh run pen.dev baru; menunggu batas paket pen.dev.
 - Anggaran: maks 3 iterasi, ≤ $30.
+- Arahan Adam 2026-11-19: (2) kelengkapan per pola — tabel (ID mono, angka kanan, badge status, aksi baris, header kecil, footer/pagination, filter), grafik (sumbu + 3–5 gridline, label nilai penting, legenda bernilai, penanda hari ini), KPI (ikon konteks, delta + pembanding, satu elemen pendukung), form (label, helper, error spesifik, state terpilih); (6) foto: tangga kata kunci Unsplash spesifik konteks Indonesia + cek relevansi dari screenshot, ganti bila tidak cocok; (7) mode gelap: 3 lapis permukaan tanpa bayangan, muted ≥ 4.5:1, aksen varian gelap, status teks + titik.
+- Arahan Adam 2026-11-19: Adam menilai cepat PNG setiap iterasi latihan (Setara/Kalah/Lebih baik per prompt); bila berulang berbeda dengan juri, juri dikalibrasi ulang sebelum putaran resmi.

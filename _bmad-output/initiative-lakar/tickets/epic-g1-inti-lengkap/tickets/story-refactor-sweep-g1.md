@@ -21,3 +21,7 @@ Verify: pnpm build dan pnpm test lulus; round --dry-run A–E tidak berubah (tek
 ## References
 
 - parent — _bmad-output/initiative-lakar/tickets/epic-g1-inti-lengkap/epic-g1-inti-lengkap.md
+
+## Notes
+
+- Arahan Adam 2026-11-19: (5) ringkas keluaran execute untuk node besar (round-2 B: 53 ribu karakter melebihi batas tool result) tanpa menghilangkan temuan check.
