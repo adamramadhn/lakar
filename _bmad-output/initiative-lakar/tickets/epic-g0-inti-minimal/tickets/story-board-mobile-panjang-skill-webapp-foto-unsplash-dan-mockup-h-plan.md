@@ -3,7 +3,7 @@ title: 'Board mobile panjang, skill webapp, foto Unsplash, dan mockup hero'
 type: feature
 ticket: '24'
 created: '2026-11-19'
-status: in-review
+status: blocked
 baseline_revision: '9b5652de1b71425b64d2855ac639328f560ab426'
 route: full
 route_source: auto
@@ -12,13 +12,15 @@ review: quick
 review_source: pinned
 lenses_ran: [quick]
 review_loop_iteration: 0
-followup_review_recommended: false
+followup_review_recommended: true
 context:
   - '{project-root}/bench/README.md'
   - '{project-root}/bench/practice/LOG.md'
   - '{project-root}/_bmad-output/initiative-lakar/tickets/epic-g0-inti-minimal/tickets/story-skill-polish-dan-disiplin-spacing-dari-ui-skills-plan.md'
 warnings: [multiple-goals, oversized]
 deferred: []
+blocked_at: "2026-11-19"
+blocked_reason: "seri polish iterasi 3 tidak bisa jalan: batas paket pen.dev (MCP pencil) tercapai untuk periode tagihan ini; rerun P7 pen.dev mustahil tanpa upgrade; butuh keputusan Adam (upgrade, atau pakai ulang pen.dev P7 iterasi 1)"
 ---
 
 <intent-contract>
@@ -165,3 +167,13 @@ deferred: []
 Status: ready-for-dev — fase plan saja (plan_checkpoint). Berhenti menunggu persetujuan orkestrator sebelum kode produk diubah.
 
 - Keputusan menunggu tinjauan: aset jarak jauh Unsplash dengan cache HTTP render daemon (AD-10/R11 follow-up arsitektur), rubrik v2.2 (R1 mobile: lebar tepat, tinggi ≥ yang diminta; versioned via `sizeRuleFor`), LC-31 baru (awal error·gerbang, tunduk pindaian arsip), `--reuse-pendev` per prompt, batas 1.24 maks 3 iterasi / $17,50 (kumulatif seri ≤ $30,24).
+
+Status: blocked (2026-11-19) — kode, review, dan verifikasi selesai; seri polish iterasi 3 tidak bisa dijalankan.
+
+- **Ringkasan:** board mobile panjang tunggal (skill + LC-12 + fixture LC-20), aturan ukuran simetris per versi rubrik beku (`sizeRuleFor`, rubrik 2.2), skill `webapp.md`, foto Unsplash (tangga kata kunci, cache cari disk, aset jarak jauh + cache render + placeholder, `download_location` per (ref, docId), urutan Unsplash → Wikimedia → Openverse), mockup hero utuh (skill) + LC-31 (error·gerbang), `--reuse-pendev` per prompt, seri polish maks 5 / $30,24.
+- **Commit:** `2bedc7d` (plan), `78481ae` (persetujuan), `9ab9ac2` (check), `73bfa5e` (skill + foto), `d416f6c` (bench), `54120a7` (rubrik 2.2 + snapshot), `4f86c29` (perbaikan review), `e14f0d1` (C7 webapp + log triase), `7c0f29c` (iterasi 3 dibatalkan).
+- **Review (quick):** 5 temuan — 5 dipatch (3 medium, 2 low), 0 ditunda, 0 ditolak. Follow-up review: **true** (3 medium dipatch; risiko yang belum diverifikasi ulang: jalur cache cari/blokir Unsplash dan LC-12 tanpa zona hanya teruji dengan fixture, belum di run agen nyata).
+- **Pindaian arsip (96 dok):** LC-31 10 error = 5 kasus unik (A round-1, A round-2, A uji-1, P9 iterasi 2, P5 effects-3), semua cacat nyata → tetap error·gerbang; LC-12 33 warning (pola dua board usang); LC-20 tidak berubah; dok dengan gate > 0: 65 → 71.
+- **Verifikasi:** `pnpm build` lulus; `pnpm test` 959/959; api.md mutakhir; lakard active (`/status` foto `unsplash`, `keyFile present`); cek key nyata tanpa kebocoran (implementer); `tools/node26/verify.sh` semua OK, snapshot C9 identik.
+- **Blocking condition:** run pen.dev P7 iterasi 3 gagal di `pen-newdoc`: MCP pencil melaporkan batas paket pen.dev periode tagihan ini tercapai (semua tool desain diblokir). Tidak ada upaya mengakali; harness berhenti sebelum Lakar/juri, biaya $0, kumulatif seri $12,74. `.pen` lama utuh (48/48). Pilihan untuk Adam: upgrade paket lalu `practice --series polish --iter 3 --reuse-pendev P8=1,P9=1 --resume`, atau ubah rencana (pakai ulang pen.dev P7 iterasi 1 = 390×1177, sah di rubrik 2.2, dengan `--reuse-pendev 1`).
+- **Risiko sisa / follow-up:** kepatuhan cache render Unsplash perlu konfirmasi Adam; `utm_source` default `lakar` harus disamakan dengan nama aplikasi di dashboard Unsplash (`unsplash_app_name`); follow-up arsitektur AD-6/AD-10, §Deferred foto, R11 dan Decision epic (Unsplash), AD-15 (pola dua board/`scrollY`); DESIGN.md (pola mobile, Lampiran A LC-12/LC-31) dan kriteria golden B belum diperbarui; landing prosa 1500/1500 dan core 3967/4000 di batas token; LC-31 menambah beban gerbang.
