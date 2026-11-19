@@ -21,8 +21,8 @@ try {
   if (fonts.missing.length) console.warn(`lakard: paket font tidak ditemukan: ${fonts.missing.join(', ')}`);
   // Katalog ikon dimuat saat start (bukan di permintaan pertama); paket hilang → gagal start yang jelas.
   const icons = IconCatalog.load();
-  // Foto stok: key Pexels dibaca dari file (bukan env) saat dibutuhkan; tanpa key → Openverse.
-  const photos = new PhotoService({ dataDir: config.dataDir, keyFile: config.pexelsKeyFile });
+  // Foto stok: key Unsplash (dan Pexels lama) dibaca dari file (bukan env) saat dibutuhkan; tanpa key → Wikimedia → Openverse.
+  const photos = new PhotoService({ dataDir: config.dataDir, keyFile: config.pexelsKeyFile, unsplashKeyFile: config.unsplashKeyFile, unsplashAppName: config.unsplashAppName });
   const daemon = await startDaemon(config, { fonts, icons, photos });
   let closing = false;
   const shutdown = (signal: string) => {

@@ -1,6 +1,6 @@
 # @lakar/skills
 
-Mekanisme baca skill Lakar: file Markdown `skills/<name>.md` (core, polish, landing, mobile, icons, api) untuk tool
+Mekanisme baca skill Lakar: file Markdown `skills/<name>.md` (core, polish, landing, mobile, webapp, icons, api) untuk tool
 `read_skill`. Isi skill ditulis terpisah; `api.md` dihasilkan dari `@lakar/exec`.
 
 - **AD terkait:** AD-11 (`read_skill`), AD-12 (api.md dari kode).

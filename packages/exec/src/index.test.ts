@@ -50,7 +50,7 @@ const fakePhotos: PhotoLibraryPort & { asked: string[] } = {
   asked: [],
   resolve(ref) {
     this.asked.push(ref);
-    return ref === 'pexels:2014422' ? { ...FAKE_PHOTO } : undefined;
+    return ref === 'pexels:2014422' || ref === 'unsplash:Kq3wLm8xT0a' ? { ...FAKE_PHOTO } : undefined;
   },
 };
 const runSnippet = (code: string, tx: Parameters<typeof runSnippetRaw>[1], opts: Partial<RunOptions> = {}) =>
@@ -444,8 +444,8 @@ describe('@lakar/exec', () => {
 
     it('photoRefsInCode: hanya literal pexels/wikimedia/openverse, unik, urutan muncul', () => {
       const uuid = '0a1b2c3d-4e5f-6789-abcd-ef0123456789';
-      const code = `const a = photo('pexels:2014422');\nconst b = photo( "openverse:${uuid}" );\nconst c = photo('wikimedia:98688894');\nphoto('pexels:2014422'); photo(x); photo('foo'); photo(\`pexels:1\`); photo('pexels:12")`;
-      expect(photoRefsInCode(code)).toEqual(['pexels:2014422', `openverse:${uuid}`, 'wikimedia:98688894']);
+      const code = `const a = photo('pexels:2014422');\nconst b = photo( "openverse:${uuid}" );\nconst c = photo('wikimedia:98688894');\nconst d = photo('unsplash:Zp9_rT2uVb1');\nphoto('pexels:2014422'); photo(x); photo('foo'); photo(\`pexels:1\`); photo('pexels:12")`;
+      expect(photoRefsInCode(code)).toEqual(['pexels:2014422', `openverse:${uuid}`, 'wikimedia:98688894', 'unsplash:Zp9_rT2uVb1']);
       expect(photoRefsInCode('add(b, {})')).toEqual([]);
     });
   });

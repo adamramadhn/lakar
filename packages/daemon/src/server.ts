@@ -61,6 +61,14 @@ const STATUS: Record<ErrorCode, number> = {
 const fileNotFound = (what: string) => notFound(`${what} tidak ada`, 'periksa path');
 
 /** Board pertama di halaman pertama: default screenshot/export tanpa id. */
+/** assetId fill gambar di subtree `n` (untuk catatan placeholder aset jarak jauh). */
+function imageAssetIds(n: unknown, out: Set<string> = new Set()): Set<string> {
+  const node = n as { fills?: { type?: string; assetId?: string }[]; children?: unknown[] };
+  for (const f of node.fills ?? []) if (f.type === 'image' && typeof f.assetId === 'string') out.add(f.assetId);
+  for (const c of node.children ?? []) imageAssetIds(c, out);
+  return out;
+}
+
 const firstBoardId = (doc: { pages: readonly { children: readonly { id: string }[] }[] }): string | undefined => doc.pages[0]?.children[0]?.id;
 
 const OpenBody = z.object({ slug: z.string() });
@@ -150,7 +158,7 @@ export type BuildOptions = {
   icons?: IconCatalogPort<string, IconGlyph>;
   /** Direktori file skill (default `SKILLS_DIR` @lakar/skills). */
   skillsDir?: string;
-  /** Layanan foto stok (default: Pexels/Openverse dengan key dari `config.pexelsKeyFile`). */
+  /** Layanan foto stok (default: Unsplash → Wikimedia → Openverse dengan key dari `config.unsplashKeyFile`). */
   photos?: PhotoService;
 };
 
@@ -170,7 +178,7 @@ export function buildServer({
   fonts = FontRegistry.load(),
   icons = IconCatalog.load(),
   skillsDir = SKILLS_DIR,
-  photos = new PhotoService({ dataDir: config.dataDir, keyFile: config.pexelsKeyFile }),
+  photos = new PhotoService({ dataDir: config.dataDir, keyFile: config.pexelsKeyFile, unsplashKeyFile: config.unsplashKeyFile, unsplashAppName: config.unsplashAppName }),
 }: BuildOptions): Daemon {
   const app = Fastify({ logger: false, bodyLimit: 1024 * 1024 });
   const startedAt = new Date();
@@ -181,6 +189,13 @@ export function buildServer({
   const docs = new Map<string, LakarDocument>();
 
   const ok = (reply: FastifyReply, data: unknown) => reply.code(200).send({ ok: true, data });
+  /** Catatan aditif: foto jarak jauh yang tampil sebagai placeholder (cache dingin + jaringan gagal). */
+  const placeholderNote = (node: unknown): { photos?: { placeholders: string[]; note: string } } => {
+    const ids = photos.placeholders(imageAssetIds(node));
+    return ids.length
+      ? { photos: { placeholders: ids, note: 'foto jarak jauh belum bisa diambil (jaringan); tampil sebagai bidang warna foto, ulangi screenshot/export nanti' } }
+      : {};
+  };
   const fail = (reply: FastifyReply, err: ApiErrorBody, status: number) => reply.code(status).send({ ok: false, error: err });
 
   app.setErrorHandler((err, req, reply) => {
@@ -351,7 +366,7 @@ export function buildServer({
     const refs = photoRefsInCode(code);
     if (refs.length) {
       try {
-        await photos.importRefs(refs);
+        await photos.importRefs(refs, { docId: docs.get(slug)!.id });
       } catch (e) {
         if (e instanceof LakarError) throw failWith(e, docs.get(slug)!.rev);
         throw e;
@@ -443,7 +458,7 @@ export function buildServer({
       assertIcons(hit.board);
       const png = await render.screenshot(doc, hit.board.id, hit.node.id === hit.board.id ? {} : { nodeId: hit.node.id });
       const size = readPngSize(png);
-      return ok(reply, { boardId: hit.board.id, nodeId: hit.node.id, ...size, mimeType: 'image/png', png: Buffer.from(png).toString('base64') });
+      return ok(reply, { boardId: hit.board.id, nodeId: hit.node.id, ...size, mimeType: 'image/png', png: Buffer.from(png).toString('base64'), ...placeholderNote(hit.node) });
     }
     const boardId = body?.boardId ?? firstBoardId(doc);
     const board = boardId ? findBoard(doc, boardId) : undefined;
@@ -455,7 +470,7 @@ export function buildServer({
     // AD-9: ikon yang tidak dikenal katalog (mis. dokumen lama di disk) → ICON_UNKNOWN + 3 saran sebelum render.
     assertIcons(board);
     const png = await render.screenshot(doc, board.id);
-    return ok(reply, { boardId: board.id, width: board.width, height: board.height, mimeType: 'image/png', png: Buffer.from(png).toString('base64') });
+    return ok(reply, { boardId: board.id, width: board.width, height: board.height, mimeType: 'image/png', png: Buffer.from(png).toString('base64'), ...placeholderNote(board) });
   });
 
   // Daftar board dokumen aktif (AD-11 `list_boards`).
@@ -526,7 +541,7 @@ export function buildServer({
         retryable: true,
       });
     }
-    return ok(reply, { path, id, name: hit.node.name, rev: stored.rev, scale, width, height, bytes: png.byteLength });
+    return ok(reply, { path, id, name: hit.node.name, rev: stored.rev, scale, width, height, bytes: png.byteLength, ...placeholderNote(hit.node) });
   });
 
   // Skill (AD-11 `read_skill`): tanpa name → daftar; nama di luar daftar / file belum ada → NOT_FOUND.
@@ -603,10 +618,14 @@ export function buildServer({
   });
 
   // Aset gambar (story 8): `<dataDir>/assets/<sha256>`, hanya raster dari magic bytes; lainnya → 404.
+  // Aset jarak jauh (Unsplash): meta tanpa byte di `assets/`, disajikan dari cache render daemon (hotlink resmi saat
+  // miss); cache dingin + jaringan gagal → placeholder berwarna foto (`no-store`, dicatat untuk respons screenshot/export).
   app.get<{ Params: { hash: string } }>('/assets/:hash', async (req, reply) => {
     const asset = await readAsset(config.dataDir, req.params.hash);
-    if (!asset) throw fileNotFound(`aset ${req.params.hash}`);
-    return reply.type(asset.type).header('cache-control', 'public, max-age=31536000, immutable').send(asset.body);
+    if (asset) return reply.type(asset.type).header('cache-control', 'public, max-age=31536000, immutable').send(asset.body);
+    const remote = await photos.remoteAsset(req.params.hash);
+    if (!remote) throw fileNotFound(`aset ${req.params.hash}`);
+    return reply.type(remote.type).header('cache-control', remote.placeholder ? 'no-store' : 'no-cache').send(remote.body);
   });
 
   return { app, store, sessions, fonts, icons, photos, startedAt: startedAt.toISOString() };

@@ -646,3 +646,56 @@ Emoji 0 di semua run. Biaya iterasi 2 $5,20; kumulatif $12,74 dari $15. Seri **b
 gerbang waktu terhadap run pen.dev P7 yang cepat (97,5 dtk; board pen.dev 390×1177 melanggar ukuran 390×844), skor Lakar
 unggul. Sisa $2,26 tidak cukup untuk iterasi 3 penuh (perkiraan $5,70); iterasi P7 saja tanpa perubahan yang menyasar
 waktu = mengulang demi hasil (C8), jadi tidak dijalankan. Story berhenti `blocked` menunggu keputusan Adam.
+
+# §1.24 Board mobile panjang, skill webapp, foto Unsplash, mockup hero (story 24)
+
+Plan: `_bmad-output/initiative-lakar/tickets/epic-g0-inti-minimal/tickets/story-board-mobile-panjang-skill-webapp-foto-unsplash-dan-mockup-h-plan.md`.
+
+## Pindaian arsip layout_check (sebelum seri iterasi 3)
+
+Arsip: 96 dokumen (`bench/runs/**` + `~/.local/share/lakar/docs`), 134 board; daemon dist sementara (port acak, dataDir
+salinan, tanpa key foto). Sebelum = dist baseline `9b5652d`; sesudah = dist story 24 (check).
+
+| Aturan | Level akhir | Sebelum | Sesudah (temuan / dok) |
+|---|---|---|---|
+| LC-12 ukuran/posisi board | warning | 0 | 33 / 33: semuanya "pola dua board usang" (board "(akhir)" ber-`Scroll /` + `scrollY`); 0 temuan ukuran atau "tinggi pas" (arsip belum punya board mobile panjang) |
+| LC-20 tertutup zona bawah | error·gerbang | 34 | 34 (identik per dokumen) |
+| LC-31 mockup terpotong rata | error·gerbang | – | 10 / 10 (5 kasus unik: dokumen yang sama muncul di arsip slug dan di run) |
+
+Temuan aturan lain tidak berubah di satu dokumen pun. Dokumen dengan gate > 0: 65 → 71 (seluruh tambahan dari LC-31).
+
+Klasifikasi LC-31 lewat potret node (crop PNG, skrip scratchpad `archcheck.mjs --shots LC-31`): kelima kasus unik adalah
+cacat nyata, kartu berisi teks yang terpotong rata di tepi bawah `Seksi / Hero`:
+
+- A round-1 `Mockup / Dasbor` (120 px; juga `practice-1` P1 di arsip) dan A round-2 `Mockup / Dasbor` (200 px; juga
+  `polish-1` arsip): kartu transaksi/grafik terpotong di tengah baris.
+- A uji-1 `Mockup / Dasbor` (80 px): grafik dan baris "Listrik toko" terpotong.
+- P9 iterasi 2 `Mockup / Reservasi malam ini` (116 px; juga dok P9 di `~/.local/share/lakar/docs`): baris "Putu Ardana"
+  terpotong di tengah teks.
+- P5 effects-3 `Mockup / Panel status` (28 px): bingkai bawah panel grafik dan daftar gardu terpotong.
+
+0 positif palsu → LC-31 tetap `error·gerbang`. Catatan: P9 iterasi 1 tidak memicu LC-31 karena heronya memakai foto + kartu
+`Overlay /` dengan padding bawah 96 (tidak ada potongan), jadi perkiraan plan "P9 iterasi 1/2" ternyata hanya iterasi 2.
+
+## Perubahan mesin dan skill (story 24)
+
+- `@lakar/check`: LC-12 mobile tanpa `expectedSize` = lebar 390, tinggi ≥ 844; board mobile > 844 diberi warning "tinggi
+  pas = N" bila isi utama berakhir > 32 px di atas zona bawah (atau tepi board); board mobile dengan `Scroll /` ber-`scrollY`
+  > 0 diberi warning pola dua board usang. LC-20 kini punya fixture board panjang (positif/negatif; kode tidak berubah).
+  LC-31 baru (error·gerbang): frame ber-cat berisi teks yang melewati tepi bawah clip terdekat > 1 px, tepi clip rata
+  (≤ 2 px) dengan tepi bawah seksi selebar ≥ 90% board atau board; dikecualikan `Scroll /`, rotasi, `Overlay /`, dan node
+  yang sudah dilaporkan LC-02a.
+- Skill: `mobile.md` satu board `390 × H` (tanpa `duplicate`/`scrollY`/`Scroll /`, zona dari H, perbaikan "tinggi pas" di
+  execute perbaikan; contoh 390 × 1114 lolos 0/0/0); `landing.md` mockup hero utuh (padding bawah ≥ 64, kurangi baris, tanpa
+  `Crop /`; contoh hero tanpa crop lolos LC-31); `webapp.md` baru (sidebar dengan item aktif ber-fill aksen, KPI utama di
+  bidang gelap merek + sparkline, chip delta, batang bertumpuk, tabel berkeadaan, daftar slop dashboard; contoh 0/0/0);
+  `core.md` alur langkah 1 membaca `webapp` untuk aplikasi desktop/dashboard, panduan kata kunci foto (`<peran> portrait`,
+  daemon menyederhanakan sendiri, "subjek jelas, berwarna").
+- Skill sha16 / token: `core.md` cb031f00432a42ab (3967/4000), `landing.md` 0216f99bfeb2fae7 (3486, prosa 1500/1500),
+  `mobile.md` a751e436a20eb6c4 (3176, prosa 1369), `webapp.md` b4acb85ec3fb0cb3 (2819, prosa 924), `polish.md` tetap.
+- Foto: rantai Unsplash (key `~/.config/lakar/unsplash-access-key`) → Wikimedia → Openverse; Pexels keluar dari rantai cari
+  (lookup ref lama tetap). Tangga kata kunci (maks 3 anak tangga per penyedia; respons memuat `query` yang dipakai dan
+  `tried`), cache cari disk `<dataDir>/cache/photo-search/` (24 jam, 500 entri). Foto Unsplash = aset jarak jauh (meta
+  tanpa byte di `assets/`, disajikan lewat cache render `<dataDir>/cache/remote-images/`, placeholder berwarna foto bila
+  cache dingin + jaringan gagal, catatan `photos.placeholders` di screenshot/export), `download_location` sekali per
+  (ref, docId).

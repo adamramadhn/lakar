@@ -26,8 +26,12 @@ export type DaemonConfig = {
   renderTimeoutMs: number;
   /** Jumlah halaman pool render (2..8). */
   renderPages: number;
-  /** File key Pexels (satu baris key; mode 600, milik uid daemon). Tidak ada → penyedia foto Openverse. */
+  /** File key Pexels lama (satu baris key; mode 600, milik uid daemon): hanya lookup ref `pexels:` lama. */
   pexelsKeyFile: string;
+  /** File key Unsplash (Access Key; mode 600, milik uid daemon). Tidak ada → penyedia foto Wikimedia → Openverse. */
+  unsplashKeyFile: string;
+  /** `utm_source` atribusi Unsplash (samakan dengan nama aplikasi di dashboard Unsplash). */
+  unsplashAppName: string;
   /** File config yang dibaca (undefined bila tidak ada). */
   configPath?: string;
 };
@@ -40,12 +44,17 @@ const KEYS = {
   render_pages: 'LAKAR_RENDER_PAGES',
   render_timeout_ms: 'LAKAR_RENDER_TIMEOUT_MS',
   pexels_key_file: 'LAKAR_PEXELS_KEY_FILE',
+  unsplash_key_file: 'LAKAR_UNSPLASH_KEY_FILE',
+  unsplash_app_name: 'LAKAR_UNSPLASH_APP_NAME',
 } as const;
 type Key = keyof typeof KEYS;
 
 export const defaultConfigPath = (home = homedir()) => join(home, '.config', 'lakar', 'config.toml');
 /** Default file key Pexels. Key hanya dibaca dari file (bukan env), agar tidak tampil di environment proses. */
 export const defaultPexelsKeyFile = (home = homedir()) => join(home, '.config', 'lakar', 'pexels-api-key');
+/** Default file key Unsplash (Access Key). Key hanya dibaca dari file (bukan env). */
+export const defaultUnsplashKeyFile = (home = homedir()) => join(home, '.config', 'lakar', 'unsplash-access-key');
+export const DEFAULT_UNSPLASH_APP_NAME = 'lakar';
 
 /** Parser TOML datar: `kunci = "str" | 'str' | 123`. Bagian `[x]`, kunci tak dikenal, atau nilai lain → Error. */
 export function parseFlatToml(text: string, file: string): Partial<Record<Key, string>> {
@@ -77,6 +86,13 @@ function intIn(name: string, raw: string, min: number, max: number): number {
   const n = Number(raw);
   if (!/^\d+$/.test(raw) || n < min || n > max) throw new Error(`${name} tidak valid: ${JSON.stringify(raw)} (harus ${min}..${max})`);
   return n;
+}
+
+/** `unsplash_app_name`: huruf kecil, angka, `_`/`-`, 1–64 (dipakai di `utm_source`). */
+function unsplashAppName(v: { name: string; raw: string } | undefined): string {
+  if (!v) return DEFAULT_UNSPLASH_APP_NAME;
+  if (!/^[a-z0-9][a-z0-9_-]{0,63}$/.test(v.raw)) throw new Error(`${v.name} tidak valid: ${JSON.stringify(v.raw)} (huruf kecil, angka, _ atau -; maks 64)`);
+  return v.raw;
 }
 
 /**
@@ -114,6 +130,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): DaemonConfig {
     renderTimeoutMs: timeout ? intIn(timeout.name, timeout.raw, 100, 600_000) : RENDER_TIMEOUT_DEFAULT_MS,
     renderPages: pages ? intIn(pages.name, pages.raw, RENDER_PAGES_MIN, RENDER_PAGES_MAX) : RENDER_PAGES_DEFAULT,
     pexelsKeyFile: pick('pexels_key_file')?.raw || defaultPexelsKeyFile(home),
+    unsplashKeyFile: pick('unsplash_key_file')?.raw || defaultUnsplashKeyFile(home),
+    unsplashAppName: unsplashAppName(pick('unsplash_app_name')),
     ...(configPath ? { configPath } : {}),
   };
 }

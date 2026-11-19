@@ -14,7 +14,7 @@ import { chromiumInstalled, DEFAULT_BROWSERS_PATH } from '../../../tests/support
 import { testLog } from '../../../tests/support/log.ts';
 
 /** Skill v1 (packages/skills; mcp tidak bergantung pada paket itu, hanya membaca file untuk perbandingan). */
-const SKILL_NAMES = ['core', 'polish', 'landing', 'mobile', 'icons', 'api'] as const;
+const SKILL_NAMES = ['core', 'polish', 'landing', 'mobile', 'webapp', 'icons', 'api'] as const;
 const readSkill = (name: string) => readFile(fileURLToPath(new URL(`../../skills/skills/${name}.md`, import.meta.url)), 'utf8');
 
 const PNG_B64 = Buffer.from('fake-png').toString('base64');
@@ -119,7 +119,7 @@ function fakeDaemon() {
     if (req.url === '/skills/read') {
       if (body.name === undefined) return send(200, { ok: true, data: { skills: [{ name: 'core', available: true }] } });
       if (body.name === 'core') return send(200, { ok: true, data: { name: 'core', content: '# core\nisi' } });
-      return send(404, { ok: false, error: { code: 'NOT_FOUND', message: `skill "${body.name}" tidak ada`, hint: 'skill dikenal: core, polish, landing, mobile, icons, api; tersedia: core', retryable: false } });
+      return send(404, { ok: false, error: { code: 'NOT_FOUND', message: `skill "${body.name}" tidak ada`, hint: 'skill dikenal: core, polish, landing, mobile, webapp, icons, api; tersedia: core', retryable: false } });
     }
     if (req.url === '/screenshot') {
       if (body.boardId === 'ZZZZZZZZ') return send(404, { ok: false, error: { code: 'NOT_FOUND', message: 'board tidak ada', hint: 'pakai id', retryable: false } });
@@ -187,18 +187,22 @@ describe('@lakar/mcp', () => {
     const none = await c.callTool({ name: 'photo_search', arguments: { query: 'kosong' } });
     expect(none.isError).toBe(true);
     expect((none.content as any)[0].text).toMatch(/^NOT_FOUND: tidak ada foto/);
-    expect(PHOTO_SEARCH_DESCRIPTION).toContain('Photos provided by Pexels');
+    expect(PHOTO_SEARCH_DESCRIPTION).toContain('Photos provided by Unsplash');
+    expect(PHOTO_SEARCH_DESCRIPTION).toMatch(/chef portrait/);
+    expect(PHOTO_SEARCH_DESCRIPTION).toMatch(/jangan mengulang pencarian/);
     expect(PHOTO_SEARCH_DESCRIPTION).toContain("photo('<ref>')");
   });
 
-  it('instructions server: read_skill core + polish + skill jenis layar di giliran yang sama, sedikit execute besar; deskripsi read_skill menyebut polish', async () => {
+  it('instructions server: read_skill core + polish + skill jenis layar di giliran yang sama, sedikit execute besar; deskripsi read_skill menyebut polish dan webapp', async () => {
     const c = await connect(url);
     const ins = c.getInstructions() ?? '';
     expect(ins).toBe(SERVER_INSTRUCTIONS);
-    expect(ins).toContain('read_skill core + polish + landing/mobile di giliran yang sama');
+    expect(ins).toContain('read_skill core + polish + landing/mobile/webapp di giliran yang sama (paralel)');
+    expect(ins).toMatch(/aplikasi desktop\/dashboard → webapp/);
     expect(ins).toContain('sedikit execute besar');
-    expect(READ_SKILL_DESCRIPTION).toMatch(/core .*\+ polish .*\+ skill jenis layar \(landing atau mobile.*giliran yang sama/);
-    expect(READ_SKILL_DESCRIPTION).toContain('Nama: core, polish, landing, mobile, icons, api.');
+    expect(READ_SKILL_DESCRIPTION).toMatch(/core .*\+ polish .*\+ skill jenis layar \(landing, mobile, atau webapp.*giliran yang sama/);
+    expect(READ_SKILL_DESCRIPTION).toMatch(/aplikasi desktop\/dashboard → webapp/);
+    expect(READ_SKILL_DESCRIPTION).toContain('Nama: core, polish, landing, mobile, webapp, icons, api.');
   });
 
   it('sesi dibuat dengan versi mcp: POST /sessions {client, version, schemaVersion}', async () => {
@@ -297,7 +301,7 @@ describe('@lakar/mcp', () => {
     expect((core.content as any)[0].text).toBe('# core\nisi');
     const none = await c.callTool({ name: 'read_skill', arguments: { name: 'landing' } });
     expect(none.isError).toBe(true);
-    expect((none.content as any)[0].text).toMatch(/^NOT_FOUND: .*\nhint: skill dikenal: core, polish, landing, mobile, icons, api/);
+    expect((none.content as any)[0].text).toMatch(/^NOT_FOUND: .*\nhint: skill dikenal: core, polish, landing, mobile, webapp, icons, api/);
     const boards = await c.callTool({ name: 'list_boards', arguments: {} });
     expect(JSON.parse((boards.content as any)[0].text).boards[0]).toMatchObject({ wip: true });
     const ins = await c.callTool({ name: 'inspect', arguments: { id: 'Tttttttt', depth: 1 } });
@@ -600,12 +604,12 @@ describe.skipIf(!browserInstalled)('layout_check dengan respons lakard asli', ()
     expect(lines.slice(1).map((l) => l.split(' · ')[1])).toEqual(['LC-01a', 'LC-01b', 'LC-05', 'LC-02a', 'LC-20', 'LC-12']);
     expect(lines.slice(1)).toEqual(eLines.slice(2, -1));
     expect(lines[1]).toMatch(/^error·gerbang · LC-01a · Sapaan \([A-Za-z0-9]{8}\) · emoji "👋" U\+1F44B di "Halo 👋" · hapus emoji; ikon pakai node icon \(icon_search\)$/);
-    expect(lines[6]).toMatch(/^warning · LC-12 · Home · mobile \([A-Za-z0-9]{8}\) · ukuran 390×800 · 390×844$/);
+    expect(lines[6]).toMatch(/^warning · LC-12 · Home · mobile \([A-Za-z0-9]{8}\) · ukuran 390×800 · lebar 390, tinggi ≥ 844 \(isi lebih panjang: satu board panjang\)$/);
     expect(text).not.toMatch(/golden|juri|rubrik|Lampiran B|skor|pen\.dev|benchmark/i);
     testLog(`[mcp] layout_check:\n${text}`);
   }, 60_000);
 
-  it('read_skill terhadap lakard asli: kelima skill tersedia, isi sama dengan file skill', async () => {
+  it('read_skill terhadap lakard asli: ketujuh skill tersedia, isi sama dengan file skill', async () => {
     const c = await connect(proxyUrl);
     const list = await c.callTool({ name: 'read_skill', arguments: {} });
     expect(list.isError).toBeFalsy();
@@ -617,7 +621,7 @@ describe.skipIf(!browserInstalled)('layout_check dengan respons lakard asli', ()
       expect(text.startsWith('# '), name).toBe(true);
       expect(text, name).toBe(await readSkill(name));
     }
-    const none = await c.callTool({ name: 'read_skill', arguments: { name: 'webapp' } });
+    const none = await c.callTool({ name: 'read_skill', arguments: { name: 'dashboard' } });
     expect(none.isError).toBe(true);
     expect((none.content as any)[0].text).toContain('NOT_FOUND');
   }, 60_000);

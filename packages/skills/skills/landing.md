@@ -1,12 +1,12 @@
 # Lakar: landing page
 
-Board `1440 × bebas` (`screen:'landing'`). Mulai dengan tinggi besar (mis. 2000–6000), lalu di execute penutup set tinggi = ujung bawah seksi terakhir dari `bounds`.
+Board `1440 × bebas` (`screen:'landing'`). Mulai dengan tinggi besar (2000–6000); execute penutup set tinggi = bawah seksi terakhir dari `bounds`.
 
 ## Struktur
 
 - Wrapper `Halaman` (kolom, `width:'fill'`) langsung di board; setiap seksi `Seksi / …` lebar fill dengan padding horizontal 80. Grid 12 kolom: isi 1280 (tepi 80), gutter 24; blok utama mulai di awal kolom. Ritme: padding vertikal seksi 96–128; judul seksi ↔ isi 32–48; antar-kartu 24; dalam grup 12–16; ikon ↔ teks 4–8.
 - **Navbar 72:** logo kiri (wadah 32 aksen + ikon + wordmark), 3–5 tautan `Link /` body-sm, kanan satu tombol sekunder + satu primer (tinggi 40). Garis bawah satu sisi.
-- **Hero ≥ 640** di bidang merek (`C.field`) atau putih: headline display ≤ 3 baris berupa klaim hasil, bukan nama fitur; subjudul body-lg ≤ 2 baris; satu CTA primer + satu sekunder; baris penguat kecil di bawah CTA (mis. "Gratis ongkir 3 kali pertama"). Visual hero adalah anak frame hero dan menyatu dengan latarnya: foto suasana nyata (`Image /` ≥ 520 lebar, radius 16–24) dengan 1–2 kartu data kecil `Overlay /` di atasnya (wajib bila permintaan menyebut foto), atau mockup produk di `Crop / …` terpotong tepi bawah. Bukan kartu berbingkai di kolom terpisah.
+- **Hero ≥ 640** di bidang merek (`C.field`) atau putih: headline display ≤ 3 baris berupa klaim hasil, bukan nama fitur; subjudul body-lg ≤ 2 baris; satu CTA primer + satu sekunder; baris penguat kecil di bawah CTA (jaminan, gratis ongkir). Visual hero adalah anak frame hero dan menyatu dengan latarnya: foto suasana nyata (`Image /` ≥ 520 lebar, radius 16–24) dengan 1–2 kartu data kecil `Overlay /` di atasnya (wajib bila permintaan menyebut foto), atau mockup produk utuh (padding bawah hero ≥ 64; isi berlebih → kurangi baris, jangan dipotong; tanpa `Crop /`). Bukan kartu berbingkai di kolom terpisah.
 - **Bidang efek** (bila permintaan/merek meminta suasana ekspresif; satu per halaman), empat lapis: (1) `fills` netral → `mesh` dari aksen, ≤ 1 pendamping, netral; (2) **struktur** bermakna bagi merek dan berulang: 12–24 garis aliran/gelombang `path` dari loop (aksen ber-alpha ±6–50%, 1–2 garis tegas), kontur konsentris, atau kisi/partikel, di `Crop /` absolut seukuran bidang (`clip:true`, anak pertama), melintasi ≥ ⅔ lebar; sapuan kecil di pojok terbaca datar; (3) `noise` 0.04–0.08; (4) latar gelap: boleh satu cahaya lembut merek di belakang fokus (blur ≥ 40, opacity ≤ 35%). Teks/tombol di zona tenang (struktur merunduk/menipis, atau elips gelap ber-blur sebagai peredam), kontras ≥ 4.5:1 terhadap warna terburuk di bawahnya; cuplikan produk = panel solid. Seksi lain yang diminta berefek: gema palet yang sama, jauh lebih tipis, bukan bidang kedua. Ring/donut progres boleh `conic`.
 - **Header seksi:** h2 → body-lg secondary, lebar ≤ 720. Rata kiri atau tengah, konsisten. Overline aksen maks 2 per halaman dan hanya bila membawa informasi (kategori, langkah), bukan di setiap seksi. Baris meta maks 2 "·".
 - **Ritme:** dua seksi bersebelahan tidak boleh berstruktur sama (variasikan: bento, dua kolom teks + visual, daftar langkah, tabel banding, seksi bidang merek). Latar seksi bergantian putih → `C.field` → putih → `C.deep` (teks `C.on`/terang, satu seksi saja), bukan abu polos. Dalam grid ≥ 3 kartu, minimal satu kartu berbeda lebar, ditekankan (bidang/solid), atau memuat elemen non-teks.
@@ -24,7 +24,7 @@ Board `1440 × bebas` (`screen:'landing'`). Mulai dengan tinggi besar (mis. 2000
 
 ## Contoh teruji
 
-Board, navbar, dan hero di bidang merek (langkah khas: mockup jadwal pengiriman terpotong tepi hero; baris memperlihatkan keadaan):
+Board, navbar, dan hero di bidang merek (langkah khas: mockup jadwal pengiriman utuh di bawah teks hero; baris memperlihatkan keadaan):
 
 ```js
 // pakai prelude
@@ -44,10 +44,10 @@ const act=Row(nav,'Aksi',{gap:12});
 Btn(act,'Masuk','secondary',{height:40,padding:[0,16]});
 Btn(act,'Coba sampel','primary',{height:40,padding:[0,16]});
 // Efek (mesh/noise/Kontur) hanya bila merek minta suasana ekspresif; selain itu fill(C.field) polos
-const hero=F(page,'Seksi / Hero',{width:'fill',padding:[96,80,0,80],gap:64,align:'center',clip:true,fills:[...fill(C.field),
+const hero=F(page,'Seksi / Hero',{width:'fill',padding:[96,80],gap:64,align:'center',clip:true,fills:[...fill(C.field),
  {type:'mesh',columns:3,rows:2,colors:['#CDE8E4',C.field,'#F4E7C8',C.field,C.field,'#D3EBE7']},{type:'noise',opacity:0.05,seed:11}]});
 // 16 kontur selebar penuh, merunduk di tengah (zona teks tenang)
-const fx=F(hero,'Crop / Kontur',{position:'absolute',x:0,y:0,width:1440,height:756,layout:'none',clip:true});
+const fx=F(hero,'Crop / Kontur',{position:'absolute',x:0,y:0,width:1440,height:876,layout:'none',clip:true});
 for(let i=0;i<16;i++){const y=60+i*26,k=i%5===2;
  add(fx,{type:'path',name:'Kontur / '+(i+1),d:`M0 ${y} C 420 ${y+40} 300 ${y+420} 720 ${y+430} S 1020 ${y+40} 1440 ${y}`,viewBox:[0,0,1440,756],width:1440,height:756,stroke:{color:C.acc+(k?'80':(16+i*2).toString(16).padStart(2,'0')),width:k?1.5:1,align:'center'}});}
 const copy=F(hero,'Hero / Teks',{width:800,gap:24,align:'center'});
@@ -58,9 +58,8 @@ const cta=Row(copy,'CTA',{gap:12,padding:[8,0,0,0]});
 Btn(cta,'Coba sampel');
 Btn(cta,'Lihat jadwal sangrai','secondary');
 T(copy,'Penguat','Gratis ongkir untuk 3 pengiriman pertama · berhenti kapan saja','body-sm',{color:C.t3});
-// Mockup dipotong tepi bawah
-const crop=F(hero,'Crop / Dasbor',{width:1040,height:240,clip:true});
-const app=F(crop,'Mockup / Dasbor',{width:'fill',height:'hug',padding:24,gap:20,radius:[16,16,0,0],fills:fill(C.bg),stroke:line(),shadows:[{x:0,y:4,blur:16,color:'#10182814'}]});
+// Mockup utuh: 3 baris cukup, padding bawah hero 96
+const app=F(hero,'Mockup / Dasbor',{width:1040,padding:24,gap:20,radius:16,fills:fill(C.bg),stroke:line(),shadows:[{x:0,y:4,blur:16,color:'#10182814'}]});
 const top=Row(app,'Header',{width:'fill',justify:'space-between'});
 T(top,'Judul','Pengiriman minggu ini','h4');
 const meta=Row(top,'Meta',{gap:8});
@@ -116,8 +115,8 @@ for(const [ic,j,dsc,det,tone,hot] of [['flame','Profil sangrai per menu','Espres
 }
 ```
 
-Execute penutup: tinggi = bawah seksi terakhir dari `bounds` (y 828 + 780), lepas `[WIP] `:
+Execute penutup: tinggi = bawah seksi terakhir dari `bounds` (y 948 + 780), lepas `[WIP] `:
 
 ```js
-update(keep.board, {height:1608, name:'Biji Pagi / Beranda · landing · Jernih'});
+update(keep.board, {height:1728, name:'Biji Pagi / Beranda · landing · Jernih'});
 ```

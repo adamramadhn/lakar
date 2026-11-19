@@ -1,5 +1,5 @@
 // Penyedia foto palsu untuk tes (bukan bagian dist paket mana pun): satu server HTTP lokal yang meniru
-// api.pexels.com, commons.wikimedia.org, api.openverse.org, images.pexels.com, thumb/upload.wikimedia.org, dan
+// api.unsplash.com, images.unsplash.com, api.pexels.com, commons.wikimedia.org, api.openverse.org, images.pexels.com, thumb/upload.wikimedia.org, dan
 // live.staticflickr.com berdasarkan header Host. SafeNet tes memakai transport http ke server ini + resolver palsu; validasi URL/allowlist/IP tetap asli.
 import { createServer, request as httpRequest, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import { crc32, deflateSync } from 'node:zlib';
@@ -31,6 +31,30 @@ export const PHOTO_RGB: [number, number, number] = [0x2e, 0x7d, 0x32];
 export const PHOTO_PNG = solidPng(64, 48, PHOTO_RGB);
 export const THUMB_PNG = solidPng(8, 6, PHOTO_RGB);
 export const WIKI_PNG = solidPng(40, 30, [0x15, 0x65, 0xc0]);
+/** Warna foto Unsplash uji (juga `color` API = warna placeholder). */
+export const UNSPLASH_RGB: [number, number, number] = [0xc0, 0x39, 0x2b];
+export const UNSPLASH_COLOR = '#C0392B';
+export const UNSPLASH_PNG = solidPng(48, 64, UNSPLASH_RGB);
+
+/** ID Unsplash palsu: tiga foto biasa (satu ber-`_`) + satu premium (Unsplash+, harus dibuang). */
+export const UNSPLASH = { a: 'Kq3wLm8xT0a', b: 'Zp9_rT2uVb1', c: 'Ab-cD3fGh45', premium: 'PrEm1umXyZ0' } as const;
+const IXID = 'M3wxMjM0NTZ8MHwxfHNlYXJjaHwxfHxjaGVm';
+
+const unsplashPhoto = (id: string, premium = false) => ({
+  id,
+  width: 4000,
+  height: 6000,
+  color: UNSPLASH_COLOR,
+  alt_description: 'chef smiling in a small kitchen',
+  premium,
+  plus: premium,
+  urls: {
+    raw: premium ? `https://plus.unsplash.com/premium_photo-${id}?ixid=${IXID}&ixlib=rb-4.0.3` : `https://images.unsplash.com/photo-${id}?ixid=${IXID}&ixlib=rb-4.0.3`,
+    thumb: premium ? `https://plus.unsplash.com/premium_photo-${id}?w=200` : `https://images.unsplash.com/photo-${id}?ixid=${IXID}&ixlib=rb-4.0.3&q=80&w=200&fit=max`,
+  },
+  links: { html: `https://unsplash.com/photos/${id}`, download_location: `https://api.unsplash.com/photos/${id}/download?ixid=${IXID}` },
+  user: { name: 'Sari Dewi', links: { html: 'https://unsplash.com/@saridewi' } },
+});
 
 export const OV_BY = 'aaaaaaaa-0000-4000-8000-000000000001';
 export const OV_CC0 = 'aaaaaaaa-0000-4000-8000-000000000002';
@@ -196,7 +220,11 @@ export type FakeProviders = {
   port: number;
   requests: FakeRequest[];
   /** Mode api.pexels.com / commons.wikimedia.org / api.openverse.org: ok, hang, atau status HTTP (+ maxlag/empty Wikimedia). */
-  mode: { pexels: Mode; wikimedia: WikiMode; openverse: Mode | 'empty' };
+  mode: { pexels: Mode; wikimedia: WikiMode; openverse: Mode | 'empty'; unsplash: Mode; unsplashImages: Mode };
+  /** Kueri (huruf kecil) yang dijawab kosong oleh api.unsplash.com `/search/photos`. */
+  unsplashEmpty: Set<string>;
+  /** Nilai header `X-Ratelimit-Remaining` api.unsplash.com (undefined = tanpa header). */
+  unsplashRemaining: { value: number | undefined };
   /** Konkurensi maksimum permintaan API commons.wikimedia.org yang teramati (reset manual). */
   wikiConcurrency: { now: number; max: number };
   /** Alamat per host untuk resolver palsu (default 127.0.0.1). */
@@ -208,7 +236,9 @@ export type FakeProviders = {
 
 export async function startFakeProviders(): Promise<FakeProviders> {
   const requests: FakeRequest[] = [];
-  const mode: FakeProviders['mode'] = { pexels: 'ok', wikimedia: 'ok', openverse: 'ok' };
+  const mode: FakeProviders['mode'] = { pexels: 'ok', wikimedia: 'ok', openverse: 'ok', unsplash: 'ok', unsplashImages: 'ok' };
+  const unsplashEmpty = new Set<string>();
+  const unsplashRemaining: { value: number | undefined } = { value: undefined };
   const wikiConcurrency = { now: 0, max: 0 };
   const ipFor = new Map<string, string>();
   const json = (res: ServerResponse, status: number, body: unknown) => {
@@ -251,6 +281,33 @@ export async function startFakeProviders(): Promise<FakeProviders> {
         return json(res, 200, { error: { code: 'badvalue', info: 'palsu' } });
       }, 25);
       return;
+    }
+    if (host === 'api.unsplash.com') {
+      if (mode.unsplash === 'hang') return;
+      if (typeof mode.unsplash === 'number') return json(res, mode.unsplash, { errors: ['palsu'] });
+      const headers: Record<string, string> = { 'content-type': 'application/json' };
+      if (unsplashRemaining.value !== undefined) headers['x-ratelimit-remaining'] = String(unsplashRemaining.value);
+      const send = (status: number, body: unknown) => {
+        res.writeHead(status, headers);
+        res.end(JSON.stringify(body));
+      };
+      if (u.pathname === '/search/photos') {
+        if (unsplashEmpty.has((u.searchParams.get('query') ?? '').toLowerCase())) return send(200, { total: 0, total_pages: 0, results: [] });
+        const n = Number(u.searchParams.get('per_page') ?? 10);
+        const all = [unsplashPhoto(UNSPLASH.premium, true), unsplashPhoto(UNSPLASH.a), unsplashPhoto(UNSPLASH.b), unsplashPhoto(UNSPLASH.c)];
+        return send(200, { total: all.length, total_pages: 1, results: all.slice(0, n) });
+      }
+      const dl = /^\/photos\/([A-Za-z0-9_-]+)\/download$/.exec(u.pathname);
+      if (dl) return send(200, { url: `https://images.unsplash.com/photo-${dl[1]}?ixid=${IXID}` });
+      const m = /^\/photos\/([A-Za-z0-9_-]+)$/.exec(u.pathname);
+      if (m && (Object.values(UNSPLASH) as string[]).includes(m[1]!)) return send(200, unsplashPhoto(m[1]!, m[1] === UNSPLASH.premium));
+      return send(404, { errors: ['Couldn\'t find Photo'] });
+    }
+    if (host === 'images.unsplash.com') {
+      if (mode.unsplashImages === 'hang') return;
+      if (typeof mode.unsplashImages === 'number') return json(res, mode.unsplashImages, {});
+      res.writeHead(200, { 'content-type': 'image/png', 'cache-control': 'max-age=31536000' });
+      return res.end(u.searchParams.get('w') === '200' ? THUMB_PNG : UNSPLASH_PNG);
     }
     const apiMode = host === 'api.pexels.com' ? mode.pexels : host === 'api.openverse.org' && !u.pathname.endsWith('/thumb/') ? mode.openverse : 'ok';
     if (apiMode === 'hang') return; // tidak pernah menjawab
@@ -322,6 +379,8 @@ export async function startFakeProviders(): Promise<FakeProviders> {
     port,
     requests,
     mode,
+    unsplashEmpty,
+    unsplashRemaining,
     wikiConcurrency,
     ipFor,
     netOptions: () => ({

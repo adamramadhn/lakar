@@ -13,11 +13,12 @@ export type FetchKind = 'api' | 'thumb' | 'image';
 /** Allowlist host per jenis (string = host persis, RegExp = pola host penuh). */
 export type HostAllowlist = Readonly<Record<FetchKind, readonly (string | RegExp)[]>>;
 
-const IMAGE_HOSTS = ['images.pexels.com', 'live.staticflickr.com', /^farm\d{1,2}\.staticflickr\.com$/, 'upload.wikimedia.org', 'thumb.wikimedia.org'] as const;
+// `images.unsplash.com` saja: `plus.unsplash.com` (Unsplash+ / premium) sengaja di luar allowlist.
+const IMAGE_HOSTS = ['images.unsplash.com', 'images.pexels.com', 'live.staticflickr.com', /^farm\d{1,2}\.staticflickr\.com$/, 'upload.wikimedia.org', 'thumb.wikimedia.org'] as const;
 
 /** Allowlist produksi (di-hardcode; tidak dibaca dari config). */
 export const DEFAULT_ALLOWLIST: HostAllowlist = {
-  api: ['api.pexels.com', 'commons.wikimedia.org', 'api.openverse.org'],
+  api: ['api.unsplash.com', 'api.pexels.com', 'commons.wikimedia.org', 'api.openverse.org'],
   thumb: [...IMAGE_HOSTS, 'api.openverse.org'],
   image: [...IMAGE_HOSTS],
 };
@@ -28,8 +29,8 @@ export const DEFAULT_ALLOWLIST: HostAllowlist = {
  */
 export const USER_AGENT = 'Lakar/0.1 (internal design tool)';
 
-/** Satu-satunya host yang boleh menerima header `Authorization` (key Pexels). */
-export const AUTH_HOST = 'api.pexels.com';
+/** Host yang boleh menerima header `Authorization` (key Unsplash `Client-ID …`, key Pexels). */
+export const AUTH_HOSTS: readonly string[] = ['api.unsplash.com', 'api.pexels.com'];
 
 export const MAX_REDIRECTS = 3;
 
@@ -132,7 +133,10 @@ export type FetchOptions = {
   signal?: AbortSignal;
 };
 
-export type FetchResult = { status: number; url: string; contentType: string; body: Buffer };
+/** Header respons yang diteruskan ke pemanggil (sisanya dibuang): batas laju Unsplash dan Cache-Control. */
+export const PASSED_HEADERS = ['x-ratelimit-remaining', 'cache-control'] as const;
+
+export type FetchResult = { status: number; url: string; contentType: string; body: Buffer; headers: Partial<Record<(typeof PASSED_HEADERS)[number], string>> };
 
 /** `host + path` tanpa query/kredensial, untuk pesan error. */
 export function describeUrl(u: URL | string): string {
@@ -213,8 +217,10 @@ export class SafeNet {
     }
     try {
       let url = this.check(opts.kind, raw);
+      // Authorization hanya ke host permintaan pertama (dan hanya bila host itu di AUTH_HOSTS): redirect tidak membawa key.
+      const authHost = url.hostname;
       for (let hop = 0; ; hop++) {
-        const res = await this.#once(url, opts, ac.signal).catch((e: unknown) => {
+        const res = await this.#once(url, opts, ac.signal, authHost).catch((e: unknown) => {
           if (timedOut) throw new NetError('timeout', `batas waktu ${opts.timeoutMs} ms terlewati (${url.hostname})`);
           throw e;
         });
@@ -240,7 +246,7 @@ export class SafeNet {
           if (timedOut) throw new NetError('timeout', `batas waktu ${opts.timeoutMs} ms terlewati (${url.hostname})`);
           throw e;
         });
-        return { status: res.status, url: url.toString(), contentType: res.contentType, body };
+        return { status: res.status, url: url.toString(), contentType: res.contentType, body, headers: res.headers };
       }
     } finally {
       clearTimeout(timer);
@@ -248,11 +254,16 @@ export class SafeNet {
     }
   }
 
-  #once(url: URL, opts: FetchOptions, signal: AbortSignal): Promise<{ status: number; location: string | undefined; contentType: string; stream: IncomingMessage }> {
-    // Header Authorization hanya ke AUTH_HOST (setiap hop dicek ulang, jadi redirect tidak membawa key).
+  #once(
+    url: URL,
+    opts: FetchOptions,
+    signal: AbortSignal,
+    authHost: string,
+  ): Promise<{ status: number; location: string | undefined; contentType: string; stream: IncomingMessage; headers: FetchResult['headers'] }> {
+    // Header Authorization hanya ke AUTH_HOSTS (setiap hop dicek ulang, jadi redirect tidak membawa key).
     const headers: Record<string, string> = { 'user-agent': USER_AGENT, accept: opts.kind === 'api' ? 'application/json' : IMAGE_ACCEPT };
     for (const [k, v] of Object.entries(opts.headers ?? {})) {
-      if (k.toLowerCase() === 'authorization' && url.hostname !== AUTH_HOST) continue;
+      if (k.toLowerCase() === 'authorization' && (url.hostname !== authHost || !AUTH_HOSTS.includes(url.hostname))) continue;
       headers[k] = v;
     }
     return new Promise((resolve, reject) => {
@@ -272,7 +283,13 @@ export class SafeNet {
           },
           (res) => {
             const ct = res.headers['content-type'];
+            const passed: FetchResult['headers'] = {};
+            for (const h of PASSED_HEADERS) {
+              const v = res.headers[h];
+              if (typeof v === 'string') passed[h] = v;
+            }
             resolve({
+              headers: passed,
               status: res.statusCode ?? 0,
               location: typeof res.headers.location === 'string' ? res.headers.location : undefined,
               contentType: typeof ct === 'string' ? ct : '',

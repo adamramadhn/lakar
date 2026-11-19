@@ -9,9 +9,10 @@ import { PhotoService, SafeNet, loadConfig, startDaemon, type RunningDaemon } fr
 import { decodePng } from './png.js';
 import { chromiumInstalled } from '../../../tests/support/browser.ts';
 import { postJson } from '../../../tests/support/http.ts';
-import { PHOTO_RGB, startFakeProviders, type FakeProviders } from '../../../tests/support/photos.ts';
+import { UNSPLASH, UNSPLASH_RGB, startFakeProviders, type FakeProviders } from '../../../tests/support/photos.ts';
 
-const baseConfig = loadConfig({});
+// Tes tidak pernah memakai key Unsplash nyata: file key default dialihkan ke path yang tidak ada.
+const baseConfig = { ...loadConfig({}), unsplashKeyFile: '/nonexistent/lakar-test/unsplash-access-key' };
 const browsersPath = process.env.LAKAR_BROWSERS_PATH || baseConfig.browsersPath;
 const browserInstalled = chromiumInstalled(browsersPath);
 
@@ -43,12 +44,13 @@ describe.skipIf(!browserInstalled)('foto stok: execute → impor → render offl
   beforeAll(async () => {
     fake = await startFakeProviders();
     tmp = await mkdtemp(join(tmpdir(), 'lakar-photo-render-'));
-    const keyFile = join(tmp, 'pexels-api-key');
-    await writeFile(keyFile, 'TESTKEYabcdef0123456789\n');
-    await chmod(keyFile, 0o600);
+    const unsplashKeyFile = join(tmp, 'unsplash-access-key');
+    await writeFile(unsplashKeyFile, 'TESTKEYabcdef0123456789\n');
+    await chmod(unsplashKeyFile, 0o600);
+    const keyFile = join(tmp, 'tidak-ada');
     const dataDir = join(tmp, 'data');
-    const photos = new PhotoService({ dataDir, keyFile, net: new SafeNet(fake.netOptions()) });
-    d = await startDaemon({ ...baseConfig, port: 0, dataDir, browsersPath, pexelsKeyFile: keyFile }, { photos, onLease: guard });
+    const photos = new PhotoService({ dataDir, keyFile, unsplashKeyFile, net: new SafeNet(fake.netOptions()) });
+    d = await startDaemon({ ...baseConfig, port: 0, dataDir, browsersPath, pexelsKeyFile: keyFile, unsplashKeyFile }, { photos, onLease: guard });
     await d.warmed;
     s = (await call('/sessions', {})).body.data.sessionId as string;
     await call('/docs/open', { slug: 'foto-uji' }, s);
@@ -62,10 +64,10 @@ describe.skipIf(!browserInstalled)('foto stok: execute → impor → render offl
 
   it('/status.photos dan POST /photos/search (kandidat + thumbnail base64)', async () => {
     const st = await fetch(`${d.url}/status`).then((r) => r.json() as Promise<{ data: { photos: unknown } }>);
-    expect(st.data.photos).toEqual({ provider: 'pexels', keyFile: 'present', imported: 0 });
-    const r = await call('/photos/search', { query: 'kamar hotel', limit: 2 }, s);
+    expect(st.data.photos).toEqual({ provider: 'unsplash', keyFile: 'present', imported: 0 });
+    const r = await call('/photos/search', { query: 'chef portrait', limit: 3 }, s);
     expect(r.status, JSON.stringify(r.body.error)).toBe(200);
-    expect(r.body.data).toMatchObject({ provider: 'pexels', query: 'kamar hotel', results: [{ ref: 'pexels:2014422' }, { ref: 'pexels:2014423' }] });
+    expect(r.body.data).toMatchObject({ provider: 'unsplash', query: 'chef portrait', tried: [{ provider: 'unsplash', query: 'chef portrait' }], results: [{ ref: `unsplash:${UNSPLASH.a}` }, { ref: `unsplash:${UNSPLASH.b}` }] });
     expect(r.body.data.thumbnails).toHaveLength(2);
     expect(Buffer.from(r.body.data.thumbnails[0].data, 'base64').subarray(1, 4).toString()).toBe('PNG');
     for (const bad of [{}, { query: '' }, { query: 'x'.repeat(101) }, { query: 'x', limit: 13 }, { query: 'x', orientation: 'miring' }, { query: 'x', url: 'https://a' }]) {
@@ -73,10 +75,10 @@ describe.skipIf(!browserInstalled)('foto stok: execute → impor → render offl
     }
   });
 
-  it('execute photo(ref literal) → foto di kartu; render tanpa permintaan luar; fetch luar dari halaman gagal', async () => {
+  it('execute photo(ref Unsplash literal) → aset jarak jauh di kartu (disajikan daemon dari cache render); render tanpa permintaan luar; fetch luar dari halaman gagal', async () => {
     const code = [
       "const b = add(null, {type:'board', name:'Foto', x:0, y:0, width:390, height:844, screen:'mobile'});",
-      "const p = photo('pexels:2014422');",
+      `const p = photo('unsplash:${UNSPLASH.a}');`,
       "const k = add(b, {type:'frame', name:'Kartu', layout:'column', gap:8, padding:16, width:'fill'});",
       "add(k, {type:'rect', name:'Image / Kamar', width:200, height:120, fills:[{type:'image', assetId:p.assetId, fit:'cover'}]});",
       "add(k, {type:'text', name:'Kredit', content:p.credit, size:12, lineHeight:16});",
@@ -84,8 +86,10 @@ describe.skipIf(!browserInstalled)('foto stok: execute → impor → render offl
     ].join('\n');
     const r = await call('/execute', { code, description: 'kartu dengan foto kamar' }, s);
     expect(r.status, JSON.stringify(r.body.error)).toBe(200);
-    expect(r.body.data.value).toMatchObject({ assetId: expect.stringMatching(/^[a-f0-9]{64}$/), width: 64, height: 48, credit: 'Foto: Rina Wijaya / Pexels' });
-    // Aset tersaji; metadata sidecar tidak.
+    expect(r.body.data.value).toMatchObject({ assetId: expect.stringMatching(/^[a-f0-9]{64}$/), credit: 'Foto: Sari Dewi / Unsplash' });
+    // download_location dipicu sekali untuk dokumen ini (ber-key, hanya ke api.unsplash.com).
+    expect(fake.requests.filter((x) => x.host === 'api.unsplash.com' && x.path.includes('/download'))).toHaveLength(1);
+    // Aset tersaji (dari cache render); metadata sidecar tidak.
     const assetId = r.body.data.value.assetId as string;
     expect((await fetch(`${d.url}/assets/${assetId}`)).status).toBe(200);
     for (const path of ['/assets/meta', `/assets/meta%2F${assetId}.json`, `/assets/${assetId}.json`]) expect((await fetch(`${d.url}${path}`)).status, path).toBe(404);
@@ -96,12 +100,13 @@ describe.skipIf(!browserInstalled)('foto stok: execute → impor → render offl
     // Rect 200×120 di (16,16): titik tengahnya = warna foto uji.
     const at = (x: number, y: number) => [...img.pixels.subarray((y * img.width + x) * img.channels, (y * img.width + x) * img.channels + 3)];
     const [r0, g0, b0] = at(116, 76);
-    expect(Math.abs(r0! - PHOTO_RGB[0]) + Math.abs(g0! - PHOTO_RGB[1]) + Math.abs(b0! - PHOTO_RGB[2])).toBeLessThan(12);
+    expect(Math.abs(r0! - UNSPLASH_RGB[0]) + Math.abs(g0! - UNSPLASH_RGB[1]) + Math.abs(b0! - UNSPLASH_RGB[2])).toBeLessThan(12);
+    expect(shot.body.data.photos).toBeUndefined();
     expect(external).toEqual([]);
 
-    // Impor ulang ref yang sama: tanpa permintaan jaringan.
+    // Impor ulang ref yang sama di dokumen yang sama: tanpa permintaan jaringan (tanpa pemicu unduhan ulang).
     fake.requests.length = 0;
-    const again = await call('/execute', { code: "photo('pexels:2014422').assetId", description: 'baca ulang foto kamar' }, s);
+    const again = await call('/execute', { code: `photo('unsplash:${UNSPLASH.a}').assetId`, description: 'baca ulang foto kamar' }, s);
     expect(again.status).toBe(200);
     expect(fake.requests).toEqual([]);
 
@@ -119,11 +124,39 @@ describe.skipIf(!browserInstalled)('foto stok: execute → impor → render offl
     expect(await failed).toMatch(/ERR_NAME_NOT_RESOLVED/);
   }, 60_000);
 
+  it('cache render dingin + jaringan gambar gagal → placeholder warna foto; screenshot/export memuat catatan photos.placeholders', async () => {
+    const externalBefore = external.length;
+    fake.mode.unsplashImages = 503;
+    try {
+      const code = [
+        "const b = add(null, {type:'board', name:'Foto 2', x:500, y:0, width:390, height:844, screen:'mobile'});",
+        `const p = photo('unsplash:${UNSPLASH.b}');`,
+        "add(b, {type:'rect', name:'Image / Chef', width:200, height:120, fills:[{type:'image', assetId:p.assetId, fit:'cover'}]});",
+        'p.assetId',
+      ].join('\n');
+      const r = await call('/execute', { code, description: 'kartu foto saat jaringan gambar gagal' }, s);
+      expect(r.status, JSON.stringify(r.body.error)).toBe(200);
+      const boardId = r.body.data.created[0].id as string;
+      const shot = await call('/screenshot', { boardId }, s);
+      expect(shot.status).toBe(200);
+      expect(shot.body.data.photos).toMatchObject({ placeholders: [r.body.data.value] });
+      const img = decodePng(Buffer.from(shot.body.data.png, 'base64'));
+      const at = (x: number, y: number) => [...img.pixels.subarray((y * img.width + x) * img.channels, (y * img.width + x) * img.channels + 3)];
+      const [r0, g0, b0] = at(100, 60);
+      expect(Math.abs(r0! - UNSPLASH_RGB[0]) + Math.abs(g0! - UNSPLASH_RGB[1]) + Math.abs(b0! - UNSPLASH_RGB[2])).toBeLessThan(12);
+      const ex = await call('/export', { id: boardId }, s);
+      expect(ex.body.data.photos).toMatchObject({ placeholders: [r.body.data.value] });
+    } finally {
+      fake.mode.unsplashImages = 'ok';
+    }
+    expect(external.length).toBe(externalBefore);
+  }, 60_000);
+
   it('ref dinamis → NOT_FOUND + editId; ref tak dikenal → NOT_FOUND; format salah → SCHEMA_INVALID', async () => {
-    const dyn = await call('/execute', { code: "const x = 'pexels:' + '2014499'; photo(x)", description: 'foto dengan ref dinamis' }, s);
+    const dyn = await call('/execute', { code: "const x = 'unsplash:' + 'Kq3wLm8xT0b'; photo(x)", description: 'foto dengan ref dinamis' }, s);
     expect(dyn.body.error).toMatchObject({ code: 'NOT_FOUND', editId: expect.any(String) });
     expect(dyn.body.error!.hint).toMatch(/literal/);
-    const unknown = await call('/execute', { code: "photo('pexels:777')", description: 'foto dengan ref asing' }, s);
+    const unknown = await call('/execute', { code: "photo('unsplash:TidakAda123')", description: 'foto dengan ref asing' }, s);
     expect(unknown.body.error).toMatchObject({ code: 'NOT_FOUND', editId: expect.any(String) });
     const bad = await call('/execute', { code: "photo('foo')", description: 'foto dengan ref salah' }, s);
     expect(bad.body.error?.code).toBe('SCHEMA_INVALID');

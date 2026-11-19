@@ -19,7 +19,8 @@ import { startFakeProviders, type FakeProviders } from '../../../tests/support/p
 
 const TRACER = `const b=add(null,{type:'board',name:'Tracer',x:0,y:0,width:390,height:844,screen:'mobile'}); add(b,{type:'text',name:'Judul',content:'Halo dari Lakar',size:32})`;
 
-const baseConfig = loadConfig({});
+// Tes tidak pernah memakai key Unsplash nyata: file key default dialihkan ke path yang tidak ada.
+const baseConfig = { ...loadConfig({}), unsplashKeyFile: '/nonexistent/lakar-test/unsplash-access-key' };
 const browsersPath = process.env.LAKAR_BROWSERS_PATH || baseConfig.browsersPath;
 const browserInstalled = chromiumInstalled(browsersPath);
 if (!browserInstalled) {
@@ -53,8 +54,12 @@ beforeAll(async () => {
   const keyFile = join(dataDir, 'pexels-api-key');
   await writeFile(keyFile, 'TESTKEYdaemon0000000000\n');
   await chmod(keyFile, 0o600);
-  const photos = new PhotoService({ dataDir, keyFile, net: new SafeNet(fakePhotos.netOptions()) });
-  d = await startDaemon({ ...baseConfig, port: 0, dataDir, browsersPath, pexelsKeyFile: keyFile }, { photos });
+  // Key Unsplash palsu (contoh `photo('unsplash:…')` di api.md/skill memakai penyedia palsu lokal, tanpa jaringan).
+  const unsplashKeyFile = join(dataDir, 'unsplash-access-key');
+  await writeFile(unsplashKeyFile, 'TESTKEYunsplash000000000\n');
+  await chmod(unsplashKeyFile, 0o600);
+  const photos = new PhotoService({ dataDir, keyFile, unsplashKeyFile, net: new SafeNet(fakePhotos.netOptions()) });
+  d = await startDaemon({ ...baseConfig, port: 0, dataDir, browsersPath, pexelsKeyFile: keyFile, unsplashKeyFile }, { photos });
 });
 afterAll(async () => {
   await d?.close();
@@ -616,7 +621,7 @@ describe.skipIf(!browserInstalled)('check G0 (AD-8): execute + /layout-check', (
     expect(check.findings.some((f: { nodeId: string }) => f.nodeId === byName['Hak cipta'])).toBe(false);
     expect(check.findings[0]).toMatchObject({ level: 'error', rule: 'LC-01a', nodeId: byName.Sapaan, detail: 'emoji "👋" U+1F44B di "Halo 👋"' });
     expect(check.findings[3].detail).toMatch(/^keluar 60px di kanan dari clip Kartu/);
-    expect(check.findings[5]).toMatchObject({ level: 'warning', detail: 'ukuran 390×800', expected: '390×844' });
+    expect(check.findings[5]).toMatchObject({ level: 'warning', detail: 'ukuran 390×800', expected: 'lebar 390, tinggi ≥ 844 (isi lebih panjang: satu board panjang)' });
     // bounds: board + node baru, dibulatkan, relatif board
     expect(r.body.data.bounds[boardId]).toEqual([0, 0, 390, 800]);
     expect(r.body.data.bounds[byName['Overlay / Tab bar']]).toEqual([0, 736, 390, 64]);
@@ -694,9 +699,11 @@ describe.skipIf(!browserInstalled)('check G0 (AD-8): execute + /layout-check', (
     expect(r.body.data.check.findings.map((f: { rule: string; nodeName: string }) => [f.rule, f.nodeName])).toEqual([
       ['LC-20', 'Kartu 4'],
       ['LC-20', 'Scroll / Feed'],
+      // Pola dua board (scrollY) kini usang: warning LC-12 pada board akhir.
+      ['LC-12', 'Feed akhir'],
     ]);
     const lc = await call('/layout-check', { boardId: akhir }, sid);
-    expect(lc.body.data.findings).toHaveLength(1);
+    expect(lc.body.data.findings.map((f: { rule: string }) => f.rule)).toEqual(['LC-20', 'LC-12']);
     const f0 = (await call('/layout-check', { boardId: awal }, sid)).body.data.findings;
     expect(f0.map((f: { nodeName: string }) => f.nodeName)).toEqual(['Kartu 4']);
     expect(f0[0].detail).toMatch(/^kartu terpotong zona bawah: terlihat y 664–780, tertutup "Overlay \/ Tab bar" \(\w+\) mulai y 780$/);

@@ -123,20 +123,20 @@ export function formatStatus(st: StatusData): string {
 /** Deskripsi tool `status`. */
 export const STATUS_DESCRIPTION =
   'Status lakard: versi daemon dan mcp (cocok/tidak), pool render (halaman siap/sibuk/antre, dibuat ulang), font hilang, versi ikon, ' +
-  'penyedia foto stok (pexels/wikimedia/openverse, status file key, jumlah foto terimpor), sesi aktif. ' +
+  'penyedia foto stok (unsplash/wikimedia/openverse, status file key Unsplash, jumlah foto terimpor), sesi aktif. ' +
   'Tetap bekerja walau versi tidak cocok. Daemon mati → error berisi cara menjalankan service (systemctl --user start lakard).';
 
 /** Deskripsi tool `read_skill`. */
 export const READ_SKILL_DESCRIPTION =
   'Baca panduan skill Lakar (Markdown). Baca core (alur kerja, prelude helper, token, konvensi) + polish (spacing, komponen, tipografi, kontras) ' +
-  '+ skill jenis layar (landing atau mobile, berisi contoh teruji) di giliran yang sama (panggilan paralel); icons bila ragu nama ikon; api hanya untuk referensi lengkap. ' +
+  '+ skill jenis layar (landing, mobile, atau webapp; aplikasi desktop/dashboard → webapp; berisi contoh teruji) di giliran yang sama (panggilan paralel); icons bila ragu nama ikon; api hanya untuk referensi lengkap. ' +
   'Tanpa name → daftar {skills:[{name, available}]}; dengan name → isi skill. ' +
-  'Nama: core, polish, landing, mobile, icons, api. Nama lain atau skill yang belum tersedia → NOT_FOUND dengan daftar yang tersedia.';
+  'Nama: core, polish, landing, mobile, webapp, icons, api. Nama lain atau skill yang belum tersedia → NOT_FOUND dengan daftar yang tersedia.';
 
 /** Instruksi server MCP (dikirim saat initialize): urutan kerja singkat. */
 export const SERVER_INSTRUCTIONS =
-  'Lakar: canvas desain lewat kode. Sebelum menggambar, read_skill core + polish + landing/mobile di giliran yang sama (paralel; app desktop: core + polish). ' +
-  'Lalu open_doc dan bangun lewat sedikit execute besar (2–4 untuk landing, 1–2 untuk mobile) yang diawali prelude dari skill core; ' +
+  'Lakar: canvas desain lewat kode. Sebelum menggambar, read_skill core + polish + landing/mobile/webapp di giliran yang sama (paralel); aplikasi desktop/dashboard → webapp. ' +
+  'Lalu open_doc dan bangun lewat sedikit execute besar (2–4 untuk landing, 1–2 untuk mobile dan webapp) yang diawali prelude dari skill core; ' +
   'baca check di respons execute, perbaiki dengan editId/edits atau update, akhiri dengan satu screenshot, perbaikan, lalu export PNG.';
 
 /** Deskripsi tool `list_boards`. */
@@ -191,7 +191,7 @@ export const EXECUTE_DESCRIPTION =
   'place(w, h, {near?, gap?}) → {x,y} posisi board baru yang tidak tumpang tindih (gap default 80); ' +
   "iconSearch(query, {lib?:'lucide'|'simple-icons', limit?}) → [{lib, icon, tags?, title?, aliasOf?}] cari ikon (default 10, maks 50; sama dengan tool icon_search). " +
   "photo('<ref>') → {assetId, width, height, credit, license, creator, sourcePageUrl} foto stok untuk ref dari tool photo_search; tulis ref sebagai literal string " +
-  "(daemon mengunduhnya sekali ke aset lokal sebelum snippet berjalan; ref dari variabel → NOT_FOUND), pakai di fills [{type:'image', assetId:p.assetId, fit:'cover'}]; credit untuk ringkasan akhir, bukan node UI kecuali diminta. " +
+  "(daemon mengimpornya sekali sebelum snippet berjalan; ref dari variabel → NOT_FOUND), pakai di fills [{type:'image', assetId:p.assetId, fit:'cover'}]; credit untuk ringkasan akhir, bukan node UI kecuali diminta. " +
   'keep: objek JSON per sesi yang bertahan antar-execute bila sukses (mis. keep.hero = add(...); lalu get(keep.hero)). ' +
   'console.log(...) → data.logs. Nilai ekspresi terakhir → data.value (JSON; dipotong di 32 KB dengan valueTruncated). ' +
   "Katalog node v1 (tertutup): board (parent null) {type:'board', name, x, y, width, height, screen:'landing'|'app'|'mobile', expectedSize?:{width,height}, fills?}; " +
@@ -230,15 +230,16 @@ export const PHOTO_THUMBNAILS_MAX = 6;
 
 /** Deskripsi tool `photo_search`. */
 export const PHOTO_SEARCH_DESCRIPTION =
-  'Cari foto stok nyata untuk gambar di desain (sampul, kartu, hero, avatar orang/tempat, makanan, produk; bukan ikon fitur). Photos provided by Pexels bila key Pexels terpasang; ' +
+  'Cari foto stok nyata untuk gambar di desain (sampul, kartu, hero, avatar orang/tempat, makanan, produk; bukan ikon fitur). Photos provided by Unsplash bila key Unsplash terpasang; ' +
   'selain itu Wikimedia Commons (foto CC0/Public Domain, CC BY, CC BY-SA; tersaring dan terurut mutu), cadangan Openverse (CC0, Public Domain Mark, CC BY). ' +
-  'Mengembalikan teks JSON {provider, fallbackReason?, query, results:[{ref, width, height, alt, avgColor?, creator, license, sourcePageUrl, credit}], previews} ' +
+  'Mengembalikan teks JSON {provider, fallbackReason?, query, tried, results:[{ref, width, height, alt, avgColor?, creator, license, sourcePageUrl, credit}], previews} ' +
   `lalu thumbnail pratinjau (maks ${PHOTO_THUMBNAILS_MAX} gambar; previews:[ref] di JSON = urutan gambar). ` +
   "Pakai di execute: const p = photo('<ref>'); lalu fills:[{type:'image', assetId:p.assetId, fit:'cover'}] pada frame/rect bernama 'Image / …'. " +
-  'Ref ditulis literal di kode; foto diunduh sekali ke aset lokal saat execute (maks 6 foto baru per execute), render tidak memakai jaringan. ' +
-  'Dahulukan kandidat CC0/Public Domain atau Pexels, lalu CC BY/CC BY-SA. ' +
-  'credit = baris kredit siap pakai; atribusi (pembuat, lisensi, sumber) tercatat di metadata aset saat impor, jadi kredit tidak ditampilkan di UI kecuali pengguna memintanya; sebut kredit di ringkasan akhir. ' +
-  'Pakai kata kunci Inggris yang konkret (Wikimedia Commons dan Openverse berindeks Inggris). orientation: landscape | portrait | square. ' +
+  'Ref ditulis literal di kode; foto diimpor sekali saat execute (maks 6 foto baru per execute); halaman render tidak memakai jaringan (foto Unsplash disajikan daemon dari cache). ' +
+  'Pilih kandidat dengan subjek jelas dan berwarna. ' +
+  'credit = baris kredit siap pakai; atribusi (pembuat, lisensi, sumber) tercatat di metadata aset, jadi kredit tidak ditampilkan di UI kecuali pengguna memintanya; sebut kredit di ringkasan akhir. ' +
+  "Kata kunci: 2–3 kata benda Inggris yang visual (tempat/objek/suasana); orang = '<peran> portrait' (mis. 'chef portrait'). orientation: landscape | portrait | square. " +
+  'Bila kosong, daemon menyederhanakan kata kunci sendiri (query = yang dipakai, tried = yang dicoba): jangan mengulang pencarian. ' +
   'Cari di awal (maks 2 pencarian per desain, paralel, sebelum execute pertama). Tidak ada hasil → NOT_FOUND; penyedia sibuk/gagal → EXEC_ERROR (retryable): satu percobaan saja, lalu pakai blok gambar pengganti.';
 
 export function createLakarMcpServer(daemonUrl: string): McpServer {

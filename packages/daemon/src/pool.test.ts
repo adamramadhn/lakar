@@ -13,7 +13,8 @@ import { decodePng, readPngSize } from './png.js';
 import { chromiumInstalled } from '../../../tests/support/browser.ts';
 import { postJson, type LakardBody } from '../../../tests/support/http.ts';
 
-const baseConfig = loadConfig({ LAKAR_CONFIG: '' });
+// Tes tidak pernah memakai key Unsplash nyata: file key default dialihkan ke path yang tidak ada.
+const baseConfig = { ...loadConfig({ LAKAR_CONFIG: '' }), unsplashKeyFile: '/nonexistent/lakar-test/unsplash-access-key' };
 const browsersPath = process.env.LAKAR_BROWSERS_PATH || baseConfig.browsersPath;
 const browserInstalled = chromiumInstalled(browsersPath);
 const mainJs = fileURLToPath(new URL('../dist/main.js', import.meta.url));
@@ -88,6 +89,14 @@ describe('config.toml (kunci datar, env menang)', () => {
     expect(() => loadConfig({ LAKAR_RENDER_PAGES: '9' })).toThrow(/LAKAR_RENDER_PAGES/);
     expect(() => loadConfig({ LAKAR_RENDER_TIMEOUT_MS: 'x' })).toThrow(/LAKAR_RENDER_TIMEOUT_MS/);
     expect(() => loadConfig({ LAKAR_CONFIG: join(dir, 'tidak-ada.toml') })).toThrow(/LAKAR_CONFIG menunjuk file yang tidak ada/);
+    // Key Unsplash: default ~/.config/lakar/unsplash-access-key; config/env menimpa; utm_source divalidasi.
+    expect(none.unsplashKeyFile).toMatch(/\/\.config\/lakar\/unsplash-access-key$/);
+    expect(none.unsplashAppName).toBe('lakar');
+    const u = join(dir, 'unsplash.toml');
+    await writeFile(u, 'unsplash_key_file = "/tmp/k"\nunsplash_app_name = "lakar_studio"\n', 'utf8');
+    expect(loadConfig({ LAKAR_CONFIG: u })).toMatchObject({ unsplashKeyFile: '/tmp/k', unsplashAppName: 'lakar_studio' });
+    expect(loadConfig({ LAKAR_CONFIG: u, LAKAR_UNSPLASH_KEY_FILE: '/tmp/k2' }).unsplashKeyFile).toBe('/tmp/k2');
+    expect(() => loadConfig({ LAKAR_CONFIG: '', LAKAR_UNSPLASH_APP_NAME: 'Nama App!' })).toThrow(/LAKAR_UNSPLASH_APP_NAME tidak valid/);
   });
 
   it('lakard dengan config.toml berkunci salah (`prot = 1`) → exit 1 + pesan kunci tak dikenal', async () => {
@@ -438,6 +447,7 @@ describe.skipIf(!browserInstalled)('pool render (AD-18) + endpoint story 12, Chr
       { name: 'polish', available: false },
       { name: 'landing', available: false },
       { name: 'mobile', available: false },
+      { name: 'webapp', available: false },
       { name: 'icons', available: false },
       { name: 'api', available: false },
     ]);
@@ -446,7 +456,7 @@ describe.skipIf(!browserInstalled)('pool render (AD-18) + endpoint story 12, Chr
       const r = await c.call('/skills/read', { name }, s);
       expect(r.status).toBe(404);
       expect(r.body.error!.code).toBe('NOT_FOUND');
-      expect(r.body.error!.hint).toContain('core, polish, landing, mobile, icons, api');
+      expect(r.body.error!.hint).toContain('core, polish, landing, mobile, webapp, icons, api');
       expect(r.body.error!.hint).toContain('tersedia: core');
     }
     expect((await c.call('/skills/read', {})).status).toBe(401);

@@ -1,6 +1,6 @@
 # Lakar: mobile app
 
-Board `390 × 844` (`screen:'mobile'`), ukuran tetap; anak board tersusun kolom (tanpa `layout`).
+Board lebar 390 (`screen:'mobile'`), tinggi 844 atau lebih (isi panjang = satu board panjang); anak board tersusun kolom (tanpa `layout`).
 
 Mode gelap (Malam): `Object.assign(C,{bg,sub:surface,line,line2,t1,t2,t3` dari netral gelap bernuansa aksen`, acc` varian gelap`, tint, field:raised, deep, on:'#0B0C0F', ok:'#4ADE80', warn:'#FBBF24', bad:'#F87171', acc2, data})`; kartu = surface, sorotan = raised, latar besar bukan abu murni.
 
@@ -15,17 +15,16 @@ Mode gelap (Malam): `Object.assign(C,{bg,sub:surface,line,line2,t1,t2,t3` dari n
 - **Tanpa duplikasi:** satu butir tampil sekali per layar; bilah menempel memuat butir yang berjalan → sorotan memuat hal lain (berikutnya, ringkasan), daftar tidak mengulanginya.
 - **Ring/grafik** dari `ellipse` busur: jalur (`inner`, tint) + progres (`startDeg`, `sweepDeg` = persen × 360) di frame `layout:'none'`. Beberapa seri = busur bernada `C.data`, legenda titik bernada sama + nilai / sasaran.
 - **Tab bar** 3–5 item: ikon 24 + label `tab`; aktif = aksen + pil tint, lainnya muted. Bilah yang menempel di atasnya = `Overlay /` lapis raised + progres tipis aksen. Mengambang = `Overlay / Tab bar` absolut (lebar 350, x 20, di atas home indicator).
-- **Bilah bawah tetap** (aksi menetap): `Overlay / Bilah bawah` padding 16 20 34, total + tombol 56 lebar fill.
-- **Layar pertama hidup dan selesai rapi:** board pertama memuat inti permintaan (aksi utama, isi kunci, awal tiap bagian) di atas zona bawah (tab bar, bilah menempel, bilah aksi). Daftar menampilkan ≥ 3 butir utuh; bila tidak muat, rapatkan header, visual puncak, dan sorotan dulu, baru kurangi butir. Butir terakhir berakhir ≥ 8 di atas zona; tanpa judul seksi yang isinya tertutup atau kartu setengah terlihat. Seksi yang tidak muat mulai utuh di balik zona/posisi akhir.
-- **Anggaran tinggi (hitung dulu):** tab bar mengambang mulai y 746; bilah menempel ±64 di atasnya; bilah aksi tetap ±734. Jumlahkan 54 status bar + header + seksi; lebih → rapatkan atau pindahkan seksi utuh, font tetap.
+- **Bilah bawah tetap** (aksi menetap): `Overlay / Bilah bawah` padding 16 20, total + tombol 56 lebar fill, tepat di atas home indicator.
+- **Atas hidup, akhir rapi:** 844 px pertama memuat inti permintaan (aksi utama, isi kunci, awal tiap bagian). Daftar menampilkan ≥ 3 butir utuh; isi terakhir berakhir 24 di atas zona bawah; tanpa kartu setengah terlihat atau judul yatim.
 - **Bidang efek** (onboarding, sampul, kartu sorotan; bila diminta/merek ekspresif), satu per layar: `mesh` dasar → struktur bermakna berulang melintasi bidang (gelombang `path` dari loop, cincin `ellipse`, partikel; alpha bertingkat) → `noise` ≤ 0.08 → latar gelap: satu cahaya merek di balik fokus (blur ≥ 40, opacity ≤ 35%), bukan di tombol; teks/tombol di zona tenang/panel solid, kontras ≥ 4.5:1.
 - **Home indicator** 34 (nama persis `Home indicator`), garis 134 × 5 di tengah.
-- **Layar lebih panjang dari 844:** putuskan saat merencanakan. Status bar → header tetap → `Scroll / Konten` (`clip:true`) → bilah bawah tetap. Dua board 390 × 844 dibangun di execute pertama: posisi awal dan akhir (`const p=place(390,844,{near:b}); const b2=duplicate(b,{name:'… (akhir) …', x:p.x, y:p.y});` lalu `update(find({name:'Scroll / Konten', within:b2})[0].id, {scrollY:…})`), `scrollY` jatuh di awal seksi/butir dan butir terakhir selesai bersih di atas zona bawah.
+- **Tinggi board (hitung saat merencanakan):** isi muat 844 → `390 × 844`. Lebih → SATU board `390 × H`, tanpa `duplicate`, `scrollY`, atau `Scroll /`. H = 54 status bar + header + seksi + gap + 24 + zona bawah (tab bar mengambang 98, bilah aksi = tingginya + 34, tanpa zona 34), minimal 844; simpan `const H=…`. Zona dari H: `Overlay / Tab bar` y `H-98`, bilah aksi y `H-34-tinggi`, home indicator y `H-34`.
 
 ## Alur execute (maks 3)
 
-1. Execute 1: semua board lengkap (termasuk posisi akhir) dengan tinggi yang sudah dihitung.
-2. Semua temuan `check` diperbaiki dalam satu execute (`update`/`editId`).
+1. Execute 1: satu board lengkap dengan H yang sudah dihitung.
+2. Semua temuan `check` diperbaiki dalam satu execute (`update`/`editId`); `LC-12` "tinggi pas = N" → `update(b,{height:N})` + geser zona ke N.
 3. Akhir sesuai `core` (tanpa `inspect`, tanpa execute keempat).
 
 ## Contoh teruji
@@ -35,8 +34,9 @@ Beranda aplikasi kursus bahasa, arketipe Ramah (langkah khas: ring target minggu
 ```js
 // pakai prelude
 Object.assign(C,{acc:'#4F46E5',tint:'#4F46E514',field:'#EEF0FE',deep:'#312E81',acc2:'#A16207',data:['#4F46E5','#8B93F8','#A16207']}); Object.assign(FONT,{h:'DM Sans',b:'DM Sans',m:'DM Mono'});
-const p=place(390,844);
-const b=add(null,{type:'board',name:'[WIP] Tutur / Beranda · mobile · Ramah',x:p.x,y:p.y,width:390,height:844,screen:'mobile',fills:fill(C.bg)});
+const H=1114; // 54 status bar + Konten (isi berakhir y 992) + 24 + tab bar 98
+const p=place(390,H);
+const b=add(null,{type:'board',name:'[WIP] Tutur / Beranda · mobile · Ramah',x:p.x,y:p.y,width:390,height:H,screen:'mobile',fills:fill(C.bg)});
 keep.board=b;
 // Status bar 54
 const sb=Row(b,'Status bar',{width:'fill',height:54,padding:[0,24],justify:'space-between'});
@@ -78,27 +78,26 @@ for(const [n,v,c] of [['Simak','45',C.data[0]],['Bicara','30',C.data[1]],['Kosak
  T(it,'Teks',n+' '+v,'caption',{color:C.t2});
 }
 Btn(card,'Lanjutkan Unit 4','primary',{width:'fill'});
-// Header seksi + list yang memperlihatkan keadaan
-const sec=F(w,'Seksi / Pelajaran',{width:'fill',gap:12}); // judul + isi satu kelompok
-const sh=Row(sec,'Header seksi',{width:'fill',justify:'space-between'});
-T(sh,'Judul','Pelajaran hari ini','h4');
-T(sh,'Link / Semua','Lihat semua','label',{color:C.acc});
-const list=F(sec,'Daftar pelajaran',{width:'fill',gap:8});
-for(const [ic,j,m,st] of [['headphones','Menyimak: di stasiun','Unit 4 · 12 menit · 92%','done'],['message-circle','Percakapan memesan tiket','Unit 4 · 15 menit','next'],['book-open','Kosakata perjalanan','Unit 4 · 8 menit','todo'],['list-checks','Kuis akhir unit','Unit 4 · 10 soal','lock']]){
- const on=st==='next', off=st==='done'||st==='lock';
- const r=Row(list,'Item / '+j,{width:'fill',gap:12,padding:12,radius:20,fills:fill(on?C.tint:C.bg),stroke:line(on?C.acc:C.line)});
- const box=Row(r,'Ikon',{width:40,height:40,radius:8,justify:'center',fills:fill(on?C.acc:off?C.sub:C.tint)}); I(box,ic,20,on?C.on:off?C.t3:C.acc);
- const tx=F(r,'Teks',{width:'fill',gap:2});
- T(tx,'Judul',j,'label',{color:off?C.t2:C.t1}); T(tx,'Meta',m,'body-sm',{color:on?C.t2:C.t3});
- if(on) Badge(r,'Berikutnya','accent'); else I(r,{done:'circle-check',todo:'chevron-right',lock:'lock'}[st],20,st==='done'?C.ok:C.t3);
-}
+// Seksi = header + list yang memperlihatkan keadaan (judul + isi satu kelompok)
+const Sec=(t,rows)=>{const sec=F(w,'Seksi / '+t,{width:'fill',gap:12});
+ const sh=Row(sec,'Header seksi',{width:'fill',justify:'space-between'});
+ T(sh,'Judul',t,'h4'); T(sh,'Link / Semua','Lihat semua','label',{color:C.acc});
+ const list=F(sec,'Daftar',{width:'fill',gap:8});
+ for(const [ic,j,m,st] of rows){const on=st==='next', off=st==='done'||st==='lock';
+  const r=Row(list,'Item / '+j,{width:'fill',gap:12,padding:12,radius:20,fills:fill(on?C.tint:C.bg),stroke:line(on?C.acc:C.line)});
+  const box=Row(r,'Ikon',{width:40,height:40,radius:8,justify:'center',fills:fill(on?C.acc:off?C.sub:C.tint)}); I(box,ic,20,on?C.on:off?C.t3:C.acc);
+  const tx=F(r,'Teks',{width:'fill',gap:2});
+  T(tx,'Judul',j,'label',{color:off?C.t2:C.t1}); T(tx,'Meta',m,'body-sm',{color:on?C.t2:C.t3});
+  if(on) Badge(r,'Berikutnya','accent'); else I(r,{done:'circle-check',todo:'chevron-right',lock:'lock'}[st],20,st==='done'?C.ok:C.t3);}};
+Sec('Pelajaran hari ini',[['headphones','Menyimak: di stasiun','Unit 4 · 12 menit · 92%','done'],['message-circle','Percakapan memesan tiket','Unit 4 · 15 menit','next'],['book-open','Kosakata perjalanan','Unit 4 · 8 menit','todo'],['list-checks','Kuis akhir unit','Unit 4 · 10 soal','lock']]);
+Sec('Ulang kata sulit',[['repeat','Arah dan peron','14 kata · 3 hari lalu','todo'],['ticket','Harga dan karcis','9 kata · 5 hari lalu','todo'],['clock','Jadwal keberangkatan','11 kata · minggu lalu','todo']]);
 // Tab bar mengambang (Overlay /), tab aktif = aksen + pil tint, + home indicator
-const tb=Row(b,'Overlay / Tab bar',{position:'absolute',x:20,y:746,width:350,height:64,padding:[0,8],radius:24,fills:fill(C.bg),stroke:line(),shadows:[{x:0,y:4,blur:16,color:'#10182814'}]});
+const tb=Row(b,'Overlay / Tab bar',{position:'absolute',x:20,y:H-98,width:350,height:64,padding:[0,8],radius:24,fills:fill(C.bg),stroke:line(),shadows:[{x:0,y:4,blur:16,color:'#10182814'}]});
 for(const [ic,l,on] of [['house','Beranda',1],['book-open','Kursus',0],['mic','Latihan',0],['user','Profil',0]]){
  const t=F(tb,'Tab / '+l,{width:'fill',height:48,gap:2,justify:'center',align:'center',radius:16,fills:fill(on?C.tint:C.bg)});
  I(t,ic,24,on?C.acc:C.t3); T(t,'Label',l,'tab',{color:on?C.acc:C.t3});
 }
-const hm=Row(b,'Home indicator',{position:'absolute',x:0,y:810,width:390,height:34,justify:'center'});
+const hm=Row(b,'Home indicator',{position:'absolute',x:0,y:H-34,width:390,height:34,justify:'center'});
 add(hm,{type:'rect',name:'Garis',width:134,height:5,radius:9999,fills:fill(C.t1)});
 b
 ```

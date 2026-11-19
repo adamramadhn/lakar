@@ -1,9 +1,9 @@
-// Adaptor penyedia foto stok: Pexels (pakai key), Wikimedia Commons (tanpa key; penyedia utama tanpa key) dan
-// Openverse (tanpa key; cadangan, CC0/PDM/CC BY dari Flickr/Wikimedia). Respons API dipetakan ke `PhotoCandidate`.
-// Key hanya dikirim di header Authorization ke api.pexels.com.
+// Adaptor penyedia foto stok: Unsplash (pakai key; penyedia utama, foto jarak jauh), Pexels (pakai key; hanya lookup
+// ref lama), Wikimedia Commons (tanpa key) dan Openverse (tanpa key; cadangan, CC0/PDM/CC BY dari Flickr/Wikimedia).
+// Respons API dipetakan ke `PhotoCandidate`. Key hanya dikirim di header Authorization ke api.unsplash.com / api.pexels.com.
 import { NetError, type SafeNet } from './net.js';
 
-export type ProviderName = 'pexels' | 'wikimedia' | 'openverse';
+export type ProviderName = 'unsplash' | 'pexels' | 'wikimedia' | 'openverse';
 export type Orientation = 'landscape' | 'portrait' | 'square';
 
 /** Batas body JSON API. */
@@ -14,7 +14,8 @@ export const IMAGE_MAX_BYTES = 12 * 1024 * 1024;
 /** Lebar unduhan Pexels: cukup untuk board 1440 skala 2. */
 export const PEXELS_DOWNLOAD_WIDTH = 2880;
 
-export const REF_PATTERN = /^(pexels|wikimedia|openverse):([A-Za-z0-9-]{1,64})$/;
+export const REF_PATTERN = /^(unsplash|pexels|wikimedia|openverse):([A-Za-z0-9_-]{1,64})$/;
+const UNSPLASH_ID = /^[A-Za-z0-9_-]{6,32}$/;
 const PEXELS_ID = /^\d{1,20}$/;
 const WIKIMEDIA_ID = /^\d{1,12}$/;
 const OPENVERSE_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
@@ -37,6 +38,8 @@ export type PhotoCandidate = {
   attribution?: string;
   downloadUrl: string;
   thumbUrl: string;
+  /** Unsplash: endpoint pemicu unduhan (dipanggil saat foto dipakai; wajib menurut pedoman API Unsplash). */
+  downloadLocation?: string;
 };
 
 export type SearchQuery = { query: string; orientation?: Orientation; limit: number };
@@ -53,7 +56,7 @@ export function parseRef(ref: string): { provider: ProviderName; id: string } | 
   if (!m) return undefined;
   const provider = m[1] as ProviderName;
   const id = m[2]!;
-  const valid = provider === 'pexels' ? PEXELS_ID : provider === 'wikimedia' ? WIKIMEDIA_ID : OPENVERSE_ID;
+  const valid = provider === 'unsplash' ? UNSPLASH_ID : provider === 'pexels' ? PEXELS_ID : provider === 'wikimedia' ? WIKIMEDIA_ID : OPENVERSE_ID;
   if (!valid.test(id)) return undefined;
   return { provider, id };
 }
@@ -74,6 +77,143 @@ function withQuery(raw: string, params: Record<string, string>): string {
   const u = new URL(raw);
   for (const [k, v] of Object.entries(params)) u.searchParams.set(k, v);
   return u.toString();
+}
+
+// ---------------------------------------------------------------------------
+// Unsplash
+// ---------------------------------------------------------------------------
+
+export const UNSPLASH_API = 'https://api.unsplash.com';
+export const UNSPLASH_LICENSE = 'Unsplash License';
+export const UNSPLASH_LICENSE_URL = 'https://unsplash.com/license';
+/** Lebar foto jarak jauh Unsplash: cukup untuk board 1440 skala 2. */
+export const UNSPLASH_WIDTH = 2880;
+const UNSPLASH_ORIENTATION: Record<Orientation, string> = { landscape: 'landscape', portrait: 'portrait', square: 'squarish' };
+
+type UnsplashPhoto = {
+  id?: unknown;
+  width?: unknown;
+  height?: unknown;
+  color?: unknown;
+  alt_description?: unknown;
+  description?: unknown;
+  premium?: unknown;
+  plus?: unknown;
+  urls?: { raw?: unknown; thumb?: unknown };
+  links?: { html?: unknown; download_location?: unknown };
+  user?: { name?: unknown; links?: { html?: unknown } };
+};
+
+/** Tambah `utm_source=<app>&utm_medium=referral` (pedoman atribusi Unsplash). */
+export function unsplashUtm(raw: string, appName: string): string {
+  return withQuery(raw, { utm_source: appName, utm_medium: 'referral' });
+}
+
+/** Pemetaan + filter: tanpa premium/Unsplash+ (`plus.unsplash.com`), URL gambar/thumbnail wajib host allowlist. */
+export function mapUnsplash(p: UnsplashPhoto, net: SafeNet, appName: string): PhotoCandidate | undefined {
+  const id = str(p.id);
+  const raw = str(p.urls?.raw);
+  const thumb = str(p.urls?.thumb);
+  const dl = str(p.links?.download_location);
+  if (!id || !UNSPLASH_ID.test(id) || !raw || !thumb || !dl || p.premium === true || p.plus === true) return undefined;
+  let downloadUrl: string;
+  try {
+    // urls.raw sudah memuat `ixid` (wajib dipertahankan): parameter ukuran ditambahkan, bukan menimpa.
+    downloadUrl = withQuery(raw, { w: String(UNSPLASH_WIDTH), q: '80', fm: 'jpg', fit: 'max' });
+    net.check('image', downloadUrl);
+    net.check('thumb', thumb);
+    net.check('api', dl);
+  } catch {
+    return undefined;
+  }
+  const creator = str(p.user?.name) ?? 'Unsplash';
+  const userHtml = str(p.user?.links?.html);
+  const pageHtml = str(p.links?.html) ?? `https://unsplash.com/photos/${id}`;
+  let creatorUrl: string | undefined;
+  let sourcePageUrl: string;
+  try {
+    creatorUrl = userHtml ? unsplashUtm(userHtml, appName) : undefined;
+    sourcePageUrl = unsplashUtm(pageHtml, appName);
+  } catch {
+    return undefined;
+  }
+  const color = str(p.color);
+  return {
+    ref: `unsplash:${id}`,
+    provider: 'unsplash',
+    width: num(p.width),
+    height: num(p.height),
+    alt: str(p.alt_description) ?? str(p.description) ?? '',
+    ...(color && /^#[0-9a-f]{6}$/i.test(color) ? { avgColor: color.toUpperCase() } : {}),
+    creator,
+    ...(creatorUrl ? { creatorUrl } : {}),
+    license: UNSPLASH_LICENSE,
+    licenseUrl: UNSPLASH_LICENSE_URL,
+    sourcePageUrl,
+    credit: `Foto: ${creator} / Unsplash`,
+    downloadUrl,
+    thumbUrl: thumb,
+    downloadLocation: dl,
+  };
+}
+
+export class UnsplashProvider implements PhotoProvider {
+  readonly name = 'unsplash' as const;
+  readonly #net: SafeNet;
+  readonly #key: string;
+  readonly #app: string;
+  readonly #base: string;
+  /** `X-Ratelimit-Remaining` respons API terakhir (undefined = belum tahu). */
+  remaining: number | undefined;
+
+  constructor(net: SafeNet, key: string, appName: string, base = UNSPLASH_API) {
+    this.#net = net;
+    this.#key = key;
+    this.#app = appName;
+    this.#base = base;
+  }
+
+  async #get(path: string): Promise<unknown> {
+    const r = await this.#net.fetch(`${this.#base}${path}`, {
+      kind: 'api',
+      maxBytes: API_MAX_BYTES,
+      timeoutMs: API_TIMEOUT_MS,
+      headers: { Authorization: `Client-ID ${this.#key}`, 'Accept-Version': 'v1' },
+    });
+    const rem = r.headers['x-ratelimit-remaining'];
+    if (rem !== undefined && /^\d+$/.test(rem.trim())) this.remaining = Number(rem.trim());
+    return parseJson(r.body, 'Unsplash');
+  }
+
+  async search(q: SearchQuery): Promise<PhotoCandidate[]> {
+    const params = new URLSearchParams({ query: q.query, per_page: String(Math.min(12, q.limit)), content_filter: 'high' });
+    if (q.orientation) params.set('orientation', UNSPLASH_ORIENTATION[q.orientation]);
+    const data = (await this.#get(`/search/photos?${params}`)) as { results?: unknown };
+    const results = Array.isArray(data.results) ? (data.results as UnsplashPhoto[]) : [];
+    return results.flatMap((p) => mapUnsplash(p, this.#net, this.#app) ?? []).slice(0, q.limit);
+  }
+
+  async byId(id: string): Promise<PhotoCandidate | undefined> {
+    if (!UNSPLASH_ID.test(id)) return undefined;
+    try {
+      return mapUnsplash((await this.#get(`/photos/${id}`)) as UnsplashPhoto, this.#net, this.#app);
+    } catch (e) {
+      if (e instanceof NetError && e.status === 404) return undefined;
+      throw e;
+    }
+  }
+
+  /** Panggil `download_location` (pemicu unduhan Unsplash) dengan key; hanya host API Unsplash. */
+  async trackDownload(downloadLocation: string): Promise<void> {
+    const u = this.#net.check('api', downloadLocation);
+    if (u.hostname !== new URL(this.#base).hostname) throw new NetError('blocked', `download_location di luar ${new URL(this.#base).hostname}`, { retryable: false });
+    await this.#net.fetch(u.toString(), {
+      kind: 'api',
+      maxBytes: API_MAX_BYTES,
+      timeoutMs: API_TIMEOUT_MS,
+      headers: { Authorization: `Client-ID ${this.#key}`, 'Accept-Version': 'v1' },
+    });
+  }
 }
 
 // ---------------------------------------------------------------------------

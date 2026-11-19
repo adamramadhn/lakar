@@ -120,8 +120,8 @@ export interface LakarApi {
    */
   iconSearch(query: string, opts?: IconSearchOptions): IconSearchMatch[];
   /**
-   * Foto stok terimpor untuk ref `photo_search` (mis. `'wikimedia:12345678'` atau `'pexels:2014422'`). Ref harus ditulis literal di kode
-   * (`photo('pexels:2014422')`): daemon mengimpornya ke store aset sebelum snippet berjalan. Pakai `assetId` di fill
+   * Foto stok terimpor untuk ref `photo_search` (mis. `'unsplash:Kq3wLm8xT0a'` atau `'wikimedia:12345678'`). Ref harus ditulis literal di kode
+   * (`photo('unsplash:Kq3wLm8xT0a')`): daemon mengimpornya sebelum snippet berjalan. Pakai `assetId` di fill
    * `{type:'image', assetId, fit:'cover'}`; `credit` = baris kredit siap pakai.
    */
   photo(ref: string): PhotoInfo;
@@ -140,12 +140,12 @@ export type ApiContext = {
   photos?: PhotoLibraryPort;
 };
 
-/** Format ref foto (`photo_search`): `wikimedia:<pageid>`, `pexels:<id>`, atau `openverse:<uuid>`. */
-export const PHOTO_REF_PATTERN = /^(?:(?:pexels|openverse):[A-Za-z0-9-]{1,64}|wikimedia:\d{1,12})$/;
-const PHOTO_REF_LITERAL = /photo\(\s*(['"])((?:pexels|wikimedia|openverse):[A-Za-z0-9-]{1,64})\1/g;
+/** Format ref foto (`photo_search`): `unsplash:<id>`, `wikimedia:<pageid>`, `openverse:<uuid>`, atau `pexels:<id>` (lama). */
+export const PHOTO_REF_PATTERN = /^(?:unsplash:[A-Za-z0-9_-]{6,32}|(?:pexels|openverse):[A-Za-z0-9-]{1,64}|wikimedia:\d{1,12})$/;
+const PHOTO_REF_LITERAL = /photo\(\s*(['"])((?:unsplash|pexels|wikimedia|openverse):[A-Za-z0-9_-]{1,64})\1/g;
 
 /**
- * Ref foto literal di kode snippet (`photo('wikimedia:123')` / `photo('pexels:123')` / `photo("openverse:<uuid>")`), unik, urutan muncul.
+ * Ref foto literal di kode snippet (`photo('unsplash:<id>')` / `photo('wikimedia:123')` / `photo("openverse:<uuid>")`), unik, urutan muncul.
  * Daemon mengimpornya sebelum snippet berjalan (snippet sinkron, tanpa jaringan).
  */
 export function photoRefsInCode(code: string): string[] {
@@ -563,27 +563,27 @@ export const API: { readonly [K in keyof LakarApi]: ApiFunction } = {
     kind: 'read',
     signature: 'photo(ref: string): {assetId, width, height, credit, license, creator, sourcePageUrl}',
     doc:
-      "Foto stok untuk ref dari tool photo_search (mis. 'wikimedia:<id>', 'pexels:2014422' atau 'openverse:<uuid>'). Tulis ref sebagai literal string di kode " +
-      "(photo('pexels:2014422')), bukan variabel: daemon mengunduhnya sekali ke store aset lokal sebelum snippet berjalan, lalu render hanya memakai file lokal. " +
+      "Foto stok untuk ref dari tool photo_search (mis. 'unsplash:Kq3wLm8xT0a', 'wikimedia:<id>' atau 'openverse:<uuid>'). Tulis ref sebagai literal string di kode " +
+      "(photo('unsplash:Kq3wLm8xT0a')), bukan variabel: daemon mengimpornya sekali sebelum snippet berjalan (Unsplash: aset jarak jauh yang disajikan daemon; lainnya: file lokal). " +
       "Pakai assetId di fill {type:'image', assetId, fit:'cover'} pada frame/rect bernama 'Image / …'; width/height = ukuran piksel asli; " +
       'credit = baris kredit siap pakai. Atribusi sudah tercatat di metadata aset: kredit tidak ditampilkan di UI kecuali pengguna memintanya; sebut di ringkasan akhir.',
     returns: '{assetId, width, height, credit, license, creator, sourcePageUrl}',
     errors: ['NOT_FOUND', 'SCHEMA_INVALID'],
     example:
-      `${BOARD}\nconst p = photo('pexels:2014422');\n` +
+      `${BOARD}\nconst p = photo('unsplash:Kq3wLm8xT0a');\n` +
       "const k = add(b, {type:'frame', name:'Kartu', layout:'column', gap:8, padding:16, width:'fill'});\n" +
       "add(k, {type:'rect', name:'Image / Kamar', width:'fill', height:200, radius:12, fills:[{type:'image', assetId:p.assetId, fit:'cover'}]});\n" +
       "add(k, {type:'text', name:'Judul', content:'Kamar deluks, 2 tamu', size:16, lineHeight:24, weight:600, color:'#101828'});",
     call(ctx, [ref]) {
       if (typeof ref !== 'string' || !PHOTO_REF_PATTERN.test(ref)) {
-        throw new LakarError('SCHEMA_INVALID', `photo: ref harus 'wikimedia:<id>', 'pexels:<id>' atau 'openverse:<uuid>', bukan ${show(ref)}`, {
-          hint: "pakai ref dari hasil photo_search apa adanya, mis. photo('pexels:2014422')",
+        throw new LakarError('SCHEMA_INVALID', `photo: ref harus 'unsplash:<id>', 'wikimedia:<id>', 'openverse:<uuid>' atau 'pexels:<id>', bukan ${show(ref)}`, {
+          hint: "pakai ref dari hasil photo_search apa adanya, mis. photo('unsplash:Kq3wLm8xT0a')",
         });
       }
       const info = ctx.photos?.resolve(ref);
       if (!info) {
         throw new LakarError('NOT_FOUND', `photo: foto ${ref} belum diimpor`, {
-          hint: "pakai ref literal dari photo_search langsung di kode, mis. photo('pexels:2014422') (bukan variabel atau string rakitan), agar daemon mengimpornya sebelum snippet berjalan",
+          hint: "pakai ref literal dari photo_search langsung di kode, mis. photo('unsplash:Kq3wLm8xT0a') (bukan variabel atau string rakitan), agar daemon mengimpornya sebelum snippet berjalan",
         });
       }
       return JSON.parse(JSON.stringify(info)) as unknown;

@@ -3,6 +3,7 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { chmod, mkdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { crc32, deflateSync } from 'node:zlib';
 import { ASSET_ID_PATTERN } from '@lakar/schema';
 
 /** MIME raster dari magic bytes, atau undefined. */
@@ -75,7 +76,38 @@ export type AssetMeta = {
   bytes: number;
   mime: string;
   importedAt: string;
+  /** Warna rata-rata foto (placeholder render aset jarak jauh). */
+  avgColor?: string;
+  /**
+   * Aset jarak jauh (Unsplash, hotlink resmi): tanpa byte di `assets/`; `url` = URL gambar dari API (ixid dipertahankan),
+   * disajikan lewat cache render `<dataDir>/cache/remote-images/`.
+   */
+  remote?: { provider: 'unsplash'; url: string; downloadLocation: string };
+  /** `download_location` yang sudah dipicu, sekali per dokumen. */
+  downloads?: { docId: string; at: string }[];
+  /** `download_location` yang gagal (pesan tersanitasi, tanpa key). */
+  downloadErrors?: { docId: string; at: string; error: string }[];
 };
+
+/** PNG RGB 8-bit `w`×`h` satu warna (placeholder aset jarak jauh saat cache dingin + jaringan gagal). */
+export function solidPng(w: number, h: number, rgb: readonly [number, number, number]): Buffer {
+  const chunk = (type: string, data: Buffer) => {
+    const len = Buffer.alloc(4);
+    len.writeUInt32BE(data.length);
+    const td = Buffer.concat([Buffer.from(type, 'latin1'), data]);
+    const crc = Buffer.alloc(4);
+    crc.writeUInt32BE(crc32(td));
+    return Buffer.concat([len, td, crc]);
+  };
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(w, 0);
+  ihdr.writeUInt32BE(h, 4);
+  ihdr[8] = 8;
+  ihdr[9] = 2;
+  const row = Buffer.concat([Buffer.from([0]), Buffer.from(Array.from({ length: w }, () => [...rgb]).flat())]);
+  const raw = Buffer.concat(Array.from({ length: h }, () => row));
+  return Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), chunk('IHDR', ihdr), chunk('IDAT', deflateSync(raw)), chunk('IEND', Buffer.alloc(0))]);
+}
 
 export const assetMetaPath = (dataDir: string, sha: string) => join(dataDir, 'assets', 'meta', `${sha}.json`);
 

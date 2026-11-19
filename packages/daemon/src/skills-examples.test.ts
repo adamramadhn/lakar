@@ -12,7 +12,8 @@ import { chromiumInstalled } from '../../../tests/support/browser.ts';
 import { postJson } from '../../../tests/support/http.ts';
 import { startFakeProviders, type FakeProviders } from '../../../tests/support/photos.ts';
 
-const baseConfig = loadConfig({});
+// Tes tidak pernah memakai key Unsplash nyata: file key default dialihkan ke path yang tidak ada.
+const baseConfig = { ...loadConfig({}), unsplashKeyFile: '/nonexistent/lakar-test/unsplash-access-key' };
 const browsersPath = process.env.LAKAR_BROWSERS_PATH || baseConfig.browsersPath;
 const browserInstalled = chromiumInstalled(browsersPath);
 if (!browserInstalled) {
@@ -76,8 +77,12 @@ describe.skipIf(!browserInstalled)('contoh skill dijalankan terhadap daemon nyat
     const keyFile = join(dataDir, 'pexels-api-key');
     await writeFile(keyFile, 'TESTKEYskillexamples000\n');
     await chmod(keyFile, 0o600);
-    const photos = new PhotoService({ dataDir, keyFile, net: new SafeNet(fake.netOptions()) });
-    d = await startDaemon({ ...baseConfig, port: 0, dataDir, browsersPath, pexelsKeyFile: keyFile }, { photos });
+    // Key Unsplash palsu (contoh `photo('unsplash:…')` di api.md/skill memakai penyedia palsu lokal, tanpa jaringan).
+    const unsplashKeyFile = join(dataDir, 'unsplash-access-key');
+    await writeFile(unsplashKeyFile, 'TESTKEYunsplash000000000\n');
+    await chmod(unsplashKeyFile, 0o600);
+    const photos = new PhotoService({ dataDir, keyFile, unsplashKeyFile, net: new SafeNet(fake.netOptions()) });
+    d = await startDaemon({ ...baseConfig, port: 0, dataDir, browsersPath, pexelsKeyFile: keyFile, unsplashKeyFile }, { photos });
     await d.warmed;
     const preludes = (await jsBlocks('core')).filter((c) => c.startsWith(PRELUDE_MARK));
     expect(preludes).toHaveLength(1);

@@ -20,7 +20,7 @@ export type StartOptions = {
   fonts?: FontRegistry;
   icons?: IconCatalogPort<string, IconGlyph>;
   skillsDir?: string;
-  /** Layanan foto stok (default: key dari `config.pexelsKeyFile`; tes menginjeksi jaringan palsu). */
+  /** Layanan foto stok (default: key dari `config.unsplashKeyFile`; tes menginjeksi jaringan palsu). */
   photos?: PhotoService;
   /** Hook tes pool render (crash/macet deterministik). */
   onLease?: (page: Page) => Promise<void> | void;
@@ -40,7 +40,7 @@ export async function startDaemon(config: DaemonConfig, opts: StartOptions = {})
     icons,
     ...(opts.onLease ? { onLease: opts.onLease } : {}),
   });
-  const photos = opts.photos ?? new PhotoService({ dataDir: config.dataDir, keyFile: config.pexelsKeyFile });
+  const photos = opts.photos ?? new PhotoService({ dataDir: config.dataDir, keyFile: config.pexelsKeyFile, unsplashKeyFile: config.unsplashKeyFile, unsplashAppName: config.unsplashAppName });
   const daemon = buildServer({ config, render: renderer, fonts, icons, photos, ...(opts.skillsDir ? { skillsDir: opts.skillsDir } : {}) });
   await daemon.app.listen({ host: config.host, port: config.port });
   const addr = daemon.app.server.address();
