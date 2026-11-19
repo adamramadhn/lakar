@@ -3,14 +3,14 @@ title: 'Board mobile panjang, skill webapp, foto Unsplash, dan mockup hero'
 type: feature
 ticket: '24'
 created: '2026-11-19'
-status: in-progress
+status: in-review
 baseline_revision: '9b5652de1b71425b64d2855ac639328f560ab426'
 route: full
 route_source: auto
 risk: high
-review: ''
-review_source: ''
-lenses_ran: []
+review: quick
+review_source: pinned
+lenses_ran: [quick]
 review_loop_iteration: 0
 followup_review_recommended: false
 context:
@@ -122,6 +122,15 @@ deferred: []
 - 2026-11-19 (implementer): foto Unsplash — tinggi info `photo()` = lebar ≤ 2880 × rasio API (tanpa unduhan byte); rute `/assets/<id>` menyajikan aset jarak jauh dengan `cache-control: no-cache` (placeholder `no-store`); `download_location` dipanggil di daemon sebelum snippet bersama impor, gagal dicatat di meta (`downloadErrors`). `X-Ratelimit-Remaining` 0 → Unsplash dilewati 1 jam.
 
 ## Review Triage Log
+
+### 2026-11-19 — Review pass
+- verdicts: 5 findings — high 0, medium 3, low 2, false 0, maybe-false 0
+- findings:
+  - `[medium]` `[patch]` LC-12 "tinggi pas" pada board mobile panjang tanpa zona bawah memakai tepi board sebagai batas, sehingga saran tinggi menaruh isi di bawah `Home indicator` — terverifikasi (`bottomZone` melewati `Home indicator`, limit = h). Dipatch (`4f86c29`): tanpa zona, batas = tepi atas `Home indicator`; fixture negatif + positif.
+  - `[low]` `[patch]` TTL cache cari 24 jam diperbarui setiap hit memori, dan hit disk memakai `at = now` — terverifikasi. Dipatch (`4f86c29`): hit memori tidak di-set ulang, hit disk memakai `at` tersimpan; tes 23 j → 25 j miss.
+  - `[medium]` `[patch]` `remaining === 0` basi memblokir Unsplash lagi pada setiap hit cache sesudah cooldown — terverifikasi (`finally` jalan juga pada hit cache). Dipatch (`4f86c29`): `remaining` di-reset sesudah blokir dipasang; tes sesudah cooldown.
+  - `[medium]` `[patch]` C7: `webapp.md` memakai contoh "(terlambat, stok tipis, menunggu)" dan "vs minggu lalu" yang mirip isi prompt latihan P8 — terverifikasi lewat grep. Dipatch oleh sesi baru tanpa konteks rubrik/prompt (implementer dan sesi build sudah membaca Lampiran B): "(lewat tenggat, hampir habis, menunggu persetujuan)" dan "vs periode lalu"; tes skill/C7/contoh 36/36.
+  - `[low]` `[patch]` JSDoc `firstBoardId` berpindah ke atas `imageAssetIds` (`server.ts`) — terverifikasi. Dipatch (`4f86c29`).
 
 ## Design Notes
 
