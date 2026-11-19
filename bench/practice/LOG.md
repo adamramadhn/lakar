@@ -1007,3 +1007,54 @@ batas; elips scrim dari bounds node (bukan persegi terpotong); teks yang sudah k
 `ICON_GROUP_LABEL_MAX` pindah ke `contrast-rules.ts` (dijaga tes terhadap Lampiran A). Pindaian ulang `after7c.json`
 (120 dok, 0 gagal) vs `after7b.json`: aturan lain, LC-04 teks, batas kontrol, ikon tanpa label identik; scrim 34 → 32
 (Siaru "Obrolan Senja" ×2 kini hanya warning kontras 4,23:1); gagal gerbang tetap **86**; tidak ada error baru.
+
+# §2.16 Skill desain bawaan per domain (G1 story 16)
+
+## Pemecahan skill (sesi baru, C7)
+
+`polish.md` dihapus; isinya dan bagian lintas layar `core.md` dipindah tanpa duplikasi ke delapan skill domain:
+`layout`, `typography`, `color`, `accessibility`, `ui`, `interface`, `writing`, `review`. `read_skill('polish')` = NOT_FOUND
+dengan pesan "skill polish dipecah menjadi layout, typography, color, accessibility, ui, interface, writing, review". Aturan muat
+(instruksi MCP + deskripsi `read_skill` + `core` langkah 1): core + 8 domain + 1 jenis layar paralel di satu giliran. Prelude dan
+baris `Font terpasang` byte-identik.
+
+- **Tambahan (arahan Adam):** butir 1 → `layout` (hitung sisa lebar sebelum elemen lebar tetap sebaris, visual samping
+  `fill` + `maxWidth`, padding bawah = atas); butir 3 → `typography` (pasangan display + teks dari nada brief) dan `landing`
+  (momen angka besar, seksi kontras berisi, tanpa ruang kosong mati); butir 4 → `review` (screenshot board, lalu
+  `screenshot({nodeId, scale:2})` area terpadat + 8 pertanyaan tetap, satu execute perbaikan); butir 6 → `writing` (angka
+  konsisten lintas elemen, nama/lokasi Indonesia wajar dan beragam, tanpa kalimat generik). `accessibility` baru (WCAG 2.2
+  AA + DESIGN.md §Ambang kontras), `ui` + tabel umum dan form dasar, `color` + elips peredam terukur.
+- **Contoh skill:** semua `PENDING_2_10` umum selesai; tinggal entri `api.md`. landing: sel tabel = frame, elips peredam
+  `C.field` E6 blur 48 di `Crop / Kontur`; mobile: pil tab radius full (radius 8/20/24), `Link / Semua` frame 44 (H 1114 →
+  1146), elips peredam B3 menutup semua teks kartu target; webapp: padding sidebar 10 → 12, `Input / Outlet` garis `#7D8798`,
+  sel tabel = frame, header tabel 40; icons: bintang + nilai "4,8". 0 error / 0 gerbang / 0 warning.
+- **Daemon/MCP:** `screenshot` menerima `scale` 1|2 (scale lain → SCHEMA_INVALID).
+- **Seri polish:** maks 6 iterasi, anggaran kumulatif $34,58 ($22,58 terpakai + $12 story 2.16), keputusan plan checkpoint.
+- **Token badge:** `badge.height-sm: 20px` ditambahkan di frontmatter DESIGN.md (dijaga `tests/design-tokens.test.ts` = prelude
+  `Badge` sm 20 / md 24).
+
+Token (`estimateTokens`, total / prosa). Sebelum = `5e10f50`.
+
+| Skill | Batas (prosa / total) | Sebelum | Sesudah |
+|---|---|---|---|
+| core | – / 3200 (dulu 4000) | 3576 / 2861 | 2578 / 1862 |
+| polish | dihapus (dulu 3000 / 3200) | 2453 / 2064 | – |
+| layout | – / 1000 | – | 689 |
+| typography | – / 800 | – | 416 |
+| color | – / 1000 | – | 583 |
+| accessibility | – / 700 | – | 410 |
+| ui | 1400 / 2600 | – | 1199 / 810 |
+| interface | – / 700 | – | 540 |
+| writing | – / 900 | – | 456 |
+| review | – / 900 | – | 570 |
+| landing | 1500 / 3500 | 3085 / 1099 | 3287 / 1212 |
+| mobile | 1500 / 3500 | 2904 / 1096 | 2984 / 1086 |
+| webapp | 1500 / 3500 | 2735 / 840 | 2745 / 819 |
+
+| Muat per jenis layar (batas 11.500) | Sebelum (core + polish + layar) | Sesudah (core + 8 domain + layar) | Selisih |
+|---|---|---|---|
+| landing | 9.114 | 10.728 | +17,7% |
+| mobile | 8.933 | 10.425 | +16,7% |
+| webapp | 8.764 | 10.186 | +16,2% |
+
+PNG contoh (pemeriksaan visual, tanpa luberan): `LAKAR_SKILL_PNG_DIR=<dir> vitest run packages/daemon/src/skills-examples.test.ts`.

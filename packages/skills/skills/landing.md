@@ -7,12 +7,13 @@ Board `1440 × bebas` (`screen:'landing'`). Mulai dengan tinggi besar (2000–60
 - Wrapper `Halaman` (kolom, `width:'fill'`) langsung di board; tiap `Seksi / …` lebar fill, padding horizontal 80. Grid 12 kolom: isi 1280, gutter 24; blok utama mulai di awal kolom. Ritme: padding vertikal seksi 96–128; judul seksi ↔ isi 32–48; antar-kartu 24; dalam grup 12–16; ikon ↔ teks 4–8.
 - **Navbar 72:** logo kiri, 3–5 `Link /` body-sm, kanan satu tombol sekunder + satu primer (tinggi 40). Garis bawah satu sisi.
 - **Hero ≥ 640** di bidang merek (`C.field`) atau putih: headline display ≤ 3 baris berupa klaim hasil, bukan nama fitur; subjudul body-lg ≤ 2 baris; CTA primer + sekunder; baris penguat kecil di bawahnya (jaminan, gratis ongkir). Visual hero = anak frame hero, menyatu dengan latarnya: foto suasana nyata (`Image /` ≥ 520 lebar, radius 16–24) + 1–2 kartu data kecil `Overlay /` (wajib bila permintaan menyebut foto), atau mockup produk utuh (padding bawah hero ≥ 64; isi berlebih → kurangi baris, tanpa `Crop /`). Bukan kartu berbingkai di kolom terpisah.
-- **Bidang efek** (resep `polish`): struktur (12–24 garis aliran/gelombang, kontur, atau kisi/partikel) di `Crop /` absolut seukuran bidang (`clip:true`, anak pertama), ≥ ⅔ lebar. Seksi lain yang diminta berefek: gema palet sama, jauh lebih tipis, bukan bidang kedua. Ring/donut progres boleh `conic`.
+- **Bidang efek** (resep `color`): struktur (12–24 garis aliran/gelombang, kontur, atau kisi/partikel) di `Crop /` absolut seukuran bidang (`clip:true`, anak pertama), ≥ ⅔ lebar. Seksi lain yang diminta berefek: gema palet sama, jauh lebih tipis, bukan bidang kedua. Ring/donut progres boleh `conic`.
 - **Header seksi:** h2 → body-lg t2, lebar ≤ 720; rata kiri atau tengah, konsisten.
 - **Ritme:** dua seksi bersebelahan tidak berstruktur sama (bento, dua kolom teks + visual, daftar langkah, tabel banding, seksi bidang merek). Latar bergantian putih → `C.field` → putih → `C.deep` (teks terang, satu seksi saja), bukan abu polos. Grid ≥ 3 kartu: minimal satu kartu berbeda lebar, ditekankan, atau memuat elemen non-teks.
 - **Kartu fitur/langkah:** ikon 24 di wadah 48, judul h4, deskripsi body-sm, satu detail konkret berpembanding (angka, durasi, harga) atau `Badge`. Alur bertahap: penanda tahap + garis penghubung, tahap kini disorot.
 - **Orang (testimoni, tim, profil):** foto potret kartu (`Image /` tinggi 240–320) atau avatar 48–64; kutipan spesifik (hasil + konteks: angka sebelum → sesudah), nama, peran/usaha, kota. Tidak kembar: satu sorotan (bidang/lebih lebar) atau metrik hasil berwarna.
 - **Pricing/jadwal:** 2–4 tier/slot. Unggulan ditonjolkan satu cara (`C.deep` + teks terang + bayangan md, atau border aksen) + `Badge`; CTA-nya primer, lainnya sekunder. Keadaan tiap pilihan terlihat (kuota, tanggal, habis/tersedia). Harga h1/display-lg tabular, fitur dengan ikon `check`; CTA sejajar di bawah (`justify:'space-between'`). Label CTA bermaksud sama = teks sama.
+- **Karakter:** satu momen angka besar (`Display /` 72/80 + satuan dan pembanding di sebelahnya) sebagai bukti, bukan strip statistik; seksi kontras (`C.deep`) memuat isi terkuat (angka, kutipan, atau perbandingan), bukan hanya ajakan. Tanpa ruang kosong mati: kolom bersebelahan sama tinggi dan terisi, visual setinggi teksnya, tidak ada seksi setengah kosong.
 - **CTA penutup** (boleh `Ekstra /`) dan **footer:** logo + satu kalimat, 3–4 kolom tautan, hak cipta; sosial dengan logo simple-icons atau teks.
 
 ## Alur execute
@@ -50,6 +51,8 @@ const hero=F(page,'Seksi / Hero',{width:'fill',padding:[96,80],gap:64,align:'cen
 const fx=F(hero,'Crop / Kontur',{position:'absolute',x:0,y:0,width:1440,height:876,layout:'none',clip:true});
 for(let i=0;i<16;i++){const y=60+i*26,k=i%5===2;
  add(fx,{type:'path',name:'Kontur / '+(i+1),d:`M0 ${y} C 420 ${y+40} 300 ${y+420} 720 ${y+430} S 1020 ${y+40} 1440 ${y}`,viewBox:[0,0,1440,756],width:1440,height:756,stroke:{color:C.acc+(k?'80':(16+i*2).toString(16).padStart(2,'0')),width:k?1.5:1,align:'center'}});}
+// Elips peredam (anak terakhir Crop, di bawah teks): memuat seluruh kotak teks hero
+add(fx,{type:'ellipse',name:'Peredam',x:120,y:0,width:1200,height:560,blur:48,fills:fill(C.field+'E6')});
 const copy=F(hero,'Hero / Teks',{width:800,gap:24,align:'center'});
 T(copy,'Overline','LANGGANAN BIJI KOPI UNTUK KAFE','overline',{color:C.acc});
 T(copy,'Headline','Biji segar tiba tiap Senin, disangrai 72 jam sebelumnya','display-lg',{width:'fill',align:'center'});
@@ -70,9 +73,8 @@ const rows=F(app,'Daftar',{width:'fill'});
 for(const [n,k,q,st,tone,ic,hot] of [['Kafe Teras, Bandung','Gayo · medium','12 kg','Tiba Senin','success','circle-check',0],['Ruang Seduh, Jakarta','Kintamani · light','8 kg','Dikemas','accent','package',1],['Pojok Arang, Bogor','Toraja · medium-dark','6,5 kg','Stok 2 hari','warning','triangle-exclamation-point',0]]){
  const r=Row(rows,'Baris / '+n,{width:'fill',height:56,gap:16,padding:[0,12],radius:8,fills:fill(hot?C.tint:C.bg)});
  const w=Row(r,'Ikon',{width:32,height:32,radius:8,justify:'center',fills:fill(hot?C.acc:C.sub)}); I(w,ic,16,hot?C.on:C.t2);
- T(r,'Cabang',n,'body-sm',{width:'fill',weight:500});
- T(r,'Biji',k,'body-sm',{width:200,color:C.t2});
- T(r,'Jumlah',q,'body-sm',{width:64,numeric:'tabular'});
+ // Tiap sel = frame berisi teksnya (kolom sejajar antarbaris)
+ for(const [c,v,wd,o] of [['Cabang',n,'fill',{weight:500}],['Biji',k,200,{color:C.t2}],['Jumlah',q,64,{numeric:'tabular'}]]) T(F(r,'Sel / '+c,{width:wd}),c,v,'body-sm',{width:'fill',...o});
  const sc=Row(r,'Status',{width:136,justify:'end'}); Badge(sc,st,tone);
 }
 keep.page=page;

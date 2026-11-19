@@ -64,39 +64,27 @@ async function runBlock(label: string, code: string, sid: string, prelude: strin
 }
 
 /**
- * Warning aturan G1 yang dipicu contoh skill dan menunggu story 2.10 (skill tidak diubah di story 4/5, C7): aturan + nama
- * node yang diketahui + awal detail per file skill. Temuan lain (termasuk pola sejenis di node lain) tetap gagal.
- * Story 4: LC-21. Story 5: LC-10 `Link / Semua` (mobile.md), LC-07 padding 10 sidebar (webapp.md), LC-08 `Judul` tanpa
- * lineHeight / 16/20 (api.md). Story 7 (LC-04 lengkap): warning scrim teks di atas mesh tanpa scrim (landing.md, mobile.md,
- * api.md), batas kontrol `Input / Outlet` #D0D5DD (webapp.md), dan baris `Bintang 1–5` tanpa nilai rating (icons.md).
+ * Warning aturan G1 yang dipicu contoh skill dan menunggu story 2.10: aturan + nama node yang diketahui + awal detail per
+ * file skill. Temuan lain (termasuk pola sejenis di node lain) tetap gagal. Story 2.16 membereskan entri landing, mobile,
+ * webapp, dan icons; tersisa api.md (dihasilkan dari `@lakar/exec`): LC-08 `Judul` tanpa lineHeight dan scrim teks di atas mesh.
  */
 const PENDING_2_10: Record<string, { rule: string; node: RegExp; detail: string }[]> = {
-  'landing.md': [
-    { rule: 'LC-21', node: /^Baris \/ (Kafe Teras, Bandung|Ruang Seduh, Jakarta|Pojok Arang, Bogor)$/, detail: 'teks di baris tabel: 3 teks langsung di baris (3 baris sejajar di Daftar)' },
-    { rule: 'LC-04', node: /^Overline$/, detail: 'scrim: teks di atas efek tanpa scrim (fill solid ≥ 0,5) "LANGGANAN BIJI KOPI UNTUK KAFE' },
-    { rule: 'LC-04', node: /^Headline$/, detail: 'scrim: teks di atas efek tanpa scrim (fill solid ≥ 0,5) "Biji segar tiba tiap Senin' },
-    { rule: 'LC-04', node: /^Subjudul$/, detail: 'scrim: teks di atas efek tanpa scrim (fill solid ≥ 0,5) "Atur jadwal, profil sangrai' },
-  ],
-  'mobile.md': [
-    { rule: 'LC-21', node: /^\[WIP\] Tutur \/ Beranda · mobile · Ramah$/, detail: 'radius: 4 nilai (8, 16, 20, 24)' },
-    { rule: 'LC-10', node: /^Link \/ Semua$/, detail: '82.2×20 < 44×44' },
-    { rule: 'LC-04', node: /^Label$/, detail: 'scrim: teks di atas efek tanpa scrim (fill solid ≥ 0,5) "Menit belajar minggu ini' },
-    { rule: 'LC-04', node: /^Nilai$/, detail: 'scrim: teks di atas efek tanpa scrim (fill solid ≥ 0,5) "90 dari 150' },
-    { rule: 'LC-04', node: /^Teks$/, detail: 'scrim: teks di atas efek tanpa scrim (fill solid ≥ 0,5) "+20 vs minggu lalu' },
-  ],
-  'webapp.md': [
-    { rule: 'LC-21', node: /^Header tabel$/, detail: 'teks di baris tabel: 3 teks langsung di baris (7 baris sejajar di Kartu / Siap diambil)' },
-    { rule: 'LC-07', node: /^(Grup label|Nav \/ (Ringkasan|Pesanan|Antar-jemput|Pendapatan|Pelanggan))$/, detail: 'padding 10' },
-    { rule: 'LC-04', node: /^Input \/ Outlet$/, detail: 'batas kontrol 1.35:1 (#D0D5DD di atas #F3F6F5)' },
-  ],
   'api.md': [
     { rule: 'LC-08', node: /^Judul$/, detail: '32/39 (token 32/40)' },
     { rule: 'LC-08', node: /^Judul$/, detail: '40/49 (token 40/48)' },
     { rule: 'LC-08', node: /^Judul$/, detail: '16/20 (token 16/24)' },
     { rule: 'LC-04', node: /^Judul$/, detail: 'scrim: teks di atas efek tanpa scrim (fill solid ≥ 0,5) "Malam yang tenang' },
   ],
-  'icons.md': [{ rule: 'LC-04', node: /^Bintang [1-5]$/, detail: 'ikon tanpa label 1.8:1 (#F5B700 di atas #FFFFFF)' }],
 };
+
+/** Skill tanpa contoh teruji (domain berisi aturan saja); skill lain selain api wajib punya ≥ 1 blok js. */
+const NO_EXAMPLES: readonly SkillName[] = ['layout', 'typography', 'color', 'accessibility', 'interface', 'writing', 'review'];
+
+describe('PENDING_2_10', () => {
+  it('hanya entri api.md (contoh skill lain bebas pengecualian)', () => {
+    expect(Object.keys(PENDING_2_10)).toEqual(['api.md']);
+  });
+});
 
 async function savePngs(slug: string, sid: string): Promise<void> {
   if (!PNG_DIR) return;
@@ -136,9 +124,13 @@ describe.skipIf(!browserInstalled)('contoh skill dijalankan terhadap daemon nyat
   });
 
   it.each(SKILL_NAMES)(
-    '%s.md: setiap blok js sukses dengan 0 error / 0 gerbang / 0 warning',
+    '%s.md: setiap blok js sukses dengan 0 error / 0 gerbang / 0 warning (PENDING hanya api.md)',
     async (name) => {
       const blocks = await jsBlocks(name);
+      if (NO_EXAMPLES.includes(name)) {
+        expect(blocks, `${name}.md: skill domain tanpa contoh teruji`).toEqual([]);
+        return;
+      }
       if (name !== 'api') expect(blocks.length, `${name}.md tanpa blok js`).toBeGreaterThan(0);
       if (name === 'api') expect(blocks.length).toBeGreaterThanOrEqual(12);
       const problems: string[] = [];

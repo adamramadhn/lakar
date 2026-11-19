@@ -9,14 +9,14 @@ Mode gelap (Malam): `Object.assign(C,{bg,sub:surface,line,line2,t1,t2,t3` dari n
 - **Status bar** 54 (nama persis `Status bar`): jam kiri, ikon `signal`/`wifi`/`battery-full` 16 kanan, padding horizontal 24.
 - **Satu wrapper** `Konten` (kolom, `width:'fill'`, padding horizontal 20; anak tanpa padding horizontal sendiri). Jarak: antar-seksi 24–32, judul seksi ↔ isi 12–16, antar-kartu 12–16, ikon ↔ teks 4–8.
 - **Header hemat ruang** ≤ 64: avatar foto 40 (bila ada pengguna) + sapaan `title` (atau judul layar `title-lg`) + maks dua `IconButton /` 44. Baris konteks hanya bila ada ruang; gaya judul sama di satu alur. Header seksi: h4 + `Link /` aksen di kanan.
-- **Kartu/list:** kartu padding 16–20; sorotan di bidang merek + `Badge` metrik. Baris list 56–72: thumbnail 48–56 (wadah ikon 40 hanya untuk aksi/pengaturan), judul label + meta body-sm, keadaan di kanan (selesai = `circle-check` success, mendatang = chevron). Target sentuh ≥ 44, jarak ≥ 8.
+- **Kartu/list:** kartu padding 16–20; sorotan di bidang merek + `Badge` metrik. Baris list 56–72: thumbnail 48–56 (wadah ikon 40 hanya untuk aksi/pengaturan), judul label + meta body-sm, keadaan di kanan (selesai = `circle-check` success, mendatang = chevron).
 - **Foto:** sampul dan thumbnail isi nyata = foto; teks di atas foto diberi lapisan gelap. Visual puncak maks ±280 tinggi.
 - **Tanpa duplikasi:** satu butir tampil sekali per layar; bilah menempel memuat butir yang berjalan → sorotan memuat hal lain (berikutnya, ringkasan), daftar tidak mengulanginya.
 - **Ring/grafik** dari `ellipse` busur: jalur (`inner`, tint) + progres (`startDeg`, `sweepDeg` = persen × 360) di frame `layout:'none'`; beberapa seri = satu busur per seri + legenda nilai / sasaran.
 - **Tab bar** 3–5 item: ikon 24 + label `tab`; aktif = aksen + pil tint, lainnya muted. Bilah yang menempel di atasnya = `Overlay /` lapis raised + progres tipis aksen. Mengambang = `Overlay / Tab bar` absolut (lebar 350, x 20, di atas home indicator).
 - **Bilah bawah tetap** (aksi menetap): `Overlay / Bilah bawah` padding 16 20, total + tombol 56 lebar fill, tepat di atas home indicator.
 - **Atas hidup, akhir rapi:** 844 px pertama memuat inti permintaan (aksi utama, isi kunci, awal tiap bagian). Daftar ≥ 3 butir utuh; isi terakhir berakhir 24 di atas zona bawah; tanpa kartu setengah terlihat atau judul yatim.
-- **Bidang efek** (resep `polish`): di onboarding, sampul, atau kartu sorotan; struktur gelombang `path`, cincin `ellipse`, atau partikel.
+- **Bidang efek** (resep `color`): di onboarding, sampul, atau kartu sorotan; struktur gelombang `path`, cincin `ellipse`, atau partikel.
 - **Home indicator** 34 (nama persis `Home indicator`), garis 134 × 5 di tengah.
 - **Tinggi board (hitung saat merencanakan):** isi muat 844 → `390 × 844`. Lebih → SATU board `390 × H`, tanpa `duplicate`, `scrollY`, atau `Scroll /`. H = 54 status bar + header + seksi + gap + 24 + zona bawah (tab bar mengambang 98, bilah aksi = tingginya + 34, tanpa zona 34), minimal 844; simpan `const H=…`. Zona dari H: `Overlay / Tab bar` y `H-98`, bilah aksi y `H-34-tinggi`, home indicator y `H-34`.
 
@@ -31,7 +31,7 @@ Beranda aplikasi kursus bahasa, arketipe Ramah (langkah khas: ring target minggu
 ```js
 // pakai prelude
 Object.assign(C,{acc:'#4F46E5',tint:'#4F46E514',field:'#EEF0FE',deep:'#312E81',acc2:'#A16207',data:['#4F46E5','#8B93F8','#A16207']}); Object.assign(FONT,{h:'DM Sans',b:'DM Sans',m:'DM Mono'});
-const H=1114; // 54 status bar + Konten (isi berakhir y 992) + 24 + tab bar 98
+const H=1146; // 54 status bar + Konten (isi berakhir y 1024) + 24 + tab bar 98
 const p=place(390,H);
 const b=add(null,{type:'board',name:'[WIP] Tutur / Beranda · mobile · Ramah',x:p.x,y:p.y,width:390,height:H,screen:'mobile',fills:fill(C.bg)});
 keep.board=b;
@@ -56,6 +56,8 @@ const card=F(w,'Kartu / Target mingguan',{width:'fill',padding:16,gap:16,radius:
 const fx=F(card,'Crop / Kontur',{position:'absolute',x:0,y:0,width:350,height:224,layout:'none',clip:true});
 for(let i=0;i<9;i++){const r=64+i*20;
  add(fx,{type:'ellipse',name:'Kontur / '+(i+1),position:'absolute',x:64-r,y:64-r,width:2*r,height:2*r,stroke:{color:C.acc+(48-i*4).toString(16).padStart(2,'0'),width:1,align:'center'}});}
+// Elips peredam di bawah semua teks kartu (zona tenang), anak terakhir Crop: kontur tetap tampak samar
+add(fx,{type:'ellipse',name:'Peredam',position:'absolute',x:-56,y:-24,width:464,height:220,blur:32,fills:fill(C.field+'B3')});
 const top=Row(card,'Atas',{width:'fill',gap:20});
 const ring=F(top,'Ring / Target',{layout:'none',width:96,height:96});
 add(ring,{type:'ellipse',name:'Jalur',width:96,height:96,inner:0.8,fills:fill('#4F46E524')});
@@ -78,7 +80,7 @@ Btn(card,'Lanjutkan Unit 4','primary',{width:'fill'});
 // Seksi = header + list yang memperlihatkan keadaan (judul + isi satu kelompok)
 const Sec=(t,rows)=>{const sec=F(w,'Seksi / '+t,{width:'fill',gap:12});
  const sh=Row(sec,'Header seksi',{width:'fill',justify:'space-between'});
- T(sh,'Judul',t,'h4'); T(sh,'Link / Semua','Lihat semua','label',{color:C.acc});
+ T(sh,'Judul',t,'h4'); T(Row(sh,'Link / Semua',{height:44,justify:'center'}),'Label','Lihat semua','label',{color:C.acc}); // target 44
  const list=F(sec,'Daftar',{width:'fill',gap:8});
  for(const [ic,j,m,st] of rows){const on=st==='next', off=st==='done'||st==='lock';
   const r=Row(list,'Item / '+j,{width:'fill',gap:12,padding:12,radius:20,fills:fill(on?C.tint:C.bg),stroke:line(on?C.acc:C.line)});
@@ -91,7 +93,7 @@ Sec('Ulang kata sulit',[['repeat','Arah dan peron','14 kata · 3 hari lalu','tod
 // Tab bar mengambang (Overlay /), tab aktif = aksen + pil tint, + home indicator
 const tb=Row(b,'Overlay / Tab bar',{position:'absolute',x:20,y:H-98,width:350,height:64,padding:[0,8],radius:24,fills:fill(C.bg),stroke:line(),shadows:[{x:0,y:4,blur:16,color:'#10182814'}]});
 for(const [ic,l,on] of [['house','Beranda',1],['book-open','Kursus',0],['mic','Latihan',0],['user','Profil',0]]){
- const t=F(tb,'Tab / '+l,{width:'fill',height:48,gap:2,justify:'center',align:'center',radius:16,fills:fill(on?C.tint:C.bg)});
+ const t=F(tb,'Tab / '+l,{width:'fill',height:48,gap:2,justify:'center',align:'center',radius:9999,fills:fill(on?C.tint:C.bg)});
  I(t,ic,24,on?C.acc:C.t3); T(t,'Label',l,'tab',{color:on?C.acc:C.t3});
 }
 const hm=Row(b,'Home indicator',{position:'absolute',x:0,y:H-34,width:390,height:34,justify:'center'});

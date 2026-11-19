@@ -1,21 +1,21 @@
-// Frasa terlarang check (`@lakar/schema` content-rules.ts) = DESIGN.md "Frasa terlarang" = skill polish.md.
+// Frasa terlarang check (`@lakar/schema` content-rules.ts) = DESIGN.md "Frasa terlarang" = skill writing.md.
 import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { FORBIDDEN_PHRASES, forbiddenPhrasesIn } from '../packages/schema/src/content-rules.ts';
 
 const root = (p: string) => fileURLToPath(new URL(`../${p}`, import.meta.url));
-const POLISH = root('packages/skills/skills/polish.md');
+const WRITING = root('packages/skills/skills/writing.md');
 const DESIGN = root('_bmad-output/initiative-lakar/ux-lakar/DESIGN.md');
 
 const quoted = (line: string): string[] => [...line.matchAll(/"([^"]+)"/g)].map((m) => m[1]!);
 
-describe('frasa terlarang = polish.md', () => {
+describe('frasa terlarang = writing.md', () => {
   it('baris "Frasa terlarang (kata utuh)" = id + en, urut', () => {
-    const line = readFileSync(POLISH, 'utf8')
+    const line = readFileSync(WRITING, 'utf8')
       .split('\n')
       .find((l) => l.startsWith('Frasa terlarang (kata utuh):'));
-    expect(line, 'baris "Frasa terlarang (kata utuh):" polish.md').toBeDefined();
+    expect(line, 'baris "Frasa terlarang (kata utuh):" writing.md').toBeDefined();
     expect(quoted(line!)).toEqual([...FORBIDDEN_PHRASES.id, ...FORBIDDEN_PHRASES.en]);
   });
 });

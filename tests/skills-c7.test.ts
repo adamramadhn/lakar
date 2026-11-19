@@ -69,8 +69,8 @@ describe('C7: isi skill bebas sumber terlarang', () => {
     if (!sources.missing.length) expect(phrases.size).toBeGreaterThan(50);
   });
 
-  it('ketujuh file skill ada', () => {
-    expect(skillFiles).toEqual(['api.md', 'core.md', 'icons.md', 'landing.md', 'mobile.md', 'polish.md', 'webapp.md']);
+  it('keempat belas file skill ada (8 domain, tanpa polish)', () => {
+    expect(skillFiles).toEqual(['accessibility.md', 'api.md', 'color.md', 'core.md', 'icons.md', 'interface.md', 'landing.md', 'layout.md', 'mobile.md', 'review.md', 'typography.md', 'ui.md', 'webapp.md', 'writing.md']);
   });
 
   it.each(skillFiles)('%s tanpa frasa sumber dan token terlarang', (f) => {

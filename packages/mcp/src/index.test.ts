@@ -14,7 +14,7 @@ import { chromiumInstalled, DEFAULT_BROWSERS_PATH } from '../../../tests/support
 import { testLog } from '../../../tests/support/log.ts';
 
 /** Skill v1 (packages/skills; mcp tidak bergantung pada paket itu, hanya membaca file untuk perbandingan). */
-const SKILL_NAMES = ['core', 'polish', 'landing', 'mobile', 'webapp', 'icons', 'api'] as const;
+const SKILL_NAMES = ['core', 'landing', 'mobile', 'webapp', 'layout', 'typography', 'color', 'accessibility', 'ui', 'interface', 'writing', 'review', 'icons', 'api'] as const;
 const readSkill = (name: string) => readFile(fileURLToPath(new URL(`../../skills/skills/${name}.md`, import.meta.url)), 'utf8');
 
 const PNG_B64 = Buffer.from('fake-png').toString('base64');
@@ -119,7 +119,7 @@ function fakeDaemon() {
     if (req.url === '/skills/read') {
       if (body.name === undefined) return send(200, { ok: true, data: { skills: [{ name: 'core', available: true }] } });
       if (body.name === 'core') return send(200, { ok: true, data: { name: 'core', content: '# core\nisi' } });
-      return send(404, { ok: false, error: { code: 'NOT_FOUND', message: `skill "${body.name}" tidak ada`, hint: 'skill dikenal: core, polish, landing, mobile, webapp, icons, api; tersedia: core', retryable: false } });
+      return send(404, { ok: false, error: { code: 'NOT_FOUND', message: `skill "${body.name}" tidak ada`, hint: 'skill dikenal: core, landing, mobile, webapp, layout, typography, color, accessibility, ui, interface, writing, review, icons, api; tersedia: core', retryable: false } });
     }
     if (req.url === '/screenshot') {
       if (body.boardId === 'ZZZZZZZZ') return send(404, { ok: false, error: { code: 'NOT_FOUND', message: 'board tidak ada', hint: 'pakai id', retryable: false } });
@@ -193,16 +193,18 @@ describe('@lakar/mcp', () => {
     expect(PHOTO_SEARCH_DESCRIPTION).toContain("photo('<ref>')");
   });
 
-  it('instructions server: read_skill core + polish + skill jenis layar di giliran yang sama, sedikit execute besar; deskripsi read_skill menyebut polish dan webapp', async () => {
+  it('instructions server: read_skill core + 8 domain + skill jenis layar di giliran yang sama, sedikit execute besar, zoom review; deskripsi read_skill tanpa polish', async () => {
     const c = await connect(url);
     const ins = c.getInstructions() ?? '';
     expect(ins).toBe(SERVER_INSTRUCTIONS);
-    expect(ins).toContain('read_skill core + polish + landing/mobile/webapp di giliran yang sama (paralel)');
+    expect(ins).toContain('read_skill core + layout + typography + color + accessibility + ui + interface + writing + review + landing/mobile/webapp di giliran yang sama (paralel)');
     expect(ins).toMatch(/aplikasi desktop\/dashboard → webapp/);
     expect(ins).toContain('sedikit execute besar');
-    expect(READ_SKILL_DESCRIPTION).toMatch(/core .*\+ polish .*\+ skill jenis layar \(landing, mobile, atau webapp.*giliran yang sama/);
+    expect(ins).toContain('screenshot zoom (nodeId, scale 2)');
+    expect(ins).not.toMatch(/\bpolish\b/);
+    expect(READ_SKILL_DESCRIPTION).toMatch(/core .*\+ delapan skill domain \(layout, typography, color, accessibility, ui, interface, writing, review\) \+ skill jenis layar \(landing, mobile, atau webapp.*giliran yang sama/);
     expect(READ_SKILL_DESCRIPTION).toMatch(/aplikasi desktop\/dashboard → webapp/);
-    expect(READ_SKILL_DESCRIPTION).toContain('Nama: core, polish, landing, mobile, webapp, icons, api.');
+    expect(READ_SKILL_DESCRIPTION).toContain(`Nama: ${SKILL_NAMES.join(', ')}.`);
   });
 
   it('sesi dibuat dengan versi mcp: POST /sessions {client, version, schemaVersion}', async () => {
@@ -301,7 +303,7 @@ describe('@lakar/mcp', () => {
     expect((core.content as any)[0].text).toBe('# core\nisi');
     const none = await c.callTool({ name: 'read_skill', arguments: { name: 'landing' } });
     expect(none.isError).toBe(true);
-    expect((none.content as any)[0].text).toMatch(/^NOT_FOUND: .*\nhint: skill dikenal: core, polish, landing, mobile, webapp, icons, api/);
+    expect((none.content as any)[0].text).toMatch(/^NOT_FOUND: .*\nhint: skill dikenal: core, landing, mobile, webapp, layout, typography, color, accessibility, ui, interface, writing, review, icons, api/);
     const boards = await c.callTool({ name: 'list_boards', arguments: {} });
     expect(JSON.parse((boards.content as any)[0].text).boards[0]).toMatchObject({ wip: true });
     const ins = await c.callTool({ name: 'inspect', arguments: { id: 'Tttttttt', depth: 1 } });
@@ -311,6 +313,7 @@ describe('@lakar/mcp', () => {
     expect(JSON.parse((ex.content as any)[0].text)).toMatchObject({ scale: 2, width: 780, height: 1688 });
     expect((await c.callTool({ name: 'export', arguments: { scale: 3 } })).isError).toBe(true);
     await c.callTool({ name: 'screenshot', arguments: { nodeId: 'Tttttttt' } });
+    await c.callTool({ name: 'screenshot', arguments: { nodeId: 'Tttttttt', scale: 2 } });
     const bodies = fake.seen.filter((x) => x.path !== '/sessions').map((x) => [x.path, x.body]);
     expect(bodies).toEqual([
       ['/skills/read', {}],
@@ -322,10 +325,11 @@ describe('@lakar/mcp', () => {
       ['/export', { id: 'Bbbbbbbb', scale: 2 }],
       ['/export', { scale: 3 }],
       ['/screenshot', { nodeId: 'Tttttttt' }],
+      ['/screenshot', { nodeId: 'Tttttttt', scale: 2 }],
     ]);
     const { tools } = await c.listTools();
     const shot = tools.find((t) => t.name === 'screenshot')!;
-    expect(Object.keys((shot.inputSchema as any).properties).sort()).toEqual(['boardId', 'nodeId']);
+    expect(Object.keys((shot.inputSchema as any).properties).sort()).toEqual(['boardId', 'nodeId', 'scale']);
   });
 
   it('execute dengan check → JSON field lain + ringkasan + maks 20 baris temuan + baris sisa', async () => {
@@ -612,7 +616,7 @@ describe.skipIf(!browserInstalled)('layout_check dengan respons lakard asli', ()
     testLog(`[mcp] layout_check:\n${text}`);
   }, 60_000);
 
-  it('read_skill terhadap lakard asli: ketujuh skill tersedia, isi sama dengan file skill', async () => {
+  it('read_skill terhadap lakard asli: keempat belas skill (8 domain) tersedia, isi sama dengan file skill; polish NOT_FOUND', async () => {
     const c = await connect(proxyUrl);
     const list = await c.callTool({ name: 'read_skill', arguments: {} });
     expect(list.isError).toBeFalsy();
@@ -627,6 +631,9 @@ describe.skipIf(!browserInstalled)('layout_check dengan respons lakard asli', ()
     const none = await c.callTool({ name: 'read_skill', arguments: { name: 'dashboard' } });
     expect(none.isError).toBe(true);
     expect((none.content as any)[0].text).toContain('NOT_FOUND');
+    const old = await c.callTool({ name: 'read_skill', arguments: { name: 'polish' } });
+    expect(old.isError).toBe(true);
+    expect((old.content as any)[0].text).toContain('NOT_FOUND: skill "polish" tidak ada: skill polish dipecah menjadi layout, typography, color, accessibility, ui, interface, writing, review');
   }, 60_000);
 
   it('status terhadap lakard asli: versi cocok, pool 2 halaman', async () => {

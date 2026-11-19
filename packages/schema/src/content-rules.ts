@@ -1,5 +1,5 @@
 // Aturan konten bersama (frasa terlarang LC-19) untuk check dan deskripsi MCP. Tanpa IO.
-// Sumber = DESIGN.md "Frasa terlarang" (per bahasa) dan skill `polish.md` (baris "Frasa terlarang (kata utuh)");
+// Sumber = DESIGN.md "Frasa terlarang" (per bahasa) dan skill `writing.md` (baris "Frasa terlarang (kata utuh)");
 // kesesuaiannya dijaga `tests/content-rules.test.ts`. Aturan check mengimpor daftar dari sini, tidak menyalinnya.
 
 /** Frasa terlarang per bahasa, urutan sama dengan DESIGN.md. Dicocokkan tanpa beda huruf, per kata utuh. */

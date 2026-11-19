@@ -139,10 +139,13 @@ md5 `.pen` sama dengan seri `practice`; tanpa `--series` perilaku seri P1–P4 t
 
 Seri ketiga untuk disiplin spacing dan komponen: tiga prompt hold-out beku `bench/practice/polish/prompts.json` (P7 mobile
 terang, P8 dashboard 1440×900, P9 landing; sha `POLISH_PROMPTS_SHA256`, penjaga n-gram juga terhadap P1–P6). Config:
-maks 5 iterasi, anggaran kumulatif $30,24 (`bench/polish-<j>.json`; story 23 $15 + story 24 $17,50 sesudah iterasi 2),
-perkiraan biaya per prompt pen.dev $0,6 / Lakar $1,15 / juri $0,8, semua prompt wajib Setara/Lebih baik. Iterasi 1 =
-baseline skill/check lama (pen.dev + Lakar + juri); iterasi 2 = sesudah story 23 dengan `--reuse-pendev 1` (C8);
-iterasi 3–5 = story 24 (`--reuse-pendev P8=1,P9=1`: P7 pen.dev baru). Laporan memuat tabel iterasi 1 vs sesudah; iterasi
+maks 6 iterasi, anggaran kumulatif $34,58 (`bench/polish-<j>.json`; story 23 $15 + story 24 $17,50 sesudah iterasi 2;
+story 2.16 = $22,58 terpakai sesudah iterasi 4 + $12), perkiraan biaya per prompt pen.dev $0,6 / Lakar $1,15 / juri $0,8,
+semua prompt wajib Setara/Lebih baik. Iterasi 1 = baseline skill/check lama (pen.dev + Lakar + juri); iterasi 2 = sesudah
+story 23 dengan `--reuse-pendev 1` (C8); iterasi 3–4 = story 24 (`--reuse-pendev P8=1,P9=1`: P7 pen.dev baru); iterasi 5–6
+= story 2.16 (skill domain, `--reuse-pendev 1`). Perluasan ke 6 iterasi / $34,58 = keputusan plan checkpoint 2.16
+(orkestrator atas delegasi Adam, 2026-11-19): iterasi 6 hanya bila iterasi 5 turun dari polish-4 atau rasio waktu > 1,5,
+dengan sisa anggaran story cukup. Laporan memuat tabel iterasi 1 vs sesudah; iterasi
 ≥ 3 menambah versi rubrik per iterasi dan wall pen.dev iterasi 1 vs sekarang. Run di `bench/runs/practice-polish/<k>/`,
 strip Lakar `bench/practice/polish/<k>/`.
 

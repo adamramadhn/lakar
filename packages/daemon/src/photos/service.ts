@@ -522,7 +522,7 @@ export class PhotoService implements PhotoLibraryPort {
       if (!anyEmpty && lastError) throw netToLakar(lastError.error, 'pencarian foto gagal', lastError.provider);
       const list = tried.map((t) => `${t.provider}:"${t.query}"${t.orientation ? `/${t.orientation}` : ''}`).join(', ');
       throw new LakarError('NOT_FOUND', `tidak ada foto untuk ${JSON.stringify(q.query)} (dicoba: ${list})`, {
-        hint: 'kata kunci sudah disederhanakan otomatis; jangan mengulang pencarian: pakai visual pengganti (lihat skill polish)',
+        hint: 'kata kunci sudah disederhanakan otomatis; jangan mengulang pencarian: pakai visual pengganti (lihat skill interface)',
       });
     }
     // Pratinjau hanya untuk kandidat teratas (klien MCP menampilkan maks 6) agar kuota thumbnail tidak terbuang.

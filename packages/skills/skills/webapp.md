@@ -9,7 +9,7 @@ Board persis ukuran permintaan (default `1440 × 900`, `screen:'app'`); semua is
 - **Area kerja** padding 32, gap 24. **Header 48–64:** judul layar `title-lg` + baris konteks t2; kanan: pemilih konteks (periode, cabang) sebagai `Input /` 40 dengan `chevron-down`, pencarian, satu tombol primer.
 - **KPI** satu baris 3–4 kartu: satu KPI utama ber-fill `C.deep` (atau aksen) dengan teks terang, nilai terbesar, sparkline atau area kecil; lainnya putih atau ber-tint. Tiap KPI: label, `KPI / Nilai` tabular + satuan kecil t3, `Badge` delta + pembanding. Kartu KPI tidak kembar: ukuran, fill, atau grafik mininya berbeda.
 - **Grafik bervariasi,** bentuk mengikuti data: batang bertumpuk/berkelompok untuk komposisi (`rect`, sudut atas 4), area bergradasi untuk tren (aksen ke transparan di bawah garis), sparkline di KPI. Garis tipis tunggal hanya pelengkap. Label sumbu caption t3; nilai kini/puncak ditandai (batang hari ini penuh, lainnya lebih muda).
-- **Tabel:** header caption t3 di bidang `sub`; baris 48–56 bergaris bawah; kolom angka rata kanan tabular dengan satuan kecil; status = `Badge` bertitik (`dot`); baris bermasalah ber-tint warning/danger; waktu relatif ("2 jam lalu").
+- **Tabel** (struktur sel: `ui`): angka dengan satuan kecil; status = `Badge` bertitik (`dot`); baris bermasalah ber-tint warning/danger; waktu relatif ("2 jam lalu").
 - **Panel keadaan** (bila ada ruang): yang perlu tindakan (lewat tenggat, hampir habis, menunggu persetujuan) dengan ikon status dan waktu.
 - Grid kartu gap 24, padding kartu 20–24, radius 12. Isi seluruh tinggi board: baris bawah dan grafik `height:'fill'`.
 
@@ -39,15 +39,15 @@ const mk=Row(lg,'Logo / Tanda',{width:32,height:32,radius:8,justify:'center',fil
 T(lg,'Wordmark','Lipat','h4');
 for(const [g,items] of [['Operasional',[['layout-dashboard','Ringkasan',1,''],['shopping-bag','Pesanan',0,'12'],['truck','Antar-jemput',0,'']]],['Laporan',[['chart-column','Pendapatan',0,''],['users','Pelanggan',0,'']]]]){
  const gr=F(sb,'Grup / '+g,{width:'fill',gap:4});
- T(Row(gr,'Grup label',{padding:[0,10,4,10]}),'Label',g.toUpperCase(),'overline',{color:C.t3});
- for(const [ic,l,on,n] of items){const it=Row(gr,'Nav / '+l,{width:'fill',height:40,gap:12,padding:[0,10],radius:8,fills:fill(on?C.acc:C.bg)});
+ T(Row(gr,'Grup label',{padding:[0,12,4,12]}),'Label',g.toUpperCase(),'overline',{color:C.t3});
+ for(const [ic,l,on,n] of items){const it=Row(gr,'Nav / '+l,{width:'fill',height:40,gap:12,padding:[0,12],radius:8,fills:fill(on?C.acc:C.bg)});
   I(it,ic,20,on?C.on:C.t2); T(it,'Label',l,'label',{width:'fill',color:on?C.on:C.t1}); if(n) Badge(it,n,'neutral');}
 }
 const main=F(app,'Area kerja',{width:'fill',padding:32,gap:24});
 const hd=Row(main,'Header',{width:'fill',justify:'space-between'});
 const ht=F(hd,'Judul',{gap:4}); T(ht,'Judul','Ringkasan hari ini','title-lg'); T(ht,'Konteks','Kamis, 14 Mei · 3 outlet buka','body-sm',{color:C.t2});
 const ha=Row(hd,'Aksi',{gap:12});
-const sel=Row(ha,'Input / Outlet',{height:40,gap:8,padding:[0,12],radius:8,fills:fill(C.bg),stroke:line(C.line2)});
+const sel=Row(ha,'Input / Outlet',{height:40,gap:8,padding:[0,12],radius:8,fills:fill(C.bg),stroke:line('#7D8798')}); // batas kontrol ≥ 3:1
 I(sel,'store',16,C.t2); T(sel,'Nilai','Semua outlet','body-sm'); I(sel,'chevron-down',16,C.t2);
 Btn(ha,'Pesanan baru','primary',{height:40,padding:[0,16]});
 // KPI: satu utama di bidang gelap + sparkline; lainnya putih dengan chip delta
@@ -81,12 +81,12 @@ for(const [d,s1,s2,s3,now] of [['Jum',212,96,40],['Sab',248,120,52],['Min',176,8
 }
 const tb=F(bw,'Kartu / Siap diambil',{width:520,padding:[24,0],gap:12,radius:12,fills:fill(C.bg),stroke:line()});
 T(Row(tb,'Kepala',{width:'fill',padding:[0,24]}),'Judul','Siap diambil','h4');
-const th=Row(tb,'Header tabel',{width:'fill',height:36,padding:[0,24],gap:16,fills:fill(C.sub)});
-for(const [h,w,a] of [['Pelanggan','fill','left'],['Berat',64,'right'],['Status',132,'right']]) T(th,'Kolom',h,'caption',{width:w,align:a,color:C.t3});
+const th=Row(tb,'Header tabel',{width:'fill',height:40,padding:[0,24],gap:16,fills:fill(C.sub)});
+for(const [h,w,a] of [['Pelanggan','fill','left'],['Berat',64,'right'],['Status',132,'right']]) T(F(th,'Sel / '+h,{width:w}),'Kolom',h,'caption',{width:'fill',align:a,color:C.t3}); // sel = frame
 for(const [n,m,kg,st,tone,bad] of [['Rina Andriani','Outlet Cempaka · 3 hari','6,4','Lewat 2 hari','warning',1],['Dimas Saputra','Outlet Pasir Kaliki · 5 jam','4,2','Siap','success',0],['Kos Melati 12','Antar 16.00 · 1 jam','11,8','Dijadwalkan','accent',0],['Hendra Wijaya','Outlet Cempaka · 2 hari','3,6','Lewat 1 hari','warning',1],['Salon Ayu','Antar 18.30 · 3 jam','9,2','Dijadwalkan','accent',0],['Putri Lestari','Outlet Dago · 40 menit','5,0','Siap','success',0]]){
  const r=Row(tb,'Baris / '+n,{width:'fill',height:56,padding:[0,24],gap:16,fills:fill(bad?C.warn+'14':C.bg),stroke:{...line(),sides:['bottom']}});
  const tx=F(r,'Teks',{width:'fill',gap:2}); T(tx,'Nama',n,'label'); T(tx,'Meta',m,'caption',{color:bad?C.t2:C.t3});
- T(r,'Berat',kg+' kg','body-sm',{width:64,align:'right',numeric:'tabular'});
+ T(F(r,'Sel / Berat',{width:64}),'Berat',kg+' kg','body-sm',{width:'fill',align:'right',numeric:'tabular'});
  const sc=Row(r,'Status',{width:132,justify:'end'}); Badge(sc,st,tone,'dot');
 }
 b

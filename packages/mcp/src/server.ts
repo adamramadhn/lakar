@@ -143,16 +143,20 @@ export const STATUS_DESCRIPTION =
 
 /** Deskripsi tool `read_skill`. */
 export const READ_SKILL_DESCRIPTION =
-  'Baca panduan skill Lakar (Markdown). Baca core (alur kerja, prelude helper, token, konvensi) + polish (spacing, komponen, tipografi, kontras) ' +
-  '+ skill jenis layar (landing, mobile, atau webapp; aplikasi desktop/dashboard → webapp; berisi contoh teruji) di giliran yang sama (panggilan paralel); icons bila ragu nama ikon; api hanya untuk referensi lengkap. ' +
+  'Baca panduan skill Lakar (Markdown). Baca core (alur kerja, prelude helper, token, konvensi) + delapan skill domain ' +
+  '(layout, typography, color, accessibility, ui, interface, writing, review) + skill jenis layar (landing, mobile, atau webapp; ' +
+  'aplikasi desktop/dashboard → webapp; berisi contoh teruji) di giliran yang sama (10 panggilan paralel); icons bila ragu nama ikon; api hanya untuk referensi lengkap. ' +
   'Tanpa name → daftar {skills:[{name, available}]}; dengan name → isi skill. ' +
-  'Nama: core, polish, landing, mobile, webapp, icons, api. Nama lain atau skill yang belum tersedia → NOT_FOUND dengan daftar yang tersedia.';
+  'Nama: core, landing, mobile, webapp, layout, typography, color, accessibility, ui, interface, writing, review, icons, api. ' +
+  'Nama lain atau skill yang belum tersedia → NOT_FOUND dengan daftar yang tersedia (polish sudah dipecah ke delapan skill domain).';
 
 /** Instruksi server MCP (dikirim saat initialize): urutan kerja singkat. */
 export const SERVER_INSTRUCTIONS =
-  'Lakar: canvas desain lewat kode. Sebelum menggambar, read_skill core + polish + landing/mobile/webapp di giliran yang sama (paralel); aplikasi desktop/dashboard → webapp. ' +
+  'Lakar: canvas desain lewat kode. Sebelum menggambar, read_skill core + layout + typography + color + accessibility + ui + interface + writing + review ' +
+  '+ landing/mobile/webapp di giliran yang sama (paralel); aplikasi desktop/dashboard → webapp. ' +
   'Lalu open_doc dan bangun lewat sedikit execute besar (2–4 untuk landing, 1–2 untuk mobile dan webapp) yang diawali prelude dari skill core; ' +
-  'baca check di respons execute, perbaiki dengan editId/edits atau update, akhiri dengan satu screenshot, perbaikan, lalu export PNG.';
+  'baca check di respons execute, perbaiki dengan editId/edits atau update, akhiri dengan satu screenshot board + satu screenshot zoom (nodeId, scale 2) ' +
+  'area terpadat (skill review), satu execute perbaikan, lalu export PNG.';
 
 /** Deskripsi tool `list_boards`. */
 export const LIST_BOARDS_DESCRIPTION =
@@ -287,7 +291,7 @@ export function createLakarMcpServer(daemonUrl: string): McpServer {
     'read_skill',
     {
       description: READ_SKILL_DESCRIPTION,
-      inputSchema: z.object({ name: z.string().optional().describe('core | landing | mobile | icons | api; kosongkan untuk daftar') }),
+      inputSchema: z.object({ name: z.string().optional().describe('core | landing | mobile | webapp | layout | typography | color | accessibility | ui | interface | writing | review | icons | api; kosongkan untuk daftar') }),
     },
     ({ name }) =>
       guarded(async () => {
@@ -378,18 +382,21 @@ export function createLakarMcpServer(daemonUrl: string): McpServer {
     'screenshot',
     {
       description:
-        'Render board dokumen aktif ke PNG (skala 1). Tanpa argumen → board pertama di halaman pertama. ' +
-        'nodeId → potret satu node saja (ukuran bounds node). Kirim boardId ATAU nodeId, bukan keduanya (SCHEMA_INVALID).',
+        'Render board dokumen aktif ke PNG (default skala 1). Tanpa argumen → board pertama di halaman pertama. ' +
+        'nodeId → potret satu node saja (ukuran bounds node). Kirim boardId ATAU nodeId, bukan keduanya (SCHEMA_INVALID). ' +
+        'scale 2 → PNG 2× piksel untuk zoom review area terpadat (skill review); scale lain → SCHEMA_INVALID.',
       inputSchema: z.object({
         boardId: z.string().optional().describe('ID board dari created[] execute atau list_boards'),
         nodeId: z.string().optional().describe('ID node yang dipotret sendiri (bukan bersama boardId)'),
+        scale: z.number().int().optional().describe('1 (default) atau 2 (zoom review: 2× piksel)'),
       }),
     },
-    ({ boardId, nodeId }) =>
+    ({ boardId, nodeId, scale }) =>
       guarded(async () => {
         const body: Record<string, unknown> = {};
         if (boardId !== undefined) body.boardId = boardId;
         if (nodeId !== undefined) body.nodeId = nodeId;
+        if (scale !== undefined) body.scale = scale;
         const r = await client.call<{ boardId: string; nodeId?: string; width: number; height: number; mimeType: string; png: string }>('/screenshot', body);
         return asResult(r, ({ png, ...meta }) => [
           { type: 'image', data: png, mimeType: 'image/png' },

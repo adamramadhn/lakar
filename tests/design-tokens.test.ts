@@ -123,4 +123,11 @@ describe.skipIf(!existsSync(DESIGN))('token desain = frontmatter DESIGN.md', () 
     expect(componentField(md, 'mobile-bottom-bar', 'padding')).toContain(`${HOME_INDICATOR_INSET}px`);
     expect(px(componentField(md, 'mobile-tab-bar', 'bottom-inset')!)).toBe(HOME_INDICATOR_INSET);
   });
+
+  it('badge: height (md) dan height-sm = ukuran Badge prelude core.md (sm 20 / md 24, story 2.16)', () => {
+    const m = /height:sm\?(\d+):(\d+)/.exec(readFileSync(CORE, 'utf8'));
+    expect(m, 'Badge prelude height:sm?<sm>:<md>').not.toBeNull();
+    expect(px(componentField(md, 'badge', 'height-sm')!)).toBe(Number(m![1]));
+    expect(px(componentField(md, 'badge', 'height')!)).toBe(Number(m![2]));
+  });
 });
