@@ -679,6 +679,9 @@ describe('LC-02c non-teks meluap dari isi wadah', () => {
     expect(only(app([frame('Crop / Foto', [0, 0, 200, 100], [wide()], { padding: 24, ...card })]), 'LC-02c')).toEqual([]);
     expect(only(app([k([frame('Crop / Pratinjau', [24, 24, 152, 52], [wide()], { layout: 'column' })])]), 'LC-02c')).toEqual([]);
     expect(only(app([k([wide({ rotation: 4 })])]), 'LC-02c')).toEqual([]);
+    // leluhur `Overlay / …` atau leluhur berotasi di rantai
+    expect(only(app([k([frame('Overlay / Sorot', [24, 24, 152, 20], [wide()], { layout: 'row' })])]), 'LC-02c')).toEqual([]);
+    expect(only(app([k([frame('Baris', [24, 24, 152, 20], [wide()], { layout: 'row', rotation: 3 })])]), 'LC-02c')).toEqual([]);
     expect(only(app([k([wide()], { layout: 'row', gap: -8 })]), 'LC-02c')).toEqual([]);
     // sumbu vertikal di Scroll / atau scrollY (sisi kiri/kanan tetap dinilai)
     const tall = () => rect('Daftar', [24, 24, 152, 120], blue);
@@ -690,6 +693,11 @@ describe('LC-02c non-teks meluap dari isi wadah', () => {
     const cut = rect('Bar', [24, 24, 220, 20], blue);
     const f = app([k([cut], { clip: true })]);
     expect(f.filter((x) => x.nodeId === cut.id).map((x) => x.rule)).toEqual(['LC-02a']);
+    // keturunan node LC-02a: baris transparan lebar tetap terpotong clip kartu, anaknya lebih lebar → hanya LC-02a pada baris
+    const child = rect('Isi', [24, 24, 260, 20], blue);
+    const row = frame('Baris', [24, 24, 230, 20], [child], { layout: 'row' });
+    const g = app([k([row], { clip: true })]);
+    expect(g.filter((x) => x.rule === 'LC-02a' || x.rule === 'LC-02c').map((x) => [x.rule, x.nodeId])).toEqual([['LC-02a', row.id]]);
     // teks dinilai LC-02b
     expect(only(app([k([text('Judul yang sangat panjang', [24, 24, 190, 20])])]), 'LC-02c')).toEqual([]);
   });
@@ -721,6 +729,16 @@ describe('LC-31 konten rata di tepi bawah board/seksi dan daftar rata', () => {
     const footer = frame('Footer', [0, 820, 1440, 80], [text('© Lumbung', [20, 840, 100, 20])], card);
     const k = kartu([300, 697, 600, 200]);
     expect(only(app([frame('Area', [0, 0, 1440, 900], [side, footer, k], { layout: 'none' })]), 'LC-31')).toEqual([]);
+  });
+
+  it('negatif: sidebar dan area kerja di bawah header, kolom tengah dalam baris di bawah header', () => {
+    const header = frame('Header', [0, 0, 1440, 64], [text('Lumbung', [24, 20, 100, 24])], card);
+    const side = frame('Sidebar', [0, 64, 240, 836], [text('Menu', [20, 84, 100, 20])], card);
+    const main = frame('Area kerja', [240, 64, 1200, 836], [text('Ringkasan', [272, 96, 200, 28])], card);
+    expect(only(app([frame('Isi', [0, 0, 1440, 900], [header, side, main], { layout: 'none' })]), 'LC-31')).toEqual([]);
+    const col = (name: string, x: number) => frame(name, [x, 64, 400, 836], [text(name, [x + 20, 84, 200, 20])], card);
+    const body = frame('Badan', [0, 64, 1440, 836], [col('Kiri', 0), col('Tengah', 520), col('Kanan', 1040)], { layout: 'row', gap: 120 });
+    expect(only(app([header, body]), 'LC-31')).toEqual([]);
   });
 
   /** Tabel P8 polish-4: kartu ber-clip padding [20,0,0,0], baris terakhir rata di tepi bawah kartu. */
@@ -756,6 +774,15 @@ describe('LC-31 konten rata di tepi bawah board/seksi dan daftar rata', () => {
     expect(wrap(table(0).k)).toEqual([]);
     expect(wrap(table(20).k)).toEqual([]);
     expect(wrap(table([20, 0, 0, 0], false).k)).toEqual([]);
+  });
+
+  it('baris terakhir menggantung 30px di bawah kartu tanpa clip → LC-02c saja, bukan LC-31', () => {
+    const { k, last } = table([20, 0, 0, 0]);
+    k.clip = false;
+    k._r = [k._r[0], k._r[1], k._r[2], k._r[3] - 30];
+    const f = app([frame('Area kerja', [240, 0, 1200, 900], [k], { layout: 'column', padding: 32 })]);
+    expect(only(f, 'LC-31')).toEqual([]);
+    expect(only(f, 'LC-02c').map((x) => x.nodeId)).toEqual([last.id]);
   });
 });
 

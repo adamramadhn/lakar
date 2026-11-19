@@ -863,7 +863,8 @@ export function lc02c(ctx: BoardContext, skip: ReadonlySet<string> = new Set()):
     const r = ctx.bounds.get(n.id);
     if (!r || area(r) <= 0) continue;
     const anc = ancestors(ctx, n);
-    if (anc.some((a) => reported.has(a.id))) continue;
+    // Keturunan node LC-02a (dibungkam lc02a) dan keturunan node LC-02c yang sudah dilaporkan dilewati.
+    if (anc.some((a) => reported.has(a.id) || skip.has(a.id))) continue;
     const parent = anc[0]!;
     if (parent.type === 'board' || !isFlowChild(parent, n) || ((parent.gap ?? 0) as number) < 0) continue;
     if (anc.some((a) => a.type === 'frame' && (named(a, 'Overlay /') || named(a, 'Crop /') || rotated(a)))) continue;
@@ -1437,7 +1438,7 @@ export const LIST_TOP_MIN = 8;
 
 /**
  * Daftar rata: `k` frame ber-cat `layout:'column'` (bukan di `Crop /`) yang dua anak flow terakhirnya frame ber-cat berisi
- * teks, baris terakhir berakhir ≤ 2 px dari tepi bawah `k`, sedangkan anak flow pertama mulai ≥ 8 px dari tepi atas.
+ * teks, baris terakhir berakhir ≤ 2 px dari tepi bawah `k` (tanpa menggantung > 2 px), sedangkan anak flow pertama mulai ≥ 8 px dari tepi atas.
  */
 function flushListRow(ctx: BoardContext, k: FrameNode, kr: Rect): { row: FrameNode; below: number; above: number } | undefined {
   if (k.layout !== 'column' || ancestors(ctx, k).some((a) => a.type === 'frame' && named(a, 'Crop /'))) return undefined;
@@ -1448,15 +1449,16 @@ function flushListRow(ctx: BoardContext, k: FrameNode, kr: Rect): { row: FrameNo
   if (!isRow(last) || !isRow(flow[flow.length - 2]!)) return undefined;
   const below = bottom(kr) - bottom(ctx.bounds.get(last.id)!);
   const above = ctx.bounds.get(flow[0]!.id)!.y - kr.y;
-  return below <= FLUSH_TOL && above >= LIST_TOP_MIN ? { row: last, below, above } : undefined;
+  return below <= FLUSH_TOL && below >= -FLUSH_TOL && above >= LIST_TOP_MIN ? { row: last, below, above } : undefined;
 }
 
 /**
  * Frame ber-cat berisi teks (hanya node terluar) yang terpotong atau rata di tepi bawah:
  * (a) melewati tepi bawah clip terdekat (frame `clip:true`, termasuk `Crop /`, atau board) > 1 px, dengan tepi bawah clip
  * rata (≤ 2 px) dengan tepi bawah seksi (leluhur selebar ≥ 90% board) atau board;
- * (b) sama, tetapi tepi bawah node rata dengan tepi clip (−2..+1 px), node lebar < 90% board dan tidak mulai dari tepi atas
- * clip (bukan sidebar, footer, tab bar, atau panel penuh);
+ * (b) sama, tetapi tepi bawah node rata dengan tepi clip (−2..+1 px), node lebar < 90% board, tidak mulai dari tepi atas
+ * clip atau tepi atas isi induknya, dan tidak menempel tepi kiri/kanan board (≤ 2 px) (bukan sidebar, footer, tab bar, atau
+ * panel penuh);
  * (c) daftar rata (`flushListRow`): temuan pada baris terakhir.
  * Dikecualikan: leluhur `Scroll /`, rotasi, `Overlay /`, dan node yang sudah dilaporkan LC-02a (`skip`).
  */
@@ -1476,7 +1478,16 @@ export function lc31(ctx: BoardContext, skip: ReadonlySet<string> = new Set()): 
         const cr = clip.type === 'board' ? ctx.boardRect : ctx.bounds.get(clip.id);
         const over = cr ? bottom(r) - bottom(cr) : 0;
         const cut = over > CUT_OVER_MIN;
-        const flush = !cut && over >= -FLUSH_TOL && r.width < minW - TOLERANCE && cr !== undefined && r.y > cr.y + FLUSH_TOL;
+        // Panel penuh (bukan kartu): mulai di tepi atas clip, menempel tepi kiri/kanan board, atau mulai di tepi atas isi induknya.
+        const par = anc[0]!;
+        const parR = par.type === 'board' ? ctx.boardRect : ctx.bounds.get(par.id);
+        const panel =
+          cr === undefined ||
+          r.y <= cr.y + FLUSH_TOL ||
+          r.x <= FLUSH_TOL ||
+          right(r) >= ctx.boardRect.width - FLUSH_TOL ||
+          (parR !== undefined && r.y <= parR.y + paddingOf(par).t + FLUSH_TOL);
+        const flush = !cut && over >= -FLUSH_TOL && r.width < minW - TOLERANCE && !panel;
         if (cr && (cut || flush) && r.y < bottom(cr) - CUT_OVER_MIN) {
           // Seksi rata: clip itu sendiri atau leluhurnya selebar ≥ 90% board yang tepi bawahnya rata dengan tepi clip; atau board.
           let section: Container | undefined = Math.abs(ctx.boardRect.height - bottom(cr)) <= FLUSH_TOL ? ctx.board : undefined;

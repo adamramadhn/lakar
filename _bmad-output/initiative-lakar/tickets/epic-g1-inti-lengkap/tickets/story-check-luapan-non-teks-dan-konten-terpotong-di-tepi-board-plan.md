@@ -3,14 +3,14 @@ title: 'Check luapan non-teks (LC-02c) dan konten terpotong rata (LC-31 diperlua
 type: feature
 ticket: '15'
 created: '2026-11-19'
-status: built
+status: in-review
 baseline_revision: 'e5e4bcc87ca3a1572b7dc48a04bfdf06ee882047'
 route: full
 route_source: auto
 risk: high
-review: ''
-review_source: ''
-lenses_ran: []
+review: quick
+review_source: pinned
+lenses_ran: [quick]
 review_loop_iteration: 0
 followup_review_recommended: false
 context:
@@ -94,9 +94,10 @@ deferred: []
 
 - Checkpoint plan 2026-11-19 (orkestrator, didelegasikan Adam): plan disetujui. Definisi (c) daftar rata = sesuai maksud Adam, pertahankan. Kasus (b) cukup fixture sintetis; catat "belum ada contoh arsip". Ambang LC-02c sisa < min(8, padding/2) diterima; laporkan kasus batas sisa 8–12px (crop + angka) di LOG.md §2.15 dan Implementation Notes.
 - **Skema:** `LC-02c` (error · gerbang, `non-teks meluap dari isi wadah`) setelah LC-02b; judul LC-31 → `konten terpotong rata di tepi bawah`.
-- **Check:** `lc02c(ctx, skip)` di `rules.ts` sesuai Design Notes (konstanta `BOX_OVERFLOW_MIN` 1, `BOX_CLEARANCE_MAX` 8); `paintedCard` dipindah ke helper bersama (perilaku sama). `lc31` = (a) lama tanpa perubahan detail, (b) rata −2..+1 dengan lebar < 90% board dan mulai > 2px di bawah tepi atas clip (detail `rata di tepi bawah <seksi> tanpa ruang bawah (sisa n px)`), (c) `flushListRow` (`LIST_TOP_MIN` 8, bukan di `Crop /`; detail `baris terakhir rata di tepi bawah <kartu> (bawah n px, atas n px)`). `checkBoard` menjalankan `lc02c(ctx, cut)` setelah LC-02b; `RULE_ORDER` + ekspor.
+- **Check:** `lc02c(ctx, skip)` di `rules.ts` sesuai Design Notes (konstanta `BOX_OVERFLOW_MIN` 1, `BOX_CLEARANCE_MAX` 8); `paintedCard` dipindah ke helper bersama (perilaku sama). `lc31` = (a) lama tanpa perubahan detail, (b) rata −2..+1 dengan lebar < 90% board, mulai > 2px di bawah tepi atas clip dan di bawah tepi atas isi induknya, dan tidak menempel tepi kiri/kanan board (≤ 2px) — sidebar/area kerja di bawah header dan kolom panel dalam baris bukan temuan (detail `rata di tepi bawah <seksi> tanpa ruang bawah (sisa n px)`), (c) `flushListRow` (`LIST_TOP_MIN` 8, bukan di `Crop /`, baris terakhir dalam ±2px dari tepi bawah — baris menggantung = LC-02c saja; detail `baris terakhir rata di tepi bawah <kartu> (bawah n px, atas n px)`). `checkBoard` menjalankan `lc02c(ctx, cut)` setelah LC-02b; `RULE_ORDER` + ekspor.
 - **Tes:** `packages/check/src/index.test.ts` dua describe baru (LC-02c: P8 minimal, tumpah, ambang padding/2, bersarang, 11 negatif; LC-31: rata board, rata seksi ber-clip, negatif sidebar/footer/margin 3, daftar rata P8 minimal, negatif daftar). `run()` tidak menyaring LC-02c dan fixture G0 lama tetap lulus. Tes daemon dokumen asli: salinan `packages/daemon/test/fixtures/p8-polish-4-lumbung.lakar.json` (bench/runs di-ignore git) → `error·gerbang · LC-02c · Batang mini`, `error·gerbang · LC-31 · Baris / Pasar Induk Cipinang Kios 14B`. `tests/execute-description.test.ts` + 1 tes deskripsi `layout_check`.
 - **Pindaian arsip** (`after15.json`, 120 dok, 0 gagal): aturan lain identik dengan `after2.json` per dokumen; LC-31 lama identik. LC-02c 32 temuan / 14 dok, LC-31 baru 2 (P8 daftar rata, 2 salinan), (b) 0 = belum ada contoh arsip. Dokumen gagal gerbang 74 → 80. Semua kasus unik diperiksa lewat crop wadah: cacat nyata, 0 positif palsu. Kasus batas sisa 8–12 (tidak dilaporkan): Bayu Hasibuan 9/24, Ruang tunggu 10/24, `Info / Porsi` 10,9/12, tiga kasus 12. Tabel di `bench/practice/LOG.md` §2.15.
+- **Patch review (orkestrator):** LC-02c melewati keturunan node LC-02a; LC-31 (b) mengecualikan panel yang menempel tepi kiri/kanan board atau mulai di tepi atas isi induknya; daftar rata butuh `below ≥ −2`; fixture negatif leluhur `Overlay /`/berotasi, keturunan LC-02a, sidebar/area kerja/kolom di bawah header, baris menggantung. Pindaian ulang `after15b.json` identik dengan `after15.json` (120 dok, 0 gagal, gagal gerbang 80).
 - **Skill:** `skills-examples.test.ts` lulus tanpa entri `PENDING_2_10` baru (contoh skill tidak memicu LC-02c/LC-31).
 - **Verifikasi:** `pnpm build` lulus; `pnpm test` 1033/1034 (gagal hanya latensi `visual.test.ts` saat paralel; lulus sendiri); lakard di-restart; `verify.sh` semua OK, Node sistem v22.23.5. DESIGN.md Lampiran A di disk (cadangan scratchpad `DESIGN.before15.md`).
 

@@ -861,6 +861,10 @@ Kasus batas yang **tidak** dilaporkan (sisa ≥ min(8, padding/2)), crop diperik
 | `Teks` (`Info / Porsi`, Dapur Wening) | info (12) | 1,1 / 10,9 (ambang padding/2 = 6) |
 | `Daftar` (Kartu / Bahan, Dentara), `Detail` (Kasku umkm), `Daftar` (Pemasok terlambat, Lumbung polish-3) | kartu (24, 24, 20) | 12 / 12 |
 
+Sesudah review (LC-02c melewati keturunan node LC-02a; LC-31 (b) mengecualikan panel yang menempel tepi kiri/kanan board
+atau mulai di tepi atas isi induknya; daftar rata tidak menerima baris yang menggantung > 2px): pindaian ulang
+`after15b.json` identik dengan `after15.json` per dokumen (120 dok, 0 gagal, gagal gerbang 80).
+
 ## Contoh skill
 
 `skills-examples.test.ts` lulus tanpa entri `PENDING_2_10` baru: contoh skill tidak memicu LC-02c atau LC-31.
