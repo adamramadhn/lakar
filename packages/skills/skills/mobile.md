@@ -2,30 +2,27 @@
 
 Board lebar 390 (`screen:'mobile'`), tinggi 844 atau lebih (isi panjang = satu board panjang); anak board tersusun kolom (tanpa `layout`).
 
-Mode gelap (Malam): `Object.assign(C,{bg,sub:surface,line,line2,t1,t2,t3` dari netral gelap bernuansa aksen`, acc` varian gelap`, tint, field:raised, deep, on:'#0B0C0F', ok:'#4ADE80', warn:'#FBBF24', bad:'#F87171', acc2, data})`; kartu = surface, sorotan = raised, latar besar bukan abu murni.
+Mode gelap (Malam): `Object.assign(C,{bg,sub:surface,line,line2,t1,t2,t3` dari netral gelap bernuansa aksen`, acc` varian gelap`, tint, field:raised, deep, on:'#0B0C0F', ok:'#4ADE80', warn:'#FBBF24', bad:'#F87171', acc2, data})`; kartu = surface, latar besar bukan abu murni.
 
 ## Struktur
 
 - **Status bar** 54 (nama persis `Status bar`): jam kiri, ikon `signal`/`wifi`/`battery-full` 16 kanan, padding horizontal 24.
 - **Satu wrapper** `Konten` (kolom, `width:'fill'`, padding horizontal 20; anak tanpa padding horizontal sendiri). Jarak: antar-seksi 24–32, judul seksi ↔ isi 12–16, antar-kartu 12–16, ikon ↔ teks 4–8.
-- Overline maks 2 per layar (bila informatif); meta maks 2 "·".
-- **Header hemat ruang** ≤ 64: avatar foto 40 (bila ada pengguna; potret, bukan inisial) + sapaan `title` (atau judul layar `title-lg`) + maks dua `IconButton /` 44. Baris konteks hanya bila ada ruang; gaya judul sama di satu alur. Header seksi: h4 + `Link /` aksen di kanan.
-- **Kartu/list:** kartu padding 16–20; sorotan di bidang merek (terang: `C.field` + bayangan md; gelap: raised + garis aksen) + `Badge` metrik. Baris list ringkas 56–72: thumbnail 48–56 (wadah ikon 40 hanya untuk aksi/pengaturan), judul label + meta body-sm, keadaan di kanan: selesai `circle-check` success, berikutnya `Badge` aksen + baris disorot, mendatang chevron, terkunci `lock` muted. Target sentuh ≥ 44, jarak ≥ 8.
-- **Foto untuk isi nyata:** sampul dan thumbnail yang mewakili konten (media, produk, makanan, tempat, orang) = foto dari pencarian `limit:12`, berbeda per butir; teks di atas foto diberi lapisan gelap. Bidang warna polos berlabel hanya bila pencarian gagal, atau tile kategori abstrak: hue sendiri per tile dari palet kategori + label kontras. Visual puncak maks ±280 tinggi.
+- **Header hemat ruang** ≤ 64: avatar foto 40 (bila ada pengguna) + sapaan `title` (atau judul layar `title-lg`) + maks dua `IconButton /` 44. Baris konteks hanya bila ada ruang; gaya judul sama di satu alur. Header seksi: h4 + `Link /` aksen di kanan.
+- **Kartu/list:** kartu padding 16–20; sorotan di bidang merek + `Badge` metrik. Baris list 56–72: thumbnail 48–56 (wadah ikon 40 hanya untuk aksi/pengaturan), judul label + meta body-sm, keadaan di kanan (selesai = `circle-check` success, mendatang = chevron). Target sentuh ≥ 44, jarak ≥ 8.
+- **Foto:** sampul dan thumbnail isi nyata = foto; teks di atas foto diberi lapisan gelap. Visual puncak maks ±280 tinggi.
 - **Tanpa duplikasi:** satu butir tampil sekali per layar; bilah menempel memuat butir yang berjalan → sorotan memuat hal lain (berikutnya, ringkasan), daftar tidak mengulanginya.
-- **Ring/grafik** dari `ellipse` busur: jalur (`inner`, tint) + progres (`startDeg`, `sweepDeg` = persen × 360) di frame `layout:'none'`. Beberapa seri = busur bernada `C.data`, legenda titik bernada sama + nilai / sasaran.
+- **Ring/grafik** dari `ellipse` busur: jalur (`inner`, tint) + progres (`startDeg`, `sweepDeg` = persen × 360) di frame `layout:'none'`; beberapa seri = busur berurutan + legenda nilai / sasaran.
 - **Tab bar** 3–5 item: ikon 24 + label `tab`; aktif = aksen + pil tint, lainnya muted. Bilah yang menempel di atasnya = `Overlay /` lapis raised + progres tipis aksen. Mengambang = `Overlay / Tab bar` absolut (lebar 350, x 20, di atas home indicator).
 - **Bilah bawah tetap** (aksi menetap): `Overlay / Bilah bawah` padding 16 20, total + tombol 56 lebar fill, tepat di atas home indicator.
-- **Atas hidup, akhir rapi:** 844 px pertama memuat inti permintaan (aksi utama, isi kunci, awal tiap bagian). Daftar menampilkan ≥ 3 butir utuh; isi terakhir berakhir 24 di atas zona bawah; tanpa kartu setengah terlihat atau judul yatim.
-- **Bidang efek** (onboarding, sampul, kartu sorotan; bila diminta/merek ekspresif), satu per layar: `mesh` dasar → struktur bermakna berulang melintasi bidang (gelombang `path` dari loop, cincin `ellipse`, partikel; alpha bertingkat) → `noise` ≤ 0.08 → latar gelap: satu cahaya merek di balik fokus (blur ≥ 40, opacity ≤ 35%), bukan di tombol; teks/tombol di zona tenang/panel solid, kontras ≥ 4.5:1.
+- **Atas hidup, akhir rapi:** 844 px pertama memuat inti permintaan (aksi utama, isi kunci, awal tiap bagian). Daftar ≥ 3 butir utuh; isi terakhir berakhir 24 di atas zona bawah; tanpa kartu setengah terlihat atau judul yatim.
+- **Bidang efek** (resep `polish`): hanya onboarding, sampul, atau kartu sorotan; struktur gelombang `path` atau cincin `ellipse`.
 - **Home indicator** 34 (nama persis `Home indicator`), garis 134 × 5 di tengah.
 - **Tinggi board (hitung saat merencanakan):** isi muat 844 → `390 × 844`. Lebih → SATU board `390 × H`, tanpa `duplicate`, `scrollY`, atau `Scroll /`. H = 54 status bar + header + seksi + gap + 24 + zona bawah (tab bar mengambang 98, bilah aksi = tingginya + 34, tanpa zona 34), minimal 844; simpan `const H=…`. Zona dari H: `Overlay / Tab bar` y `H-98`, bilah aksi y `H-34-tinggi`, home indicator y `H-34`.
 
-## Alur execute (maks 3)
+## Alur execute
 
-1. Execute 1: satu board lengkap dengan H yang sudah dihitung.
-2. Semua temuan `check` diperbaiki dalam satu execute (`update`/`editId`); `LC-12` "tinggi pas = N" → `update(b,{height:N})` + geser zona ke N.
-3. Akhir sesuai `core` (tanpa `inspect`, tanpa execute keempat).
+Execute 1 = satu board lengkap dengan H; execute 2 = semua temuan `check` sekaligus (`update`/`editId`); `LC-12` "tinggi pas = N" → `update(b,{height:N})` + geser zona ke N. Tanpa execute keempat.
 
 ## Contoh teruji
 

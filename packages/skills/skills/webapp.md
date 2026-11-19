@@ -4,24 +4,22 @@ Board persis ukuran permintaan (default `1440 × 900`, `screen:'app'`); semua is
 
 ## Struktur
 
-- **Latar halaman** netral yang digeser 2–4% ke hue aksen (mis. `#F3F6F5` untuk teal), bukan abu murni; kartu putih di atasnya. Satu strategi kedalaman: garis 1 px + bayangan sm.
-- **Sidebar 240** (padding 16, putih, garis kanan): logo 32 + nama, lalu grup bernavigasi dengan label `overline` t3. Item 40 (ikon 20 + label, radius 8); item aktif = fill aksen solid + ikon/teks `C.on`, bukan sekadar tint atau teks tebal. Hitungan tugas = `Badge` sm di kanan item. Bawah: organisasi/pengguna.
+- **Latar halaman** netral digeser 2–4% ke hue aksen (mis. `#F3F6F5` untuk teal), bukan abu murni; kartu putih di atasnya. Kedalaman: garis 1 px + bayangan sm.
+- **Sidebar 248** (padding 16, putih, garis kanan): logo + nama, lalu grup navigasi berlabel `overline` t3. Item 40 (ikon 20 + label, radius 8); aktif = fill aksen solid + ikon/teks `C.on`, bukan sekadar tint atau tebal. Hitungan = `Badge` sm di kanan item. Bawah: organisasi/pengguna.
 - **Area kerja** padding 32, gap 24. **Header 48–64:** judul layar `title-lg` + baris konteks t2; kanan: pemilih konteks (periode, cabang) sebagai `Input /` 40 dengan `chevron-down`, pencarian, satu tombol primer.
-- **KPI** satu baris 3–4 kartu: satu KPI utama ber-fill `C.deep` (atau aksen) dengan teks terang, nilai terbesar, sparkline atau area kecil; KPI lain putih atau ber-tint. Setiap KPI: label, nilai `KPI / Nilai` tabular + satuan kecil t3, chip delta berwarna status + ikon arah + pembanding ("vs periode lalu"). Kartu KPI tidak kembar: ukuran, fill, atau grafik mininya berbeda.
-- **Grafik bervariasi dalam satu layar,** bentuk mengikuti data: batang bertumpuk/berkelompok untuk komposisi (dari `rect`, sudut atas 4), area bergradasi untuk tren (gradien aksen ke transparan di bawah garis), sparkline di KPI. Garis tipis tunggal hanya pelengkap. Seri bernada `C.data`, legenda titik bernada sama, label sumbu caption t3, nilai kini/puncak ditandai (batang hari ini aksen penuh, lainnya lebih muda).
-- **Tabel:** header caption t3 di bidang `sub`; baris 48–56 dengan garis bawah; kolom angka rata kanan tabular dengan satuan kecil; status = `Badge` bertitik (`dot`); baris bermasalah ber-tint warning/danger; keterangan waktu relatif ("2 jam lalu").
-- **Panel keadaan** (bila ada ruang): daftar yang perlu tindakan (lewat tenggat, hampir habis, menunggu persetujuan) dengan ikon status dan waktu.
-- Grid kartu gap 24, padding kartu 20–24, radius 12. Isi seluruh tinggi board: baris bawah `height:'fill'`, grafik `height:'fill'`.
+- **KPI** satu baris 3–4 kartu: satu KPI utama ber-fill `C.deep` (atau aksen) dengan teks terang, nilai terbesar, sparkline atau area kecil; lainnya putih atau ber-tint. Tiap KPI: label, `KPI / Nilai` tabular + satuan kecil t3, `Badge` delta + pembanding. Kartu KPI tidak kembar: ukuran, fill, atau grafik mininya berbeda.
+- **Grafik bervariasi,** bentuk mengikuti data: batang bertumpuk/berkelompok untuk komposisi (`rect`, sudut atas 4), area bergradasi untuk tren (aksen ke transparan di bawah garis), sparkline di KPI. Garis tipis tunggal hanya pelengkap. Label sumbu caption t3; nilai kini/puncak ditandai (batang hari ini penuh, lainnya lebih muda).
+- **Tabel:** header caption t3 di bidang `sub`; baris 48–56 bergaris bawah; kolom angka rata kanan tabular dengan satuan kecil; status = `Badge` bertitik (`dot`); baris bermasalah ber-tint warning/danger; waktu relatif ("2 jam lalu").
+- **Panel keadaan** (bila ada ruang): yang perlu tindakan (lewat tenggat, hampir habis, menunggu persetujuan) dengan ikon status dan waktu.
+- Grid kartu gap 24, padding kartu 20–24, radius 12. Isi seluruh tinggi board: baris bawah dan grafik `height:'fill'`.
 
 ## Tanda slop dashboard
 
-Semua kartu putih + garis tipis + satu aksen biru; grafik garis tipis tanpa area atau legenda; KPI telanjang tanpa delta dan pembanding; sidebar polos tanpa penanda aktif tegas; empat kartu KPI kembar; tabel tanpa keadaan; ruang kosong besar di bawah.
+Semua kartu putih + garis tipis + satu aksen biru; grafik garis tipis tanpa area atau legenda; KPI tanpa delta dan pembanding; sidebar tanpa penanda aktif tegas; empat KPI kembar; tabel tanpa keadaan; ruang kosong besar di bawah.
 
-## Alur execute (maks 3)
+## Alur execute
 
-1. Execute 1: board lengkap (sidebar, header, KPI, grafik, tabel).
-2. Semua temuan `check` + kritik diri diperbaiki dalam satu execute.
-3. Akhir sesuai `core`.
+Execute 1 = board lengkap (sidebar, header, KPI, grafik, tabel); execute 2 = semua temuan `check` + kritik diri sekaligus.
 
 ## Contoh teruji
 
@@ -35,7 +33,7 @@ const b=add(null,{type:'board',name:'[WIP] Lipat / Ringkasan · app · Padat',x:
 keep.board=b;
 const app=Row(b,'Aplikasi',{width:'fill',height:'fill',align:'stretch'});
 // Sidebar: grup berlabel, item aktif = fill aksen solid
-const sb=F(app,'Sidebar',{width:240,padding:16,gap:24,fills:fill(C.bg),stroke:{...line(),sides:['right']}});
+const sb=F(app,'Sidebar',{width:248,padding:16,gap:24,fills:fill(C.bg),stroke:{...line(),sides:['right']}});
 const lg=Row(sb,'Logo',{gap:12,padding:[4,8]});
 const mk=Row(lg,'Logo / Tanda',{width:32,height:32,radius:8,justify:'center',fills:fill(C.acc)}); I(mk,'shirt',18,C.on);
 T(lg,'Wordmark','Lipat','h4');

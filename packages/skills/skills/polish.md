@@ -1,28 +1,27 @@
 # Lakar: polesan
 
-Dibaca di giliran yang sama dengan `core` dan skill jenis layar (paralel). Tidak menambah execute: terapkan sejak execute pertama; warning sisa diperbaiki sekaligus di execute perbaikan akhir, bukan satu per satu.
+Tempat tunggal aturan polesan untuk semua jenis layar. Tidak menambah execute: terapkan sejak execute pertama; warning sisa diperbaiki sekaligus di execute perbaikan akhir.
 
 ## Struktur dan jarak
 
-- Row berisi teks + badge/ikon/tombol: kolom teks `width:'fill'` (teks panjang di dalamnya juga `width:'fill'` agar dibungkus, bukan meluap: `LC-02b`); badge, ikon, tombol hug atau ukuran tetap.
+- Row berisi teks + badge/ikon/tombol: kolom teks `width:'fill'` (teks panjang di dalamnya juga `width:'fill'` agar dibungkus: `LC-02b`); badge, ikon, tombol hug atau ukuran tetap.
 - Gap antar-saudara ≥ 8 (`LC-23`). Inset teks di wadah ber-fill/garis ≥ 8 (kartu 12–24), pill ≥ 6 kiri-kanan.
-- Judul + isinya satu kelompok (gap 8–16); jeda antarkelompok ≥ 2× jarak di dalamnya, jadi ruang di atas judul > ruang judul ke isi (`LC-26`). Kolom bergap seragam berisi kartu, judul, daftar = belum dikelompokkan.
+- Judul + isinya satu kelompok (gap 8–16); jeda antarkelompok ≥ 2× jarak di dalamnya: ruang di atas judul > judul ke isi (`LC-26`). Kolom bergap seragam berisi kartu, judul, daftar = belum dikelompokkan.
 - Satu tepi kiri bersama per permukaan; selisih 1–4 px terbaca sebagai salah.
 - Padding simetris; tombol berikon: sisi ikon 2 px lebih kecil.
 - Kepadatan berbeda per zona: kontrol rapat, konten lega.
 - Elemen menumpuk/beririsan hanya di `Overlay /`; saudara lain tidak beririsan (`LC-11`).
-- Tanpa potongan/luberan: kartu berteks tinggi `hug` (baris kartu `align:'stretch'`), lebar isi bar = persen × lebar induk.
+- Tanpa potongan/luberan: kartu berteks tinggi `hug`, sederet kartu satu tinggi (baris `align:'stretch'`), lebar isi bar = persen × lebar induk.
 
 ## Komponen
 
-- Badge `sm` (20) default di baris, daftar, tabel, meta; `md` (24) hanya di samping judul ≥ 18 atau di header kartu. Tinggi badge ≤ line-height teks terbesar di barisnya, teksnya lebih kecil dari teks itu, satu baris (`LC-24`).
+- Badge `sm` (20) default di baris, daftar, tabel, meta; `md` (24) hanya di samping judul ≥ 18 atau di header kartu. Tinggi badge ≤ line-height teks terbesar di barisnya, teksnya lebih kecil, satu baris (`LC-24`). Di permukaan gelap pada board terang: arg ke-6 = warna permukaan itu (mis. `C.deep`).
 - Kartu tidak di dalam kartu bergaris/berbayang (`LC-18`): isi kartu = baris atau bidang tint tanpa garis dan bayangan; judul seksi di luar kartu.
 - Radius konsentris untuk anak ber-cat yang menempel di sudut padding: luar = dalam + padding, dalam ≥ 6 (`LC-25`); mis. baris radius 20 + padding 12 → wadah ikon 8. Pill dan lingkaran bebas.
 - Satu strategi kedalaman per board: garis, bayangan, atau tonal.
-- Bayangan berlapis, semua jatuh ke bawah: cincin 1 px alpha rendah (`spread:1`, blur 0) + 2–3 lapis dengan blur makin besar dan alpha makin kecil. Tanpa glow berwarna tanpa offset.
+- Bayangan berlapis, semua jatuh ke bawah: cincin 1 px alpha rendah (`spread:1`, blur 0) + 2–3 lapis dengan blur makin besar dan alpha makin kecil.
 - Foto konten diberi garis dalam 1 px `#0000001A` (terang) atau `#FFFFFF1A` (gelap); logo tidak.
 - Kartu fitur: kartu → panel → fragmen produk; panel mengisi 60–65% bagian bawah dan terpotong tepi kartu (`Crop /`).
-- Sederet kartu satu tinggi (`align:'stretch'`).
 
 ## Tipografi
 
@@ -33,15 +32,20 @@ Dibaca di giliran yang sama dengan `core` dan skill jenis layar (paralel). Tidak
 - Bobot < 400 hanya untuk ≥ 28 px (`LC-29`). Teks terang di latar gelap: line-height sedikit lebih longgar dan bobot naik satu tingkat.
 - `numeric:'tabular'` untuk harga, jam, hitungan, kolom angka.
 - Tanda baca (`LC-30`): rentang memakai en dash (`09.00–10.00`, `5–10`), elipsis `…`, kutip lengkung “…” pada testimoni, spasi tak-putus ` ` antara angka dan satuan agar tidak terpisah.
-- Judul dan paragraf tidak berakhir satu kata sendirian. Headline tanpa satu kata berwarna/tebal (paling banyak sekali per halaman).
+- Judul dan paragraf tidak berakhir satu kata sendirian. Satu kata berwarna/tebal di headline paling banyak sekali per halaman.
+- Overline aksen maks 2 per halaman/layar, hanya bila membawa informasi (kategori, langkah). Baris meta maks 2 "·".
 
 ## Warna dan kontras
 
-- Kontras dihitung setelah komposit (`LC-04`, error): ≥ 4,5:1 teks biasa; ≥ 3:1 teks ≥ 24 (atau ≥ 19 tebal), ikon, dan tepi field. Tint = aksen ber-alpha di atas latarnya; teks dinilai terhadap hasil campurannya.
+- Kontras dihitung setelah komposit (`LC-04`, error): ≥ 4,5:1 teks biasa; ≥ 3:1 teks ≥ 24 (atau ≥ 19 tebal), ikon, dan tepi field. Teks di tint/efek dinilai terhadap hasil campuran terburuk di bawahnya.
 - Di bidang tint atau `field`, teks sekunder `t2`, bukan `t3`. Teks badge bernada gelap (prelude). `acc2`, kuning, oranye, amber bukan warna teks kecil: pakai untuk ikon atau bidang.
 - Tidak ada teks abu di atas permukaan berwarna: teks sekunder = turunan hue permukaan itu, hex eksplisit, bukan alpha.
 - Aksen ±10% luas board: aksi, pilihan, fokus; bukan judul atau deretan ikon.
 - Merah hanya untuk error dan aksi destruktif. Hue status berjarak ≥ 15° dari hue aksen.
+
+## Bidang efek
+
+Hanya bila permintaan/merek meminta suasana ekspresif; ≤ 1 bidang per board/layar, di fokus merek. Lapis berurutan: (1) `fills` netral → `mesh` dari aksen, ≤ 1 pendamping, netral; (2) **struktur** bermakna bagi merek dan berulang, melintasi bidang (gelombang/aliran `path` dari loop, kontur/cincin konsentris, kisi/partikel; alpha bertingkat ±6–50%, 1–2 garis tegas); sapuan kecil di pojok terbaca datar; (3) `noise` 0.04–0.08; (4) latar gelap: boleh satu cahaya lembut merek di balik fokus (blur ≥ 40, opacity ≤ 35%), bukan di tombol. Teks/tombol di zona tenang (struktur merunduk/menipis, atau elips gelap ber-blur sebagai peredam) atau di panel solid, kontras ≥ 4,5:1; cuplikan produk = panel solid. Tanpa permintaan itu: bidang merek polos.
 
 ## Kekayaan informasi
 
@@ -54,7 +58,7 @@ Dibaca di giliran yang sama dengan `core` dan skill jenis layar (paralel). Tidak
 
 ## Tanda slop
 
-Teks bergradien; garis aksen di sisi kartu > 1 px; glow tanpa offset; label 01/02/03 yang bukan urutan sungguhan; overline di setiap seksi; pola "bukan X, melainkan Y" dan "X. Y."; strip 3–4 angka di bawah hero; kata kebajikan (jujur, tenang, benar-benar, sederhana); semua kartu sama panjang; set nama stok; "·" lebih dari 2 per baris; nama yang sama ≥ 3× dalam satu kartu.
+Teks bergradien; garis aksen di sisi kartu > 1 px; glow berwarna tanpa offset; label 01/02/03 yang bukan urutan sungguhan; overline di setiap seksi; pola "bukan X, melainkan Y" dan "X. Y."; strip 3–4 angka di bawah hero; kata kebajikan (jujur, tenang, benar-benar, sederhana); semua kartu sama panjang; set nama stok; nama yang sama ≥ 3× dalam satu kartu.
 
 Frasa terlarang (kata utuh): "solusi terbaik", "revolusioner", "tingkatkan produktivitas", "pelajari lebih lanjut", "klik di sini", "lorem ipsum", "judul fitur", "learn more", "click here", "unlock", "seamless", "next-level", "game changer", "empower your".
 
