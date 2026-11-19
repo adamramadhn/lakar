@@ -134,7 +134,7 @@ after = [3, 7]
 hitl = false
 risk = "high"
 plan_checkpoint = true
-notes = ["Arahan Adam 2026-11-19: fokus ke built-in design skills, samakan dengan yang ada di pen.dev; fondasi UI library (shadcn/ui) tidak dulu.", "Anggaran: maks 2 iterasi latihan, ≤ $12."]
+notes = ["Arahan Adam 2026-11-19: fokus ke built-in design skills, samakan dengan yang ada di pen.dev; fondasi UI library (shadcn/ui) dibatalkan.", "Anggaran: maks 2 iterasi latihan, ≤ $12."]
 
 [[entry]]
 id = 10

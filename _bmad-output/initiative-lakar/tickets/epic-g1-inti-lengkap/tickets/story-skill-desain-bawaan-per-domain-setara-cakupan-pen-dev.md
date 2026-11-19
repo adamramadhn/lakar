@@ -25,5 +25,5 @@ Verify: read_skill mengembalikan skill domain baru; tests/skills.test.ts (dengan
 
 ## Notes
 
-- Arahan Adam 2026-11-19: fokus ke built-in design skills, samakan dengan yang ada di pen.dev; fondasi UI library (shadcn/ui) tidak dulu.
+- Arahan Adam 2026-11-19: fokus ke built-in design skills, samakan dengan yang ada di pen.dev; fondasi UI library (shadcn/ui) dibatalkan.
 - Anggaran: maks 2 iterasi latihan, ≤ $12.
