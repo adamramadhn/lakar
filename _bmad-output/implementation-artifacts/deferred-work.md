@@ -40,3 +40,7 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-app-1-file-management.md`
   summary: Delete dokumen yang hanya ada di memori (file dihapus dari luar) tidak punya tes; rename/archive pada kasus yang sama mengembalikan 404 sementara delete berhasil.
   evidence: hanya terjangkau setelah data dir diubah dari luar aplikasi.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-app-6-dashboard-search-settings.md`
+  summary: Layar awal aplikasi desktop (`apps/desktop/ui/index.html`) masih mengikuti `prefers-color-scheme`, tidak mengikuti pilihan tema Light/Dark di Settings → General.
+  evidence: pilihan tema disimpan di localStorage viewer (`lakar.viewer.theme`); layar awal desktop dimuat sebelum viewer dan tidak membacanya, sehingga warna awal bisa berlawanan.

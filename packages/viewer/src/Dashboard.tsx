@@ -1,18 +1,22 @@
 // Dashboard — Recents (desain bagian 01) dan halaman Files / Archive (bagian 02): sidebar + grid/list dokumen.
-// Thumbnail = screenshot board pertama, dirender malas (hanya kartu yang terlihat) dan di-cache per `slug@rev`.
+// Thumbnail = screenshot board pertama (Thumb.tsx). Search sidebar dengan dropdown hasil (Search.tsx).
 // Kelola file: tombol New file, context menu kartu (klik kanan / "…" / pintasan F2, Del, Ctrl D); daftar
-// dimuat ulang lewat `api.onDocsChanged`. Halaman Settings → Connections (`#/settings/connections`) memakai sidebar yang sama.
+// dimuat ulang lewat `api.onDocsChanged`. Halaman Settings → General (`#/settings`) dan Connections
+// (`#/settings/connections`) memakai sidebar yang sama.
 import { useCallback, useEffect, useMemo, useState, type KeyboardEvent, type MouseEvent } from 'react';
 import { api, errorText, OfflineError, type DaemonStatus, type DocSummary } from './api';
-import { CONNECTIONS_HASH, openDoc } from './App';
+import { openDoc } from './App';
 import { FileMenu, type MenuTarget } from './FileMenu';
-import { byName } from './files';
+import { byName, CONNECTIONS_HASH, SETTINGS_HASH } from './files';
 import { Connections, copyText } from './Connections';
 import { HARNESSES } from './harnesses';
 import { relativeTime } from './format';
-import { useRetry, useSeen } from './hooks';
+import { useRetry } from './hooks';
 import { Icon } from './icons';
 import { NewFileDialog } from './NewFileDialog';
+import { Search } from './Search';
+import { SettingsGeneral, SettingsLayout } from './SettingsGeneral';
+import { docSubtitle, Thumb } from './Thumb';
 
 type View = 'grid' | 'list';
 const VIEW_KEY = 'lakar.viewer.view';
@@ -25,63 +29,7 @@ function loadView(): View {
   }
 }
 
-/** Thumbnail per `slug@rev` (memori viewer). */
-const thumbs = new Map<string, Promise<string | null>>();
-function thumbnail(doc: DocSummary): Promise<string | null> {
-  if (!doc.firstBoardId) return Promise.resolve(null);
-  const key = `${doc.slug}@${doc.rev}`;
-  let hit = thumbs.get(key);
-  if (!hit) {
-    hit = api.screenshot(doc.slug, doc.rev, doc.firstBoardId).then((s) => s.url);
-    hit.catch(() => thumbs.delete(key));
-    thumbs.set(key, hit);
-  }
-  return hit;
-}
-
-/** Lupakan thumbnail (slug bisa dipakai ulang setelah rename/delete dengan rev yang sama). */
-api.onDocsChanged(() => thumbs.clear());
-
-/** Thumbnail kartu; file terarsip tidak bisa dirender (bukan dokumen aktif) → ikon arsip. */
-function Thumb({ doc, size, archived = false }: { doc: DocSummary; size: 'large' | 'mini'; archived?: boolean }) {
-  const [ref, seen] = useSeen<HTMLDivElement>();
-  const [url, setUrl] = useState<string | null | undefined>(undefined);
-  const [failed, setFailed] = useState(false);
-  const [attempt, setAttempt] = useState(0);
-  useRetry(() => failed && setAttempt((a) => a + 1));
-  useEffect(() => {
-    if (!seen || archived) return;
-    let live = true;
-    setFailed(false);
-    thumbnail(doc).then(
-      (u) => live && setUrl(u),
-      () => live && setFailed(true),
-    );
-    return () => {
-      live = false;
-    };
-  }, [seen, doc, attempt, archived]);
-  return (
-    <div ref={ref} className={`thumb ${size}`}>
-      {archived ? (
-        <Icon name="archive" size={size === 'large' ? 20 : 12} className="thumb-icon" />
-      ) : url ? (
-        <img src={url} alt="" draggable={false} />
-      ) : failed ? (
-        <Icon name="alert" size={size === 'large' ? 18 : 12} className="thumb-icon" />
-      ) : url === null ? (
-        <Icon name="board" size={size === 'large' ? 20 : 12} className="thumb-icon" />
-      ) : (
-        <div className="skeleton" />
-      )}
-    </div>
-  );
-}
-
-const subtitle = (d: DocSummary) =>
-  `${d.boardCount === 0 ? 'No boards yet' : `${d.boardCount} board${d.boardCount === 1 ? '' : 's'}`} · ${relativeTime(d.updatedAt)}`;
-
-export type DashboardPage = 'recents' | 'files' | 'archive' | 'connections';
+export type DashboardPage = 'recents' | 'files' | 'archive' | 'settings' | 'connections';
 
 /** Tombol "Copy MCP config" kartu sidebar: salin config Claude Code; entry MCP tidak ada → buka Connections. */
 function CopyMcpConfig() {
@@ -161,7 +109,7 @@ function MoreButton({ onClick }: { onClick: (e: MouseEvent<HTMLElement>) => void
   );
 }
 
-const TITLES: Record<Exclude<DashboardPage, 'connections'>, string> = { recents: 'Recents', files: 'Files', archive: 'Archive' };
+const TITLES: Record<Exclude<DashboardPage, 'settings' | 'connections'>, string> = { recents: 'Recents', files: 'Files', archive: 'Archive' };
 
 export function Dashboard({ page = 'recents', menuOpen, onCloseMenu }: { page?: DashboardPage; menuOpen: boolean; onCloseMenu: () => void }) {
   const [docs, setDocs] = useState<DocSummary[] | undefined>(undefined);
@@ -171,9 +119,11 @@ export function Dashboard({ page = 'recents', menuOpen, onCloseMenu }: { page?: 
   const [view, setView] = useState<View>(loadView);
   const [query, setQuery] = useState('');
   const [menu, setMenu] = useState<MenuState | undefined>(undefined);
-  const [creating, setCreating] = useState(false);
+  /** Nama awal dialog New file; `undefined` = dialog tertutup. */
+  const [creating, setCreating] = useState<string | undefined>(undefined);
   const [notice, setNotice] = useState<string | undefined>(undefined);
   const archivedPage = page === 'archive';
+  const settingsPage = page === 'settings' || page === 'connections';
 
   const load = useCallback(() => {
     setError(undefined);
@@ -220,7 +170,7 @@ export function Dashboard({ page = 'recents', menuOpen, onCloseMenu }: { page?: 
   const handlers = fileHandlers(archivedPage, setMenu, duplicate);
 
   const newFileBtn = (
-    <button type="button" className="btn primary" onClick={() => setCreating(true)}>
+    <button type="button" className="btn primary" onClick={() => setCreating('Untitled')}>
       <Icon name="plus" size={14} />
       New file
     </button>
@@ -235,10 +185,7 @@ export function Dashboard({ page = 'recents', menuOpen, onCloseMenu }: { page?: 
             <span className="avatar">L</span>
             <span className="profile-name">Lakar</span>
           </div>
-          <label className="search">
-            <Icon name="search" size={15} />
-            <input type="search" placeholder="Search" value={query} onChange={(e) => setQuery(e.target.value)} aria-label="Search documents" />
-          </label>
+          <Search docs={error || archivedPage ? undefined : docs} query={query} onQuery={setQuery} onCreate={setCreating} />
           <nav className="nav">
             <a className={`nav-item${page === 'recents' ? ' active' : ''}`} href="#/">
               <Icon name="clock" size={16} />
@@ -260,7 +207,7 @@ export function Dashboard({ page = 'recents', menuOpen, onCloseMenu }: { page?: 
             <Icon name="archive" size={16} />
             <span>Archive</span>
           </a>
-          <a className={`nav-item${page === 'connections' ? ' active' : ''}`} href={CONNECTIONS_HASH}>
+          <a className={`nav-item${settingsPage ? ' active' : ''}`} href={SETTINGS_HASH}>
             <Icon name="settings" size={16} />
             <span>Settings</span>
           </a>
@@ -282,13 +229,8 @@ export function Dashboard({ page = 'recents', menuOpen, onCloseMenu }: { page?: 
         <footer className="sidebar-footer">{status ? `lakard ${status.version} · ${status.host}:${status.port}` : 'lakard'}</footer>
       </aside>
 
-      {page === 'connections' ? (
-        <section className="main">
-          <div className="main-header">
-            <h1>Connections</h1>
-          </div>
-          <Connections />
-        </section>
+      {settingsPage ? (
+        <SettingsLayout tab={page === 'connections' ? 'connections' : 'general'}>{page === 'connections' ? <Connections /> : <SettingsGeneral />}</SettingsLayout>
       ) : (
         <section className="main">
           <div className="main-header">
@@ -378,7 +320,7 @@ export function Dashboard({ page = 'recents', menuOpen, onCloseMenu }: { page?: 
                         <span className="card-title">{d.slug}</span>
                         <MoreButton onClick={menuBelow} />
                       </div>
-                      <span className="card-subtitle">{subtitle(d)}</span>
+                      <span className="card-subtitle">{docSubtitle(d)}</span>
                     </div>
                     <Thumb doc={d} size="large" archived={archivedPage} />
                   </div>
@@ -426,7 +368,7 @@ export function Dashboard({ page = 'recents', menuOpen, onCloseMenu }: { page?: 
           onError={setNotice}
         />
       )}
-      {creating && <NewFileDialog taken={taken} onClose={() => setCreating(false)} />}
+      {creating !== undefined && <NewFileDialog taken={taken} initialName={creating} onClose={() => setCreating(undefined)} />}
     </div>
   );
 }

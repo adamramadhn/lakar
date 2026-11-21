@@ -30,8 +30,9 @@ export function Modal({ label, onClose, children, className = '' }: { label: str
 
 const PRESET_ICON: Record<PresetId, IconName> = { desktop: 'board', tablet: 'tablet', mobile: 'smartphone', custom: 'fit' };
 
-export function NewFileDialog({ taken, onClose }: { taken: ReadonlySet<string>; onClose: () => void }) {
-  const [name, setName] = useState('Untitled');
+/** `initialName`: nama awal (default `Untitled`; dari Search tanpa hasil = query). */
+export function NewFileDialog({ taken, onClose, initialName = 'Untitled' }: { taken: ReadonlySet<string>; onClose: () => void; initialName?: string }) {
+  const [name, setName] = useState(initialName);
   const [preset, setPreset] = useState<PresetId>('desktop');
   const [width, setWidth] = useState('1440');
   const [height, setHeight] = useState('900');

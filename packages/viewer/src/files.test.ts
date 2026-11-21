@@ -1,7 +1,7 @@
 // Logika murni kelola file + routing hash viewer. Slugify viewer harus sama dengan daemon (sumber kebenaran).
 import { describe, expect, it } from 'vitest';
 import { slugify as daemonSlugify, withSuffix as daemonWithSuffix } from '../../daemon/src/files.ts';
-import { byName, docHash, docLink, parseRoute, previewSlug, slugify, validSize, withSuffix } from './files.ts';
+import { byName, CONNECTIONS_HASH, docHash, docLink, parseRoute, previewSlug, searchDocs, SETTINGS_HASH, slugify, validSize, withSuffix, wrapIndex } from './files.ts';
 
 describe('slugify (pratinjau = daemon)', () => {
   const names = ['My Landing', '  Café — Menu 2  ', '--a__b--', '!!!', '', 'Ünïcödé Ñame', 'x'.repeat(80), `a${'-'.repeat(70)}b`, 'Landing 2026 / v2'];
@@ -41,11 +41,20 @@ describe('parseRoute', () => {
     ['#/files/', { name: 'files' }],
     ['#/archive', { name: 'archive' }],
     ['#/settings/connections', { name: 'connections' }],
+    ['#/settings/connections/', { name: 'connections' }],
+    ['#/settings', { name: 'settings' }],
+    ['#/settings/', { name: 'settings' }],
+    ['#/settings/general', { name: 'settings' }],
+    ['#/settings/other', { name: 'recents' }],
     ['#/d/my-landing', { name: 'viewer', slug: 'my-landing' }],
     ['#/d/%E0%A4%A', { name: 'recents' }],
     ['#/unknown', { name: 'recents' }],
   ])('%j', (hash, route) => {
     expect(parseRoute(hash)).toEqual(route);
+  });
+  it('konstanta hash Settings', () => {
+    expect(parseRoute(SETTINGS_HASH)).toEqual({ name: 'settings' });
+    expect(parseRoute(CONNECTIONS_HASH)).toEqual({ name: 'connections' });
   });
   it('docHash bolak-balik', () => {
     expect(parseRoute(docHash('a-b'))).toEqual({ name: 'viewer', slug: 'a-b' });
@@ -58,5 +67,37 @@ describe('docLink / byName', () => {
   });
   it('urut nama', () => {
     expect(byName([{ slug: 'b' }, { slug: 'a' }, { slug: 'a-2' }]).map((d) => d.slug)).toEqual(['a', 'a-2', 'b']);
+  });
+});
+
+describe('searchDocs', () => {
+  const docs = ['creative-waterfall', 'scratchpad', 'welcome-to-paper', 'waterfall-2', 'Wa-upper'].map((slug) => ({ slug }));
+  it('cocok di slug, tidak peka huruf besar, urutan daftar', () => {
+    expect(searchDocs(docs, 'wa').map((d) => d.slug)).toEqual(['creative-waterfall', 'waterfall-2', 'Wa-upper']);
+    expect(searchDocs(docs, '  WA ').map((d) => d.slug)).toEqual(['creative-waterfall', 'waterfall-2', 'Wa-upper']);
+  });
+  it('query kosong / spasi → kosong; tanpa hasil → kosong', () => {
+    expect(searchDocs(docs, '')).toEqual([]);
+    expect(searchDocs(docs, '   ')).toEqual([]);
+    expect(searchDocs(docs, 'pricing')).toEqual([]);
+  });
+  it('maksimal `limit` (default 8)', () => {
+    const many = Array.from({ length: 12 }, (_, i) => ({ slug: `file-${i}` }));
+    expect(searchDocs(many, 'file')).toHaveLength(8);
+    expect(searchDocs(many, 'file', 3).map((d) => d.slug)).toEqual(['file-0', 'file-1', 'file-2']);
+  });
+});
+
+describe('wrapIndex', () => {
+  it('melingkar di kedua ujung', () => {
+    expect(wrapIndex(0, 3, 1)).toBe(1);
+    expect(wrapIndex(2, 3, 1)).toBe(0);
+    expect(wrapIndex(0, 3, -1)).toBe(2);
+    expect(wrapIndex(1, 3, -1)).toBe(0);
+    expect(wrapIndex(0, 1, 1)).toBe(0);
+  });
+  it('n = 0 → 0', () => {
+    expect(wrapIndex(0, 0, 1)).toBe(0);
+    expect(wrapIndex(0, 0, -1)).toBe(0);
   });
 });
