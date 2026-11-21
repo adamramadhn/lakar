@@ -32,6 +32,8 @@ export type DaemonConfig = {
   unsplashKeyFile: string;
   /** `utm_source` atribusi Unsplash (samakan dengan nama aplikasi di dashboard Unsplash). */
   unsplashAppName: string;
+  /** Direktori hasil build viewer yang disajikan di `/app/` (default `packages/viewer/dist`). */
+  viewerDir?: string;
   /** File config yang dibaca (undefined bila tidak ada). */
   configPath?: string;
 };

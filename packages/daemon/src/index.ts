@@ -9,5 +9,6 @@ export { rasterType, readAsset, writeAsset, readAssetMeta, imageSize, type Asset
 export { PhotoService, type PhotoServiceOptions, type PhotoStatus, type SearchResponse } from './photos/service.js';
 export { SafeNet, NetError, isBlockedIp, DEFAULT_ALLOWLIST, type HostAllowlist, type SafeNetOptions } from './photos/net.js';
 export { DocStore } from './store.js';
+export { VIEWER_DIST_DIR, registerViewerRoutes, type ViewerDocSummary } from './viewer.js';
 export { startDaemon, type RunningDaemon, type StartOptions } from './start.js';
 export { IconCatalog } from '@lakar/icons';

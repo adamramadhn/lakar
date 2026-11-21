@@ -41,6 +41,7 @@ import { INSPECT_DEPTH_DEFAULT, INSPECT_DEPTH_MAX, WIP_PREFIX, boundsMap, inspec
 import { readPngSize } from './png.js';
 import { Sessions, UnknownSessionError, logExecute, recallFailed, rememberFailed } from './sessions.js';
 import { DocStore } from './store.js';
+import { VIEWER_DIST_DIR, registerViewerRoutes } from './viewer.js';
 
 const STATUS: Record<ErrorCode, number> = {
   SCHEMA_INVALID: 400,
@@ -616,6 +617,9 @@ export function buildServer({
     if (!path) throw fileNotFound(`font ${req.params.pkg}/${req.params.file}`);
     return reply.type('font/woff2').header('cache-control', 'public, max-age=31536000, immutable').send(await readFile(path));
   });
+
+  // Viewer baca-saja (Viewer B slice 1): `/viewer/*` dan `/app/*`. Route lama tidak berubah.
+  registerViewerRoutes(app, { docs, store, distDir: config.viewerDir ?? VIEWER_DIST_DIR });
 
   // Aset gambar (story 8): `<dataDir>/assets/<sha256>`, hanya raster dari magic bytes; lainnya → 404.
   // Aset jarak jauh (Unsplash): meta tanpa byte di `assets/`, disajikan dari cache render daemon (hotlink resmi saat
