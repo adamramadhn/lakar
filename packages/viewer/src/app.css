@@ -199,6 +199,30 @@ code {
   padding: 0 10px;
   font-size: 12px;
 }
+/* Komponen desain "Button" (primary/secondary): 34px, 14/500, jarak ikon 6, secondary tanpa isi (hanya garis).
+   Dibatasi ke Dashboard, dialog, dan dropdown Search; tombol di atas kanvas Viewer tetap berlatar surface. */
+.dashboard .btn,
+.modal .btn,
+.search-pop .btn {
+  height: 34px;
+  gap: 6px;
+  font-size: 14px;
+}
+.dashboard .btn:not(.primary):not(.danger),
+.modal .btn:not(.primary):not(.danger),
+.search-pop .btn {
+  background: transparent;
+}
+.dashboard .btn:not(.primary):not(.danger):hover,
+.modal .btn:not(.primary):not(.danger):hover,
+.search-pop .btn:hover {
+  background: var(--surface-hover);
+}
+.dashboard .btn.small,
+.modal .btn.small {
+  height: 28px;
+  font-size: 12px;
+}
 .icon-btn {
   display: grid;
   place-items: center;
@@ -335,6 +359,31 @@ code {
   padding: 48px 20px;
   font-size: 12px;
 }
+/* Komponen desain "Empty State": 420 lebar, padding 40/24, jarak 12, lingkaran ikon 56, judul 16/600, deskripsi 300. */
+.empty-state {
+  gap: 12px;
+  padding: 40px 24px;
+}
+.empty-state strong {
+  font-size: 16px;
+  overflow-wrap: anywhere;
+}
+.empty-desc {
+  max-width: 300px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.empty-action {
+  padding-top: 8px;
+}
+.empty-action .btn,
+.empty-state .empty-action .btn {
+  margin-top: 0;
+}
+/* Archive kosong / offline / error: di tengah area isi, sedikit di atas tengah (desain: padding bawah 120). */
+.empty-state.centered {
+  margin-top: max(0px, calc((100vh - 44px - 118px - 273px - 120px) / 2 - 44px));
+}
 
 /* ---- Dashboard ---- */
 .dashboard {
@@ -355,6 +404,7 @@ code {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  border-bottom: 1px solid var(--border);
 }
 .profile {
   display: flex;
@@ -386,6 +436,7 @@ code {
   padding: 0 10px;
   border-radius: 6px;
   background: var(--surface);
+  border: 1px solid var(--border);
   color: var(--text-secondary);
 }
 .search input {
@@ -432,20 +483,33 @@ code {
   flex: 1;
 }
 .badge {
-  padding: 2px 7px;
+  padding: 1px 7px;
   border-radius: 5px;
   border: 1px solid var(--border);
   font-size: 11px;
+  line-height: 13px;
   color: var(--text-secondary);
 }
 .sidebar-section {
-  padding: 0 14px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 14px;
 }
+.nav-item:not(.active):not(.static):hover {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+/* Desain "Connect Card": 16 padding, jarak 6, judul 14/600 + tombol lipat, tombol penuh 34px berlatar sidebar. */
 .connect-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
   margin: 4px 14px;
   padding: 16px;
   border-radius: 8px;
   background: var(--surface);
+  border: 1px solid var(--border);
 }
 .connect-title {
   display: flex;
@@ -454,11 +518,27 @@ code {
   font-size: 14px;
   font-weight: 600;
 }
-.connect-card p {
-  margin: 6px 0 0;
+.connect-title > span {
+  flex: 1;
+}
+.connect-toggle {
+  width: 20px;
+  height: 20px;
+  margin: -3px -3px -3px 0;
   color: var(--text-secondary);
-  font-size: 13px;
+}
+.connect-card p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 14px;
   line-height: 1.45;
+}
+.dashboard .connect-card .btn.connect-copy {
+  width: 100%;
+  margin-top: 0;
+  background: var(--sidebar);
+  font-size: 13px;
+  gap: 8px;
 }
 .sidebar-spacer {
   flex: 1;
@@ -466,7 +546,7 @@ code {
 .sidebar-footer {
   padding: 16px 20px;
   color: var(--text-secondary);
-  font-size: 12px;
+  font-size: 13px;
 }
 .main {
   overflow-y: auto;
@@ -476,13 +556,25 @@ code {
   display: flex;
   align-items: center;
   gap: 12px;
+  min-height: 34px;
   margin-bottom: 40px;
+}
+.main.list-view .main-header {
+  margin-bottom: 32px;
+}
+.main.files-page .main-header {
+  margin-bottom: 24px;
 }
 .main-header h1 {
   margin: 0;
   font-size: 28px;
   font-weight: 600;
-  letter-spacing: -0.01em;
+  line-height: 34px;
+  letter-spacing: -0.4px;
+}
+/* Top bar Dashboard tablet/mobile (desain "Top Bar"): hanya ≤768px. */
+.dash-topbar {
+  display: none;
 }
 .spacer {
   flex: 1;
@@ -511,33 +603,37 @@ code {
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
   gap: 24px;
 }
+/* Desain "File Card": garis tepi selalu ada, hover = garis text-muted (latar tetap surface). */
 .card {
+  position: relative;
   display: flex;
   flex-direction: column;
   text-align: left;
   border-radius: 8px;
   background: var(--surface);
   overflow: hidden;
-  border: 1px solid transparent;
+  border: 1px solid var(--border);
   transition: border-color 120ms;
 }
 .card:hover {
-  border-color: var(--border);
-  background: var(--surface-hover);
+  border-color: var(--text-muted);
 }
 .card.loading {
   cursor: default;
+}
+.card.loading:hover {
+  border-color: var(--border);
 }
 .card-header {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  padding: 14px;
+  padding: 14px 14px 12px;
   min-height: 63px;
 }
 .card-title {
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 500;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -545,16 +641,53 @@ code {
 .card-subtitle {
   color: var(--text-secondary);
   font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
+.card-title {
+  line-height: 17px;
+}
+.card-subtitle {
+  line-height: 16px;
+}
+/* Judul kartu/baris = pemegang fokus (tautan/tombol); cincin fokus digambar di kartu/baris. */
+.file-link {
+  min-width: 0;
+  color: var(--text-primary);
+  text-align: left;
+  text-decoration: none;
+}
+.file-link:focus-visible {
+  outline: none;
+}
+.card:has(.file-link:focus-visible),
+.list-row:has(.file-link:focus-visible),
+.folder-item:has(.folder-link:focus-visible) {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.folder-link {
+  color: inherit;
+  text-decoration: none;
+}
+.folder-link:focus-visible {
+  outline: none;
+}
+/* Thumbnail besar: inset 4px di dalam kartu (desain padding [0,4,4,4]), sudut 4, board di tengah tanpa terpotong. */
 .thumb {
-  display: grid;
-  place-items: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   background: var(--thumb);
   overflow: hidden;
+  min-height: 0;
 }
 .thumb.large {
-  height: 195px;
+  height: 191px;
+  margin: 0 4px 4px;
   padding: 12px;
+  border-radius: 4px;
 }
 .thumb.mini {
   width: 48px;
@@ -564,37 +697,76 @@ code {
   flex: none;
 }
 .thumb img {
+  display: block;
   max-width: 100%;
   max-height: 100%;
+  width: auto;
+  height: auto;
+  min-width: 0;
+  min-height: 0;
   object-fit: contain;
   border-radius: 2px;
   box-shadow: 0 1px 3px #0000002e;
 }
+.thumb > .skeleton {
+  border-radius: 0;
+}
 .thumb-icon {
   color: var(--text-muted);
+}
+/* Skeleton kartu (desain "Dashboard — Loading"): garis 130×10 dan 90×8, thumbnail shimmer penuh. */
+.skeleton-line {
+  display: block;
+  width: 90px;
+  height: 8px;
+  border-radius: 4px;
+  background: var(--surface-hover);
+}
+.skeleton-line.wide {
+  width: 130px;
+  height: 10px;
+  border-radius: 5px;
+  margin: 2px 0 4px;
+}
+.card.loading .card-header {
+  padding: 16px 14px 14px;
+  min-height: 56px;
+  gap: 8px;
+}
+.thumb.skeleton-thumb {
+  height: 202px;
+  margin: 0;
+  padding: 0;
+  border-radius: 0;
 }
 .file-list {
   display: flex;
   flex-direction: column;
+  gap: 6px;
 }
+.file-list > [role='list'] {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+/* Desain "List Row": Name 360 · Edited 160 · Boards 160 · Revision 200 · "…"; baris 82 (thumb 120×66). */
 .list-head,
 .list-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 90px 90px 140px 28px;
+  grid-template-columns: minmax(0, 360fr) minmax(0, 160fr) minmax(0, 160fr) minmax(0, 200fr) 28px;
   align-items: center;
-  gap: 16px;
-  padding: 0 12px;
+  gap: 0;
 }
 .list-head {
-  height: 32px;
-  color: var(--text-muted);
-  font-size: 12px;
-  border-bottom: 1px solid var(--border);
+  padding-bottom: 10px;
+  color: var(--text-secondary);
+  font-size: 13px;
 }
 .list-row {
-  height: 52px;
+  padding: 8px 0;
   text-align: left;
   color: var(--text-secondary);
+  font-size: 14px;
   border-radius: 6px;
 }
 .list-row:hover {
@@ -603,15 +775,130 @@ code {
 .list-name {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 20px;
   color: var(--text-primary);
   font-weight: 500;
   min-width: 0;
+  padding-right: 16px;
 }
-.list-name > span:last-child {
+.list-name .thumb.mini {
+  width: 120px;
+  height: 66px;
+  padding: 4px;
+}
+.list-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.list-title-row,
+.card-title-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.list-title {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-size: 14px;
+}
+.list-col {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.live-badge {
+  flex: none;
+}
+/* Recents pertama kali (desain "Recents — Empty"): empty state + "How it works" tiga langkah. */
+.first-run {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 28px;
+  padding-top: 40px;
+}
+.get-started {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: 100%;
+  max-width: 760px;
+}
+.main .get-started .section-label {
+  margin: 0;
+}
+.steps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.step {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.step strong {
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+.step-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.step-number {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 12px;
+  background: var(--surface-hover);
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 600;
+}
+/* Halaman Files: bar urut (desain "Filter Bar" → "Sort"). */
+.filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 28px;
+  margin-bottom: 24px;
+}
+.sort-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 6px;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+.sort-btn:hover,
+.sort-btn[aria-expanded='true'] {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+.menu-icon-space {
+  flex: none;
+  width: 15px;
 }
 /* Subjudul baris list hanya di mobile (aplikasi 9). */
 .list-sub {
@@ -637,24 +924,15 @@ code {
 .card {
   cursor: pointer;
 }
-.card:focus-visible,
-.list-row:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 1px;
-}
 .card.menu-open {
-  border-color: var(--border);
-  background: var(--surface-hover);
-}
-.card-title-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
+  border-color: var(--text-muted);
 }
 .card-title-row .card-title {
-  flex: 1;
+  flex: 0 1 auto;
   min-width: 0;
+}
+.card-title-row .more-btn {
+  margin: -6px -6px -6px auto;
 }
 .list-row {
   cursor: pointer;
@@ -662,10 +940,18 @@ code {
 .list-row.menu-open {
   background: var(--surface-hover);
 }
+/* Desain "File Card/hover" → "More": 28×28, latar surface-hover. */
 .more-btn {
+  flex: none;
+  width: 28px;
+  height: 28px;
   color: var(--text-secondary);
   opacity: 0;
   transition: opacity 120ms;
+}
+.card .more-btn {
+  background: var(--surface-hover);
+  color: var(--text-primary);
 }
 .card:hover .more-btn,
 .card:focus-within .more-btn,
@@ -696,17 +982,14 @@ code {
   flex: 1;
   min-width: 0;
 }
-.archive-empty {
-  margin-top: 120px;
-}
 .empty-icon {
   display: grid;
   place-items: center;
-  width: 44px;
-  height: 44px;
-  margin-bottom: 8px;
-  border-radius: 22px;
+  width: 56px;
+  height: 56px;
+  border-radius: 28px;
   background: var(--surface);
+  border: 1px solid var(--border);
   color: var(--text-secondary);
 }
 
@@ -715,18 +998,22 @@ code {
   inset: 0;
   z-index: 40;
 }
+/* Desain "Context Menu": 232 lebar, padding 5, jarak 1, sudut 9, bayangan 0 12 32. */
 .menu {
   position: fixed;
-  min-width: 220px;
-  padding: 6px;
-  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 232px;
+  padding: 5px;
+  border-radius: 9px;
   background: var(--modal);
   border: 1px solid var(--border);
-  box-shadow: 0 8px 24px #00000033;
+  box-shadow: 0 12px 32px #00000052;
 }
 .menu-separator {
   height: 1px;
-  margin: 6px 4px;
+  margin: 4px 0;
   background: var(--border);
 }
 .menu-item {
@@ -736,7 +1023,7 @@ code {
   width: 100%;
   height: 32px;
   padding: 0 10px;
-  border-radius: 5px;
+  border-radius: 6px;
   color: var(--text-primary);
   font-size: 13px;
   text-align: left;
@@ -779,7 +1066,7 @@ code {
   border-radius: 12px;
   background: var(--modal);
   border: 1px solid var(--border);
-  box-shadow: 0 16px 48px #0000004d;
+  box-shadow: 0 24px 60px #00000059;
 }
 .modal.small {
   width: 420px;
@@ -789,6 +1076,13 @@ code {
   display: flex;
   flex-direction: column;
   gap: 20px;
+}
+/* Desain "Delete Dialog": jarak 16, ikon 40×40 sudut 10, tombol dengan padding atas 8. */
+.modal.confirm {
+  gap: 16px;
+}
+.modal.confirm .modal-buttons {
+  padding-top: 8px;
 }
 .modal-text {
   display: flex;
@@ -805,19 +1099,16 @@ code {
   margin: 0;
   color: var(--text-secondary);
   font-size: 13px;
-  line-height: 1.45;
+  line-height: 1.5;
 }
 .confirm-icon {
   display: grid;
   place-items: center;
-  width: 36px;
-  height: 36px;
-  border-radius: 18px;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
   background: var(--danger-soft);
   color: var(--danger);
-}
-.modal.confirm .modal-text {
-  margin-top: -8px;
 }
 .field {
   display: flex;
@@ -827,6 +1118,13 @@ code {
 .field-label {
   color: var(--text-secondary);
   font-size: 12px;
+  font-weight: 500;
+}
+.modal .presets {
+  margin-top: 2px;
+}
+.field:has(> .presets) {
+  gap: 8px;
 }
 .field-hint {
   color: var(--text-muted);
@@ -838,7 +1136,7 @@ code {
 .input {
   height: 36px;
   padding: 0 12px;
-  border-radius: 6px;
+  border-radius: 7px;
   border: 1px solid var(--border);
   background: var(--input);
   color: var(--text-primary);
@@ -856,27 +1154,24 @@ code {
   gap: 8px;
   margin-top: 2px;
 }
+/* Desain "Board Options": kotak 83px, padding 12, jarak 6; aktif = garis + latar accent-soft, ikon accent. */
 .preset {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 2px;
-  padding: 10px;
+  gap: 6px;
+  padding: 12px;
   border-radius: 8px;
   border: 1px solid var(--border);
-  background: var(--surface);
+  background: transparent;
   color: var(--text-secondary);
   text-align: left;
-}
-.preset svg {
-  margin-bottom: 6px;
 }
 .preset:hover {
   background: var(--surface-hover);
 }
 .preset.active {
   border-color: var(--accent);
-  box-shadow: 0 0 0 1px var(--accent);
   background: var(--accent-soft);
   color: var(--accent);
 }
@@ -884,10 +1179,12 @@ code {
   color: var(--text-primary);
   font-size: 13px;
   font-weight: 500;
+  line-height: 16px;
 }
 .preset-size {
   color: var(--text-muted);
   font-size: 11px;
+  line-height: 13px;
 }
 .custom-size {
   display: flex;
@@ -1716,29 +2013,111 @@ button.panel-tab:hover {
 .connections {
   display: flex;
   flex-direction: column;
-  gap: 36px;
-  max-width: 760px;
+  gap: 28px;
+  max-width: 764px;
 }
 .conn-card {
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 10px;
   background: var(--surface);
 }
 .conn-daemon {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 14px 16px;
+  gap: 14px;
+  padding: 16px;
 }
 .conn-daemon-icon {
   display: grid;
   place-items: center;
   flex: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 9px;
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+.conn-daemon-title strong {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 600;
+}
+/* Desain "Agents Card": baris 62px, ikon harness 32 sudut 8 berwarna, status Live (warna agen) / Idle. */
+.conn-agents {
+  overflow: hidden;
+}
+.conn-agent {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 62px;
+  padding: 14px 16px;
+}
+.conn-agent + .conn-agent {
+  border-top: 1px solid var(--border);
+}
+.conn-agent-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
   width: 32px;
   height: 32px;
-  border-radius: 7px;
-  background: var(--input);
+  border-radius: 8px;
+  background: var(--agent);
+  color: #fff;
+}
+.conn-agent-icon.codex {
+  background: var(--codex);
+}
+.conn-agent-icon.idle {
+  background: var(--surface-hover);
   color: var(--text-secondary);
+}
+.conn-agent-info {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  flex: 1;
+  min-width: 0;
+}
+.conn-agent-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+.conn-agent-title strong {
+  font-weight: 600;
+}
+.conn-agent-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+.conn-agent-status i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--text-muted);
+}
+.conn-agent-status.live {
+  color: var(--agent);
+  font-weight: 600;
+}
+.conn-agent-status.live.codex {
+  color: var(--codex);
+}
+.conn-agent-status.live i {
+  background: currentColor;
+}
+.conn-agent-sub {
+  color: var(--text-secondary);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .conn-daemon-text {
   display: flex;
@@ -1764,20 +2143,18 @@ button.panel-tab:hover {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  padding: 1px 7px;
-  border-radius: 999px;
-  border: 1px solid var(--border);
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: var(--surface-hover);
   color: var(--text-secondary);
   font-size: 11px;
   font-weight: 500;
 }
 .status-pill.ok {
   color: var(--success);
-  border-color: currentColor;
 }
 .status-pill.error {
   color: var(--danger);
-  border-color: currentColor;
 }
 .status-pill.ok::before {
   content: '';
@@ -1822,12 +2199,13 @@ button.panel-tab:hover {
 }
 .conn-section h2 {
   margin: 0;
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 600;
 }
 .conn-section > p {
-  margin: 4px 0 14px;
+  margin: 4px 0 28px;
   color: var(--text-secondary);
+  font-size: 12px;
 }
 .conn-code-card {
   overflow: hidden;
@@ -1835,18 +2213,20 @@ button.panel-tab:hover {
 .conn-code-card[aria-busy='true'] {
   padding: 16px;
 }
+/* Desain "Harness Tabs": pil 25px (aktif berlatar surface-hover), bar padding 10 dengan garis bawah. */
 .conn-tabs {
   display: flex;
-  gap: 2px;
-  padding: 6px 6px 0;
+  gap: 4px;
+  padding: 10px;
   border-bottom: 1px solid var(--border);
   overflow-x: auto;
 }
 .conn-tab {
-  height: 32px;
-  padding: 0 12px;
-  border-bottom: 2px solid transparent;
+  height: 25px;
+  padding: 0 10px;
+  border-radius: 6px;
   color: var(--text-secondary);
+  font-size: 12px;
   font-weight: 500;
   white-space: nowrap;
 }
@@ -1855,24 +2235,34 @@ button.panel-tab:hover {
 }
 .conn-tab.active {
   color: var(--text-primary);
-  border-bottom-color: var(--text-primary);
+  background: var(--surface-hover);
 }
 .conn-code-head {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 10px 12px 0 16px;
+  gap: 8px;
+  min-height: 28px;
+  margin: 16px 16px 10px;
   color: var(--text-secondary);
   font-size: 12px;
 }
+.conn-code-file {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .conn-code {
-  margin: 0;
-  padding: 12px 16px 16px;
+  margin: 0 16px 16px;
+  padding: 14px 16px;
   overflow-x: auto;
   font-size: 12px;
-  line-height: 1.55;
+  line-height: 1.6;
   color: var(--text-primary);
+  background: var(--canvas);
+  border: 1px solid var(--border);
+  border-radius: 8px;
 }
 .conn-note {
   display: flex;
@@ -1893,6 +2283,7 @@ button.panel-tab:hover {
   border-radius: 6px;
   border: 1px solid var(--border);
   background: var(--surface);
+  color: var(--text-secondary);
   font-size: 12px;
 }
 
@@ -2152,10 +2543,16 @@ button.panel-tab:hover {
     max-width: 85%;
     z-index: 20;
     transform: translateX(-100%);
-    transition: transform 160ms ease-out;
+    /* Laci tertutup tidak bisa difokus (Tab tidak masuk ke tautan di luar layar). */
+    visibility: hidden;
+    transition:
+      transform 160ms ease-out,
+      visibility 0s linear 160ms;
   }
   .sidebar.open {
     transform: none;
+    visibility: visible;
+    transition: transform 160ms ease-out;
   }
   .scrim {
     display: block;
@@ -2164,30 +2561,97 @@ button.panel-tab:hover {
     z-index: 10;
     background: var(--scrim);
   }
+  /* Tablet (desain "Tablet — Grid/List", 768): top bar 60px (menu, profil, Search 200px) di atas isi. Di browser
+     top bar ini menggantikan title bar; di aplikasi desktop title bar (kontrol jendela) tetap, tanpa tombol menu. */
+  .app:has(> .body > .dashboard) > .titlebar:not(.mac):not(:has(.window-controls)) {
+    display: none;
+  }
+  .app:has(> .body > .dashboard) .titlebar-menu {
+    display: none;
+  }
+  .dashboard {
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+  .dash-topbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    height: 60px;
+    min-width: 0;
+    padding: 0 16px;
+    background: var(--sidebar);
+    border-bottom: 1px solid var(--border);
+  }
+  .topbar-btn {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 36px;
+    height: 36px;
+    border-radius: 6px;
+    color: var(--text-secondary);
+  }
+  .topbar-btn:hover {
+    background: var(--surface-hover);
+    color: var(--text-primary);
+  }
+  .topbar-profile {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    height: 36px;
+    padding: 6px 8px;
+  }
+  .topbar-profile .profile-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .topbar-search {
+    flex: none;
+    width: 200px;
+  }
+  .topbar-search .search {
+    height: 36px;
+  }
+  .topbar-search-btn {
+    display: none;
+  }
   .main {
-    padding: 24px 16px 48px;
+    padding: 32px 32px 48px;
   }
   .main-header {
-    margin-bottom: 24px;
+    margin-bottom: 28px;
   }
+  .main.list-view .main-header,
+  .main.files-page .main-header {
+    margin-bottom: 28px;
+  }
+  .main-header h1 {
+    font-size: 26px;
+  }
+  .file-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 20px;
+  }
+  /* List tablet: Name · Edited · Boards (Revision disembunyikan). */
   .list-head,
   .list-row {
-    grid-template-columns: minmax(0, 1fr) 90px 28px;
+    grid-template-columns: minmax(0, 344fr) minmax(0, 170fr) minmax(0, 190fr) 28px;
   }
-  .main-header .btn.primary {
-    padding: 0 10px;
+  .list-head span:nth-child(4),
+  .list-row > span:nth-child(4) {
+    display: none;
+  }
+  .steps {
+    grid-template-columns: minmax(0, 1fr);
   }
   .modal {
     width: calc(100vw - 32px);
   }
   .presets {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-  .list-head span:nth-child(2),
-  .list-head span:nth-child(3),
-  .list-row > span:nth-child(2),
-  .list-row > span:nth-child(3) {
-    display: none;
   }
   .offline-banner {
     flex-wrap: wrap;
@@ -2200,23 +2664,97 @@ button.panel-tab:hover {
 /* Dashboard mobile (desain "Mobile — List/Grid — …", 375): "+" ikon 34×34, list tanpa header, baris 74px dengan
    thumbnail 104×58 dan dua baris teks. Tablet 768 tetap memakai aturan di atas. */
 @media (max-width: 767.98px) {
-  .main-header .new-file-btn {
+  /* Mobile (desain "Mobile — Grid/List", 375): top bar 56px dengan tombol search ikon, isi padding 20/16. */
+  .dash-topbar {
+    height: 56px;
+    gap: 4px;
+    padding: 0 8px;
+  }
+  .topbar-btn {
+    color: var(--text-primary);
+  }
+  .topbar-profile {
+    padding: 6px;
+  }
+  .topbar-search {
+    display: none;
+  }
+  .topbar-search-btn {
+    display: grid;
+  }
+  .main {
+    padding: 20px 16px 40px;
+  }
+  .main-header,
+  .main.list-view .main-header,
+  .main.files-page .main-header {
+    gap: 0;
+    margin-bottom: 20px;
+  }
+  .main-header h1 {
+    font-size: 24px;
+  }
+  .main-header .new-file-btn,
+  .main-header .new-folder-btn {
     width: 34px;
     height: 34px;
     padding: 0;
   }
-  .new-file-btn .btn-label {
+  .new-file-btn .btn-label,
+  .new-folder-btn .btn-label {
     display: none;
+  }
+  .main-header .new-folder-btn {
+    margin-right: 8px;
+  }
+  .file-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+  }
+  .thumb.large {
+    height: 129px;
+  }
+  .filter-bar {
+    margin-bottom: 20px;
+  }
+  .sort-btn {
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    justify-content: center;
+    color: var(--text-primary);
+  }
+  .sort-label,
+  .sort-chevron {
+    display: none;
+  }
+  /* Folder mobile: satu baris 180px yang digulir horizontal. */
+  .folder-grid {
+    display: flex;
+    gap: 10px;
+    overflow-x: auto;
+    margin-bottom: 20px;
+    scrollbar-width: none;
+  }
+  .folder-grid > .folder-item {
+    flex: none;
+    width: 180px;
   }
   .list-head {
     display: none;
   }
+  .file-list,
+  .file-list > [role='list'] {
+    gap: 2px;
+  }
   .list-row {
     grid-template-columns: minmax(0, 1fr) 32px;
-    height: 74px;
-    padding: 0;
+    padding: 8px 0;
   }
-  .list-row > span:nth-child(4) {
+  .list-row:hover {
+    background: none;
+  }
+  .list-row > .list-col {
     display: none;
   }
   .list-name {
@@ -2225,12 +2763,6 @@ button.panel-tab:hover {
   .list-name .thumb.mini {
     width: 104px;
     height: 58px;
-    padding: 4px;
-  }
-  .list-text {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
   }
   .list-title,
   .list-sub {
@@ -2238,15 +2770,19 @@ button.panel-tab:hover {
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  .list-title {
-    font-size: 14px;
-    font-weight: 600;
-  }
   .list-sub {
     display: block;
     color: var(--text-secondary);
     font-size: 12px;
     font-weight: 400;
+  }
+  .list-row .more-btn {
+    width: 32px;
+    height: 32px;
+    color: var(--text-primary);
+  }
+  .first-run {
+    padding-top: 0;
   }
 }
 
@@ -3225,7 +3761,7 @@ button.panel-tab:hover {
   padding: 6px 8px 4px;
   color: var(--text-muted);
   font-size: 11px;
-  font-weight: 500;
+  font-weight: 600;
 }
 .search-list {
   display: flex;
@@ -3278,6 +3814,7 @@ button.panel-tab:hover {
   display: flex;
   gap: 14px;
   padding: 8px 8px 4px;
+  border-top: 1px solid var(--border);
   color: var(--text-muted);
   font-size: 11px;
 }
@@ -3293,7 +3830,7 @@ button.panel-tab:hover {
 .search-empty strong {
   color: var(--text-primary);
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 600;
   overflow-wrap: anywhere;
 }
 .search-empty > span {
@@ -3502,8 +4039,8 @@ button.panel-tab:hover {
 .settings-unavailable {
   color: var(--text-muted);
 }
-/* Lebar isi, bukan lebar jendela: sidebar 300px memakan ruang di desktop sempit. Isi ≤ 640px (termasuk ≤768px
-   jendela) → sub-nav jadi tab horizontal; ≤ 900px → bagian bertumpuk (intro di atas isi). */
+/* Lebar isi, bukan lebar jendela: sidebar 300px memakan ruang di desktop sempit. Isi ≤ 720px (termasuk ≤768px
+   jendela, desain "Settings — Tablet") → sub-nav jadi tab horizontal; ≤ 900px → bagian bertumpuk (intro di atas isi). */
 .main.settings-main {
   container: settings-main / inline-size;
 }
@@ -3513,7 +4050,7 @@ button.panel-tab:hover {
     gap: 16px;
   }
 }
-@container settings-main (max-width: 640px) {
+@container settings-main (max-width: 720px) {
   .main-header + .settings-body {
     margin-top: 0;
   }
@@ -3546,9 +4083,10 @@ button.panel-tab:hover {
 }
 
 /* ---- Folder (aplikasi 10; desain 02 "Files — Light/Dark", komponen Folder Item) ---- */
-.section-label {
-  margin: 0 0 16px;
-  color: var(--text-secondary);
+.main .section-label {
+  padding: 0;
+  margin: 0 0 24px;
+  color: var(--text-muted);
   font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.3px;
@@ -3557,7 +4095,7 @@ button.panel-tab:hover {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
   gap: 16px;
-  margin-bottom: 32px;
+  margin-bottom: 24px;
 }
 .folder-item {
   display: flex;
@@ -3714,11 +4252,20 @@ button.panel-tab:hover {
 }
 @media (max-width: 768px) {
   .folder-grid {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 8px;
-    margin-bottom: 24px;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   }
-  .breadcrumb-root {
+  .breadcrumb-root,
+  .main-header .breadcrumb-current {
     font-size: 22px;
+  }
+}
+@media (max-width: 767.98px) {
+  .main .section-label {
+    margin-bottom: 20px;
+  }
+  /* Sesudah aturan dasar .folder-grid di atas (urutan cascade). */
+  .folder-grid {
+    gap: 10px;
+    margin-bottom: 20px;
   }
 }

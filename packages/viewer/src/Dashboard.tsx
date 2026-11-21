@@ -1,44 +1,57 @@
-// Dashboard — Recents (desain bagian 01) dan halaman Files / Archive (bagian 02): sidebar + grid/list dokumen.
-// Thumbnail = screenshot board pertama (Thumb.tsx). Search sidebar dengan dropdown hasil (Search.tsx).
-// Kelola file: tombol New file, context menu kartu (klik kanan / "…" / pintasan F2, Del, Ctrl D); daftar
-// dimuat ulang lewat `api.onDocsChanged`. Halaman Settings → General (`#/settings`) dan Connections
-// (`#/settings/connections`) memakai sidebar yang sama.
-// Mobile (aplikasi 9, desain "Mobile — List/Grid"): tombol New file jadi ikon "+", list tanpa header dengan baris dua
-// baris (nama + "Edited …") dan thumbnail besar; `.list-sub`/label disembunyikan/ditampilkan lewat CSS.
-// Folder (aplikasi 10): halaman Files menampilkan bagian "Folders" (Folder Item) lalu "Files" (file di root);
-// `#/files/<id>` membuka folder dengan breadcrumb `Files › <nama>`. New folder, menu folder, "Move to…" di menu
-// file, dan seret kartu/baris ke Folder Item atau ke breadcrumb "Files".
-import { useCallback, useEffect, useMemo, useState, type KeyboardEvent, type MouseEvent } from 'react';
+// Dashboard — Recents (desain bagian 01) dan halaman Files / Archive / Settings (bagian 02): sidebar + grid/list dokumen.
+// Thumbnail = screenshot board pertama (Thumb.tsx). Search sidebar dengan dropdown hasil (Search.tsx), Ctrl/⌘ F memfokuskannya.
+// Kelola file: tombol New file, context menu kartu (klik kanan / "…" / pintasan F2, Del, Ctrl D, Shift F10); daftar
+// dimuat ulang lewat `api.onDocsChanged` dan saat agen selesai mengubah dokumen (stream aktivitas). Badge "Live" +
+// subjudul "<agen> is editing…" untuk dokumen yang sedang dikerjakan agen (live.ts).
+// Aksesibilitas: kartu/baris bukan tombol; judulnya tautan (aktif) / tombol (arsip) yang memegang fokus, pintasan
+// (`aria-keyshortcuts` + tooltip), dan klik seluruh kartu. Tombol "…" saudara tautan, tidak bersarang.
+// Tablet/mobile (≤768px, desain "Tablet/Mobile — Grid/List"): top bar Dashboard (menu, profil, Search / ikon search)
+// menggantikan title bar di browser; sidebar jadi laci. Mobile: New file jadi ikon "+", list dua baris.
+// Folder (aplikasi 10): halaman Files menampilkan "Folders" (Folder Item) lalu "Files"; `#/files/<id>` membuka folder
+// dengan breadcrumb `Files › <nama>`. New folder, menu folder, "Move to…", dan seret kartu/baris ke folder/breadcrumb.
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react';
+import { activityReducer, connectActivity, initialActivity, type ActivityEvent } from './activity';
 import { api, errorText, OfflineError, type DaemonStatus, type DocSummary, type FolderState } from './api';
 import { openDoc } from './App';
-import { FileMenu, type MenuTarget } from './FileMenu';
-import { byName, CONNECTIONS_HASH, folderHash, inFolder, memberOf, SETTINGS_HASH } from './files';
+import { FileMenu, Menu, SHORTCUT, type MenuTarget } from './FileMenu';
+import { CONNECTIONS_HASH, docHash, fileErrorText, folderHash, inFolder, memberOf, parseSort, SETTINGS_HASH, SORT_KEYS, SORT_LABEL, sortDocs, type SortKey } from './files';
 import { dragSource, FolderItem, FolderMenu, FolderNameDialog, useDropTarget, type FolderMenuTarget } from './Folders';
 import { Connections, copyText } from './Connections';
 import { HARNESSES } from './harnesses';
 import { relativeTime } from './format';
-import { useRetry } from './hooks';
-import { Icon } from './icons';
+import { useNow, useRetry } from './hooks';
+import { Icon, type IconName } from './icons';
+import { liveDocs, type LiveDoc } from './live';
 import { NewFileDialog } from './NewFileDialog';
 import { Search } from './Search';
 import { SettingsGeneral, SettingsLayout } from './SettingsGeneral';
+import { openInNewTab } from './tabs';
 import { docSubtitle, Thumb } from './Thumb';
 
 type View = 'grid' | 'list';
 const VIEW_KEY = 'lakar.viewer.view';
+const SORT_KEY = 'lakar.viewer.sort';
+const CONNECT_KEY = 'lakar.viewer.connectCollapsed';
 
-function loadView(): View {
+function stored(key: string): string | null {
   try {
-    return localStorage.getItem(VIEW_KEY) === 'list' ? 'list' : 'grid';
+    return localStorage.getItem(key);
   } catch {
-    return 'grid';
+    return null;
+  }
+}
+function store(key: string, value: string) {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    // penyimpanan tidak tersedia: tetap jalan
   }
 }
 
 export type DashboardPage = 'recents' | 'files' | 'archive' | 'settings' | 'connections';
 
-/** Tombol "Copy MCP config" kartu sidebar: salin config Claude Code; entry MCP tidak ada → buka Connections. */
-function CopyMcpConfig() {
+/** Tombol "Copy MCP config": salin config Claude Code; entry MCP tidak ada / gagal → buka Connections. */
+function CopyMcpConfig({ className = '' }: { className?: string }) {
   const [state, setState] = useState<'idle' | 'copied'>('idle');
   const copy = async () => {
     try {
@@ -55,16 +68,91 @@ function CopyMcpConfig() {
     }
   };
   return (
-    <button type="button" className="btn small connect-copy" onClick={copy}>
-      <Icon name={state === 'copied' ? 'circleCheck' : 'copy'} size={13} />
+    <button type="button" className={`btn ${className}`} onClick={copy}>
+      <Icon name={state === 'copied' ? 'circleCheck' : 'copy'} size={15} />
       {state === 'copied' ? 'Copied' : 'Copy MCP config'}
     </button>
   );
 }
 
+/** Kartu sidebar "Connect an agent"; tombol "–" melipatnya (diingat per peramban). */
+function ConnectCard() {
+  const [collapsed, setCollapsed] = useState(() => stored(CONNECT_KEY) === '1');
+  const toggle = () => {
+    setCollapsed((c) => {
+      store(CONNECT_KEY, c ? '0' : '1');
+      return !c;
+    });
+  };
+  return (
+    <div className={`connect-card${collapsed ? ' collapsed' : ''}`}>
+      <div className="connect-title">
+        <span>Connect an agent</span>
+        <button type="button" className="icon-btn connect-toggle" aria-expanded={!collapsed} aria-label={collapsed ? 'Expand Connect an agent' : 'Collapse Connect an agent'} onClick={toggle}>
+          <Icon name={collapsed ? 'plus' : 'minus'} size={14} />
+        </button>
+      </div>
+      {!collapsed && (
+        <>
+          <p>Point Claude Code, Codex, or any ACP harness at Lakar's MCP server.</p>
+          <CopyMcpConfig className="connect-copy" />
+        </>
+      )}
+    </div>
+  );
+}
+
 type MenuState = MenuTarget & { dialog?: 'rename' | 'delete' };
 
-/** Kartu/baris file: klik membuka (arsip: membuka menu), klik kanan / "…" membuka menu, pintasan F2, Del, Ctrl D. */
+/** Empty State (komponen desain): lingkaran ikon 56px, judul 16/600, deskripsi 300px, aksi. */
+function EmptyState({ icon, title, children, action, className = '' }: { icon: IconName; title: ReactNode; children?: ReactNode; action?: ReactNode; className?: string }) {
+  return (
+    <div className={`empty-state ${className}`}>
+      <span className="empty-icon">
+        <Icon name={icon} size={22} />
+      </span>
+      <strong>{title}</strong>
+      {children && <span className="empty-desc">{children}</span>}
+      {action && <div className="empty-action">{action}</div>}
+    </div>
+  );
+}
+
+const STEPS: { icon: IconName; title: string; text: string }[] = [
+  { icon: 'plug', title: 'Connect your harness', text: "Add Lakar's MCP server to Claude Code, Codex, or any ACP client." },
+  { icon: 'pencil', title: 'Ask for a design', text: 'Describe the screen in your harness. Lakar never asks for a prompt here.' },
+  { icon: 'activity', title: 'Watch it land', text: 'Changes stream in live, with layout_check after every execute.' },
+];
+
+/** Recents pertama kali (desain "Recents — Empty"): empty state + "How it works". */
+function FirstRun() {
+  return (
+    <div className="first-run">
+      <EmptyState icon="file" title="No designs yet" action={<CopyMcpConfig />}>
+        Ask your agent to design something. Files show up here as soon as the first change lands.
+      </EmptyState>
+      <section className="get-started" aria-labelledby="how-it-works">
+        <h2 id="how-it-works" className="section-label">
+          How it works
+        </h2>
+        <ol className="steps">
+          {STEPS.map((s, i) => (
+            <li key={s.title} className="step">
+              <span className="step-head">
+                <span className="step-number">{i + 1}</span>
+                <Icon name={s.icon} size={16} />
+              </span>
+              <strong>{s.title}</strong>
+              <span>{s.text}</span>
+            </li>
+          ))}
+        </ol>
+      </section>
+    </div>
+  );
+}
+
+/** Kartu/baris file: klik membuka (arsip: membuka menu), klik kanan / "…" membuka menu, pintasan di tautan judul. */
 function fileHandlers(archived: boolean, setMenu: (m: MenuState) => void, onDuplicate: (slug: string) => void) {
   return (d: DocSummary) => {
     const menuAt = (e: MouseEvent) => {
@@ -77,25 +165,24 @@ function fileHandlers(archived: boolean, setMenu: (m: MenuState) => void, onDupl
       const r = e.currentTarget.getBoundingClientRect();
       setMenu({ slug: d.slug, x: r.left, y: r.bottom + 4 });
     };
+    /** Klik di mana saja pada kartu/baris (bukan tombol "…"). Ctrl/⌘/klik tengah → tab baru tanpa berpindah. */
     const open = (e: MouseEvent<HTMLElement>) => {
-      if (!archived) return openDoc(d.slug);
-      setMenu({ slug: d.slug, x: e.clientX, y: e.clientY });
+      e.preventDefault();
+      if (archived) return setMenu({ slug: d.slug, x: e.clientX, y: e.clientY });
+      if (e.ctrlKey || e.metaKey || e.button === 1) openInNewTab(d.slug);
+      else openDoc(d.slug);
     };
+    /** Pintasan di tautan/tombol judul (pemegang fokus kartu). Enter = klik bawaan elemen. */
     const onKeyDown = (e: KeyboardEvent<HTMLElement>) => {
-      if (e.target !== e.currentTarget) return;
-      const r = e.currentTarget.getBoundingClientRect();
+      const r = (e.currentTarget.closest('.card, .list-row') ?? e.currentTarget).getBoundingClientRect();
       const at = { slug: d.slug, x: r.left + 16, y: r.top + 16 };
-      if (e.key === 'Enter' || e.key === ' ') {
-        e.preventDefault();
-        if (archived) setMenu(at);
-        else openDoc(d.slug);
-      } else if (e.key === 'F2' && !archived) {
+      if (e.key === 'F2' && !archived) {
         e.preventDefault();
         setMenu({ ...at, dialog: 'rename' });
       } else if (e.key === 'Delete') {
         e.preventDefault();
         setMenu({ ...at, dialog: 'delete' });
-      } else if (e.key.toLowerCase() === 'd' && (e.ctrlKey || e.metaKey) && !archived) {
+      } else if (e.key.toLowerCase() === 'd' && (e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && !archived) {
         e.preventDefault();
         onDuplicate(d.slug);
       } else if (e.key === 'ContextMenu' || (e.key === 'F10' && e.shiftKey)) {
@@ -103,17 +190,47 @@ function fileHandlers(archived: boolean, setMenu: (m: MenuState) => void, onDupl
         setMenu(at);
       }
     };
-    return { role: 'button' as const, tabIndex: 0, onClick: open, onContextMenu: menuAt, onKeyDown, menuBelow };
+    return { open, menuAt, menuBelow, onKeyDown };
   };
+}
+
+/** Judul kartu/baris: tautan dokumen (Enter membuka) atau, di Archive, tombol yang membuka menu. */
+function FileLink({ d, archived, className, onOpen, onKeyDown }: { d: DocSummary; archived: boolean; className: string; onOpen: (e: MouseEvent<HTMLElement>) => void; onKeyDown: (e: KeyboardEvent<HTMLElement>) => void }) {
+  const click = (e: MouseEvent<HTMLElement>) => {
+    e.stopPropagation();
+    onOpen(e);
+  };
+  if (archived)
+    return (
+      <button type="button" className={`file-link ${className}`} aria-haspopup="menu" aria-keyshortcuts={SHORTCUT.archived.aria} title={SHORTCUT.archived.title} onClick={click} onKeyDown={onKeyDown}>
+        {d.slug}
+      </button>
+    );
+  return (
+    <a className={`file-link ${className}`} href={docHash(d.slug)} aria-keyshortcuts={SHORTCUT.file.aria} title={SHORTCUT.file.title} onClick={click} onAuxClick={(e) => e.button === 1 && click(e)} onKeyDown={onKeyDown} draggable={false}>
+      {d.slug}
+    </a>
+  );
 }
 
 function MoreButton({ onClick }: { onClick: (e: MouseEvent<HTMLElement>) => void }) {
   return (
-    <button type="button" className="icon-btn more-btn" aria-label="More actions" aria-haspopup="menu" onClick={onClick} onKeyDown={(e) => e.stopPropagation()}>
+    <button type="button" className="icon-btn more-btn" aria-label="More actions" aria-haspopup="menu" title="More actions (Shift+F10)" onClick={onClick}>
       <Icon name="ellipsis" size={16} />
     </button>
   );
 }
+
+function LiveBadge({ live }: { live: LiveDoc }) {
+  return (
+    <span className={`live-badge ${live.color}`} title={live.running ? `${live.label} is editing` : `${live.label} is connected`}>
+      <i />
+      Live
+    </span>
+  );
+}
+
+const liveSubtitle = (live: LiveDoc | undefined, d: DocSummary) => (live?.running ? `${live.label} is editing…` : live ? `${live.label} · ${relativeTime(d.updatedAt)}` : docSubtitle(d));
 
 const TITLES: Record<Exclude<DashboardPage, 'settings' | 'connections'>, string> = { recents: 'Recents', files: 'Files', archive: 'Archive' };
 const NO_FOLDERS: FolderState = { folders: [], membership: {} };
@@ -135,12 +252,97 @@ function Breadcrumb({ name, onDropRoot }: { name: string; onDropRoot: (slug: str
   );
 }
 
-export function Dashboard({ page = 'recents', folder, menuOpen, onCloseMenu }: { page?: DashboardPage; folder?: string; menuOpen: boolean; onCloseMenu: () => void }) {
+/** Kontrol urut halaman Files (desain "Filter Bar" → "Sort": Last edited ▾). */
+function SortControl({ sort, onSort }: { sort: SortKey; onSort: (s: SortKey) => void }) {
+  const [at, setAt] = useState<{ x: number; y: number } | undefined>(undefined);
+  return (
+    <>
+      <button
+        type="button"
+        className="sort-btn"
+        aria-haspopup="menu"
+        aria-expanded={!!at}
+        aria-label={`Sort by ${SORT_LABEL[sort]}`}
+        onClick={(e) => {
+          const r = e.currentTarget.getBoundingClientRect();
+          setAt({ x: r.right - 180, y: r.bottom + 4 });
+        }}
+      >
+        <Icon name="arrowDownUp" size={14} />
+        <span className="sort-label">{SORT_LABEL[sort]}</span>
+        <Icon name="chevronDown" size={12} className="sort-chevron" />
+      </button>
+      {at && (
+        <Menu
+          x={at.x}
+          y={at.y}
+          onClose={() => setAt(undefined)}
+          items={SORT_KEYS.map((k) => ({
+            label: SORT_LABEL[k],
+            checked: k === sort,
+            run: () => {
+              setAt(undefined);
+              onSort(k);
+            },
+          }))}
+        />
+      )}
+    </>
+  );
+}
+
+/** Stream aktivitas agen: badge Live dan muat ulang daftar saat agen selesai mengubah dokumen. */
+function useLive(onDocChange: () => void) {
+  const [activity, dispatch] = useReducer(activityReducer, initialActivity);
+  const change = useRef(onDocChange);
+  change.current = onDocChange;
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const onEvent = (event: ActivityEvent) => {
+      dispatch({ type: 'event', event });
+      // Execute/rename agen selesai (rev baru) → daftar + thumbnail usang. Digabung supaya rentetan call cukup sekali.
+      if (event.type === 'call' && event.call.status !== 'running' && event.call.status !== 'error' && typeof event.call.rev === 'number') {
+        clearTimeout(timer);
+        timer = setTimeout(() => change.current(), 400);
+      }
+    };
+    const stop = connectActivity({
+      onHello: (hello) => dispatch({ type: 'hello', hello }),
+      onEvent,
+      onConnection: (connected) => dispatch({ type: 'connection', connected }),
+      onReconnect: () => change.current(),
+    });
+    return () => {
+      clearTimeout(timer);
+      stop();
+    };
+  }, []);
+  const now = useNow(10_000);
+  return useMemo(() => liveDocs(activity, now), [activity, now]);
+}
+
+export function Dashboard({
+  page = 'recents',
+  folder,
+  menuOpen,
+  onCloseMenu,
+  onOpenMenu,
+}: {
+  page?: DashboardPage;
+  folder?: string;
+  menuOpen: boolean;
+  onCloseMenu: () => void;
+  /** Tombol menu top bar tablet/mobile (laci sidebar). */
+  onOpenMenu?: () => void;
+}) {
   const [docs, setDocs] = useState<DocSummary[] | undefined>(undefined);
   const [archive, setArchive] = useState<DocSummary[] | undefined>(undefined);
   const [error, setError] = useState<string | undefined>(undefined);
+  /** lakard tidak terjangkau saat memuat (desain "Dashboard — Offline": "Can't load your files"). */
+  const [offline, setOffline] = useState(false);
   const [status, setStatus] = useState<DaemonStatus | undefined>(undefined);
-  const [view, setView] = useState<View>(loadView);
+  const [view, setView] = useState<View>(() => (stored(VIEW_KEY) === 'list' ? 'list' : 'grid'));
+  const [sort, setSort] = useState<SortKey>(() => parseSort(stored(SORT_KEY)));
   const [query, setQuery] = useState('');
   const [menu, setMenu] = useState<MenuState | undefined>(undefined);
   /** Nama awal dialog New file; `undefined` = dialog tertutup. */
@@ -159,10 +361,17 @@ export function Dashboard({ page = 'recents', folder, menuOpen, onCloseMenu }: {
   const load = useCallback(() => {
     setError(undefined);
     const fail = (e: unknown) => {
-      if (!(e instanceof OfflineError)) setError(errorText(e));
+      if (e instanceof OfflineError) setOffline(true);
+      else setError(fileErrorText(e, 'load', undefined, errorText));
     };
-    api.listDocs().then(setDocs, fail);
-    if (page === 'archive') api.listArchive().then(setArchive, fail);
+    const ok =
+      <T,>(set: (v: T) => void) =>
+      (v: T) => {
+        setOffline(false);
+        set(v);
+      };
+    api.listDocs().then(ok(setDocs), fail);
+    if (page === 'archive') api.listArchive().then(ok(setArchive), fail);
     if (page === 'files')
       api.listFolders().then(
         (s) => {
@@ -171,7 +380,7 @@ export function Dashboard({ page = 'recents', folder, menuOpen, onCloseMenu }: {
         },
         (e: unknown) => {
           setFolderState((s) => s ?? NO_FOLDERS);
-          setFolderError(errorText(e));
+          if (!(e instanceof OfflineError)) setFolderError(fileErrorText(e, 'folder', undefined, errorText));
         },
       );
     api.status().then(setStatus, () => {});
@@ -186,18 +395,34 @@ export function Dashboard({ page = 'recents', folder, menuOpen, onCloseMenu }: {
     document.addEventListener('visibilitychange', onVisible);
     return () => document.removeEventListener('visibilitychange', onVisible);
   }, [load]);
+  const live = useLive(load);
   useEffect(() => {
     setMenu(undefined);
     setFolderMenu(undefined);
   }, [page, folder]);
 
+  // Ctrl/⌘ F: fokus Search yang terlihat (sidebar desktop / top bar tablet). Abaikan saat dialog/menu terbuka.
+  useEffect(() => {
+    const onKey = (e: globalThis.KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || e.shiftKey || e.altKey || e.key.toLowerCase() !== 'f') return;
+      if (document.querySelector('.modal-scrim, .menu-layer')) return;
+      const input = [...document.querySelectorAll<HTMLInputElement>('.dashboard .search input')].find((el) => el.offsetParent !== null);
+      if (!input) return;
+      e.preventDefault();
+      input.focus();
+      input.select();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
   const changeView = (v: View) => {
     setView(v);
-    try {
-      localStorage.setItem(VIEW_KEY, v);
-    } catch {
-      // penyimpanan tidak tersedia: tetap jalan
-    }
+    store(VIEW_KEY, v);
+  };
+  const changeSort = (s: SortKey) => {
+    setSort(s);
+    store(SORT_KEY, s);
   };
 
   const folders = folderState?.folders ?? NO_FOLDERS.folders;
@@ -216,9 +441,9 @@ export function Dashboard({ page = 'recents', folder, menuOpen, onCloseMenu }: {
   }, [archivedPage, archive, filesPage, docs, folderState, membership, currentFolder]);
   const shown = useMemo(() => {
     const q = query.trim().toLowerCase();
-    const hit = (list ?? []).filter((d) => d.slug.includes(q));
-    return page === 'files' ? byName(hit) : hit;
-  }, [list, query, page]);
+    const hit = (list ?? []).filter((d) => d.slug.toLowerCase().includes(q));
+    return filesPage ? sortDocs(hit, sort) : hit;
+  }, [list, query, filesPage, sort]);
   /** Jumlah file aktif per folder (meta Folder Item). */
   const counts = useMemo(() => {
     const n = new Map<string, number>();
@@ -228,11 +453,11 @@ export function Dashboard({ page = 'recents', folder, menuOpen, onCloseMenu }: {
     }
     return n;
   }, [docs, membership]);
-  const showFolders = filesPage && folder === undefined && folders.length > 0 && !error;
+  const showFolders = filesPage && folder === undefined && folders.length > 0 && !error && !offline;
   const moveTo = useCallback(
     (slug: string, id: string | null) => {
       if (memberOf(membership, slug) === id) return;
-      api.moveToFolder(slug, id).catch((e: unknown) => setNotice(errorText(e)));
+      api.moveToFolder(slug, id).catch((e: unknown) => setNotice(fileErrorText(e, 'move', slug, errorText)));
     },
     [membership],
   );
@@ -249,21 +474,217 @@ export function Dashboard({ page = 'recents', folder, menuOpen, onCloseMenu }: {
   // dimuat, selain itu pratinjau mengandalkan hasil server.
   const taken = useMemo(() => new Set([...(docs ?? []), ...(archive ?? [])].map((d) => d.slug)), [docs, archive]);
   const duplicate = useCallback((slug: string) => {
-    api.duplicateFile(slug).catch((e: unknown) => setNotice(errorText(e)));
+    api.duplicateFile(slug).catch((e: unknown) => setNotice(fileErrorText(e, 'duplicate', slug, errorText)));
   }, []);
   const handlers = fileHandlers(archivedPage, setMenu, duplicate);
 
   const newFileBtn = (
     <button type="button" className="btn primary new-file-btn" aria-label="New file" onClick={() => setCreating('Untitled')}>
-      <Icon name="plus" size={14} />
+      <Icon name="plus" size={15} />
       <span className="btn-label">New file</span>
     </button>
   );
   const dragProps = (slug: string) => (filesPage ? dragSource(slug) : {});
   const menuFolder = folderMenu ? folders.find((f) => f.id === folderMenu.id) : undefined;
+  /** Recents tanpa file sama sekali: first-run (desain "Recents — Empty"), tanpa view toggle. */
+  const firstRun = page === 'recents' && docs !== undefined && docs.length === 0 && !error && !offline;
+  const loadFailed = !!error || offline;
+  const showToggle = !loadFailed && !folderMissing && !firstRun && !(archivedPage && archive?.length === 0) && !(list?.length === 0 && !showFolders);
+
+  // Tombol search mobile: buka laci lalu fokus Search sidebar sesudah laci ter-render terlihat (efek di bawah).
+  const focusSearch = useRef(false);
+  const openSearch = () => {
+    focusSearch.current = true;
+    if (menuOpen) document.querySelector<HTMLInputElement>('.sidebar .search input')?.focus();
+    else onOpenMenu?.();
+  };
+  // Laci terbuka: Escape menutupnya (Search menghentikan Escape miliknya sendiri lebih dulu).
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onKey = (e: globalThis.KeyboardEvent) => {
+      if (e.key === 'Escape' && !document.querySelector('.modal-scrim, .menu-layer')) onCloseMenu();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [menuOpen, onCloseMenu]);
+  useEffect(() => {
+    if (!menuOpen || !focusSearch.current) return;
+    focusSearch.current = false;
+    document.querySelector<HTMLInputElement>('.sidebar .search input')?.focus();
+  }, [menuOpen]);
+  const searchDocsList = error || archivedPage ? undefined : docs;
+
+  let body: ReactNode;
+  if (folderMissing)
+    body = (
+      <EmptyState
+        icon="folder"
+        title="Folder not found"
+        action={
+          <a className="btn" href={folderHash()}>
+            <Icon name="file" size={15} /> Go to Files
+          </a>
+        }
+      >
+        It may have been deleted in another window.
+      </EmptyState>
+    );
+  else if (offline && (list === undefined || list.length === 0) && !showFolders)
+    body = (
+      <EmptyState
+        icon="wifiOff"
+        title="Can't load your files"
+        className="centered"
+        action={
+          <a className="btn" href={CONNECTIONS_HASH}>
+            <Icon name="plug" size={15} /> Open Connections
+          </a>
+        }
+      >
+        Lakar lists files through lakard. They'll appear as soon as it's running again.
+      </EmptyState>
+    );
+  else if (error || folderLoadFailed)
+    body = (
+      <EmptyState
+        icon="alert"
+        title={error ? "Couldn't load your files" : "Couldn't load folders"}
+        className="centered"
+        action={
+          <button type="button" className="btn" onClick={load}>
+            <Icon name="refresh" size={15} /> Try again
+          </button>
+        }
+      >
+        {error ?? folderError}
+      </EmptyState>
+    );
+  else if (list === undefined)
+    body = (
+      <div className="file-grid" aria-busy="true" aria-label="Loading files">
+        {[0, 1, 2].map((i) => (
+          <div key={i} className="card loading">
+            <div className="card-header">
+              <span className="skeleton-line wide" />
+              <span className="skeleton-line" />
+            </div>
+            <div className="thumb large skeleton-thumb">
+              <div className="skeleton" />
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  else if (firstRun) body = <FirstRun />;
+  else if (list.length === 0 && currentFolder)
+    body = (
+      <EmptyState icon="folder" title="This folder is empty" action={newFileBtn}>
+        Drag files onto the folder, or use Move to… in a file’s menu. New files created here go into this folder.
+      </EmptyState>
+    );
+  else if (list.length === 0 && showFolders) body = <div className="folder-root-empty">{docs?.length ? 'All files are in folders.' : 'No files yet.'}</div>;
+  else if (list.length === 0)
+    body = archivedPage ? (
+      <EmptyState
+        icon="archive"
+        title="Nothing in archive"
+        className="centered"
+        action={
+          <a className="btn" href="#/files">
+            <Icon name="file" size={15} /> Go to Files
+          </a>
+        }
+      >
+        Archived files are hidden from Recents. You can restore them anytime.
+      </EmptyState>
+    ) : (
+      <EmptyState icon="file" title="No files yet" action={newFileBtn}>
+        Create a file here, or ask your agent to create one with the lakar MCP tools.
+      </EmptyState>
+    );
+  else if (shown.length === 0)
+    body = (
+      <EmptyState icon="searchX" title={`No results for “${query.trim()}”`} action={!archivedPage ? newFileBtn : undefined}>
+        Try a different name.
+      </EmptyState>
+    );
+  else if (view === 'grid')
+    body = (
+      <div className="file-grid">
+        {shown.map((d) => {
+          const h = handlers(d);
+          const l = archivedPage ? undefined : live.get(d.slug);
+          return (
+            <div key={d.slug} className={`card${menu?.slug === d.slug ? ' menu-open' : ''}`} onClick={h.open} onContextMenu={h.menuAt} {...dragProps(d.slug)}>
+              <div className="card-header">
+                <div className="card-title-row">
+                  <FileLink d={d} archived={archivedPage} className="card-title" onOpen={h.open} onKeyDown={h.onKeyDown} />
+                  {l && <LiveBadge live={l} />}
+                  <MoreButton onClick={h.menuBelow} />
+                </div>
+                <span className="card-subtitle">{archivedPage ? docSubtitle(d) : liveSubtitle(l, d)}</span>
+              </div>
+              <Thumb doc={d} size="large" archived={archivedPage} />
+            </div>
+          );
+        })}
+      </div>
+    );
+  else
+    body = (
+      <div className="file-list">
+        <div className="list-head" aria-hidden="true">
+          <span>Name</span>
+          <span>Edited</span>
+          <span>Boards</span>
+          <span>Revision</span>
+          <span />
+        </div>
+        <div role="list" aria-label={currentFolder ? currentFolder.name : TITLES[page as keyof typeof TITLES]}>
+          {shown.map((d) => {
+            const h = handlers(d);
+            const l = archivedPage ? undefined : live.get(d.slug);
+            return (
+              <div key={d.slug} role="listitem" className={`list-row${menu?.slug === d.slug ? ' menu-open' : ''}`} onClick={h.open} onContextMenu={h.menuAt} {...dragProps(d.slug)}>
+                <span className="list-name">
+                  <Thumb doc={d} size="mini" archived={archivedPage} />
+                  <span className="list-text">
+                    <span className="list-title-row">
+                      <FileLink d={d} archived={archivedPage} className="list-title" onOpen={h.open} onKeyDown={h.onKeyDown} />
+                      {l && <LiveBadge live={l} />}
+                    </span>
+                    <span className="list-sub">{l?.running ? `${l.label} is editing…` : `Edited ${relativeTime(d.updatedAt)}`}</span>
+                  </span>
+                </span>
+                <span className="list-col">{relativeTime(d.updatedAt)}</span>
+                <span className="list-col">{d.boardCount}</span>
+                <span className="list-col mono">r{d.rev}</span>
+                <MoreButton onClick={h.menuBelow} />
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
 
   return (
     <div className="dashboard">
+      <header className="dash-topbar">
+        <button type="button" className="topbar-btn" aria-label="Menu" aria-expanded={menuOpen} onClick={onOpenMenu}>
+          <Icon name="menu" size={18} />
+        </button>
+        <div className="topbar-profile">
+          <span className="avatar">L</span>
+          <span className="profile-name">Lakar</span>
+        </div>
+        <div className="spacer" />
+        <div className="topbar-search">
+          <Search docs={searchDocsList} query={query} onQuery={setQuery} onCreate={setCreating} />
+        </div>
+        <button type="button" className="topbar-btn topbar-search-btn" aria-label="Search" onClick={openSearch}>
+          <Icon name="search" size={18} />
+        </button>
+      </header>
       {menuOpen && <div className="scrim" onClick={onCloseMenu} />}
       <aside className={`sidebar${menuOpen ? ' open' : ''}`}>
         <div className="sidebar-top">
@@ -271,46 +692,34 @@ export function Dashboard({ page = 'recents', folder, menuOpen, onCloseMenu }: {
             <span className="avatar">L</span>
             <span className="profile-name">Lakar</span>
           </div>
-          <Search docs={error || archivedPage ? undefined : docs} query={query} onQuery={setQuery} onCreate={setCreating} />
-          <nav className="nav">
-            <a className={`nav-item${page === 'recents' ? ' active' : ''}`} href="#/">
+          <Search docs={searchDocsList} query={query} onQuery={setQuery} onCreate={setCreating} />
+          <nav className="nav" aria-label="Dashboard">
+            <a className={`nav-item${page === 'recents' ? ' active' : ''}`} href="#/" aria-current={page === 'recents' ? 'page' : undefined}>
               <Icon name="clock" size={16} />
               <span>Recents</span>
             </a>
           </nav>
         </div>
-        <div className="sidebar-section">
+        <nav className="sidebar-section" aria-label="Local workspace">
           <div className="nav-item static">
             <Icon name="layers" size={16} />
             <span className="nav-strong">Local workspace</span>
             <span className="badge">Local</span>
           </div>
-          <a className={`nav-item${page === 'files' ? ' active' : ''}`} href="#/files">
+          <a className={`nav-item${filesPage ? ' active' : ''}`} href="#/files" aria-current={filesPage ? 'page' : undefined}>
             <Icon name="file" size={16} />
             <span>Files</span>
           </a>
-          <a className={`nav-item${page === 'archive' ? ' active' : ''}`} href="#/archive">
+          <a className={`nav-item${archivedPage ? ' active' : ''}`} href="#/archive" aria-current={archivedPage ? 'page' : undefined}>
             <Icon name="archive" size={16} />
             <span>Archive</span>
           </a>
-          <a className={`nav-item${settingsPage ? ' active' : ''}`} href={SETTINGS_HASH}>
+          <a className={`nav-item${settingsPage ? ' active' : ''}`} href={SETTINGS_HASH} aria-current={settingsPage ? 'page' : undefined}>
             <Icon name="settings" size={16} />
             <span>Settings</span>
           </a>
-        </div>
-        <div className="connect-card">
-          <div className="connect-title">
-            <Icon name="plug" size={14} />
-            Connect an agent
-          </div>
-          <p>Point Claude Code, Codex, or any ACP harness at the lakar MCP server. Designs show up here as the agent works.</p>
-          <div className="connect-actions">
-            <CopyMcpConfig />
-            <a className="link-btn" href={CONNECTIONS_HASH}>
-              All harnesses
-            </a>
-          </div>
-        </div>
+        </nav>
+        <ConnectCard />
         <div className="sidebar-spacer" />
         <footer className="sidebar-footer">{status ? `lakard ${status.version} · ${status.host}:${status.port}` : 'lakard'}</footer>
       </aside>
@@ -318,9 +727,9 @@ export function Dashboard({ page = 'recents', folder, menuOpen, onCloseMenu }: {
       {settingsPage ? (
         <SettingsLayout tab={page === 'connections' ? 'connections' : 'general'}>{page === 'connections' ? <Connections /> : <SettingsGeneral />}</SettingsLayout>
       ) : (
-        <section className="main">
+        <section className={`main${filesPage ? ' files-page' : ''}${view === 'list' ? ' list-view' : ''}`}>
           <div className="main-header">
-            {currentFolder ? <Breadcrumb name={currentFolder.name} onDropRoot={(slug) => moveTo(slug, null)} /> : <h1>{TITLES[page]}</h1>}
+            {currentFolder ? <Breadcrumb name={currentFolder.name} onDropRoot={(slug) => moveTo(slug, null)} /> : <h1>{TITLES[page as keyof typeof TITLES]}</h1>}
             {currentFolder && (
               <button
                 type="button"
@@ -336,19 +745,19 @@ export function Dashboard({ page = 'recents', folder, menuOpen, onCloseMenu }: {
               </button>
             )}
             <div className="spacer" />
-            {filesPage && folder === undefined && folderState !== undefined && (
-              <button type="button" className="btn" onClick={() => setNewFolder(true)}>
-                <Icon name="folderPlus" size={14} />
-                New folder
+            {filesPage && folder === undefined && folderState !== undefined && !loadFailed && (
+              <button type="button" className="btn new-folder-btn" aria-label="New folder" onClick={() => setNewFolder(true)}>
+                <Icon name="folderPlus" size={15} />
+                <span className="btn-label">New folder</span>
               </button>
             )}
             {!archivedPage && !folderMissing && newFileBtn}
-            {!(archivedPage && archive?.length === 0) && !folderMissing && (
+            {showToggle && (
               <div className="view-toggle" role="group" aria-label="View">
-                <button type="button" className={view === 'grid' ? 'active' : ''} aria-pressed={view === 'grid'} aria-label="Grid view" onClick={() => changeView('grid')}>
+                <button type="button" className={view === 'grid' ? 'active' : ''} aria-pressed={view === 'grid'} aria-label="Grid view" title="Grid view" onClick={() => changeView('grid')}>
                   <Icon name="layoutGrid" />
                 </button>
-                <button type="button" className={view === 'list' ? 'active' : ''} aria-pressed={view === 'list'} aria-label="List view" onClick={() => changeView('list')}>
+                <button type="button" className={view === 'list' ? 'active' : ''} aria-pressed={view === 'list'} aria-label="List view" title="List view" onClick={() => changeView('list')}>
                   <Icon name="list" />
                 </button>
               </div>
@@ -365,9 +774,16 @@ export function Dashboard({ page = 'recents', folder, menuOpen, onCloseMenu }: {
             </div>
           )}
 
+          {filesPage && !loadFailed && !folderMissing && (list?.length ?? 0) > 0 && (
+            <div className="filter-bar">
+              <div className="spacer" />
+              <SortControl sort={sort} onSort={changeSort} />
+            </div>
+          )}
+
           {showFolders && (
             <>
-              <div className="section-label">Folders</div>
+              <h2 className="section-label">Folders</h2>
               <div className="folder-grid">
                 {byFolderName(folders).map((f) => (
                   <FolderItem
@@ -380,131 +796,11 @@ export function Dashboard({ page = 'recents', folder, menuOpen, onCloseMenu }: {
                   />
                 ))}
               </div>
-              <div className="section-label">Files</div>
+              <h2 className="section-label">Files</h2>
             </>
           )}
 
-          {folderMissing ? (
-            <div className="empty-state">
-              <span className="empty-icon">
-                <Icon name="folder" size={20} />
-              </span>
-              <strong>Folder not found</strong>
-              <span>It may have been deleted in another window.</span>
-              <a className="btn" href={folderHash()}>
-                <Icon name="file" size={14} /> Go to Files
-              </a>
-            </div>
-          ) : error || folderLoadFailed ? (
-            <div className="empty-state">
-              <Icon name="alert" size={22} />
-              <strong>{error ? "Couldn't load documents" : "Couldn't load folders"}</strong>
-              <span>{error ?? folderError}</span>
-              <button type="button" className="btn" onClick={load}>
-                <Icon name="refresh" size={14} /> Try again
-              </button>
-            </div>
-          ) : list === undefined ? (
-            <div className="file-grid" aria-busy="true">
-              {[0, 1, 2].map((i) => (
-                <div key={i} className="card loading">
-                  <div className="card-header">
-                    <div className="skeleton line" />
-                    <div className="skeleton line short" />
-                  </div>
-                  <div className="thumb large">
-                    <div className="skeleton" />
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : list.length === 0 && currentFolder ? (
-            <div className="empty-state">
-              <span className="empty-icon">
-                <Icon name="folder" size={20} />
-              </span>
-              <strong>This folder is empty</strong>
-              <span>Drag files onto the folder, or use Move to… in a file’s menu. New files created here go into this folder.</span>
-              {newFileBtn}
-            </div>
-          ) : list.length === 0 && showFolders ? (
-            <div className="folder-root-empty">{docs?.length ? 'All files are in folders.' : 'No files yet.'}</div>
-          ) : list.length === 0 ? (
-            archivedPage ? (
-              <div className="empty-state archive-empty">
-                <span className="empty-icon">
-                  <Icon name="archive" size={20} />
-                </span>
-                <strong>Nothing in archive</strong>
-                <span>Archived files are hidden from Recents. You can restore them anytime.</span>
-                <a className="btn" href="#/files">
-                  <Icon name="file" size={14} /> Go to Files
-                </a>
-              </div>
-            ) : (
-              <div className="empty-state">
-                <Icon name="file" size={22} />
-                <strong>No designs yet</strong>
-                <span>Create a file, or ask your agent to create one with the lakar MCP tools. It will appear here.</span>
-                {newFileBtn}
-              </div>
-            )
-          ) : shown.length === 0 ? (
-            <div className="empty-state">
-              <Icon name="search" size={22} />
-              <strong>No results for “{query}”</strong>
-              <span>Try a different name.</span>
-              {!archivedPage && newFileBtn}
-            </div>
-          ) : view === 'grid' ? (
-            <div className="file-grid">
-              {shown.map((d) => {
-                const { menuBelow, ...h } = handlers(d);
-                return (
-                  <div key={d.slug} className={`card${menu?.slug === d.slug ? ' menu-open' : ''}`} aria-label={d.slug} {...h} {...dragProps(d.slug)}>
-                    <div className="card-header">
-                      <div className="card-title-row">
-                        <span className="card-title">{d.slug}</span>
-                        <MoreButton onClick={menuBelow} />
-                      </div>
-                      <span className="card-subtitle">{docSubtitle(d)}</span>
-                    </div>
-                    <Thumb doc={d} size="large" archived={archivedPage} />
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="file-list" role="list">
-              <div className="list-head">
-                <span>Name</span>
-                <span>Boards</span>
-                <span>Revision</span>
-                <span>Updated</span>
-                <span />
-              </div>
-              {shown.map((d) => {
-                const { menuBelow, ...h } = handlers(d);
-                return (
-                  <div key={d.slug} role="listitem">
-                    <div className={`list-row${menu?.slug === d.slug ? ' menu-open' : ''}`} aria-label={d.slug} {...h} {...dragProps(d.slug)}>
-                      <span className="list-name">
-                        <Thumb doc={d} size="mini" archived={archivedPage} />
-                        <span className="list-text">
-                          <span className="list-title">{d.slug}</span>
-                          <span className="list-sub">Edited {relativeTime(d.updatedAt)}</span>
-                        </span>
-                      </span>
-                      <span>{d.boardCount}</span>
-                      <span className="mono">r{d.rev}</span>
-                      <span>{relativeTime(d.updatedAt)}</span>
-                      <MoreButton onClick={menuBelow} />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+          {body}
         </section>
       )}
       {menu && (
@@ -514,6 +810,7 @@ export function Dashboard({ page = 'recents', folder, menuOpen, onCloseMenu }: {
           {...(menu.dialog ? { dialog: menu.dialog } : {})}
           archived={archivedPage}
           port={status?.port}
+          taken={taken}
           {...(filesPage && folderState ? { folders, folderOf: memberOf(membership, menu.slug) } : {})}
           onClose={() => setMenu(undefined)}
           onError={setNotice}

@@ -1,7 +1,7 @@
-// Settings (desain 02 "Settings — Dark/Light", tablet/mobile): judul + sub-nav General / Connections (desktop: kolom
-// 200px di kiri; ≤768px: tab horizontal di atas). General berisi Appearance (Light / Dark / System, theme.ts) dan
-// bagian lokal dari `GET /status` (folder data, alamat server, versi). Profile, Language, Notifications sengaja
-// tidak ada (aplikasi lokal tanpa akun).
+// Settings (desain 02 "Settings — Dark/Light", tablet/mobile): judul (nama tab) + sub-nav General / Connections
+// (desktop: kolom 200px di kiri; ≤768px: tab horizontal di atas). General berisi Appearance (Light / Dark / System,
+// theme.ts) dan bagian lokal dari `GET /status` (folder data, alamat server, versi). Profile, Language, Notifications
+// sengaja tidak ada (aplikasi lokal tanpa akun, UI hanya bahasa Inggris, isi Notifications belum didesain).
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { api, type DaemonStatus } from './api';
 import { CopyButton } from './Connections';
@@ -22,7 +22,8 @@ export function SettingsLayout({ tab, children }: { tab: SettingsTab; children: 
   return (
     <section className="main settings-main">
       <div className="main-header">
-        <h1>Settings</h1>
+        {/* Desain: judul halaman mengikuti tab ("Settings" / "Connections"). */}
+        <h1>{tab === 'connections' ? 'Connections' : 'Settings'}</h1>
       </div>
       <div className="settings-body">
         <nav className="settings-nav" aria-label="Settings">
@@ -69,9 +70,9 @@ function ThemePreview({ pref }: { pref: ThemePref }) {
 function Appearance() {
   const [pref, setPref] = useTheme();
   return (
-    <div className="theme-options" role="group" aria-label="Theme">
+    <div className="theme-options" role="radiogroup" aria-label="Theme">
       {THEME_PREFS.map((p) => (
-        <button key={p} type="button" aria-pressed={pref === p} className={`theme-option${pref === p ? ' active' : ''}`} onClick={() => setPref(p)}>
+        <button key={p} type="button" role="radio" aria-checked={pref === p} className={`theme-option${pref === p ? ' active' : ''}`} onClick={() => setPref(p)}>
           <ThemePreview pref={p} />
           <span className="theme-label">
             <span className="radio" />

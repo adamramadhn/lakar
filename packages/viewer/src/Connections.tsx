@@ -1,11 +1,13 @@
-// Settings → Connections (desain `lakar-ui.pen` node e7hIme): kartu status lakard, "Add an agent" bertab dengan
-// config MCP stdio + Copy, dan "Tools exposed". Daftar "Connected agents" per harness sengaja belum ada (butuh
-// identitas harness). Data dari `GET /viewer/connections` (URL lakard sebenarnya) dan `GET /status` (pool render).
-import { useCallback, useEffect, useState } from 'react';
+// Settings → Connections (desain `lakar-ui.pen` node e7hIme): kartu status lakard, "Connected agents" (sesi MCP dari
+// stream aktivitas, Live/Idle), "Add an agent" bertab dengan config MCP stdio + Copy, dan "Tools exposed". Data dari
+// `GET /viewer/connections` (URL lakard sebenarnya), `GET /status` (pool render), dan `GET /viewer/events` (sesi).
+import { useCallback, useEffect, useMemo, useReducer, useState } from 'react';
+import { activityReducer, connectActivity, initialActivity, shortAgo } from './activity';
 import { api, errorText, type Connections as ConnectionsInfo, type DaemonStatus, type McpServerConfig } from './api';
 import { HARNESSES, MCP_TOOLS, nonDefaultPort } from './harnesses';
-import { useRetry } from './hooks';
+import { useNow, useRetry } from './hooks';
 import { Icon } from './icons';
+import { agentRows } from './live';
 
 /** Status lakard untuk kartu: `undefined` = belum ada jawaban, `null` = permintaan gagal. */
 type StatusState = DaemonStatus | null | undefined;
@@ -96,6 +98,71 @@ function DaemonCard({ info, status }: { info: ConnectionsInfo | undefined; statu
   );
 }
 
+function lastCall(at: string | undefined, now: number): string {
+  if (!at) return 'No calls yet';
+  const ago = shortAgo(Date.parse(at), now);
+  return ago === 'now' ? 'Last call just now' : `Last call ${ago} ago`;
+}
+
+/** "Connected agents" (desain "Agents Card"): sesi MCP yang dikenal lakard sejak mulai, Live dulu. */
+function ConnectedAgents() {
+  const [activity, dispatch] = useReducer(activityReducer, initialActivity);
+  useEffect(
+    () =>
+      connectActivity({
+        onHello: (hello) => dispatch({ type: 'hello', hello }),
+        onEvent: (event) => dispatch({ type: 'event', event }),
+        onConnection: (connected) => dispatch({ type: 'connection', connected }),
+      }),
+    [],
+  );
+  const now = useNow(10_000);
+  const rows = useMemo(() => agentRows(activity, now), [activity, now]);
+  return (
+    <section className="conn-section">
+      <h2>Connected agents</h2>
+      <p>Harnesses currently talking to Lakar over MCP.</p>
+      <div className="conn-card conn-agents">
+        {rows.length === 0 ? (
+          <div className="conn-agent empty">
+            <span className="conn-agent-icon idle">
+              <Icon name="plug" size={16} />
+            </span>
+            <span className="conn-agent-info">
+              <span className="conn-agent-title">
+                <strong>No agents yet</strong>
+              </span>
+              <span className="conn-agent-sub">{activity.connected ? 'Add the MCP config below to connect one.' : 'Waiting for lakard…'}</span>
+            </span>
+          </div>
+        ) : (
+          rows.map((r) => (
+            <div key={r.id} className="conn-agent">
+              <span className={`conn-agent-icon ${r.color}`}>
+                <Icon name="squareTerminal" size={16} />
+              </span>
+              <span className="conn-agent-info">
+                <span className="conn-agent-title">
+                  <strong>{r.label}</strong>
+                  <span className={`conn-agent-status${r.live ? ` live ${r.color}` : ''}`}>
+                    <i />
+                    {r.live ? 'Live' : 'Idle'}
+                  </span>
+                </span>
+                <span className="conn-agent-sub">
+                  {r.live
+                    ? `Session ${r.id.slice(0, 4)} · ${r.executes} execute${r.executes === 1 ? '' : 's'}${r.activeSlug ? ` · open: ${r.activeSlug}` : ''}`
+                    : `${lastCall(r.lastAt, now)} · ${r.executes} execute${r.executes === 1 ? '' : 's'}`}
+                </span>
+              </span>
+            </div>
+          ))
+        )}
+      </div>
+    </section>
+  );
+}
+
 function AddAgent({ mcp, url }: { mcp: McpServerConfig | null; url: string }) {
   const [tab, setTab] = useState(HARNESSES[0]!.id);
   const harness = HARNESSES.find((h) => h.id === tab) ?? HARNESSES[0]!;
@@ -113,7 +180,8 @@ function AddAgent({ mcp, url }: { mcp: McpServerConfig | null; url: string }) {
       {mcp ? (
         <>
           <div className="conn-code-head">
-            <span className="mono">{harness.file}</span>
+            <Icon name="file" size={14} />
+            <span className="mono conn-code-file">{harness.file}</span>
             <CopyButton text={snippet} />
           </div>
           <pre className="conn-code" role="tabpanel">
@@ -169,6 +237,8 @@ export function Connections() {
   return (
     <div className="connections">
       <DaemonCard info={info} status={status} />
+
+      <ConnectedAgents />
 
       <section className="conn-section">
         <h2>Add an agent</h2>

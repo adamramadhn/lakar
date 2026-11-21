@@ -6,7 +6,7 @@
 import { useLayoutEffect, useRef, useState } from 'react';
 import { api, errorText, type Folder } from './api';
 import { copyText } from './Connections';
-import { docHash, docLink, slugify } from './files';
+import { docHash, docLink, fileErrorText, slugify, type FileOp } from './files';
 import { MoveToDialog } from './Folders';
 import { Icon, type IconName } from './icons';
 import { Modal } from './NewFileDialog';
@@ -15,20 +15,46 @@ import { openInNewTab } from './tabs';
 export type MenuTarget = { slug: string; x: number; y: number };
 export type FileAction = 'rename' | 'delete' | 'duplicate' | 'archive';
 
-export type Item = { label: string; icon: IconName; shortcut?: string; danger?: boolean; separator?: boolean; disabled?: boolean; title?: string; run: () => void };
+const IS_MAC = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
+
+/**
+ * Pintasan kartu/baris file (dipegang tautan judul): label menu, nilai `aria-keyshortcuts`, dan tooltip. Ctrl D di
+ * macOS = ⌘D (Dashboard menerima keduanya).
+ */
+export const SHORTCUT = {
+  rename: { label: 'F2', aria: 'F2' },
+  duplicate: { label: IS_MAC ? '⌘D' : 'Ctrl D', aria: IS_MAC ? 'Meta+D' : 'Control+D' },
+  delete: { label: 'Del', aria: 'Delete' },
+  open: { label: '↵', aria: 'Enter' },
+  file: {
+    aria: `Enter F2 ${IS_MAC ? 'Meta+D' : 'Control+D'} Delete Shift+F10`,
+    title: `Open (Enter) · Rename (F2) · Duplicate (${IS_MAC ? '⌘D' : 'Ctrl+D'}) · Delete (Del) · More (Shift+F10)`,
+  },
+  archived: { aria: 'Delete Shift+F10', title: 'Actions (Enter) · Delete (Del)' },
+} as const;
+
+/** `icon` kosong → ruang kosong selebar ikon; `checked` → ikon centang + `menuitemradio`. `keys` = `aria-keyshortcuts`. */
+export type Item = { label: string; icon?: IconName; shortcut?: string; keys?: string; checked?: boolean; danger?: boolean; separator?: boolean; disabled?: boolean; title?: string; run: () => void };
 
 export function Menu({ x, y, items, onClose }: { x: number; y: number; items: Item[]; onClose: () => void }) {
   const ref = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState({ left: x, top: y });
+  // Menu ditutup → fokus kembali ke pemicu (tautan kartu, tombol "…") bila masih ada.
+  useLayoutEffect(() => {
+    const before = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    return () => {
+      if (before?.isConnected && !ref.current?.contains(before)) before.focus({ preventScroll: true });
+    };
+  }, []);
   useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
     const r = el.getBoundingClientRect();
     setPos({ left: Math.max(8, Math.min(x, window.innerWidth - r.width - 8)), top: Math.max(8, Math.min(y, window.innerHeight - r.height - 8)) });
-    el.querySelector<HTMLElement>('[role=menuitem]:not(:disabled)')?.focus();
+    (el.querySelector<HTMLElement>('[aria-checked=true]') ?? el.querySelector<HTMLElement>('.menu-item:not(:disabled)'))?.focus();
   }, [x, y]);
   const move = (d: number) => {
-    const all = [...(ref.current?.querySelectorAll<HTMLElement>('[role=menuitem]:not(:disabled)') ?? [])];
+    const all = [...(ref.current?.querySelectorAll<HTMLElement>('.menu-item:not(:disabled)') ?? [])];
     const i = all.indexOf(document.activeElement as HTMLElement);
     all[(i + d + all.length) % all.length]?.focus();
   };
@@ -56,16 +82,33 @@ export function Menu({ x, y, items, onClose }: { x: number; y: number; items: It
           } else if (e.key === 'ArrowUp') {
             e.preventDefault();
             move(-1);
+          } else if (e.key === 'Home' || e.key === 'End') {
+            e.preventDefault();
+            const all = [...(ref.current?.querySelectorAll<HTMLElement>('.menu-item:not(:disabled)') ?? [])];
+            (e.key === 'Home' ? all[0] : all[all.length - 1])?.focus();
           }
         }}
       >
         {items.map((it) => (
-          <div key={it.label} className="menu-group">
+          <div key={it.label} className="menu-group" role="none">
             {it.separator && <div className="menu-separator" role="separator" />}
-            <button type="button" role="menuitem" className={`menu-item${it.danger ? ' danger' : ''}`} onClick={it.run} disabled={it.disabled} title={it.title}>
-              <Icon name={it.icon} size={15} />
+            <button
+              type="button"
+              role={it.checked === undefined ? 'menuitem' : 'menuitemradio'}
+              {...(it.checked !== undefined ? { 'aria-checked': it.checked } : {})}
+              {...(it.keys ? { 'aria-keyshortcuts': it.keys } : {})}
+              className={`menu-item${it.danger ? ' danger' : ''}`}
+              onClick={it.run}
+              disabled={it.disabled}
+              title={it.title}
+            >
+              {it.icon || it.checked ? <Icon name={it.icon ?? 'check'} size={15} /> : <span className="menu-icon-space" />}
               <span className="menu-label">{it.label}</span>
-              {it.shortcut && <span className="menu-shortcut">{it.shortcut}</span>}
+              {it.shortcut && (
+                <span className="menu-shortcut" aria-hidden="true">
+                  {it.shortcut}
+                </span>
+              )}
             </button>
           </div>
         ))}
@@ -74,20 +117,23 @@ export function Menu({ x, y, items, onClose }: { x: number; y: number; items: It
   );
 }
 
-function RenameDialog({ slug, onClose }: { slug: string; onClose: () => void }) {
+/** `taken`: slug aktif + arsip yang sudah dimuat; bentrok ditolak sebelum dikirim (daemon tetap memeriksa). */
+function RenameDialog({ slug, taken, onClose }: { slug: string; taken: ReadonlySet<string>; onClose: () => void }) {
   const [name, setName] = useState(slug);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | undefined>(undefined);
   const next = slugify(name);
+  const clash = !!next && next !== slug && taken.has(next);
   const submit = async () => {
-    if (!next || busy) return;
+    if (!next || busy || clash) return;
     if (next === slug) return onClose();
     setBusy(true);
+    setError(undefined);
     try {
       await api.renameFile(slug, name);
       onClose();
     } catch (e) {
-      setError(errorText(e));
+      setError(fileErrorText(e, 'rename', next, errorText));
       setBusy(false);
     }
   };
@@ -104,24 +150,43 @@ function RenameDialog({ slug, onClose }: { slug: string; onClose: () => void }) 
         </div>
         <label className="field">
           <span className="field-label">Name</span>
-          <input data-autofocus className="input" value={name} maxLength={200} onChange={(e) => setName(e.target.value)} />
-          <span className={`field-hint${next ? '' : ' danger'}`}>
-            {next ? (
+          <input
+            data-autofocus
+            className="input"
+            value={name}
+            maxLength={200}
+            onChange={(e) => {
+              setName(e.target.value);
+              setError(undefined);
+            }}
+            aria-invalid={!next || clash}
+            aria-describedby="rename-hint"
+          />
+          <span id="rename-hint" className={`field-hint${next && !clash ? '' : ' danger'}`}>
+            {!next ? (
+              'Use letters or numbers in the name.'
+            ) : clash ? (
+              <>
+                A file named <span className="mono">{next}</span> already exists.
+              </>
+            ) : (
               <>
                 Saved as <span className="mono">{next}</span>
               </>
-            ) : (
-              'Use letters or numbers in the name.'
             )}
           </span>
         </label>
-        {error && <div className="modal-error">{error}</div>}
+        {error && (
+          <div className="modal-error" role="alert">
+            {error}
+          </div>
+        )}
         <div className="modal-buttons">
           <button type="button" className="btn" onClick={onClose}>
             Cancel
           </button>
-          <button type="submit" className="btn primary" disabled={!next || busy}>
-            Rename
+          <button type="submit" className="btn primary" disabled={!next || busy || clash}>
+            {busy ? 'Renaming…' : 'Rename'}
           </button>
         </div>
       </form>
@@ -134,16 +199,17 @@ function DeleteDialog({ slug, archived, onClose }: { slug: string; archived: boo
   const [error, setError] = useState<string | undefined>(undefined);
   const confirm = async () => {
     setBusy(true);
+    setError(undefined);
     try {
       await api.deleteFile(slug, archived);
       onClose();
     } catch (e) {
-      setError(errorText(e));
+      setError(fileErrorText(e, 'delete', slug, errorText));
       setBusy(false);
     }
   };
   return (
-    <Modal label="Delete file" onClose={onClose} className="small confirm">
+    <Modal label="Delete file" onClose={onClose} className="small confirm" role="alertdialog">
       <span className="confirm-icon">
         <Icon name="trash" size={18} />
       </span>
@@ -151,14 +217,18 @@ function DeleteDialog({ slug, archived, onClose }: { slug: string; archived: boo
         <h2>Delete “{slug}”?</h2>
         <p>The file and its change history will be removed from this computer. This can't be undone.</p>
       </div>
-      {error && <div className="modal-error">{error}</div>}
+      {error && (
+        <div className="modal-error" role="alert">
+          {error}
+        </div>
+      )}
       <div className="modal-buttons">
         {/* Fokus awal di Cancel: Enter tidak langsung menghapus permanen. */}
         <button type="button" data-autofocus className="btn" onClick={onClose}>
           Cancel
         </button>
         <button type="button" className="btn danger" disabled={busy} onClick={() => void confirm()}>
-          Delete file
+          {busy ? 'Deleting…' : 'Delete file'}
         </button>
       </div>
     </Modal>
@@ -176,6 +246,7 @@ export function FileMenu({
   port,
   folders,
   folderOf,
+  taken = EMPTY,
   onClose,
   onError,
 }: {
@@ -183,6 +254,8 @@ export function FileMenu({
   dialog?: 'rename' | 'delete';
   archived: boolean;
   port: number | undefined;
+  /** Slug terpakai (aktif + arsip yang dimuat) untuk validasi Rename. */
+  taken?: ReadonlySet<string>;
   /** Folder yang sudah dimuat (halaman Files); tanpa ini dialog "Move to…" memuat sendiri. */
   folders?: readonly Folder[];
   /** Folder file ini saat ini (null = root); dipakai bersama `folders`. */
@@ -192,25 +265,26 @@ export function FileMenu({
 }) {
   const [phase, setPhase] = useState<'menu' | 'rename' | 'delete' | 'move'>(dialog ?? 'menu');
   const { slug } = target;
-  const act = (fn: () => Promise<unknown>) => () => {
+  const act = (op: FileOp, fn: () => Promise<unknown>) => () => {
     onClose();
-    fn().catch((e: unknown) => onError(errorText(e)));
+    fn().catch((e: unknown) => onError(fileErrorText(e, op, slug, errorText)));
   };
 
-  if (phase === 'rename') return <RenameDialog slug={slug} onClose={onClose} />;
+  if (phase === 'rename') return <RenameDialog slug={slug} taken={taken} onClose={onClose} />;
   if (phase === 'delete') return <DeleteDialog slug={slug} archived={archived} onClose={onClose} />;
   if (phase === 'move') return <MoveToDialog slug={slug} {...(folders ? { folders, current: folderOf ?? null } : {})} onClose={onClose} onError={onError} />;
 
   const items: Item[] = archived
     ? [
-        { label: 'Unarchive', icon: 'archiveRestore', run: act(() => api.unarchiveFile(slug)) },
-        { label: 'Delete', icon: 'trash', shortcut: 'Del', danger: true, separator: true, run: () => setPhase('delete') },
+        { label: 'Unarchive', icon: 'archiveRestore', run: act('unarchive', () => api.unarchiveFile(slug)) },
+        { label: 'Delete', icon: 'trash', shortcut: SHORTCUT.delete.label, keys: SHORTCUT.delete.aria, danger: true, separator: true, run: () => setPhase('delete') },
       ]
     : [
         {
           label: 'Open',
           icon: 'arrowUpRight',
-          shortcut: '↵',
+          shortcut: SHORTCUT.open.label,
+          keys: SHORTCUT.open.aria,
           run: () => {
             onClose();
             location.hash = docHash(slug);
@@ -224,16 +298,18 @@ export function FileMenu({
             openInNewTab(slug);
           },
         },
-        { label: 'Rename', icon: 'pencil', shortcut: 'F2', separator: true, run: () => setPhase('rename') },
-        { label: 'Duplicate', icon: 'copy', shortcut: 'Ctrl D', run: act(() => api.duplicateFile(slug)) },
+        { label: 'Rename', icon: 'pencil', shortcut: SHORTCUT.rename.label, keys: SHORTCUT.rename.aria, separator: true, run: () => setPhase('rename') },
+        { label: 'Duplicate', icon: 'copy', shortcut: SHORTCUT.duplicate.label, keys: SHORTCUT.duplicate.aria, run: act('duplicate', () => api.duplicateFile(slug)) },
         {
           label: 'Copy link',
           icon: 'link',
-          run: act(async () => copyText(docLink(port ?? (Number(location.port) || 7466), slug))),
+          run: act('copy', async () => copyText(docLink(port ?? (Number(location.port) || 7466), slug))),
         },
         { label: 'Move to…', icon: 'folderInput', run: () => setPhase('move') },
-        { label: 'Move to Archive', icon: 'archive', separator: true, run: act(() => api.archiveFile(slug)) },
-        { label: 'Delete', icon: 'trash', shortcut: 'Del', danger: true, run: () => setPhase('delete') },
+        { label: 'Move to Archive', icon: 'archive', separator: true, run: act('archive', () => api.archiveFile(slug)) },
+        { label: 'Delete', icon: 'trash', shortcut: SHORTCUT.delete.label, keys: SHORTCUT.delete.aria, danger: true, run: () => setPhase('delete') },
       ];
   return <Menu x={target.x} y={target.y} items={items} onClose={onClose} />;
 }
+
+const EMPTY: ReadonlySet<string> = new Set();

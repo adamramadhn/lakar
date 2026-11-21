@@ -132,3 +132,59 @@ export function wrapIndex(current: number, n: number, dir: 1 | -1): number {
   if (n <= 0) return 0;
   return (((current + dir) % n) + n) % n;
 }
+
+// ---- Urutan halaman Files ----
+
+export type SortKey = 'edited' | 'name';
+export const SORT_LABEL: Record<SortKey, string> = { edited: 'Last edited', name: 'Name' };
+export const SORT_KEYS: readonly SortKey[] = ['edited', 'name'];
+/** Nilai simpanan → kunci urut; tidak dikenal → `edited` (bawaan desain "Files": "Last edited"). */
+export const parseSort = (v: string | null | undefined): SortKey => (v === 'name' ? 'name' : 'edited');
+
+/** Terbaru diedit dulu (seri: nama). */
+export const byEdited = <T extends { slug: string; updatedAt: string }>(docs: readonly T[]): T[] =>
+  [...docs].sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : a.updatedAt > b.updatedAt ? -1 : a.slug.localeCompare(b.slug)));
+
+export const sortDocs = <T extends { slug: string; updatedAt: string }>(docs: readonly T[], key: SortKey): T[] => (key === 'name' ? byName(docs) : byEdited(docs));
+
+// ---- Pesan error kelola file ----
+
+export type FileOp = 'load' | 'create' | 'rename' | 'duplicate' | 'archive' | 'unarchive' | 'delete' | 'move' | 'folder' | 'copy';
+
+const INTERNAL_PREFIX = 'kesalahan internal daemon: ';
+
+/**
+ * Pesan error berbahasa Inggris untuk aksi Dashboard. Pesan daemon ditulis dalam bahasa Indonesia untuk agen dan
+ * tidak boleh tampil di UI: kode AD-11 (`code`) dipetakan per aksi. `slug` = file sasaran (rename: slug tujuan).
+ * Error tanpa kode (jaringan, offline, clipboard) memakai `fallback` dari pemanggil (mis. `errorText`).
+ */
+export function fileErrorText(e: unknown, op: FileOp, slug: string | undefined, fallback: (e: unknown) => string): string {
+  const err = (typeof e === 'object' && e !== null ? e : {}) as { code?: unknown; message?: unknown; retryable?: unknown };
+  const code = typeof err.code === 'string' ? err.code : undefined;
+  if (op === 'copy' && !code) return 'Couldn’t copy to the clipboard. Select the text and copy it manually.';
+  if (!code) return fallback(e);
+  const message = typeof err.message === 'string' ? err.message : '';
+  const name = slug ? `“${slug}”` : 'This file';
+  switch (code) {
+    case 'CONFLICT':
+      if (err.retryable === true) return 'Another file with this name was just created. Try again.';
+      if (op === 'rename' || op === 'create')
+        return message.includes('arsip') ? `An archived file is already named ${name}. Choose another name, or delete it from Archive first.` : `A file named ${name} already exists. Choose another name.`;
+      if (op === 'unarchive') return `A file named ${name} is already in your files. Rename or delete it first, then unarchive.`;
+      if (op === 'folder') return 'A folder with this name already exists.';
+      return `${name} changed in another window. Reload and try again.`;
+    case 'NOT_FOUND':
+      if (op === 'move' || op === 'folder') return 'This folder or file no longer exists. It may have been deleted in another window.';
+      return `${name} no longer exists. It may have been renamed or deleted in another window.`;
+    case 'SCHEMA_INVALID':
+      if (op === 'create' || op === 'rename' || op === 'folder') return 'That name or size isn’t valid. Use letters or numbers, and board sizes from 1 to 10000 px.';
+      return 'Lakar rejected this request. Reload the app and try again.';
+    case 'EXEC_ERROR': {
+      // Error tak terduga di daemon (mis. EPERM dari sistem file): sertakan pesan sistem (bahasa Inggris dari Node).
+      const detail = message.startsWith(INTERNAL_PREFIX) ? message.slice(INTERNAL_PREFIX.length) : '';
+      return `Lakar couldn’t save this change${detail ? ` (${detail})` : ''}. Try again.`;
+    }
+    default:
+      return `Something went wrong (${code}). Try again.`;
+  }
+}
