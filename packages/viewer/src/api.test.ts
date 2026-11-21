@@ -129,4 +129,28 @@ describe('ViewerClient', () => {
     await api.screenshot('a', 3, 'A');
     expect(calls.filter((c) => c.path === '/screenshot')).toHaveLength(2);
   });
+  it('PNG board yang dirender pada rev ≥ seenRev dipakai ulang tanpa /docs/open atau /screenshot baru', async () => {
+    let rev = 3;
+    const calls = fakeFetch((c) => {
+      if (c.path === '/viewer/docs') return docs(['a']);
+      if (c.path === '/viewer/docs/a') return doc('a');
+      if (c.path === '/sessions') return ok({ sessionId: 's1' });
+      if (c.path === '/docs/open') return ok({ docId: 'Dddddddd', slug: 'a', rev, created: false });
+      if (c.path === '/screenshot') return ok({ boardId: 'A', width: 1, height: 1, mimeType: 'image/png', png: PNG });
+      throw new Error(`tak terduga ${c.path}`);
+    });
+    const api = await freshApi();
+    const first = await api.screenshot('a', 3, 'A');
+    const count = (path: string) => calls.filter((c) => c.path === path).length;
+    const opens = count('/docs/open');
+    expect(count('/screenshot')).toBe(1);
+    // Board terakhir berubah di rev 1; PNG rev 3 masih benar.
+    expect(await api.screenshot('a', 1, 'A')).toBe(first);
+    expect(count('/docs/open')).toBe(opens);
+    expect(count('/screenshot')).toBe(1);
+    // Daemon maju, board berubah di rev 4 → render baru.
+    rev = 4;
+    await api.screenshot('a', 4, 'A');
+    expect(count('/screenshot')).toBe(2);
+  });
 });

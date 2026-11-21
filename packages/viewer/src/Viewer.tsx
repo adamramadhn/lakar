@@ -1,13 +1,33 @@
 // Viewer read-only (desain bagian 03): Layers kiri dari JSON dokumen, canvas PNG per board, panel kanan
-// Inspect/Checks/Activity/History. Seleksi dari layer, board, atau temuan check disorot di canvas.
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+// Activity/Inspect/Checks/History. Seleksi dari layer, board, atau temuan check disorot di canvas. Stream
+// aktivitas (`/viewer/events`) memuat ulang dokumen dan PNG board tersentuh saat rev berubah.
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type ReactNode } from 'react';
 import type { LakarDocument } from '@lakar/schema';
+import { activityReducer, connectActivity, harnessColor, harnessLabel, initialActivity, revChange, sessionsForSlug, VIEWER_CLIENT, type ActivityEvent } from './activity';
+import { ActivityPanel } from './ActivityPanel';
 import { api, ApiError, errorText, OfflineError, type InspectResult, type LayoutCheck } from './api';
-import { Canvas, type Highlight } from './Canvas';
+import { Canvas, type AgentMark, type Focus, type Highlight } from './Canvas';
 import { indexDocument, relativeTime, type NodeInfo, type TreeNode } from './format';
-import { useRetry } from './hooks';
+import { HistoryPanel } from './HistoryPanel';
+import { useNow, useRetry } from './hooks';
 import { Icon, NODE_ICON } from './icons';
-import { ChecksPanel, InspectPanel, SoonPanel } from './panels';
+import { ChecksPanel, InspectPanel } from './panels';
+
+const FOLLOW_KEY = 'lakar.viewer.followAgent';
+function readFollow(): boolean {
+  try {
+    return localStorage.getItem(FOLLOW_KEY) !== 'off';
+  } catch {
+    return true;
+  }
+}
+function writeFollow(v: boolean) {
+  try {
+    localStorage.setItem(FOLLOW_KEY, v ? 'on' : 'off');
+  } catch {
+    // penyimpanan tidak tersedia
+  }
+}
 
 type Tab = 'activity' | 'inspect' | 'checks' | 'history';
 const TABS: { id: Tab; label: string }[] = [
@@ -25,19 +45,35 @@ export function Viewer({ slug }: { slug: string }) {
   const [selectedId, setSelectedId] = useState<string | undefined>(undefined);
   const [inspect, setInspect] = useState<Loaded<InspectResult> | undefined>(undefined);
   const [checks, setChecks] = useState<Loaded<LayoutCheck> | undefined>(undefined);
-  const [tab, setTab] = useState<Tab>('inspect');
+  const [tab, setTab] = useState<Tab>('activity');
   const [attempt, setAttempt] = useState(0);
+  const [activity, dispatch] = useReducer(activityReducer, initialActivity);
+  const [follow, setFollowState] = useState(readFollow);
+  const [focus, setFocus] = useState<Focus | undefined>(undefined);
+  /** Rev dasar semua board (muat penuh) dan rev terakhir per board tersentuh menurut event execute. */
+  const [baseRev, setBaseRev] = useState(-1);
+  const [touched, setTouched] = useState<Record<string, number>>({});
 
   const docRef = useRef<LakarDocument | undefined>(undefined);
-  /** Muat dokumen. `onlyIfChanged`: abaikan hasil bila id dan rev sama (refresh diam saat tab aktif lagi). */
+  /**
+   * Muat dokumen. `onlyIfChanged`: abaikan hasil bila id dan rev sama (refresh diam). `full`: semua board
+   * dianggap berubah (PNG dimuat ulang); event execute memakai `full=false` sehingga hanya board tersentuh dirender.
+   */
   const loadDoc = useCallback(
-    (onlyIfChanged = false) => {
+    (onlyIfChanged = false, full = true) => {
       api.getDoc(slug).then(
         (d) => {
           const prev = docRef.current;
           const changed = !prev || prev.id !== d.id || prev.rev !== d.rev;
           if (onlyIfChanged && !changed) return;
+          // Respons lama yang tiba belakangan (getDoc tumpang tindih) tidak boleh memundurkan rev yang tampil.
+          if (prev && prev.id === d.id && d.rev < prev.rev) return;
           docRef.current = d;
+          if (full || !prev || prev.id !== d.id) {
+            setBaseRev(d.rev);
+            // Board yang tersentuh di rev lebih baru dari dokumen ini tetap ditandai (event tiba sebelum muatan ini).
+            setTouched((t) => Object.fromEntries(Object.entries(t).filter(([, r]) => r > d.rev)));
+          }
           setDoc({ state: 'ok', value: { doc: d, loadedAt: Date.now() } });
           if (prev && changed) setAttempt((a) => a + 1);
         },
@@ -63,6 +99,80 @@ export function Viewer({ slug }: { slug: string }) {
 
   const current = doc.state === 'ok' ? doc.value.doc : undefined;
   const index = useMemo(() => (current ? indexDocument(current) : new Map<string, NodeInfo>()), [current]);
+
+  // Stream aktivitas: execute pada dokumen ini → muat ulang dokumen (rev lebih baru) dan PNG board tersentuh;
+  // Follow agent → pindah halaman dan geser kamera ke board yang berubah. Reconnect → muat ulang penuh.
+  const followRef = useRef(follow);
+  followRef.current = follow;
+  const onEvent = useRef<(e: ActivityEvent) => void>(() => {});
+  onEvent.current = (e) => {
+    if (e.type !== 'call') return;
+    const c = e.call;
+    if (c.slug !== slug || c.status === 'running' || c.status === 'error' || c.client === VIEWER_CLIENT) return;
+    const boardsTouched = c.tool === 'execute' ? (c.boards ?? []) : [];
+    if (typeof c.rev === 'number' && boardsTouched.length) {
+      const rev = c.rev;
+      setTouched((t) => {
+        const next = { ...t };
+        for (const b of boardsTouched) next[b] = Math.max(next[b] ?? -1, rev);
+        return next;
+      });
+    }
+    const shown = docRef.current;
+    const ch = shown ? revChange(e, slug, shown.rev) : undefined;
+    if (ch) loadDoc(true, ch.boards === undefined);
+    if (followRef.current && boardsTouched.length) setFocus({ boardId: boardsTouched[0]!, nonce: e.seq });
+  };
+  const reload = useRef(loadDoc);
+  reload.current = loadDoc;
+  useEffect(
+    () =>
+      connectActivity({
+        onHello: (hello) => dispatch({ type: 'hello', hello }),
+        onEvent: (event) => {
+          dispatch({ type: 'event', event });
+          onEvent.current(event);
+        },
+        onConnection: (connected) => dispatch({ type: 'connection', connected }),
+        onReconnect: () => reload.current(true),
+      }),
+    [],
+  );
+  const setFollow = useCallback((v: boolean) => {
+    setFollowState(v);
+    writeFollow(v);
+    if (!v) setFocus(undefined);
+  }, []);
+  // Board fokus di halaman lain → pindah halaman (Canvas halaman baru lalu menggeser kamera).
+  useEffect(() => {
+    const info = focus ? index.get(focus.boardId) : undefined;
+    if (info && info.pageIndex !== pageIndex) setPageIndex(info.pageIndex);
+  }, [focus, index, pageIndex]);
+  const onFocused = useCallback((nonce: number) => setFocus((f) => (f?.nonce === nonce ? undefined : f)), []);
+
+  const now = useNow(5000);
+  const views = useMemo(() => sessionsForSlug(activity, slug, now), [activity, slug, now]);
+  /** Board yang sedang dikerjakan: board dari call terakhir (yang punya board) tiap sesi Live pada dokumen ini. */
+  const agents = useMemo<AgentMark[]>(() => {
+    const out: AgentMark[] = [];
+    for (const v of views) {
+      if (!v.live) continue;
+      const running = v.calls.find((c) => c.status === 'running');
+      const boardOf = (c: (typeof v.calls)[number]) => c.boards?.[0] ?? (c.target ? index.get(c.target)?.boardId : undefined);
+      // Call terbaru masih running tanpa board (mis. execute): board targetnya belum diketahui → tanpa outline.
+      const newest = v.calls[0];
+      if (newest && newest.status === 'running' && !boardOf(newest)) continue;
+      for (const c of v.calls) {
+        const boardId = boardOf(c);
+        if (!boardId) continue;
+        const who = harnessLabel(v.session.client);
+        out.push({ session: v.session.id, boardId, color: harnessColor(v.session.client), running: running !== undefined, label: running ? `${who} · ${running.tool}` : who });
+        break;
+      }
+    }
+    return out;
+  }, [views, index]);
+  const nameOf = useCallback((id: string) => index.get(id)?.name, [index]);
 
   const runChecks = useCallback(() => {
     if (!current || current.pages.every((p) => p.children.length === 0)) return;
@@ -138,6 +248,9 @@ export function Viewer({ slug }: { slug: string }) {
         ? { boardId: selectedInfo.boardId }
         : undefined;
   const summary = checks?.state === 'ok' ? checks.value.summary : undefined;
+  /** Rev terakhir tiap board berubah (≤ rev dokumen): PNG board lain dipakai ulang dari cache. */
+  const boardRevs: Record<string, number> = {};
+  for (const b of boards) boardRevs[b.id] = Math.min(d.rev, Math.max(baseRev, touched[b.id] ?? -1));
 
   return (
     <div className="viewer">
@@ -170,7 +283,11 @@ export function Viewer({ slug }: { slug: string }) {
         key={page?.id}
         slug={slug}
         rev={d.rev}
+        boardRevs={boardRevs}
         boards={boards}
+        agents={agents}
+        focus={focus && boards.some((b) => b.id === focus.boardId) ? focus : undefined}
+        onFocused={onFocused}
         highlight={highlight}
         summary={summary}
         checksLoading={checks?.state === 'loading'}
@@ -189,8 +306,8 @@ export function Viewer({ slug }: { slug: string }) {
         <div className="panel-body">
           {tab === 'inspect' && <InspectPanel info={selectedInfo} inspect={inspect} />}
           {tab === 'checks' && <ChecksPanel checks={checks} index={index} selectedId={selectedId} onSelect={select} onRun={runChecks} hasBoards={d.pages.some((p) => p.children.length > 0)} />}
-          {tab === 'activity' && <SoonPanel icon="activity" title="Activity" text="Live tool calls from your agents will show here." />}
-          {tab === 'history' && <SoonPanel icon="clock" title="History" text="A timeline of changes per execute will show here." />}
+          {tab === 'activity' && <ActivityPanel views={views} connected={activity.connected} follow={follow} onFollow={setFollow} nameOf={nameOf} />}
+          {tab === 'history' && <HistoryPanel slug={slug} rev={d.rev} />}
         </div>
       </aside>
     </div>

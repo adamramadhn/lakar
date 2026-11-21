@@ -222,6 +222,69 @@ describe('GET /viewer/docs/:slug', () => {
   });
 });
 
+describe('GET /viewer/docs/:slug/history', () => {
+  it('entri {rev, description, opsSummary, opCount, at, session, client?} urut rev turun; baris rusak dilewati; id sesi penuh tidak bocor', async () => {
+    const { app, put, get, post, docsDir } = await setup();
+    try {
+      await put('a', docJson('Aaaaaaaa', 3, [{ id: 'Bbbbbbb1', name: 'Home' }]));
+      const sid = (await post('/sessions', { client: 'claude-code' })).json().data.sessionId as string;
+      const gone = '0123456789abcdef-gone';
+      const lines = [
+        { rev: 1, sessionId: gone, description: 'buat board home awal', opsSummary: 'add×4', at: '2026-11-20T10:00:00.000Z' },
+        { rev: 2, sessionId: sid, description: 'rapikan judul hero landing', opsSummary: 'set×2, add×1', at: '2026-11-21T09:00:00.000Z' },
+      ].map((x) => JSON.stringify(x));
+      lines.splice(1, 0, '{rusak', JSON.stringify({ rev: 9, description: 'tanpa sesi', opsSummary: 'add×1', at: '2026-11-21T11:00:00.000Z' }));
+      lines.push(JSON.stringify({ rev: 3, sessionId: sid, description: 'hapus node lama', opsSummary: 'remove×1', at: '2026-11-21T10:00:00.000Z' }));
+      await writeFile(join(docsDir, 'a.history.jsonl'), lines.map((l) => `${l}\n`).join(''));
+      const before = await readFile(join(docsDir, 'a.history.jsonl'), 'utf8');
+      const r = await get('/viewer/docs/a/history');
+      expect(r.statusCode).toBe(200);
+      expect(r.json()).toEqual({
+        ok: true,
+        data: {
+          entries: [
+            { rev: 3, description: 'hapus node lama', opsSummary: 'remove×1', opCount: 1, at: '2026-11-21T10:00:00.000Z', session: sid.slice(0, 8), client: 'claude-code' },
+            { rev: 2, description: 'rapikan judul hero landing', opsSummary: 'set×2, add×1', opCount: 3, at: '2026-11-21T09:00:00.000Z', session: sid.slice(0, 8), client: 'claude-code' },
+            { rev: 1, description: 'buat board home awal', opsSummary: 'add×4', opCount: 4, at: '2026-11-20T10:00:00.000Z', session: '01234567' },
+          ],
+        },
+      });
+      expect(r.body).not.toContain(sid);
+      expect(r.body).not.toContain(gone);
+      expect(await readFile(join(docsDir, 'a.history.jsonl'), 'utf8')).toBe(before);
+    } finally {
+      await app.close();
+    }
+  });
+
+  it('dokumen tanpa riwayat → entries: []', async () => {
+    const { app, put, get } = await setup();
+    try {
+      await put('a', docJson('Aaaaaaaa', 0, []));
+      expect((await get('/viewer/docs/a/history')).json()).toEqual({ ok: true, data: { entries: [] } });
+    } finally {
+      await app.close();
+    }
+  });
+
+  it('slug tanpa dokumen → 404 NOT_FOUND; slug tidak valid → 400 SCHEMA_INVALID (AD-11)', async () => {
+    const { app, get, docsDir } = await setup();
+    try {
+      const nf = await get('/viewer/docs/zzz/history');
+      expect(nf.statusCode).toBe(404);
+      expect(nf.json()).toMatchObject({ ok: false, error: { code: 'NOT_FOUND', retryable: false } });
+      for (const slug of ['..%2Fx', 'Bad_Slug']) {
+        const bad = await get(`/viewer/docs/${slug}/history`);
+        expect(bad.statusCode).toBe(400);
+        expect(bad.json()).toMatchObject({ ok: false, error: { code: 'SCHEMA_INVALID' } });
+      }
+      expect(existsSync(docsDir)).toBe(false);
+    } finally {
+      await app.close();
+    }
+  });
+});
+
 describe('GET /app/*', () => {
   it('default dist = packages/viewer/dist', () => {
     expect(VIEWER_DIST_DIR.replaceAll('\\', '/')).toMatch(/packages\/viewer\/dist\/?$/);

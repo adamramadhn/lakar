@@ -33,3 +33,14 @@ export function useSeen<T extends Element>(): [RefObject<T | null>, boolean] {
   }, [seen]);
   return [ref, seen];
 }
+
+/** `Date.now()` yang diperbarui tiap `intervalMs` (waktu relatif, status Live/Idle). */
+export function useNow(intervalMs: number): number {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    setNow(Date.now());
+    const t = setInterval(() => setNow(Date.now()), intervalMs);
+    return () => clearInterval(t);
+  }, [intervalMs]);
+  return now;
+}
