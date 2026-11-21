@@ -31,6 +31,29 @@ jobs:
         with:
           fetch-depth: 1
 
+      # Fail fast with a readable reason if the gateway rejects the request.
+      # Prints only the HTTP status and the error type/message, never the key.
+      - name: Check gateway
+        env:
+          ANTHROPIC_BASE_URL: ${{ secrets.ANTHROPIC_BASE_URL }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          MODEL: ${{ vars.CLAUDE_REVIEW_MODEL || 'claude-sonnet-5-5' }}
+        run: |
+          base="${ANTHROPIC_BASE_URL%/}"
+          case "$base" in */v1) echo "::warning::ANTHROPIC_BASE_URL ends with /v1; Claude Code appends /v1/messages itself, so remove the /v1 suffix.";; esac
+          code=$(curl -sS -o resp.json -w '%{http_code}' "$base/v1/messages" \
+            -H "x-api-key: $ANTHROPIC_API_KEY" \
+            -H "anthropic-version: 2023-06-01" \
+            -H "content-type: application/json" \
+            -d "{\"model\":\"$MODEL\",\"max_tokens\":8,\"messages\":[{\"role\":\"user\",\"content\":\"ping\"}]}" || echo "000")
+          echo "Gateway HTTP $code for model $MODEL"
+          jq -r '[.error.type, .error.message] | map(select(. != null)) | join(": ")' resp.json 2>/dev/null | head -c 500 || true
+          echo
+          if [ "$code" != "200" ]; then
+            echo "::error::Gateway rejected the test request (HTTP $code). Check ANTHROPIC_BASE_URL (no /v1 suffix), ANTHROPIC_API_KEY, and the CLAUDE_REVIEW_MODEL variable."
+            exit 1
+          fi
+
       - uses: anthropics/claude-code-action@v1
         env:
           ANTHROPIC_BASE_URL: ${{ secrets.ANTHROPIC_BASE_URL }}
