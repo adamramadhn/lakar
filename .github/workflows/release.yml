@@ -37,6 +37,8 @@ jobs:
             os: macos-latest
             target: x86_64-apple-darwin
             bundles: app,dmg
+            # Node x64 di Rosetta pada runner arm64: peluncuran Chrome timeout, jadi syarat render dilewati.
+            skip_render_check: true
           - name: linux-x64
             os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
@@ -85,8 +87,8 @@ jobs:
       # Jalankan daemon + MCP hasil bundel persis seperti aplikasi (macOS x64 lewat Rosetta di runner arm64).
       - name: Smoke-test sidecar
         env:
-          # Runner GitHub punya Google Chrome: pool render wajib siap lewat browser sistem.
-          LAKAR_SMOKE_REQUIRE_RENDER: '1'
+          # Runner GitHub punya Google Chrome: pool render wajib siap lewat browser sistem (kecuali lintas arsitektur).
+          LAKAR_SMOKE_REQUIRE_RENDER: ${{ matrix.skip_render_check && '0' || '1' }}
         run: node apps/desktop/scripts/smoke-sidecar.mjs --target ${{ matrix.target }}
 
       - name: Set version from tag
