@@ -33,6 +33,7 @@ export { PhotoService, type PhotoServiceOptions, type PhotoStatus, type SearchRe
 export { SafeNet, NetError, isBlockedIp, DEFAULT_ALLOWLIST, type HostAllowlist, type SafeNetOptions } from './photos/net.js';
 export { DocStore } from './store.js';
 export { ASSET_UPLOAD_MAX, BOARD_PRESETS, SLUG_MAX, registerFileRoutes, slugify, withSuffix, type FileRoutesOptions } from './files.js';
+export { FOLDER_ID_PATTERN, FOLDER_NAME_MAX, FOLDERS_FILE, FolderStore, folderName, memberOf, newFolderId, type Folder } from './folders.js';
 export { exportFileName, registerExportRoutes, type ExportRoutesOptions } from './export.js';
 export { VIEWER_DIST_DIR, registerViewerRoutes, type ViewerDocSummary, type ViewerHistoryEntry } from './viewer.js';
 export {

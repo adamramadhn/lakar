@@ -51,7 +51,7 @@ export const validSize = (v: number) => Number.isInteger(v) && v >= 1 && v <= SI
 
 export type Route =
   | { name: 'recents' }
-  | { name: 'files' }
+  | { name: 'files'; folder?: string }
   | { name: 'archive' }
   | { name: 'settings' }
   | { name: 'connections' }
@@ -63,13 +63,21 @@ export const SETTINGS_HASH = '#/settings';
 export const CONNECTIONS_HASH = '#/settings/connections';
 
 /**
- * `#/` Recents, `#/files`, `#/archive`, `#/settings` (= `#/settings/general`) General, `#/settings/connections`,
+ * `#/` Recents, `#/files`, `#/files/<id>` folder, `#/archive`, `#/settings` (= `#/settings/general`) General, `#/settings/connections`,
  * `#/d/<slug>` Viewer; selain itu Recents.
  */
 export function parseRoute(hash: string): Route {
   if (/^#\/settings\/connections\/?$/.test(hash)) return { name: 'connections' };
   if (/^#\/settings(\/general)?\/?$/.test(hash)) return { name: 'settings' };
   if (/^#\/files\/?$/.test(hash)) return { name: 'files' };
+  const f = /^#\/files\/([^/?#]+)\/?$/.exec(hash);
+  if (f) {
+    try {
+      return { name: 'files', folder: decodeURIComponent(f[1]!) };
+    } catch {
+      return { name: 'files' };
+    }
+  }
   if (/^#\/archive\/?$/.test(hash)) return { name: 'archive' };
   const m = /^#\/d\/([^/?#]+)/.exec(hash);
   if (m) {
@@ -83,6 +91,22 @@ export function parseRoute(hash: string): Route {
 }
 
 export const docHash = (slug: string) => `#/d/${encodeURIComponent(slug)}`;
+
+/** Hash halaman folder (`#/files/<id>`); tanpa id → halaman Files (root). */
+export const folderHash = (id?: string | null) => (id ? `#/files/${encodeURIComponent(id)}` : '#/files');
+
+// ---- Folder ----
+
+/** Meta Folder Item: `Empty`, `1 file`, `N files`. */
+export const folderMeta = (n: number) => (n <= 0 ? 'Empty' : n === 1 ? '1 file' : `${n} files`);
+
+/** Folder `slug` (null = root). Hanya properti milik sendiri: slug seperti `constructor` tidak membaca Object.prototype. */
+export const memberOf = (membership: Readonly<Record<string, string>>, slug: string): string | null => (Object.hasOwn(membership, slug) ? membership[slug]! : null);
+
+/** File di folder `folder` (null = root: file yang tidak di folder mana pun). Urutan daftar dipertahankan. */
+export function inFolder<T extends { slug: string }>(docs: readonly T[], membership: Readonly<Record<string, string>>, folder: string | null): T[] {
+  return docs.filter((d) => memberOf(membership, d.slug) === folder);
+}
 
 /** Tautan file untuk Copy link: `http://127.0.0.1:<port>/app/#/d/<slug>`. */
 export const docLink = (port: number, slug: string) => `http://127.0.0.1:${port}/app/${docHash(slug)}`;

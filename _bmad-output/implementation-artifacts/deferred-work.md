@@ -56,3 +56,9 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-app-7-titlebar-tabs.md`
   summary: Resize jendela tanpa dekorasi di Linux (tepi jendela) belum terverifikasi; tidak ada `start_resize_dragging`.
   evidence: maybe-false; tao biasanya menangani resize jendela undecorated, perlu dicek di build release Linux.
+- source_spec: `_bmad-output/implementation-artifacts/spec-app-10-folders.md`
+  summary: `/docs/open` agen yang membuat dokumen baru pada slug dengan keanggotaan folder basi (file lama dihapus dari luar aplikasi) memunculkan dokumen itu di folder lama.
+  evidence: maybe-false, medium bila terjadi; route agen dibekukan untuk bench. Diselesaikan dengan membersihkan keanggotaan di cabang `created` `/docs/open` (server.ts) atau pemangkasan aman saat daemon mulai.
+- source_spec: `_bmad-output/implementation-artifacts/spec-app-10-folders.md`
+  summary: Alur UI folder (seret ke folder, Move to…, New file di halaman folder) hanya diverifikasi manual; viewer belum punya tes komponen.
+  evidence: setelan tes komponen (jsdom/testing-library) belum ada di repo; kontrak klien api.ts sudah dites.

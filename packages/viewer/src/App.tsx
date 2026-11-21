@@ -1,4 +1,4 @@
-// Kerangka aplikasi: title bar bertab (TitleBar.tsx), routing hash (`#/` Recents, `#/files`, `#/archive`, `#/settings`
+// Kerangka aplikasi: title bar bertab (TitleBar.tsx), routing hash (`#/` Recents, `#/files`, `#/files/<id>` folder, `#/archive`, `#/settings`
 // General, `#/settings/connections` Connections, `#/d/<slug>` Viewer; lihat `parseRoute` di files.ts), banner offline.
 // Tab dokumen (aplikasi 7): daftar slug di localStorage (`TABS_KEY`); membuka dokumen menambah/mengaktifkan tabnya,
 // Close lewat x / klik tengah / Ctrl/Cmd+W. Rename/archive/delete dari aplikasi (`api.onFileEvent`) ikut ke tab.
@@ -81,6 +81,7 @@ export function App() {
 
   useEffect(() => {
     const titles: Record<Route['name'], string> = { recents: 'Lakar', files: 'Files · Lakar', archive: 'Archive · Lakar', settings: 'Settings · Lakar', connections: 'Connections · Lakar', viewer: 'Lakar' };
+    // Halaman folder (`#/files/<id>`): Dashboard mengganti judul dengan nama folder setelah folder dimuat.
     document.title = route.name === 'viewer' ? `${route.slug} · Lakar` : titles[route.name];
   }, [route]);
 
@@ -151,7 +152,7 @@ export function App() {
         {route.name === 'viewer' ? (
           <Viewer key={route.slug} slug={route.slug} />
         ) : (
-          <Dashboard page={route.name} menuOpen={menuOpen} onCloseMenu={() => setMenuOpen(false)} />
+          <Dashboard page={route.name} {...(route.name === 'files' && route.folder ? { folder: route.folder } : {})} menuOpen={menuOpen} onCloseMenu={() => setMenuOpen(false)} />
         )}
       </main>
       {creating && <NewFileDialog taken={creating} onClose={() => setCreating(undefined)} />}

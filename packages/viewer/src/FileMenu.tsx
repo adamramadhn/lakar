@@ -1,11 +1,13 @@
 // Context menu kartu file (desain 02 "Dashboard — Context Menu") + dialog Rename dan konfirmasi Delete
 // ("Dashboard — Delete Confirm"). Recents/Files: Open, Open in new tab, Rename, Duplicate, Copy link, Move to Archive, Delete.
 // "Open in new tab" (aplikasi 7) menambah tab title bar tanpa berpindah halaman.
-// Archive: Unarchive, Delete. Folder/"Move to…" sengaja tidak ada.
+// "Move to…" (aplikasi 10) di antara Copy link dan Move to Archive: dialog pilih "Files" (root) atau folder.
+// Archive: Unarchive, Delete.
 import { useLayoutEffect, useRef, useState } from 'react';
-import { api, errorText } from './api';
+import { api, errorText, type Folder } from './api';
 import { copyText } from './Connections';
 import { docHash, docLink, slugify } from './files';
+import { MoveToDialog } from './Folders';
 import { Icon, type IconName } from './icons';
 import { Modal } from './NewFileDialog';
 import { openInNewTab } from './tabs';
@@ -172,6 +174,8 @@ export function FileMenu({
   dialog,
   archived,
   port,
+  folders,
+  folderOf,
   onClose,
   onError,
 }: {
@@ -179,10 +183,14 @@ export function FileMenu({
   dialog?: 'rename' | 'delete';
   archived: boolean;
   port: number | undefined;
+  /** Folder yang sudah dimuat (halaman Files); tanpa ini dialog "Move to…" memuat sendiri. */
+  folders?: readonly Folder[];
+  /** Folder file ini saat ini (null = root); dipakai bersama `folders`. */
+  folderOf?: string | null;
   onClose: () => void;
   onError: (message: string) => void;
 }) {
-  const [phase, setPhase] = useState<'menu' | 'rename' | 'delete'>(dialog ?? 'menu');
+  const [phase, setPhase] = useState<'menu' | 'rename' | 'delete' | 'move'>(dialog ?? 'menu');
   const { slug } = target;
   const act = (fn: () => Promise<unknown>) => () => {
     onClose();
@@ -191,6 +199,7 @@ export function FileMenu({
 
   if (phase === 'rename') return <RenameDialog slug={slug} onClose={onClose} />;
   if (phase === 'delete') return <DeleteDialog slug={slug} archived={archived} onClose={onClose} />;
+  if (phase === 'move') return <MoveToDialog slug={slug} {...(folders ? { folders, current: folderOf ?? null } : {})} onClose={onClose} onError={onError} />;
 
   const items: Item[] = archived
     ? [
@@ -222,6 +231,7 @@ export function FileMenu({
           icon: 'link',
           run: act(async () => copyText(docLink(port ?? (Number(location.port) || 7466), slug))),
         },
+        { label: 'Move to…', icon: 'folderInput', run: () => setPhase('move') },
         { label: 'Move to Archive', icon: 'archive', separator: true, run: act(() => api.archiveFile(slug)) },
         { label: 'Delete', icon: 'trash', shortcut: 'Del', danger: true, run: () => setPhase('delete') },
       ];

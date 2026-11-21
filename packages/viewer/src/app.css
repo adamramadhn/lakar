@@ -3218,3 +3218,181 @@ button.panel-tab:hover {
     gap: 4px;
   }
 }
+
+/* ---- Folder (aplikasi 10; desain 02 "Files — Light/Dark", komponen Folder Item) ---- */
+.section-label {
+  margin: 0 0 16px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+}
+.folder-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 16px;
+  margin-bottom: 32px;
+}
+.folder-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 56px;
+  padding: 0 8px 0 14px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  cursor: pointer;
+  min-width: 0;
+  transition:
+    border-color 120ms,
+    background-color 120ms;
+}
+.folder-item:hover,
+.folder-item.menu-open {
+  background: var(--surface-hover);
+}
+.folder-item:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.folder-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 7px;
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+.folder-item:hover .folder-icon,
+.folder-item.menu-open .folder-icon {
+  background: var(--surface);
+}
+.folder-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+.folder-name {
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.folder-meta {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+/* Desain "Folder Item": ikon "…" selalu terlihat (beda dengan kartu file yang muncul saat hover). */
+.folder-item .more-btn {
+  flex: none;
+  opacity: 1;
+}
+.folder-root-empty {
+  padding: 24px 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+.breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.breadcrumb-root {
+  padding: 2px 6px;
+  margin-left: -6px;
+  border-radius: 6px;
+  color: var(--text-secondary);
+  font-size: 28px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.breadcrumb-root:hover {
+  color: var(--text-primary);
+}
+.breadcrumb-sep {
+  flex: none;
+  color: var(--text-muted);
+}
+.breadcrumb .breadcrumb-current {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.folder-header-more {
+  width: 28px;
+  height: 28px;
+  color: var(--text-secondary);
+}
+.drop-target,
+.folder-item.drop-target {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+.breadcrumb-root.drop-target {
+  color: var(--accent);
+}
+.move-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 320px;
+  overflow-y: auto;
+  margin: 4px 0 8px;
+}
+.move-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 36px;
+  padding: 0 10px;
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-size: 13px;
+  text-align: left;
+}
+.move-option:hover:not(:disabled),
+.move-option:focus-visible {
+  background: var(--surface-hover);
+}
+.move-option:disabled {
+  cursor: default;
+  color: var(--text-secondary);
+}
+.move-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.move-current {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.move-empty {
+  padding: 8px 10px;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+@media (max-width: 768px) {
+  .folder-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+    margin-bottom: 24px;
+  }
+  .breadcrumb-root {
+    font-size: 22px;
+  }
+}
