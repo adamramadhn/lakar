@@ -1,9 +1,9 @@
 // Kode execute layer manual (aplikasi 4): dijalankan di sandbox exec sungguhan (tanpa daemon) supaya node yang
 // dibangkitkan lolos skema dan mendarat di posisi/ukuran spec. Deskripsi selalu 3–8 kata.
 import { describe, expect, it } from 'vitest';
-import { createDocument, transact } from '@lakar/core';
-import { runSnippet } from '@lakar/exec';
-import { IconCatalog } from '@lakar/icons';
+import { createDocument, transact } from '../packages/core/src/index.ts';
+import { runSnippet } from '../packages/exec/src/index.ts';
+import { IconCatalog } from '../packages/icons/src/index.ts';
 import {
   failureText,
   imageBox,
@@ -16,7 +16,7 @@ import {
   removeNode,
   wordCount,
   type InsertKind,
-} from './codegen.ts';
+} from '../packages/viewer/src/codegen.ts';
 
 const icons = IconCatalog.load();
 const ASSET = 'a'.repeat(64);
