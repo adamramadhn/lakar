@@ -20,6 +20,9 @@ jobs:
       # Cache Chromium khusus Lakar, sama seperti scripts/install-browser.sh (C9).
       LAKAR_BROWSERS_PATH: ${{ github.workspace }}/.cache/lakar/ms-playwright
       PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/.cache/lakar/ms-playwright
+      # ux-lakar (DESIGN.md, golden-set.md) is excluded from git, so the C7 and
+      # judge-text guards cannot read their sources on CI; let them skip.
+      LAKAR_C7_ALLOW_MISSING_SOURCES: "1"
     steps:
       - uses: actions/checkout@v6
 
