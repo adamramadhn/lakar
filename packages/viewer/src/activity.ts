@@ -152,6 +152,8 @@ export function harnessLabel(client: string | undefined): string {
   if (c.includes('claude')) return 'Claude Code';
   if (c.includes('codex')) return 'Codex';
   if (c === 'lakar-mcp') return 'MCP agent';
+  // Kelola file dari aplikasi (New file, Duplicate) mencatat riwayat atas nama viewer.
+  if (c === 'lakar-viewer') return 'You';
   return client;
 }
 

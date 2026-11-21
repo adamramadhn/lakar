@@ -1,5 +1,6 @@
 // Route baca-saja untuk viewer (Viewer B slice 1): daftar dan isi dokumen di `/viewer/*`, aset statis
-// hasil build `packages/viewer` di `/app/*`. Tidak ada yang menulis ke store atau mengubah salinan memori.
+// hasil build `packages/viewer` di `/app/*`. Tidak ada yang menulis ke store atau mengubah salinan memori
+// (route tulis kelola file ada di `files.ts`).
 import type { FastifyInstance } from 'fastify';
 import { readFile, stat } from 'node:fs/promises';
 import { extname, resolve, sep } from 'node:path';
@@ -7,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { migrateDocument, parseDocument } from '@lakar/core';
 import { LakarError, SLUG_PATTERN, errorMessage, type LakarDocument } from '@lakar/schema';
 import { notFound } from './errors.js';
+import { VIEWER_CLIENT } from './events.js';
 import type { Sessions } from './sessions.js';
 import type { DocStore } from './store.js';
 
@@ -79,10 +81,10 @@ const docNotFound = (slug: string) => notFound(`dokumen ${slug} tidak ada`, 'pak
  * Baca dokumen dari file tanpa efek samping (berbeda dengan `DocStore.read`, yang bisa menulis balik hasil
  * migrasi dan merapikan riwayat). `undefined` bila file tidak ada; file rusak → LakarError.
  */
-async function peekDocument(store: DocStore, slug: string): Promise<LakarDocument | undefined> {
+export async function peekDocument(store: DocStore, slug: string, archived = false): Promise<LakarDocument | undefined> {
   let text: string;
   try {
-    text = await readFile(store.docPath(slug), 'utf8');
+    text = await readFile(archived ? store.archivedDocPath(slug) : store.docPath(slug), 'utf8');
   } catch (e) {
     if (isEnoent(e)) return undefined;
     throw e;
@@ -110,7 +112,7 @@ export function opCountOf(opsSummary: string): number {
   return n;
 }
 
-const summarize = (slug: string, doc: LakarDocument, mtimeMs: number): ViewerDocSummary => ({
+export const summarize = (slug: string, doc: LakarDocument, mtimeMs: number): ViewerDocSummary => ({
   slug,
   rev: doc.rev,
   updatedAt: new Date(mtimeMs).toISOString(),
@@ -176,7 +178,8 @@ export function registerViewerRoutes(app: FastifyInstance, { docs, store, sessio
       // `isHistoryEntry` store hanya memeriksa rev/opsSummary: lewati baris tanpa field yang dipakai di sini.
       .filter((h) => typeof h.sessionId === 'string' && typeof h.at === 'string' && typeof h.description === 'string')
       .map((h) => {
-        const client = sessions?.byId(h.sessionId)?.client;
+        // Entri dari aplikasi (kelola file) memakai id sesi tetap `lakar-viewer`.
+        const client = sessions?.byId(h.sessionId)?.client ?? (h.sessionId === VIEWER_CLIENT ? VIEWER_CLIENT : undefined);
         return {
           rev: h.rev,
           description: h.description,

@@ -1,11 +1,15 @@
-// Klien lakard untuk viewer. Hanya endpoint baca: /viewer/* (termasuk /viewer/connections), /status, dan endpoint sesi (open, screenshot,
-// inspect, layout-check) yang tidak mengubah dokumen. Bentuk respons AD-11: {ok:true,data} | {ok:false,error}.
+// Klien lakard untuk viewer. Endpoint baca: /viewer/* (termasuk /viewer/connections), /status, dan endpoint sesi (open, screenshot,
+// inspect, layout-check) yang tidak mengubah dokumen. Endpoint tulis hanya kelola file (POST/DELETE /viewer/docs*):
+// sesudahnya cache dokumen/screenshot slug terkait dibuang dan pendengar `onDocsChanged` dipanggil.
+// Bentuk respons AD-11: {ok:true,data} | {ok:false,error}.
 import type { Finding, FindingSummary, LakarDocument } from '@lakar/schema';
 
 /** Header sesi (sama dengan SESSION_HEADER @lakar/schema; disalin agar bundle tidak menarik zod). */
 const SESSION_HEADER = 'x-lakar-session';
 const CLIENT = 'lakar-viewer';
 
+/** Board awal New file (sama dengan `BoardChoice` di files.ts; tanpa impor relatif agar api.ts bisa dites di Node). */
+export type BoardChoice = { preset: 'desktop' | 'tablet' | 'mobile' } | { preset: 'custom'; width: number; height: number };
 export type DocSummary = { slug: string; rev: number; updatedAt: string; boardCount: number; firstBoardId: string | null };
 /** Status pool render (`/status` → `pool`); `lastError` mis. "Chrome atau Edge tidak ditemukan …" di aplikasi desktop. */
 export type PoolStatus = { size: number; ready: number; browserVersion?: string; lastError?: string };
@@ -66,7 +70,7 @@ export const connection = {
   },
 };
 
-async function request<T>(method: 'GET' | 'POST', path: string, body?: unknown, session?: string): Promise<T> {
+async function request<T>(method: 'GET' | 'POST' | 'DELETE', path: string, body?: unknown, session?: string): Promise<T> {
   let res: Response;
   try {
     res = await fetch(path, {
@@ -119,6 +123,8 @@ class ViewerClient {
   #latest = new Map<string, { rev: number; shot: Promise<Screenshot> }>();
   /** Permintaan screenshot yang sedang antre, per argumen pemanggil. */
   #pending = new Map<string, Promise<Screenshot>>();
+  /** Pendengar perubahan daftar file (kelola file dari aplikasi). */
+  #changed = new Set<() => void>();
 
   status() {
     return request<DaemonStatus>('GET', '/status');
@@ -144,6 +150,86 @@ class ViewerClient {
   async getHistory(slug: string): Promise<HistoryEntry[]> {
     const { entries } = await request<{ entries: HistoryEntry[] }>('GET', `/viewer/docs/${encodeURIComponent(slug)}/history`);
     return entries;
+  }
+
+  /** File terarsip (GET /viewer/archive). */
+  async listArchive(): Promise<DocSummary[]> {
+    const { docs } = await request<{ docs: DocSummary[] }>('GET', '/viewer/archive');
+    return docs;
+  }
+
+  /** Dipanggil setelah New file/rename/duplicate/archive/unarchive/delete berhasil. */
+  onDocsChanged(l: () => void): () => void {
+    this.#changed.add(l);
+    return () => {
+      this.#changed.delete(l);
+    };
+  }
+
+  /** Buang cache dokumen + screenshot untuk `slugs`, lalu beri tahu pendengar. */
+  #invalidate(...slugs: string[]) {
+    for (const slug of slugs) {
+      this.#known.delete(slug);
+      if (this.#active === slug) this.#active = undefined;
+      for (const map of [this.#shots, this.#pending] as Map<string, unknown>[]) for (const k of [...map.keys()]) if (k.startsWith(`${slug}@`)) map.delete(k);
+      for (const k of [...this.#latest.keys()]) if (k.startsWith(`${slug}:`)) this.#latest.delete(k);
+    }
+    for (const l of this.#changed) l();
+  }
+
+  /** Tulis lewat antrean sesi: tidak menyela open + permintaan dokumen yang sedang berjalan. */
+  #write<T>(fn: () => Promise<T>, slugs: (result: T) => string[]): Promise<T> {
+    const run = async () => {
+      const result = await fn();
+      this.#invalidate(...slugs(result));
+      return result;
+    };
+    const next = this.#queue.then(run, run);
+    this.#queue = next.catch(() => undefined);
+    return next;
+  }
+
+  createFile(name: string, board: BoardChoice): Promise<{ slug: string; rev: number }> {
+    return this.#write(
+      () => request<{ slug: string; rev: number }>('POST', '/viewer/docs', { name, board }),
+      (r) => [r.slug],
+    );
+  }
+
+  renameFile(slug: string, name: string): Promise<{ slug: string }> {
+    return this.#write(
+      () => request<{ slug: string }>('POST', `/viewer/docs/${encodeURIComponent(slug)}/rename`, { name }),
+      (r) => [slug, r.slug],
+    );
+  }
+
+  duplicateFile(slug: string): Promise<{ slug: string }> {
+    return this.#write(
+      () => request<{ slug: string }>('POST', `/viewer/docs/${encodeURIComponent(slug)}/duplicate`),
+      (r) => [r.slug],
+    );
+  }
+
+  archiveFile(slug: string): Promise<{ slug: string }> {
+    return this.#write(
+      () => request<{ slug: string }>('POST', `/viewer/docs/${encodeURIComponent(slug)}/archive`),
+      () => [slug],
+    );
+  }
+
+  unarchiveFile(slug: string): Promise<{ slug: string }> {
+    return this.#write(
+      () => request<{ slug: string }>('POST', `/viewer/docs/${encodeURIComponent(slug)}/unarchive`),
+      () => [slug],
+    );
+  }
+
+  /** Hapus permanen; `archived` menghapus salinan di arsip. */
+  deleteFile(slug: string, archived = false): Promise<{ slug: string }> {
+    return this.#write(
+      () => request<{ slug: string }>('DELETE', `/viewer/docs/${encodeURIComponent(slug)}${archived ? '?archived=true' : ''}`),
+      () => [slug],
+    );
   }
 
   #sessionId(): Promise<string> {

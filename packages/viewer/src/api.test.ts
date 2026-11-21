@@ -154,3 +154,64 @@ describe('ViewerClient', () => {
     expect(count('/screenshot')).toBe(2);
   });
 });
+
+describe('kelola file', () => {
+  it('rute + metode tulis; sukses → cache screenshot slug terkait dibuang dan pendengar dipanggil', async () => {
+    let deleted = false;
+    const calls = fakeFetch((c) => {
+      if (c.path === '/viewer/docs' && c.method === 'GET') return docs(deleted ? [] : ['a']);
+      if (c.path === '/viewer/docs/a' && c.method === 'GET') return doc('a');
+      if (c.path === '/sessions') return ok({ sessionId: 's1' });
+      if (c.path === '/docs/open') return ok({ docId: 'Dddddddd', slug: 'a', rev: 1, created: false });
+      if (c.path === '/screenshot') return ok({ boardId: 'A', width: 1, height: 1, mimeType: 'image/png', png: PNG });
+      if (c.path === '/viewer/docs' && c.method === 'POST') return ok({ slug: 'my-landing', rev: 1 });
+      if (c.path === '/viewer/docs/a/rename') return ok({ slug: 'b', from: 'a' });
+      if (c.path === '/viewer/docs/a/duplicate') return ok({ slug: 'a-copy', rev: 0 });
+      if (c.path === '/viewer/docs/a/archive' || c.path === '/viewer/docs/a/unarchive') return ok({ slug: 'a' });
+      if (c.path.startsWith('/viewer/docs/a') && c.method === 'DELETE') {
+        deleted = true;
+        return ok({ slug: 'a', deleted: true });
+      }
+      if (c.path === '/viewer/archive') return docs(['z']);
+      throw new Error(`tak terduga ${c.method} ${c.path}`);
+    });
+    const api = await freshApi();
+    const changed = vi.fn();
+    api.onDocsChanged(changed);
+    await expect(api.createFile('My Landing', { preset: 'custom', width: 10, height: 20 })).resolves.toEqual({ slug: 'my-landing', rev: 1 });
+    await api.renameFile('a', 'B');
+    await api.duplicateFile('a');
+    await api.archiveFile('a');
+    await api.unarchiveFile('a');
+    await api.deleteFile('a', true);
+    expect((await api.listArchive()).map((d) => d.slug)).toEqual(['z']);
+    expect(changed).toHaveBeenCalledTimes(6);
+    expect(calls.filter((c) => c.method !== 'GET' && c.path.startsWith('/viewer')).map((c) => `${c.method} ${c.path}`)).toEqual([
+      'POST /viewer/docs',
+      'POST /viewer/docs/a/rename',
+      'POST /viewer/docs/a/duplicate',
+      'POST /viewer/docs/a/archive',
+      'POST /viewer/docs/a/unarchive',
+      'DELETE /viewer/docs/a?archived=true',
+    ]);
+    expect(calls[0]!.body).toEqual({ name: 'My Landing', board: { preset: 'custom', width: 10, height: 20 } });
+
+    // Screenshot a di-cache, lalu dihapus: cache dibuang → permintaan berikut tidak memakai PNG lama.
+    deleted = false;
+    await api.screenshot('a', 1, 'A');
+    await api.screenshot('a', 1, 'A');
+    expect(calls.filter((c) => c.path === '/screenshot')).toHaveLength(1);
+    await api.deleteFile('a');
+    await expect(api.screenshot('a', 1, 'A')).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    expect(calls.filter((c) => c.path === '/screenshot')).toHaveLength(1);
+  });
+
+  it('gagal → ApiError, pendengar tidak dipanggil', async () => {
+    fakeFetch(() => ({ status: 409, body: { ok: false, error: { code: 'CONFLICT', message: 'dokumen b sudah ada', hint: 'pilih nama lain', retryable: false } } }));
+    const api = await freshApi();
+    const changed = vi.fn();
+    api.onDocsChanged(changed);
+    await expect(api.renameFile('a', 'b')).rejects.toMatchObject({ code: 'CONFLICT', status: 409 });
+    expect(changed).not.toHaveBeenCalled();
+  });
+});

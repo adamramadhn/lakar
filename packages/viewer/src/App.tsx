@@ -1,32 +1,18 @@
-// Kerangka aplikasi: title bar bertab, routing hash (`#/` Dashboard, `#/settings/connections` Connections,
-// `#/d/<slug>` Viewer), banner offline.
+// Kerangka aplikasi: title bar bertab, routing hash (`#/` Recents, `#/files`, `#/archive`, `#/settings/connections`
+// Connections, `#/d/<slug>` Viewer; lihat `parseRoute` di files.ts), banner offline.
 import { useEffect, useState, useSyncExternalStore } from 'react';
 import { connection } from './api';
 import { Dashboard } from './Dashboard';
+import { docHash, parseRoute, type Route } from './files';
 import { Icon } from './icons';
 import { OfflineBanner } from './OfflineBanner';
 import { Viewer } from './Viewer';
 
-type Route = { name: 'dashboard' } | { name: 'connections' } | { name: 'viewer'; slug: string };
-
 /** Hash halaman Settings → Connections. */
 export const CONNECTIONS_HASH = '#/settings/connections';
 
-function parseRoute(hash: string): Route {
-  if (/^#\/settings\/connections\/?$/.test(hash)) return { name: 'connections' };
-  const m = /^#\/d\/([^/?#]+)/.exec(hash);
-  if (m) {
-    try {
-      return { name: 'viewer', slug: decodeURIComponent(m[1]!) };
-    } catch {
-      // hash rusak → dashboard
-    }
-  }
-  return { name: 'dashboard' };
-}
-
 export const openDoc = (slug: string) => {
-  location.hash = `#/d/${encodeURIComponent(slug)}`;
+  location.hash = docHash(slug);
 };
 export const openDashboard = () => {
   location.hash = '#/';
@@ -47,7 +33,8 @@ export function App() {
   }, []);
 
   useEffect(() => {
-    document.title = route.name === 'viewer' ? `${route.slug} · Lakar` : route.name === 'connections' ? 'Connections · Lakar' : 'Lakar';
+    const titles: Record<Route['name'], string> = { recents: 'Lakar', files: 'Files · Lakar', archive: 'Archive · Lakar', connections: 'Connections · Lakar', viewer: 'Lakar' };
+    document.title = route.name === 'viewer' ? `${route.slug} · Lakar` : titles[route.name];
   }, [route]);
 
   return (
@@ -77,7 +64,7 @@ export function App() {
         {route.name === 'viewer' ? (
           <Viewer key={route.slug} slug={route.slug} />
         ) : (
-          <Dashboard page={route.name === 'connections' ? 'connections' : 'recents'} menuOpen={menuOpen} onCloseMenu={() => setMenuOpen(false)} />
+          <Dashboard page={route.name} menuOpen={menuOpen} onCloseMenu={() => setMenuOpen(false)} />
         )}
       </main>
     </div>
