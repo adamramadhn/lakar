@@ -1,15 +1,18 @@
 // Adaptor RenderPort: satu chromium-headless-shell + pool halaman hangat sewa eksklusif (AD-18, `pool.ts`).
 // Setiap screenshot/measure menyewa satu halaman sampai selesai; tidak ada mutex global.
+// Opsi `browserChannel` (aplikasi desktop): Chrome/Edge sistem sebagai ganti headless-shell.
+import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { BoardMeasure, IconCatalogPort, MeasureOptions, RenderPort, RenderStatus, ScreenshotOptions } from '@lakar/ports';
 import { CHROMIUM_ARGS, NODE_ATTR, fontRequests, iconRefs, type FontFaceSource, type RenderResult } from '@lakar/render';
-import { LakarError, findBoard, type IconGlyph, type ResolvedDocument } from '@lakar/schema';
+import { LakarError, errorMessage, findBoard, type IconGlyph, type ResolvedDocument } from '@lakar/schema';
 import { notFound } from './errors.js';
-import type { Browser, Page } from 'playwright-core';
+import type { Browser, LaunchOptions, Page } from 'playwright-core';
+import type { BrowserChannel } from './config.js';
 import type { FontRegistry } from './fonts.js';
-import { RenderPool, type Lease } from './pool.js';
+import { BrowserLaunchError, RenderPool, type Lease } from './pool.js';
 
 /** Lokasi dist render (entry) yang disajikan apa adanya ke halaman Chromium. */
 export const RENDER_MODULE_PATH = fileURLToPath(import.meta.resolve('@lakar/render'));
@@ -47,6 +50,59 @@ export async function readRenderModule(file: string): Promise<string | undefined
  */
 export const DAEMON_BROWSER_ARGS = ['--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE 127.0.0.1, EXCLUDE localhost'] as const;
 
+/** Satu kandidat browser sistem: channel Playwright atau path executable. */
+export type BrowserCandidate = { label: string; channel?: 'chrome' | 'msedge'; executablePath?: string };
+
+/** Path chromium sistem yang dicoba `auto` di Linux (setelah Chrome dan Edge). */
+export const LINUX_SYSTEM_CHROMIUM = ['/usr/bin/chromium', '/usr/bin/chromium-browser', '/snap/bin/chromium'] as const;
+
+/** Awalan pesan saat tidak ada browser sistem (dideteksi aplikasi desktop lewat substring). */
+export const BROWSER_NOT_FOUND = 'Chrome atau Edge tidak ditemukan';
+
+/** Urutan kandidat untuk `channel`: `auto` → Chrome → Edge → (Linux) chromium sistem yang ada. */
+export function browserCandidates(channel: BrowserChannel, platform: NodeJS.Platform = process.platform, exists: (p: string) => boolean = existsSync): BrowserCandidate[] {
+  const chrome: BrowserCandidate = { label: 'Google Chrome', channel: 'chrome' };
+  const edge: BrowserCandidate = { label: 'Microsoft Edge', channel: 'msedge' };
+  if (channel === 'chrome') return [chrome];
+  if (channel === 'msedge') return [edge];
+  const system = platform === 'linux' ? LINUX_SYSTEM_CHROMIUM.filter((p) => exists(p)).map((p) => ({ label: `Chromium (${p})`, executablePath: p })) : [];
+  return [chrome, edge, ...system];
+}
+
+/** Error Playwright untuk browser yang tidak terpasang (bukan browser yang terpasang tapi gagal jalan). */
+const MISSING = /is not found at|Executable doesn't exist|ENOENT|not installed/i;
+
+/**
+ * Jalankan browser sistem pertama yang berhasil dari `candidates`. Semua tidak terpasang → BrowserLaunchError
+ * "Chrome atau Edge tidak ditemukan …"; ada yang terpasang tapi gagal → BrowserLaunchError dengan alasan per kandidat.
+ */
+export async function launchSystemBrowser(
+  launch: (opts: LaunchOptions) => Promise<Browser>,
+  candidates: readonly BrowserCandidate[],
+  base: LaunchOptions,
+  channel: BrowserChannel,
+): Promise<Browser> {
+  const failures: string[] = [];
+  let allMissing = true;
+  for (const c of candidates) {
+    try {
+      return await launch({ ...base, ...(c.channel ? { channel: c.channel } : { executablePath: c.executablePath! }) });
+    } catch (e) {
+      const line = errorMessage(e).split('\n')[0]!;
+      const missing = MISSING.test(errorMessage(e));
+      if (!missing) allMissing = false;
+      failures.push(`${c.label}: ${missing ? 'tidak terpasang' : line}`);
+    }
+  }
+  const tried = candidates.map((c) => c.label).join(', ');
+  if (allMissing) {
+    throw new BrowserLaunchError(
+      `${BROWSER_NOT_FOUND} (dicoba: ${tried}; LAKAR_BROWSER_CHANNEL=${channel}). Pasang Google Chrome atau Microsoft Edge, lalu jalankan ulang Lakar.`,
+    );
+  }
+  throw new BrowserLaunchError(`Chrome/Edge gagal dijalankan (LAKAR_BROWSER_CHANNEL=${channel}): ${failures.join('; ')}`);
+}
+
 const ASSET_HINT = 'assetId adalah sha256 file gambar di store aset daemon; impor gambar dulu (aset harus ada di store)';
 
 export type ChromiumOptions = {
@@ -57,6 +113,8 @@ export type ChromiumOptions = {
   timeoutMs: number;
   /** Jumlah halaman pool (default 2). */
   pages?: number;
+  /** Browser sistem (`chrome`/`msedge`/`auto`); tidak diset = chromium-headless-shell di `browsersPath`. */
+  browserChannel?: BrowserChannel;
   /** Registry font lokal: face board di-resolve sebelum render (AD-10). */
   fonts: FontRegistry;
   /** Katalog ikon: glyph node icon board di-resolve sebelum render (AD-9). */
@@ -75,10 +133,13 @@ export class ChromiumRenderer implements RenderPort<ResolvedDocument> {
       size: opts.pages ?? 2,
       timeoutMs: opts.timeoutMs,
       launch: async () => {
+        const channel = this.#opts.browserChannel;
         // C9 (a): browser Lakar di cache khusus Lakar. Wajib di-set sebelum playwright-core dimuat.
-        process.env.PLAYWRIGHT_BROWSERS_PATH = this.#opts.browsersPath;
+        if (!channel) process.env.PLAYWRIGHT_BROWSERS_PATH = this.#opts.browsersPath;
         const { chromium } = await import('playwright-core');
-        return chromium.launch({ headless: true, timeout: this.#opts.timeoutMs, args: [...CHROMIUM_ARGS, ...DAEMON_BROWSER_ARGS] });
+        const base: LaunchOptions = { headless: true, timeout: this.#opts.timeoutMs, args: [...CHROMIUM_ARGS, ...DAEMON_BROWSER_ARGS] };
+        if (!channel) return chromium.launch(base);
+        return launchSystemBrowser((o) => chromium.launch(o), browserCandidates(channel), base, channel);
       },
       openPage: async (browser: Browser, dpr) => {
         const page = await browser.newPage({ deviceScaleFactor: dpr });

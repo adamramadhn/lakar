@@ -60,13 +60,21 @@ function prune(nodeModules) {
   if (existsSync(lucide)) {
     rmSync(join(lucide, 'font'), { recursive: true, force: true });
     rmSync(join(lucide, 'sprite.svg'), { force: true });
-    // Daemon hanya membaca dist/esm/lucide-static.mjs (packages/icons/src/data.ts).
+    // Daemon membaca dist/esm/lucide-static.mjs dan me-resolve entry `main` paket (packages/icons/src/data.ts
+    // `packageRoot`); file dist lain dibuang.
+    const main = JSON.parse(readFileSync(join(lucide, 'package.json'), 'utf8')).main;
+    const keep = new Set(['esm/lucide-static.mjs', ...(typeof main === 'string' ? [main.replace(/^\.\//, '').replace(/^dist\//, '')] : [])]);
     const dist = join(lucide, 'dist');
-    if (existsSync(dist)) {
-      for (const entry of readdirSync(dist)) if (entry !== 'esm') rmSync(join(dist, entry), { recursive: true, force: true });
-      const esm = join(dist, 'esm');
-      if (existsSync(esm)) for (const entry of readdirSync(esm)) if (entry !== 'lucide-static.mjs') rmSync(join(esm, entry), { recursive: true, force: true });
-    }
+    const walk = (dir, rel) => {
+      for (const entry of readdirSync(dir, { withFileTypes: true })) {
+        const r = rel ? `${rel}/${entry.name}` : entry.name;
+        if (entry.isDirectory()) {
+          if ([...keep].some((k) => k.startsWith(`${r}/`))) walk(join(dir, entry.name), r);
+          else rmSync(join(dir, entry.name), { recursive: true, force: true });
+        } else if (!keep.has(r)) rmSync(join(dir, entry.name), { force: true });
+      }
+    };
+    if (existsSync(dist)) walk(dist, '');
   }
   // Shim .bin bisa berupa symlink (tidak dipakai daemon, dan resource Tauri tidak boleh berisi symlink);
   // metadata pnpm tidak dibutuhkan saat runtime.
@@ -150,7 +158,6 @@ async function prepareNode(target) {
   }
 }
 
-const target = arg('--target') || hostTriple();
 if (!flag('--skip-deploy')) prepareResources();
-if (!flag('--skip-node')) await prepareNode(target);
+if (!flag('--skip-node')) await prepareNode(arg('--target') || hostTriple());
 log('selesai');

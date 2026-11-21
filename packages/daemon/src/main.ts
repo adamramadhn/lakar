@@ -38,6 +38,14 @@ try {
   };
   process.on('SIGTERM', () => shutdown('SIGTERM'));
   process.on('SIGINT', () => shutdown('SIGINT'));
+  // Sidecar aplikasi desktop: parent mati/menutup pipe → stdin `end` → berhenti rapi (tidak jadi proses yatim).
+  if (process.env.LAKAR_EXIT_ON_STDIN_CLOSE === '1') {
+    const onClose = () => shutdown('stdin ditutup');
+    process.stdin.on('end', onClose);
+    process.stdin.on('close', onClose);
+    process.stdin.on('error', onClose);
+    process.stdin.on('data', () => {}); // isi stdin diabaikan; listener data menjaga stream mengalir sampai EOF
+  }
   // Baris kesiapan dicetak SETELAH handler sinyal terpasang: pengawas (tes, tracer-e2e) boleh
   // langsung mengirim SIGTERM begitu membaca baris ini tanpa membunuh proses lewat aksi default.
   console.log(`lakard: mendengarkan ${daemon.url} (data: ${config.dataDir})`);

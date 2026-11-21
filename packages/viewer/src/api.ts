@@ -1,4 +1,4 @@
-// Klien lakard untuk viewer. Hanya endpoint baca: /viewer/*, /status, dan endpoint sesi (open, screenshot,
+// Klien lakard untuk viewer. Hanya endpoint baca: /viewer/* (termasuk /viewer/connections), /status, dan endpoint sesi (open, screenshot,
 // inspect, layout-check) yang tidak mengubah dokumen. Bentuk respons AD-11: {ok:true,data} | {ok:false,error}.
 import type { Finding, FindingSummary, LakarDocument } from '@lakar/schema';
 
@@ -7,7 +7,12 @@ const SESSION_HEADER = 'x-lakar-session';
 const CLIENT = 'lakar-viewer';
 
 export type DocSummary = { slug: string; rev: number; updatedAt: string; boardCount: number; firstBoardId: string | null };
-export type DaemonStatus = { version: string; host: string; port: number; dataDir: string };
+/** Status pool render (`/status` → `pool`); `lastError` mis. "Chrome atau Edge tidak ditemukan …" di aplikasi desktop. */
+export type PoolStatus = { size: number; ready: number; browserVersion?: string; lastError?: string };
+export type DaemonStatus = { version: string; host: string; port: number; dataDir: string; pool?: PoolStatus | null };
+/** Config server MCP stdio dari `GET /viewer/connections`; `null` bila entry MCP tidak ditemukan. */
+export type McpServerConfig = { command: string; args: string[]; env: { LAKAR_URL: string } };
+export type Connections = { url: string; mcp: McpServerConfig | null };
 export type Screenshot = { boardId: string; width: number; height: number; url: string };
 export type InspectNode = Record<string, unknown> & { id: string; name: string; type?: string; bounds?: [number, number, number, number]; children?: InspectNode[]; childCount?: number };
 export type InspectResult = { docId: string; rev: number; boardId: string; node: InspectNode; truncated?: boolean };
@@ -117,6 +122,10 @@ class ViewerClient {
 
   status() {
     return request<DaemonStatus>('GET', '/status');
+  }
+
+  connections() {
+    return request<Connections>('GET', '/viewer/connections');
   }
 
   async listDocs(): Promise<DocSummary[]> {

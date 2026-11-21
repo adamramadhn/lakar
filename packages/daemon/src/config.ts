@@ -34,9 +34,20 @@ export type DaemonConfig = {
   unsplashAppName: string;
   /** Direktori hasil build viewer yang disajikan di `/app/` (default `packages/viewer/dist`). */
   viewerDir?: string;
+  /**
+   * Browser sistem untuk pool render (`chrome`, `msedge`, `auto`). Tidak diset = chromium-headless-shell Lakar di
+   * `browsersPath` (default lama). Aplikasi desktop memakai `auto`: Chrome → Edge → (Linux) chromium sistem.
+   */
+  browserChannel?: BrowserChannel;
+  /** Entry server MCP stdio (`packages/mcp/dist/main.js`) yang ditampilkan di `GET /viewer/connections`. */
+  mcpEntry?: string;
   /** File config yang dibaca (undefined bila tidak ada). */
   configPath?: string;
 };
+
+/** Nilai `browser_channel` yang valid. */
+export const BROWSER_CHANNELS = ['chrome', 'msedge', 'auto'] as const;
+export type BrowserChannel = (typeof BROWSER_CHANNELS)[number];
 
 /** Kunci config.toml → nama env pengganti. */
 const KEYS = {
@@ -48,6 +59,9 @@ const KEYS = {
   pexels_key_file: 'LAKAR_PEXELS_KEY_FILE',
   unsplash_key_file: 'LAKAR_UNSPLASH_KEY_FILE',
   unsplash_app_name: 'LAKAR_UNSPLASH_APP_NAME',
+  browser_channel: 'LAKAR_BROWSER_CHANNEL',
+  viewer_dir: 'LAKAR_VIEWER_DIR',
+  mcp_entry: 'LAKAR_MCP_ENTRY',
 } as const;
 type Key = keyof typeof KEYS;
 
@@ -97,6 +111,15 @@ function unsplashAppName(v: { name: string; raw: string } | undefined): string {
   return v.raw;
 }
 
+/** `browser_channel`: kosong → undefined (headless-shell); selain `chrome`/`msedge`/`auto` → Error. */
+function browserChannel(v: { name: string; raw: string } | undefined): BrowserChannel | undefined {
+  if (!v) return undefined;
+  if (!(BROWSER_CHANNELS as readonly string[]).includes(v.raw)) {
+    throw new Error(`${v.name} tidak valid: ${JSON.stringify(v.raw)} (nilai valid: ${BROWSER_CHANNELS.join(', ')}; kosong = chromium-headless-shell Lakar)`);
+  }
+  return v.raw as BrowserChannel;
+}
+
 /**
  * Baca config. `LAKAR_CONFIG` menunjuk file config (bila diset, file wajib ada); default
  * `~/.config/lakar/config.toml` opsional. Nilai salah atau kunci tak dikenal → Error (gagal start yang jelas).
@@ -122,6 +145,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): DaemonConfig {
   const port = pick('port');
   const pages = pick('render_pages');
   const timeout = pick('render_timeout_ms');
+  const channel = browserChannel(pick('browser_channel'));
+  const viewerDir = pick('viewer_dir')?.raw;
+  const mcpEntry = pick('mcp_entry')?.raw;
   return {
     host: HOST,
     port: port ? intIn(port.name, port.raw, 0, 65535) : DEFAULT_PORT,
@@ -134,6 +160,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): DaemonConfig {
     pexelsKeyFile: pick('pexels_key_file')?.raw || defaultPexelsKeyFile(home),
     unsplashKeyFile: pick('unsplash_key_file')?.raw || defaultUnsplashKeyFile(home),
     unsplashAppName: unsplashAppName(pick('unsplash_app_name')),
+    ...(viewerDir ? { viewerDir } : {}),
+    ...(channel ? { browserChannel: channel } : {}),
+    ...(mcpEntry ? { mcpEntry } : {}),
     ...(configPath ? { configPath } : {}),
   };
 }
