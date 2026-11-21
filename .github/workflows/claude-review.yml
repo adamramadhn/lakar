@@ -4,6 +4,18 @@ on:
   pull_request:
     branches: [main]
     types: [opened, synchronize, ready_for_review, reopened]
+    # Only review PRs that touch code; skip vendored skills (_bmad, .claude), design assets and docs.
+    paths:
+      - 'packages/**'
+      - 'bench/src/**'
+      - 'tests/**'
+      - 'scripts/**'
+      - 'tools/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - 'tsconfig*.json'
+      - 'vitest.config.ts'
 
 concurrency:
   group: code-review-${{ github.ref }}
