@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main, g1]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      # Cache Chromium khusus Lakar, sama seperti scripts/install-browser.sh (C9).
+      LAKAR_BROWSERS_PATH: ${{ github.workspace }}/.cache/lakar/ms-playwright
+      PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/.cache/lakar/ms-playwright
+      # ux-lakar (DESIGN.md, golden-set.md) is excluded from git, so the C7 and
+      # judge-text guards cannot read their sources on CI; let them skip.
+      LAKAR_C7_ALLOW_MISSING_SOURCES: "1"
+    steps:
+      - uses: actions/checkout@v6
+
+      # pnpm versi diambil dari "packageManager" di package.json.
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Cache Chromium
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.PLAYWRIGHT_BROWSERS_PATH }}
+          key: chromium-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+
+      - name: Install chromium-headless-shell
+        run: pnpm --filter @lakar/daemon exec playwright-core install --with-deps chromium-headless-shell
+
+      - name: Build
+        run: pnpm build
+
+      # GitHub runners are slower than the VPS; render latency tests need more than vitest's 5 s default.
+      - name: Test
+        run: pnpm test --testTimeout=30000

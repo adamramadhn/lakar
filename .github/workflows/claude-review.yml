@@ -1,0 +1,67 @@
+name: Code Review
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, ready_for_review, reopened]
+    # Only review PRs that touch code; skip vendored skills (_bmad, .claude), design assets and docs.
+    paths:
+      - 'packages/**'
+      - 'bench/src/**'
+      - 'tests/**'
+      - 'scripts/**'
+      - 'tools/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - 'tsconfig*.json'
+      - 'vitest.config.ts'
+
+concurrency:
+  group: code-review-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+  id-token: write
+
+jobs:
+  claude-review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      ANTHROPIC_BASE_URL: https://api.moccilabs.com
+      API_TIMEOUT_MS: 3000000
+      # Map every Claude Code model tier to GLM 5.3 on the moccilabs gateway.
+      ANTHROPIC_MODEL: glm/glm-5.3
+      ANTHROPIC_DEFAULT_OPUS_MODEL: glm/glm-5.3
+      ANTHROPIC_DEFAULT_SONNET_MODEL: glm/glm-5.3
+      ANTHROPIC_DEFAULT_HAIKU_MODEL: glm/glm-5.3
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@a5ad31d6a139d249332a2605b85202e8c0b78450 # v2
+        with:
+          egress-policy: audit
+
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Run Claude Code Review
+        id: claude-review
+        uses: anthropics/claude-code-action@acfe7992852970efb4fee683d63d628e3e52df67 # v1
+        env:
+          ANTHROPIC_BASE_URL: https://api.moccilabs.com
+          API_TIMEOUT_MS: 3000000
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          # Use the built-in token so the Claude GitHub App does not need to be installed.
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          plugin_marketplaces: 'https://github.com/anthropics/claude-code.git'
+          plugins: 'code-review@claude-code-plugins'
+          prompt: '/code-review:code-review ${{ github.repository }}/pull/${{ github.event.pull_request.number }}'
+          claude_args: '--model glm/glm-5.3'
