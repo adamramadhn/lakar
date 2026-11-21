@@ -2555,6 +2555,19 @@ button.panel-tab:hover {
   flex: 1;
   overflow-wrap: anywhere;
 }
+.toast.info > svg {
+  flex: none;
+  margin-top: 2px;
+  color: var(--success);
+}
+.toast.busy > .spinner {
+  flex: none;
+  margin-top: 1px;
+}
+.toast-action {
+  flex: none;
+  font-weight: 600;
+}
 .toast-close {
   display: grid;
   place-items: center;

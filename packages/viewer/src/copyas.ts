@@ -134,16 +134,17 @@ export function cssDeclarations(node: Node): Decl[] {
     if (typeof node.align === 'string') push('text-align', node.align);
   }
   if (type === 'icon') push('color', color(node.color));
+  // Satu entri padding tidak valid → padding dilewati (bukan "16px  8px").
+  const pad = Array.isArray(node.padding) ? (node.padding.map(len).every(Boolean) ? node.padding.map(len).join(' ') : undefined) : len(node.padding);
   if (type === 'frame' && (node.layout === 'row' || node.layout === 'column')) {
     push('display', 'flex');
     push('flex-direction', node.layout);
     push('gap', len(node.gap));
-    const pad = Array.isArray(node.padding) ? (node.padding.map(len).every(Boolean) ? node.padding.map(len).join(' ') : undefined) : len(node.padding);
     push('padding', pad);
     if (typeof node.align === 'string') push('align-items', ALIGN[node.align]);
     if (typeof node.justify === 'string') push('justify-content', JUSTIFY[node.justify]);
-  } else if (type === 'frame' && node.padding !== undefined) {
-    push('padding', Array.isArray(node.padding) ? node.padding.map(len).join(' ') : len(node.padding));
+  } else if (type === 'frame') {
+    push('padding', pad);
   }
   return out;
 }
@@ -209,6 +210,7 @@ export function toTailwind(node: Node): string {
     const p = pad.split(' ');
     if (p.length === 1) cls.push(`p-${arb(p[0]!)}`);
     else if (p.length === 2) cls.push(`py-${arb(p[0]!)}`, `px-${arb(p[1]!)}`);
+    else if (p.length === 3) cls.push(`pt-${arb(p[0]!)}`, `px-${arb(p[1]!)}`, `pb-${arb(p[2]!)}`);
     else if (p.length === 4) ['pt', 'pr', 'pb', 'pl'].forEach((k, i) => cls.push(`${k}-${arb(p[i]!)}`));
   }
   const ai = get('align-items');

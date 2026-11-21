@@ -23,7 +23,7 @@ export function withSuffix(base: string, n: number): string {
   return `${base.slice(0, SLUG_MAX - sfx.length).replace(/-+$/, '')}${sfx}`;
 }
 
-/** Pratinjau slug New file: slug pertama yang belum dipakai (`-2`, `-3`, …); '' bila nama tidak valid. */
+/** Pratinjau slug New file: slug pertama yang belum dipakai (`-2`, `-3`, …; `taken` termasuk arsip bila sudah dimuat); '' bila nama tidak valid. */
 export function previewSlug(name: string, taken: ReadonlySet<string>): string {
   const base = slugify(name);
   if (!base) return '';

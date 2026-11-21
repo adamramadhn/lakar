@@ -220,7 +220,10 @@ describe('archive / unarchive', () => {
     const t = await setup();
     await t.create('a');
     await t.post('/viewer/docs/a/archive');
-    await t.create('a');
+    // New file tidak lagi memakai slug arsip (jadi a-2); bentrok tetap mungkin lewat open_doc agen.
+    expect((await t.create('a')).slug).toBe('a-2');
+    const s = await t.session();
+    expect((await t.post('/docs/open', { slug: 'a' }, s)).statusCode).toBe(200);
     const u = await t.post('/viewer/docs/a/unarchive');
     expect(u.statusCode).toBe(409);
     expect(u.json().error.code).toBe('CONFLICT');
@@ -427,5 +430,94 @@ describe('GET /viewer/icons/:lib/:icon', () => {
     expect(r.body).toContain('<path');
     expect((await t.get('/viewer/icons/lucide/no-such-icon-xyz')).statusCode).toBe(404);
     expect((await t.get('/viewer/icons/evil/star')).statusCode).toBe(404);
+  });
+});
+
+describe('execute antre di belakang kelola file', () => {
+  /** Server dengan measure lambat: execute pertama memegang kunci dokumen selama check. */
+  async function slowSetup() {
+    const t = await setup();
+    await t.app.close();
+    const slow = {
+      screenshot: async () => new Uint8Array(PNG_1x1),
+      measure: async (doc: any, boardId: string) => {
+        await new Promise((r) => setTimeout(r, 150));
+        const b = doc.pages.flatMap((p: any) => p.children).find((x: any) => x.id === boardId);
+        return { width: b.width, height: b.height, nodes: [], texts: [] };
+      },
+    } as never;
+    const { app } = buildServer({ config: { ...baseConfig, port: 0, dataDir: t.dataDir }, render: slow });
+    const post = (url: string, payload?: unknown, session?: string) =>
+      app.inject({ method: 'POST', url, ...(payload !== undefined ? { payload: payload as object } : {}), headers: session ? { 'x-lakar-session': session } : {} });
+    const slug = (await post('/viewer/docs', { name: 'Queued' })).json().data.slug as string;
+    const s = (await post('/sessions', { client: 'claude-code' })).json().data.sessionId as string;
+    expect((await post('/docs/open', { slug }, s)).statusCode).toBe(200);
+    const exec = (n: number) => post('/execute', { code: `add(null,{type:'board',name:'B${n}',x:${n * 500},y:0,width:10,height:10,screen:'mobile'})`, description: `tambah board antre nomor ${n}` }, s);
+    return { app, post, slug, s, exec, docsDir: t.docsDir, docFile: t.docFile };
+  }
+  const tick = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+  it.each(['rename', 'delete'] as const)('%s antre di antara dua execute → execute kedua NO_ACTIVE_DOC, slug lama tidak dibuat ulang', async (op) => {
+    const t = await slowSetup();
+    try {
+      const first = t.exec(1);
+      await tick(30);
+      const mutate = op === 'rename' ? t.post(`/viewer/docs/${t.slug}/rename`, { name: 'Moved' }) : t.app.inject({ method: 'DELETE', url: `/viewer/docs/${t.slug}` });
+      await tick(30);
+      const second = t.exec(2);
+      const [a, m, b] = await Promise.all([first, mutate, second]);
+      expect(a.statusCode, a.body).toBe(200);
+      expect(m.statusCode, m.body).toBe(200);
+      expect(b.statusCode, b.body).not.toBe(500);
+      expect(b.json().error.code).toBe('NO_ACTIVE_DOC');
+      expect(existsSync(t.docFile(t.slug))).toBe(false);
+      if (op === 'rename') expect(existsSync(t.docFile('moved'))).toBe(true);
+    } finally {
+      await t.app.close();
+    }
+  });
+});
+
+describe('Origin route tulis /viewer/*', () => {
+  it('Origin asing → 403; origin daemon sendiri dan tanpa Origin → boleh; GET tidak diperiksa', async () => {
+    const dataDir = await mkdtemp(join(root, 'origin-'));
+    const { app } = buildServer({ config: { ...baseConfig, port: 7466, dataDir }, render: fakeRender });
+    try {
+      const post = (origin?: string) =>
+        app.inject({ method: 'POST', url: '/viewer/docs', payload: { name: 'Origin Test' }, headers: origin ? { origin } : {} });
+      const evil = await post('https://evil.example');
+      expect(evil.statusCode).toBe(403);
+      expect(evil.json()).toMatchObject({ ok: false, error: { code: 'SCHEMA_INVALID' } });
+      expect((await post('http://127.0.0.1:9999')).statusCode).toBe(403);
+      expect((await post('null')).statusCode).toBe(403);
+      expect((await app.inject({ method: 'DELETE', url: '/viewer/docs/x', headers: { origin: 'https://evil.example' } })).statusCode).toBe(403);
+      expect((await post('http://127.0.0.1:7466')).statusCode).toBe(200);
+      expect((await post('http://localhost:7466')).statusCode).toBe(200);
+      expect((await post()).statusCode).toBe(200);
+      expect((await app.inject({ method: 'GET', url: '/viewer/docs', headers: { origin: 'https://evil.example' } })).statusCode).toBe(200);
+    } finally {
+      await app.close();
+    }
+  });
+});
+
+describe('slug arsip dianggap terpakai', () => {
+  it('New file/duplicate/rename tidak memakai slug milik file arsip; Unarchive sesudahnya tidak bentrok', async () => {
+    const t = await setup();
+    await t.create('Shelf');
+    expect((await t.post('/viewer/docs/shelf/archive')).statusCode).toBe(200);
+    expect((await t.create('Shelf')).slug).toBe('shelf-2');
+    await t.create('Other');
+    const ren = await t.post('/viewer/docs/other/rename', { name: 'Shelf' });
+    expect(ren.statusCode).toBe(409);
+    expect(ren.json().error.code).toBe('CONFLICT');
+    await t.create('Book');
+    expect((await t.post('/viewer/docs/book/archive')).statusCode).toBe(200);
+    await t.create('Bk');
+    expect((await t.post('/viewer/docs/bk/rename', { name: 'Book copy' })).json().data.slug).toBe('book-copy');
+    expect((await t.post('/viewer/docs/book-copy/archive')).statusCode).toBe(200);
+    await t.create('Book');
+    expect((await t.post('/viewer/docs/book-2/duplicate')).json().data.slug).toBe('book-2-copy');
+    expect((await t.post('/viewer/docs/shelf/unarchive')).statusCode).toBe(200);
   });
 });

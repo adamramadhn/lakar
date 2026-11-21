@@ -71,7 +71,7 @@ const CreateBody = z
 const CREATE_HINT = "kirim {name, board?:{preset:'desktop'|'tablet'|'mobile'} | {preset:'custom', width, height}} (width/height 1–10000)";
 const RenameBody = z.object({ name: NameField }).strict();
 const DeleteQuery = z.object({ archived: z.enum(['true', 'false']).optional() }).strict();
-const RestoreBody = z.object({ rev: z.number().int().nonnegative() }).strict();
+const RestoreBody = z.object({ rev: z.number().int().nonnegative(), baseRev: z.number().int().nonnegative().optional() }).strict();
 const REV_PARAM = /^(0|[1-9]\d{0,9})$/;
 
 export type FileRoutesOptions = {
@@ -154,11 +154,13 @@ export function registerFileRoutes(app: FastifyInstance, { docs, store, sessions
   const locked = <T>(slugs: string[], fn: () => Promise<T>): Promise<T> => docLocks.run(FILES_LOCK, () => lockSlugs(slugs, fn));
   /** Slug terpakai: ada di memori (mis. baru dibuka agen) atau di disk. */
   const taken = async (slug: string) => docs.has(slug) || (await store.exists(slug));
-  /** Slug pertama yang bebas: `base`, `base-2`, `base-3`, … */
+  /** Slug tidak boleh dipakai file baru: terpakai, atau milik file di arsip (Unarchive nanti tidak bentrok). */
+  const claimed = async (slug: string) => (await taken(slug)) || (await store.exists(slug, true));
+  /** Slug pertama yang bebas (termasuk arsip): `base`, `base-2`, `base-3`, … */
   const freeSlug = async (base: string): Promise<string> => {
     for (let n = 1; ; n++) {
       const slug = withSuffix(base, n);
-      if (!(await taken(slug))) return slug;
+      if (!(await claimed(slug))) return slug;
     }
   };
   const mustExist = async (slug: string) => {
@@ -175,7 +177,7 @@ export function registerFileRoutes(app: FastifyInstance, { docs, store, sessions
       const slug = await freeSlug(base);
       return docLocks.run(slug, async () => {
         // Agen bisa membuka slug ini di antara pemeriksaan dan kunci (open tidak memegang `#files`).
-        if (await taken(slug)) throw new LakarError('CONFLICT', `dokumen ${slug} baru saja dibuat`, { hint: 'coba lagi', retryable: true });
+        if (await claimed(slug)) throw new LakarError('CONFLICT', `dokumen ${slug} baru saja dibuat`, { hint: 'coba lagi', retryable: true });
         const committed = await transact(createDocument(), { sessionId: VIEWER_CLIENT, description: 'Created file' }, (tx) => {
           tx.add(null, { type: 'board', name: spec.name, x: 0, y: 0, width: spec.width, height: spec.height, screen: spec.screen, fills: [{ type: 'solid', color: '#FFFFFF' }] });
         });
@@ -197,6 +199,7 @@ export function registerFileRoutes(app: FastifyInstance, { docs, store, sessions
       await mustExist(from);
       if (to === from) return { slug: to, from };
       if (await taken(to)) throw new LakarError('CONFLICT', `dokumen ${to} sudah ada`, { hint: 'pilih nama lain' });
+      if (await store.exists(to, true)) throw new LakarError('CONFLICT', `dokumen ${to} sudah ada di arsip`, { hint: 'pilih nama lain, atau hapus file arsip itu dulu' });
       await store.rename(from, to);
       const mem = docs.get(from);
       docs.delete(from);
@@ -216,7 +219,7 @@ export function registerFileRoutes(app: FastifyInstance, { docs, store, sessions
       return lockSlugs([from, slug], async () => {
         const src = docs.get(from) ?? (await peekDocument(store, from));
         if (!src) throw new LakarError('NOT_FOUND', `dokumen ${from} tidak ada`, { hint: 'pakai slug dari GET /viewer/docs' });
-        if (await taken(slug)) throw new LakarError('CONFLICT', `dokumen ${slug} baru saja dibuat`, { hint: 'coba lagi', retryable: true });
+        if (await claimed(slug)) throw new LakarError('CONFLICT', `dokumen ${slug} baru saja dibuat`, { hint: 'coba lagi', retryable: true });
         const copy: LakarDocument = { ...structuredClone(src), id: IdAllocator.forDocument(src).next(), rev: 0 };
         await store.dropOrphanHistory(slug);
         await store.commit(slug, copy, historyEntry(0, `Duplicated from ${from}`));
@@ -283,7 +286,7 @@ export function registerFileRoutes(app: FastifyInstance, { docs, store, sessions
   app.post<{ Params: { slug: string } }>('/viewer/docs/:slug/restore', async (req, reply) => {
     const { slug } = req.params;
     checkSlug(slug);
-    const { rev } = parse(RestoreBody, req.body, 'kirim {rev} (rev dari GET /viewer/docs/:slug/history)');
+    const { rev, baseRev } = parse(RestoreBody, req.body, 'kirim {rev, baseRev?} (rev dari GET /viewer/docs/:slug/history; baseRev = rev terkini yang dilihat klien)');
     const description = `Restored r${rev}`;
     const t0 = Date.now();
     const call: ActivityCall = {
@@ -302,6 +305,11 @@ export function registerFileRoutes(app: FastifyInstance, { docs, store, sessions
         // Dokumen belum dimuat (belum dibuka siapa pun): muat dari disk seperti open_doc.
         const current = docs.get(slug) ?? (await store.read(slug));
         if (!current) throw new LakarError('NOT_FOUND', `dokumen ${slug} tidak ada`, { hint: 'pakai slug dari GET /viewer/docs' });
+        // Klien melihat versi yang sudah usang (agen menulis sesudahnya) → jangan timpa perubahan baru.
+        if (baseRev !== undefined && current.rev !== baseRev) {
+          throw new LakarError('CONFLICT', `dokumen ${slug} sudah berubah ke r${current.rev} (klien melihat r${baseRev})`, { hint: 'ada perubahan yang lebih baru; muat ulang riwayat lalu pilih versi lagi' });
+        }
+        if (rev === current.rev) throw new LakarError('CONFLICT', `r${rev} sudah versi terkini ${slug}`, { hint: 'pilih versi yang lebih lama untuk dipulihkan' });
         const snap = await readRevision(new Map([[slug, current]]), store, slug, rev);
         const next: LakarDocument = { ...structuredClone(snap), id: current.id, rev: current.rev + 1 };
         await store.commit(slug, next, historyEntry(next.rev, description, 'restore'));

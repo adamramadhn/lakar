@@ -2,7 +2,7 @@
 title: 'Aplikasi 4: tambah dan hapus layer manual dari kanvas'
 type: 'feature'
 created: '2026-11-21'
-status: 'in-review'
+status: 'done'
 baseline_commit: '04f532bf26e75306f1e835b02d13968bd42c13a4'
 route: 'dispatch'
 review_loop_iteration: 0

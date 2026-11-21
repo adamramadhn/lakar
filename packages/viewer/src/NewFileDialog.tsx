@@ -8,14 +8,17 @@ import { Icon, type IconName } from './icons';
 /** Dialog modal: scrim, Escape/klik scrim menutup, fokus awal di elemen `[data-autofocus]`. */
 export function Modal({ label, onClose, children, className = '' }: { label: string; onClose: () => void; children: ReactNode; className?: string }) {
   const ref = useRef<HTMLDivElement>(null);
+  // `onClose` sering inline (berubah tiap render induk): simpan di ref supaya fokus/select hanya sekali saat dibuka.
+  const close = useRef(onClose);
+  close.current = onClose;
   useEffect(() => {
     const el = ref.current?.querySelector<HTMLElement>('[data-autofocus]');
     el?.focus();
     if (el instanceof HTMLInputElement) el.select();
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && close.current();
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
+  }, []);
   return (
     <div className="modal-scrim" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
       <div ref={ref} className={`modal ${className}`} role="dialog" aria-modal="true" aria-label={label}>

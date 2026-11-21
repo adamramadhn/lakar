@@ -24,3 +24,19 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-desktop-release-1.md`
   summary: `RenderPool.close()` menunggu peluncuran browser yang sedang berjalan, sehingga shutdown (SIGTERM atau stdin ditutup) saat pool masih hangat bisa melewati batas 5 s dan keluar paksa dengan kode 1.
   evidence: smoke test sidecar di release.yml (Linux, macOS x64, Windows) keluar 1 saat stdin ditutup ketika pool 0/2; perilaku pool sudah ada sebelum perubahan ini. Chrome ikut berhenti karena pipe Playwright tertutup, jadi dampaknya hanya kode keluar dan jeda 5 s.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-app-1-file-management.md`
+  summary: Operasi file dan edit dari viewer (new/rename/duplicate/archive/delete, insert/delete layer) tidak memancarkan event activity, jadi jendela viewer lain (mis. tab browser di samping aplikasi desktop) tidak ikut memuat ulang; hanya Restore yang memancarkan event.
+  evidence: `events.ts` melewati sesi `lakar-viewer`; `api.onDocsChanged` hanya listener dalam proses. Viewer yang membuka slug yang di-rename/arsip/hapus di tempat lain jatuh ke 404 tanpa pengalihan.
+- source_spec: `_bmad-output/implementation-artifacts/spec-app-2-export-copy.md`
+  summary: Handler unduhan Tauri (`on_download`, konfigurasi jendela `create:false`) hanya diuji lewat helper murninya; perlu smoke test manual di Windows, macOS, dan Linux bahwa Export PNG mendarat di Downloads tanpa menimpa file.
+  evidence: `cargo test` hanya mencakup `unique_path`/`download_name`; tidak ada webview di CI.
+- source_spec: `_bmad-output/implementation-artifacts/spec-app-1-file-management.md`
+  summary: Kartu dan baris Dashboard memakai `div role=button` yang berisi tombol "…" (kontrol interaktif bersarang), dan pintasan F2/Del/Ctrl+D tidak punya `aria-keyshortcuts`/tooltip.
+  evidence: temuan Blind Hunter pada review batch 1–4.
+- source_spec: `_bmad-output/implementation-artifacts/spec-app-3-history-restore.md`
+  summary: Snapshot 200 rev per dokumen tanpa batas byte, dan cache viewer `#revShots`/`#revDocs` tidak me-revoke blob URL atau memangkas isi saat menelusuri riwayat panjang.
+  evidence: temuan Blind Hunter pada review batch 1–4.
+- source_spec: `_bmad-output/implementation-artifacts/spec-app-1-file-management.md`
+  summary: Delete dokumen yang hanya ada di memori (file dihapus dari luar) tidak punya tes; rename/archive pada kasus yang sama mengembalikan 404 sementara delete berhasil.
+  evidence: hanya terjangkau setelah data dir diubah dari luar aplikasi.

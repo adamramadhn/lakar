@@ -1,6 +1,6 @@
 // Klien lakard untuk viewer. Endpoint baca: /viewer/* (termasuk /viewer/connections), /status, dan endpoint sesi (open, screenshot,
-// inspect, layout-check) yang tidak mengubah dokumen. Endpoint tulis hanya kelola file (POST/DELETE /viewer/docs*):
-// sesudahnya cache dokumen/screenshot slug terkait dibuang dan pendengar `onDocsChanged` dipanggil.
+// inspect, layout-check) yang tidak mengubah dokumen. Endpoint tulis: kelola file (POST/DELETE /viewer/docs*; sesudahnya
+// cache dokumen/screenshot slug terkait dibuang dan pendengar `onDocsChanged` dipanggil), Restore, dan layer manual di bawah.
 // History (aplikasi 3): versi lama dari snapshot (GET revs/:rev, POST revs/:rev/screenshot, di-cache per
 // `slug@rev`, isinya tidak pernah berubah) dan Restore (tulis, lewat antrean yang sama).
 // Layer manual (aplikasi 4): `execute` (POST /execute dari sesi viewer sendiri, kode dari codegen.ts), unggah
@@ -273,10 +273,14 @@ class ViewerClient {
     return hit;
   }
 
-  /** Pulihkan rev `rev` sebagai rev baru (POST /viewer/docs/:slug/restore). */
-  restore(slug: string, rev: number): Promise<{ slug: string; rev: number; restoredFrom: number }> {
+  /** Pulihkan rev `rev` sebagai rev baru (POST /viewer/docs/:slug/restore). `baseRev` = rev terkini yang dilihat; usang → CONFLICT. */
+  restore(slug: string, rev: number, baseRev?: number): Promise<{ slug: string; rev: number; restoredFrom: number }> {
     return this.#write(
-      () => request<{ slug: string; rev: number; restoredFrom: number }>('POST', `/viewer/docs/${encodeURIComponent(slug)}/restore`, { rev }),
+      () =>
+        request<{ slug: string; rev: number; restoredFrom: number }>('POST', `/viewer/docs/${encodeURIComponent(slug)}/restore`, {
+          rev,
+          ...(baseRev !== undefined ? { baseRev } : {}),
+        }),
       () => [slug],
     );
   }

@@ -2,7 +2,7 @@
 title: 'Aplikasi 2: Export PNG dan Copy as CSS/Tailwind/JSON'
 type: 'feature'
 created: '2026-11-21'
-status: 'in-review'
+status: 'done'
 baseline_commit: '4f28633f392ac666913457f6d3c33ff2c778a4d3'
 route: 'dispatch'
 review_loop_iteration: 0

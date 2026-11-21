@@ -1,6 +1,6 @@
-// Route baca-saja untuk viewer (Viewer B slice 1): daftar dan isi dokumen di `/viewer/*`, aset statis
-// hasil build `packages/viewer` di `/app/*`. Tidak ada yang menulis ke store atau mengubah salinan memori
-// (route tulis kelola file ada di `files.ts`).
+// Route baca untuk viewer (Viewer B slice 1): daftar dan isi dokumen di `/viewer/*`, aset statis hasil build
+// `packages/viewer` di `/app/*`. Route di file ini tidak menulis ke store atau salinan memori; route tulis viewer
+// (kelola file, Restore, unggah gambar) ada di `files.ts`, dan edit layer memakai `/execute` biasa.
 import type { FastifyInstance } from 'fastify';
 import { readFile, stat } from 'node:fs/promises';
 import { extname, resolve, sep } from 'node:path';

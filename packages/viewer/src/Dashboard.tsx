@@ -211,7 +211,9 @@ export function Dashboard({ page = 'recents', menuOpen, onCloseMenu }: { page?: 
     const hit = (list ?? []).filter((d) => d.slug.includes(q));
     return page === 'files' ? byName(hit) : hit;
   }, [list, query, page]);
-  const taken = useMemo(() => new Set((docs ?? []).map((d) => d.slug)), [docs]);
+  // Slug arsip juga terpakai (server memberi sufiks agar Unarchive tidak bentrok); arsip hanya diketahui bila sudah
+  // dimuat, selain itu pratinjau mengandalkan hasil server.
+  const taken = useMemo(() => new Set([...(docs ?? []), ...(archive ?? [])].map((d) => d.slug)), [docs, archive]);
   const duplicate = useCallback((slug: string) => {
     api.duplicateFile(slug).catch((e: unknown) => setNotice(errorText(e)));
   }, []);

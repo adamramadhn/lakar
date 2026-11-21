@@ -249,6 +249,28 @@ describe('POST /viewer/docs/:slug/restore', () => {
     }
   });
 
+  it('baseRev usang → 409 CONFLICT tanpa commit; rev terkini → 409; baseRev cocok → sukses', async () => {
+    const t = await setup();
+    try {
+      const { slug, s } = await t.createOpen('Stale');
+      await t.addBoard(s); // r2
+      await t.addBoard(s); // r3
+      const stale = await t.post(`/viewer/docs/${slug}/restore`, { rev: 1, baseRev: 2 });
+      expect(stale.statusCode).toBe(409);
+      expect(stale.json().error.code).toBe('CONFLICT');
+      expect(stale.json().error.hint).toMatch(/lebih baru/);
+      const current = await t.post(`/viewer/docs/${slug}/restore`, { rev: 3 });
+      expect(current.statusCode).toBe(409);
+      expect(current.json().error.code).toBe('CONFLICT');
+      expect((await t.get(`/viewer/docs/${slug}`)).json().data.doc.rev).toBe(3);
+      const ok = await t.post(`/viewer/docs/${slug}/restore`, { rev: 1, baseRev: 3 });
+      expect(ok.statusCode, ok.body).toBe(200);
+      expect(ok.json().data.rev).toBe(4);
+    } finally {
+      await t.app.close();
+    }
+  });
+
   it('restore saat execute agen berjalan → diserialkan oleh kunci dokumen (rev berurutan, tidak ada yang hilang)', async () => {
     const t = await setup({ measureDelayMs: 150 });
     try {

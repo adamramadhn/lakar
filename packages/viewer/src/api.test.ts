@@ -250,6 +250,17 @@ describe('History (aplikasi 3)', () => {
     await expect(api.restore('a', 3)).resolves.toEqual({ slug: 'a', rev: 8, restoredFrom: 3 });
     expect(calls.at(-1)).toMatchObject({ method: 'POST', path: '/viewer/docs/a/restore', body: { rev: 3 } });
     expect(changed).toHaveBeenCalledOnce();
+    await api.restore('a', 3, 7);
+    expect(calls.at(-1)).toMatchObject({ path: '/viewer/docs/a/restore', body: { rev: 3, baseRev: 7 } });
+  });
+
+  it('restore dengan baseRev usang → ApiError CONFLICT 409 dengan hint', async () => {
+    fakeFetch((c) => {
+      if (c.path === '/viewer/docs/a/restore') return { status: 409, body: { ok: false, error: { code: 'CONFLICT', message: 'dokumen a sudah berubah ke r9', hint: 'ada perubahan yang lebih baru', retryable: false } } };
+      throw new Error(`tak terduga ${c.path}`);
+    });
+    const api = await freshApi();
+    await expect(api.restore('a', 3, 8)).rejects.toMatchObject({ code: 'CONFLICT', status: 409, hint: 'ada perubahan yang lebih baru' });
   });
 });
 

@@ -1,4 +1,4 @@
-// Viewer read-only (desain bagian 03): Layers kiri dari JSON dokumen, canvas PNG per board, panel kanan
+// Viewer (desain bagian 03): Layers kiri dari JSON dokumen, canvas PNG per board, panel kanan
 // Activity/Inspect/Checks/History. Seleksi dari layer, board, atau temuan check disorot di canvas. Stream
 // aktivitas (`/viewer/events`) memuat ulang dokumen dan PNG board tersentuh saat rev berubah.
 // History (aplikasi 3): klik entri → pratinjau versi lama (snapshot) di kanvas baca-saja dengan banner; Restore
@@ -8,9 +8,9 @@
 // (event sesi viewer tidak dipancarkan daemon) dan node baru dipilih. Gagal → toast, dokumen tidak berubah.
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type ReactNode } from 'react';
 import type { LakarDocument } from '@lakar/schema';
-import { activityReducer, connectActivity, harnessColor, harnessLabel, initialActivity, isDocChangeFromViewer, revChange, sessionsForSlug, VIEWER_CLIENT, type ActivityEvent } from './activity';
+import { activityReducer, connectActivity, harnessColor, harnessLabel, initialActivity, revChange, sessionsForSlug, type ActivityEvent } from './activity';
 import { ActivityPanel } from './ActivityPanel';
-import { AddLayerButton, IconPicker, Toast } from './AddLayer';
+import { AddLayerButton, IconPicker, Toast, type ToastState } from './AddLayer';
 import { api, ApiError, errorText, OfflineError, type HistoryEntry, type InspectResult, type LayoutCheck } from './api';
 import { Canvas, type AgentMark, type CanvasPreview, type Focus, type Highlight, type InsertPoint } from './Canvas';
 import { failureText, imageFileProblem, insertBoardAt, insertBoardPlaced, insertIntoBoard, MENU_OFFSET, removeNode, type InsertExtra, type InsertKind } from './codegen';
@@ -53,6 +53,10 @@ type InsertTarget = { kind: InsertKind; board?: { id: string; name: string }; x:
 const typingTarget = (t: EventTarget | null) =>
   t instanceof HTMLElement && (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || t instanceof HTMLSelectElement || t.isContentEditable);
 
+/** Pesan Restore gagal; CONFLICT = versi usang (ada perubahan lebih baru) atau versi terkini. */
+const restoreErrorText = (e: unknown) =>
+  e instanceof ApiError && e.code === 'CONFLICT' ? `Newer changes arrived since you opened this version. Check History and try again. (${e.message})` : errorText(e);
+
 type Loaded<T> = { state: 'loading' } | { state: 'ok'; value: T } | { state: 'error'; message: string; notFound?: boolean; corrupt?: boolean };
 
 export function Viewer({ slug }: { slug: string }) {
@@ -76,9 +80,10 @@ export function Viewer({ slug }: { slug: string }) {
   const [restoring, setRestoring] = useState(false);
   const [restoreError, setRestoreError] = useState<string | undefined>(undefined);
   const offline = useOffline();
-  /** Toast gagal sisip/hapus/unggah. */
-  const [toast, setToast] = useState<string | undefined>(undefined);
-  const closeToast = useCallback(() => setToast(undefined), []);
+  /** Toast sisip/hapus/unggah: gagal, "Deleted …" + Undo, atau "Uploading image…". */
+  const [toast, setToastState] = useState<ToastState | undefined>(undefined);
+  const setToast = useCallback((message: string) => setToastState({ message, kind: 'error' }), []);
+  const closeToast = useCallback(() => setToastState(undefined), []);
   /** Sisipan Icon menunggu pilihan di pemilih ikon. */
   const [iconAsk, setIconAsk] = useState<InsertTarget | undefined>(undefined);
   /** Sisipan Image menunggu file dari pemilih file. */
@@ -159,7 +164,8 @@ export function Viewer({ slug }: { slug: string }) {
     (entry: HistoryEntry) => {
       setRestoring(true);
       setRestoreError(undefined);
-      api.restore(slug, entry.rev).then(
+      // baseRev = rev terkini yang diketahui viewer: daemon menolak bila agen sudah menulis sesudahnya.
+      api.restore(slug, entry.rev, docRef.current?.rev).then(
         () => {
           setRestoring(false);
           setRestoreAsk(undefined);
@@ -168,7 +174,8 @@ export function Viewer({ slug }: { slug: string }) {
         },
         (e) => {
           setRestoring(false);
-          setRestoreError(errorText(e));
+          setRestoreError(restoreErrorText(e));
+          if (e instanceof ApiError && e.code === 'CONFLICT') loadDoc(true);
         },
       );
     },
@@ -183,7 +190,8 @@ export function Viewer({ slug }: { slug: string }) {
   onEvent.current = (e) => {
     if (e.type !== 'call') return;
     const c = e.call;
-    if (c.slug !== slug || c.status === 'running' || c.status === 'error' || (c.client === VIEWER_CLIENT && !isDocChangeFromViewer(c))) return;
+    // Klien viewer sendiri disaring oleh `revChange` (satu-satunya gerbang aturan itu).
+    if (c.slug !== slug || c.status === 'running' || c.status === 'error') return;
     const boardsTouched = c.tool === 'execute' ? (c.boards ?? []) : [];
     if (typeof c.rev === 'number' && boardsTouched.length) {
       const rev = c.rev;
@@ -304,7 +312,7 @@ export function Viewer({ slug }: { slug: string }) {
 
   /** Jalankan snippet viewer; sukses → muat ulang (board tersentuh saja) dan pilih node baru. */
   const runEdit = useCallback(
-    (code: string, description: string, after?: (created: string | undefined) => void) => {
+    (code: string, description: string, after?: (created: string | undefined, rev: number) => void) => {
       editing.current++;
       return api.execute(slug, code, description).then(
         (r) => {
@@ -318,7 +326,7 @@ export function Viewer({ slug }: { slug: string }) {
               return next;
             });
           }
-          after?.(created);
+          after?.(created, r.rev);
           loadDoc(true, boardsTouched.length === 0);
         },
         (e) => {
@@ -358,6 +366,9 @@ export function Viewer({ slug }: { slug: string }) {
     [insert],
   );
 
+  /** Status edit terkini untuk callback async (unggahan selesai sesudah pratinjau dibuka/offline). */
+  const editableRef = useRef(false);
+  editableRef.current = editable;
   const onImageFile = useCallback(
     (file: File | undefined) => {
       const t = imageTarget.current;
@@ -368,12 +379,45 @@ export function Viewer({ slug }: { slug: string }) {
         setToast(problem);
         return;
       }
+      setToastState({ message: 'Uploading image…', kind: 'busy' });
       api.uploadAsset(file).then(
-        (a) => insert(t, { image: a }),
+        (a) => {
+          if (!editableRef.current) {
+            setToast("Image uploaded but not inserted: the canvas can't be edited right now.");
+            return;
+          }
+          setToastState(undefined);
+          insert(t, { image: a });
+        },
         (e) => setToast(e instanceof ApiError ? failureText(e.message, e.hint) : errorText(e)),
       );
     },
-    [insert],
+    [insert, setToast],
+  );
+
+  /** Toast "Deleted <name>" + Undo (Restore rev sebelum hapus, baseRev = rev hapus) bila rev itu bersnapshot. */
+  const offerUndo = useCallback(
+    (name: string, rev: number) => {
+      const message = `Deleted ${name}`;
+      setToastState({ message, kind: 'info' });
+      const prev = rev - 1;
+      api.getHistory(slug).then(
+        (entries) => {
+          if (!entries.find((h) => h.rev === prev)?.snapshot) return;
+          const undo = () => {
+            setToastState(undefined);
+            api.restore(slug, prev, rev).then(
+              () => loadDoc(),
+              (e) => setToast(restoreErrorText(e)),
+            );
+          };
+          // Hanya bila toast ini masih tampil (belum diganti/ditutup).
+          setToastState((t) => (t?.message === message && t.kind === 'info' ? { ...t, action: { label: 'Undo', run: undo } } : t));
+        },
+        () => {},
+      );
+    },
+    [slug, loadDoc, setToast],
   );
 
   // Delete/Backspace: hapus node terpilih (board juga), kecuali saat mengetik atau dialog/menu terbuka.
@@ -390,11 +434,14 @@ export function Viewer({ slug }: { slug: string }) {
       e.preventDefault();
       if (e.repeat || editing.current > 0) return;
       const { code, description } = removeNode(node);
-      void runEdit(code, description, () => setSelectedId((s) => (s === node.id ? undefined : s)));
+      void runEdit(code, description, (_created, rev) => {
+        setSelectedId((s) => (s === node.id ? undefined : s));
+        offerUndo(node.name, rev);
+      });
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [editable, runEdit]);
+  }, [editable, runEdit, offerUndo]);
 
   if (doc.state === 'loading') {
     return (
@@ -545,7 +592,7 @@ export function Viewer({ slug }: { slug: string }) {
           }}
         />
       )}
-      {toast && <Toast message={toast} onClose={closeToast} />}
+      {toast && <Toast toast={toast} onClose={closeToast} />}
       {restoreAsk && <RestoreDialog entry={restoreAsk} busy={restoring} error={restoreError} onCancel={() => !restoring && setRestoreAsk(undefined)} onConfirm={() => restore(restoreAsk)} />}
     </div>
   );

@@ -124,7 +124,7 @@ export function ExportButton({ slug, boards, selectedBoardId }: { slug: string; 
             <div className="export-note" role="status">
               <Icon name="circleCheck" size={13} />
               <span>
-                Saved to Downloads <span className="mono">{status.filename}</span>
+                Download started: <span className="mono">{status.filename}</span>
               </span>
             </div>
           )}

@@ -62,7 +62,6 @@ const STATUS: Record<ErrorCode, number> = {
   VERSION_MISMATCH: 409,
 };
 
-/** Route statis (modul render, font, aset): `<what> tidak ada`. */
 const SVG_TAGS = new Set(['path', 'circle', 'ellipse', 'rect', 'line', 'polyline', 'polygon']);
 const xmlAttr = (v: string) => v.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
 /** Glyph katalog → SVG mandiri (warna netral, terbaca di tema gelap dan terang). */
@@ -75,6 +74,7 @@ function glyphSvg(g: IconGlyph): string {
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${g.viewBox.join(' ')}" ${paint}>${body}</svg>`;
 }
 
+/** Route statis (modul render, font, aset): `<what> tidak ada`. */
 const fileNotFound = (what: string) => notFound(`${what} tidak ada`, 'periksa path');
 
 /** assetId fill gambar di subtree `n` (untuk catatan placeholder aset jarak jauh). */
@@ -243,6 +243,24 @@ export function buildServer({
   // sebelum route supaya hook berlaku untuk semua route tool.
   registerActivityHooks(app, { sessions, bus: activity, ...(activityHeartbeatMs !== undefined ? { heartbeatMs: activityHeartbeatMs } : {}) });
 
+  // Route tulis `/viewer/*` tanpa sesi: tolak permintaan lintas situs. Browser selalu mengirim `Origin` pada POST/DELETE
+  // (juga `mode:'no-cors'` tanpa preflight); origin selain daemon sendiri → 403. Tanpa Origin (CLI, tes, MCP) tetap boleh.
+  app.addHook('onRequest', async (req, reply) => {
+    if (req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS' || !req.url.startsWith('/viewer/')) return;
+    const origin = req.headers.origin;
+    if (origin === undefined) return;
+    const addr = app.server.address();
+    const port = addr && typeof addr === 'object' ? addr.port : config.port;
+    let host: string | undefined;
+    try {
+      host = new URL(origin).host;
+    } catch {
+      host = undefined;
+    }
+    if (host === `127.0.0.1:${port}` || host === `localhost:${port}`) return;
+    return fail(reply, { code: 'SCHEMA_INVALID', message: `origin ${origin} tidak diizinkan`, hint: `buka viewer dari http://127.0.0.1:${port}/app/`, retryable: false }, 403);
+  });
+
   const parse = <T>(schema: z.ZodType<T>, body: unknown, hint: string): T => {
     const r = schema.safeParse(body);
     if (!r.success) {
@@ -402,7 +420,9 @@ export function buildServer({
 
     // 4. Transaksi + snippet → commit → simpan → keep.
     const data = await docLocks.run(slug, async () => {
-      const doc = docs.get(slug)!;
+      // Rename/archive/delete yang antre lebih dulu di kunci ini bisa melepas slug dari sesi: sama dengan cek awal.
+      const doc = docs.get(slug);
+      if (!doc) throw new LakarError('NO_ACTIVE_DOC', 'sesi ini belum punya dokumen aktif', { hint: 'panggil open_doc {slug} terlebih dahulu' });
       let committed;
       try {
         // AD-4: error tak tertangkap di snippet → lempar di dalam body → rollback penuh oleh `transact`.

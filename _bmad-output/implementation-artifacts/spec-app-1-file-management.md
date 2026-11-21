@@ -2,7 +2,7 @@
 title: 'Aplikasi 1: kelola file (New file, rename, duplicate, archive, delete)'
 type: 'feature'
 created: '2026-11-21'
-status: 'in-review'
+status: 'done'
 baseline_commit: 'afeadb19daef0f557c9f55e63ea1a3a386a930b7'
 route: 'dispatch'
 review_loop_iteration: 0
@@ -96,6 +96,28 @@ context:
 ## Spec Change Log
 
 ## Review Triage Log
+
+Review gabungan batch 1–4 (spec-app-1..4), tiga reviewer: Blind Hunter (B), Edge Case Hunter (E), Verification Gap (V). Semua temuan yang lolos ber-rute `patch` atau `defer`.
+
+| Temuan | Verdict | Keputusan |
+|---|---|---|
+| CSRF: route tulis `/viewer/*` tanpa cek Origin (B) | high | patch: guard `onRequest` Origin, 403 lintas-situs |
+| `/execute` antre di belakang rename/delete → 500 (V, juga laporan implementer) | medium | patch: cek ulang `docs.get` di dalam kunci → `NO_ACTIVE_DOC` + tes interleaving |
+| Restore tanpa penjaga versi basi / restore rev terkini (B, E) | medium | patch: `baseRev` + 409 `CONFLICT` |
+| Modal fokus ulang tiap re-render 5 s → ketikan tertimpa (E) | medium | patch: `onClose` via ref, efek sekali |
+| Upload gambar lalu sisip saat pratinjau/offline; tanpa indikator (B, E) | medium | patch: cek ulang editable + toast "Uploading image…" |
+| Delete/Backspace tanpa undo (B) | medium | patch: toast Undo → restore rev sebelumnya bila ada snapshot |
+| Guard event viewer duplikat dari `revChange` (V) | low | patch: `revChange` satu-satunya gerbang |
+| "Saved to Downloads" sebelum tersimpan / nama salah (B, E, V) | low | patch: "Download started: <file>" |
+| Padding Copy as tidak konsisten (B, E) | low | patch |
+| Slug baru mengabaikan arsip → Unarchive 409 (B) | medium | patch: slug arsip dianggap terpakai |
+| Komentar header usang/salah tempat (B) | low | patch |
+| Event lintas-jendela untuk operasi viewer (B, E, V) | medium | defer (deferred-work.md) |
+| Handler unduhan Tauri tanpa tes integrasi (B, V) | medium | defer: smoke manual per OS |
+| A11y kontrol bersarang di kartu (B) | low | defer |
+| Snapshot tanpa batas byte, blob URL tidak di-revoke (B) | low | defer |
+| Delete/rename/archive dokumen yang hanya di memori (B, E, V) | low | defer/ditolak: hanya setelah data dir diubah dari luar |
+| Race nama unduhan ganda di `unique_path` (E) | low | ditolak: dua export bernama sama dalam milidetik yang sama |
 
 ## Verification
 

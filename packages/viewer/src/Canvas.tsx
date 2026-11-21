@@ -1,5 +1,5 @@
 // Canvas viewer: PNG per board dari POST /screenshot (renderer yang sama, AD-6) di posisi x/y dokumen.
-// Pan, zoom, Fit, seleksi, dan Export PNG (ExportPopover); tidak ada edit.
+// Pan, zoom, Fit, seleksi, Export PNG (ExportPopover), dan tool sisip layer (aplikasi 4, di bawah); tanpa drag/resize.
 // Mode pratinjau versi (History, aplikasi 3): board dari snapshot (POST revs/:rev/screenshot), banner
 // "Previewing …" dengan Back to latest / Restore this version; Export, Checks, dan outline agen disembunyikan.
 // Tool edit (batch 4) wajib nonaktif selama `preview` ada.

@@ -2,7 +2,7 @@
 title: 'Aplikasi 3: History Restore, Compare, dan pratinjau versi'
 type: 'feature'
 created: '2026-11-21'
-status: 'in-review'
+status: 'done'
 baseline_commit: 'da79ddee018ca60c05be670fa9e9b558d73fdcfd'
 route: 'dispatch'
 review_loop_iteration: 0

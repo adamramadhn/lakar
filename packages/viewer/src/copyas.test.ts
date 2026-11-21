@@ -116,6 +116,13 @@ describe('toTailwind', () => {
     expect(toTailwind({ ...id, type: 'frame', layout: 'row', gap: 8, padding: 16 })).toBe('flex flex-row gap-[8px] p-[16px]');
   });
 
+  it('padding 3 nilai → pt/px/pb; padding tidak valid (non-flex) dilewati, bukan "16px  8px"', () => {
+    expect(toTailwind({ ...id, type: 'frame', layout: 'column', padding: [4, 8, 12] })).toBe('flex flex-col pt-[4px] px-[8px] pb-[12px]');
+    expect(toCss({ ...id, type: 'frame', padding: [16, 'x', 8] })).not.toContain('padding');
+    expect(toCss({ ...id, type: 'frame', padding: [16, 8] })).toContain('padding: 16px 8px;');
+    expect(toTailwind({ ...id, type: 'frame', padding: [16, null] })).toBe('');
+  });
+
   it('ukuran + fill solid → w-[298px] bg-[#F97316]', () => {
     expect(toTailwind({ ...id, type: 'rect', width: 298, fills: [{ type: 'solid', color: '#F97316' }] })).toBe('w-[298px] bg-[#F97316]');
   });

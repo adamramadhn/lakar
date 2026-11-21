@@ -112,19 +112,31 @@ export function IconPicker({ onPick, onClose }: { onPick: (icon: { lib: string; 
   );
 }
 
-/** Toast kesalahan (execute/unggah gagal); hilang sendiri setelah 6 detik. */
-export function Toast({ message, onClose }: { message: string; onClose: () => void }) {
+/** Isi toast: kesalahan, info (mis. "Deleted …" dengan Undo), atau proses berjalan (tanpa tutup otomatis). */
+export type ToastState = { message: string; kind: 'error' | 'info' | 'busy'; action?: { label: string; run: () => void } };
+
+/** Toast di bawah kanvas; error/info hilang sendiri setelah 6 detik, `busy` bertahan sampai diganti. */
+export function Toast({ toast, onClose }: { toast: ToastState; onClose: () => void }) {
+  const { message, kind, action } = toast;
   useEffect(() => {
+    if (kind === 'busy') return;
     const t = setTimeout(onClose, 6000);
     return () => clearTimeout(t);
-  }, [message, onClose]);
+  }, [toast, kind, onClose]);
   return (
-    <div className="toast error" role="alert">
-      <Icon name="alert" size={15} />
+    <div className={`toast ${kind}`} role={kind === 'error' ? 'alert' : 'status'}>
+      {kind === 'busy' ? <div className="spinner small" /> : <Icon name={kind === 'error' ? 'alert' : 'circleCheck'} size={15} />}
       <span className="toast-text">{message}</span>
-      <button type="button" className="toast-close" aria-label="Dismiss" onClick={onClose}>
-        <Icon name="x" size={13} />
-      </button>
+      {action && (
+        <button type="button" className="link-btn toast-action" onClick={action.run}>
+          {action.label}
+        </button>
+      )}
+      {kind !== 'busy' && (
+        <button type="button" className="toast-close" aria-label="Dismiss" onClick={onClose}>
+          <Icon name="x" size={13} />
+        </button>
+      )}
     </div>
   );
 }
