@@ -13,9 +13,15 @@ Catatan: `lakar-ui.pen` adalah salinan snapshot dari `untitled.pen` di folder do
 
 ## Model produk
 
-- Lakar UI adalah **viewer**. Aplikasi ini tidak punya kotak prompt. Desain dibuat sepenuhnya oleh agen di harness terpisah (Claude Code, Codex, atau klien ACP lain) lewat tool MCP `lakar`.
+- Lakar UI tidak punya kotak prompt. Agen di harness terpisah (Claude Code, Codex, atau klien ACP lain) mendesain lewat tool MCP `lakar`.
 - Viewer menampilkan hasil, aktivitas tool call yang masuk secara live, temuan `layout_check`, dan riwayat perubahan.
-- Tidak ada edit manual (C), edit komponen atau variabel (D), kolaborasi, berbagi, atau akun. Ini sesuai Boundaries di initiative-lakar. Aplikasi hanya lokal untuk satu pengguna.
+- **Sejak 2026-11-21, pengguna juga bisa bekerja langsung dari aplikasi:**
+  - Membuat file baru: tombol **New file**, lalu dialog nama dan board awal (Desktop 1440×900, Tablet 768×1024, Mobile 375×812, Custom).
+  - Mengelola file: rename, duplicate, archive, delete.
+  - Export, dan Copy as CSS/Tailwind/JSON.
+  - Restore atau Compare riwayat.
+  - Menambah layer manual: tool Frame, Rectangle, Ellipse, Text, Image, Icon, dan menu "+" di Layers.
+- Edit komponen atau variabel (D), kolaborasi, berbagi, dan akun tetap di luar cakupan. Aplikasi hanya lokal untuk satu pengguna.
 - Indikator status koneksi agen di header sengaja tidak dipakai. Koneksi hanya terlihat di halaman Connections dan di banner saat `lakard` offline.
 
 ## Struktur dokumen
@@ -24,16 +30,16 @@ Catatan: `lakar-ui.pen` adalah salinan snapshot dari `untitled.pen` di folder do
 |---|---|
 | 00 · Components | Library komponen (lihat di bawah) |
 | 01 · Dashboard — Recents | Grid dan list. Desktop 1440, tablet 768, mobile 375, plus menu drawer mobile |
-| 02 · Dashboard — Pages & states | Files, Archive kosong, Recents first-run, Settings, Connections, context menu, konfirmasi delete, search (ada hasil / tidak ada hasil), offline, loading. Desktop, tablet, mobile |
-| 03 · Viewer | Activity, Inspect, Checks, History, Waiting, Offline, Error, Export. Desktop 1440, tablet 1024 lanskap, mobile 375 |
+| 02 · Dashboard — Pages & states | Files, Archive kosong, Recents first-run, Settings, Connections, context menu, konfirmasi delete, dialog New file, search (ada hasil / tidak ada hasil, dengan aksi New file), offline, loading. Desktop, tablet, mobile |
+| 03 · Viewer | Activity, Inspect, Checks, History, Waiting, Offline, Error, Export, Add layer (menu), New File (board kosong). Desktop 1440, tablet 1024 lanskap, mobile 375 |
 | 04 · Agent presence & motion | Storyboard 4 langkah, state baris layer, tabel spesifikasi motion, aturan reduced motion |
 
 Setiap layar punya versi dark dan light yang disusun sejajar atas-bawah.
 
 ## Layar Viewer (inti)
 
-- **Canvas:** hanya pan, zoom, dan seleksi. Ada kontrol Select, Hand, zoom, Fit, dan tombol Export.
-- **Panel kiri:** Pages dan Layers, hanya untuk dilihat.
+- **Canvas:** kontrol Select, Hand, tool sisip (Frame, Rectangle, Ellipse, Text, Image, Icon), zoom, Fit, dan tombol Export.
+- **Panel kiri:** Pages dan Layers. Header Layers punya tombol "+" untuk menu tambah layer.
 - **Panel kanan, tab:**
   - **Activity:** sesi per harness (Live, Idle, Disconnected) dan daftar tool call (running, done, warning/error) dengan nama tool, durasi, dan jumlah node.
   - **Inspect:** properti node terpilih yang hanya bisa dibaca, plus Copy as CSS/Tailwind/JSON.
