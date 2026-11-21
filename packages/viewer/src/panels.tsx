@@ -1,8 +1,10 @@
-// Panel kanan Viewer: Inspect (properti dari POST /inspect) dan Checks (temuan layout_check). Activity dan
+// Panel kanan Viewer: Inspect (properti dari POST /inspect, Copy as CSS/Tailwind/JSON lewat copyas.ts) dan Checks (temuan layout_check). Activity dan
 // History ada di ActivityPanel.tsx dan HistoryPanel.tsx.
 import { useState, type ReactNode } from 'react';
 import { G0_RULES, isGateRule, type Finding } from '@lakar/schema';
 import type { InspectResult, LayoutCheck } from './api';
+import { copyText } from './Connections';
+import { copyAs, type CopyFormat } from './copyas';
 import { formatValue, hexColor, relativeTime, type NodeInfo } from './format';
 import { Icon, NODE_ICON, type IconName } from './icons';
 
@@ -65,8 +67,14 @@ const SHOWN = new Set([
   'layout', 'gap', 'padding', 'justify', 'clip', 'opacity', 'radius', 'shadows', 'lib', 'icon', 'screen',
 ]);
 
+const COPY_FORMATS: readonly [CopyFormat, string][] = [
+  ['css', 'CSS'],
+  ['tailwind', 'Tailwind'],
+  ['json', 'JSON'],
+];
+
 export function InspectPanel({ info, inspect }: { info: NodeInfo | undefined; inspect: Loaded<InspectResult> | undefined }) {
-  const [copied, setCopied] = useState(false);
+  const [copied, setCopied] = useState<CopyFormat | undefined>(undefined);
   if (!info) return <Empty icon="pointer" title="Nothing selected" text="Select a layer or a board on the canvas to see its properties." />;
   const node = inspect?.state === 'ok' && inspect.value.node.id === info.id ? inspect.value.node : undefined;
   const n = (node ?? {}) as Record<string, unknown>;
@@ -80,12 +88,12 @@ export function InspectPanel({ info, inspect }: { info: NodeInfo | undefined; in
   };
   const other = node ? Object.keys(n).filter((k) => !SHOWN.has(k)) : [];
   const stroke = n.stroke as { color?: unknown; width?: unknown; align?: unknown } | undefined;
-  const copy = async () => {
+  const copy = async (format: CopyFormat) => {
     if (!node) return;
     try {
-      await navigator.clipboard.writeText(JSON.stringify(node, null, 2));
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
+      await copyText(copyAs(format, node));
+      setCopied(format);
+      setTimeout(() => setCopied((c) => (c === format ? undefined : c)), 1500);
     } catch {
       // clipboard tidak tersedia
     }
@@ -177,10 +185,14 @@ export function InspectPanel({ info, inspect }: { info: NodeInfo | undefined; in
           )}
           <section className="inspect-section">
             <h3>Copy as</h3>
-            <button type="button" className="btn small" onClick={copy}>
-              <Icon name={copied ? 'circleCheck' : 'copy'} size={13} />
-              {copied ? 'Copied' : 'JSON'}
-            </button>
+            <div className="copy-as">
+              {COPY_FORMATS.map(([format, label]) => (
+                <button key={format} type="button" className="btn small" onClick={() => copy(format)}>
+                  <Icon name={copied === format ? 'circleCheck' : 'copy'} size={13} />
+                  {copied === format ? 'Copied' : label}
+                </button>
+              ))}
+            </div>
           </section>
         </>
       )}

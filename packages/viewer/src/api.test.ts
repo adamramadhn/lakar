@@ -215,3 +215,30 @@ describe('kelola file', () => {
     expect(changed).not.toHaveBeenCalled();
   });
 });
+
+describe('exportPng (aplikasi 2)', () => {
+  it('PNG → blob + nama dari content-disposition; error AD-11 → ApiError; nama aneh → cadangan', async () => {
+    const mod = await (async () => {
+      vi.resetModules();
+      return import('./api.ts');
+    })();
+    const seen: { path: string; body: unknown }[] = [];
+    vi.stubGlobal('fetch', async (path: string, init: { body: string }) => {
+      seen.push({ path, body: JSON.parse(init.body) });
+      if (JSON.parse(init.body).boardId === 'nope') {
+        return new Response(JSON.stringify({ ok: false, error: { code: 'NOT_FOUND', message: 'board nope tidak ada', hint: 'pilih board lain' } }), { status: 404 });
+      }
+      return new Response(new Uint8Array([137, 80, 78, 71]), {
+        status: 200,
+        headers: { 'content-type': 'image/png', 'content-disposition': 'attachment; filename="my-landing-desktop@2x.png"' },
+      });
+    });
+    const r = await mod.api.exportPng('my-landing', 'Bbbbbbb1', 2);
+    expect(r.filename).toBe('my-landing-desktop@2x.png');
+    expect(r.blob.size).toBe(4);
+    expect(seen[0]).toEqual({ path: '/viewer/docs/my-landing/export', body: { boardId: 'Bbbbbbb1', scale: 2 } });
+    await expect(mod.api.exportPng('my-landing', 'nope', 1)).rejects.toMatchObject({ code: 'NOT_FOUND', status: 404 });
+    expect(mod.exportFileName('attachment; filename="../x.png"', 'f.png')).toBe('f.png');
+    expect(mod.exportFileName(null, 'f.png')).toBe('f.png');
+  });
+});

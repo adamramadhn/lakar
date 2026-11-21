@@ -44,6 +44,7 @@ import { DocStore } from './store.js';
 import { ActivityBus, registerActivityHooks } from './events.js';
 import { registerConnectionRoutes } from './connections.js';
 import { registerFileRoutes } from './files.js';
+import { registerExportRoutes } from './export.js';
 import { VIEWER_DIST_DIR, registerViewerRoutes } from './viewer.js';
 
 const STATUS: Record<ErrorCode, number> = {
@@ -634,6 +635,7 @@ export function buildServer({
   // Viewer baca-saja (Viewer B slice 1): `/viewer/*` dan `/app/*`. Route lama tidak berubah.
   registerViewerRoutes(app, { docs, store, sessions, distDir: config.viewerDir ?? VIEWER_DIST_DIR });
   registerFileRoutes(app, { docs, store, sessions, docLocks });
+  registerExportRoutes(app, { docs, store, render, icons });
   registerConnectionRoutes(app, { host: config.host, port: config.port, ...(config.mcpEntry ? { mcpEntry: config.mcpEntry } : {}) });
 
   // Aset gambar (story 8): `<dataDir>/assets/<sha256>`, hanya raster dari magic bytes; lainnya → 404.

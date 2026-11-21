@@ -232,6 +232,41 @@ class ViewerClient {
     );
   }
 
+  /**
+   * Export PNG board (POST /viewer/docs/:slug/export): byte PNG + nama file dari `content-disposition`.
+   * Tanpa sesi; error tetap berbentuk AD-11 (JSON).
+   */
+  async exportPng(slug: string, boardId: string, scale: 1 | 2): Promise<{ blob: Blob; filename: string }> {
+    let res: Response;
+    try {
+      res = await fetch(`/viewer/docs/${encodeURIComponent(slug)}/export`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ boardId, scale }),
+      });
+    } catch (e) {
+      setOffline(true);
+      throw new OfflineError(e instanceof Error ? e.message : String(e));
+    }
+    if (res.ok && (res.headers.get('content-type') ?? '').startsWith('image/png')) {
+      setOffline(false);
+      return { blob: await res.blob(), filename: exportFileName(res.headers.get('content-disposition'), `${slug}@${scale}x.png`) };
+    }
+    let json: { ok?: boolean; error?: { code: string; message: string; hint: string } } | undefined;
+    try {
+      json = await res.json();
+    } catch {
+      json = undefined;
+    }
+    if (!json && (res.status === 502 || res.status === 504)) {
+      setOffline(true);
+      throw new OfflineError(`HTTP ${res.status}`);
+    }
+    setOffline(false);
+    const err = json?.error ?? { code: 'EXPORT_FAILED', message: `HTTP ${res.status}`, hint: '' };
+    throw new ApiError(err.code, err.message, err.hint, res.status);
+  }
+
   #sessionId(): Promise<string> {
     this.#session ??= request<{ sessionId: string }>('POST', '/sessions', { client: CLIENT }).then(
       (d) => d.sessionId,
@@ -350,6 +385,13 @@ function pngUrl(base64: string): string {
   const bytes = new Uint8Array(bin.length);
   for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
   return URL.createObjectURL(new Blob([bytes], { type: 'image/png' }));
+}
+
+/** Nama file dari header `content-disposition` (`filename="…"`); tanpa nama → `fallback`. */
+export function exportFileName(disposition: string | null, fallback: string): string {
+  const m = /filename="([^"]+)"/i.exec(disposition ?? '') ?? /filename=([^;]+)/i.exec(disposition ?? '');
+  const name = m?.[1]?.trim();
+  return name && !/[\\/]/.test(name) ? name : fallback;
 }
 
 export const api = new ViewerClient();

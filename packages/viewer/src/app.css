@@ -1225,6 +1225,97 @@ button.panel-tab:hover {
   }
 }
 
+/* ---- Export (desain `Viewer — Desktop — Export`) ---- */
+.export {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+.export-btn {
+  height: 32px;
+  font-size: 13px;
+  gap: 6px;
+}
+.export-popover {
+  position: absolute;
+  top: 40px;
+  right: 0;
+  width: 280px;
+  max-width: calc(100vw - 32px);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px;
+  border-radius: 10px;
+  background: var(--modal);
+  border: 1px solid var(--border);
+  box-shadow: 0 12px 32px #00000052;
+  cursor: default;
+}
+.export-title {
+  font-size: 13px;
+  font-weight: 600;
+}
+.export-popover .field-label {
+  font-weight: 500;
+}
+.export-popover .select {
+  width: 100%;
+  font-size: 13px;
+}
+.segmented {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 7px;
+  background: var(--input);
+}
+.segment {
+  flex: 1;
+  height: 28px;
+  border-radius: 5px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+}
+.segment.active {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+.export-size {
+  color: var(--text-muted);
+  font: 400 11px var(--font-mono);
+}
+.export-run {
+  width: 100%;
+  height: 34px;
+}
+.export-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin-top: -4px;
+  color: var(--success);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.export-note svg {
+  flex: none;
+  margin-top: 1px;
+}
+.export-note .mono {
+  display: block;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+.export-note.danger {
+  color: var(--danger);
+}
+
 /* ---- Panel kanan ---- */
 .panel-body {
   flex: 1;
@@ -1331,6 +1422,16 @@ button.panel-tab:hover {
   border-radius: 3px;
   flex: none;
   box-shadow: inset 0 0 0 1px #8080804d;
+}
+.copy-as {
+  display: flex;
+  gap: 6px;
+}
+.copy-as .btn {
+  flex: 1;
+  min-width: 0;
+  height: 30px;
+  gap: 6px;
 }
 .read-only-note {
   margin-top: auto;

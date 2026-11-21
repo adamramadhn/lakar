@@ -17,7 +17,8 @@ use std::time::{Duration, Instant};
 use serde::Serialize;
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
-use tauri::{AppHandle, Manager, RunEvent, WindowEvent};
+use tauri::webview::DownloadEvent;
+use tauri::{AppHandle, Manager, RunEvent, WebviewWindowBuilder, WindowEvent};
 
 /// Port default lakard (sama dengan DEFAULT_LAKARD_PORT @lakar/schema) agar config MCP stabil.
 const DEFAULT_PORT: u16 = 7466;
@@ -532,6 +533,59 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
     Ok(())
 }
 
+/// `dir/name`, atau `dir/name (2).ext`, `(3)`, … bila sudah ada (unduhan tidak menimpa file lama).
+fn unique_path(dir: &Path, name: &str, exists: impl Fn(&Path) -> bool) -> PathBuf {
+    let first = dir.join(name);
+    if !exists(&first) {
+        return first;
+    }
+    let file = Path::new(name);
+    let stem = file.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_else(|| name.to_string());
+    let ext = file.extension().map(|e| format!(".{}", e.to_string_lossy())).unwrap_or_default();
+    let mut n = 2u32;
+    loop {
+        let candidate = dir.join(format!("{stem} ({n}){ext}"));
+        if !exists(&candidate) {
+            return candidate;
+        }
+        n += 1;
+    }
+}
+
+/// Nama file unduhan dari tujuan yang diusulkan webview (nama dari `<a download>`/server); kosong → `export.png`.
+fn download_name(suggested: &Path) -> String {
+    suggested
+        .file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .filter(|n| !n.trim().is_empty())
+        .unwrap_or_else(|| "export.png".to_string())
+}
+
+/// Jendela utama dari `tauri.conf.json` (`create: false`) dengan handler unduhan: Export PNG viewer disimpan ke
+/// folder Downloads OS, tanpa menimpa file yang sudah ada.
+fn build_main_window(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
+    let config = app
+        .config()
+        .app
+        .windows
+        .iter()
+        .find(|w| w.label == "main")
+        .cloned()
+        .ok_or("konfigurasi jendela main tidak ada di tauri.conf.json")?;
+    WebviewWindowBuilder::from_config(app, &config)?
+        .on_download(|webview, event| {
+            if let DownloadEvent::Requested { destination, .. } = event {
+                if let Ok(dir) = webview.path().download_dir() {
+                    let name = download_name(destination.as_path());
+                    *destination = unique_path(&dir, &name, |p| p.exists());
+                }
+            }
+            true
+        })
+        .build()?;
+    Ok(())
+}
+
 fn main() {
     let app = tauri::Builder::default()
         // Instance kedua hanya memunculkan jendela yang ada (satu daemon per data dir).
@@ -539,6 +593,7 @@ fn main() {
         .manage(DaemonState::default())
         .invoke_handler(tauri::generate_handler![daemon_state, restart_daemon])
         .setup(|app| {
+            build_main_window(app.handle())?;
             build_tray(app.handle())?;
             start_daemon(app.handle());
             Ok(())
@@ -567,6 +622,26 @@ fn main() {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn unique_path_keeps_free_name() {
+        let dir = Path::new("dl");
+        assert_eq!(unique_path(dir, "a@2x.png", |_| false), dir.join("a@2x.png"));
+    }
+
+    #[test]
+    fn unique_path_numbers_taken_names() {
+        let dir = Path::new("dl");
+        let taken = [dir.join("a@2x.png"), dir.join("a@2x (2).png")];
+        assert_eq!(unique_path(dir, "a@2x.png", |p| taken.iter().any(|t| t == p)), dir.join("a@2x (3).png"));
+        assert_eq!(unique_path(dir, "README", |p| p == dir.join("README")), dir.join("README (2)"));
+    }
+
+    #[test]
+    fn download_name_falls_back() {
+        assert_eq!(download_name(Path::new("/home/u/Downloads/x-hero@1x.png")), "x-hero@1x.png");
+        assert_eq!(download_name(Path::new("")), "export.png");
+    }
 
     #[test]
     fn dechunk_joins_chunks() {

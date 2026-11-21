@@ -2,10 +2,13 @@
 // Seluruh matriks I/O spec; RenderPort palsu (execute butuh check board tersentuh).
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { existsSync } from 'node:fs';
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { buildServer, loadConfig, slugify, withSuffix } from './index.js';
+import { createDocument, transact } from '@lakar/core';
+import { LakarError } from '@lakar/schema';
+import { buildServer, exportFileName, loadConfig, slugify, withSuffix } from './index.js';
+import { readPngSize } from './png.js';
 
 const baseConfig = { ...loadConfig({}), unsplashKeyFile: '/nonexistent/lakar-test/unsplash-access-key', pexelsKeyFile: '/nonexistent/lakar-test/pexels-api-key' };
 
@@ -269,5 +272,93 @@ describe('route lama tidak berubah', () => {
     const t = await setup();
     const s = await t.session();
     expect((await t.post('/docs/open', { slug: 'fresh' }, s)).json().data).toMatchObject({ slug: 'fresh', rev: 0, created: true });
+  });
+});
+
+describe('POST /viewer/docs/:slug/export (aplikasi 2)', () => {
+  /** PNG tiruan: signature + IHDR berukuran board × scale (cukup untuk readPngSize). */
+  const pngOf = (width: number, height: number): Uint8Array => {
+    const b = Buffer.alloc(33);
+    Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]).copy(b, 0);
+    b.writeUInt32BE(13, 8);
+    b.write('IHDR', 12, 'latin1');
+    b.writeUInt32BE(width, 16);
+    b.writeUInt32BE(height, 20);
+    return new Uint8Array(b);
+  };
+  const calls: { boardId: string; opts: unknown }[] = [];
+  const sizedRender = {
+    screenshot: async (doc: any, boardId: string, opts: { scale?: number } = {}) => {
+      calls.push({ boardId, opts });
+      const b = doc.pages.flatMap((p: any) => p.children).find((x: any) => x.id === boardId);
+      const s = opts.scale ?? 1;
+      return pngOf(b.width * s, b.height * s);
+    },
+    measure: (fakeRender as any).measure,
+  } as never;
+
+  async function exportSetup(render: never = sizedRender) {
+    const dataDir = await mkdtemp(join(root, 'export-'));
+    const { app } = buildServer({ config: { ...baseConfig, port: 0, dataDir }, render });
+    const post = (url: string, payload?: unknown) => app.inject({ method: 'POST', url, ...(payload !== undefined ? { payload: payload as object } : {}) });
+    // Dokumen ditulis langsung ke disk (tanpa commit/fsync) supaya tes ini juga jalan di Windows.
+    const committed = await transact(createDocument(), { sessionId: 'test', description: 'seed' }, (tx) => {
+      tx.add(null, { type: 'board', name: 'Desktop', x: 0, y: 0, width: 1440, height: 900, screen: 'landing' });
+    });
+    await mkdir(join(dataDir, 'docs'), { recursive: true });
+    await writeFile(join(dataDir, 'docs', 'my-landing.lakar.json'), JSON.stringify(committed.doc));
+    return { app, post, dataDir, boardId: committed.doc.pages[0]!.children[0]!.id };
+  }
+
+  it('board 1440×900, scale 2 → PNG 2880×1800 sebagai lampiran; tidak menulis ke <dataDir>/exports', async () => {
+    const t = await exportSetup();
+    const r = await t.post('/viewer/docs/my-landing/export', { boardId: t.boardId, scale: 2 });
+    expect(r.statusCode, r.body).toBe(200);
+    expect(r.headers['content-type']).toBe('image/png');
+    expect(r.headers['content-disposition']).toBe('attachment; filename="my-landing-desktop@2x.png"');
+    expect(readPngSize(r.rawPayload)).toEqual({ width: 2880, height: 1800 });
+    expect(calls.at(-1)).toEqual({ boardId: t.boardId, opts: { scale: 2 } });
+    expect(existsSync(join(t.dataDir, 'exports'))).toBe(false);
+  });
+
+  it('scale 1 → ukuran asli, nama @1x', async () => {
+    const t = await exportSetup();
+    const r = await t.post('/viewer/docs/my-landing/export', { boardId: t.boardId, scale: 1 });
+    expect(r.statusCode).toBe(200);
+    expect(r.headers['content-disposition']).toContain('my-landing-desktop@1x.png');
+    expect(readPngSize(r.rawPayload)).toEqual({ width: 1440, height: 900 });
+  });
+
+  it('boardId salah / dokumen tidak ada → 404 NOT_FOUND', async () => {
+    const t = await exportSetup();
+    const bad = await t.post('/viewer/docs/my-landing/export', { boardId: 'nope', scale: 1 });
+    expect(bad.statusCode).toBe(404);
+    expect(bad.json().error.code).toBe('NOT_FOUND');
+    const gone = await t.post('/viewer/docs/ghost/export', { boardId: t.boardId, scale: 1 });
+    expect(gone.statusCode).toBe(404);
+  });
+
+  it('body tidak valid (scale 3, tanpa boardId) → 400 SCHEMA_INVALID', async () => {
+    const t = await exportSetup();
+    expect((await t.post('/viewer/docs/my-landing/export', { boardId: t.boardId, scale: 3 })).statusCode).toBe(400);
+    expect((await t.post('/viewer/docs/my-landing/export', { scale: 1 })).json().error.code).toBe('SCHEMA_INVALID');
+  });
+
+  it('render gagal (browser tidak ada) → 503 RENDER_FAILED retryable', async () => {
+    const broken = {
+      ...(sizedRender as object),
+      screenshot: async () => {
+        throw new LakarError('RENDER_FAILED', 'Chrome atau Edge tidak ditemukan', { hint: 'pasang Chrome atau Edge', retryable: true });
+      },
+    } as never;
+    const t = await exportSetup(broken);
+    const r = await t.post('/viewer/docs/my-landing/export', { boardId: t.boardId, scale: 1 });
+    expect(r.statusCode).toBe(503);
+    expect(r.json().error).toMatchObject({ code: 'RENDER_FAILED', retryable: true });
+  });
+
+  it('exportFileName: nama board di-slugify; kosong → id board', () => {
+    expect(exportFileName('shop', { id: 'b1', name: 'Hero / Mobile' }, 2)).toBe('shop-hero-mobile@2x.png');
+    expect(exportFileName('shop', { id: 'B1', name: '!!!' }, 1)).toBe('shop-b1@1x.png');
   });
 });

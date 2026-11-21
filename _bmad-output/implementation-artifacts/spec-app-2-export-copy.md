@@ -2,7 +2,8 @@
 title: 'Aplikasi 2: Export PNG dan Copy as CSS/Tailwind/JSON'
 type: 'feature'
 created: '2026-11-21'
-status: 'ready-for-dev'
+status: 'in-review'
+baseline_commit: '4f28633f392ac666913457f6d3c33ff2c778a4d3'
 route: 'dispatch'
 review_loop_iteration: 0
 context:
@@ -59,15 +60,20 @@ context:
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] daemon route export + test.
-- [ ] `packages/viewer/src/{ExportPopover.tsx,copyas.ts,copyas.test.ts,panels.tsx,Canvas.tsx,api.ts,app.css}`.
-- [ ] `apps/desktop/src-tauri/src/main.rs` + `tauri.conf.json` -- handler unduhan; `cargo clippy` dan `cargo test` tetap lulus (CI desktop-check).
+- [x] daemon route export + test.
+- [x] `packages/viewer/src/{ExportPopover.tsx,copyas.ts,copyas.test.ts,panels.tsx,Canvas.tsx,api.ts,app.css}`.
+- [x] `apps/desktop/src-tauri/src/main.rs` + `tauri.conf.json` -- handler unduhan; `cargo clippy` dan `cargo test` tetap lulus (CI desktop-check).
 
 **Acceptance Criteria:**
 - Given Viewer dengan board terpilih, when Export → 2x → Export PNG, then file PNG 2× muncul di Downloads, di browser maupun di aplikasi desktop.
 - Given node terpilih, when Copy as CSS/Tailwind, then clipboard berisi teks yang sesuai pemetaan dan tombol menampilkan "Copied".
 
 ## Implementation Notes
+
+- Route di `packages/daemon/src/export.ts` (didaftarkan dari `server.ts`); nama board di nama file di-slugify (kosong → id board). Tes di `files.test.ts` menulis dokumen langsung ke disk (tanpa fsync) agar juga jalan di Windows.
+- Popover: skala default 1x; daftar board = board halaman aktif kanvas. Pesan "Saved to Downloads" tampil setelah unduhan dipicu (viewer tidak punya IPC untuk tahu kapan Tauri selesai menulis).
+- Desktop: `tauri.conf.json` `create: false`; `build_main_window` memakai `WebviewWindowBuilder::from_config` + `on_download` (tujuan `download_dir()` + nama dari webview, `unique_path` → `name (2).png`). Rust tidak dikompilasi lokal; CI desktop-check yang memverifikasi.
+- Copy as: token → `var(--nama-token)`; Tailwind memakai petunjuk tipe (`text-[color:var(...)]`) untuk utilitas ambigu. Fill image/noise/mesh tidak dipetakan.
 
 ## Spec Change Log
 

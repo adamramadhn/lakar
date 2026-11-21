@@ -1,8 +1,9 @@
 // Canvas viewer: PNG per board dari POST /screenshot (renderer yang sama, AD-6) di posisi x/y dokumen.
-// Hanya pan, zoom, Fit, dan seleksi; tidak ada edit.
+// Pan, zoom, Fit, seleksi, dan Export PNG (ExportPopover); tidak ada edit.
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import type { FindingSummary } from '@lakar/schema';
 import { api, errorText } from './api';
+import { ExportButton } from './ExportPopover';
 import { useRetry } from './hooks';
 import { Icon } from './icons';
 
@@ -348,6 +349,8 @@ export function Canvas({
           )}
         </button>
       )}
+
+      <ExportButton slug={slug} boards={boards} selectedBoardId={highlight?.boardId} />
 
       <div className="view-controls canvas-overlay-ui" role="toolbar" aria-label="View controls">
         <button type="button" className={`tool${tool === 'select' ? ' active' : ''}`} aria-label="Select (V)" title="Select (V)" aria-pressed={tool === 'select'} onClick={() => setTool('select')}>
