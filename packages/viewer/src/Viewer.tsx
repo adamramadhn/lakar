@@ -10,10 +10,14 @@
 // baris Layers (agent / created / changed); disembunyikan saat pratinjau versi.
 // Kelola halaman (aplikasi 8): section Pages (PagesPanel.tsx) menambah/rename/mengurutkan/menghapus halaman lewat
 // route `/viewer/docs/:slug/pages…`. Halaman aktif dilacak per ID; board baru dari viewer masuk ke halaman aktif.
+// Responsif (aplikasi 9): tablet (≤1100px) → panel kiri jadi laci di atas kanvas (tombol "Layers" + scrim); mobile
+// (<768px) → top bar viewer (back, nama file + halaman yang membuka laci, History) dan panel kanan jadi bottom sheet
+// (BottomSheet.tsx). Di desktop elemen tambahan disembunyikan CSS; hanya state tata letak yang ditambah di sini.
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type ReactNode } from 'react';
 import type { LakarDocument } from '@lakar/schema';
 import { activityReducer, connectActivity, initialActivity, revChange, sessionsForSlug, type ActivityEvent } from './activity';
 import { ActivityPanel } from './ActivityPanel';
+import { BottomSheet } from './BottomSheet';
 import { AddLayerButton, IconPicker, Toast, type ToastState } from './AddLayer';
 import { api, ApiError, errorText, OfflineError, type HistoryEntry, type InspectResult, type LayoutCheck } from './api';
 import { Canvas, type CanvasPreview, type Focus, type Highlight, type InsertPoint } from './Canvas';
@@ -28,6 +32,7 @@ import { Icon, NODE_ICON } from './icons';
 import { Modal } from './NewFileDialog';
 import { ChecksPanel, InspectPanel } from './panels';
 import { agentPresence, layerMarks, type LayerMarkInfo } from './presence';
+import { sheetForTab, type SheetState } from './sheet';
 import { getCamera, getViewState, saveCamera, saveViewState, type PanelTab } from './viewState';
 
 const FOLLOW_KEY = 'lakar.viewer.followAgent';
@@ -45,6 +50,9 @@ function writeFollow(v: boolean) {
     // penyimpanan tidak tersedia
   }
 }
+
+/** Media query tata letak tablet (laci Layers); sama dengan app.css. */
+const DRAWER_QUERY = '(max-width: 1100px)';
 
 type Tab = PanelTab;
 const TABS: { id: Tab; label: string }[] = [
@@ -106,6 +114,27 @@ export function Viewer({ slug }: { slug: string }) {
   const pendingSelect = useRef<string | undefined>(undefined);
   /** Execute dari viewer yang sedang berjalan (Delete berulang tidak dikirim dua kali). */
   const editing = useRef(0);
+  /** Tata letak tablet/mobile: laci Layers/Pages terbuka, state bottom sheet (mobile). */
+  const [layersOpen, setLayersOpen] = useState(false);
+  const [sheet, setSheet] = useState<SheetState>('half');
+  // Laci hanya ada di ≤1100px (sama dengan app.css): Escape menutupnya lebih dulu (fase capture) dan tidak diteruskan
+  // ke shortcut kanvas (Escape kanvas menghapus seleksi). Layar melebar melewati 1100px → laci ditutup.
+  useEffect(() => {
+    if (!layersOpen) return;
+    const mq = matchMedia(DRAWER_QUERY);
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape' || !mq.matches) return;
+      e.stopPropagation();
+      setLayersOpen(false);
+    };
+    const onChange = () => !mq.matches && setLayersOpen(false);
+    window.addEventListener('keydown', onKey, { capture: true });
+    mq.addEventListener('change', onChange);
+    return () => {
+      window.removeEventListener('keydown', onKey, { capture: true });
+      mq.removeEventListener('change', onChange);
+    };
+  }, [layersOpen]);
 
   const docRef = useRef<LakarDocument | undefined>(undefined);
   /**
@@ -567,8 +596,26 @@ export function Viewer({ slug }: { slug: string }) {
   const boardRevs: Record<string, number> = {};
   for (const b of boards) boardRevs[b.id] = Math.min(d.rev, Math.max(baseRev, touched[b.id] ?? -1));
 
+  /** Pilih tab panel; sheet mobile yang collapsed terbuka ke half. */
+  const openTab = (t: Tab) => {
+    setTab(t);
+    setSheet(sheetForTab);
+  };
+
   return (
-    <div className="viewer">
+    <div className={`viewer sheet-${sheet}${layersOpen ? ' layers-open' : ''}`}>
+      <header className="viewer-topbar">
+        <a className="viewer-topbar-btn" href="#/" aria-label="Back to Dashboard">
+          <Icon name="chevronLeft" size={18} />
+        </a>
+        <button type="button" className="viewer-topbar-file" aria-label="Layers and pages" aria-expanded={layersOpen} onClick={() => setLayersOpen((v) => !v)}>
+          <span className="viewer-topbar-title">{slug}</span>
+          <span className="viewer-topbar-page">{previewDoc ? `Previewing rev ${d.rev}` : page?.name}</span>
+        </button>
+        <button type="button" className={`viewer-topbar-btn${tab === 'history' ? ' active' : ''}`} aria-label="History" title="History" onClick={() => openTab('history')}>
+          <Icon name="history" size={18} />
+        </button>
+      </header>
       <aside className="layers-panel">
         <div className="file-header">
           <div className="file-title">{slug}</div>
@@ -598,6 +645,12 @@ export function Viewer({ slug }: { slug: string }) {
           {boards.length === 0 ? <div className="muted-note">No boards on this page yet.</div> : <LayerTree key={page?.id} nodes={boards} selectedId={selectedId} selectedPath={selectedInfo} index={index} onSelect={select} marks={preview ? undefined : marks} />}
         </div>
       </aside>
+      <div className="layers-scrim" aria-hidden="true" onClick={() => setLayersOpen(false)} />
+      <button type="button" className="layers-toggle" aria-expanded={layersOpen} onClick={() => setLayersOpen((v) => !v)}>
+        <Icon name="layers" size={15} />
+        <span>Layers</span>
+        <Icon name="chevronDown" size={12} className="layers-toggle-chevron" />
+      </button>
 
       <Canvas
         key={page?.id}
@@ -614,20 +667,13 @@ export function Viewer({ slug }: { slug: string }) {
         summary={summary}
         checksLoading={checks?.state === 'loading'}
         onSelect={select}
-        onOpenChecks={() => setTab('checks')}
+        onOpenChecks={() => openTab('checks')}
         preview={canvasPreview}
         editable={editable}
         onInsert={onCanvasInsert}
       />
 
-      <aside className="side-panel">
-        <div className="panel-tabs" role="tablist">
-          {TABS.map((t) => (
-            <button key={t.id} type="button" role="tab" aria-selected={tab === t.id} className={`panel-tab${tab === t.id ? ' active' : ''}`} onClick={() => setTab(t.id)}>
-              {t.label}
-            </button>
-          ))}
-        </div>
+      <BottomSheet state={sheet} onState={setSheet} tabs={TABS} tab={tab} onTab={openTab} summary={summary} onChecks={() => openTab('checks')}>
         <div className="panel-body">
           {tab === 'inspect' && <InspectPanel info={selectedInfo} inspect={inspect} />}
           {tab === 'checks' && <ChecksPanel checks={checks} index={index} selectedId={selectedId} onSelect={select} onRun={runChecks} hasBoards={d.pages.some((p) => p.children.length > 0)} />}
@@ -645,7 +691,7 @@ export function Viewer({ slug }: { slug: string }) {
             />
           )}
         </div>
-      </aside>
+      </BottomSheet>
       <input ref={fileInput} type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden onChange={(e) => onImageFile(e.currentTarget.files?.[0])} />
       {iconAsk && (
         <IconPicker

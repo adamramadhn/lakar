@@ -9,6 +9,8 @@
 // Layer manual (aplikasi 4): tool sisip Frame (F), Rectangle (R), Ellipse (O), Text (T), Image (Shift+Ctrl/Cmd+K),
 // Icon (I). Klik di board → `onInsert` dengan koordinat board; Frame di area kosong → koordinat halaman (board baru).
 // Sesudah satu sisipan tool kembali ke Select. `editable` false (pratinjau versi, offline) → tool sisip nonaktif.
+// Sentuh (aplikasi 9): dua jari = pinch-zoom di titik tengah + pan (sheet.ts `pinchCamera`); satu jari dengan tool
+// Select/Hand = pan; tap (gerak ≤8px) = pilih/sisip seperti klik. Jari kedua dilepas → pan satu jari tanpa lompat.
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import type { FindingSummary } from '@lakar/schema';
 import { api, errorText } from './api';
@@ -17,6 +19,7 @@ import { ExportButton } from './ExportPopover';
 import { useRetry } from './hooks';
 import { Icon, type IconName } from './icons';
 import type { AgentPresence, Rect } from './presence';
+import { pinchCamera, pointerIntent, TAP_SLOP, type Point } from './sheet';
 import type { Camera } from './viewState';
 
 export type CanvasBoard = { id: string; name: string; x: number; y: number; width: number; height: number };
@@ -268,7 +271,11 @@ export function Canvas({
   }, [canInsert]);
   const [spaceHeld, setSpaceHeld] = useState(false);
   const [panning, setPanning] = useState(false);
-  const drag = useRef<{ x: number; y: number; cam: Camera; moved: boolean; pan: boolean; target: string | undefined } | null>(null);
+  /** Satu pointer: `pan` = gerak menggeser kamera, `tap` = lepas tanpa gerak memilih/menyisip. */
+  const drag = useRef<{ id: number; x: number; y: number; cam: Camera; moved: boolean; pan: boolean; tap: boolean; slop: number; target: string | undefined } | null>(null);
+  /** Pointer sentuh aktif (koordinat client) dan pinch dua jari yang sedang berjalan. */
+  const touches = useRef(new Map<number, Point>());
+  const pinch = useRef<{ ids: [number, number]; a0: Point; b0: Point; cam: Camera; left: number; top: number } | null>(null);
   const camRef = useRef(cam);
   camRef.current = cam;
   const anim = useRef<number | undefined>(undefined);
@@ -405,27 +412,73 @@ export function Canvas({
 
   const onPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
     if ((e.target as HTMLElement).closest('.canvas-overlay-ui')) return;
-    const pan = tool === 'hand' || spaceHeld || e.button === 1;
+    const touch = e.pointerType === 'touch';
     if (e.button !== 0 && e.button !== 1) return;
     stopAnim();
-    const boardEl = (e.target as HTMLElement).closest<HTMLElement>('[data-board]');
-    drag.current = { x: e.clientX, y: e.clientY, cam, moved: false, pan, target: boardEl?.dataset.board };
     e.currentTarget.setPointerCapture(e.pointerId);
-    if (pan) setPanning(true);
+    if (touch) {
+      touches.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (touches.current.size === 2) {
+        // Jari kedua: mulai pinch dari kamera sekarang; tap jari pertama batal.
+        const [[ia, a], [ib, b]] = [...touches.current] as [[number, Point], [number, Point]];
+        const r = e.currentTarget.getBoundingClientRect();
+        pinch.current = { ids: [ia, ib], a0: a, b0: b, cam: camRef.current, left: r.left, top: r.top };
+        drag.current = null;
+        setPanning(true);
+        return;
+      }
+      if (touches.current.size > 2) return;
+    }
+    // Sentuh: satu jari menggeser di Select/Hand; tap tetap memilih (Select) atau menyisip (tool sisip).
+    const { pan, tap, slop } = pointerIntent({ touch, tool, spaceHeld, button: e.button });
+    const boardEl = (e.target as HTMLElement).closest<HTMLElement>('[data-board]');
+    drag.current = { id: e.pointerId, x: e.clientX, y: e.clientY, cam: camRef.current, moved: false, pan, tap, slop, target: boardEl?.dataset.board };
+    if (pan && !touch) setPanning(true);
   };
   const onPointerMove = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (touches.current.has(e.pointerId)) touches.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    const p = pinch.current;
+    if (p) {
+      const a1 = touches.current.get(p.ids[0]);
+      const b1 = touches.current.get(p.ids[1]);
+      if (!a1 || !b1) return;
+      const rel = (q: Point) => ({ x: q.x - p.left, y: q.y - p.top });
+      const next = pinchCamera(p.cam, rel(p.a0), rel(p.b0), rel(a1), rel(b1), clampZoom);
+      // Langsung ke ref: jari kedua bisa lepas sebelum render, handoff pan memakai kamera ini.
+      camRef.current = next;
+      setCam(next);
+      return;
+    }
     const d = drag.current;
-    if (!d) return;
+    if (!d || d.id !== e.pointerId) return;
     const dx = e.clientX - d.x;
     const dy = e.clientY - d.y;
-    if (!d.moved && Math.hypot(dx, dy) > 3) d.moved = true;
+    if (!d.moved && Math.hypot(dx, dy) > d.slop) {
+      d.moved = true;
+      if (d.pan) setPanning(true);
+    }
     if (d.pan && d.moved) setCam({ ...d.cam, x: d.cam.x + dx, y: d.cam.y + dy });
   };
-  const onPointerUp = () => {
+  /** Pointer sentuh lepas: pinch berakhir → jari tersisa lanjut menggeser dari posisinya sekarang (tanpa lompat). */
+  const releaseTouch = (pointerId: number): boolean => {
+    if (!touches.current.delete(pointerId)) return false;
+    const p = pinch.current;
+    if (p && (p.ids[0] === pointerId || p.ids[1] === pointerId)) {
+      pinch.current = null;
+      const rest = [...touches.current][0];
+      if (rest) drag.current = { id: rest[0], x: rest[1].x, y: rest[1].y, cam: camRef.current, moved: true, pan: true, tap: false, slop: TAP_SLOP, target: undefined };
+      else setPanning(false);
+      return true;
+    }
+    return p !== null;
+  };
+  const onPointerUp = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (releaseTouch(e.pointerId)) return;
     const d = drag.current;
+    if (d && d.id !== e.pointerId) return;
     drag.current = null;
     setPanning(false);
-    if (!d || d.pan || d.moved) return;
+    if (!d || d.moved || !d.tap) return;
     if (isInsertTool(tool)) {
       insertAt(tool, d.x, d.y, d.target);
       return;
@@ -445,8 +498,10 @@ export function Canvas({
     else return; // tipe lain butuh board: klik di luar board diabaikan, tool tetap aktif
     setTool('select');
   };
-  /** Gestur dibatalkan (mis. sistem mengambil alih pointer): bersihkan tanpa memilih apa pun. */
-  const onPointerCancel = () => {
+  /** Gestur dibatalkan (mis. sistem mengambil alih pointer): jari pinch → jari tersisa lanjut menggeser; selain itu bersihkan tanpa memilih. */
+  const onPointerCancel = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (releaseTouch(e.pointerId)) return;
+    if (drag.current && drag.current.id !== e.pointerId) return;
     drag.current = null;
     setPanning(false);
   };
@@ -564,11 +619,11 @@ export function Canvas({
           );
         })}
         <span className="divider" />
-        <button type="button" className="tool" aria-label="Zoom out" title="Zoom out (-)" onClick={() => zoomAt(1 / 1.25, ...center())}>
+        <button type="button" className="tool zoom-btn" aria-label="Zoom out" title="Zoom out (-)" onClick={() => zoomAt(1 / 1.25, ...center())}>
           <Icon name="minus" />
         </button>
         <span className="zoom-level">{Math.round(cam.z * 100)}%</span>
-        <button type="button" className="tool" aria-label="Zoom in" title="Zoom in (+)" onClick={() => zoomAt(1.25, ...center())}>
+        <button type="button" className="tool zoom-btn" aria-label="Zoom in" title="Zoom in (+)" onClick={() => zoomAt(1.25, ...center())}>
           <Icon name="plus" />
         </button>
         <button type="button" className="tool" aria-label="Fit" title="Fit (Shift+1)" onClick={fit}>
