@@ -49,5 +49,6 @@ jobs:
       - name: Build
         run: pnpm build
 
+      # GitHub runners are slower than the VPS; render latency tests need more than vitest's 5 s default.
       - name: Test
-        run: pnpm test
+        run: pnpm test --testTimeout=30000
