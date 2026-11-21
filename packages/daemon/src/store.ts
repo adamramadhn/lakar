@@ -8,7 +8,8 @@
 // arsip di <data>/docs/archive dengan pola nama yang sama.
 // Snapshot (aplikasi 3): isi dokumen per rev di <dir>/.snapshots/<slug>/r<rev>.lakar.json (dir = docs atau
 // docs/archive), ditulis atomik sesudah commit berhasil; gagal tulis hanya dicatat. Retensi SNAPSHOT_KEEP rev
-// terakhir. Rename/archive/unarchive memindahkan foldernya, remove menghapusnya.
+// terakhir, dan total byte folder snapshot per dokumen maks SNAPSHOT_MAX_BYTES (snapshot tertua dibuang dulu; snapshot
+// terbaru selalu disimpan). Rename/archive/unarchive memindahkan foldernya, remove menghapusnya.
 import { mkdir, open, readFile, readdir, rename, rm, stat, truncate, type FileHandle } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { randomBytes } from 'node:crypto';
@@ -24,10 +25,14 @@ export type DocStoreOptions = {
   log?: (message: string) => void;
   /** Jumlah snapshot yang disimpan per dokumen (default `SNAPSHOT_KEEP`). */
   snapshotKeep?: number;
+  /** Batas total byte snapshot per dokumen (default `SNAPSHOT_MAX_BYTES`). */
+  snapshotMaxBytes?: number;
 };
 
 /** Retensi snapshot: rev terakhir per dokumen. */
 export const SNAPSHOT_KEEP = 200;
+/** Retensi snapshot: total byte folder snapshot per dokumen (200 MB). */
+export const SNAPSHOT_MAX_BYTES = 200 * 1024 * 1024;
 const SNAPSHOTS_DIR = '.snapshots';
 const SNAPSHOT_FILE = /^r(\d+)\.lakar\.json$/;
 
@@ -116,12 +121,14 @@ export class DocStore {
   readonly #migrate: (raw: unknown) => unknown;
   readonly #log: (message: string) => void;
   readonly #keep: number;
+  readonly #maxBytes: number;
 
   constructor(dataDir: string, opts: DocStoreOptions = {}) {
     this.docsDir = join(dataDir, 'docs');
     this.#migrate = opts.migrate ?? ((raw) => migrateDocument(raw, { migrations: opts.migrations }));
     this.#log = opts.log ?? ((m) => console.warn(m));
     this.#keep = Math.max(1, opts.snapshotKeep ?? SNAPSHOT_KEEP);
+    this.#maxBytes = Math.max(0, opts.snapshotMaxBytes ?? SNAPSHOT_MAX_BYTES);
   }
 
   docPath(slug: string): string {
@@ -267,12 +274,28 @@ export class DocStore {
     return parseDocument(this.#migrate(json));
   }
 
-  /** Tulis `r<rev>.lakar.json` atomik, lalu buang snapshot di luar `#keep` rev terakhir. */
+  /**
+   * Tulis `r<rev>.lakar.json` atomik, lalu buang snapshot di luar `#keep` rev terakhir dan snapshot tertua yang
+   * membuat total byte melewati `#maxBytes`. Snapshot terbaru selalu disimpan walau sendirian melebihi batas.
+   */
   async #writeSnapshot(slug: string, doc: LakarDocument): Promise<void> {
     const dir = this.snapshotDir(slug);
     await this.#writeAtomic(this.snapshotPath(slug, doc.rev), JSON.stringify(doc), dir);
     const revs = [...(await this.snapshotRevs(slug))].sort((a, b) => b - a);
-    await Promise.all(revs.slice(this.#keep).map((r) => rm(this.snapshotPath(slug, r), { force: true })));
+    const drop = revs.slice(this.#keep);
+    let total = 0;
+    for (const [i, r] of revs.slice(0, this.#keep).entries()) {
+      let size: number;
+      try {
+        size = (await stat(this.snapshotPath(slug, r))).size;
+      } catch (e) {
+        if (isEnoent(e)) continue;
+        throw e;
+      }
+      total += size;
+      if (i > 0 && total > this.#maxBytes) drop.push(r);
+    }
+    await Promise.all(drop.map((r) => rm(this.snapshotPath(slug, r), { force: true })));
   }
 
   /** Pindahkan folder snapshot (best-effort): folder target yatim dibuang dulu; gagal hanya dicatat. */

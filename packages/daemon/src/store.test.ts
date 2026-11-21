@@ -8,7 +8,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createDocument } from '@lakar/core';
 import type { HistoryEntry, LakarDocument } from '@lakar/schema';
-import { DocStore } from './store.js';
+import { DocStore, SNAPSHOT_MAX_BYTES } from './store.js';
 
 const STORE_DIST = fileURLToPath(new URL('../dist/store.js', import.meta.url));
 
@@ -23,6 +23,26 @@ afterAll(async () => {
 const entry = (rev: number): HistoryEntry => ({ rev, sessionId: 's', description: `rev ${rev} uji`, opsSummary: 'add×1', at: '2026-11-18T00:00:00.000Z' });
 const withRev = (doc: LakarDocument, rev: number): LakarDocument => ({ ...doc, rev });
 const tmpFiles = (dir: string) => readdirSync(dir).filter((f) => f.endsWith('.tmp'));
+
+describe('DocStore retensi snapshot per byte', () => {
+  it('default 200 MB; total folder snapshot melewati batas → snapshot tertua dibuang, terbaru selalu disimpan', async () => {
+    expect(SNAPSHOT_MAX_BYTES).toBe(200 * 1024 * 1024);
+    const base = createDocument();
+    const size = (rev: number) => JSON.stringify({ ...base, rev }).length;
+    // Batas muat tepat 3 snapshot (ukuran per rev hampir sama; rev 1 digit).
+    const store = new DocStore(join(root, 'bytes'), { snapshotMaxBytes: size(1) * 3 + 2 });
+    for (let rev = 1; rev <= 6; rev++) await store.commit('d', withRev(base, rev), entry(rev));
+    expect([...(await store.snapshotRevs('d'))].sort()).toEqual([4, 5, 6]);
+    // Batas lebih kecil dari satu snapshot: snapshot terbaru tetap ada.
+    const tiny = new DocStore(join(root, 'tiny'), { snapshotMaxBytes: 1 });
+    for (let rev = 1; rev <= 3; rev++) await tiny.commit('d', withRev(base, rev), entry(rev));
+    expect([...(await tiny.snapshotRevs('d'))]).toEqual([3]);
+    // Batas jumlah tetap berlaku bersamaan.
+    const both = new DocStore(join(root, 'both'), { snapshotKeep: 2 });
+    for (let rev = 1; rev <= 4; rev++) await both.commit('d', withRev(base, rev), entry(rev));
+    expect([...(await both.snapshotRevs('d'))].sort()).toEqual([3, 4]);
+  });
+});
 
 describe('DocStore', () => {
   it('commit: riwayat lalu dokumen; readHistory; tanpa tmp sisa', async () => {

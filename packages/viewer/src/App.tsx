@@ -3,13 +3,17 @@
 // Tab dokumen (aplikasi 7): daftar slug di localStorage (`TABS_KEY`); membuka dokumen menambah/mengaktifkan tabnya,
 // Close lewat x / klik tengah / Ctrl/Cmd+W. Rename/archive/delete dari aplikasi (`api.onFileEvent`) ikut ke tab.
 // Hanya Viewer tab aktif yang ter-mount; state tampilan per dokumen disimpan di viewState.ts.
+// Sinkron antar jendela: App berlangganan `activityHub` (satu stream per jendela) dan menerapkan perubahan dari
+// jendela lain (`remoteEffect` → `api.applyRemote`): daftar dimuat ulang, tab ikut rename. Archive/delete dokumen
+// yang sedang tampil membiarkan tabnya; Viewer menampilkan pesan dan menutup tab lewat `requestCloseTab`.
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { activityHub, remoteDocCall, remoteEffect } from './activity';
 import { api, connection } from './api';
 import { Dashboard } from './Dashboard';
 import { docHash, parseRoute, type Route } from './files';
 import { NewFileDialog } from './NewFileDialog';
 import { OfflineBanner } from './OfflineBanner';
-import { applyFileEvent, closeTab, onOpenInNewTab, openTab, pruneTabs, readTabs, serializeTabs, TABS_KEY } from './tabs';
+import { applyFileEvent, closeTab, onOpenInNewTab, onRequestCloseTab, openTab, pruneTabs, readTabs, serializeTabs, TABS_KEY } from './tabs';
 import { TitleBar } from './TitleBar';
 import { dropViewState, moveViewState } from './viewState';
 import { Viewer } from './Viewer';
@@ -108,7 +112,35 @@ export function App() {
 
   useEffect(() => onOpenInNewTab((slug) => setTabs((t) => openTab(t, slug))), []);
 
-  // Rename/archive/delete dari aplikasi (keputusan di `applyFileEvent`). Perubahan oleh agen lewat MCP sengaja tidak disinkronkan.
+  // Pesan "diarsip/dihapus di jendela lain" di Viewer: tutup tabnya lalu buka Dashboard/Archive.
+  useEffect(
+    () =>
+      onRequestCloseTab((slug, hash) => {
+        const r = closeTab(tabsRef.current, slug, activeRef.current);
+        dropViewState(slug);
+        apply(r.tabs, false, undefined);
+        location.hash = hash;
+      }),
+    [apply],
+  );
+
+  // Perubahan dari jendela/tab viewer lain (stream): gema jendela ini diabaikan di `remoteEffect`.
+  useEffect(
+    () =>
+      activityHub.listen({
+        onEvent: (e) => {
+          if (e.type === 'change') {
+            const effect = remoteEffect(e.change, api.origin);
+            if (effect) api.applyRemote(effect);
+          } else if (remoteDocCall(e, api.origin)) api.notifyDocsChanged();
+        },
+        // Event selama putus tidak diputar ulang: muat ulang daftar.
+        onReconnect: () => api.notifyDocsChanged(),
+      }),
+    [],
+  );
+
+  // Rename/archive/delete dari aplikasi, jendela ini atau jendela lain (keputusan di `applyFileEvent`). Perubahan oleh agen lewat MCP sengaja tidak disinkronkan.
   useEffect(
     () =>
       api.onFileEvent((e) => {

@@ -7,7 +7,7 @@ import type { FastifyInstance } from 'fastify';
 import { IdAllocator, type DocumentLocks } from '@lakar/core';
 import { ID_PATTERN, LakarError, SLUG_PATTERN, errorMessage, type HistoryEntry, type LakarDocument } from '@lakar/schema';
 import { z } from 'zod';
-import { VIEWER_CLIENT, publicSessionId, type ActivityBus, type ActivityCall } from './events.js';
+import { VIEWER_CLIENT, originOf, publicSessionId, type ActivityBus, type ActivityCall } from './events.js';
 import type { DocStore } from './store.js';
 
 /** Panjang maksimum nama halaman (sesudah trim). */
@@ -78,7 +78,7 @@ export function registerPageRoutes(app: FastifyInstance, { docs, store, docLocks
    * Jalankan `mutate` di bawah kunci dokumen lalu commit (rev+1, satu entri riwayat, snapshot). `mutate`
    * mengembalikan `null` bila tidak ada perubahan: rev tetap, tanpa riwayat. Event aktivitas running→done/error.
    */
-  const run = async (slug: string, label: string, mutate: (doc: LakarDocument) => { mutation: Mutation; pageId: string }) => {
+  const run = async (slug: string, label: string, mutate: (doc: LakarDocument) => { mutation: Mutation; pageId: string }, origin?: string) => {
     const t0 = Date.now();
     const call: ActivityCall = {
       callId: `pages-${t0.toString(36)}-${++seq}`,
@@ -89,6 +89,7 @@ export function registerPageRoutes(app: FastifyInstance, { docs, store, docLocks
       description: label,
       status: 'running',
       startedAt: new Date(t0).toISOString(),
+      ...(origin ? { origin } : {}),
     };
     activity?.emit({ type: 'call', call });
     try {
@@ -123,7 +124,7 @@ export function registerPageRoutes(app: FastifyInstance, { docs, store, docLocks
       const pageId = IdAllocator.forDocument(doc).next();
       doc.pages.push({ id: pageId, name, children: [] });
       return { mutation: { next: doc, description: `Added page ${JSON.stringify(name)}` }, pageId };
-    });
+    }, originOf(req.headers));
     return reply.code(200).send({ ok: true, data });
   });
 
@@ -137,7 +138,7 @@ export function registerPageRoutes(app: FastifyInstance, { docs, store, docLocks
       if (doc.pages[i]!.name === name) return { mutation: null, pageId };
       doc.pages[i]!.name = name;
       return { mutation: { next: doc, description: `Renamed page to ${JSON.stringify(name)}` }, pageId };
-    });
+    }, originOf(req.headers));
     return reply.code(200).send({ ok: true, data });
   });
 
@@ -155,7 +156,7 @@ export function registerPageRoutes(app: FastifyInstance, { docs, store, docLocks
       const [page] = doc.pages.splice(from, 1);
       doc.pages.splice(index, 0, page!);
       return { mutation: { next: doc, description: `Moved page ${JSON.stringify(page!.name)}` }, pageId };
-    });
+    }, originOf(req.headers));
     return reply.code(200).send({ ok: true, data });
   });
 
@@ -168,7 +169,7 @@ export function registerPageRoutes(app: FastifyInstance, { docs, store, docLocks
       if (doc.pages.length === 1) throw new LakarError('CONFLICT', `halaman ${pageId} adalah satu-satunya halaman ${slug}`, { hint: 'dokumen butuh setidaknya satu halaman' });
       const [page] = doc.pages.splice(i, 1);
       return { mutation: { next: doc, description: `Deleted page ${JSON.stringify(page!.name)}` }, pageId };
-    });
+    }, originOf(req.headers));
     return reply.code(200).send({ ok: true, data });
   });
 }

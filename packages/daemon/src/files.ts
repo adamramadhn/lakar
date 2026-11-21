@@ -8,13 +8,17 @@
 // image sendiri disisipkan viewer lewat `/execute` biasa.
 // Folder (aplikasi 10): `/viewer/folders*` mengelola metadata `<dataDir>/folders.json` (FolderStore, folders.ts).
 // Rename/duplicate/archive/unarchive/delete menjaga keanggotaan folder sesudah operasi disk sukses (best-effort + log).
+// Sinkron antar jendela: setiap tulis sukses memancarkan event `change` (events.ts) dengan `origin` dari header
+// `x-lakar-origin`, supaya jendela/tab viewer lain memuat ulang daftar, tab, dan dokumen yang terbuka.
+// Dokumen yang hanya ada di memori (file dihapus dari luar aplikasi): rename/archive menulis balik salinan memori
+// dulu lalu berjalan seperti biasa; delete cukup melupakannya.
 import type { FastifyInstance } from 'fastify';
 import { IdAllocator, createDocument, transact, type DocumentLocks } from '@lakar/core';
 import { LakarError, SLUG_PATTERN, errorMessage, type HistoryEntry, type LakarDocument } from '@lakar/schema';
 import { z } from 'zod';
 import { imageSize, writeAsset } from './assets.js';
 import { FOLDER_ID_PATTERN, FolderStore } from './folders.js';
-import { VIEWER_CLIENT, publicSessionId, type ActivityBus, type ActivityCall } from './events.js';
+import { VIEWER_CLIENT, originOf, publicSessionId, type ActivityBus, type ActivityCall, type DocChange } from './events.js';
 import type { Sessions } from './sessions.js';
 import type { DocStore } from './store.js';
 import { peekDocument, summarize, type ViewerDocSummary } from './viewer.js';
@@ -85,7 +89,7 @@ export type FileRoutesOptions = {
   store: DocStore;
   sessions: Sessions;
   docLocks: DocumentLocks;
-  /** Bus aktivitas: Restore dipancarkan seperti tool call supaya viewer lain ikut memuat ulang. */
+  /** Bus aktivitas: Restore dipancarkan seperti tool call, kelola file/folder sebagai `change`, supaya viewer lain ikut memuat ulang. */
   activity?: ActivityBus;
   /** Direktori data daemon: unggahan gambar ditulis ke `<dataDir>/assets`. Tanpa ini route unggah tidak didaftarkan. */
   dataDir?: string;
@@ -171,6 +175,19 @@ export function registerFileRoutes(app: FastifyInstance, { docs, store, sessions
   const mustExist = async (slug: string) => {
     if (!(await taken(slug))) throw new LakarError('NOT_FOUND', `dokumen ${slug} tidak ada`, { hint: 'pakai slug dari GET /viewer/docs' });
   };
+  /**
+   * Dokumen hanya di memori (file dihapus dari luar, salinan masih dipakai sesi): tulis balik ke disk supaya
+   * operasi pindah file (rename/archive) berlaku sama dengan dokumen biasa. Riwayat yang tersisa tetap milik dokumen ini.
+   */
+  const writeBackMemoryOnly = async (slug: string) => {
+    const mem = docs.get(slug);
+    if (mem && !(await store.exists(slug))) await store.write(slug, mem);
+  };
+  /** Pancarkan perubahan untuk jendela viewer lain, dengan id jendela pengirim bila ada. */
+  const notify = (headers: Record<string, string | string[] | undefined>, change: DocChange) => {
+    const origin = originOf(headers);
+    activity?.change({ ...change, ...(origin ? { origin } : {}) });
+  };
   /** Metadata folder; tanpa `dataDir` tidak ada folder (route folder tidak didaftarkan, kait tidak berbuat apa-apa). */
   const folders = dataDir !== undefined ? new FolderStore(dataDir, log) : undefined;
   /** Kait keanggotaan folder sesudah operasi file sukses: gagal tidak menggagalkan operasi itu, cukup dicatat. */
@@ -205,6 +222,7 @@ export function registerFileRoutes(app: FastifyInstance, { docs, store, sessions
         return { slug, rev: committed.doc.rev };
       });
     });
+    notify(req.headers, { kind: 'create', slug: data.slug, rev: data.rev });
     return reply.code(200).send({ ok: true, data });
   });
 
@@ -218,6 +236,7 @@ export function registerFileRoutes(app: FastifyInstance, { docs, store, sessions
       if (to === from) return { slug: to, from };
       if (await taken(to)) throw new LakarError('CONFLICT', `dokumen ${to} sudah ada`, { hint: 'pilih nama lain' });
       if (await store.exists(to, true)) throw new LakarError('CONFLICT', `dokumen ${to} sudah ada di arsip`, { hint: 'pilih nama lain, atau hapus file arsip itu dulu' });
+      await writeBackMemoryOnly(from);
       await store.rename(from, to);
       const mem = docs.get(from);
       docs.delete(from);
@@ -226,6 +245,7 @@ export function registerFileRoutes(app: FastifyInstance, { docs, store, sessions
       await keepFolders(`rename ${from}→${to}`, (f) => f.onRenamed(from, to));
       return { slug: to, from };
     });
+    if (data.slug !== data.from) notify(req.headers, { kind: 'rename', slug: data.slug, from: data.from });
     return reply.code(200).send({ ok: true, data });
   });
 
@@ -246,6 +266,7 @@ export function registerFileRoutes(app: FastifyInstance, { docs, store, sessions
         return { slug, rev: 0 };
       });
     });
+    notify(req.headers, { kind: 'duplicate', slug: data.slug, from, rev: data.rev });
     return reply.code(200).send({ ok: true, data });
   });
 
@@ -254,11 +275,13 @@ export function registerFileRoutes(app: FastifyInstance, { docs, store, sessions
     const { slug } = req.params;
     checkSlug(slug);
     await locked([slug], async () => {
+      await writeBackMemoryOnly(slug);
       await store.archive(slug);
       docs.delete(slug);
       sessions.retarget(slug, undefined);
       await keepFolders(`archive ${slug}`, (f) => f.onRemoved(slug));
     });
+    notify(req.headers, { kind: 'archive', slug });
     return reply.code(200).send({ ok: true, data: { slug } });
   });
 
@@ -271,6 +294,7 @@ export function registerFileRoutes(app: FastifyInstance, { docs, store, sessions
       await store.unarchive(slug);
       await keepFolders(`unarchive ${slug}`, (f) => f.onRemoved(slug));
     });
+    notify(req.headers, { kind: 'unarchive', slug });
     return reply.code(200).send({ ok: true, data: { slug } });
   });
 
@@ -293,6 +317,7 @@ export function registerFileRoutes(app: FastifyInstance, { docs, store, sessions
       sessions.retarget(slug, undefined);
       await keepFolders(`delete ${slug}`, (f) => f.onRemoved(slug));
     });
+    notify(req.headers, { kind: 'delete', slug, archived });
     return reply.code(200).send({ ok: true, data: { slug, deleted: true } });
   });
 
@@ -312,6 +337,7 @@ export function registerFileRoutes(app: FastifyInstance, { docs, store, sessions
     checkSlug(slug);
     const { rev, baseRev } = parse(RestoreBody, req.body, 'kirim {rev, baseRev?} (rev dari GET /viewer/docs/:slug/history; baseRev = rev terkini yang dilihat klien)');
     const description = `Restored r${rev}`;
+    const origin = originOf(req.headers);
     const t0 = Date.now();
     const call: ActivityCall = {
       callId: `restore-${t0.toString(36)}-${++restoreSeq}`,
@@ -322,6 +348,7 @@ export function registerFileRoutes(app: FastifyInstance, { docs, store, sessions
       description,
       status: 'running',
       startedAt: new Date(t0).toISOString(),
+      ...(origin ? { origin } : {}),
     };
     activity?.emit({ type: 'call', call });
     try {
@@ -408,6 +435,7 @@ export function registerFileRoutes(app: FastifyInstance, { docs, store, sessions
     app.post('/viewer/folders', async (req, reply) => {
       const { name } = parse(FolderNameBody, req.body, 'kirim {name} (1–60 karakter)');
       const folder = await folders.create(name);
+      notify(req.headers, { kind: 'folders' });
       return reply.code(200).send({ ok: true, data: { folder } });
     });
 
@@ -416,6 +444,7 @@ export function registerFileRoutes(app: FastifyInstance, { docs, store, sessions
       const id = folderId(req.params.id);
       const { name } = parse(FolderNameBody, req.body, 'kirim {name} (1–60 karakter)');
       const folder = await folders.rename(id, name);
+      notify(req.headers, { kind: 'folders' });
       return reply.code(200).send({ ok: true, data: { folder } });
     });
 
@@ -424,6 +453,7 @@ export function registerFileRoutes(app: FastifyInstance, { docs, store, sessions
       const id = folderId(req.params.id);
       const moved: string[] = [];
       for (const slug of await folders.remove(id)) if (await taken(slug)) moved.push(slug);
+      notify(req.headers, { kind: 'folders' });
       return reply.code(200).send({ ok: true, data: { id, deleted: true, moved } });
     });
 
@@ -436,6 +466,7 @@ export function registerFileRoutes(app: FastifyInstance, { docs, store, sessions
         await mustExist(slug);
         await folders.move(slug, target);
       });
+      notify(req.headers, { kind: 'folders', slug });
       return reply.code(200).send({ ok: true, data: { slug, folder: target } });
     });
   }
