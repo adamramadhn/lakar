@@ -1,5 +1,5 @@
 // Dialog New file (desain 02 "Dashboard — New File"): nama + board awal (Desktop, Tablet, Mobile, Custom),
-// pratinjau slug. Sukses → viewer membuka `#/d/<slug>`. `Modal` dipakai juga oleh dialog di FileMenu.tsx.
+// pratinjau slug. Sukses → viewer membuka `#/d/<slug>`. Dibuka dari halaman folder (`folder`) → file baru masuk folder itu. `Modal` dipakai juga oleh dialog di FileMenu.tsx.
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { api, errorText } from './api';
 import { docHash, previewSlug, PRESETS, SIZE_MAX, validSize, type BoardChoice, type PresetId } from './files';
@@ -30,8 +30,8 @@ export function Modal({ label, onClose, children, className = '' }: { label: str
 
 const PRESET_ICON: Record<PresetId, IconName> = { desktop: 'board', tablet: 'tablet', mobile: 'smartphone', custom: 'fit' };
 
-/** `initialName`: nama awal (default `Untitled`; dari Search tanpa hasil = query). */
-export function NewFileDialog({ taken, onClose, initialName = 'Untitled' }: { taken: ReadonlySet<string>; onClose: () => void; initialName?: string }) {
+/** `initialName`: nama awal (default `Untitled`; dari Search tanpa hasil = query). `folder`: id folder tujuan file baru. */
+export function NewFileDialog({ taken, onClose, initialName = 'Untitled', folder }: { taken: ReadonlySet<string>; onClose: () => void; initialName?: string; folder?: string }) {
   const [name, setName] = useState(initialName);
   const [preset, setPreset] = useState<PresetId>('desktop');
   const [width, setWidth] = useState('1440');
@@ -52,6 +52,10 @@ export function NewFileDialog({ taken, onClose, initialName = 'Untitled' }: { ta
     setError(undefined);
     try {
       const r = await api.createFile(name, board);
+      if (folder) {
+        // File sudah dibuat: gagal masuk folder tidak membatalkannya (file tetap di root).
+        await api.moveToFolder(r.slug, folder).catch(() => undefined);
+      }
       onClose();
       location.hash = docHash(r.slug);
     } catch (e) {

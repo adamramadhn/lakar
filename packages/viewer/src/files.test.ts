@@ -1,7 +1,7 @@
 // Logika murni kelola file + routing hash viewer. Slugify viewer harus sama dengan daemon (sumber kebenaran).
 import { describe, expect, it } from 'vitest';
 import { slugify as daemonSlugify, withSuffix as daemonWithSuffix } from '../../daemon/src/files.ts';
-import { byName, CONNECTIONS_HASH, docHash, docLink, parseRoute, previewSlug, searchDocs, SETTINGS_HASH, slugify, validSize, withSuffix, wrapIndex } from './files.ts';
+import { byName, CONNECTIONS_HASH, docHash, docLink, folderHash, folderMeta, inFolder, parseRoute, previewSlug, searchDocs, SETTINGS_HASH, slugify, validSize, withSuffix, wrapIndex } from './files.ts';
 
 describe('slugify (pratinjau = daemon)', () => {
   const names = ['My Landing', '  Café — Menu 2  ', '--a__b--', '!!!', '', 'Ünïcödé Ñame', 'x'.repeat(80), `a${'-'.repeat(70)}b`, 'Landing 2026 / v2'];
@@ -39,6 +39,11 @@ describe('parseRoute', () => {
     ['#/', { name: 'recents' }],
     ['#/files', { name: 'files' }],
     ['#/files/', { name: 'files' }],
+    ['#/files/fabc1234567', { name: 'files', folder: 'fabc1234567' }],
+    ['#/files/fabc1234567/', { name: 'files', folder: 'fabc1234567' }],
+    ['#/files/zzz', { name: 'files', folder: 'zzz' }],
+    ['#/files/%E0%A4%A', { name: 'files' }],
+    ['#/files/a/b', { name: 'recents' }],
     ['#/archive', { name: 'archive' }],
     ['#/settings/connections', { name: 'connections' }],
     ['#/settings/connections/', { name: 'connections' }],
@@ -58,6 +63,11 @@ describe('parseRoute', () => {
   });
   it('docHash bolak-balik', () => {
     expect(parseRoute(docHash('a-b'))).toEqual({ name: 'viewer', slug: 'a-b' });
+  });
+  it('folderHash bolak-balik; tanpa id → Files', () => {
+    expect(parseRoute(folderHash('fabc1234567'))).toEqual({ name: 'files', folder: 'fabc1234567' });
+    expect(folderHash()).toBe('#/files');
+    expect(folderHash(null)).toBe('#/files');
   });
 });
 
@@ -99,5 +109,21 @@ describe('wrapIndex', () => {
   it('n = 0 → 0', () => {
     expect(wrapIndex(0, 0, 1)).toBe(0);
     expect(wrapIndex(0, 0, -1)).toBe(0);
+  });
+});
+
+describe('folderMeta / inFolder', () => {
+  it('Empty, 1 file, N files', () => {
+    expect(folderMeta(0)).toBe('Empty');
+    expect(folderMeta(1)).toBe('1 file');
+    expect(folderMeta(2)).toBe('2 files');
+    expect(folderMeta(12)).toBe('12 files');
+  });
+  it('root = file tanpa folder; folder = anggotanya; urutan dipertahankan', () => {
+    const docs = ['c', 'a', 'b', 'd'].map((slug) => ({ slug }));
+    const membership = { a: 'f1', b: 'f2', d: 'f1', ghost: 'f1' };
+    expect(inFolder(docs, membership, null).map((d) => d.slug)).toEqual(['c']);
+    expect(inFolder(docs, membership, 'f1').map((d) => d.slug)).toEqual(['a', 'd']);
+    expect(inFolder(docs, membership, 'f9')).toEqual([]);
   });
 });

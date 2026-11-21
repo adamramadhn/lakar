@@ -225,6 +225,54 @@ describe('kelola file', () => {
   });
 });
 
+describe('folder (aplikasi 10)', () => {
+  const folder = { id: 'fabcdefghij', name: 'Client work', createdAt: '2026-01-01T00:00:00.000Z' };
+  it('metode, path, body; pendengar onDocsChanged dipanggil setelah setiap tulis', async () => {
+    const calls = fakeFetch((c) => {
+      if (c.path === '/viewer/folders' && c.method === 'GET') return ok({ folders: [folder], membership: { a: folder.id } });
+      if (c.path === '/viewer/folders' && c.method === 'POST') return ok({ folder });
+      if (c.path === `/viewer/folders/${folder.id}/rename`) return ok({ folder: { ...folder, name: 'Clients' } });
+      if (c.path === `/viewer/folders/${folder.id}` && c.method === 'DELETE') return ok({ id: folder.id, deleted: true, moved: ['a'] });
+      if (c.path === '/viewer/folders/move') return ok({ slug: c.body.slug, folder: c.body.folder });
+      throw new Error(`tak terduga ${c.method} ${c.path}`);
+    });
+    const api = await freshApi();
+    const changed = vi.fn();
+    api.onDocsChanged(changed);
+    await expect(api.listFolders()).resolves.toEqual({ folders: [folder], membership: { a: folder.id } });
+    expect(changed).not.toHaveBeenCalled();
+    await expect(api.createFolder('Client work')).resolves.toEqual(folder);
+    expect(changed).toHaveBeenCalledTimes(1);
+    await expect(api.renameFolder(folder.id, 'Clients')).resolves.toMatchObject({ id: folder.id, name: 'Clients' });
+    expect(changed).toHaveBeenCalledTimes(2);
+    await expect(api.moveToFolder('a', folder.id)).resolves.toEqual({ slug: 'a', folder: folder.id });
+    expect(changed).toHaveBeenCalledTimes(3);
+    await expect(api.moveToFolder('a', null)).resolves.toEqual({ slug: 'a', folder: null });
+    expect(changed).toHaveBeenCalledTimes(4);
+    await expect(api.deleteFolder(folder.id)).resolves.toMatchObject({ id: folder.id, moved: ['a'] });
+    expect(changed).toHaveBeenCalledTimes(5);
+    expect(calls.map((c) => [c.method, c.path, c.body])).toEqual([
+      ['GET', '/viewer/folders', undefined],
+      ['POST', '/viewer/folders', { name: 'Client work' }],
+      ['POST', `/viewer/folders/${folder.id}/rename`, { name: 'Clients' }],
+      ['POST', '/viewer/folders/move', { slug: 'a', folder: folder.id }],
+      ['POST', '/viewer/folders/move', { slug: 'a', folder: null }],
+      ['DELETE', `/viewer/folders/${folder.id}`, undefined],
+    ]);
+  });
+
+  it('409 dari createFolder → ApiError CONFLICT, pendengar tidak dipanggil', async () => {
+    fakeFetch(() => ({ status: 409, body: { ok: false, error: { code: 'CONFLICT', message: 'folder "Client work" sudah ada', hint: 'pilih nama lain', retryable: false } } }));
+    const api = await freshApi();
+    const changed = vi.fn();
+    api.onDocsChanged(changed);
+    const err = await api.createFolder('client work').catch((e: unknown) => e);
+    expect(err).toBeInstanceOf((await import('./api.ts')).ApiError);
+    expect(err).toMatchObject({ code: 'CONFLICT', status: 409 });
+    expect(changed).not.toHaveBeenCalled();
+  });
+});
+
 describe('History (aplikasi 3)', () => {
   it('versi lama + screenshot snapshot di-cache per slug@rev tanpa sesi; gagal tidak di-cache; restore → POST {rev} + pendengar', async () => {
     let failShot = true;

@@ -6,6 +6,7 @@
 // Kelola halaman (aplikasi 8): tambah/rename/pindah/hapus halaman (tulis, lewat antrean yang sama).
 // Layer manual (aplikasi 4): `execute` (POST /execute dari sesi viewer sendiri, kode dari codegen.ts), unggah
 // gambar (POST /viewer/assets, byte mentah), dan cari ikon (POST /icons/search).
+// Folder (aplikasi 10): GET/POST /viewer/folders*, tulis lewat antrean yang sama (memanggil pendengar `onDocsChanged`).
 // Bentuk respons AD-11: {ok:true,data} | {ok:false,error}.
 import type { Finding, FindingSummary, LakarDocument } from '@lakar/schema';
 
@@ -17,6 +18,10 @@ const CLIENT = 'lakar-viewer';
 export type BoardChoice = { preset: 'desktop' | 'tablet' | 'mobile' } | { preset: 'custom'; width: number; height: number };
 /** Kelola file dari aplikasi yang memengaruhi tab title bar (dipancarkan setelah tulis sukses). */
 export type FileEvent = { type: 'rename'; from: string; to: string } | { type: 'archive'; slug: string } | { type: 'delete'; slug: string; archived: boolean };
+/** Folder viewer (metadata, bukan direktori); id stabil `f` + 10 karakter. */
+export type Folder = { id: string; name: string; createdAt: string };
+/** `GET /viewer/folders`: folder urut nama + keanggotaan slug → id folder (slug aktif saja). */
+export type FolderState = { folders: Folder[]; membership: Record<string, string> };
 export type DocSummary = { slug: string; rev: number; updatedAt: string; boardCount: number; firstBoardId: string | null };
 /** Status pool render (`/status` → `pool`); `lastError` mis. "Chrome atau Edge tidak ditemukan …" di aplikasi desktop. */
 export type PoolStatus = { size: number; ready: number; browserVersion?: string; lastError?: string };
@@ -265,6 +270,42 @@ class ViewerClient {
       () => request<{ slug: string }>('DELETE', `/viewer/docs/${encodeURIComponent(slug)}${archived ? '?archived=true' : ''}`),
       () => [slug],
       () => ({ type: 'delete', slug, archived }),
+    );
+  }
+
+  /** Folder + keanggotaan (GET /viewer/folders). */
+  listFolders(): Promise<FolderState> {
+    return request<FolderState>('GET', '/viewer/folders');
+  }
+
+  /** Folder baru; nama 1–60 karakter, bentrok (tanpa peka huruf besar) → ApiError CONFLICT. */
+  createFolder(name: string): Promise<Folder> {
+    return this.#write(
+      () => request<{ folder: Folder }>('POST', '/viewer/folders', { name }).then((d) => d.folder),
+      () => [],
+    );
+  }
+
+  renameFolder(id: string, name: string): Promise<Folder> {
+    return this.#write(
+      () => request<{ folder: Folder }>('POST', `/viewer/folders/${encodeURIComponent(id)}/rename`, { name }).then((d) => d.folder),
+      () => [],
+    );
+  }
+
+  /** Hapus folder; file di dalamnya kembali ke root (tidak ada file yang dihapus). */
+  deleteFolder(id: string): Promise<{ id: string; moved: string[] }> {
+    return this.#write(
+      () => request<{ id: string; moved: string[] }>('DELETE', `/viewer/folders/${encodeURIComponent(id)}`),
+      () => [],
+    );
+  }
+
+  /** Pindahkan file ke folder `folder` (null = root Files). */
+  moveToFolder(slug: string, folder: string | null): Promise<{ slug: string; folder: string | null }> {
+    return this.#write(
+      () => request<{ slug: string; folder: string | null }>('POST', '/viewer/folders/move', { slug, folder }),
+      () => [],
     );
   }
 

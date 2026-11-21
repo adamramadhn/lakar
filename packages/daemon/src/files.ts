@@ -6,11 +6,14 @@
 // (`POST /viewer/docs/:slug/restore`), yang meng-commit isi snapshot sebagai rev baru di bawah kunci dokumen.
 // Layer manual (aplikasi 4): unggah gambar `POST /viewer/assets` (byte mentah, maks 20 MB) ke store aset; node
 // image sendiri disisipkan viewer lewat `/execute` biasa.
+// Folder (aplikasi 10): `/viewer/folders*` mengelola metadata `<dataDir>/folders.json` (FolderStore, folders.ts).
+// Rename/duplicate/archive/unarchive/delete menjaga keanggotaan folder sesudah operasi disk sukses (best-effort + log).
 import type { FastifyInstance } from 'fastify';
 import { IdAllocator, createDocument, transact, type DocumentLocks } from '@lakar/core';
 import { LakarError, SLUG_PATTERN, errorMessage, type HistoryEntry, type LakarDocument } from '@lakar/schema';
 import { z } from 'zod';
 import { imageSize, writeAsset } from './assets.js';
+import { FOLDER_ID_PATTERN, FolderStore } from './folders.js';
 import { VIEWER_CLIENT, publicSessionId, type ActivityBus, type ActivityCall } from './events.js';
 import type { Sessions } from './sessions.js';
 import type { DocStore } from './store.js';
@@ -73,6 +76,8 @@ const RenameBody = z.object({ name: NameField }).strict();
 const DeleteQuery = z.object({ archived: z.enum(['true', 'false']).optional() }).strict();
 const RestoreBody = z.object({ rev: z.number().int().nonnegative(), baseRev: z.number().int().nonnegative().optional() }).strict();
 const REV_PARAM = /^(0|[1-9]\d{0,9})$/;
+const FolderNameBody = z.object({ name: z.string().max(200, 'name maks 200 karakter') }).strict();
+const MoveBody = z.object({ slug: z.string(), folder: z.string().nullable() }).strict();
 
 export type FileRoutesOptions = {
   /** Salinan memori daemon (AD-1); diperbarui setiap operasi. */
@@ -166,6 +171,17 @@ export function registerFileRoutes(app: FastifyInstance, { docs, store, sessions
   const mustExist = async (slug: string) => {
     if (!(await taken(slug))) throw new LakarError('NOT_FOUND', `dokumen ${slug} tidak ada`, { hint: 'pakai slug dari GET /viewer/docs' });
   };
+  /** Metadata folder; tanpa `dataDir` tidak ada folder (route folder tidak didaftarkan, kait tidak berbuat apa-apa). */
+  const folders = dataDir !== undefined ? new FolderStore(dataDir, log) : undefined;
+  /** Kait keanggotaan folder sesudah operasi file sukses: gagal tidak menggagalkan operasi itu, cukup dicatat. */
+  const keepFolders = async (what: string, fn: (f: FolderStore) => Promise<void>) => {
+    if (!folders) return;
+    try {
+      await fn(folders);
+    } catch (e) {
+      log(`lakard: gagal memperbarui folder (${what}): ${errorMessage(e)}`);
+    }
+  };
 
   // New file: dokumen baru dengan satu board preset (fill putih), satu entri riwayat "Created file", rev 1.
   app.post('/viewer/docs', async (req, reply) => {
@@ -184,6 +200,8 @@ export function registerFileRoutes(app: FastifyInstance, { docs, store, sessions
         await store.dropOrphanHistory(slug);
         await store.commit(slug, committed.doc, committed.entry!);
         docs.set(slug, committed.doc);
+        // Keanggotaan sisa file lama yang dihapus dari luar tidak boleh menempel ke file baru.
+        await keepFolders(`create ${slug}`, (f) => f.onRemoved(slug));
         return { slug, rev: committed.doc.rev };
       });
     });
@@ -205,6 +223,7 @@ export function registerFileRoutes(app: FastifyInstance, { docs, store, sessions
       docs.delete(from);
       if (mem) docs.set(to, mem);
       sessions.retarget(from, to);
+      await keepFolders(`rename ${from}→${to}`, (f) => f.onRenamed(from, to));
       return { slug: to, from };
     });
     return reply.code(200).send({ ok: true, data });
@@ -223,6 +242,7 @@ export function registerFileRoutes(app: FastifyInstance, { docs, store, sessions
         const copy: LakarDocument = { ...structuredClone(src), id: IdAllocator.forDocument(src).next(), rev: 0 };
         await store.dropOrphanHistory(slug);
         await store.commit(slug, copy, historyEntry(0, `Duplicated from ${from}`));
+        await keepFolders(`duplicate ${from}→${slug}`, (f) => f.onDuplicated(from, slug));
         return { slug, rev: 0 };
       });
     });
@@ -237,6 +257,7 @@ export function registerFileRoutes(app: FastifyInstance, { docs, store, sessions
       await store.archive(slug);
       docs.delete(slug);
       sessions.retarget(slug, undefined);
+      await keepFolders(`archive ${slug}`, (f) => f.onRemoved(slug));
     });
     return reply.code(200).send({ ok: true, data: { slug } });
   });
@@ -248,6 +269,7 @@ export function registerFileRoutes(app: FastifyInstance, { docs, store, sessions
     await locked([slug], async () => {
       if (docs.has(slug)) throw new LakarError('CONFLICT', `dokumen ${slug} sudah ada`, { hint: 'ganti nama atau hapus dokumen aktif itu dulu' });
       await store.unarchive(slug);
+      await keepFolders(`unarchive ${slug}`, (f) => f.onRemoved(slug));
     });
     return reply.code(200).send({ ok: true, data: { slug } });
   });
@@ -260,6 +282,7 @@ export function registerFileRoutes(app: FastifyInstance, { docs, store, sessions
     await locked([slug], async () => {
       if (archived) {
         await store.remove(slug, true);
+        await keepFolders(`delete arsip ${slug}`, (f) => f.onRemoved(slug));
         return;
       }
       if (!(await store.exists(slug))) {
@@ -268,6 +291,7 @@ export function registerFileRoutes(app: FastifyInstance, { docs, store, sessions
       } else await store.remove(slug);
       docs.delete(slug);
       sessions.retarget(slug, undefined);
+      await keepFolders(`delete ${slug}`, (f) => f.onRemoved(slug));
     });
     return reply.code(200).send({ ok: true, data: { slug, deleted: true } });
   });
@@ -365,6 +389,54 @@ export function registerFileRoutes(app: FastifyInstance, { docs, store, sessions
           return reply.code(200).send({ ok: true, data: { assetId: saved.sha, mime: saved.mime, width: size.width, height: size.height } });
         },
       );
+    });
+  }
+
+  if (folders) {
+    const folderId = (raw: string): string => {
+      if (!FOLDER_ID_PATTERN.test(raw)) throw new LakarError('NOT_FOUND', `folder ${raw} tidak ada`, { hint: 'pakai id dari GET /viewer/folders' });
+      return raw;
+    };
+
+    // Daftar folder (urut nama) + keanggotaan slug aktif yang ada (memori atau disk).
+    app.get('/viewer/folders', async (_req, reply) => {
+      const data = await folders.list(taken);
+      return reply.code(200).send({ ok: true, data });
+    });
+
+    // Buat folder: nama dipangkas 1–60, unik tanpa peka huruf besar (bentrok → CONFLICT).
+    app.post('/viewer/folders', async (req, reply) => {
+      const { name } = parse(FolderNameBody, req.body, 'kirim {name} (1–60 karakter)');
+      const folder = await folders.create(name);
+      return reply.code(200).send({ ok: true, data: { folder } });
+    });
+
+    // Rename folder: id (dan URL viewer) tetap.
+    app.post<{ Params: { id: string } }>('/viewer/folders/:id/rename', async (req, reply) => {
+      const id = folderId(req.params.id);
+      const { name } = parse(FolderNameBody, req.body, 'kirim {name} (1–60 karakter)');
+      const folder = await folders.rename(id, name);
+      return reply.code(200).send({ ok: true, data: { folder } });
+    });
+
+    // Hapus folder: file di dalamnya kembali ke root, tidak ada file yang dihapus.
+    app.delete<{ Params: { id: string } }>('/viewer/folders/:id', async (req, reply) => {
+      const id = folderId(req.params.id);
+      const moved: string[] = [];
+      for (const slug of await folders.remove(id)) if (await taken(slug)) moved.push(slug);
+      return reply.code(200).send({ ok: true, data: { id, deleted: true, moved } });
+    });
+
+    // Pindahkan file ke folder (`folder:null` = root). Memegang kunci slug supaya tidak bersilang dengan rename/archive/delete.
+    app.post('/viewer/folders/move', async (req, reply) => {
+      const { slug, folder } = parse(MoveBody, req.body, 'kirim {slug, folder: id | null}');
+      checkSlug(slug);
+      const target = folder === null ? null : folderId(folder);
+      await locked([slug], async () => {
+        await mustExist(slug);
+        await folders.move(slug, target);
+      });
+      return reply.code(200).send({ ok: true, data: { slug, folder: target } });
     });
   }
 

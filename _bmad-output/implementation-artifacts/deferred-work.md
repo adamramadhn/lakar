@@ -62,3 +62,9 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-app-8-pages.md`
   summary: Agen hanya bisa menambah board ke halaman pertama (`add(null)`, `children(null)`, `place`); halaman lain yang dibuat pengguna tidak terjangkau agen.
   evidence: Disengaja agar `/execute` dan tool MCP tidak berubah untuk bench; butuh keputusan desain API agen (mis. `pages()` + `add(pageId)` terdokumentasi).
+- source_spec: `_bmad-output/implementation-artifacts/spec-app-10-folders.md`
+  summary: `/docs/open` agen yang membuat dokumen baru pada slug dengan keanggotaan folder basi (file lama dihapus dari luar aplikasi) memunculkan dokumen itu di folder lama.
+  evidence: maybe-false, medium bila terjadi; route agen dibekukan untuk bench. Diselesaikan dengan membersihkan keanggotaan di cabang `created` `/docs/open` (server.ts) atau pemangkasan aman saat daemon mulai.
+- source_spec: `_bmad-output/implementation-artifacts/spec-app-10-folders.md`
+  summary: Alur UI folder (seret ke folder, Move to…, New file di halaman folder) hanya diverifikasi manual; viewer belum punya tes komponen.
+  evidence: setelan tes komponen (jsdom/testing-library) belum ada di repo; kontrak klien api.ts sudah dites.

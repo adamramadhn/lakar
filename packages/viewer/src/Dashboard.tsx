@@ -5,11 +5,15 @@
 // (`#/settings/connections`) memakai sidebar yang sama.
 // Mobile (aplikasi 9, desain "Mobile — List/Grid"): tombol New file jadi ikon "+", list tanpa header dengan baris dua
 // baris (nama + "Edited …") dan thumbnail besar; `.list-sub`/label disembunyikan/ditampilkan lewat CSS.
+// Folder (aplikasi 10): halaman Files menampilkan bagian "Folders" (Folder Item) lalu "Files" (file di root);
+// `#/files/<id>` membuka folder dengan breadcrumb `Files › <nama>`. New folder, menu folder, "Move to…" di menu
+// file, dan seret kartu/baris ke Folder Item atau ke breadcrumb "Files".
 import { useCallback, useEffect, useMemo, useState, type KeyboardEvent, type MouseEvent } from 'react';
-import { api, errorText, OfflineError, type DaemonStatus, type DocSummary } from './api';
+import { api, errorText, OfflineError, type DaemonStatus, type DocSummary, type FolderState } from './api';
 import { openDoc } from './App';
 import { FileMenu, type MenuTarget } from './FileMenu';
-import { byName, CONNECTIONS_HASH, SETTINGS_HASH } from './files';
+import { byName, CONNECTIONS_HASH, folderHash, inFolder, memberOf, SETTINGS_HASH } from './files';
+import { dragSource, FolderItem, FolderMenu, FolderNameDialog, useDropTarget, type FolderMenuTarget } from './Folders';
 import { Connections, copyText } from './Connections';
 import { HARNESSES } from './harnesses';
 import { relativeTime } from './format';
@@ -112,8 +116,26 @@ function MoreButton({ onClick }: { onClick: (e: MouseEvent<HTMLElement>) => void
 }
 
 const TITLES: Record<Exclude<DashboardPage, 'settings' | 'connections'>, string> = { recents: 'Recents', files: 'Files', archive: 'Archive' };
+const NO_FOLDERS: FolderState = { folders: [], membership: {} };
 
-export function Dashboard({ page = 'recents', menuOpen, onCloseMenu }: { page?: DashboardPage; menuOpen: boolean; onCloseMenu: () => void }) {
+/** Urut nama folder tanpa peka huruf besar (daemon sudah mengurutkan; dijaga juga di sini). */
+const byFolderName = <T extends { name: string }>(folders: readonly T[]): T[] => [...folders].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+
+/** Breadcrumb halaman folder: "Files" (tautan + target lepas ke root) › nama folder. */
+function Breadcrumb({ name, onDropRoot }: { name: string; onDropRoot: (slug: string) => void }) {
+  const drop = useDropTarget(onDropRoot);
+  return (
+    <nav className="breadcrumb" aria-label="Breadcrumb">
+      <a href={folderHash()} className={`breadcrumb-root${drop.active ? ' drop-target' : ''}`} {...drop.props}>
+        Files
+      </a>
+      <Icon name="chevronRight" size={18} className="breadcrumb-sep" />
+      <h1 className="breadcrumb-current">{name}</h1>
+    </nav>
+  );
+}
+
+export function Dashboard({ page = 'recents', folder, menuOpen, onCloseMenu }: { page?: DashboardPage; folder?: string; menuOpen: boolean; onCloseMenu: () => void }) {
   const [docs, setDocs] = useState<DocSummary[] | undefined>(undefined);
   const [archive, setArchive] = useState<DocSummary[] | undefined>(undefined);
   const [error, setError] = useState<string | undefined>(undefined);
@@ -124,7 +146,14 @@ export function Dashboard({ page = 'recents', menuOpen, onCloseMenu }: { page?: 
   /** Nama awal dialog New file; `undefined` = dialog tertutup. */
   const [creating, setCreating] = useState<string | undefined>(undefined);
   const [notice, setNotice] = useState<string | undefined>(undefined);
+  /** Folder + keanggotaan (hanya dimuat di halaman Files); gagal dimuat berarti tanpa folder (daftar datar). */
+  const [folderState, setFolderState] = useState<FolderState | undefined>(undefined);
+  const [folderMenu, setFolderMenu] = useState<FolderMenuTarget | undefined>(undefined);
+  const [newFolder, setNewFolder] = useState(false);
+  /** Gagal memuat folder (halaman folder menampilkan error, bukan "Folder not found"). */
+  const [folderError, setFolderError] = useState<string | undefined>(undefined);
   const archivedPage = page === 'archive';
+  const filesPage = page === 'files';
   const settingsPage = page === 'settings' || page === 'connections';
 
   const load = useCallback(() => {
@@ -134,6 +163,17 @@ export function Dashboard({ page = 'recents', menuOpen, onCloseMenu }: { page?: 
     };
     api.listDocs().then(setDocs, fail);
     if (page === 'archive') api.listArchive().then(setArchive, fail);
+    if (page === 'files')
+      api.listFolders().then(
+        (s) => {
+          setFolderState(s);
+          setFolderError(undefined);
+        },
+        (e: unknown) => {
+          setFolderState((s) => s ?? NO_FOLDERS);
+          setFolderError(errorText(e));
+        },
+      );
     api.status().then(setStatus, () => {});
   }, [page]);
   useEffect(load, [load]);
@@ -146,7 +186,10 @@ export function Dashboard({ page = 'recents', menuOpen, onCloseMenu }: { page?: 
     document.addEventListener('visibilitychange', onVisible);
     return () => document.removeEventListener('visibilitychange', onVisible);
   }, [load]);
-  useEffect(() => setMenu(undefined), [page]);
+  useEffect(() => {
+    setMenu(undefined);
+    setFolderMenu(undefined);
+  }, [page, folder]);
 
   const changeView = (v: View) => {
     setView(v);
@@ -157,12 +200,51 @@ export function Dashboard({ page = 'recents', menuOpen, onCloseMenu }: { page?: 
     }
   };
 
-  const list = archivedPage ? archive : docs;
+  const folders = folderState?.folders ?? NO_FOLDERS.folders;
+  const membership = folderState?.membership ?? NO_FOLDERS.membership;
+  const currentFolder = filesPage && folder !== undefined ? folders.find((f) => f.id === folder) : undefined;
+  /** `#/files/<id>` dengan id yang tidak dikenal (sesudah folder dimuat). */
+  const folderMissing = filesPage && folder !== undefined && folderState !== undefined && !currentFolder && !folderError;
+  /** Halaman folder dengan daftar folder yang gagal dimuat. */
+  const folderLoadFailed = filesPage && folder !== undefined && !currentFolder && folderError !== undefined;
+  // Halaman Files menunggu folder dimuat supaya file di folder tidak sempat tampil di root.
+  const list = useMemo(() => {
+    if (archivedPage) return archive;
+    if (!filesPage) return docs;
+    if (folderState === undefined || docs === undefined) return undefined;
+    return inFolder(docs, membership, currentFolder?.id ?? null);
+  }, [archivedPage, archive, filesPage, docs, folderState, membership, currentFolder]);
   const shown = useMemo(() => {
     const q = query.trim().toLowerCase();
     const hit = (list ?? []).filter((d) => d.slug.includes(q));
     return page === 'files' ? byName(hit) : hit;
   }, [list, query, page]);
+  /** Jumlah file aktif per folder (meta Folder Item). */
+  const counts = useMemo(() => {
+    const n = new Map<string, number>();
+    for (const d of docs ?? []) {
+      const id = memberOf(membership, d.slug);
+      if (id) n.set(id, (n.get(id) ?? 0) + 1);
+    }
+    return n;
+  }, [docs, membership]);
+  const showFolders = filesPage && folder === undefined && folders.length > 0 && !error;
+  const moveTo = useCallback(
+    (slug: string, id: string | null) => {
+      if (memberOf(membership, slug) === id) return;
+      api.moveToFolder(slug, id).catch((e: unknown) => setNotice(errorText(e)));
+    },
+    [membership],
+  );
+  // Judul tab browser = nama folder (dijadwalkan sesudah efek judul App.tsx); folder hilang → kembali 'Files · Lakar'.
+  const folderName = currentFolder?.name;
+  useEffect(() => {
+    if (!filesPage || folder === undefined) return;
+    const t = setTimeout(() => {
+      document.title = folderName ? `${folderName} · Lakar` : 'Files · Lakar';
+    }, 0);
+    return () => clearTimeout(t);
+  }, [filesPage, folderName, folder]);
   // Slug arsip juga terpakai (server memberi sufiks agar Unarchive tidak bentrok); arsip hanya diketahui bila sudah
   // dimuat, selain itu pratinjau mengandalkan hasil server.
   const taken = useMemo(() => new Set([...(docs ?? []), ...(archive ?? [])].map((d) => d.slug)), [docs, archive]);
@@ -177,6 +259,8 @@ export function Dashboard({ page = 'recents', menuOpen, onCloseMenu }: { page?: 
       <span className="btn-label">New file</span>
     </button>
   );
+  const dragProps = (slug: string) => (filesPage ? dragSource(slug) : {});
+  const menuFolder = folderMenu ? folders.find((f) => f.id === folderMenu.id) : undefined;
 
   return (
     <div className="dashboard">
@@ -236,10 +320,30 @@ export function Dashboard({ page = 'recents', menuOpen, onCloseMenu }: { page?: 
       ) : (
         <section className="main">
           <div className="main-header">
-            <h1>{TITLES[page]}</h1>
+            {currentFolder ? <Breadcrumb name={currentFolder.name} onDropRoot={(slug) => moveTo(slug, null)} /> : <h1>{TITLES[page]}</h1>}
+            {currentFolder && (
+              <button
+                type="button"
+                className="icon-btn folder-header-more"
+                aria-label="Folder actions"
+                aria-haspopup="menu"
+                onClick={(e) => {
+                  const r = e.currentTarget.getBoundingClientRect();
+                  setFolderMenu({ id: currentFolder.id, x: r.left, y: r.bottom + 4 });
+                }}
+              >
+                <Icon name="ellipsis" size={16} />
+              </button>
+            )}
             <div className="spacer" />
-            {!archivedPage && newFileBtn}
-            {!(archivedPage && archive?.length === 0) && (
+            {filesPage && folder === undefined && folderState !== undefined && (
+              <button type="button" className="btn" onClick={() => setNewFolder(true)}>
+                <Icon name="folderPlus" size={14} />
+                New folder
+              </button>
+            )}
+            {!archivedPage && !folderMissing && newFileBtn}
+            {!(archivedPage && archive?.length === 0) && !folderMissing && (
               <div className="view-toggle" role="group" aria-label="View">
                 <button type="button" className={view === 'grid' ? 'active' : ''} aria-pressed={view === 'grid'} aria-label="Grid view" onClick={() => changeView('grid')}>
                   <Icon name="layoutGrid" />
@@ -261,11 +365,41 @@ export function Dashboard({ page = 'recents', menuOpen, onCloseMenu }: { page?: 
             </div>
           )}
 
-          {error ? (
+          {showFolders && (
+            <>
+              <div className="section-label">Folders</div>
+              <div className="folder-grid">
+                {byFolderName(folders).map((f) => (
+                  <FolderItem
+                    key={f.id}
+                    folder={f}
+                    count={counts.get(f.id) ?? 0}
+                    menuOpen={folderMenu?.id === f.id}
+                    onMenu={(x, y) => setFolderMenu({ id: f.id, x, y })}
+                    onDropFile={(slug) => moveTo(slug, f.id)}
+                  />
+                ))}
+              </div>
+              <div className="section-label">Files</div>
+            </>
+          )}
+
+          {folderMissing ? (
+            <div className="empty-state">
+              <span className="empty-icon">
+                <Icon name="folder" size={20} />
+              </span>
+              <strong>Folder not found</strong>
+              <span>It may have been deleted in another window.</span>
+              <a className="btn" href={folderHash()}>
+                <Icon name="file" size={14} /> Go to Files
+              </a>
+            </div>
+          ) : error || folderLoadFailed ? (
             <div className="empty-state">
               <Icon name="alert" size={22} />
-              <strong>Couldn't load documents</strong>
-              <span>{error}</span>
+              <strong>{error ? "Couldn't load documents" : "Couldn't load folders"}</strong>
+              <span>{error ?? folderError}</span>
               <button type="button" className="btn" onClick={load}>
                 <Icon name="refresh" size={14} /> Try again
               </button>
@@ -284,6 +418,17 @@ export function Dashboard({ page = 'recents', menuOpen, onCloseMenu }: { page?: 
                 </div>
               ))}
             </div>
+          ) : list.length === 0 && currentFolder ? (
+            <div className="empty-state">
+              <span className="empty-icon">
+                <Icon name="folder" size={20} />
+              </span>
+              <strong>This folder is empty</strong>
+              <span>Drag files onto the folder, or use Move to… in a file’s menu. New files created here go into this folder.</span>
+              {newFileBtn}
+            </div>
+          ) : list.length === 0 && showFolders ? (
+            <div className="folder-root-empty">{docs?.length ? 'All files are in folders.' : 'No files yet.'}</div>
           ) : list.length === 0 ? (
             archivedPage ? (
               <div className="empty-state archive-empty">
@@ -316,7 +461,7 @@ export function Dashboard({ page = 'recents', menuOpen, onCloseMenu }: { page?: 
               {shown.map((d) => {
                 const { menuBelow, ...h } = handlers(d);
                 return (
-                  <div key={d.slug} className={`card${menu?.slug === d.slug ? ' menu-open' : ''}`} aria-label={d.slug} {...h}>
+                  <div key={d.slug} className={`card${menu?.slug === d.slug ? ' menu-open' : ''}`} aria-label={d.slug} {...h} {...dragProps(d.slug)}>
                     <div className="card-header">
                       <div className="card-title-row">
                         <span className="card-title">{d.slug}</span>
@@ -342,7 +487,7 @@ export function Dashboard({ page = 'recents', menuOpen, onCloseMenu }: { page?: 
                 const { menuBelow, ...h } = handlers(d);
                 return (
                   <div key={d.slug} role="listitem">
-                    <div className={`list-row${menu?.slug === d.slug ? ' menu-open' : ''}`} aria-label={d.slug} {...h}>
+                    <div className={`list-row${menu?.slug === d.slug ? ' menu-open' : ''}`} aria-label={d.slug} {...h} {...dragProps(d.slug)}>
                       <span className="list-name">
                         <Thumb doc={d} size="mini" archived={archivedPage} />
                         <span className="list-text">
@@ -369,11 +514,31 @@ export function Dashboard({ page = 'recents', menuOpen, onCloseMenu }: { page?: 
           {...(menu.dialog ? { dialog: menu.dialog } : {})}
           archived={archivedPage}
           port={status?.port}
+          {...(filesPage && folderState ? { folders, folderOf: memberOf(membership, menu.slug) } : {})}
           onClose={() => setMenu(undefined)}
           onError={setNotice}
         />
       )}
-      {creating !== undefined && <NewFileDialog taken={taken} initialName={creating} onClose={() => setCreating(undefined)} />}
+      {folderMenu && menuFolder && (
+        <FolderMenu
+          key={`${folderMenu.id}:${folderMenu.x}:${folderMenu.y}`}
+          target={folderMenu}
+          folder={menuFolder}
+          folders={folders}
+          count={counts.get(menuFolder.id) ?? 0}
+          onClose={() => setFolderMenu(undefined)}
+          {...(currentFolder?.id === menuFolder.id
+            ? {
+                fromHeader: true,
+                onDeleted: () => {
+                  location.hash = folderHash();
+                },
+              }
+            : {})}
+        />
+      )}
+      {newFolder && <FolderNameDialog folders={folders} onClose={() => setNewFolder(false)} />}
+      {creating !== undefined && <NewFileDialog taken={taken} initialName={creating} {...(currentFolder ? { folder: currentFolder.id } : {})} onClose={() => setCreating(undefined)} />}
     </div>
   );
 }
