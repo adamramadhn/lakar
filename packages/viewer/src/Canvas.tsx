@@ -1,5 +1,8 @@
 // Canvas viewer: PNG per board dari POST /screenshot (renderer yang sama, AD-6) di posisi x/y dokumen.
 // Pan, zoom, Fit, seleksi, dan Export PNG (ExportPopover); tidak ada edit.
+// Mode pratinjau versi (History, aplikasi 3): board dari snapshot (POST revs/:rev/screenshot), banner
+// "Previewing …" dengan Back to latest / Restore this version; Export, Checks, dan outline agen disembunyikan.
+// Tool edit (batch 4) wajib nonaktif selama `preview` ada.
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import type { FindingSummary } from '@lakar/schema';
 import { api, errorText } from './api';
@@ -13,6 +16,20 @@ export type Highlight = { boardId: string; bounds?: [number, number, number, num
 export type AgentMark = { session: string; boardId: string; label: string; color: 'agent' | 'codex'; running: boolean };
 /** Permintaan Follow agent: geser kamera ke board ini (sekali per `nonce`). */
 export type Focus = { boardId: string; nonce: number };
+/** Pratinjau versi lama: board dirender dari snapshot `rev`, kanvas baca-saja. */
+export type CanvasPreview = {
+  rev: number;
+  label: string;
+  /** Dokumen versi sedang dimuat (board yang tampil masih versi terkini). */
+  loading?: boolean;
+  /** Dokumen versi gagal dimuat. */
+  error?: string;
+  restoring?: boolean;
+  /** Restore tersedia (versi lama bersnapshot). */
+  canRestore: boolean;
+  onBack: () => void;
+  onRestore: () => void;
+};
 type Camera = { x: number; y: number; z: number };
 
 const ZOOM_MIN = 0.05;
@@ -50,21 +67,21 @@ const reducedMotion = () => typeof matchMedia === 'function' && matchMedia('(pre
 /** Durasi geser kamera Follow agent (desain bagian 04: 500ms). */
 const FOLLOW_MS = 500;
 
-function BoardImage({ slug, rev, board }: { slug: string; rev: number; board: CanvasBoard }) {
+function BoardImage({ slug, rev, board, previewRev }: { slug: string; rev: number; board: CanvasBoard; previewRev?: number | undefined }) {
   const [state, setState] = useState<{ url?: string; error?: string }>({});
   const [attempt, setAttempt] = useState(0);
   useRetry(() => state.error && setAttempt((a) => a + 1));
   useEffect(() => {
     let live = true;
     setState({});
-    api.screenshot(slug, rev, board.id).then(
+    (previewRev !== undefined ? api.revScreenshot(slug, previewRev, board.id) : api.screenshot(slug, rev, board.id)).then(
       (s) => live && setState({ url: s.url }),
       (e) => live && setState({ error: errorText(e) }),
     );
     return () => {
       live = false;
     };
-  }, [slug, rev, board.id, attempt]);
+  }, [slug, rev, board.id, attempt, previewRev]);
   if (state.url) return <img src={state.url} alt={board.name} draggable={false} />;
   if (state.error)
     return (
@@ -89,6 +106,7 @@ export function Canvas({
   checksLoading,
   onSelect,
   onOpenChecks,
+  preview,
 }: {
   slug: string;
   rev: number;
@@ -103,6 +121,8 @@ export function Canvas({
   checksLoading: boolean;
   onSelect: (id: string | undefined) => void;
   onOpenChecks: () => void;
+  /** Pratinjau versi lama (History); `undefined` = versi terkini. */
+  preview?: CanvasPreview | undefined;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ w: 0, h: 0 });
@@ -270,18 +290,20 @@ export function Canvas({
         : { x: hb.x, y: hb.y, w: hb.width, h: hb.height }
       : undefined;
   const handMode = tool === 'hand' || spaceHeld;
+  /** Rev snapshot yang dirender board: hanya setelah dokumen versi itu termuat (board-nya milik versi itu). */
+  const previewRev = preview && !preview.loading && !preview.error ? preview.rev : undefined;
 
   return (
     <section
       ref={ref}
-      className={`canvas${handMode ? ' hand' : ''}${panning ? ' panning' : ''}`}
+      className={`canvas${handMode ? ' hand' : ''}${panning ? ' panning' : ''}${preview ? ' previewing' : ''}`}
       aria-label="Canvas"
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerCancel}
     >
-      {boards.length === 0 && (
+      {boards.length === 0 && !preview && (
         <div className="canvas-waiting">
           <div className="spinner" />
           <strong>Waiting for the agent</strong>
@@ -298,12 +320,12 @@ export function Canvas({
               {b.name}
             </div>
             <div className={`board${selected ? ' selected' : ''}`} data-board={b.id} style={{ left, top, width: b.width * cam.z, height: b.height * cam.z }}>
-              <BoardImage slug={slug} rev={Math.min(rev, boardRevs?.[b.id] ?? rev)} board={b} />
+              <BoardImage slug={slug} rev={Math.min(rev, boardRevs?.[b.id] ?? rev)} board={b} previewRev={previewRev} />
             </div>
           </div>
         );
       })}
-      {(agents ?? []).map((a) => {
+      {(preview ? [] : (agents ?? [])).map((a) => {
         const b = boardById.get(a.boardId);
         if (!b) return null;
         const left = cam.x + b.x * cam.z;
@@ -329,7 +351,9 @@ export function Canvas({
         </div>
       )}
 
-      {(summary || checksLoading) && (
+      {preview && <PreviewBanner preview={preview} />}
+
+      {!preview && (summary || checksLoading) && (
         <button type="button" className="checks-pill canvas-overlay-ui" onClick={onOpenChecks}>
           <Icon name="shieldCheck" size={15} />
           <span className="mono-label">layout_check</span>
@@ -350,7 +374,7 @@ export function Canvas({
         </button>
       )}
 
-      <ExportButton slug={slug} boards={boards} selectedBoardId={highlight?.boardId} />
+      {!preview && <ExportButton slug={slug} boards={boards} selectedBoardId={highlight?.boardId} />}
 
       <div className="view-controls canvas-overlay-ui" role="toolbar" aria-label="View controls">
         <button type="button" className={`tool${tool === 'select' ? ' active' : ''}`} aria-label="Select (V)" title="Select (V)" aria-pressed={tool === 'select'} onClick={() => setTool('select')}>
@@ -372,5 +396,29 @@ export function Canvas({
         </button>
       </div>
     </section>
+  );
+}
+
+/** Banner pratinjau versi (desain "Viewer — Desktop — History": Version Banner). */
+function PreviewBanner({ preview }: { preview: CanvasPreview }) {
+  return (
+    <div className="version-banner canvas-overlay-ui" role="status">
+      <Icon name={preview.error ? 'alert' : 'history'} size={14} className="version-banner-icon" />
+      <span className="version-banner-text" title={preview.label}>
+        {preview.error ? `Couldn't load this version: ${preview.error}` : preview.loading ? `${preview.label} · loading…` : preview.label}
+      </span>
+      <button type="button" className="btn small ghost" onClick={preview.onBack}>
+        Back to latest
+      </button>
+      <button
+        type="button"
+        className="btn small primary"
+        disabled={!preview.canRestore || preview.restoring || preview.loading || preview.error !== undefined}
+        title={preview.canRestore ? undefined : 'No snapshot for this version'}
+        onClick={preview.onRestore}
+      >
+        <Icon name="rotateCcw" size={13} /> {preview.restoring ? 'Restoring…' : 'Restore this version'}
+      </button>
+    </div>
   );
 }

@@ -6,8 +6,11 @@
 //   dokumen hasil migrasi ditulis balik.
 // Kelola file (aplikasi 1): rename/archive/unarchive memindahkan dokumen lalu riwayat (rename atomik per file);
 // arsip di <data>/docs/archive dengan pola nama yang sama.
+// Snapshot (aplikasi 3): isi dokumen per rev di <dir>/.snapshots/<slug>/r<rev>.lakar.json (dir = docs atau
+// docs/archive), ditulis atomik sesudah commit berhasil; gagal tulis hanya dicatat. Retensi SNAPSHOT_KEEP rev
+// terakhir. Rename/archive/unarchive memindahkan foldernya, remove menghapusnya.
 import { mkdir, open, readFile, readdir, rename, rm, stat, truncate, type FileHandle } from 'node:fs/promises';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { randomBytes } from 'node:crypto';
 import { migrateDocument, parseDocument, type MigrationRegistry } from '@lakar/core';
 import { LakarError, SLUG_PATTERN, errorMessage, type HistoryEntry, type LakarDocument } from '@lakar/schema';
@@ -17,7 +20,16 @@ export type DocStoreOptions = {
   migrations?: MigrationRegistry;
   /** Pengganti langkah migrasi (khusus tes write-back): mentah → dokumen versi kini. */
   migrate?: (raw: unknown) => unknown;
+  /** Pencatat masalah non-fatal (snapshot gagal ditulis/dipindah). Default `console.warn`. */
+  log?: (message: string) => void;
+  /** Jumlah snapshot yang disimpan per dokumen (default `SNAPSHOT_KEEP`). */
+  snapshotKeep?: number;
 };
+
+/** Retensi snapshot: rev terakhir per dokumen. */
+export const SNAPSHOT_KEEP = 200;
+const SNAPSHOTS_DIR = '.snapshots';
+const SNAPSHOT_FILE = /^r(\d+)\.lakar\.json$/;
 
 const DOC_SUFFIX = '.lakar.json';
 const HISTORY_SUFFIX = '.history.jsonl';
@@ -96,10 +108,14 @@ const isHistoryEntry = (v: unknown): v is HistoryEntry =>
 export class DocStore {
   readonly docsDir: string;
   readonly #migrate: (raw: unknown) => unknown;
+  readonly #log: (message: string) => void;
+  readonly #keep: number;
 
   constructor(dataDir: string, opts: DocStoreOptions = {}) {
     this.docsDir = join(dataDir, 'docs');
     this.#migrate = opts.migrate ?? ((raw) => migrateDocument(raw, { migrations: opts.migrations }));
+    this.#log = opts.log ?? ((m) => console.warn(m));
+    this.#keep = Math.max(1, opts.snapshotKeep ?? SNAPSHOT_KEEP);
   }
 
   docPath(slug: string): string {
@@ -191,6 +207,82 @@ export class DocStore {
       await truncate(hp, before).catch(() => {});
       throw e;
     }
+    // Commit sudah berhasil: snapshot hanya pelengkap (History Restore/Compare), gagalnya tidak menggagalkan commit.
+    try {
+      await this.#writeSnapshot(slug, doc);
+    } catch (e) {
+      this.#log(`lakard: snapshot ${slug} r${doc.rev} gagal ditulis: ${errorMessage(e)}`);
+    }
+  }
+
+  /** Folder snapshot `<dir>/.snapshots/<slug>` (dir = docs, atau arsip bila `archived`). */
+  snapshotDir(slug: string, archived = false): string {
+    return join(archived ? this.archiveDir : this.docsDir, SNAPSHOTS_DIR, slug);
+  }
+  snapshotPath(slug: string, rev: number, archived = false): string {
+    return join(this.snapshotDir(slug, archived), `r${rev}${DOC_SUFFIX}`);
+  }
+
+  /** Rev yang punya snapshot (dokumen aktif). Folder belum ada → kosong. */
+  async snapshotRevs(slug: string): Promise<Set<number>> {
+    let names: string[];
+    try {
+      names = await readdir(this.snapshotDir(slug));
+    } catch (e) {
+      if (isEnoent(e) || (e as NodeJS.ErrnoException)?.code === 'ENOTDIR') return new Set();
+      throw e;
+    }
+    const out = new Set<number>();
+    for (const n of names) {
+      const m = SNAPSHOT_FILE.exec(n);
+      if (m) out.add(Number(m[1]));
+    }
+    return out;
+  }
+
+  /** Isi snapshot rev `rev` (dimigrasi ke versi kini, tanpa tulis balik); `undefined` bila tidak ada. */
+  async readSnapshot(slug: string, rev: number): Promise<LakarDocument | undefined> {
+    let text: string;
+    try {
+      text = await readFile(this.snapshotPath(slug, rev), 'utf8');
+    } catch (e) {
+      const code = (e as NodeJS.ErrnoException)?.code;
+      if (code === 'ENOENT' || code === 'ENOTDIR') return undefined;
+      throw e;
+    }
+    let json: unknown;
+    try {
+      json = JSON.parse(text);
+    } catch (e) {
+      throw new LakarError('SCHEMA_INVALID', `snapshot ${slug} r${rev} bukan JSON valid: ${errorMessage(e)}`, { hint: 'pilih versi lain' });
+    }
+    return parseDocument(this.#migrate(json));
+  }
+
+  /** Tulis `r<rev>.lakar.json` atomik, lalu buang snapshot di luar `#keep` rev terakhir. */
+  async #writeSnapshot(slug: string, doc: LakarDocument): Promise<void> {
+    const dir = this.snapshotDir(slug);
+    await this.#writeAtomic(this.snapshotPath(slug, doc.rev), JSON.stringify(doc), dir);
+    const revs = [...(await this.snapshotRevs(slug))].sort((a, b) => b - a);
+    await Promise.all(revs.slice(this.#keep).map((r) => rm(this.snapshotPath(slug, r), { force: true })));
+  }
+
+  /** Pindahkan folder snapshot (best-effort): folder target yatim dibuang dulu; gagal hanya dicatat. */
+  async #moveSnapshots(fromDir: string, from: string, toDir: string, to: string): Promise<void> {
+    const src = join(fromDir, SNAPSHOTS_DIR, from);
+    const dst = join(toDir, SNAPSHOTS_DIR, to);
+    try {
+      await rm(dst, { recursive: true, force: true });
+      const exists = await stat(src).then(
+        (s) => s.isDirectory(),
+        () => false,
+      );
+      if (!exists) return;
+      await mkdir(dirname(dst), { recursive: true });
+      await rename(src, dst);
+    } catch (e) {
+      this.#log(`lakard: snapshot ${from} gagal dipindah ke ${to}: ${errorMessage(e)}`);
+    }
   }
 
   /**
@@ -246,6 +338,7 @@ export class DocStore {
     if (!(await this.exists(slug, archived))) throw notFoundDoc(slug, archived);
     await rm(join(dir, `${slug}${DOC_SUFFIX}`));
     await rm(join(dir, `${slug}${HISTORY_SUFFIX}`), { force: true });
+    await rm(this.snapshotDir(slug, archived), { recursive: true, force: true }).catch((e) => this.#log(`lakard: snapshot ${slug} gagal dihapus: ${errorMessage(e)}`));
     await removeTmp(dir, slug);
     await syncDir(dir).catch(() => {});
   }
@@ -254,6 +347,7 @@ export class DocStore {
   async dropOrphanHistory(slug: string): Promise<void> {
     if (await this.exists(slug)) return;
     await rm(this.historyPath(slug), { force: true });
+    await rm(this.snapshotDir(slug), { recursive: true, force: true });
   }
 
   /** Seperti `list`, untuk direktori arsip. */
@@ -289,6 +383,7 @@ export class DocStore {
     // slug asal dan dibuang saat slug itu dipakai lagi) — dokumen sendiri tidak pernah hilang.
     await rename(fromDoc, toDoc);
     if (hasHistory) await rename(fromHist, toHist);
+    await this.#moveSnapshots(fromDir, from, toDir, to);
     await syncDir(toDir).catch(() => {});
     if (toDir !== fromDir) await syncDir(fromDir).catch(() => {});
   }
@@ -315,8 +410,8 @@ export class DocStore {
     return out;
   }
 
-  async #writeAtomic(target: string, content: string): Promise<void> {
-    await mkdir(this.docsDir, { recursive: true });
+  async #writeAtomic(target: string, content: string, dir = this.docsDir): Promise<void> {
+    await mkdir(dir, { recursive: true });
     const tmp = `${target}.${process.pid}.${randomBytes(4).toString('hex')}.tmp`;
     try {
       const h = await open(tmp, 'w');
@@ -332,7 +427,7 @@ export class DocStore {
       throw e;
     }
     // Rename sudah terjadi: fsync direktori best-effort, kegagalannya bukan kegagalan tulis.
-    await syncDir(this.docsDir).catch(() => {});
+    await syncDir(dir).catch(() => {});
   }
 
   /** Hapus `<slug>.lakar.json.*.tmp` / `<slug>.history.jsonl.*.tmp` sisa proses yang dibunuh. */

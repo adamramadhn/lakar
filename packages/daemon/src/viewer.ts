@@ -34,6 +34,8 @@ export type ViewerHistoryEntry = {
   session: string;
   /** Klien sesi bila sesi masih dikenal daemon (hilang setelah restart). */
   client?: string;
+  /** Isi versi ini tersimpan sebagai snapshot (bisa dipratinjau, dibandingkan, dan dipulihkan). */
+  snapshot?: boolean;
 };
 
 export type ViewerRoutesOptions = {
@@ -174,6 +176,7 @@ export function registerViewerRoutes(app: FastifyInstance, { docs, store, sessio
       if (!exists) throw docNotFound(slug);
     }
     const history = await store.readHistory(slug);
+    const snapshots = await store.snapshotRevs(slug);
     const entries: ViewerHistoryEntry[] = history
       // `isHistoryEntry` store hanya memeriksa rev/opsSummary: lewati baris tanpa field yang dipakai di sini.
       .filter((h) => typeof h.sessionId === 'string' && typeof h.at === 'string' && typeof h.description === 'string')
@@ -188,6 +191,8 @@ export function registerViewerRoutes(app: FastifyInstance, { docs, store, sessio
           at: h.at,
           session: h.sessionId.slice(0, 8),
           ...(client ? { client } : {}),
+          // Opsional: hanya ditulis bila ada (bentuk entri lama tidak berubah).
+          ...(snapshots.has(h.rev) ? { snapshot: true } : {}),
         };
       })
       .sort((a, b) => b.rev - a.rev);

@@ -216,6 +216,43 @@ describe('kelola file', () => {
   });
 });
 
+describe('History (aplikasi 3)', () => {
+  it('versi lama + screenshot snapshot di-cache per slug@rev tanpa sesi; gagal tidak di-cache; restore → POST {rev} + pendengar', async () => {
+    let failShot = true;
+    const calls = fakeFetch((c) => {
+      if (c.path === '/viewer/docs/a/revs/3' && c.method === 'GET') return ok({ doc: { id: 'Dddddddd', rev: 3, pages: [] } });
+      if (c.path === '/viewer/docs/a/revs/2' && c.method === 'GET')
+        return { status: 404, body: { ok: false, error: { code: 'NOT_FOUND', message: 'tidak ada snapshot', hint: 'versi ini dibuat sebelum snapshot tersedia' } } };
+      if (c.path === '/viewer/docs/a/revs/3/screenshot') {
+        if (failShot) {
+          failShot = false;
+          return { status: 500, body: { ok: false, error: { code: 'RENDER_FAILED', message: 'x', hint: '' } } };
+        }
+        return ok({ boardId: c.body.boardId, width: 1, height: 1, mimeType: 'image/png', png: PNG });
+      }
+      if (c.path === '/viewer/docs/a/restore') return ok({ slug: 'a', rev: 8, restoredFrom: 3 });
+      throw new Error(`tak terduga ${c.method} ${c.path}`);
+    });
+    const api = await freshApi();
+    const changed = vi.fn();
+    api.onDocsChanged(changed);
+    expect((await api.getRevision('a', 3)).rev).toBe(3);
+    await api.getRevision('a', 3);
+    await expect(api.getRevision('a', 2)).rejects.toMatchObject({ code: 'NOT_FOUND', hint: 'versi ini dibuat sebelum snapshot tersedia' });
+    await expect(api.getRevision('a', 2)).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    await expect(api.revScreenshot('a', 3, 'B')).rejects.toMatchObject({ code: 'RENDER_FAILED' });
+    expect((await api.revScreenshot('a', 3, 'B')).boardId).toBe('B');
+    await api.revScreenshot('a', 3, 'B');
+    expect(calls.filter((c) => c.path === '/viewer/docs/a/revs/3')).toHaveLength(1);
+    expect(calls.filter((c) => c.path === '/viewer/docs/a/revs/2')).toHaveLength(2);
+    expect(calls.filter((c) => c.path === '/viewer/docs/a/revs/3/screenshot')).toHaveLength(2);
+    expect(calls.every((c) => c.session === undefined)).toBe(true);
+    await expect(api.restore('a', 3)).resolves.toEqual({ slug: 'a', rev: 8, restoredFrom: 3 });
+    expect(calls.at(-1)).toMatchObject({ method: 'POST', path: '/viewer/docs/a/restore', body: { rev: 3 } });
+    expect(changed).toHaveBeenCalledOnce();
+  });
+});
+
 describe('exportPng (aplikasi 2)', () => {
   it('PNG → blob + nama dari content-disposition; error AD-11 → ApiError; nama aneh → cadangan', async () => {
     const mod = await (async () => {

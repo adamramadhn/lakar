@@ -2,11 +2,13 @@
 // dan daftar arsip di `/viewer/*`. Bentuk respons AD-11. Route dan tool MCP lama tidak berubah.
 // Setiap operasi memegang kunci `#files` (alokasi slug serial) lalu kunci per slug yang disentuh (urut nama,
 // tanpa deadlock), dan menjaga salinan memori `docs` serta `activeSlug` sesi tetap konsisten dengan disk.
+// History (aplikasi 3): baca snapshot per rev (`GET /viewer/docs/:slug/revs/:rev`) dan Restore
+// (`POST /viewer/docs/:slug/restore`), yang meng-commit isi snapshot sebagai rev baru di bawah kunci dokumen.
 import type { FastifyInstance } from 'fastify';
 import { IdAllocator, createDocument, transact, type DocumentLocks } from '@lakar/core';
 import { LakarError, SLUG_PATTERN, errorMessage, type HistoryEntry, type LakarDocument } from '@lakar/schema';
 import { z } from 'zod';
-import { VIEWER_CLIENT } from './events.js';
+import { VIEWER_CLIENT, publicSessionId, type ActivityBus, type ActivityCall } from './events.js';
 import type { Sessions } from './sessions.js';
 import type { DocStore } from './store.js';
 import { peekDocument, summarize, type ViewerDocSummary } from './viewer.js';
@@ -63,6 +65,8 @@ const CreateBody = z
 const CREATE_HINT = "kirim {name, board?:{preset:'desktop'|'tablet'|'mobile'} | {preset:'custom', width, height}} (width/height 1–10000)";
 const RenameBody = z.object({ name: NameField }).strict();
 const DeleteQuery = z.object({ archived: z.enum(['true', 'false']).optional() }).strict();
+const RestoreBody = z.object({ rev: z.number().int().nonnegative() }).strict();
+const REV_PARAM = /^(0|[1-9]\d{0,9})$/;
 
 export type FileRoutesOptions = {
   /** Salinan memori daemon (AD-1); diperbarui setiap operasi. */
@@ -70,6 +74,8 @@ export type FileRoutesOptions = {
   store: DocStore;
   sessions: Sessions;
   docLocks: DocumentLocks;
+  /** Bus aktivitas: Restore dipancarkan seperti tool call supaya viewer lain ikut memuat ulang. */
+  activity?: ActivityBus;
   /** Pencatat masalah non-fatal (file arsip rusak dilewati). Default `console.warn`. */
   log?: (message: string) => void;
 };
@@ -98,6 +104,30 @@ const checkSlug = (slug: string) => {
   }
 };
 
+/** Param rev `:rev` → bilangan bulat ≥ 0; selain itu SCHEMA_INVALID. */
+export const parseRevParam = (raw: string): number => {
+  if (!REV_PARAM.test(raw)) throw new LakarError('SCHEMA_INVALID', `rev tidak valid: ${JSON.stringify(raw)}`, { hint: 'pakai rev dari GET /viewer/docs/:slug/history' });
+  return Number(raw);
+};
+
+const noSnapshot = (slug: string, rev: number) =>
+  new LakarError('NOT_FOUND', `versi r${rev} dokumen ${slug} tidak punya snapshot`, { hint: 'versi ini dibuat sebelum snapshot tersedia' });
+
+/**
+ * Isi dokumen `slug` pada rev `rev` dari snapshot. Rev terkini tanpa snapshot memakai dokumen kini (bukan
+ * rekonstruksi). Snapshot milik dokumen lain (id beda, mis. slug dipakai ulang) atau rev di atas rev kini
+ * dianggap tidak ada. Dokumen tidak ada → NOT_FOUND.
+ */
+export async function readRevision(docs: ReadonlyMap<string, LakarDocument>, store: DocStore, slug: string, rev: number): Promise<LakarDocument> {
+  const current = docs.get(slug) ?? (await peekDocument(store, slug));
+  if (!current) throw new LakarError('NOT_FOUND', `dokumen ${slug} tidak ada`, { hint: 'pakai slug dari GET /viewer/docs' });
+  if (rev > current.rev) throw noSnapshot(slug, rev);
+  const snap = await store.readSnapshot(slug, rev);
+  if (snap && snap.id === current.id && snap.rev === rev) return snap;
+  if (rev === current.rev) return current;
+  throw noSnapshot(slug, rev);
+}
+
 const historyEntry = (rev: number, description: string, opsSummary = ''): HistoryEntry => ({
   rev,
   sessionId: VIEWER_CLIENT,
@@ -106,7 +136,7 @@ const historyEntry = (rev: number, description: string, opsSummary = ''): Histor
   at: new Date().toISOString(),
 });
 
-export function registerFileRoutes(app: FastifyInstance, { docs, store, sessions, docLocks, log = (m) => console.warn(m) }: FileRoutesOptions): void {
+export function registerFileRoutes(app: FastifyInstance, { docs, store, sessions, docLocks, activity, log = (m) => console.warn(m) }: FileRoutesOptions): void {
   /** Jalankan `fn` memegang kunci setiap slug (urut, unik); `locked` memegang `#files` dulu. Kunci tidak reentrant. */
   const lockSlugs = <T>(slugs: string[], fn: () => Promise<T>): Promise<T> => {
     const keys = [...new Set(slugs)].sort();
@@ -229,6 +259,54 @@ export function registerFileRoutes(app: FastifyInstance, { docs, store, sessions
       sessions.retarget(slug, undefined);
     });
     return reply.code(200).send({ ok: true, data: { slug, deleted: true } });
+  });
+
+  // Isi versi lama (snapshot) untuk pratinjau/Compare; tanpa snapshot → 404.
+  app.get<{ Params: { slug: string; rev: string } }>('/viewer/docs/:slug/revs/:rev', async (req, reply) => {
+    const { slug } = req.params;
+    checkSlug(slug);
+    const doc = await readRevision(docs, store, slug, parseRevParam(req.params.rev));
+    return reply.code(200).send({ ok: true, data: { doc } });
+  });
+
+  // Restore: isi snapshot `rev` di-commit sebagai rev baru (jalur commit sama dengan execute), di bawah kunci
+  // dokumen sehingga diserialkan dengan execute agen. Riwayat "Restored r<rev>" atas nama sesi viewer.
+  let restoreSeq = 0;
+  app.post<{ Params: { slug: string } }>('/viewer/docs/:slug/restore', async (req, reply) => {
+    const { slug } = req.params;
+    checkSlug(slug);
+    const { rev } = parse(RestoreBody, req.body, 'kirim {rev} (rev dari GET /viewer/docs/:slug/history)');
+    const description = `Restored r${rev}`;
+    const t0 = Date.now();
+    const call: ActivityCall = {
+      callId: `restore-${t0.toString(36)}-${++restoreSeq}`,
+      session: publicSessionId(VIEWER_CLIENT),
+      client: VIEWER_CLIENT,
+      tool: 'restore',
+      slug,
+      description,
+      status: 'running',
+      startedAt: new Date(t0).toISOString(),
+    };
+    activity?.emit({ type: 'call', call });
+    try {
+      const data = await docLocks.run(slug, async () => {
+        // Dokumen belum dimuat (belum dibuka siapa pun): muat dari disk seperti open_doc.
+        const current = docs.get(slug) ?? (await store.read(slug));
+        if (!current) throw new LakarError('NOT_FOUND', `dokumen ${slug} tidak ada`, { hint: 'pakai slug dari GET /viewer/docs' });
+        const snap = await readRevision(new Map([[slug, current]]), store, slug, rev);
+        const next: LakarDocument = { ...structuredClone(snap), id: current.id, rev: current.rev + 1 };
+        await store.commit(slug, next, historyEntry(next.rev, description, 'restore'));
+        docs.set(slug, next);
+        return { slug, rev: next.rev, restoredFrom: rev };
+      });
+      activity?.emit({ type: 'call', call: { ...call, status: 'done', durationMs: Date.now() - t0, rev: data.rev } });
+      return reply.code(200).send({ ok: true, data });
+    } catch (e) {
+      const err = e instanceof LakarError ? { code: e.code, message: e.message } : { code: 'EXEC_ERROR', message: errorMessage(e) };
+      activity?.emit({ type: 'call', call: { ...call, status: 'error', durationMs: Date.now() - t0, error: err } });
+      throw e;
+    }
   });
 
   // Daftar arsip: bentuk sama dengan GET /viewer/docs, urut terakhir diubah.

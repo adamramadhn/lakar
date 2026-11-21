@@ -1,6 +1,8 @@
 // Klien lakard untuk viewer. Endpoint baca: /viewer/* (termasuk /viewer/connections), /status, dan endpoint sesi (open, screenshot,
 // inspect, layout-check) yang tidak mengubah dokumen. Endpoint tulis hanya kelola file (POST/DELETE /viewer/docs*):
 // sesudahnya cache dokumen/screenshot slug terkait dibuang dan pendengar `onDocsChanged` dipanggil.
+// History (aplikasi 3): versi lama dari snapshot (GET revs/:rev, POST revs/:rev/screenshot, di-cache per
+// `slug@rev`, isinya tidak pernah berubah) dan Restore (tulis, lewat antrean yang sama).
 // Bentuk respons AD-11: {ok:true,data} | {ok:false,error}.
 import type { Finding, FindingSummary, LakarDocument } from '@lakar/schema';
 
@@ -20,7 +22,7 @@ export type Connections = { url: string; mcp: McpServerConfig | null };
 export type Screenshot = { boardId: string; width: number; height: number; url: string };
 export type InspectNode = Record<string, unknown> & { id: string; name: string; type?: string; bounds?: [number, number, number, number]; children?: InspectNode[]; childCount?: number };
 export type InspectResult = { docId: string; rev: number; boardId: string; node: InspectNode; truncated?: boolean };
-export type HistoryEntry = { rev: number; description: string; opsSummary: string; opCount: number; at: string; session: string; client?: string };
+export type HistoryEntry = { rev: number; description: string; opsSummary: string; opCount: number; at: string; session: string; client?: string; snapshot?: boolean };
 export type LayoutCheck = { docId: string; rev: number; boards: unknown; summary: FindingSummary; findings: Finding[]; ranAt: number };
 
 /** lakard tidak bisa dihubungi (jaringan). */
@@ -123,6 +125,10 @@ class ViewerClient {
   #latest = new Map<string, { rev: number; shot: Promise<Screenshot> }>();
   /** Permintaan screenshot yang sedang antre, per argumen pemanggil. */
   #pending = new Map<string, Promise<Screenshot>>();
+  /** Dokumen versi lama per `slug@rev` (snapshot tidak berubah). */
+  #revDocs = new Map<string, Promise<LakarDocument>>();
+  /** PNG board versi lama per `slug@rev:boardId`. */
+  #revShots = new Map<string, Promise<Screenshot>>();
   /** Pendengar perubahan daftar file (kelola file dari aplikasi). */
   #changed = new Set<() => void>();
 
@@ -171,7 +177,7 @@ class ViewerClient {
     for (const slug of slugs) {
       this.#known.delete(slug);
       if (this.#active === slug) this.#active = undefined;
-      for (const map of [this.#shots, this.#pending] as Map<string, unknown>[]) for (const k of [...map.keys()]) if (k.startsWith(`${slug}@`)) map.delete(k);
+      for (const map of [this.#shots, this.#pending, this.#revDocs, this.#revShots] as Map<string, unknown>[]) for (const k of [...map.keys()]) if (k.startsWith(`${slug}@`)) map.delete(k);
       for (const k of [...this.#latest.keys()]) if (k.startsWith(`${slug}:`)) this.#latest.delete(k);
     }
     for (const l of this.#changed) l();
@@ -228,6 +234,43 @@ class ViewerClient {
   deleteFile(slug: string, archived = false): Promise<{ slug: string }> {
     return this.#write(
       () => request<{ slug: string }>('DELETE', `/viewer/docs/${encodeURIComponent(slug)}${archived ? '?archived=true' : ''}`),
+      () => [slug],
+    );
+  }
+
+  /** Isi dokumen pada rev `rev` (snapshot). Tanpa snapshot → ApiError NOT_FOUND. */
+  getRevision(slug: string, rev: number): Promise<LakarDocument> {
+    const key = `${slug}@${rev}`;
+    let hit = this.#revDocs.get(key);
+    if (!hit) {
+      hit = request<{ doc: LakarDocument }>('GET', `/viewer/docs/${encodeURIComponent(slug)}/revs/${rev}`).then((d) => d.doc);
+      hit.catch(() => this.#revDocs.get(key) === hit && this.#revDocs.delete(key));
+      this.#revDocs.set(key, hit);
+    }
+    return hit;
+  }
+
+  /** PNG board versi lama (POST revs/:rev/screenshot), tanpa sesi; di-cache per `slug@rev:boardId`. */
+  revScreenshot(slug: string, rev: number, boardId: string): Promise<Screenshot> {
+    const key = `${slug}@${rev}:${boardId}`;
+    let hit = this.#revShots.get(key);
+    if (!hit) {
+      hit = request<{ boardId: string; width: number; height: number; png: string }>('POST', `/viewer/docs/${encodeURIComponent(slug)}/revs/${rev}/screenshot`, { boardId }).then((d) => ({
+        boardId: d.boardId,
+        width: d.width,
+        height: d.height,
+        url: pngUrl(d.png),
+      }));
+      hit.catch(() => this.#revShots.get(key) === hit && this.#revShots.delete(key));
+      this.#revShots.set(key, hit);
+    }
+    return hit;
+  }
+
+  /** Pulihkan rev `rev` sebagai rev baru (POST /viewer/docs/:slug/restore). */
+  restore(slug: string, rev: number): Promise<{ slug: string; rev: number; restoredFrom: number }> {
+    return this.#write(
+      () => request<{ slug: string; rev: number; restoredFrom: number }>('POST', `/viewer/docs/${encodeURIComponent(slug)}/restore`, { rev }),
       () => [slug],
     );
   }

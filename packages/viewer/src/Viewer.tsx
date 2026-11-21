@@ -1,16 +1,20 @@
 // Viewer read-only (desain bagian 03): Layers kiri dari JSON dokumen, canvas PNG per board, panel kanan
 // Activity/Inspect/Checks/History. Seleksi dari layer, board, atau temuan check disorot di canvas. Stream
 // aktivitas (`/viewer/events`) memuat ulang dokumen dan PNG board tersentuh saat rev berubah.
+// History (aplikasi 3): klik entri → pratinjau versi lama (snapshot) di kanvas baca-saja dengan banner; Restore
+// (dari banner atau entri) meminta konfirmasi lalu meng-commit versi itu sebagai rev baru.
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type ReactNode } from 'react';
 import type { LakarDocument } from '@lakar/schema';
-import { activityReducer, connectActivity, harnessColor, harnessLabel, initialActivity, revChange, sessionsForSlug, VIEWER_CLIENT, type ActivityEvent } from './activity';
+import { activityReducer, connectActivity, harnessColor, harnessLabel, initialActivity, isDocChangeFromViewer, revChange, sessionsForSlug, VIEWER_CLIENT, type ActivityEvent } from './activity';
 import { ActivityPanel } from './ActivityPanel';
-import { api, ApiError, errorText, OfflineError, type InspectResult, type LayoutCheck } from './api';
-import { Canvas, type AgentMark, type Focus, type Highlight } from './Canvas';
+import { api, ApiError, errorText, OfflineError, type HistoryEntry, type InspectResult, type LayoutCheck } from './api';
+import { Canvas, type AgentMark, type CanvasPreview, type Focus, type Highlight } from './Canvas';
 import { indexDocument, relativeTime, type NodeInfo, type TreeNode } from './format';
-import { HistoryPanel } from './HistoryPanel';
+import { HistoryPanel, timeOf } from './HistoryPanel';
+import { canRestore, previewLabel } from './history';
 import { useNow, useRetry } from './hooks';
 import { Icon, NODE_ICON } from './icons';
+import { Modal } from './NewFileDialog';
 import { ChecksPanel, InspectPanel } from './panels';
 
 const FOLLOW_KEY = 'lakar.viewer.followAgent';
@@ -53,6 +57,12 @@ export function Viewer({ slug }: { slug: string }) {
   /** Rev dasar semua board (muat penuh) dan rev terakhir per board tersentuh menurut event execute. */
   const [baseRev, setBaseRev] = useState(-1);
   const [touched, setTouched] = useState<Record<string, number>>({});
+  /** Pratinjau versi lama (History) dan dokumennya dari snapshot. */
+  const [preview, setPreview] = useState<{ entry: HistoryEntry; doc: Loaded<LakarDocument> } | undefined>(undefined);
+  /** Entri yang menunggu konfirmasi Restore. */
+  const [restoreAsk, setRestoreAsk] = useState<HistoryEntry | undefined>(undefined);
+  const [restoring, setRestoring] = useState(false);
+  const [restoreError, setRestoreError] = useState<string | undefined>(undefined);
 
   const docRef = useRef<LakarDocument | undefined>(undefined);
   /**
@@ -98,7 +108,47 @@ export function Viewer({ slug }: { slug: string }) {
   }, [loadDoc]);
 
   const current = doc.state === 'ok' ? doc.value.doc : undefined;
-  const index = useMemo(() => (current ? indexDocument(current) : new Map<string, NodeInfo>()), [current]);
+  /** Dokumen yang tampil: versi pratinjau bila sudah termuat, selain itu terkini. */
+  const previewDoc = preview?.doc.state === 'ok' ? preview.doc.value : undefined;
+  const shown = previewDoc ?? current;
+  const index = useMemo(() => (shown ? indexDocument(shown) : new Map<string, NodeInfo>()), [shown]);
+
+  // Pratinjau versi: muat dokumen snapshot; ganti slug → keluar dari pratinjau.
+  const startPreview = useCallback(
+    (entry: HistoryEntry | undefined) => {
+      if (!entry) {
+        setPreview(undefined);
+        return;
+      }
+      setPreview({ entry, doc: { state: 'loading' } });
+      api.getRevision(slug, entry.rev).then(
+        (d) => setPreview((p) => (p?.entry.rev === entry.rev ? { entry, doc: { state: 'ok', value: d } } : p)),
+        (e) => setPreview((p) => (p?.entry.rev === entry.rev ? { entry, doc: { state: 'error', message: errorText(e) } } : p)),
+      );
+    },
+    [slug],
+  );
+  useEffect(() => setPreview(undefined), [slug]);
+
+  const restore = useCallback(
+    (entry: HistoryEntry) => {
+      setRestoring(true);
+      setRestoreError(undefined);
+      api.restore(slug, entry.rev).then(
+        () => {
+          setRestoring(false);
+          setRestoreAsk(undefined);
+          setPreview(undefined);
+          loadDoc();
+        },
+        (e) => {
+          setRestoring(false);
+          setRestoreError(errorText(e));
+        },
+      );
+    },
+    [slug, loadDoc],
+  );
 
   // Stream aktivitas: execute pada dokumen ini → muat ulang dokumen (rev lebih baru) dan PNG board tersentuh;
   // Follow agent → pindah halaman dan geser kamera ke board yang berubah. Reconnect → muat ulang penuh.
@@ -108,7 +158,7 @@ export function Viewer({ slug }: { slug: string }) {
   onEvent.current = (e) => {
     if (e.type !== 'call') return;
     const c = e.call;
-    if (c.slug !== slug || c.status === 'running' || c.status === 'error' || c.client === VIEWER_CLIENT) return;
+    if (c.slug !== slug || c.status === 'running' || c.status === 'error' || (c.client === VIEWER_CLIENT && !isDocChangeFromViewer(c))) return;
     const boardsTouched = c.tool === 'execute' ? (c.boards ?? []) : [];
     if (typeof c.rev === 'number' && boardsTouched.length) {
       const rev = c.rev;
@@ -186,7 +236,8 @@ export function Viewer({ slug }: { slug: string }) {
 
   // Inspect node terpilih: properti tersimpan + bounds terukur (POST /inspect).
   useEffect(() => {
-    if (!selectedId) {
+    // Pratinjau: properti terukur hanya ada untuk versi terkini, jadi Inspect menampilkan data JSON versi itu saja.
+    if (!selectedId || preview) {
       setInspect(undefined);
       return;
     }
@@ -199,7 +250,7 @@ export function Viewer({ slug }: { slug: string }) {
     return () => {
       live = false;
     };
-  }, [slug, selectedId, attempt]);
+  }, [slug, selectedId, attempt, preview]);
 
   useRetry(() => {
     loadDoc();
@@ -237,7 +288,23 @@ export function Viewer({ slug }: { slug: string }) {
     );
   }
 
-  const { doc: d, loadedAt } = doc.value;
+  const { doc: latestDoc, loadedAt } = doc.value;
+  const d = previewDoc ?? latestDoc;
+  const canvasPreview: CanvasPreview | undefined = preview
+    ? {
+        rev: preview.entry.rev,
+        label: previewLabel(preview.entry, timeOf),
+        loading: preview.doc.state === 'loading',
+        ...(preview.doc.state === 'error' ? { error: preview.doc.message } : {}),
+        restoring,
+        canRestore: canRestore(preview.entry, latestDoc.rev),
+        onBack: () => setPreview(undefined),
+        onRestore: () => {
+          setRestoreError(undefined);
+          setRestoreAsk(preview.entry);
+        },
+      }
+    : undefined;
   const page = d.pages[pageIndex] ?? d.pages[0];
   const boards = (page?.children ?? []) as unknown as (TreeNode & { x: number; y: number; width: number; height: number })[];
   const selectedInfo = selectedId ? index.get(selectedId) : undefined;
@@ -258,7 +325,7 @@ export function Viewer({ slug }: { slug: string }) {
         <div className="file-header">
           <div className="file-title">{slug}</div>
           <div className="file-meta">
-            Rev {d.rev} · loaded {relativeTime(loadedAt)}
+            {previewDoc ? `Previewing rev ${d.rev} · latest ${latestDoc.rev}` : `Rev ${d.rev} · loaded ${relativeTime(loadedAt)}`}
           </div>
         </div>
         <div className="panel-tabs">
@@ -293,6 +360,7 @@ export function Viewer({ slug }: { slug: string }) {
         checksLoading={checks?.state === 'loading'}
         onSelect={select}
         onOpenChecks={() => setTab('checks')}
+        preview={canvasPreview}
       />
 
       <aside className="side-panel">
@@ -307,10 +375,46 @@ export function Viewer({ slug }: { slug: string }) {
           {tab === 'inspect' && <InspectPanel info={selectedInfo} inspect={inspect} />}
           {tab === 'checks' && <ChecksPanel checks={checks} index={index} selectedId={selectedId} onSelect={select} onRun={runChecks} hasBoards={d.pages.some((p) => p.children.length > 0)} />}
           {tab === 'activity' && <ActivityPanel views={views} connected={activity.connected} follow={follow} onFollow={setFollow} nameOf={nameOf} />}
-          {tab === 'history' && <HistoryPanel slug={slug} rev={d.rev} />}
+          {tab === 'history' && (
+            <HistoryPanel
+              slug={slug}
+              rev={latestDoc.rev}
+              previewRev={preview?.entry.rev}
+              onPreview={startPreview}
+              onRestore={(entry) => {
+                setRestoreError(undefined);
+                setRestoreAsk(entry);
+              }}
+            />
+          )}
         </div>
       </aside>
+      {restoreAsk && <RestoreDialog entry={restoreAsk} busy={restoring} error={restoreError} onCancel={() => !restoring && setRestoreAsk(undefined)} onConfirm={() => restore(restoreAsk)} />}
     </div>
+  );
+}
+
+/** Konfirmasi singkat Restore: versi dipulihkan sebagai revisi baru, riwayat tidak dihapus. */
+function RestoreDialog({ entry, busy, error, onCancel, onConfirm }: { entry: HistoryEntry; busy: boolean; error: string | undefined; onCancel: () => void; onConfirm: () => void }) {
+  return (
+    <Modal label="Restore version" onClose={onCancel} className="small confirm">
+      <span className="confirm-icon neutral">
+        <Icon name="rotateCcw" size={18} />
+      </span>
+      <div className="modal-text">
+        <h2>Restore rev {entry.rev}?</h2>
+        <p>“{entry.description}” becomes a new revision on top of the history. Nothing is deleted, and agents continue from the restored version.</p>
+      </div>
+      {error && <div className="modal-error">{error}</div>}
+      <div className="modal-buttons">
+        <button type="button" className="btn" onClick={onCancel} disabled={busy}>
+          Cancel
+        </button>
+        <button type="button" data-autofocus className="btn primary" disabled={busy} onClick={onConfirm}>
+          {busy ? 'Restoring…' : 'Restore'}
+        </button>
+      </div>
+    </Modal>
   );
 }
 

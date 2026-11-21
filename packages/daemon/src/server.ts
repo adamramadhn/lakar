@@ -634,7 +634,7 @@ export function buildServer({
 
   // Viewer baca-saja (Viewer B slice 1): `/viewer/*` dan `/app/*`. Route lama tidak berubah.
   registerViewerRoutes(app, { docs, store, sessions, distDir: config.viewerDir ?? VIEWER_DIST_DIR });
-  registerFileRoutes(app, { docs, store, sessions, docLocks });
+  registerFileRoutes(app, { docs, store, sessions, docLocks, activity });
   registerExportRoutes(app, { docs, store, render, icons });
   registerConnectionRoutes(app, { host: config.host, port: config.port, ...(config.mcpEntry ? { mcpEntry: config.mcpEntry } : {}) });
 

@@ -2,7 +2,8 @@
 title: 'Aplikasi 3: History Restore, Compare, dan pratinjau versi'
 type: 'feature'
 created: '2026-11-21'
-status: 'ready-for-dev'
+status: 'in-review'
+baseline_commit: 'da79ddee018ca60c05be670fa9e9b558d73fdcfd'
 route: 'dispatch'
 review_loop_iteration: 0
 context:
@@ -74,13 +75,19 @@ context:
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] daemon snapshot + route + `history-restore.test.ts` (seluruh matriks).
-- [ ] viewer History Compare/Restore/pratinjau + test logika murni.
+- [x] daemon snapshot + route + `history-restore.test.ts` (seluruh matriks).
+- [x] viewer History Compare/Restore/pratinjau + test logika murni.
 
 **Acceptance Criteria:**
 - Given dokumen dengan beberapa rev, when klik entri lama → Restore this version → konfirmasi, then kanvas kembali ke isi versi itu sebagai rev baru, dan entri "Restored r<rev>" muncul di History.
 
 ## Implementation Notes
+
+- 2026-11-21 (subagen implementasi): snapshot ditulis di `DocStore.commit` sesudah dokumen tersimpan (`#writeAtomic` dengan direktori target), JSON ringkas; retensi `SNAPSHOT_KEEP` = 200 dipangkas setiap tulis; gagal → `console.warn`. Duplicate tidak menyalin folder, tetapi commit r0 salinan menulis snapshot r0 miliknya sendiri. `dropOrphanHistory` juga membuang folder snapshot yatim (slug dipakai ulang).
+- `readRevision` (files.ts) dipakai GET revs, screenshot revs (export.ts, karena butuh RenderPort/ikon), dan Restore: snapshot dengan `id` dokumen berbeda atau rev di atas rev kini dianggap tidak ada; rev terkini tanpa snapshot memakai dokumen kini (bukan rekonstruksi).
+- History: `snapshot: true` hanya ditulis bila ada (bentuk entri lama tetap persis sama).
+- Restore: `sessionId` = `lakar-viewer` (identitas sesi viewer yang sama dengan entri kelola file batch 1); `opsSummary` = `restore`; respons `{slug, rev, restoredFrom}`. Event bus: call `tool: 'restore'`, `client: 'lakar-viewer'` running → done/error. Viewer menyaring call `lakar-viewer` dari Activity, kecuali `restore` dipakai `revChange` untuk memuat ulang dokumen.
+- Viewer: kanvas pratinjau menyembunyikan Export, pill Checks, dan outline agen; Inspect hanya JSON versi itu (tanpa `/inspect`). Belum ada tool edit; prop `preview` Canvas adalah sinyal nonaktif untuk batch 4.
 
 ## Spec Change Log
 

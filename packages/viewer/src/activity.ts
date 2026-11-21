@@ -48,6 +48,11 @@ export type ActivityAction = { type: 'hello'; hello: Hello } | { type: 'event'; 
 export const initialActivity: ActivityState = { sessions: {}, calls: [], seq: 0, connected: false };
 
 const isViewer = (client: string | undefined) => client === VIEWER_CLIENT;
+/**
+ * Restore dari aplikasi (tool `restore`, client `lakar-viewer`) tidak tampil di Activity, tetapi tetap
+ * mengubah dokumen: viewer lain (dan viewer yang sama) memuat ulang karenanya.
+ */
+export const isDocChangeFromViewer = (c: Pick<ActivityCall, 'client' | 'tool'>) => isViewer(c.client) && c.tool === 'restore';
 
 function applyEvent(state: ActivityState, event: ActivityEvent): ActivityState {
   if (event.seq <= state.seq) return state;
@@ -138,7 +143,7 @@ export function sessionsForSlug(state: ActivityState, slug: string, now: number)
 export function revChange(event: ActivityEvent, slug: string, shownRev: number): { rev: number; boards?: string[] } | undefined {
   if (event.type !== 'call') return undefined;
   const c = event.call;
-  if (isViewer(c.client) || c.status === 'running' || c.status === 'error' || c.slug !== slug) return undefined;
+  if ((isViewer(c.client) && !isDocChangeFromViewer(c)) || c.status === 'running' || c.status === 'error' || c.slug !== slug) return undefined;
   if (typeof c.rev !== 'number' || c.rev <= shownRev) return undefined;
   return c.tool === 'execute' ? { rev: c.rev, boards: c.boards ?? [] } : { rev: c.rev };
 }
@@ -179,6 +184,8 @@ export function callTitle(c: ActivityCall, nameOf: (id: string) => string | unde
       return t ? `Export ${t}` : 'Export first board';
     case 'open_doc':
       return c.slug ? `Open ${c.slug}` : 'Open document';
+    case 'restore':
+      return c.description ?? 'Restore version';
     case 'list_boards':
       return 'List boards';
     case 'read_skill':
