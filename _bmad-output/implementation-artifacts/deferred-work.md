@@ -40,3 +40,10 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-app-1-file-management.md`
   summary: Delete dokumen yang hanya ada di memori (file dihapus dari luar) tidak punya tes; rename/archive pada kasus yang sama mengembalikan 404 sementara delete berhasil.
   evidence: hanya terjangkau setelah data dir diubah dari luar aplikasi.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-app-5-agent-presence.md`
+  summary: Batasi `bounds` di event aktivitas (atau buang dari event lama saat snapshot hello) supaya snapshot tidak membengkak.
+  evidence: maybe-false, bila benar medium — tiap execute selesai membawa ≤ 60 tuple, ring 100 event; ukur ukuran `hello` nyata pada dokumen besar untuk memastikan.
+- source_spec: `_bmad-output/implementation-artifacts/spec-app-5-agent-presence.md`
+  summary: Test komponen untuk `AgentLayer`/`AgentCursor`/`useGlide` dan tanda baris `LayerTree` (posisi, sembunyi saat pratinjau, reduced motion).
+  evidence: viewer belum punya setup test DOM; regresi posisi kursor/outline atau guard `!preview` saat ini tidak tertangkap test mana pun.

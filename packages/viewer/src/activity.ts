@@ -25,6 +25,8 @@ export type ActivityCall = {
   created?: string[];
   boards?: string[];
   nodes?: number;
+  /** Posisi `[x, y, w, h]` relatif board per id node (execute dan inspect selesai). */
+  bounds?: Record<string, [number, number, number, number]>;
   summary?: { error: number; warning: number };
   error?: { code: string; message: string };
 };

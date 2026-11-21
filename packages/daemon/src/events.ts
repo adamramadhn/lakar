@@ -5,6 +5,7 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import type { ServerResponse } from 'node:http';
 import { SESSION_HEADER } from '@lakar/schema';
+import type { BoundsTuple } from './inspect.js';
 import type { Session, Sessions } from './sessions.js';
 
 /** Jumlah event terakhir yang diingat untuk snapshot `hello`. */
@@ -66,6 +67,11 @@ export type ActivityCall = {
   boards?: string[];
   /** Jumlah node berubah (execute) atau diperiksa. */
   nodes?: number;
+  /**
+   * Posisi terukur `[x, y, w, h]` relatif board per id node (execute: `data.bounds`, maks 60 entri; inspect: node
+   * target). Dipakai viewer untuk kursor dan outline agen.
+   */
+  bounds?: Record<string, BoundsTuple>;
   summary?: CallSummary;
   error?: { code: string; message: string };
 };
@@ -132,6 +138,15 @@ const asSummary = (v: unknown): CallSummary | undefined => {
   const o = obj(v);
   return o && typeof o.error === 'number' && typeof o.warning === 'number' ? { error: o.error, warning: o.warning } : undefined;
 };
+const isTuple = (v: unknown): v is BoundsTuple => Array.isArray(v) && v.length === 4 && v.every((n) => typeof n === 'number' && Number.isFinite(n));
+/** Peta id → tuple 4 angka; entri tidak valid dibuang, peta kosong → undefined. */
+const boundsRecord = (v: unknown): Record<string, BoundsTuple> | undefined => {
+  const o = obj(v);
+  if (!o) return undefined;
+  const out: Record<string, BoundsTuple> = {};
+  for (const [id, b] of Object.entries(o)) if (id && isTuple(b)) out[id] = [b[0], b[1], b[2], b[3]];
+  return Object.keys(out).length ? out : undefined;
+};
 const ids = (v: unknown): string[] | undefined => {
   if (!Array.isArray(v)) return undefined;
   const out = v.map((x) => (typeof x === 'string' ? x : str(obj(x)?.id))).filter((x): x is string => x !== undefined);
@@ -186,6 +201,8 @@ function finish(call: ActivityCall, statusCode: number, json: unknown): Activity
       if (boards) out.boards = boards;
       const bounds = obj(data.bounds);
       if (bounds) out.nodes = Object.keys(bounds).length + (typeof data.boundsTruncated === 'number' ? data.boundsTruncated : 0);
+      const rects = boundsRecord(bounds);
+      if (rects) out.bounds = rects;
       const summary = asSummary(check?.summary);
       if (summary) out.summary = summary;
       break;
@@ -197,10 +214,15 @@ function finish(call: ActivityCall, statusCode: number, json: unknown): Activity
       if (summary) out.summary = summary;
       break;
     }
-    case 'inspect':
-      if (str(obj(data.node)?.id)) out.nodes = 1;
+    case 'inspect': {
+      const node = obj(data.node);
+      const id = str(node?.id);
+      if (id) out.nodes = 1;
+      const b = node?.bounds;
+      if (id && isTuple(b)) out.bounds = { [id]: [b[0], b[1], b[2], b[3]] };
       if (str(data.boardId)) out.boards = [str(data.boardId)!];
       break;
+    }
     case 'list_boards':
       if (Array.isArray(data.boards)) out.nodes = data.boards.length;
       break;

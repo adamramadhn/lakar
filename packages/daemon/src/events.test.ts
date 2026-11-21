@@ -103,6 +103,9 @@ describe('event tool call', () => {
       expect(done).toMatchObject({ rev: data.rev, created: data.created.map((c: { id: string }) => c.id), boards: data.check.boards });
       expect(done.durationMs).toBeGreaterThanOrEqual(0);
       expect(done.nodes).toBe(Object.keys(data.bounds).length);
+      expect(Object.keys(data.bounds).length).toBeGreaterThan(0);
+      expect(done.bounds).toEqual(data.bounds);
+      expect(running.bounds).toBeUndefined();
       expect(done.summary).toEqual({ error: data.check.summary.error, warning: data.check.summary.warning });
       expect(done.status).toBe(data.check.summary.error + data.check.summary.warning > 0 ? 'warning' : 'done');
       expect(JSON.stringify(calls())).not.toContain(sid);
@@ -209,7 +212,7 @@ describe('event tool call', () => {
       const ex = await post('/execute', { code: BOARD, description: 'tambah board home awal' }, sid);
       const boardId = ex.json().data.created[0].id as string;
       await post('/boards', {}, sid);
-      await post('/inspect', { id: boardId }, sid);
+      const ins = await post('/inspect', { id: boardId }, sid);
       await post('/skills/read', { name: 'webapp' }, sid);
       expect((await post('/screenshot', { boardId }, sid)).statusCode).toBe(200);
       await post('/screenshot', {}, sid);
@@ -223,6 +226,11 @@ describe('event tool call', () => {
       expect(done[0]).toMatchObject({ slug: 'b', rev: 0 });
       expect(done[2]).toMatchObject({ nodes: 1, slug: 'b' });
       expect(done[3]).toMatchObject({ target: boardId, nodes: 1, boards: [boardId] });
+      // inspect → bounds node target dari respons (relatif board).
+      const insNode = ins.json().data.node;
+      expect(insNode.bounds).toHaveLength(4);
+      expect(done[3]!.bounds).toEqual({ [boardId]: insNode.bounds });
+      expect(done[2]!.bounds).toBeUndefined();
       expect(done[4]).toMatchObject({ target: 'webapp' });
     } finally {
       await app.close();

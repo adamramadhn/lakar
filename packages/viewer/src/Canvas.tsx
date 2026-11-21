@@ -3,6 +3,9 @@
 // Mode pratinjau versi (History, aplikasi 3): board dari snapshot (POST revs/:rev/screenshot), banner
 // "Previewing …" dengan Back to latest / Restore this version; Export, Checks, dan outline agen disembunyikan.
 // Tool edit (batch 4) wajib nonaktif selama `preview` ada.
+// Kehadiran agen (aplikasi 5, desain bagian 04): per sesi Live garis tepi board lokasi (putus-putus, berdenyut saat
+// working), outline node lokasi saat working, outline "Just changed" sesudah execute, dan Agent Cursor yang meluncur
+// di koordinat dokumen (pan/zoom tidak membuatnya tertinggal). Lapisan ini tidak menangkap pointer.
 // Layer manual (aplikasi 4): tool sisip Frame (F), Rectangle (R), Ellipse (O), Text (T), Image (Shift+Ctrl/Cmd+K),
 // Icon (I). Klik di board → `onInsert` dengan koordinat board; Frame di area kosong → koordinat halaman (board baru).
 // Sesudah satu sisipan tool kembali ke Select. `editable` false (pratinjau versi, offline) → tool sisip nonaktif.
@@ -13,11 +16,10 @@ import { INSERT_KINDS, type InsertKind } from './codegen';
 import { ExportButton } from './ExportPopover';
 import { useRetry } from './hooks';
 import { Icon, type IconName } from './icons';
+import type { AgentPresence, Rect } from './presence';
 
 export type CanvasBoard = { id: string; name: string; x: number; y: number; width: number; height: number };
 export type Highlight = { boardId: string; bounds?: [number, number, number, number] };
-/** Board yang sedang dikerjakan agen: garis tepi berdenyut + label agen. */
-export type AgentMark = { session: string; boardId: string; label: string; color: 'agent' | 'codex'; running: boolean };
 /** Permintaan Follow agent: geser kamera ke board ini (sekali per `nonce`). */
 export type Focus = { boardId: string; nonce: number };
 /** Pratinjau versi lama: board dirender dari snapshot `rev`, kanvas baca-saja. */
@@ -79,6 +81,104 @@ function focusCamera(b: CanvasBoard, c: Camera, w: number, h: number): Camera {
 const reducedMotion = () => typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
 /** Durasi geser kamera Follow agent (desain bagian 04: 500ms). */
 const FOLLOW_MS = 500;
+/** Durasi luncur Agent Cursor (desain bagian 04: 400ms ease-out). */
+const GLIDE_MS = 400;
+
+/**
+ * Posisi (koordinat dokumen) yang meluncur ke (tx, ty) dalam `GLIDE_MS` ease-out; reduced motion → lompat.
+ * Posisi awal = target pertama (kursor yang baru tampil tidak meluncur dari mana pun).
+ */
+function useGlide(tx: number, ty: number): { x: number; y: number } {
+  const [pos, setPos] = useState({ x: tx, y: ty });
+  const posRef = useRef(pos);
+  posRef.current = pos;
+  useEffect(() => {
+    const from = posRef.current;
+    if (from.x === tx && from.y === ty) return;
+    if (reducedMotion()) {
+      setPos({ x: tx, y: ty });
+      return;
+    }
+    const t0 = performance.now();
+    let raf = 0;
+    const step = (t: number) => {
+      const k = Math.min(1, (t - t0) / GLIDE_MS);
+      const e = 1 - (1 - k) ** 3;
+      setPos({ x: from.x + (tx - from.x) * e, y: from.y + (ty - from.y) * e });
+      if (k < 1) raf = requestAnimationFrame(step);
+    };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+  }, [tx, ty]);
+  return pos;
+}
+
+/** Agent Cursor (komponen desain): pointer + tag warna harness; working → spinner, nama, baris aksi mono. */
+function AgentCursor({ p, x, y, cam }: { p: AgentPresence; x: number; y: number; cam: Camera }) {
+  const pos = useGlide(x, y);
+  return (
+    <div className={`agent-cursor ${p.color}${p.working ? ' working' : ''}`} style={{ transform: `translate(${cam.x + pos.x * cam.z}px, ${cam.y + pos.y * cam.z}px)` }}>
+      <svg className="agent-cursor-pointer" width="16" height="18" viewBox="0 0 16 18" aria-hidden="true">
+        <path d="M1 1 L1 15 L5 11.5 L8 17 L10.5 15.8 L7.6 10.4 L13 10.4 Z" />
+      </svg>
+      <div className="agent-cursor-tag">
+        <div className="agent-cursor-name">
+          {p.working && <span className="agent-cursor-spinner" />}
+          <span>{p.label}</span>
+        </div>
+        {p.working && p.action && (
+          <div key={p.action} className="agent-cursor-action">
+            {p.action}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** Gaya kotak node (bounds relatif board) di layar. */
+function nodeBox(b: CanvasBoard, r: Rect, cam: Camera) {
+  // Radius dari tinggi node di satuan board (tidak berubah saat zoom).
+  return { left: cam.x + (b.x + r[0]) * cam.z, top: cam.y + (b.y + r[1]) * cam.z, width: Math.max(1, r[2] * cam.z), height: Math.max(1, r[3] * cam.z), borderRadius: r[3] < 48 ? 4 : 8 };
+}
+
+/** Lapisan kehadiran agen: outline board, outline node (working / Just changed), dan kursor. */
+function AgentLayer({ presence, boardById, cam }: { presence: readonly AgentPresence[]; boardById: ReadonlyMap<string, CanvasBoard>; cam: Camera }) {
+  return (
+    <div className="agent-layer" aria-hidden="true">
+      {presence.map((p) => {
+        const b = boardById.get(p.boardId);
+        if (!b) return null;
+        return (
+          <div key={`outline:${p.session}`} className={`agent-outline ${p.color}${p.working ? ' working' : ''}`} style={{ left: cam.x + b.x * cam.z - 4, top: cam.y + b.y * cam.z - 4, width: b.width * cam.z + 8, height: b.height * cam.z + 8 }} />
+        );
+      })}
+      {presence.map((p) => {
+        const b = boardById.get(p.boardId);
+        if (!b || !p.working || !p.rect) return null;
+        return <div key={`node:${p.session}`} className={`agent-node-outline ${p.color} working`} style={nodeBox(b, p.rect, cam)} />;
+      })}
+      {presence.flatMap((p) =>
+        p.changed.map((c, i) => {
+          const b = boardById.get(c.boardId);
+          if (!b) return null;
+          return (
+            <div key={`changed:${p.session}:${p.changedKey}:${c.id}`} className={`agent-node-outline ${p.color} changed`} style={{ ...nodeBox(b, c.rect, cam), animationDelay: `${i * 40}ms` }}>
+              {c.id === p.primary && <span className="agent-badge">Just changed</span>}
+            </div>
+          );
+        }),
+      )}
+      {presence.map((p) => {
+        const b = boardById.get(p.boardId);
+        if (!b) return null;
+        const x = b.x + (p.rect ? p.rect[0] + p.rect[2] / 2 : b.width / 2);
+        const y = b.y + (p.rect ? p.rect[1] + p.rect[3] / 2 : b.height / 2);
+        return <AgentCursor key={`cursor:${p.session}`} p={p} x={x} y={y} cam={cam} />;
+      })}
+    </div>
+  );
+}
 
 function BoardImage({ slug, rev, board, previewRev }: { slug: string; rev: number; board: CanvasBoard; previewRev?: number | undefined }) {
   const [state, setState] = useState<{ url?: string; error?: string }>({});
@@ -111,7 +211,7 @@ export function Canvas({
   rev,
   boardRevs,
   boards,
-  agents,
+  presence,
   focus,
   onFocused,
   highlight,
@@ -128,7 +228,8 @@ export function Canvas({
   /** Rev terakhir board berubah (default `rev`): board yang tidak tersentuh tidak dirender ulang. */
   boardRevs?: Readonly<Record<string, number>>;
   boards: CanvasBoard[];
-  agents?: readonly AgentMark[];
+  /** Kehadiran agen per sesi Live (disembunyikan saat pratinjau versi). */
+  presence?: readonly AgentPresence[];
   focus?: Focus | undefined;
   onFocused?: (nonce: number) => void;
   highlight: Highlight | undefined;
@@ -383,17 +484,6 @@ export function Canvas({
           </div>
         );
       })}
-      {(preview ? [] : (agents ?? [])).map((a) => {
-        const b = boardById.get(a.boardId);
-        if (!b) return null;
-        const left = cam.x + b.x * cam.z;
-        const top = cam.y + b.y * cam.z;
-        return (
-          <div key={`${a.session}:${a.boardId}`} className={`agent-outline ${a.color}${a.running ? ' working' : ''}`} style={{ left: left - 3, top: top - 3, width: b.width * cam.z + 6, height: b.height * cam.z + 6 }}>
-            <span className="agent-label">{a.label}</span>
-          </div>
-        );
-      })}
       {hRect && (
         <div
           className="selection"
@@ -408,6 +498,8 @@ export function Canvas({
           </span>
         </div>
       )}
+
+      {!preview && presence && presence.length > 0 && <AgentLayer presence={presence} boardById={boardById} cam={cam} />}
 
       {preview && <PreviewBanner preview={preview} />}
 
