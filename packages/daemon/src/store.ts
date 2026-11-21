@@ -79,7 +79,13 @@ async function removeTmp(dir: string, slug: string): Promise<void> {
   await Promise.all(names.filter((n) => n.endsWith('.tmp') && prefixes.some((p) => n.startsWith(p))).map((n) => rm(join(dir, n), { force: true })));
 }
 
+/**
+ * fsync direktori agar entri (rename/buat file) tahan crash. Windows tidak mendukung fsync pada handle direktori
+ * (selalu EPERM) dan NTFS sudah menjurnal metadata, jadi di sana no-op; tanpa ini setiap commit pertama dokumen
+ * (New file, aplikasi desktop Windows) gagal. Platform lain tidak berubah.
+ */
 async function syncDir(dir: string): Promise<void> {
+  if (process.platform === 'win32') return;
   const h = await open(dir, 'r');
   try {
     await h.sync();
@@ -176,6 +182,8 @@ export class DocStore {
     await mkdir(this.docsDir, { recursive: true });
     const hp = this.historyPath(slug);
     const h = await open(hp, 'a+');
+    // Windows menolak ftruncate pada handle mode append (EPERM); potong lewat path (handle dibuka dengan share write).
+    const cut = (n: number) => (process.platform === 'win32' ? truncate(hp, n) : h.truncate(n));
     let before: number;
     let fresh: boolean;
     try {
@@ -187,14 +195,14 @@ export class DocStore {
         await h.read(last, 0, 1, size - 1);
         if (last[0] !== 0x0a) {
           before = await lastLineEnd(h, size);
-          await h.truncate(before);
+          await cut(before);
         }
       }
       try {
         await h.write(`${JSON.stringify(entry)}\n`);
         await h.sync();
       } catch (e) {
-        await h.truncate(before).catch(() => {});
+        await cut(before).catch(() => {});
         throw e;
       }
     } finally {
