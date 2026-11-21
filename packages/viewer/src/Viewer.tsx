@@ -13,20 +13,24 @@
 // Responsif (aplikasi 9): tablet (≤1100px) → panel kiri jadi laci di atas kanvas (tombol "Layers" + scrim); mobile
 // (<768px) → top bar viewer (back, nama file + halaman yang membuka laci, History) dan panel kanan jadi bottom sheet
 // (BottomSheet.tsx). Di desktop elemen tambahan disembunyikan CSS; hanya state tata letak yang ditambah di sini.
+// Paritas desain: header file (nama + chevron menu file, keterangan "Updated … by …" dari History), tab
+// Layers/Assets, toast rollback saat execute agen gagal, pill "Last synced …" saat offline, chip "Following agent"
+// di mobile, dan bagian "Parent layout" di Inspect (properti induk dari dokumen).
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type ReactNode } from 'react';
 import type { LakarDocument } from '@lakar/schema';
-import { activityReducer, connectActivity, initialActivity, revChange, sessionsForSlug, type ActivityEvent } from './activity';
+import { activityReducer, connectActivity, harnessLabel, initialActivity, revChange, sessionsForSlug, type ActivityEvent } from './activity';
 import { ActivityPanel } from './ActivityPanel';
 import { BottomSheet } from './BottomSheet';
 import { AddLayerButton, IconPicker, Toast, type ToastState } from './AddLayer';
 import { api, ApiError, errorText, OfflineError, type HistoryEntry, type InspectResult, type LayoutCheck } from './api';
-import { Canvas, type CanvasPreview, type Focus, type Highlight, type InsertPoint } from './Canvas';
+import { Canvas, type CanvasMarker, type CanvasPreview, type Focus, type Highlight, type InsertPoint } from './Canvas';
 import { failureText, imageFileProblem, insertBoardAt, insertBoardPlaced, insertIntoBoard, canvasInsertTarget, menuInsertTarget, removeNode, type InsertExtra, type InsertKind, type InsertTarget } from './codegen';
 import { resolvePageIndex } from './pages';
 import { PagesPanel } from './PagesPanel';
 import { indexDocument, relativeTime, type NodeInfo, type TreeNode } from './format';
 import { HistoryPanel, timeOf } from './HistoryPanel';
-import { canRestore, previewLabel } from './history';
+import { canRestore, fileMeta, previewLabel } from './history';
+import { FileMenu } from './FileMenu';
 import { useNow, useOffline, useRetry } from './hooks';
 import { Icon, NODE_ICON } from './icons';
 import { Modal } from './NewFileDialog';
@@ -73,6 +77,51 @@ const restoreErrorText = (e: unknown) =>
 
 type Loaded<T> = { state: 'loading' } | { state: 'ok'; value: T } | { state: 'error'; message: string; notFound?: boolean; corrupt?: boolean };
 
+type RawNode = Record<string, unknown> & { id: string; name: string; type: string; children?: RawNode[] };
+
+/** Node mentah dokumen berdasarkan id (untuk properti induk di Inspect). */
+function findNode(doc: LakarDocument, id: string): RawNode | undefined {
+  const walk = (nodes: readonly RawNode[]): RawNode | undefined => {
+    for (const n of nodes) {
+      if (n.id === id) return n;
+      const hit = walk(n.children ?? []);
+      if (hit) return hit;
+    }
+    return undefined;
+  };
+  for (const p of doc.pages) {
+    const hit = walk(p.children as unknown as RawNode[]);
+    if (hit) return hit;
+  }
+  return undefined;
+}
+
+/** Node rect dengan fill gambar: ikon Image di Layers/Assets (desain "Visual"). */
+const isImageNode = (n: { type: string; fills?: unknown }) => n.type === 'rect' && Array.isArray(n.fills) && n.fills.some((f) => (f as { type?: unknown })?.type === 'image');
+
+/** Aset dokumen untuk tab Assets: gambar terunggah dan ikon, urut dokumen. */
+type AssetItem = { id: string; name: string; kind: 'image' | 'icon'; where: string };
+function collectAssets(doc: LakarDocument): AssetItem[] {
+  const out: AssetItem[] = [];
+  for (const p of doc.pages) {
+    for (const board of p.children as unknown as RawNode[]) {
+      const walk = (n: RawNode) => {
+        if (isImageNode(n as { type: string; fills?: unknown })) out.push({ id: n.id, name: n.name, kind: 'image', where: board.name });
+        else if (n.type === 'icon') out.push({ id: n.id, name: typeof n.icon === 'string' ? `${String(n.lib ?? '')} / ${n.icon}` : n.name, kind: 'icon', where: board.name });
+        for (const c of n.children ?? []) walk(c);
+      };
+      walk(board);
+    }
+  }
+  return out;
+}
+
+/** Batas node temuan yang diukur untuk marker kanvas per run check. */
+const MARKER_MAX = 24;
+
+/** Durasi toast rollback di atas kanvas (desain "Viewer — Desktop — Error"). */
+const ROLLBACK_MS = 6000;
+
 export function Viewer({ slug }: { slug: string }) {
   const [doc, setDoc] = useState<Loaded<{ doc: LakarDocument; loadedAt: number }>>({ state: 'loading' });
   // State tampilan dipulihkan dari kunjungan tab sebelumnya (viewState.ts, memori sesi) dan disimpan tiap berubah.
@@ -117,6 +166,16 @@ export function Viewer({ slug }: { slug: string }) {
   /** Tata letak tablet/mobile: laci Layers/Pages terbuka, state bottom sheet (mobile). */
   const [layersOpen, setLayersOpen] = useState(false);
   const [sheet, setSheet] = useState<SheetState>('half');
+  /** Tab panel kiri (desain "Panel Tabs": Layers | Assets). */
+  const [leftTab, setLeftTab] = useState<'layers' | 'assets'>('layers');
+  /** Menu file dari chevron di header file. */
+  const [fileMenu, setFileMenu] = useState<{ x: number; y: number } | undefined>(undefined);
+  /** Ringkasan History untuk keterangan header file. */
+  const [histInfo, setHistInfo] = useState<{ count: number; top?: HistoryEntry } | undefined>(undefined);
+  /** Toast rollback: execute agen pada dokumen ini gagal (perubahan tidak diterapkan). */
+  const [rollback, setRollback] = useState<{ text: string; key: number } | undefined>(undefined);
+  /** Waktu kontak terakhir dengan lakard (muat dokumen / event): pill "Last synced …" saat offline. */
+  const lastSync = useRef(Date.now());
   // Laci hanya ada di ≤1100px (sama dengan app.css): Escape menutupnya lebih dulu (fase capture) dan tidak diteruskan
   // ke shortcut kanvas (Escape kanvas menghapus seleksi). Layar melebar melewati 1100px → laci ditutup.
   useEffect(() => {
@@ -151,6 +210,7 @@ export function Viewer({ slug }: { slug: string }) {
           // Respons lama yang tiba belakangan (getDoc tumpang tindih) tidak boleh memundurkan rev yang tampil.
           if (prev && prev.id === d.id && d.rev < prev.rev) return;
           docRef.current = d;
+          lastSync.current = Date.now();
           if (full || !prev || prev.id !== d.id) {
             setBaseRev(d.rev);
             // Board yang tersentuh di rev lebih baru dari dokumen ini tetap ditandai (event tiba sebelum muatan ini).
@@ -180,6 +240,23 @@ export function Viewer({ slug }: { slug: string }) {
   }, [loadDoc]);
 
   const current = doc.state === 'ok' ? doc.value.doc : undefined;
+  const currentRev = current?.rev;
+  useEffect(() => {
+    if (currentRev === undefined) return;
+    let live = true;
+    api.getHistory(slug).then(
+      (entries) => live && setHistInfo(entries[0] ? { count: entries.length, top: entries[0] } : { count: 0 }),
+      () => {},
+    );
+    return () => {
+      live = false;
+    };
+  }, [slug, currentRev]);
+  useEffect(() => {
+    if (!rollback) return;
+    const t = setTimeout(() => setRollback(undefined), ROLLBACK_MS);
+    return () => clearTimeout(t);
+  }, [rollback]);
   /** Dokumen yang tampil: versi pratinjau bila sudah termuat, selain itu terkini. */
   const previewDoc = preview?.doc.state === 'ok' ? preview.doc.value : undefined;
   const shown = previewDoc ?? current;
@@ -262,8 +339,13 @@ export function Viewer({ slug }: { slug: string }) {
   followRef.current = follow;
   const onEvent = useRef<(e: ActivityEvent) => void>(() => {});
   onEvent.current = (e) => {
+    lastSync.current = Date.now();
     if (e.type !== 'call') return;
     const c = e.call;
+    // Execute agen gagal pada dokumen ini → toast "…: execute failed, change rolled back" (snippet atomik).
+    if (c.slug === slug && c.tool === 'execute' && c.status === 'error' && c.client !== 'lakar-viewer') {
+      setRollback({ text: `${harnessLabel(c.client)}: execute failed, change rolled back`, key: e.seq });
+    }
     // Klien viewer sendiri disaring oleh `revChange` (satu-satunya gerbang aturan itu).
     if (c.slug !== slug || c.status === 'running' || c.status === 'error') return;
     const boardsTouched = c.tool === 'execute' ? (c.boards ?? []) : [];
@@ -295,6 +377,19 @@ export function Viewer({ slug }: { slug: string }) {
       }),
     [],
   );
+  // Stream aktivitas terputus → probe lakard lewat GET dokumen (tiap 5 dtk selama terputus) supaya status offline
+  // (banner, pill "Last synced …", badge Disconnected) muncul tanpa menunggu aksi pengguna.
+  const streamDown = !activity.connected;
+  useEffect(() => {
+    if (!streamDown) return;
+    const probe = () => reload.current(true);
+    const first = setTimeout(probe, 1000);
+    const t = setInterval(probe, 5000);
+    return () => {
+      clearTimeout(first);
+      clearInterval(t);
+    };
+  }, [streamDown]);
   const setFollow = useCallback((v: boolean) => {
     setFollowState(v);
     writeFollow(v);
@@ -326,6 +421,34 @@ export function Viewer({ slug }: { slug: string }) {
     );
   }, [slug, current]);
   useEffect(runChecks, [runChecks]);
+
+  // Marker temuan di kanvas (desain "Warning Outline/Marker"): bounds node temuan diukur lewat POST /inspect
+  // (maks. MARKER_MAX node per run check). Temuan pada board cukup memakai kotak board.
+  const [findingBounds, setFindingBounds] = useState<Record<string, { boardId: string; bounds: [number, number, number, number] }>>({});
+  const checkFindings = checks?.state === 'ok' ? checks.value.findings : undefined;
+  const indexRef = useRef(index);
+  indexRef.current = index;
+  useEffect(() => {
+    if (!checkFindings) return;
+    let live = true;
+    const ids = [...new Set(checkFindings.map((f) => f.nodeId))].filter((id) => {
+      const info = indexRef.current.get(id);
+      return info && info.type !== 'board';
+    });
+    setFindingBounds({});
+    for (const id of ids.slice(0, MARKER_MAX)) {
+      api.inspect(slug, id, 0).then(
+        (r) => {
+          const b = r.node.bounds;
+          if (live && b) setFindingBounds((m) => ({ ...m, [id]: { boardId: r.boardId, bounds: b } }));
+        },
+        () => {},
+      );
+    }
+    return () => {
+      live = false;
+    };
+  }, [slug, checkFindings]);
 
   // Inspect node terpilih: properti tersimpan + bounds terukur (POST /inspect).
   useEffect(() => {
@@ -583,6 +706,35 @@ export function Viewer({ slug }: { slug: string }) {
         ? { boardId: selectedInfo.boardId }
         : undefined;
   const summary = checks?.state === 'ok' ? checks.value.summary : undefined;
+  /** Marker temuan per node (level terberat menang); disembunyikan saat pratinjau versi. */
+  const markers: CanvasMarker[] = [];
+  if (!preview && checks?.state === 'ok') {
+    const byNode = new Map<string, CanvasMarker>();
+    for (const f of checks.value.findings) {
+      const info = index.get(f.nodeId);
+      if (!info) continue;
+      const fb = findingBounds[f.nodeId];
+      const m: CanvasMarker | undefined =
+        info.type === 'board' ? { nodeId: f.nodeId, boardId: info.boardId, level: f.level } : fb ? { nodeId: f.nodeId, boardId: fb.boardId, bounds: fb.bounds, level: f.level } : undefined;
+      const prev = byNode.get(f.nodeId);
+      if (m && (!prev || (prev.level === 'warning' && m.level === 'error'))) byNode.set(f.nodeId, m);
+    }
+    markers.push(...byNode.values());
+  }
+  /** Induk node terpilih (frame/board berlayout) untuk "Parent layout" di Inspect. */
+  const parentNode = selectedInfo?.parentId ? findNode(d, selectedInfo.parentId) : undefined;
+  const docHasBoards = d.pages.some((p) => p.children.length > 0);
+  const meta = previewDoc
+    ? `Previewing rev ${d.rev} · latest ${latestDoc.rev}`
+    : fileMeta(histInfo, latestDoc.pages.reduce((n, p) => n + p.children.length, 0), loadedAt, (t) => relativeTime(t, now), harnessLabel);
+  const assets = leftTab === 'assets' ? collectAssets(d) : [];
+  /** Pilih halaman dari Pages: seleksi di halaman lain dilepas (Inspect tidak menampilkan node yang tidak terlihat). */
+  const choosePage = (id: string) => {
+    setPageId(id);
+    const i = d.pages.findIndex((p) => p.id === id);
+    setSelectedId((sel) => (sel && index.get(sel)?.pageIndex !== i ? undefined : sel));
+  };
+  const hasLive = views.some((v) => v.live);
   /** Rev terakhir tiap board berubah (≤ rev dokumen): PNG board lain dipakai ulang dari cache. */
   const onCanvasInsert = (kind: InsertKind, at: InsertPoint) => {
     beginInsert(canvasInsertTarget(kind, at, boards, page));
@@ -618,20 +770,75 @@ export function Viewer({ slug }: { slug: string }) {
       </header>
       <aside className="layers-panel">
         <div className="file-header">
-          <div className="file-title">{slug}</div>
-          <div className="file-meta">
-            {previewDoc ? `Previewing rev ${d.rev} · latest ${latestDoc.rev}` : `Rev ${d.rev} · loaded ${relativeTime(loadedAt)}`}
+          <div className="file-row">
+            <div className="file-title" title={slug}>
+              {slug}
+            </div>
+            <button
+              type="button"
+              className="file-menu-btn"
+              aria-label="File menu"
+              aria-haspopup="menu"
+              aria-expanded={fileMenu !== undefined}
+              onClick={(e) => {
+                const r = e.currentTarget.getBoundingClientRect();
+                setFileMenu({ x: r.left, y: r.bottom + 6 });
+              }}
+            >
+              <Icon name="chevronDown" size={13} />
+            </button>
+          </div>
+          <div className="file-meta" title={`Rev ${latestDoc.rev}`}>
+            {meta}
           </div>
         </div>
-        <div className="panel-tabs">
-          <span className="panel-tab active">Layers</span>
+        <div className="panel-tabs" role="tablist">
+          <button type="button" role="tab" aria-selected={leftTab === 'layers'} className={`panel-tab${leftTab === 'layers' ? ' active' : ''}`} onClick={() => setLeftTab('layers')}>
+            Layers
+          </button>
+          <button type="button" role="tab" aria-selected={leftTab === 'assets'} className={`panel-tab${leftTab === 'assets' ? ' active' : ''}`} onClick={() => setLeftTab('assets')}>
+            Assets
+          </button>
         </div>
+        {leftTab === 'assets' ? (
+          <div className="layer-tree assets">
+            <div className="section-header">
+              <span className="section-label">Assets</span>
+            </div>
+            {assets.length === 0 ? (
+              <div className="muted-note">No assets yet. Images and icons added to this file show up here.</div>
+            ) : (
+              assets.map((a) => (
+                <div
+                  key={a.id}
+                  role="button"
+                  tabIndex={0}
+                  className={`layer-row asset-row${a.id === selectedId ? ' selected' : ''}`}
+                  style={{ paddingLeft: 8 }}
+                  title={a.where}
+                  onClick={() => select(a.id)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      select(a.id);
+                    }
+                  }}
+                >
+                  <Icon name={a.kind === 'image' ? 'image' : 'star'} size={13} className="type-icon" />
+                  <span className="layer-label">{a.name}</span>
+                  <span className="asset-where">{a.where}</span>
+                </div>
+              ))
+            )}
+          </div>
+        ) : (
+          <>
         <PagesPanel
           pages={d.pages.map((p) => ({ id: p.id, name: p.name, boardCount: p.children.length }))}
           activeId={page?.id}
           editable={editable}
           disabledReason={preview ? 'Not available while previewing a version' : 'lakard is offline'}
-          onSelect={setPageId}
+          onSelect={choosePage}
           onAdd={addPage}
           onRename={renamePage}
           onMove={movePage}
@@ -642,8 +849,10 @@ export function Viewer({ slug }: { slug: string }) {
             <span className="section-label">Layers</span>
             <AddLayerButton disabled={!editable} disabledReason={preview ? 'Not available while previewing a version' : 'lakard is offline'} hasBoard={boards.length > 0} onPick={onMenuInsert} />
           </div>
-          {boards.length === 0 ? <div className="muted-note">No boards on this page yet.</div> : <LayerTree key={page?.id} nodes={boards} selectedId={selectedId} selectedPath={selectedInfo} index={index} onSelect={select} marks={preview ? undefined : marks} />}
+          {boards.length === 0 ? <div className="muted-note">No layers yet</div> : <LayerTree key={page?.id} nodes={boards} selectedId={selectedId} selectedPath={selectedInfo} index={index} onSelect={select} marks={preview ? undefined : marks} />}
         </div>
+          </>
+        )}
       </aside>
       <div className="layers-scrim" aria-hidden="true" onClick={() => setLayersOpen(false)} />
       <button type="button" className="layers-toggle" aria-expanded={layersOpen} onClick={() => setLayersOpen((v) => !v)}>
@@ -671,13 +880,36 @@ export function Viewer({ slug }: { slug: string }) {
         preview={canvasPreview}
         editable={editable}
         onInsert={onCanvasInsert}
+        docEmpty={!docHasBoards}
+        stale={offline ? relativeTime(lastSync.current, now) : undefined}
+        markers={markers}
+        onMarker={(id) => {
+          select(id);
+          openTab('checks');
+        }}
+        overlay={
+          <>
+            {rollback && (
+              <div key={rollback.key} className="rollback-toast canvas-overlay-ui" role="alert">
+                <Icon name="undo2" size={14} />
+                <span>{rollback.text}</span>
+              </div>
+            )}
+            {hasLive && !preview && (
+              <button type="button" className={`follow-chip canvas-overlay-ui${follow ? ' on' : ''}`} aria-pressed={follow} onClick={() => setFollow(!follow)}>
+                <Icon name="crosshair" size={14} />
+                <span>{follow ? 'Following agent' : 'Follow agent'}</span>
+              </button>
+            )}
+          </>
+        }
       />
 
       <BottomSheet state={sheet} onState={setSheet} tabs={TABS} tab={tab} onTab={openTab} summary={summary} onChecks={() => openTab('checks')}>
         <div className="panel-body">
-          {tab === 'inspect' && <InspectPanel info={selectedInfo} inspect={inspect} />}
+          {tab === 'inspect' && <InspectPanel info={selectedInfo} inspect={inspect} parent={parentNode} />}
           {tab === 'checks' && <ChecksPanel checks={checks} index={index} selectedId={selectedId} onSelect={select} onRun={runChecks} hasBoards={d.pages.some((p) => p.children.length > 0)} />}
-          {tab === 'activity' && <ActivityPanel views={views} connected={activity.connected} follow={follow} onFollow={setFollow} nameOf={nameOf} />}
+          {tab === 'activity' && <ActivityPanel views={views} connected={activity.connected} offline={offline} follow={follow} onFollow={setFollow} nameOf={nameOf} />}
           {tab === 'history' && (
             <HistoryPanel
               slug={slug}
@@ -704,6 +936,15 @@ export function Viewer({ slug }: { slug: string }) {
         />
       )}
       {toast && <Toast toast={toast} onClose={closeToast} />}
+      {fileMenu && (
+        <FileMenu
+          target={{ slug, x: fileMenu.x, y: fileMenu.y }}
+          archived={false}
+          port={Number(location.port) || undefined}
+          onClose={() => setFileMenu(undefined)}
+          onError={setToast}
+        />
+      )}
       {restoreAsk && <RestoreDialog entry={restoreAsk} busy={restoring} error={restoreError} onCancel={() => !restoring && setRestoreAsk(undefined)} onConfirm={() => restore(restoreAsk)} />}
     </div>
   );
@@ -805,7 +1046,7 @@ function LayerTree({
         >
           {kids.length > 0 && <Icon name={isOpen ? 'chevronDown' : 'chevronRight'} size={12} />}
         </span>
-        <Icon name={NODE_ICON[n.type] ?? 'square'} size={13} className="type-icon" />
+        <Icon name={isImageNode(n) ? 'image' : (NODE_ICON[n.type] ?? 'square')} size={13} className="type-icon" />
         <span className="layer-label">{n.name}</span>
         {/* Kunci per execute: execute berikutnya pada node yang sama memutar ulang pudar titik. */}
         {(mark === 'agent' || mark === 'changed') && <i key={m?.key ?? mark} className="layer-agent-dot" aria-hidden="true" />}

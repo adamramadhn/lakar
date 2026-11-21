@@ -81,6 +81,10 @@ const ICONS = {
   externalLink: [['path', 'M15 3h6v6M10 14 21 3'], ['path', 'M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6']],
   tablet: [['rect', 4, 2, 16, 20, 2], ['path', 'M12 18h.01']],
   smartphone: [['rect', 5, 2, 14, 20, 2], ['path', 'M12 18h.01']],
+  undo2: [['path', 'M9 14 4 9l5-5'], ['path', 'M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5a5.5 5.5 0 0 1-5.5 5.5H11']],
+  hourglass: [['path', 'M5 22h14M5 2h14M17 22v-4.172a2 2 0 0 0-.586-1.414L12 12l-4.414 4.414A2 2 0 0 0 7 17.828V22M7 2v4.172a2 2 0 0 0 .586 1.414L12 12l4.414-4.414A2 2 0 0 0 17 6.172V2']],
+  eye: [['path', 'M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0'], ['circle', 12, 12, 3]],
+  columns2: [['rect', 3, 3, 18, 18, 2], ['path', 'M12 3v18']],
   layers: [
     ['path', 'M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z'],
     ['path', 'M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12'],
@@ -116,7 +120,8 @@ export function Icon({ name, size = 16, className, style }: { name: IconName; si
 
 /** Ikon tipe node untuk Layers dan Inspect. */
 export const NODE_ICON: Record<string, IconName> = {
-  board: 'board',
+  // Desain (Layer Row): board memakai ikon frame (#) sama seperti frame.
+  board: 'frame',
   frame: 'frame',
   text: 'text',
   rect: 'square',

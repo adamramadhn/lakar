@@ -1,6 +1,6 @@
 // Pengelompokan History per hari dengan `now` tetap (waktu lokal).
 import { describe, expect, it } from 'vitest';
-import { canRestore, changedBoards, comparePair, dayLabel, groupByDay, hasVersion, previewLabel } from './history.ts';
+import { canRestore, changedBoards, comparePair, dayLabel, fileMeta, groupByDay, hasVersion, previewLabel } from './history.ts';
 
 /** 1 Maret 2026 10:00 waktu lokal: hari sebelumnya melintasi batas bulan (28 Februari). */
 const NOW = new Date(2026, 2, 1, 10, 0, 0);
@@ -81,5 +81,25 @@ describe('changedBoards', () => {
     const a = doc([{ id: 'A', name: 'Home' }]);
     expect(changedBoards(undefined, a)).toEqual([{ id: 'A', name: 'Home', change: 'added' }]);
     expect(changedBoards(a, doc([{ id: 'A', name: 'Home' }]))).toEqual([]);
+  });
+});
+
+describe('fileMeta', () => {
+  const ago = (t: string | number) => (t === 1000 ? '10s ago' : 'just now');
+  const label = (c: string | undefined) => (c === 'lakar-viewer' ? 'You' : c === 'claude-code' ? 'Claude Code' : (c ?? 'Agent'));
+  it('riwayat belum termuat → hanya waktu buka', () => {
+    expect(fileMeta(undefined, 0, 1000, ago, label)).toBe('Opened 10s ago');
+  });
+  it('belum ada revisi → no changes yet', () => {
+    expect(fileMeta({ count: 0 }, 0, 1000, ago, label)).toBe('Opened 10s ago · no changes yet');
+  });
+  it('satu revisi dari aplikasi (New file) → Created · jumlah board', () => {
+    expect(fileMeta({ count: 1, top: { at: 'x', client: 'lakar-viewer' } }, 1, 1000, ago, label)).toBe('Created just now · 1 board');
+    expect(fileMeta({ count: 1, top: { at: 'x', client: 'lakar-viewer' } }, 3, 1000, ago, label)).toBe('Created just now · 3 boards');
+  });
+  it('revisi terakhir agen → Updated by harness; aplikasi → by you', () => {
+    expect(fileMeta({ count: 4, top: { at: 'x', client: 'claude-code' } }, 2, 1000, ago, label)).toBe('Updated just now by Claude Code');
+    expect(fileMeta({ count: 4, top: { at: 'x', client: 'lakar-viewer' } }, 2, 1000, ago, label)).toBe('Updated just now by you');
+    expect(fileMeta({ count: 2, top: { at: 'x' } }, 2, 1000, ago, label)).toBe('Updated just now by an agent');
   });
 });

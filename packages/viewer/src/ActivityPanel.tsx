@@ -1,5 +1,8 @@
 // Tab Activity (desain bagian 03, frame "Viewer — Desktop — Activity"): sesi per harness (Live/Idle) dengan
 // daftar Tool Call Row (running, done, warning, error), dan bar "Follow agent" di bawah.
+// Paritas desain: execute gagal → meta "failed · rolled back" + blok pesan error mono di bawah baris (frame
+// "Viewer — Desktop — Error"); lakard offline → badge "Disconnected" dan call yang masih berjalan ditandai
+// "interrupted · no response" (frame "… — Offline").
 import { useState } from 'react';
 import { callMeta, callTitle, harnessColor, harnessLabel, shortAgo, type ActivityCall, type SessionView } from './activity';
 import { relativeTime } from './format';
@@ -10,14 +13,20 @@ const STATUS_ICON: Record<ActivityCall['status'], IconName> = { running: 'loader
 /** Baris yang ditampilkan per sesi. */
 const CALLS_SHOWN = 50;
 
-export function ToolCallRow({ call, now, nameOf }: { call: ActivityCall; now: number; nameOf: (id: string) => string | undefined }) {
+export function ToolCallRow({ call, now, nameOf, offline = false }: { call: ActivityCall; now: number; nameOf: (id: string) => string | undefined; offline?: boolean }) {
   const at = call.status === 'running' ? Date.parse(call.startedAt) : Date.parse(call.startedAt) + (call.durationMs ?? 0);
-  const meta = callMeta(call, now);
+  // Offline: call yang masih berjalan tidak akan mendapat jawaban dari stream → ditampilkan terputus.
+  const interrupted = offline && call.status === 'running';
+  const rolledBack = call.status === 'error' && call.tool === 'execute';
+  // Desain Error: execute yang di-rollback memakai ikon segitiga kuning, meta merah.
+  const status = interrupted || rolledBack ? 'warning' : call.status;
+  const meta = interrupted ? 'interrupted · no response' : rolledBack ? 'failed · rolled back' : callMeta(call, now);
   return (
-    <div className={`tool-call ${call.status}${call.summary?.error ? ' has-error' : ''}`} title={call.error ? `${call.error.code}: ${call.error.message}` : undefined}>
-      <span className="tool-call-status">
-        <Icon name={STATUS_ICON[call.status]} size={14} className={call.status === 'running' ? 'spin' : undefined} />
-      </span>
+    <>
+      <div className={`tool-call ${status}${call.summary?.error || interrupted || rolledBack ? ' has-error' : ''}`} title={call.error ? `${call.error.code}: ${call.error.message}` : undefined}>
+        <span className="tool-call-status">
+          <Icon name={STATUS_ICON[status]} size={14} className={status === 'running' ? 'spin' : undefined} />
+        </span>
       <span className="tool-call-body">
         <span className="tool-call-title">{callTitle(call, nameOf)}</span>
         <span className="tool-call-meta">
@@ -26,18 +35,26 @@ export function ToolCallRow({ call, now, nameOf }: { call: ActivityCall; now: nu
         </span>
       </span>
       <span className="tool-call-time">{shortAgo(at, now)}</span>
-    </div>
+      </div>
+      {call.status === 'error' && call.error && (
+        <div className="tool-call-error">
+          {/* Baris pertama saja: sisa pesan daemon berisi kutipan snippet. */}
+          {call.tool} error: {call.error.message.split('\n')[0]}
+          {rolledBack ? ' No changes were applied.' : ''}
+        </div>
+      )}
+    </>
   );
 }
 
-function SessionCard({ view, now, nameOf }: { view: SessionView; now: number; nameOf: (id: string) => string | undefined }) {
+function SessionCard({ view, now, nameOf, offline }: { view: SessionView; now: number; nameOf: (id: string) => string | undefined; offline: boolean }) {
   const [open, setOpen] = useState<boolean | undefined>(undefined);
   const { session, calls, live, lastCallAt } = view;
   const expanded = open ?? live;
   const color = harnessColor(session.client);
   const callCount = calls.length;
   const subtitle = live
-    ? `${session.client ?? 'agent'} · started ${relativeTime(session.createdAt, now)} · ${callCount} call${callCount === 1 ? '' : 's'}`
+    ? `Started ${relativeTime(session.createdAt, now)} · ${callCount} call${callCount === 1 ? '' : 's'}`
     : lastCallAt !== undefined
       ? `Idle · last call ${relativeTime(lastCallAt, now)}`
       : `Idle · session ${session.id}`;
@@ -51,9 +68,9 @@ function SessionCard({ view, now, nameOf }: { view: SessionView; now: number; na
           <span className="session-title-row">
             <span className="session-title">{harnessLabel(session.client)}</span>
             {live && (
-              <span className={`live-badge ${color}`}>
+              <span className={`live-badge ${offline ? 'disconnected' : color}`}>
                 <i />
-                Live
+                {offline ? 'Disconnected' : 'Live'}
               </span>
             )}
           </span>
@@ -66,7 +83,14 @@ function SessionCard({ view, now, nameOf }: { view: SessionView; now: number; na
           {calls.length === 0 ? (
             <div className="muted-note">No tool calls on this document yet.</div>
           ) : (
-            calls.slice(0, CALLS_SHOWN).map((c) => <ToolCallRow key={c.callId} call={c} now={now} nameOf={nameOf} />)
+            calls.slice(0, CALLS_SHOWN).map((c) => <ToolCallRow key={c.callId} call={c} now={now} nameOf={nameOf} offline={offline} />)
+          )}
+          {/* Desain Waiting: sesi Live yang belum menjalankan execute pada file ini. */}
+          {live && !offline && !calls.some((c) => c.tool === 'execute') && (
+            <div className="tool-call-waiting">
+              <Icon name="hourglass" size={14} />
+              Waiting for the first execute…
+            </div>
           )}
         </div>
       )}
@@ -77,12 +101,15 @@ function SessionCard({ view, now, nameOf }: { view: SessionView; now: number; na
 export function ActivityPanel({
   views,
   connected,
+  offline = false,
   follow,
   onFollow,
   nameOf,
 }: {
   views: SessionView[];
   connected: boolean;
+  /** lakard tidak terjangkau (desain "Viewer — … — Offline"). */
+  offline?: boolean;
   follow: boolean;
   onFollow: (v: boolean) => void;
   nameOf: (id: string) => string | undefined;
@@ -91,7 +118,7 @@ export function ActivityPanel({
   return (
     <div className="activity">
       <div className="activity-scroll">
-        {!connected && (
+        {!connected && !offline && (
           <div className="activity-reconnect">
             <div className="spinner small" /> Connecting to live activity…
           </div>
@@ -106,7 +133,7 @@ export function ActivityPanel({
           <>
             <div className="section-label activity-label">LIVE SESSIONS</div>
             {views.map((v) => (
-              <SessionCard key={v.session.id} view={v} now={now} nameOf={nameOf} />
+              <SessionCard key={v.session.id} view={v} now={now} nameOf={nameOf} offline={offline} />
             ))}
           </>
         )}

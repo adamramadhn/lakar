@@ -1352,8 +1352,16 @@ button.panel-tab:hover {
 }
 
 /* Canvas sempit: pill check naik supaya tidak tertutup kontrol view. */
-/* Toolbar dengan tool sisip (aplikasi 4) ~470px: pill naik di atas toolbar sebelum bertabrakan. */
-@container (max-width: 860px) {
+/* Toolbar dengan tool sisip (aplikasi 4) ~465px. Desain (desktop 860px, tablet 724px): pill dan toolbar sejajar di
+   bawah; bila toolbar di tengah akan menabrak pill, toolbar digeser ke kanan pill (x 212). Kanvas lebih sempit dari
+   itu: pill naik di atas toolbar. */
+@container (min-width: 694px) and (max-width: 940px) {
+  .canvas:has(> .checks-pill) > .view-controls {
+    left: 212px;
+    transform: none;
+  }
+}
+@container (max-width: 693px) {
   .checks-pill {
     bottom: 72px;
   }
@@ -3720,5 +3728,336 @@ button.panel-tab:hover {
   }
   .breadcrumb-root {
     font-size: 22px;
+  }
+}
+
+
+/* ---- Paritas desain Viewer (bagian 03/04): header file, Assets, Waiting, marker temuan, offline, rollback ---- */
+/* `.section-label` global milik halaman Files (folder) memakai margin dan ukuran lain: dikembalikan di viewer. */
+.viewer .section-label {
+  margin: 0;
+  padding: 4px 8px 6px;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+}
+.viewer .pages .section-label {
+  padding: 4px 8px;
+}
+.viewer .activity-label {
+  padding: 0;
+  letter-spacing: 0.4px;
+}
+.file-header {
+  padding: 14px 14px 12px;
+}
+.file-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.file-row .file-title {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+}
+.file-menu-btn {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  /* Margin negatif: tinggi baris tetap 16px seperti desain (header 59px). */
+  margin: -2px -4px -2px 0;
+  border-radius: 5px;
+  color: var(--text-secondary);
+}
+.file-menu-btn:hover,
+.file-menu-btn[aria-expanded='true'] {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+.file-meta {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.layers-panel .panel-tabs {
+  padding: 10px 10px 6px;
+}
+.chevron {
+  color: var(--text-muted);
+}
+.layer-row.top:not(.selected):not(.agent) {
+  color: var(--text-primary);
+}
+.asset-row {
+  cursor: pointer;
+}
+.asset-where {
+  margin-left: auto;
+  padding-left: 8px;
+  color: var(--text-muted);
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 45%;
+}
+
+/* State Waiting (desain "Viewer — Desktop — Waiting"): kotak board putus-putus, judul, teks, petunjuk open_doc. */
+.canvas-waiting {
+  gap: 0;
+}
+.waiting-board {
+  display: grid;
+  place-items: center;
+  width: min(440px, 100%);
+  height: 240px;
+  margin-bottom: 14px;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  color: var(--text-muted);
+}
+.canvas-waiting strong {
+  font-size: 16px;
+  margin-bottom: 14px;
+}
+.canvas-waiting > span {
+  max-width: 360px;
+  font-size: 13px;
+  line-height: 1.5;
+  margin-bottom: 14px;
+}
+.waiting-hint {
+  display: inline-flex;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  font-size: 12px;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.waiting-hint span {
+  color: var(--text-secondary);
+}
+
+/* Marker temuan layout_check (desain "Warning Outline", "Warning Marker", "Board Warning Marker"). */
+.marker-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.finding-outline {
+  position: absolute;
+  border: 1px dashed var(--danger);
+}
+.finding-outline.warning {
+  border-color: var(--warning);
+}
+.finding-marker {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid var(--canvas);
+  background: var(--danger);
+  color: #ffffff;
+  pointer-events: auto;
+  z-index: 3;
+}
+.finding-marker.warning {
+  background: var(--warning);
+  color: #1a1a1a;
+}
+.canvas.previewing .marker-layer {
+  display: none;
+}
+
+/* Offline (desain "Viewer — Desktop — Offline"): board diredupkan, pill "Last synced …" di tengah atas. */
+.canvas.stale .board,
+.canvas.stale .board-label,
+.canvas.stale .selection,
+.canvas.stale .marker-layer {
+  opacity: 0.45;
+}
+.stale-pill {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 6;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 27px;
+  padding: 0 12px;
+  border-radius: 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-size: 12px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.live-badge.disconnected {
+  background: var(--surface-hover);
+  color: var(--text-secondary);
+}
+
+/* Toast rollback (desain "Rollback Toast"): di atas kanvas kanan, garis merah. */
+.rollback-toast {
+  position: absolute;
+  top: 60px;
+  right: 16px;
+  z-index: 7;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  max-width: calc(100% - 32px);
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: var(--surface);
+  border: 1px solid var(--danger);
+  box-shadow: 0 8px 24px #00000040;
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 500;
+  animation: rollback-in 160ms ease-out;
+}
+.rollback-toast svg {
+  flex: none;
+  color: var(--danger);
+}
+@keyframes rollback-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+.tool-call-error {
+  margin: 0 0 2px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: var(--danger-soft);
+  color: var(--text-primary);
+  font: 400 11px/1.5 var(--font-mono);
+  overflow-wrap: anywhere;
+}
+.tool-call-waiting {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px 10px;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+.tool-call-waiting svg {
+  flex: none;
+  color: var(--text-muted);
+}
+/* Sesi Live yang terbuka tanpa chevron (desain); sesi Idle memakai chevron kanan. */
+.session-card.open .session-chevron {
+  visibility: hidden;
+}
+
+/* History: entri yang dipratinjau berlatar biru penuh (desain "Entry … (selected)"). */
+.history-entry.previewing {
+  margin: 0 -8px;
+  padding: 0 8px;
+  border-radius: 8px;
+  background: var(--accent-soft);
+}
+.history-entry.previewing .history-select,
+.history-entry.previewing .history-select.clickable:hover {
+  background: none;
+}
+.export-run {
+  font-size: 14px;
+}
+
+/* Chip Follow (desain "Viewer — Mobile": "Following agent"): hanya di mobile, menggantikan bar Follow. */
+.follow-chip {
+  display: none;
+}
+@media (max-width: 767.98px) {
+  .follow-chip {
+    position: absolute;
+    left: 50%;
+    bottom: calc(var(--sheet-h, 54px) + 14px);
+    transform: translateX(-50%);
+    z-index: 8;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    height: 34px;
+    padding: 0 12px;
+    border-radius: 17px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    box-shadow: 0 8px 24px #00000033;
+    color: var(--text-primary);
+    font-size: 12px;
+    font-weight: 500;
+    white-space: nowrap;
+  }
+  .follow-chip svg {
+    color: var(--text-secondary);
+  }
+  .follow-chip.on svg {
+    color: var(--accent);
+  }
+  /* Toolbar naik di atas chip Follow bila keduanya tampil. */
+  .viewer .canvas:has(.follow-chip) .view-controls {
+    bottom: calc(var(--sheet-h, 54px) + 60px);
+  }
+  .viewer .follow-bar {
+    display: none;
+  }
+  /* Desain mobile: tanpa tombol Layers (laci dibuka dari nama file) dan tanpa Export. */
+  .viewer .layers-toggle,
+  .viewer .export {
+    display: none;
+  }
+  .session-card.open .session-chevron {
+    visibility: visible;
+  }
+  .rollback-toast {
+    top: 12px;
+    left: 16px;
+    right: 16px;
+  }
+  /* History mobile (desain "Viewer — Mobile — History"): daftar ringkas, judul di atas, pemisah antar entri. */
+  .viewer .history-line,
+  .viewer .history-agent {
+    display: none;
+  }
+  .viewer .history-entry {
+    border-bottom: 1px solid var(--border);
+  }
+  .viewer .history-entry.previewing {
+    border-bottom-color: transparent;
+  }
+  .viewer .history-body {
+    padding: 10px 0;
+    gap: 6px;
+  }
+  .viewer .history-select {
+    gap: 2px;
+  }
+  .viewer .history-title {
+    order: -1;
+  }
+  .viewer .history-rail {
+    padding-top: 13px;
   }
 }
