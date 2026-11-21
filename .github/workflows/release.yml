@@ -84,6 +84,9 @@ jobs:
 
       # Jalankan daemon + MCP hasil bundel persis seperti aplikasi (macOS x64 lewat Rosetta di runner arm64).
       - name: Smoke-test sidecar
+        env:
+          # Runner GitHub punya Google Chrome: pool render wajib siap lewat browser sistem.
+          LAKAR_SMOKE_REQUIRE_RENDER: '1'
         run: node apps/desktop/scripts/smoke-sidecar.mjs --target ${{ matrix.target }}
 
       - name: Set version from tag

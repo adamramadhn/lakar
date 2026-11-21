@@ -2,7 +2,7 @@
 title: 'Rilis desktop pertama Lakar (Tauri v2 + sidecar lakard)'
 type: 'feature'
 created: '2026-11-21'
-status: 'in-progress'
+status: 'in-review'
 baseline_commit: 'dd4e339dfd06f8df695e5952c7fb0694f7e66cd2'
 route: 'dispatch'
 review_loop_iteration: 0
@@ -91,6 +91,44 @@ context:
 ## Spec Change Log
 
 ## Review Triage Log
+
+Pass 1 (Blind Hunter = B, Edge Case Hunter = E, Verification Gap = V). Semua temuan yang lolos ber-rute `patch`; tidak ada intent_gap/bad_spec.
+
+| # | Temuan | Verdict | Bukti / keputusan |
+|---|---|---|---|
+| B1 | Trigger `push` sementara + upload `Cargo.lock` tertinggal di workflow | medium | Nyata; `Cargo.lock` sudah di-commit → upload dihapus; trigger dihapus sebelum PR siap merge. patch |
+| B2 | Versi tag pra-rilis memakai versi statis | low | Nyata tapi jarang; MSI menolak semver pra-rilis. Ditolak (low, fix menambah cabang). |
+| B3 | Rilis tanpa checksum | medium | Nyata. patch: `SHA256SUMS.txt` di job publish. |
+| B4 | Tidak ada auto-update | false | Dikecualikan intent (Never: auto-update). Ditolak. |
+| B5/E13 | Path MCP tidak stabil di AppImage / App Translocation | medium | Nyata: `process.execPath` di `/tmp/.mount_*`. patch: runtime + MCP disalin ke `<app-local-data>/runtime/<versi>` dan daemon dijalankan dari salinan itu. |
+| B6 | Port cadangan berubah tiap restart → config MCP basi | medium | Nyata. patch: simpan port cadangan (`port`), pakai ulang; Connections menampilkan catatan port non-default. |
+| B7/V2 | Penanda no-browser disalin manual Rust↔TS tanpa tes | medium | Nyata. patch: tes TS membaca `main.rs`; tes Rust `classify_pool`. |
+| B8/E4/E5 | Tidak ada pengawasan setelah Ready; proses mati saat pool hangat → Ready | medium | Nyata (`watch_startup` berhenti setelah set fase). patch: `child_exit` di loop pool + `supervise()` ke layar mulai. |
+| B9 | Log tumbuh tanpa batas dalam satu sesi | low | Jarang (log daemon sedikit). Ditolak. |
+| B10/E6 | Retry tanpa IPC melempar TypeError | low | Nyata, fix langsung (guard). patch. |
+| B11 | Daftar tool MCP hard-coded | low | Drift developer; fix butuh mekanisme baru. Ditolak. |
+| B12/E15 | Status gagal → "Checking…" selamanya; polling berhenti | low | Nyata, fix kecil. patch (Unreachable + polling lanjut). |
+| B13 | Sidecar macOS x64 membawa modul native arm64 | false | Dependensi daemon/mcp murni JS + wasm (tidak ada addon native); smoke test x64 jalan di Rosetta. |
+| B14/V2 | Rust tanpa tes; CI hanya clippy | medium | Nyata. patch: modul tes + `cargo test --locked`. |
+| B15 | Tes stdin bergantung pada dist hasil build | low | CI selalu `pnpm build` sebelum tes; pola sama dengan tes daemon lain. Ditolak. |
+| B16 | `csp: null` di layar mulai | low | Layar mulai tidak memuat konten luar. Ditolak. |
+| E1 | Restart tumpang tindih → proses yatim | medium | Nyata. patch: `AtomicBool restarting`. |
+| E2 | Fallback port 0 gagal → port sibuk | low | Hampir mustahil. Ditolak. |
+| E3 | TOCTOU port | low | Jarang; daemon gagal jelas, Restart tersedia. Ditolak. |
+| E7 | `state.log` undefined | false | Rust selalu mengirim `log`. |
+| E8 | Siapkan target Windows dari host non-Windows (zip) | low | Tidak dipakai CI. Ditolak. |
+| E9 | `--target` tanpa nilai | low | Ditolak. |
+| E10 | Secret multi-baris merusak `GITHUB_ENV` | medium | Nyata. patch: bentuk heredoc. |
+| E11 | PFX tanpa password | low | Nyata, fix langsung. patch. |
+| E12 | Beberapa `--config` | maybe-false | patch tetap (satu `ci-config.json` gabungan) karena murah. |
+| E14 | `browser_channel = ""` di file melempar | low | Nyata, fix langsung. patch. |
+| E16 | `size 0` → Renderer ready | false | Pool minimal 2 halaman (`RENDER_PAGES_MIN`). |
+| V1 | Tidak ada tes alur channel config→startDaemon→launch | medium | Nyata (regresi start.ts lolos). patch: tes `startDaemon` dengan `browserChannel`. |
+| V3 | Sidecar hasil pangkas tidak pernah dijalankan di CI | medium | Nyata (bug prune `main` lucide tertangkap lokal). patch: `smoke-sidecar.mjs` di release. |
+| V4 | Snippet harness tanpa tes | medium | Nyata. patch: `harnesses.ts` + `connections.test.ts`. |
+| V-o1 | Komentar header tes melebih-lebihkan cakupan | low | Fix langsung. patch. |
+| V-o2 | `dechunk` pada string lossy | low | Fastify mengirim content-length. Ditolak. |
+| V-o3 | Cabang `BrowserLaunchError` di `lease` tidak teruji | low | Substring tetap cocok. Ditolak. |
 
 ## Verification
 

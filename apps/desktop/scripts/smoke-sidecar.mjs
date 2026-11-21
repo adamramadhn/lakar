@@ -115,8 +115,18 @@ try {
   assert(/arrow-right/.test(text(4)), `icon_search: ${text(4).slice(0, 200)}`);
   log('MCP status, read_skill, icon_search OK');
 
-  const pool = status.data.pool;
-  log(`pool render: ${pool ? `${pool.ready}/${pool.size}${pool.lastError ? ` (${pool.lastError})` : ''}` : 'tidak ada'}`);
+  // Tunggu pool render selesai hangat (siap, atau melapor error seperti browser tidak ada) sebelum menutup daemon:
+  // menutup saat peluncuran browser masih berjalan menunggu peluncuran itu (perilaku pool yang sudah ada).
+  let pool;
+  const poolDeadline = Date.now() + 60_000;
+  for (;;) {
+    pool = (await (await fetch(`${url}/status`)).json()).data.pool;
+    if (!pool || (pool.size > 0 && pool.ready === pool.size) || pool.lastError) break;
+    assert(Date.now() < poolDeadline, `pool render tidak selesai hangat dalam 60 s: ${JSON.stringify(pool)}`);
+    await new Promise((r) => setTimeout(r, 500));
+  }
+  log(`pool render: ${pool ? `${pool.ready}/${pool.size}${pool.browserVersion ? ` (browser ${pool.browserVersion})` : ''}${pool.lastError ? ` (${pool.lastError})` : ''}` : 'tidak ada'}`);
+  if (process.env.LAKAR_SMOKE_REQUIRE_RENDER === '1') assert(pool && pool.ready === pool.size, 'pool render tidak siap');
 
   daemon.stdin.end();
   const code = await Promise.race([exited, new Promise((r) => setTimeout(() => r('timeout'), 15_000))]);
