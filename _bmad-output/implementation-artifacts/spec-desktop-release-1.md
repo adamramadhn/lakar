@@ -2,7 +2,7 @@
 title: 'Rilis desktop pertama Lakar (Tauri v2 + sidecar lakard)'
 type: 'feature'
 created: '2026-11-21'
-status: 'in-review'
+status: 'done'
 baseline_commit: 'dd4e339dfd06f8df695e5952c7fb0694f7e66cd2'
 route: 'dispatch'
 review_loop_iteration: 0
@@ -86,7 +86,8 @@ context:
 - `prepare-sidecar.mjs`: `pnpm deploy --prod --config.node-linker=hoisted` (pnpm 12 tidak butuh `inject-workspace-packages`); pangkas `lucide-static` (`font/`, `sprite.svg`, dist selain esm + entry `main`) dan metadata pnpm → daemon 96 MB, Node 26.13.1 win-x64 95 MB.
 - Diuji lokal (Windows, tanpa Rust): sidecar bundel dijalankan dengan `lakar-node.exe` + env desktop → pool siap dengan Edge (fallback `auto`), `/viewer/connections` menunjuk runtime + mcp bundel, `/app/` 200, stdin ditutup → keluar rapi; MCP bundel menjawab `initialize` dan `status`.
 - Rust tidak terpasang lokal: `desktop-check.yml` (clippy `-D warnings`) di CI lulus percobaan pertama; `Cargo.lock` diambil dari artefak run itu.
-- `workflow_dispatch` hanya bisa dipicu bila workflow ada di branch default, jadi validasi memakai trigger `push` sementara ke branch ini (dihapus sebelum PR siap merge).
+- `workflow_dispatch` hanya bisa dipicu bila workflow ada di branch default, jadi validasi memakai trigger `push` sementara ke branch ini; trigger itu sudah dihapus. Run validasi akhir: https://github.com/adamramadhn/lakar/actions/runs/44915442129 (4/4 hijau; smoke test pool 2/2 dengan Chrome sistem di Linux, Windows, macOS arm64; macOS x64 lintas arsitektur di Rosetta melewati syarat render karena peluncuran Chrome timeout).
+- Ukuran installer (tanpa signing): setup.exe 46 MB, msi 74 MB, dmg arm64 77 MB, deb 83 MB, AppImage 158 MB.
 
 ## Spec Change Log
 

@@ -9,9 +9,6 @@ on:
       - '.github/workflows/desktop-check.yml'
       - '.github/workflows/release.yml'
   workflow_dispatch:
-  # SEMENTARA (validasi sebelum PR): hapus sebelum merge.
-  push:
-    branches: ['claude/desktop-tauri-f5e05a']
 
 concurrency:
   group: desktop-check-${{ github.ref }}

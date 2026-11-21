@@ -5,8 +5,6 @@ name: Release desktop
 on:
   push:
     tags: ['v*']
-    # SEMENTARA (validasi sebelum PR; workflow_dispatch baru bisa dipicu setelah file ada di main): hapus sebelum merge.
-    branches: ['claude/desktop-tauri-f5e05a']
   workflow_dispatch:
 
 concurrency:
