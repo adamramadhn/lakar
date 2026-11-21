@@ -1,5 +1,7 @@
 // Panel kanan Viewer: Inspect (properti dari POST /inspect, Copy as CSS/Tailwind/JSON lewat copyas.ts) dan Checks (temuan layout_check). Activity dan
 // History ada di ActivityPanel.tsx dan HistoryPanel.tsx.
+// Paritas desain: Inspect punya bagian "Parent layout" (arah/gap/padding induk); judul aturan Checks berbahasa
+// Inggris (judul di @lakar/schema berbahasa Indonesia untuk agen).
 import { useState, type ReactNode } from 'react';
 import { G0_RULES, isGateRule, type Finding } from '@lakar/schema';
 import type { InspectResult, LayoutCheck } from './api';
@@ -11,6 +13,9 @@ import { Icon, NODE_ICON, type IconName } from './icons';
 type Loaded<T> = { state: 'loading' } | { state: 'ok'; value: T } | { state: 'error'; message: string };
 
 const TYPE_LABEL: Record<string, string> = { board: 'Board', frame: 'Frame', text: 'Text', rect: 'Rectangle', ellipse: 'Ellipse', path: 'Path', icon: 'Icon' };
+
+/** Arah layout induk seperti di desain ("vertical" / "horizontal"). */
+const DIRECTION: Record<string, string> = { column: 'vertical', row: 'horizontal', none: 'none' };
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -73,7 +78,7 @@ const COPY_FORMATS: readonly [CopyFormat, string][] = [
   ['json', 'JSON'],
 ];
 
-export function InspectPanel({ info, inspect }: { info: NodeInfo | undefined; inspect: Loaded<InspectResult> | undefined }) {
+export function InspectPanel({ info, inspect, parent }: { info: NodeInfo | undefined; inspect: Loaded<InspectResult> | undefined; parent?: Record<string, unknown> | undefined }) {
   const [copied, setCopied] = useState<CopyFormat | undefined>(undefined);
   if (!info) return <Empty icon="pointer" title="Nothing selected" text="Select a layer or a board on the canvas to see its properties." />;
   const node = inspect?.state === 'ok' && inspect.value.node.id === info.id ? inspect.value.node : undefined;
@@ -141,7 +146,6 @@ export function InspectPanel({ info, inspect }: { info: NodeInfo | undefined; in
               {n.letterSpacing !== undefined && <Prop label="Letter spacing" value={formatValue(n.letterSpacing)} />}
               {n.align !== undefined && <Prop label="Align" value={formatValue(n.align)} />}
               {n.style !== undefined && <Prop label="Style" value={formatValue(n.style)} />}
-              <Prop label="Content" value={<span className="clamp">{String(n.content ?? '')}</span>} />
             </Section>
           )}
           {type === 'icon' && (
@@ -166,6 +170,13 @@ export function InspectPanel({ info, inspect }: { info: NodeInfo | undefined; in
               {n.align !== undefined && <Prop label="Align" value={formatValue(n.align)} />}
               {n.justify !== undefined && <Prop label="Justify" value={formatValue(n.justify)} />}
               {n.clip !== undefined && <Prop label="Clip" value={formatValue(n.clip)} />}
+            </Section>
+          )}
+          {parent && typeof parent.layout === 'string' && parent.layout !== 'none' && (
+            <Section title="Parent layout">
+              <Prop label="Direction" value={DIRECTION[parent.layout] ?? parent.layout} />
+              <Prop label="Gap" value={formatValue(parent.gap ?? 0)} />
+              <Prop label="Padding" value={formatValue(parent.padding ?? 0)} />
             </Section>
           )}
           {(n.opacity !== undefined || n.radius !== undefined || n.shadows !== undefined) && (
@@ -204,7 +215,29 @@ export function InspectPanel({ info, inspect }: { info: NodeInfo | undefined; in
   );
 }
 
-const ruleTitle = (rule: string) => (G0_RULES as Record<string, { title: string }>)[rule]?.title ?? rule;
+/** Judul aturan untuk UI (desain: "Text smaller than 12px", "Board size off target"). */
+const RULE_TITLE: Record<string, string> = {
+  'LC-01a': 'Emoji in text',
+  'LC-01b': 'Unicode glyph used as an icon',
+  'LC-02a': 'Node clipped by its parent',
+  'LC-02b': 'Text overflows its parent',
+  'LC-04': 'Text contrast too low',
+  'LC-05': 'Text smaller than 12px',
+  'LC-11': 'Siblings partly overlap',
+  'LC-12': 'Board size off target',
+  'LC-18': 'Nested cards',
+  'LC-20': 'Content covered by the bottom bar',
+  'LC-23': 'Gap to badge, button, or icon under 8px',
+  'LC-24': 'Badge out of proportion in its row',
+  'LC-25': 'Radii not concentric',
+  'LC-26': 'Heading rhythm: space above not larger',
+  'LC-27': 'Too many font sizes',
+  'LC-28': 'Text lines too long',
+  'LC-29': 'Thin weight on small text',
+  'LC-30': 'Punctuation',
+  'LC-31': 'Mockup cut flat at the section edge',
+};
+const ruleTitle = (rule: string) => RULE_TITLE[rule] ?? (G0_RULES as Record<string, { title: string }>)[rule]?.title ?? rule;
 const TOTAL_RULES = Object.keys(G0_RULES).length;
 
 export function ChecksPanel({

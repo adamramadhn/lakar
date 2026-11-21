@@ -2,6 +2,8 @@
 // tanggal) dari GET /viewer/docs/:slug/history. Klik entri → pratinjau versi itu di kanvas; Compare membuka
 // thumbnail Before/After board yang berubah; Restore memulihkan versi (konfirmasi di Viewer). Entri tanpa
 // snapshot: Compare/Restore nonaktif ("No snapshot for this version").
+// Seperti desain, tombol Compare/Restore hanya tampil pada entri terkini (Compare) dan entri yang sedang
+// dipratinjau (latar biru); entri lain cukup judul + meta (klik untuk pratinjau). Jam 24 jam ("14:32").
 import { useEffect, useState } from 'react';
 import type { LakarDocument } from '@lakar/schema';
 import { harnessColor, harnessLabel } from './activity';
@@ -14,7 +16,7 @@ type Loaded = { state: 'loading' } | { state: 'ok'; entries: HistoryEntry[] } | 
 
 export const timeOf = (at: string) => {
   const d = new Date(at);
-  return Number.isNaN(d.getTime()) ? '' : d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+  return Number.isNaN(d.getTime()) ? '' : d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
 };
 
 /** Jumlah pasangan Before/After yang ditampilkan per Compare. */
@@ -110,7 +112,7 @@ export function HistoryPanel({
                     tabIndex={0}
                     aria-pressed={previewing}
                     aria-disabled={!readable && !current}
-                    title={current ? 'Latest version' : readable ? (previewing ? 'Back to latest' : 'Preview this version') : NO_SNAPSHOT}
+                    title={current ? 'Latest version' : readable ? (previewing ? 'Back to live' : 'Preview this version') : NO_SNAPSHOT}
                     onClick={select}
                     onKeyDown={(k) => {
                       if (k.key === 'Enter' || k.key === ' ') {
@@ -136,6 +138,7 @@ export function HistoryPanel({
                     </div>
                   </div>
                   {open && readable && <ComparePanel slug={slug} pair={comparePair(entries, e, latest)} />}
+                  {(current || previewing || open) && (
                   <div className="history-actions">
                     <button
                       type="button"
@@ -145,7 +148,7 @@ export function HistoryPanel({
                       aria-expanded={open}
                       onClick={() => setComparing(open ? undefined : e.rev)}
                     >
-                      <Icon name="gitCompare" size={13} /> Compare
+                      <Icon name="columns2" size={13} /> Compare
                     </button>
                     {!current && (
                       <button type="button" className="btn small" disabled={!restorable} title={restorable ? 'Restore this version as a new revision' : NO_SNAPSHOT} onClick={() => onRestore(e)}>
@@ -153,6 +156,7 @@ export function HistoryPanel({
                       </button>
                     )}
                   </div>
+                  )}
                 </div>
               </div>
             );

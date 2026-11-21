@@ -11,8 +11,12 @@
 // Sesudah satu sisipan tool kembali ke Select. `editable` false (pratinjau versi, offline) → tool sisip nonaktif.
 // Sentuh (aplikasi 9): dua jari = pinch-zoom di titik tengah + pan (sheet.ts `pinchCamera`); satu jari dengan tool
 // Select/Hand = pan; tap (gerak ≤8px) = pilih/sisip seperti klik. Jari kedua dilepas → pan satu jari tanpa lompat.
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
-import type { FindingSummary } from '@lakar/schema';
+// Paritas desain: state Waiting (kotak putus-putus + petunjuk `open_doc slug: …`), marker temuan layout_check
+// (outline putus-putus + lingkaran di sudut kanan atas node/board), mode offline (board diredupkan + pill
+// "Last synced …"), dan slot `overlay` untuk toast rollback / chip Follow dari Viewer. PNG board lama tetap tampil
+// sampai PNG rev baru selesai dimuat (tanpa kedip skeleton sesudah edit).
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
+import type { FindingLevel, FindingSummary } from '@lakar/schema';
 import { api, errorText } from './api';
 import { INSERT_KINDS, type InsertKind } from './codegen';
 import { ExportButton } from './ExportPopover';
@@ -42,6 +46,8 @@ export type CanvasPreview = {
 };
 /** Titik sisip: dalam board (`boardId`, koordinat board) atau di halaman (tanpa board, koordinat halaman). */
 export type InsertPoint = { boardId: string; x: number; y: number } | { boardId?: undefined; x: number; y: number };
+/** Marker temuan layout_check: tanpa `bounds` = temuan pada board (lingkaran di sudut board saja). */
+export type CanvasMarker = { nodeId: string; boardId: string; bounds?: [number, number, number, number]; level: FindingLevel };
 type Tool = 'select' | 'hand' | InsertKind;
 const isInsertTool = (t: Tool): t is InsertKind => t !== 'select' && t !== 'hand';
 const TOOL_ICON: Record<InsertKind, IconName> = { frame: 'frame', rect: 'square', ellipse: 'circle', text: 'text', image: 'image', icon: 'shapes' };
@@ -189,7 +195,8 @@ function BoardImage({ slug, rev, board, previewRev }: { slug: string; rev: numbe
   useRetry(() => state.error && setAttempt((a) => a + 1));
   useEffect(() => {
     let live = true;
-    setState({});
+    // PNG sebelumnya tetap tampil sampai yang baru tiba; hanya error lama yang dibuang.
+    setState((s) => (s.url ? { url: s.url } : {}));
     (previewRev !== undefined ? api.revScreenshot(slug, previewRev, board.id) : api.screenshot(slug, rev, board.id)).then(
       (s) => live && setState({ url: s.url }),
       (e) => live && setState({ error: errorText(e) }),
@@ -227,7 +234,22 @@ export function Canvas({
   onInsert,
   camera,
   onCamera,
+  docEmpty = false,
+  stale,
+  markers,
+  onMarker,
+  overlay,
 }: {
+  /** Dokumen belum punya board sama sekali (state Waiting desain); false = hanya halaman ini yang kosong. */
+  docEmpty?: boolean;
+  /** lakard offline: teks "Last synced …" dan board diredupkan. */
+  stale?: string | undefined;
+  /** Marker temuan layout_check di halaman ini. */
+  markers?: readonly CanvasMarker[];
+  /** Klik marker: pilih node temuan. */
+  onMarker?: (nodeId: string) => void;
+  /** Elemen tambahan di atas kanvas (toast rollback, chip Follow). */
+  overlay?: ReactNode;
   /** Kamera tersimpan (pindah tab, viewState.ts): dipakai saat mount, tanpa auto-fit. */
   camera?: Camera | undefined;
   /** Kamera berubah: disimpan pemanggil per halaman. */
@@ -522,7 +544,7 @@ export function Canvas({
   return (
     <section
       ref={ref}
-      className={`canvas${handMode ? ' hand' : isInsertTool(tool) ? ' inserting' : ''}${panning ? ' panning' : ''}${preview ? ' previewing' : ''}`}
+      className={`canvas${handMode ? ' hand' : isInsertTool(tool) ? ' inserting' : ''}${panning ? ' panning' : ''}${preview ? ' previewing' : ''}${stale !== undefined ? ' stale' : ''}`}
       aria-label="Canvas"
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
@@ -531,9 +553,16 @@ export function Canvas({
     >
       {boards.length === 0 && !preview && (
         <div className="canvas-waiting">
-          <div className="spinner" />
-          <strong>Waiting for the agent</strong>
-          <span>This page has no boards yet. They'll appear here after the agent's next execute.</span>
+          <div className="waiting-board">
+            {docEmpty ? <Icon name="loaderCircle" size={22} className="spin" /> : <Icon name="frame" size={22} />}
+          </div>
+          <strong>{docEmpty ? 'Waiting for your agent' : 'This page is empty'}</strong>
+          <span>{docEmpty ? 'This file is open in lakard. Boards appear here as soon as your agent runs execute.' : 'Boards appear here as soon as your agent runs execute, or add one with the Frame tool.'}</span>
+          {docEmpty && (
+            <code className="waiting-hint">
+              open_doc <span>slug: {slug}</span>
+            </code>
+          )}
         </div>
       )}
       {boards.map((b) => {
@@ -566,7 +595,42 @@ export function Canvas({
         </div>
       )}
 
+      {markers && markers.length > 0 && (
+        <div className="marker-layer">
+          {markers.map((m) => {
+            const b = boardById.get(m.boardId);
+            if (!b) return null;
+            const r = m.bounds ? nodeBox(b, m.bounds, cam) : undefined;
+            const right = r ? r.left + r.width : cam.x + (b.x + b.width) * cam.z;
+            const top = r ? r.top : cam.y + b.y * cam.z;
+            return (
+              <div key={m.nodeId}>
+                {r && <div className={`finding-outline ${m.level}`} style={{ left: r.left, top: r.top, width: r.width, height: r.height }} />}
+                <button
+                  type="button"
+                  className={`finding-marker canvas-overlay-ui ${m.level}`}
+                  style={{ left: right - 10, top: top - 10 }}
+                  aria-label={m.level === 'error' ? 'Layout error: show in Checks' : 'Layout warning: show in Checks'}
+                  title="Show in Checks"
+                  onClick={() => onMarker?.(m.nodeId)}
+                >
+                  <Icon name="alert" size={11} />
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
       {!preview && presence && presence.length > 0 && <AgentLayer presence={presence} boardById={boardById} cam={cam} />}
+
+      {stale !== undefined && (
+        <div className="stale-pill" role="status">
+          <Icon name="clock" size={13} />
+          Last synced {stale}
+        </div>
+      )}
+      {overlay}
 
       {preview && <PreviewBanner preview={preview} />}
 
@@ -642,8 +706,8 @@ function PreviewBanner({ preview }: { preview: CanvasPreview }) {
       <span className="version-banner-text" title={preview.label}>
         {preview.error ? `Couldn't load this version: ${preview.error}` : preview.loading ? `${preview.label} · loading…` : preview.label}
       </span>
-      <button type="button" className="btn small ghost" onClick={preview.onBack}>
-        Back to latest
+      <button type="button" className="btn small" onClick={preview.onBack}>
+        Back to live
       </button>
       <button
         type="button"

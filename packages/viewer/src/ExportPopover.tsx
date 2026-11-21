@@ -26,7 +26,8 @@ function download(blob: Blob, filename: string) {
 export function ExportButton({ slug, boards, selectedBoardId }: { slug: string; boards: readonly CanvasBoard[]; selectedBoardId: string | undefined }) {
   const [open, setOpen] = useState(false);
   const [boardId, setBoardId] = useState<string | undefined>(undefined);
-  const [scale, setScale] = useState<1 | 2>(1);
+  // Default 2x seperti desain (`Viewer — Desktop — Export`).
+  const [scale, setScale] = useState<1 | 2>(2);
   const [status, setStatus] = useState<Status>({ state: 'idle' });
   const root = useRef<HTMLDivElement>(null);
 
