@@ -1,5 +1,5 @@
-// Kerangka aplikasi: title bar bertab, routing hash (`#/` Recents, `#/files`, `#/archive`, `#/settings/connections`
-// Connections, `#/d/<slug>` Viewer; lihat `parseRoute` di files.ts), banner offline.
+// Kerangka aplikasi: title bar bertab, routing hash (`#/` Recents, `#/files`, `#/archive`, `#/settings` General,
+// `#/settings/connections` Connections, `#/d/<slug>` Viewer; lihat `parseRoute` di files.ts), banner offline.
 import { useEffect, useState, useSyncExternalStore } from 'react';
 import { connection } from './api';
 import { Dashboard } from './Dashboard';
@@ -8,8 +8,7 @@ import { Icon } from './icons';
 import { OfflineBanner } from './OfflineBanner';
 import { Viewer } from './Viewer';
 
-/** Hash halaman Settings → Connections. */
-export const CONNECTIONS_HASH = '#/settings/connections';
+export { CONNECTIONS_HASH } from './files';
 
 export const openDoc = (slug: string) => {
   location.hash = docHash(slug);
@@ -33,7 +32,7 @@ export function App() {
   }, []);
 
   useEffect(() => {
-    const titles: Record<Route['name'], string> = { recents: 'Lakar', files: 'Files · Lakar', archive: 'Archive · Lakar', connections: 'Connections · Lakar', viewer: 'Lakar' };
+    const titles: Record<Route['name'], string> = { recents: 'Lakar', files: 'Files · Lakar', archive: 'Archive · Lakar', settings: 'Settings · Lakar', connections: 'Connections · Lakar', viewer: 'Lakar' };
     document.title = route.name === 'viewer' ? `${route.slug} · Lakar` : titles[route.name];
   }, [route]);
 

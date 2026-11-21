@@ -35,7 +35,7 @@ export async function copyText(text: string): Promise<void> {
   if (!ok) throw new Error('clipboard tidak tersedia');
 }
 
-function CopyButton({ text, label = 'Copy' }: { text: string; label?: string }) {
+export function CopyButton({ text, label = 'Copy' }: { text: string; label?: string }) {
   const [copied, setCopied] = useState(false);
   const copy = async () => {
     try {

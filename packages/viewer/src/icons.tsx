@@ -7,6 +7,7 @@ const ICONS = {
   layoutGrid: [['rect', 3, 3, 7, 7, 1], ['rect', 14, 3, 7, 7, 1], ['rect', 14, 14, 7, 7, 1], ['rect', 3, 14, 7, 7, 1]],
   list: [['path', 'M3 12h.01M3 18h.01M3 6h.01M8 12h13M8 18h13M8 6h13']],
   search: [['circle', 11, 11, 8], ['path', 'm21 21-4.3-4.3']],
+  searchX: [['circle', 11, 11, 8], ['path', 'm13.5 8.5-5 5M8.5 8.5l5 5M21 21l-4.3-4.3']],
   file: [['path', 'M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z'], ['path', 'M14 2v4a2 2 0 0 0 2 2h4']],
   x: [['path', 'M18 6 6 18M6 6l12 12']],
   menu: [['path', 'M4 12h16M4 6h16M4 18h16']],

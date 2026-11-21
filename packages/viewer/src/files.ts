@@ -49,11 +49,26 @@ export const validSize = (v: number) => Number.isInteger(v) && v >= 1 && v <= SI
 
 // ---- Routing hash ----
 
-export type Route = { name: 'recents' } | { name: 'files' } | { name: 'archive' } | { name: 'connections' } | { name: 'viewer'; slug: string };
+export type Route =
+  | { name: 'recents' }
+  | { name: 'files' }
+  | { name: 'archive' }
+  | { name: 'settings' }
+  | { name: 'connections' }
+  | { name: 'viewer'; slug: string };
 
-/** `#/` Recents, `#/files`, `#/archive`, `#/settings/connections`, `#/d/<slug>` Viewer; selain itu Recents. */
+/** Hash halaman Settings → General. */
+export const SETTINGS_HASH = '#/settings';
+/** Hash Settings → Connections (App.tsx mengekspor ulang dari sini). */
+export const CONNECTIONS_HASH = '#/settings/connections';
+
+/**
+ * `#/` Recents, `#/files`, `#/archive`, `#/settings` (= `#/settings/general`) General, `#/settings/connections`,
+ * `#/d/<slug>` Viewer; selain itu Recents.
+ */
 export function parseRoute(hash: string): Route {
   if (/^#\/settings\/connections\/?$/.test(hash)) return { name: 'connections' };
+  if (/^#\/settings(\/general)?\/?$/.test(hash)) return { name: 'settings' };
   if (/^#\/files\/?$/.test(hash)) return { name: 'files' };
   if (/^#\/archive\/?$/.test(hash)) return { name: 'archive' };
   const m = /^#\/d\/([^/?#]+)/.exec(hash);
@@ -74,3 +89,22 @@ export const docLink = (port: number, slug: string) => `http://127.0.0.1:${port}
 
 /** Urut nama (halaman Files). */
 export const byName = <T extends { slug: string }>(docs: readonly T[]): T[] => [...docs].sort((a, b) => a.slug.localeCompare(b.slug));
+
+/** Hasil Search sidebar: file yang slug-nya memuat `query` (tanpa peka huruf besar), urutan daftar dipertahankan, ≤ `limit`. Query kosong → []. */
+export function searchDocs<T extends { slug: string }>(docs: readonly T[], query: string, limit = 8): T[] {
+  const q = query.trim().toLowerCase();
+  if (!q) return [];
+  const out: T[] = [];
+  for (const d of docs) {
+    if (!d.slug.toLowerCase().includes(q)) continue;
+    out.push(d);
+    if (out.length >= limit) break;
+  }
+  return out;
+}
+
+/** Indeks baris berikut (`dir` 1) / sebelumnya (-1) yang melingkar di daftar `n` baris; `n` 0 → 0. */
+export function wrapIndex(current: number, n: number, dir: 1 | -1): number {
+  if (n <= 0) return 0;
+  return (((current + dir) % n) + n) % n;
+}

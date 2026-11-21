@@ -47,3 +47,6 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-app-5-agent-presence.md`
   summary: Test komponen untuk `AgentLayer`/`AgentCursor`/`useGlide` dan tanda baris `LayerTree` (posisi, sembunyi saat pratinjau, reduced motion).
   evidence: viewer belum punya setup test DOM; regresi posisi kursor/outline atau guard `!preview` saat ini tidak tertangkap test mana pun.
+- source_spec: `_bmad-output/implementation-artifacts/spec-app-6-dashboard-search-settings.md`
+  summary: Layar awal aplikasi desktop (`apps/desktop/ui/index.html`) masih mengikuti `prefers-color-scheme`, tidak mengikuti pilihan tema Light/Dark di Settings → General.
+  evidence: pilihan tema disimpan di localStorage viewer (`lakar.viewer.theme`); layar awal desktop dimuat sebelum viewer dan tidak membacanya, sehingga warna awal bisa berlawanan.
