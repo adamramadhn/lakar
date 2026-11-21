@@ -18,7 +18,8 @@ use serde::Serialize;
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::webview::DownloadEvent;
-use tauri::{AppHandle, Manager, RunEvent, WebviewWindowBuilder, WindowEvent};
+use tauri::utils::config::{LogicalPosition, WindowConfig};
+use tauri::{AppHandle, Manager, RunEvent, TitleBarStyle, WebviewWindowBuilder, WindowEvent};
 
 /// Port default lakard (sama dengan DEFAULT_LAKARD_PORT @lakar/schema) agar config MCP stabil.
 const DEFAULT_PORT: u16 = 7466;
@@ -561,10 +562,26 @@ fn download_name(suggested: &Path) -> String {
         .unwrap_or_else(|| "export.png".to_string())
 }
 
+/// Posisi traffic lights macOS (tepi kiri-atas tombol, tinggi ±14px): tengah vertikal title bar viewer (44px).
+const TRAFFIC_LIGHTS: LogicalPosition = LogicalPosition { x: 16.0, y: 15.0 };
+
+/// Title bar kustom viewer (tab + tombol jendela sendiri): Windows/Linux tanpa dekorasi native; macOS memakai
+/// title bar Overlay tanpa judul sehingga traffic lights native tampil di atas strip tab.
+fn apply_chrome(config: &mut WindowConfig, macos: bool) {
+    if macos {
+        config.decorations = true;
+        config.title_bar_style = TitleBarStyle::Overlay;
+        config.hidden_title = true;
+        config.traffic_light_position = Some(TRAFFIC_LIGHTS);
+    } else {
+        config.decorations = false;
+    }
+}
+
 /// Jendela utama dari `tauri.conf.json` (`create: false`) dengan handler unduhan: Export PNG viewer disimpan ke
-/// folder Downloads OS, tanpa menimpa file yang sudah ada.
+/// folder Downloads OS, tanpa menimpa file yang sudah ada. Dekorasi jendela diatur `apply_chrome`.
 fn build_main_window(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
-    let config = app
+    let mut config = app
         .config()
         .app
         .windows
@@ -572,6 +589,7 @@ fn build_main_window(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> 
         .find(|w| w.label == "main")
         .cloned()
         .ok_or("konfigurasi jendela main tidak ada di tauri.conf.json")?;
+    apply_chrome(&mut config, cfg!(target_os = "macos"));
     WebviewWindowBuilder::from_config(app, &config)?
         .on_download(|webview, event| {
             if let DownloadEvent::Requested { destination, .. } = event {
@@ -635,6 +653,52 @@ mod tests {
         let taken = [dir.join("a@2x.png"), dir.join("a@2x (2).png")];
         assert_eq!(unique_path(dir, "a@2x.png", |p| taken.iter().any(|t| t == p)), dir.join("a@2x (3).png"));
         assert_eq!(unique_path(dir, "README", |p| p == dir.join("README")), dir.join("README (2)"));
+    }
+
+    #[test]
+    fn chrome_windows_linux_drops_native_decorations() {
+        let mut config = WindowConfig::default();
+        apply_chrome(&mut config, false);
+        assert!(!config.decorations);
+        assert_eq!(config.title_bar_style, TitleBarStyle::Visible);
+    }
+
+    #[test]
+    fn chrome_macos_overlays_traffic_lights() {
+        let mut config = WindowConfig::default();
+        apply_chrome(&mut config, true);
+        assert!(config.decorations);
+        assert_eq!(config.title_bar_style, TitleBarStyle::Overlay);
+        assert!(config.hidden_title);
+        assert_eq!(config.traffic_light_position, Some(TRAFFIC_LIGHTS));
+    }
+
+    /// Izin jendela yang dipakai title bar viewer (tombol + drag region); tidak lebih.
+    const WINDOW_PERMISSIONS: [&str; 6] = [
+        "core:window:allow-minimize",
+        "core:window:allow-toggle-maximize",
+        "core:window:allow-internal-toggle-maximize",
+        "core:window:allow-close",
+        "core:window:allow-start-dragging",
+        "core:window:allow-is-maximized",
+    ];
+
+    #[test]
+    fn viewer_capability_is_narrow_remote_loopback() {
+        let cap: serde_json::Value = serde_json::from_str(include_str!("../capabilities/viewer-window.json")).unwrap();
+        assert_eq!(cap["remote"]["urls"], json!(["http://127.0.0.1:*"]));
+        assert_eq!(cap["windows"], json!(["main"]));
+        assert_eq!(cap["permissions"], json!(WINDOW_PERMISSIONS));
+    }
+
+    #[test]
+    fn start_screen_capability_has_window_controls() {
+        let cap: serde_json::Value = serde_json::from_str(include_str!("../capabilities/default.json")).unwrap();
+        assert!(cap.get("remote").is_none());
+        let perms = cap["permissions"].as_array().unwrap();
+        for p in WINDOW_PERMISSIONS {
+            assert!(perms.contains(&json!(p)), "{p} tidak ada di default.json");
+        }
     }
 
     #[test]

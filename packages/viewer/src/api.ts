@@ -1,6 +1,6 @@
 // Klien lakard untuk viewer. Endpoint baca: /viewer/* (termasuk /viewer/connections), /status, dan endpoint sesi (open, screenshot,
 // inspect, layout-check) yang tidak mengubah dokumen. Endpoint tulis: kelola file (POST/DELETE /viewer/docs*; sesudahnya
-// cache dokumen/screenshot slug terkait dibuang dan pendengar `onDocsChanged` dipanggil), Restore, dan layer manual di bawah.
+// cache dokumen/screenshot slug terkait dibuang, lalu pendengar `onDocsChanged` dan `onFileEvent` dipanggil), Restore, dan layer manual di bawah.
 // History (aplikasi 3): versi lama dari snapshot (GET revs/:rev, POST revs/:rev/screenshot, di-cache per
 // `slug@rev`, isinya tidak pernah berubah) dan Restore (tulis, lewat antrean yang sama).
 // Layer manual (aplikasi 4): `execute` (POST /execute dari sesi viewer sendiri, kode dari codegen.ts), unggah
@@ -14,6 +14,8 @@ const CLIENT = 'lakar-viewer';
 
 /** Board awal New file (sama dengan `BoardChoice` di files.ts; tanpa impor relatif agar api.ts bisa dites di Node). */
 export type BoardChoice = { preset: 'desktop' | 'tablet' | 'mobile' } | { preset: 'custom'; width: number; height: number };
+/** Kelola file dari aplikasi yang memengaruhi tab title bar (dipancarkan setelah tulis sukses). */
+export type FileEvent = { type: 'rename'; from: string; to: string } | { type: 'archive'; slug: string } | { type: 'delete'; slug: string; archived: boolean };
 export type DocSummary = { slug: string; rev: number; updatedAt: string; boardCount: number; firstBoardId: string | null };
 /** Status pool render (`/status` → `pool`); `lastError` mis. "Chrome atau Edge tidak ditemukan …" di aplikasi desktop. */
 export type PoolStatus = { size: number; ready: number; browserVersion?: string; lastError?: string };
@@ -137,6 +139,8 @@ class ViewerClient {
   #revShots = new Map<string, Promise<Screenshot>>();
   /** Pendengar perubahan daftar file (kelola file dari aplikasi). */
   #changed = new Set<() => void>();
+  /** Pendengar rename/archive/delete dengan slug (tab title bar). */
+  #fileEvents = new Set<(e: FileEvent) => void>();
 
   status() {
     return request<DaemonStatus>('GET', '/status');
@@ -178,6 +182,14 @@ class ViewerClient {
     };
   }
 
+  /** Dipanggil setelah rename/archive/delete berhasil, dengan slug terkait (sesudah pendengar `onDocsChanged`). */
+  onFileEvent(l: (e: FileEvent) => void): () => void {
+    this.#fileEvents.add(l);
+    return () => {
+      this.#fileEvents.delete(l);
+    };
+  }
+
   /** Buang cache dokumen + screenshot untuk `slugs`, lalu beri tahu pendengar. */
   #invalidate(...slugs: string[]) {
     for (const slug of slugs) {
@@ -190,10 +202,14 @@ class ViewerClient {
   }
 
   /** Tulis lewat antrean sesi: tidak menyela open + permintaan dokumen yang sedang berjalan. */
-  #write<T>(fn: () => Promise<T>, slugs: (result: T) => string[]): Promise<T> {
+  #write<T>(fn: () => Promise<T>, slugs: (result: T) => string[], event?: (result: T) => FileEvent): Promise<T> {
     const run = async () => {
       const result = await fn();
       this.#invalidate(...slugs(result));
+      if (event) {
+        const e = event(result);
+        for (const l of this.#fileEvents) l(e);
+      }
       return result;
     };
     const next = this.#queue.then(run, run);
@@ -212,6 +228,7 @@ class ViewerClient {
     return this.#write(
       () => request<{ slug: string }>('POST', `/viewer/docs/${encodeURIComponent(slug)}/rename`, { name }),
       (r) => [slug, r.slug],
+      (r) => ({ type: 'rename', from: slug, to: r.slug }),
     );
   }
 
@@ -226,6 +243,7 @@ class ViewerClient {
     return this.#write(
       () => request<{ slug: string }>('POST', `/viewer/docs/${encodeURIComponent(slug)}/archive`),
       () => [slug],
+      () => ({ type: 'archive', slug }),
     );
   }
 
@@ -241,6 +259,7 @@ class ViewerClient {
     return this.#write(
       () => request<{ slug: string }>('DELETE', `/viewer/docs/${encodeURIComponent(slug)}${archived ? '?archived=true' : ''}`),
       () => [slug],
+      () => ({ type: 'delete', slug, archived }),
     );
   }
 

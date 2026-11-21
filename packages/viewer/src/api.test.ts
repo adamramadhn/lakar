@@ -178,6 +178,8 @@ describe('kelola file', () => {
     const api = await freshApi();
     const changed = vi.fn();
     api.onDocsChanged(changed);
+    const fileEvents = vi.fn();
+    api.onFileEvent(fileEvents);
     await expect(api.createFile('My Landing', { preset: 'custom', width: 10, height: 20 })).resolves.toEqual({ slug: 'my-landing', rev: 1 });
     await api.renameFile('a', 'B');
     await api.duplicateFile('a');
@@ -186,6 +188,12 @@ describe('kelola file', () => {
     await api.deleteFile('a', true);
     expect((await api.listArchive()).map((d) => d.slug)).toEqual(['z']);
     expect(changed).toHaveBeenCalledTimes(6);
+    // Hanya rename/archive/delete yang memengaruhi tab; slug rename dari respons daemon.
+    expect(fileEvents.mock.calls.map((c) => c[0])).toEqual([
+      { type: 'rename', from: 'a', to: 'b' },
+      { type: 'archive', slug: 'a' },
+      { type: 'delete', slug: 'a', archived: true },
+    ]);
     expect(calls.filter((c) => c.method !== 'GET' && c.path.startsWith('/viewer')).map((c) => `${c.method} ${c.path}`)).toEqual([
       'POST /viewer/docs',
       'POST /viewer/docs/a/rename',
@@ -211,6 +219,7 @@ describe('kelola file', () => {
     const api = await freshApi();
     const changed = vi.fn();
     api.onDocsChanged(changed);
+    api.onFileEvent(changed);
     await expect(api.renameFile('a', 'b')).rejects.toMatchObject({ code: 'CONFLICT', status: 409 });
     expect(changed).not.toHaveBeenCalled();
   });

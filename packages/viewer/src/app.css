@@ -62,12 +62,71 @@ code {
   height: 28px;
   color: var(--text-secondary);
 }
+/* macOS (desktop): traffic lights native di kiri (titleBarStyle Overlay). */
+.titlebar.mac {
+  padding-left: 78px;
+}
 .tabs {
   display: flex;
+  align-items: center;
   gap: 6px;
   min-width: 0;
+  flex: 0 1 auto;
+  /* Banyak tab: gulir horizontal tanpa scrollbar terlihat. */
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.tabs::-webkit-scrollbar {
+  display: none;
+}
+.tab-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  height: 100%;
+}
+.tab-new {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  color: var(--text-secondary);
+}
+.tab-new:hover {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+/* Area kosong title bar: drag region jendela desktop (data-tauri-drag-region). */
+.titlebar-spacer {
+  flex: 1 0 24px;
+  align-self: stretch;
+}
+.window-controls {
+  flex: none;
+  display: flex;
+  align-self: flex-start;
+  margin-right: -12px;
+}
+.window-btn {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 32px;
+  color: var(--text-secondary);
+}
+.window-btn:hover {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+.window-btn.close:hover {
+  background: var(--danger);
+  color: #ffffff;
 }
 .tab {
+  flex: none;
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -87,6 +146,7 @@ code {
 }
 .tab.doc {
   font-weight: 600;
+  padding-right: 6px;
 }
 .tab-label {
   overflow: hidden;

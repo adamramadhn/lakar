@@ -50,3 +50,9 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-app-6-dashboard-search-settings.md`
   summary: Layar awal aplikasi desktop (`apps/desktop/ui/index.html`) masih mengikuti `prefers-color-scheme`, tidak mengikuti pilihan tema Light/Dark di Settings → General.
   evidence: pilihan tema disimpan di localStorage viewer (`lakar.viewer.theme`); layar awal desktop dimuat sebelum viewer dan tidak membacanya, sehingga warna awal bisa berlawanan.
+- source_spec: `_bmad-output/implementation-artifacts/spec-app-7-titlebar-tabs.md`
+  summary: Belum terverifikasi bahwa halaman viewer remote (http://127.0.0.1:<port>/app/) mendapat `window.__TAURI__` + IPC lewat capability `viewer-window`; bila tidak, jendela tanpa dekorasi (Windows/Linux) tidak punya tombol jendela maupun drag region (keluar/tampil hanya lewat tray).
+  evidence: maybe-false, dampak tinggi bila benar. Diselesaikan dengan menjalankan build release di Windows/Linux: tombol minimize/maximize/close tampil dan bekerja, drag + dobel-klik spacer jalan.
+- source_spec: `_bmad-output/implementation-artifacts/spec-app-7-titlebar-tabs.md`
+  summary: Resize jendela tanpa dekorasi di Linux (tepi jendela) belum terverifikasi; tidak ada `start_resize_dragging`.
+  evidence: maybe-false; tao biasanya menangani resize jendela undecorated, perlu dicek di build release Linux.

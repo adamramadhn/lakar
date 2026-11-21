@@ -71,6 +71,7 @@ const ICONS = {
   rotateCcw: [['path', 'M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8'], ['path', 'M3 3v5h5']],
   gitCompare: [['circle', 18, 18, 3], ['circle', 6, 6, 3], ['path', 'M13 6h3a2 2 0 0 1 2 2v7'], ['path', 'M11 18H8a2 2 0 0 1-2-2V9']],
   arrowUpRight: [['path', 'M7 7h10v10M7 17 17 7']],
+  externalLink: [['path', 'M15 3h6v6M10 14 21 3'], ['path', 'M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6']],
   tablet: [['rect', 4, 2, 16, 20, 2], ['path', 'M12 18h.01']],
   smartphone: [['rect', 5, 2, 14, 20, 2], ['path', 'M12 18h.01']],
   layers: [
