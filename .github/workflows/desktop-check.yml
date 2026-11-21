@@ -1,0 +1,64 @@
+name: Desktop check
+
+# Cek ringan bahwa aplikasi Tauri (apps/desktop) terkompilasi. Hanya jalan bila kode desktop atau
+# workflow-nya berubah, agar PR lain tidak membayar kompilasi Rust. Installer lengkap: release.yml.
+on:
+  pull_request:
+    paths:
+      - 'apps/desktop/**'
+      - '.github/workflows/desktop-check.yml'
+      - '.github/workflows/release.yml'
+  workflow_dispatch:
+  # SEMENTARA (validasi sebelum PR): hapus sebelum merge.
+  push:
+    branches: ['claude/desktop-tauri-f5e05a']
+
+concurrency:
+  group: desktop-check-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  cargo-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: apps/desktop/src-tauri
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev libssl-dev
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/desktop/src-tauri -> target
+
+      # tauri-build memeriksa bahwa externalBin dan resource ada; sidecar asli dibuat release.yml.
+      - name: Placeholder sidecar
+        run: |
+          mkdir -p binaries resources/sidecar
+          touch binaries/lakar-node-x86_64-unknown-linux-gnu resources/sidecar/placeholder.txt
+
+      - name: Check prepare-sidecar script syntax
+        run: node --check ../scripts/prepare-sidecar.mjs
+
+      - name: cargo clippy
+        run: |
+          locked=""
+          if [ -f Cargo.lock ]; then locked="--locked"; fi
+          cargo clippy $locked --all-targets -- -D warnings
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Cargo.lock
+          path: apps/desktop/src-tauri/Cargo.lock

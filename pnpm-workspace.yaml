@@ -1,6 +1,7 @@
 packages:
   - 'packages/*'
   - 'bench'
+  - 'apps/desktop'
 
 engineStrict: true
 
