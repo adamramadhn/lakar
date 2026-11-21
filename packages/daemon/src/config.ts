@@ -113,7 +113,7 @@ function unsplashAppName(v: { name: string; raw: string } | undefined): string {
 
 /** `browser_channel`: kosong → undefined (headless-shell); selain `chrome`/`msedge`/`auto` → Error. */
 function browserChannel(v: { name: string; raw: string } | undefined): BrowserChannel | undefined {
-  if (!v) return undefined;
+  if (!v || v.raw === '') return undefined;
   if (!(BROWSER_CHANNELS as readonly string[]).includes(v.raw)) {
     throw new Error(`${v.name} tidak valid: ${JSON.stringify(v.raw)} (nilai valid: ${BROWSER_CHANNELS.join(', ')}; kosong = chromium-headless-shell Lakar)`);
   }

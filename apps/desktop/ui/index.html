@@ -151,8 +151,14 @@
 
       $('continue').addEventListener('click', () => target && location.replace(target));
       $('retry').addEventListener('click', async () => {
+        if (!invoke) return;
         show({ phase: 'starting', message: '', log: [], logFile: '' });
-        await invoke('restart_daemon');
+        try {
+          await invoke('restart_daemon');
+        } catch (e) {
+          show({ phase: 'failed', message: String(e), log: [], logFile: '' });
+          return;
+        }
         setTimeout(poll, 600);
       });
       poll();

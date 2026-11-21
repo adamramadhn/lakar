@@ -3,4 +3,4 @@ src-tauri/target/
 src-tauri/gen/
 src-tauri/binaries/
 src-tauri/resources/
-src-tauri/signing.json
+src-tauri/ci-config.json

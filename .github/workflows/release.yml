@@ -82,14 +82,17 @@ jobs:
       - name: Prepare sidecar (lakard + Node runtime)
         run: node apps/desktop/scripts/prepare-sidecar.mjs --target ${{ matrix.target }}
 
+      # Jalankan daemon + MCP hasil bundel persis seperti aplikasi (macOS x64 lewat Rosetta di runner arm64).
+      - name: Smoke-test sidecar
+        run: node apps/desktop/scripts/smoke-sidecar.mjs --target ${{ matrix.target }}
+
       - name: Set version from tag
         if: startsWith(github.ref, 'refs/tags/v')
         run: |
           version="${GITHUB_REF_NAME#v}"
           # MSI hanya menerima x.y.z numerik; tag pra-rilis memakai versi di tauri.conf.json.
           if [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "{\"version\":\"$version\"}" > apps/desktop/src-tauri/version.json
-            echo "TAURI_EXTRA_CONFIG=--config src-tauri/version.json" >> "$GITHUB_ENV"
+            echo "LAKAR_APP_VERSION=$version" >> "$GITHUB_ENV"
           fi
 
       - name: Enable macOS signing
@@ -102,8 +105,12 @@ jobs:
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
+          # Bentuk heredoc: aman untuk nilai multi-baris (mis. base64 .p12 yang dibungkus per 76 kolom).
           for v in APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD APPLE_SIGNING_IDENTITY APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID; do
-            if [ -n "${!v}" ]; then echo "$v=${!v}" >> "$GITHUB_ENV"; fi
+            if [ -n "${!v}" ]; then
+              delim="EOF_$(openssl rand -hex 8)"
+              { echo "$v<<$delim"; echo "${!v}"; echo "$delim"; } >> "$GITHUB_ENV"
+            fi
           done
 
       - name: Enable Windows signing
@@ -114,17 +121,31 @@ jobs:
           WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
         run: |
           $pfx = Join-Path $env:RUNNER_TEMP 'cert.pfx'
-          [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:WINDOWS_CERTIFICATE))
-          $pass = ConvertTo-SecureString -String $env:WINDOWS_CERTIFICATE_PASSWORD -Force -AsPlainText
+          [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String(($env:WINDOWS_CERTIFICATE -replace '\s', '')))
+          if ($env:WINDOWS_CERTIFICATE_PASSWORD) {
+            $pass = ConvertTo-SecureString -String $env:WINDOWS_CERTIFICATE_PASSWORD -Force -AsPlainText
+          } else {
+            $pass = New-Object System.Security.SecureString
+          }
           $cert = Import-PfxCertificate -FilePath $pfx -CertStoreLocation Cert:\CurrentUser\My -Password $pass
           Remove-Item $pfx
-          $json = @{ bundle = @{ windows = @{ certificateThumbprint = $cert.Thumbprint; digestAlgorithm = 'sha256'; timestampUrl = 'http://timestamp.digicert.com' } } } | ConvertTo-Json -Depth 5
-          Set-Content -Path apps/desktop/src-tauri/signing.json -Value $json -Encoding utf8
-          "TAURI_SIGNING_CONFIG=--config src-tauri/signing.json" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "LAKAR_WINDOWS_THUMBPRINT=$($cert.Thumbprint)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      # Satu file --config gabungan (versi dari tag + thumbprint signing Windows) agar tidak bergantung pada
+      # perilaku beberapa --config.
+      - name: Compose Tauri CI config
+        run: |
+          node -e '
+            const c = {};
+            if (process.env.LAKAR_APP_VERSION) c.version = process.env.LAKAR_APP_VERSION;
+            if (process.env.LAKAR_WINDOWS_THUMBPRINT) c.bundle = { windows: { certificateThumbprint: process.env.LAKAR_WINDOWS_THUMBPRINT, digestAlgorithm: "sha256", timestampUrl: "http://timestamp.digicert.com" } };
+            require("fs").writeFileSync("apps/desktop/src-tauri/ci-config.json", JSON.stringify(c, null, 2));
+            console.log(JSON.stringify(c));
+          '
 
       - name: Build installers
         working-directory: apps/desktop
-        run: pnpm tauri build --ci --target ${{ matrix.target }} --bundles ${{ matrix.bundles }} $TAURI_EXTRA_CONFIG $TAURI_SIGNING_CONFIG
+        run: pnpm tauri build --ci --target ${{ matrix.target }} --bundles ${{ matrix.bundles }} --config src-tauri/ci-config.json
 
       - name: Collect installers
         run: |
@@ -160,7 +181,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.ref_name }}
         run: |
-          ls -la installers
+          (cd installers && sha256sum * > SHA256SUMS.txt && cat SHA256SUMS.txt)
           prerelease=""
           if [[ "$TAG" == *-* ]]; then prerelease="--prerelease"; fi
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then

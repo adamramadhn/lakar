@@ -53,12 +53,7 @@ jobs:
         run: node --check ../scripts/prepare-sidecar.mjs
 
       - name: cargo clippy
-        run: |
-          locked=""
-          if [ -f Cargo.lock ]; then locked="--locked"; fi
-          cargo clippy $locked --all-targets -- -D warnings
+        run: cargo clippy --locked --all-targets -- -D warnings
 
-      - uses: actions/upload-artifact@v4
-        with:
-          name: Cargo.lock
-          path: apps/desktop/src-tauri/Cargo.lock
+      - name: cargo test
+        run: cargo test --locked

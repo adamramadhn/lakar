@@ -9,6 +9,7 @@ use std::io::{BufRead, BufReader, Read, Write};
 use std::net::{SocketAddr, TcpListener, TcpStream};
 use std::path::{Path, PathBuf};
 use std::process::{Child, ChildStdin, Command, Stdio};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
@@ -30,7 +31,7 @@ const DEFAULT_CONFIG: &str = "# Config lakard untuk Lakar desktop (TOML datar: k
 # Kunci yang berguna di sini: render_pages, render_timeout_ms, unsplash_key_file, unsplash_app_name.\n\
 # port, data_dir, browser_channel, viewer_dir, dan mcp_entry diatur aplikasi lewat env.\n";
 
-#[derive(Clone, Copy, Default, PartialEq, Serialize)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Serialize)]
 #[serde(rename_all = "kebab-case")]
 enum Phase {
     #[default]
@@ -55,6 +56,8 @@ struct Inner {
 #[derive(Default)]
 struct DaemonState {
     inner: Arc<Mutex<Inner>>,
+    /// Restart sedang berjalan: restart kedua (tray + Retry, klik ganda) diabaikan.
+    restarting: Arc<AtomicBool>,
 }
 
 #[derive(Serialize)]
@@ -75,6 +78,7 @@ struct Paths {
     data_dir: PathBuf,
     config_file: PathBuf,
     log_file: PathBuf,
+    port_file: PathBuf,
 }
 
 fn daemon_url(port: u16) -> String {
@@ -92,7 +96,8 @@ fn resolve_paths(app: &AppHandle) -> Result<Paths, String> {
     let data_root = path.app_local_data_dir().map_err(|e| format!("direktori data tidak diketahui: {e}"))?;
     let config_dir = path.app_config_dir().map_err(|e| format!("direktori config tidak diketahui: {e}"))?;
     let log_dir = path.app_log_dir().map_err(|e| format!("direktori log tidak diketahui: {e}"))?;
-    let data_dir = dunce::simplified(&data_root).join("data");
+    let state_dir = dunce::simplified(&data_root).to_path_buf();
+    let data_dir = state_dir.join("data");
     let config_dir = dunce::simplified(&config_dir).to_path_buf();
     let log_dir = dunce::simplified(&log_dir).to_path_buf();
     let config_file = config_dir.join("config.toml");
@@ -103,26 +108,93 @@ fn resolve_paths(app: &AppHandle) -> Result<Paths, String> {
     if !config_file.exists() {
         fs::write(&config_file, DEFAULT_CONFIG).map_err(|e| format!("gagal menulis {}: {e}", config_file.display()))?;
     }
+    let mcp_dir = sidecar.join("mcp");
+    let (node, mcp_main) = if needs_stable_runtime(&exe) {
+        let version = app.package_info().version.to_string();
+        stable_runtime(&node, &mcp_dir, &state_dir, &version)?
+    } else {
+        (node, mcp_dir.join("dist").join("main.js"))
+    };
     Ok(Paths {
         node,
         daemon_main: sidecar.join("daemon").join("dist").join("main.js"),
-        mcp_main: sidecar.join("mcp").join("dist").join("main.js"),
+        mcp_main,
         viewer_dir: sidecar.join("viewer"),
         data_dir,
         config_file,
         log_file,
+        port_file: state_dir.join("port"),
     })
 }
 
-/// 7466 bila bebas; kalau terpakai (mis. lakard lain), port bebas acak di loopback.
-fn pick_port() -> u16 {
-    if TcpListener::bind(("127.0.0.1", DEFAULT_PORT)).is_ok() {
+/// AppImage (mount `/tmp/.mount_*` baru setiap peluncuran) dan macOS App Translocation memberi path yang berubah
+/// setiap peluncuran, sehingga config MCP yang disalin harness rusak setelah aplikasi dibuka ulang.
+fn needs_stable_runtime(exe: &Path) -> bool {
+    std::env::var_os("APPIMAGE").is_some() || exe.to_string_lossy().contains("/AppTranslocation/")
+}
+
+fn copy_dir(src: &Path, dst: &Path) -> std::io::Result<()> {
+    fs::create_dir_all(dst)?;
+    for entry in fs::read_dir(src)? {
+        let entry = entry?;
+        let to = dst.join(entry.file_name());
+        if entry.file_type()?.is_dir() {
+            copy_dir(&entry.path(), &to)?;
+        } else {
+            fs::copy(entry.path(), &to)?;
+        }
+    }
+    Ok(())
+}
+
+/// Salin runtime Node + server MCP ke `<app-local-data>/runtime/<versi>` (sekali per versi) agar path di config
+/// MCP stabil. Daemon juga dijalankan dengan Node salinan ini, sehingga `process.execPath` ikut stabil.
+fn stable_runtime(node: &Path, mcp_dir: &Path, state_dir: &Path, version: &str) -> Result<(PathBuf, PathBuf), String> {
+    let root = state_dir.join("runtime");
+    let dir = root.join(version);
+    let node_name = node.file_name().ok_or("nama runtime Node tidak diketahui")?;
+    let stable_node = dir.join(node_name);
+    let stable_mcp = dir.join("mcp");
+    let complete = dir.join(".complete");
+    if !complete.exists() {
+        let fail = |e: std::io::Error| format!("gagal menyalin runtime ke {}: {e}", dir.display());
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).map_err(fail)?;
+        fs::copy(node, &stable_node).map_err(fail)?;
+        copy_dir(mcp_dir, &stable_mcp).map_err(fail)?;
+        fs::write(&complete, version).map_err(fail)?;
+    }
+    // Salinan versi lama tidak dipakai lagi.
+    if let Ok(entries) = fs::read_dir(&root) {
+        for entry in entries.flatten() {
+            if entry.file_name().to_string_lossy() != version {
+                let _ = fs::remove_dir_all(entry.path());
+            }
+        }
+    }
+    Ok((stable_node, stable_mcp.join("dist").join("main.js")))
+}
+
+fn port_free(port: u16) -> bool {
+    TcpListener::bind(("127.0.0.1", port)).is_ok()
+}
+
+/// 7466 bila bebas. Kalau terpakai (mis. lakard lain): port cadangan yang dipakai terakhir kali (disimpan di
+/// `port_file`, agar config MCP yang sudah disalin tetap berlaku), atau port bebas baru.
+fn pick_port(port_file: &Path) -> u16 {
+    if port_free(DEFAULT_PORT) {
         return DEFAULT_PORT;
     }
-    TcpListener::bind(("127.0.0.1", 0))
+    let saved = fs::read_to_string(port_file).ok().and_then(|s| s.trim().parse::<u16>().ok());
+    if let Some(port) = saved.filter(|p| *p != 0 && *p != DEFAULT_PORT && port_free(*p)) {
+        return port;
+    }
+    let port = TcpListener::bind(("127.0.0.1", 0))
         .and_then(|l| l.local_addr())
         .map(|a| a.port())
-        .unwrap_or(DEFAULT_PORT)
+        .unwrap_or(DEFAULT_PORT);
+    let _ = fs::write(port_file, port.to_string());
+    port
 }
 
 /// GET JSON minimal ke lakard di loopback (tanpa dependensi HTTP tambahan).
@@ -211,7 +283,7 @@ fn start_daemon(app: &AppHandle) {
         Ok(p) => p,
         Err(e) => return set_phase(&inner, generation, Phase::Failed, e),
     };
-    let port = pick_port();
+    let port = pick_port(&paths.port_file);
     let mut cmd = Command::new(&paths.node);
     cmd.arg(&paths.daemon_main)
         .env("LAKAR_PORT", port.to_string())
@@ -253,23 +325,47 @@ fn start_daemon(app: &AppHandle) {
         g.child = Some(child);
         g.port = port;
     }
-    thread::spawn(move || watch_startup(inner, generation, port));
+    let app = app.clone();
+    thread::spawn(move || watch_startup(app, inner, generation, port));
 }
 
-/// Tunggu /status menjawab, lalu tunggu pool render siap atau melapor browser tidak ada.
-fn watch_startup(inner: Arc<Mutex<Inner>>, generation: u64, port: u16) {
+/// Keputusan fase dari `pool` di /status: siap, browser tidak ada, atau (habis waktu / tanpa pool) buka viewer
+/// dengan pesan; `None` = masih hangat, tunggu lagi.
+fn classify_pool(pool: &serde_json::Value, timed_out: bool) -> Option<(Phase, String)> {
+    let ready = pool["ready"].as_u64().unwrap_or(0);
+    let size = pool["size"].as_u64().unwrap_or(0);
+    let last_error = pool["lastError"].as_str().unwrap_or("").to_string();
+    if size > 0 && ready == size {
+        return Some((Phase::Ready, String::new()));
+    }
+    if last_error.contains(NO_BROWSER_MARKER) {
+        return Some((Phase::NoBrowser, last_error));
+    }
+    if pool.is_null() || timed_out {
+        // Viewer tetap bisa dipakai; masalah render terlihat di halaman Connections.
+        return Some((Phase::Ready, last_error));
+    }
+    None
+}
+
+/// Status proses generasi ini: `Err` = generasi usang (berhenti mengawasi), `Ok(Some)` = proses sudah keluar.
+fn child_exit(inner: &Arc<Mutex<Inner>>, generation: u64) -> Result<Option<String>, ()> {
+    let mut g = inner.lock().unwrap();
+    if g.generation != generation {
+        return Err(());
+    }
+    Ok(g.child.as_mut().and_then(|c| c.try_wait().ok().flatten()).map(|code| code.to_string()))
+}
+
+/// Tunggu /status menjawab, lalu tunggu pool render siap atau melapor browser tidak ada; setelah itu awasi proses.
+fn watch_startup(app: AppHandle, inner: Arc<Mutex<Inner>>, generation: u64, port: u16) {
     let deadline = Instant::now() + START_TIMEOUT;
     let mut status = loop {
         thread::sleep(Duration::from_millis(300));
-        let exited = {
-            let mut g = inner.lock().unwrap();
-            if g.generation != generation {
-                return;
-            }
-            g.child.as_mut().and_then(|c| c.try_wait().ok().flatten())
-        };
-        if let Some(code) = exited {
-            return set_phase(&inner, generation, Phase::Failed, format!("lakard berhenti saat start ({code})"));
+        match child_exit(&inner, generation) {
+            Err(()) => return,
+            Ok(Some(code)) => return set_phase(&inner, generation, Phase::Failed, format!("lakard berhenti saat start ({code})")),
+            Ok(None) => {}
         }
         if let Some(json) = http_get_json(port, "/status") {
             if json["ok"] == true {
@@ -282,26 +378,39 @@ fn watch_startup(inner: Arc<Mutex<Inner>>, generation: u64, port: u16) {
     };
     let deadline = Instant::now() + POOL_TIMEOUT;
     loop {
-        let pool = &status["data"]["pool"];
-        let ready = pool["ready"].as_u64().unwrap_or(0);
-        let size = pool["size"].as_u64().unwrap_or(0);
-        let last_error = pool["lastError"].as_str().unwrap_or("").to_string();
-        if size > 0 && ready == size {
-            return set_phase(&inner, generation, Phase::Ready, String::new());
-        }
-        if last_error.contains(NO_BROWSER_MARKER) {
-            return set_phase(&inner, generation, Phase::NoBrowser, last_error);
-        }
-        if pool.is_null() || Instant::now() > deadline {
-            // Viewer tetap bisa dipakai; masalah render terlihat di halaman Connections.
-            return set_phase(&inner, generation, Phase::Ready, last_error);
+        if let Some((phase, message)) = classify_pool(&status["data"]["pool"], Instant::now() > deadline) {
+            set_phase(&inner, generation, phase, message);
+            break;
         }
         thread::sleep(Duration::from_millis(500));
-        if inner.lock().unwrap().generation != generation {
-            return;
+        match child_exit(&inner, generation) {
+            Err(()) => return,
+            Ok(Some(code)) => return set_phase(&inner, generation, Phase::Failed, format!("lakard berhenti saat start ({code})")),
+            Ok(None) => {}
         }
         if let Some(json) = http_get_json(port, "/status") {
             status = json;
+        }
+    }
+    supervise(&app, &inner, generation);
+}
+
+/// Setelah siap: bila lakard berhenti tiba-tiba, tampilkan layar mulai dengan pesan gagal (tombol Restart).
+fn supervise(app: &AppHandle, inner: &Arc<Mutex<Inner>>, generation: u64) {
+    loop {
+        thread::sleep(Duration::from_secs(1));
+        match child_exit(inner, generation) {
+            Err(()) => return,
+            Ok(None) => {}
+            Ok(Some(code)) => {
+                set_phase(inner, generation, Phase::Failed, format!("lakard berhenti tiba-tiba ({code})"));
+                if let Some(win) = app.get_webview_window("main") {
+                    if let Ok(url) = tauri::Url::parse(splash_url()) {
+                        let _ = win.navigate(url);
+                    }
+                }
+                return;
+            }
         }
     }
 }
@@ -337,17 +446,22 @@ fn splash_url() -> &'static str {
 }
 
 fn restart_daemon_bg(app: &AppHandle) {
+    let state = app.state::<DaemonState>();
+    if state.restarting.swap(true, Ordering::SeqCst) {
+        return;
+    }
     {
         // Layar mulai langsung melihat "starting", bukan fase gagal yang lama.
-        let state = app.state::<DaemonState>();
         let mut g = state.inner.lock().unwrap();
         g.phase = Phase::Starting;
         g.message.clear();
     }
+    let restarting = state.restarting.clone();
     let app = app.clone();
     thread::spawn(move || {
         stop_daemon(&app);
         start_daemon(&app);
+        restarting.store(false, Ordering::SeqCst);
         // Layar mulai menunggu daemon siap lalu membuka viewer lagi (port bisa berubah).
         if let Some(win) = app.get_webview_window("main") {
             if let Ok(url) = tauri::Url::parse(splash_url()) {
@@ -447,4 +561,56 @@ fn main() {
         RunEvent::Reopen { .. } => show_main(app),
         _ => {}
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn dechunk_joins_chunks() {
+        assert_eq!(dechunk("5\r\nhello\r\n6\r\n world\r\n0\r\n\r\n").as_deref(), Some("hello world"));
+    }
+
+    #[test]
+    fn dechunk_rejects_truncated_body() {
+        assert_eq!(dechunk("a\r\nshort"), None);
+    }
+
+    #[test]
+    fn pool_ready_when_all_pages_ready() {
+        assert_eq!(classify_pool(&json!({"size": 2, "ready": 2}), false), Some((Phase::Ready, String::new())));
+    }
+
+    #[test]
+    fn pool_no_browser_from_marker() {
+        let pool = json!({"size": 2, "ready": 0, "lastError": format!("{NO_BROWSER_MARKER} (dicoba: Google Chrome, Microsoft Edge)")});
+        assert_eq!(classify_pool(&pool, false).map(|(phase, _)| phase), Some(Phase::NoBrowser));
+    }
+
+    #[test]
+    fn pool_warming_keeps_waiting() {
+        assert_eq!(classify_pool(&json!({"size": 2, "ready": 1}), false), None);
+    }
+
+    #[test]
+    fn pool_timeout_or_missing_opens_viewer() {
+        let pool = json!({"size": 2, "ready": 0, "lastError": "render Chromium gagal: x"});
+        assert_eq!(classify_pool(&pool, true), Some((Phase::Ready, "render Chromium gagal: x".to_string())));
+        assert_eq!(classify_pool(&serde_json::Value::Null, false), Some((Phase::Ready, String::new())));
+    }
+
+    #[test]
+    fn pick_port_reuses_saved_fallback_port() {
+        let dir = std::env::temp_dir().join(format!("lakar-port-test-{}", std::process::id()));
+        fs::create_dir_all(&dir).unwrap();
+        let file = dir.join("port");
+        // Tahan 7466 bila bebas agar jalur cadangan teruji (bila sudah dipakai proses lain, hasilnya sama).
+        let _hold = TcpListener::bind(("127.0.0.1", DEFAULT_PORT)).ok();
+        let first = pick_port(&file);
+        assert_ne!(first, DEFAULT_PORT);
+        assert_eq!(pick_port(&file), first);
+        let _ = fs::remove_dir_all(&dir);
+    }
 }

@@ -3,85 +3,36 @@
 // identitas harness). Data dari `GET /viewer/connections` (URL lakard sebenarnya) dan `GET /status` (pool render).
 import { useCallback, useEffect, useState } from 'react';
 import { api, errorText, type Connections as ConnectionsInfo, type DaemonStatus, type McpServerConfig } from './api';
+import { HARNESSES, MCP_TOOLS, nonDefaultPort } from './harnesses';
 import { useRetry } from './hooks';
 import { Icon } from './icons';
 
-/** Tool MCP `lakar` (packages/mcp/src/server.ts). */
-export const MCP_TOOLS = [
-  'status',
-  'read_skill',
-  'open_doc',
-  'list_boards',
-  'execute',
-  'inspect',
-  'layout_check',
-  'screenshot',
-  'export',
-  'icon_search',
-  'photo_search',
-] as const;
-
-type Harness = { id: string; label: string; file: string; snippet: (mcp: McpServerConfig) => string };
-
-/** String TOML (basic string, escape setara JSON untuk path Windows). */
-const toml = (s: string) => JSON.stringify(s);
-
-export const HARNESSES: Harness[] = [
-  {
-    id: 'claude-code',
-    label: 'Claude Code',
-    file: '.mcp.json',
-    snippet: (m) => JSON.stringify({ mcpServers: { lakar: { command: m.command, args: m.args, env: m.env } } }, null, 2),
-  },
-  {
-    id: 'codex',
-    label: 'Codex',
-    file: '~/.codex/config.toml',
-    snippet: (m) =>
-      [
-        '[mcp_servers.lakar]',
-        `command = ${toml(m.command)}`,
-        `args = [${m.args.map(toml).join(', ')}]`,
-        `env = { LAKAR_URL = ${toml(m.env.LAKAR_URL)} }`,
-      ].join('\n'),
-  },
-  {
-    id: 'gemini',
-    label: 'Gemini CLI',
-    file: '~/.gemini/settings.json',
-    snippet: (m) => JSON.stringify({ mcpServers: { lakar: { command: m.command, args: m.args, env: m.env } } }, null, 2),
-  },
-  {
-    id: 'acp',
-    label: 'Other ACP',
-    file: 'mcpServers (ACP session/new)',
-    snippet: (m) => JSON.stringify([{ name: 'lakar', command: m.command, args: m.args, env: [{ name: 'LAKAR_URL', value: m.env.LAKAR_URL }] }], null, 2),
-  },
-];
+/** Status lakard untuk kartu: `undefined` = belum ada jawaban, `null` = permintaan gagal. */
+type StatusState = DaemonStatus | null | undefined;
 
 /**
- * Salin teks. Clipboard API dulu; webview aplikasi desktop (WKWebView, WebKitGTK) bisa menolaknya, jadi
- * jatuh ke textarea + `execCommand('copy')`. Melempar bila keduanya gagal.
+ * Salin teks: Clipboard API bila ada, selain itu textarea + `execCommand('copy')` (webview tanpa Clipboard API).
+ * Gagal → melempar.
  */
 export async function copyText(text: string): Promise<void> {
-  try {
-    await navigator.clipboard.writeText(text);
-    return;
-  } catch {
-    // lanjut ke fallback
+  if (navigator.clipboard?.writeText) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return;
+    } catch {
+      // jatuh ke cara lama di bawah
+    }
   }
-  const area = document.createElement('textarea');
-  area.value = text;
-  area.setAttribute('readonly', '');
-  area.style.position = 'fixed';
-  area.style.opacity = '0';
-  document.body.appendChild(area);
-  area.select();
-  try {
-    if (!document.execCommand('copy')) throw new Error('copy ditolak');
-  } finally {
-    area.remove();
-  }
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.setAttribute('readonly', '');
+  ta.style.position = 'fixed';
+  ta.style.opacity = '0';
+  document.body.appendChild(ta);
+  ta.select();
+  const ok = document.execCommand('copy');
+  ta.remove();
+  if (!ok) throw new Error('clipboard tidak tersedia');
 }
 
 function CopyButton({ text, label = 'Copy' }: { text: string; label?: string }) {
@@ -103,7 +54,7 @@ function CopyButton({ text, label = 'Copy' }: { text: string; label?: string }) 
   );
 }
 
-function DaemonCard({ info, status }: { info: ConnectionsInfo | undefined; status: DaemonStatus | undefined }) {
+function DaemonCard({ info, status }: { info: ConnectionsInfo | undefined; status: StatusState }) {
   const pool = status?.pool;
   const renderError = pool && pool.ready < pool.size ? pool.lastError : undefined;
   return (
@@ -115,7 +66,13 @@ function DaemonCard({ info, status }: { info: ConnectionsInfo | undefined; statu
         <div className="conn-daemon-text">
           <div className="conn-daemon-title">
             <strong>lakard</strong>
-            {status ? <span className="status-pill ok">Running</span> : <span className="status-pill">Checking…</span>}
+            {status ? (
+              <span className="status-pill ok">Running</span>
+            ) : status === null ? (
+              <span className="status-pill error">Unreachable</span>
+            ) : (
+              <span className="status-pill">Checking…</span>
+            )}
           </div>
           <span className="conn-daemon-sub mono">
             {info?.url ?? location.origin} · local only{status ? ` · v${status.version}` : ''}
@@ -139,10 +96,11 @@ function DaemonCard({ info, status }: { info: ConnectionsInfo | undefined; statu
   );
 }
 
-function AddAgent({ mcp }: { mcp: McpServerConfig | null }) {
+function AddAgent({ mcp, url }: { mcp: McpServerConfig | null; url: string }) {
   const [tab, setTab] = useState(HARNESSES[0]!.id);
   const harness = HARNESSES.find((h) => h.id === tab) ?? HARNESSES[0]!;
   const snippet = mcp ? harness.snippet(mcp) : '';
+  const port = nonDefaultPort(url);
   return (
     <div className="conn-card conn-code-card">
       <div className="conn-tabs" role="tablist" aria-label="Harness">
@@ -161,6 +119,12 @@ function AddAgent({ mcp }: { mcp: McpServerConfig | null }) {
           <pre className="conn-code" role="tabpanel">
             <code>{snippet}</code>
           </pre>
+          {port !== null && (
+            <p className="conn-note">
+              <Icon name="info" size={13} />
+              lakard is on port {port}, not the default 7466. This config points there; copy it again if the port changes.
+            </p>
+          )}
         </>
       ) : (
         <div className="conn-render error" role="alert">
@@ -174,23 +138,33 @@ function AddAgent({ mcp }: { mcp: McpServerConfig | null }) {
 
 export function Connections() {
   const [info, setInfo] = useState<ConnectionsInfo | undefined>(undefined);
-  const [status, setStatus] = useState<DaemonStatus | undefined>(undefined);
+  const [status, setStatus] = useState<StatusState>(undefined);
   const [error, setError] = useState<string | undefined>(undefined);
 
   const load = useCallback(() => {
     setError(undefined);
     api.connections().then(setInfo, (e) => setError(errorText(e)));
-    api.status().then(setStatus, () => setStatus(undefined));
+    api.status().then(setStatus, () => setStatus(null));
   }, []);
   useEffect(load, [load]);
   useRetry(load);
-  // Pool render bisa masih memanaskan diri: muat ulang status sampai siap atau gagal.
+  // Pool render bisa masih memanaskan diri, atau lakard belum terjangkau: muat ulang status sampai siap atau gagal.
+  // Permintaan gagal → `null` (Unreachable) dan tetap dijadwalkan ulang (status berubah → efek ini jalan lagi).
+  const [attempt, setAttempt] = useState(0);
   useEffect(() => {
     const pool = status?.pool;
-    if (!pool || pool.ready === pool.size || pool.lastError) return;
-    const t = setTimeout(() => api.status().then(setStatus, () => {}), 1500);
+    if (status && (!pool || pool.ready === pool.size || pool.lastError)) return;
+    if (status === undefined) return; // muat pertama masih berjalan
+    const t = setTimeout(
+      () =>
+        api.status().then(setStatus, () => {
+          setStatus(null);
+          setAttempt((a) => a + 1);
+        }),
+      1500,
+    );
     return () => clearTimeout(t);
-  }, [status]);
+  }, [status, attempt]);
 
   return (
     <div className="connections">
@@ -213,7 +187,7 @@ export function Connections() {
             <div className="skeleton line short" />
           </div>
         ) : (
-          <AddAgent mcp={info.mcp} />
+          <AddAgent mcp={info.mcp} url={info.url} />
         )}
       </section>
 

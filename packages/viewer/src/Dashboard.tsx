@@ -4,7 +4,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { api, errorText, OfflineError, type DaemonStatus, type DocSummary } from './api';
 import { CONNECTIONS_HASH, openDoc } from './App';
-import { Connections, HARNESSES, copyText } from './Connections';
+import { Connections, copyText } from './Connections';
+import { HARNESSES } from './harnesses';
 import { relativeTime } from './format';
 import { useRetry, useSeen } from './hooks';
 import { Icon } from './icons';

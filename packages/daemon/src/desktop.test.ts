@@ -1,8 +1,9 @@
 // Opsi daemon untuk aplikasi desktop (sidecar): browser_channel, viewer_dir, mcp_entry, GET /viewer/connections,
-// LAKAR_EXIT_ON_STDIN_CLOSE. Tanpa Chromium kecuali tes channel nyata (dilewati bila Chrome/Edge tidak terpasang).
+// LAKAR_EXIT_ON_STDIN_CLOSE. Peluncuran browser memakai launcher palsu, kecuali tes alur startDaemon → channel yang
+// memakai Chrome sistem bila ada (lulus juga tanpa Chrome: harus pesan "Chrome atau Edge tidak ditemukan").
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { spawn } from 'node:child_process';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -16,6 +17,7 @@ import {
   launchSystemBrowser,
   loadConfig,
   resolveMcpEntry,
+  startDaemon,
 } from './index.js';
 
 const baseConfig = { ...loadConfig({}), unsplashKeyFile: '/nonexistent/lakar-test/unsplash-access-key', pexelsKeyFile: '/nonexistent/lakar-test/pexels-api-key' };
@@ -54,6 +56,8 @@ describe('config desktop', () => {
     await writeFile(file, 'browser_channel = "msedge"\nviewer_dir = "/v"\nmcp_entry = "/m.js"\n');
     expect(loadConfig({ LAKAR_CONFIG: file })).toMatchObject({ browserChannel: 'msedge', viewerDir: '/v', mcpEntry: '/m.js' });
     expect(loadConfig({ LAKAR_CONFIG: file, LAKAR_BROWSER_CHANNEL: 'chrome' }).browserChannel).toBe('chrome');
+    await writeFile(file, 'browser_channel = ""\n');
+    expect(loadConfig({ LAKAR_CONFIG: file }).browserChannel).toBeUndefined();
     await writeFile(file, 'browser_channel = "safari"\n');
     expect(() => loadConfig({ LAKAR_CONFIG: file })).toThrow(/browser_channel tidak valid/);
   });
@@ -120,6 +124,30 @@ describe('browser sistem', () => {
     await pool.warm();
     expect(pool.status()).toMatchObject({ ready: 0, lastError: `${BROWSER_NOT_FOUND} (dicoba: Google Chrome)` });
     await pool.close();
+  });
+});
+
+describe('alur channel: config → startDaemon → ChromiumRenderer → browser sistem', () => {
+  it('browserChannel chrome: pool siap (Chrome ada) ATAU lastError diawali BROWSER_NOT_FOUND; bukan jalur headless-shell', async () => {
+    const dataDir = join(root, 'flow-data');
+    const browsersPath = join(root, 'flow-empty-browsers');
+    await mkdir(browsersPath, { recursive: true });
+    const d = await startDaemon({ ...baseConfig, port: 0, dataDir, browsersPath, renderPages: 2, renderTimeoutMs: 20_000, browserChannel: 'chrome' });
+    try {
+      await d.warmed;
+      const st = d.renderer.status();
+      if (st.ready !== st.size) expect(st.lastError?.startsWith(BROWSER_NOT_FOUND), st.lastError).toBe(true);
+      expect(st.lastError ?? '').not.toContain('browser gagal dijalankan');
+    } finally {
+      await d.close();
+    }
+  }, 60_000);
+});
+
+describe('host desktop (Rust)', () => {
+  it('NO_BROWSER_MARKER di apps/desktop/src-tauri/src/main.rs sama dengan BROWSER_NOT_FOUND', async () => {
+    const mainRs = await readFile(fileURLToPath(new URL('../../../apps/desktop/src-tauri/src/main.rs', import.meta.url)), 'utf8');
+    expect(mainRs).toContain(`NO_BROWSER_MARKER: &str = "${BROWSER_NOT_FOUND}"`);
   });
 });
 

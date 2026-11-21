@@ -1241,6 +1241,10 @@ button.panel-tab:hover {
   color: var(--success);
   border-color: currentColor;
 }
+.status-pill.error {
+  color: var(--danger);
+  border-color: currentColor;
+}
 .status-pill.ok::before {
   content: '';
   width: 6px;
@@ -1335,6 +1339,15 @@ button.panel-tab:hover {
   font-size: 12px;
   line-height: 1.55;
   color: var(--text-primary);
+}
+.conn-note {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: 0 16px 14px;
+  color: var(--text-secondary);
+  font-size: 12px;
 }
 .conn-tools {
   display: flex;
