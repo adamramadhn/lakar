@@ -115,16 +115,23 @@ export function IconPicker({ onPick, onClose }: { onPick: (icon: { lib: string; 
 /** Isi toast: kesalahan, info (mis. "Deleted …" dengan Undo), atau proses berjalan (tanpa tutup otomatis). */
 export type ToastState = { message: string; kind: 'error' | 'info' | 'busy'; action?: { label: string; run: () => void } };
 
-/** Toast di bawah kanvas; error/info hilang sendiri setelah 6 detik, `busy` bertahan sampai diganti. */
+/** Lama toast tampil: 6 detik, atau 12 detik bila punya aksi (Undo) supaya sempat diklik. */
+export const toastDuration = (toast: ToastState): number => (toast.action ? 12000 : 6000);
+
+/**
+ * Toast di bawah kanvas. error/info hilang sendiri (lihat `toastDuration`); hitungan berhenti selama kursor di atas
+ * toast. `busy` bertahan sampai diganti.
+ */
 export function Toast({ toast, onClose }: { toast: ToastState; onClose: () => void }) {
   const { message, kind, action } = toast;
+  const [hover, setHover] = useState(false);
   useEffect(() => {
-    if (kind === 'busy') return;
-    const t = setTimeout(onClose, 6000);
+    if (kind === 'busy' || hover) return;
+    const t = setTimeout(onClose, toastDuration(toast));
     return () => clearTimeout(t);
-  }, [toast, kind, onClose]);
+  }, [toast, kind, hover, onClose]);
   return (
-    <div className={`toast ${kind}`} role={kind === 'error' ? 'alert' : 'status'}>
+    <div className={`toast ${kind}`} role={kind === 'error' ? 'alert' : 'status'} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}>
       {kind === 'busy' ? <div className="spinner small" /> : <Icon name={kind === 'error' ? 'alert' : 'circleCheck'} size={15} />}
       <span className="toast-text">{message}</span>
       {action && (
