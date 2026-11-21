@@ -31,7 +31,10 @@ export type OpKind = 'add' | 'update' | 'replace' | 'move' | 'duplicate' | 'remo
 export type CommitResult = { doc: Doc; entry: HistoryEntry | null; created: CreatedEntry[] };
 
 export interface Transaction {
-  /** Tambah node. `parentId` null = halaman pertama (khusus board). Mengembalikan ID baru secara sinkron. */
+  /**
+   * Tambah node. `parentId` null = halaman pertama (khusus board); `parentId` = ID halaman → board ke halaman
+   * itu (dipakai viewer untuk halaman aktif). Mengembalikan ID baru secara sinkron.
+   */
   add(parentId: string | null, node: unknown): string;
   /** Merge dangkal properti; `null` menghapus kunci opsional. Tidak boleh mengubah `type`/`id`/`children`. */
   update(id: string, patch: unknown): void;
@@ -202,7 +205,15 @@ export function beginTransaction(doc: Doc, opts: TransactionOptions): Transactio
         // Parent dicari tanpa throw dulu (normalisasi x/y); urutan error lama tetap (skema → parent).
         const input = parseInput('add', implicitAbsolute(pid === null ? null : locate(w, pid)?.node, raw));
         let target: Container | null = null;
-        if (pid === null) {
+        // ID halaman (viewer: board baru di halaman aktif); halaman bukan node, jadi dicari terpisah.
+        const page = pid === null ? w.pages[0]! : w.pages.find((p) => p.id === pid);
+        if (page && pid !== null) {
+          if (input.type !== 'board') {
+            throw new LakarError('SCHEMA_INVALID', `add(pageId, …) hanya untuk board, bukan ${input.type}`, {
+              hint: 'anak halaman hanya board; tambahkan node anak ke dalam board: add(boardId, {...})',
+            });
+          }
+        } else if (pid === null) {
           if (input.type !== 'board') {
             throw new LakarError('SCHEMA_INVALID', `add(null, …) hanya untuk board, bukan ${input.type}`, {
               hint: 'anak halaman hanya board; tambahkan node anak (frame, text, rect, ellipse, path, icon) ke dalam board: add(boardId, {...})',
@@ -222,7 +233,7 @@ export function beginTransaction(doc: Doc, opts: TransactionOptions): Transactio
         }
         const id = ids.next();
         const node = buildNode(input, id, undefined);
-        if (target === null) w.pages[0]!.children.push(node as BoardNode);
+        if (target === null) page!.children.push(node as BoardNode);
         else target.children.push(node as ChildNode);
         createdIds.push(id);
         return id;

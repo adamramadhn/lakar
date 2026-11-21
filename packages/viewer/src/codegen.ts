@@ -86,14 +86,60 @@ export function insertIntoBoard(kind: InsertKind, board: { id: string; name: str
 const boardNode = (x: string, y: string) =>
   `{type: 'board', name: 'Frame', x: ${x}, y: ${y}, width: ${NEW_BOARD.width}, height: ${NEW_BOARD.height}, screen: 'app', fills: [{type: 'solid', color: '#FFFFFF'}]}`;
 
-/** Board baru 400×300 di (x, y) koordinat halaman (tool Frame di area kosong). */
-export function insertBoardAt(x: number, y: number): { code: string; description: string } {
-  return { code: `add(null, ${boardNode(String(r(x)), String(r(y)))});`, description: 'Add new frame board to page' };
+/** Jarak board baru tanpa klik dari board terakhir halaman. */
+export const BOARD_GAP = 80;
+
+/** Posisi board baru tanpa klik: kanan board terakhir halaman + 80 (y sama), atau (0, 0) bila halaman kosong. */
+export function nextBoardPosition(boards: readonly { x: number; y: number; width: number }[]): { x: number; y: number } {
+  const last = boards.at(-1);
+  return last ? { x: last.x + last.width + BOARD_GAP, y: last.y } : { x: 0, y: 0 };
 }
 
-/** Board baru 400×300 di posisi bebas `place` (menu "+" tanpa board). */
-export function insertBoardPlaced(): { code: string; description: string } {
-  return { code: `const p = place(${NEW_BOARD.width}, ${NEW_BOARD.height});\nadd(null, ${boardNode('p.x', 'p.y')});`, description: 'Add new frame board to page' };
+/**
+ * Board baru 400×300 di (x, y) koordinat halaman (tool Frame di area kosong). `pageId` = halaman aktif
+ * (`add(pageId, …)`); tanpa itu halaman pertama (`add(null, …)`).
+ */
+export function insertBoardAt(x: number, y: number, pageId?: string): { code: string; description: string } {
+  return { code: `add(${pageId ? JSON.stringify(pageId) : 'null'}, ${boardNode(String(r(x)), String(r(y)))});`, description: 'Add new frame board to page' };
+}
+
+/** Board baru 400×300 tanpa klik (menu "+" tanpa board) di halaman `pageId`: posisi dari `nextBoardPosition`. */
+export function insertBoardPlaced(pageId: string, boards: readonly { x: number; y: number; width: number }[]): { code: string; description: string } {
+  const p = nextBoardPosition(boards);
+  return insertBoardAt(p.x, p.y, pageId);
+}
+
+// Tujuan sisipan (aplikasi 8): board baru dari viewer membawa ID halaman aktif.
+
+type BoardBox = { id: string; name: string; x: number; y: number; width: number };
+
+/**
+ * Tujuan sisipan yang sudah ditentukan (klik kanvas atau menu "+"); Image/Icon menunggu file/ikon dulu. Tanpa
+ * `board`: board baru di halaman `pageId` pada (x, y), atau `placed` = kanan board terakhir `pageBoards`.
+ */
+export type InsertTarget = {
+  kind: InsertKind;
+  board?: { id: string; name: string };
+  x: number;
+  y: number;
+  pageId?: string;
+  placed?: { pageId: string; pageBoards: readonly { x: number; y: number; width: number }[] };
+};
+
+/** Klik kanvas: di atas board → sisip ke board itu; area kosong → board baru di halaman aktif `page`. */
+export function canvasInsertTarget(kind: InsertKind, at: { boardId?: string | undefined; x: number; y: number }, boards: readonly BoardBox[], page: { id: string } | undefined): InsertTarget {
+  const b = at.boardId ? boards.find((x) => x.id === at.boardId) : undefined;
+  return b ? { kind, board: { id: b.id, name: b.name }, x: at.x, y: at.y } : { kind, x: at.x, y: at.y, ...(page ? { pageId: page.id } : {}) };
+}
+
+/**
+ * Menu "+" Layers: `menuBoard` → kiri atas + 40px; tanpa board → Frame jadi board baru di halaman aktif (kanan board
+ * terakhir). Tipe lain tanpa board → undefined.
+ */
+export function menuInsertTarget(kind: InsertKind, menuBoard: BoardBox | undefined, boards: readonly BoardBox[], page: { id: string } | undefined): InsertTarget | undefined {
+  if (menuBoard) return { kind, board: { id: menuBoard.id, name: menuBoard.name }, x: MENU_OFFSET, y: MENU_OFFSET };
+  if (kind === 'frame' && page) return { kind, x: 0, y: 0, placed: { pageId: page.id, pageBoards: boards } };
+  return undefined;
 }
 
 /** Hapus node `id` (board juga boleh). */

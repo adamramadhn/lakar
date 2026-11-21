@@ -1015,6 +1015,55 @@ button.panel-tab:hover {
 .page-row.active svg {
   color: var(--text-primary);
 }
+.pages .section-header {
+  padding-right: 0;
+}
+.pages .section-header .add-layer-btn {
+  margin-right: 2px;
+}
+.page-row {
+  position: relative;
+}
+.page-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.page-row.dragging {
+  opacity: 0.5;
+}
+/* Garis penanda posisi jatuh saat mengurutkan halaman. */
+.page-row.drop-before::before,
+.page-row.drop-after::after {
+  content: '';
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--accent);
+  pointer-events: none;
+}
+.page-row.drop-before::before {
+  top: -1px;
+}
+.page-row.drop-after::after {
+  bottom: -1px;
+}
+.page-rename {
+  flex: 1;
+  min-width: 0;
+  height: 22px;
+  padding: 0 6px;
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  background: var(--input);
+  color: var(--text-primary);
+  font: inherit;
+  outline: none;
+}
 .layer-tree {
   flex: 1;
   min-height: 0;

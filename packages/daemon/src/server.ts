@@ -44,6 +44,7 @@ import { DocStore } from './store.js';
 import { ActivityBus, registerActivityHooks } from './events.js';
 import { registerConnectionRoutes } from './connections.js';
 import { registerFileRoutes } from './files.js';
+import { registerPageRoutes } from './pages.js';
 import { registerExportRoutes } from './export.js';
 import { VIEWER_DIST_DIR, registerViewerRoutes } from './viewer.js';
 
@@ -667,6 +668,7 @@ export function buildServer({
   // Viewer baca-saja (Viewer B slice 1): `/viewer/*` dan `/app/*`. Route lama tidak berubah.
   registerViewerRoutes(app, { docs, store, sessions, distDir: config.viewerDir ?? VIEWER_DIST_DIR });
   registerFileRoutes(app, { docs, store, sessions, docLocks, activity, dataDir: config.dataDir });
+  registerPageRoutes(app, { docs, store, docLocks, activity });
   registerExportRoutes(app, { docs, store, render, icons });
   registerConnectionRoutes(app, { host: config.host, port: config.port, ...(config.mcpEntry ? { mcpEntry: config.mcpEntry } : {}) });
 
