@@ -21,6 +21,7 @@ import { useNow, useOffline, useRetry } from './hooks';
 import { Icon, NODE_ICON } from './icons';
 import { Modal } from './NewFileDialog';
 import { ChecksPanel, InspectPanel } from './panels';
+import { getCamera, getViewState, saveCamera, saveViewState, type PanelTab } from './viewState';
 
 const FOLLOW_KEY = 'lakar.viewer.followAgent';
 function readFollow(): boolean {
@@ -38,7 +39,7 @@ function writeFollow(v: boolean) {
   }
 }
 
-type Tab = 'activity' | 'inspect' | 'checks' | 'history';
+type Tab = PanelTab;
 const TABS: { id: Tab; label: string }[] = [
   { id: 'activity', label: 'Activity' },
   { id: 'inspect', label: 'Inspect' },
@@ -61,11 +62,13 @@ type Loaded<T> = { state: 'loading' } | { state: 'ok'; value: T } | { state: 'er
 
 export function Viewer({ slug }: { slug: string }) {
   const [doc, setDoc] = useState<Loaded<{ doc: LakarDocument; loadedAt: number }>>({ state: 'loading' });
-  const [pageIndex, setPageIndex] = useState(0);
-  const [selectedId, setSelectedId] = useState<string | undefined>(undefined);
+  // State tampilan dipulihkan dari kunjungan tab sebelumnya (viewState.ts, memori sesi) dan disimpan tiap berubah.
+  const [saved] = useState(() => getViewState(slug));
+  const [pageIndex, setPageIndex] = useState(saved?.pageIndex ?? 0);
+  const [selectedId, setSelectedId] = useState<string | undefined>(saved?.selectedId);
   const [inspect, setInspect] = useState<Loaded<InspectResult> | undefined>(undefined);
   const [checks, setChecks] = useState<Loaded<LayoutCheck> | undefined>(undefined);
-  const [tab, setTab] = useState<Tab>('activity');
+  const [tab, setTab] = useState<Tab>(saved?.panel ?? 'activity');
   const [attempt, setAttempt] = useState(0);
   const [activity, dispatch] = useReducer(activityReducer, initialActivity);
   const [follow, setFollowState] = useState(readFollow);
@@ -130,6 +133,7 @@ export function Viewer({ slug }: { slug: string }) {
     [slug],
   );
   useEffect(() => loadDoc(), [loadDoc]);
+  useEffect(() => saveViewState(slug, { pageIndex, selectedId, panel: tab }), [slug, pageIndex, selectedId, tab]);
   // Perubahan agen terlihat saat tab kembali aktif (pola sama dengan Dashboard).
   useEffect(() => {
     const onVisible = () => document.visibilityState === 'visible' && loadDoc(true);
@@ -142,6 +146,15 @@ export function Viewer({ slug }: { slug: string }) {
   const previewDoc = preview?.doc.state === 'ok' ? preview.doc.value : undefined;
   const shown = previewDoc ?? current;
   const index = useMemo(() => (shown ? indexDocument(shown) : new Map<string, NodeInfo>()), [shown]);
+  // Seleksi yang dipulihkan dari viewState bisa menunjuk node yang sudah tidak ada: dicek sekali saat dokumen
+  // pertama termuat. Seleksi langsung oleh pengguna tidak disentuh.
+  const restoredSelection = useRef(saved?.selectedId);
+  useEffect(() => {
+    const id = restoredSelection.current;
+    if (id === undefined || !current) return;
+    restoredSelection.current = undefined;
+    if (selectedId === id && !index.has(id)) setSelectedId(undefined);
+  }, [current, index, selectedId]);
 
   // Pratinjau versi: muat dokumen snapshot; ganti slug → keluar dari pratinjau.
   const startPreview = useCallback(
@@ -538,6 +551,8 @@ export function Viewer({ slug }: { slug: string }) {
 
       <Canvas
         key={page?.id}
+        camera={page ? getCamera(slug, page.id) : undefined}
+        onCamera={(c) => page && saveCamera(slug, page.id, c)}
         slug={slug}
         rev={d.rev}
         boardRevs={boardRevs}

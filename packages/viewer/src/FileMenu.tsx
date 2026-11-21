@@ -1,12 +1,14 @@
 // Context menu kartu file (desain 02 "Dashboard — Context Menu") + dialog Rename dan konfirmasi Delete
-// ("Dashboard — Delete Confirm"). Recents/Files: Open, Rename, Duplicate, Copy link, Move to Archive, Delete.
-// Archive: Unarchive, Delete. Folder/"Move to…" dan "Open in new tab" sengaja tidak ada.
+// ("Dashboard — Delete Confirm"). Recents/Files: Open, Open in new tab, Rename, Duplicate, Copy link, Move to Archive, Delete.
+// "Open in new tab" (aplikasi 7) menambah tab title bar tanpa berpindah halaman.
+// Archive: Unarchive, Delete. Folder/"Move to…" sengaja tidak ada.
 import { useLayoutEffect, useRef, useState } from 'react';
 import { api, errorText } from './api';
 import { copyText } from './Connections';
 import { docHash, docLink, slugify } from './files';
 import { Icon, type IconName } from './icons';
 import { Modal } from './NewFileDialog';
+import { openInNewTab } from './tabs';
 
 export type MenuTarget = { slug: string; x: number; y: number };
 export type FileAction = 'rename' | 'delete' | 'duplicate' | 'archive';
@@ -203,6 +205,14 @@ export function FileMenu({
           run: () => {
             onClose();
             location.hash = docHash(slug);
+          },
+        },
+        {
+          label: 'Open in new tab',
+          icon: 'externalLink',
+          run: () => {
+            onClose();
+            openInNewTab(slug);
           },
         },
         { label: 'Rename', icon: 'pencil', shortcut: 'F2', separator: true, run: () => setPhase('rename') },

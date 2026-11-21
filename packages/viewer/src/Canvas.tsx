@@ -13,6 +13,7 @@ import { INSERT_KINDS, type InsertKind } from './codegen';
 import { ExportButton } from './ExportPopover';
 import { useRetry } from './hooks';
 import { Icon, type IconName } from './icons';
+import type { Camera } from './viewState';
 
 export type CanvasBoard = { id: string; name: string; x: number; y: number; width: number; height: number };
 export type Highlight = { boardId: string; bounds?: [number, number, number, number] };
@@ -34,7 +35,6 @@ export type CanvasPreview = {
   onBack: () => void;
   onRestore: () => void;
 };
-type Camera = { x: number; y: number; z: number };
 /** Titik sisip: dalam board (`boardId`, koordinat board) atau di halaman (tanpa board, koordinat halaman). */
 export type InsertPoint = { boardId: string; x: number; y: number } | { boardId?: undefined; x: number; y: number };
 type Tool = 'select' | 'hand' | InsertKind;
@@ -122,7 +122,13 @@ export function Canvas({
   preview,
   editable = false,
   onInsert,
+  camera,
+  onCamera,
 }: {
+  /** Kamera tersimpan (pindah tab, viewState.ts): dipakai saat mount, tanpa auto-fit. */
+  camera?: Camera | undefined;
+  /** Kamera berubah: disimpan pemanggil per halaman. */
+  onCamera?: (c: Camera) => void;
   slug: string;
   rev: number;
   /** Rev terakhir board berubah (default `rev`): board yang tidak tersentuh tidak dirender ulang. */
@@ -145,8 +151,14 @@ export function Canvas({
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ w: 0, h: 0 });
-  const [cam, setCam] = useState<Camera>({ x: 0, y: 0, z: 1 });
-  const [fitted, setFitted] = useState(false);
+  const [cam, setCam] = useState<Camera>(() => camera ?? { x: 0, y: 0, z: 1 });
+  const [fitted, setFitted] = useState(camera !== undefined);
+  const onCameraRef = useRef(onCamera);
+  onCameraRef.current = onCamera;
+  // Simpan hanya sesudah auto-fit (kamera awal 0,0,1 bukan pilihan pengguna).
+  useEffect(() => {
+    if (fitted) onCameraRef.current?.(cam);
+  }, [cam, fitted]);
   const [tool, setTool] = useState<Tool>('select');
   const canInsert = editable && !preview && onInsert !== undefined;
   // Pratinjau/offline: tool sisip yang aktif kembali ke Select.
