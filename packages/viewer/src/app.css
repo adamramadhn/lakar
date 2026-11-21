@@ -613,6 +613,10 @@ code {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* Subjudul baris list hanya di mobile (aplikasi 9). */
+.list-sub {
+  display: none;
+}
 .scrim {
   display: none;
 }
@@ -1844,22 +1848,243 @@ button.panel-tab:hover {
 }
 
 /* ---- Responsif ---- */
+/* Viewer tablet/mobile (aplikasi 9, desain bagian 03 "Viewer — Tablet/Mobile — …"). Di desktop (>1100px) elemen
+   tambahan ini tidak tampil, jadi tata letak tiga kolom tidak berubah. */
+.viewer-topbar,
+.layers-toggle,
+.layers-scrim,
+.sheet-grabber,
+.sheet-checks {
+  display: none;
+}
+/* Tablet: kanvas + panel kanan 300px; Layers/Pages jadi laci di atas kanvas lewat tombol "Layers". */
 @media (max-width: 1100px) {
   .viewer {
-    grid-template-columns: 220px minmax(0, 1fr) 300px;
+    position: relative;
+    grid-template-columns: minmax(0, 1fr) 300px;
+    grid-template-rows: minmax(0, 1fr);
+    grid-template-areas: 'canvas side';
+  }
+  .viewer > .canvas {
+    grid-area: canvas;
+  }
+  .viewer > .side-panel {
+    grid-area: side;
+  }
+  .viewer > .layers-panel {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 30;
+    width: 280px;
+    max-width: 85%;
+    box-shadow: 8px 0 24px #00000033;
+    transform: translateX(-100%);
+    visibility: hidden;
+    transition:
+      transform 160ms ease-out,
+      visibility 0s linear 160ms;
+  }
+  .viewer.layers-open > .layers-panel {
+    transform: none;
+    visibility: visible;
+    transition: transform 160ms ease-out;
+  }
+  .viewer.layers-open > .layers-scrim {
+    display: block;
+    position: absolute;
+    inset: 0;
+    z-index: 25;
+    background: var(--scrim);
+  }
+  .layers-toggle {
+    grid-area: canvas;
+    align-self: start;
+    justify-self: start;
+    z-index: 7;
+    margin: 14px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    height: 34px;
+    padding: 0 10px;
+    border-radius: 8px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text-primary);
+    font-size: 12px;
+    font-weight: 500;
+  }
+  .layers-toggle:hover,
+  .viewer.layers-open .layers-toggle {
+    background: var(--surface-hover);
+  }
+  .layers-toggle-chevron {
+    color: var(--text-secondary);
+  }
+  /* Banner versi tidak menabrak tombol Layers (kiri) dan Export (kanan). */
+  .viewer .version-banner {
+    max-width: calc(100% - 256px);
+  }
+  @container (max-width: 600px) {
+    .viewer .version-banner {
+      top: 60px;
+      max-width: none;
+    }
   }
 }
-@media (max-width: 900px) {
-  .viewer {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: minmax(0, 1fr) 45%;
-  }
-  .layers-panel {
+/* Mobile: top bar viewer, kanvas penuh, panel kanan jadi bottom sheet (BottomSheet.tsx). */
+/* Tinggi sheet (54px, 356px, celah 8px di bawah top bar 56px) dan query 767.98px harus sama dengan sheet.ts / MOBILE_QUERY. */
+@media (max-width: 767.98px) {
+  /* TitleBar aplikasi disembunyikan di Viewer hanya di browser (tanpa kontrol jendela desktop). */
+  .app:has(> .body > .viewer) > .titlebar:not(.mac):not(:has(.window-controls)) {
     display: none;
   }
-  .side-panel {
+  .viewer {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+    grid-template-areas: 'top' 'canvas';
+  }
+  .viewer-topbar {
+    grid-area: top;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    height: 56px;
+    min-width: 0;
+    padding: 0 8px;
+    background: var(--titlebar);
+    border-bottom: 1px solid var(--border);
+  }
+  .viewer-topbar-btn {
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 6px;
+    color: var(--text-primary);
+  }
+  .viewer-topbar-btn:hover,
+  .viewer-topbar-btn.active,
+  .viewer-topbar-file:hover {
+    background: var(--surface-hover);
+  }
+  .viewer-topbar-file {
+    flex: 1;
+    min-width: 0;
+    height: 40px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1px;
+    padding: 0 6px;
+    border-radius: 6px;
+  }
+  .viewer-topbar-title,
+  .viewer-topbar-page {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .viewer-topbar-title {
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .viewer-topbar-page {
+    color: var(--text-secondary);
+    font-size: 11px;
+  }
+  .viewer > .side-panel {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 20;
+    height: min(356px, calc((100% - 56px) / 2));
+    overflow: hidden;
     border-left: 0;
     border-top: 1px solid var(--border);
+    border-radius: 16px 16px 0 0;
+    box-shadow: 0 -8px 24px #00000033;
+    transition: height 200ms ease-out;
+  }
+  .viewer > .side-panel.sheet-collapsed {
+    height: 54px;
+  }
+  .viewer > .side-panel.sheet-full {
+    height: calc(100% - 64px);
+  }
+  .viewer > .side-panel.dragging {
+    transition: none;
+  }
+  .sheet-grabber {
+    flex: none;
+    display: flex;
+    justify-content: center;
+    height: 16px;
+    padding-top: 8px;
+    touch-action: none;
+    cursor: grab;
+  }
+  .sheet-grabber i {
+    width: 36px;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--border);
+  }
+  .side-panel .panel-tabs {
+    flex: none;
+    align-items: center;
+    height: 38px;
+    padding: 4px 12px 8px;
+    border-bottom: 0;
+    touch-action: none;
+  }
+  .side-panel:not(.sheet-collapsed) .panel-tabs {
+    border-bottom: 1px solid var(--border);
+  }
+  .side-panel .panel-tab {
+    flex: none;
+    height: 26px;
+  }
+  /* History hanya di strip saat aktif; dibuka dari tombol History di top bar. */
+  .side-panel .panel-tab.tab-history:not(.active) {
+    display: none;
+  }
+  .sheet-checks {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    height: 26px;
+    margin-left: auto;
+    padding: 0 4px;
+    border-radius: 6px;
+    font-size: 12px;
+  }
+  /* Toolbar kanvas dan toast duduk di atas sheet (`--sheet-h` ditulis BottomSheet). Zoom lewat pinch. */
+  .viewer .view-controls {
+    bottom: calc(var(--sheet-h, 54px) + 12px);
+  }
+  .viewer.sheet-full .view-controls {
+    visibility: hidden;
+  }
+  .viewer .zoom-btn,
+  .viewer .zoom-level {
+    display: none;
+  }
+  .viewer .checks-pill {
+    display: none;
+  }
+  /* Pesan Waiting di tengah area kanvas yang terlihat (di atas toolbar dan sheet). */
+  .viewer .canvas-waiting {
+    bottom: calc(var(--sheet-h, 54px) + 56px);
+  }
+  .viewer .toast {
+    bottom: calc(var(--sheet-h, 54px) + 64px);
   }
 }
 @media (min-width: 769px) {
@@ -1921,6 +2146,58 @@ button.panel-tab:hover {
   .offline-command {
     order: 3;
     width: 100%;
+  }
+}
+/* Dashboard mobile (desain "Mobile — List/Grid — …", 375): "+" ikon 34×34, list tanpa header, baris 74px dengan
+   thumbnail 104×58 dan dua baris teks. Tablet 768 tetap memakai aturan di atas. */
+@media (max-width: 767.98px) {
+  .main-header .new-file-btn {
+    width: 34px;
+    height: 34px;
+    padding: 0;
+  }
+  .new-file-btn .btn-label {
+    display: none;
+  }
+  .list-head {
+    display: none;
+  }
+  .list-row {
+    grid-template-columns: minmax(0, 1fr) 32px;
+    height: 74px;
+    padding: 0;
+  }
+  .list-row > span:nth-child(4) {
+    display: none;
+  }
+  .list-name {
+    gap: 14px;
+  }
+  .list-name .thumb.mini {
+    width: 104px;
+    height: 58px;
+    padding: 4px;
+  }
+  .list-text {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .list-title,
+  .list-sub {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .list-title {
+    font-size: 14px;
+    font-weight: 600;
+  }
+  .list-sub {
+    display: block;
+    color: var(--text-secondary);
+    font-size: 12px;
+    font-weight: 400;
   }
 }
 

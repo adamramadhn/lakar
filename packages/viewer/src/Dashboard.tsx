@@ -3,6 +3,8 @@
 // Kelola file: tombol New file, context menu kartu (klik kanan / "…" / pintasan F2, Del, Ctrl D); daftar
 // dimuat ulang lewat `api.onDocsChanged`. Halaman Settings → General (`#/settings`) dan Connections
 // (`#/settings/connections`) memakai sidebar yang sama.
+// Mobile (aplikasi 9, desain "Mobile — List/Grid"): tombol New file jadi ikon "+", list tanpa header dengan baris dua
+// baris (nama + "Edited …") dan thumbnail besar; `.list-sub`/label disembunyikan/ditampilkan lewat CSS.
 import { useCallback, useEffect, useMemo, useState, type KeyboardEvent, type MouseEvent } from 'react';
 import { api, errorText, OfflineError, type DaemonStatus, type DocSummary } from './api';
 import { openDoc } from './App';
@@ -170,9 +172,9 @@ export function Dashboard({ page = 'recents', menuOpen, onCloseMenu }: { page?: 
   const handlers = fileHandlers(archivedPage, setMenu, duplicate);
 
   const newFileBtn = (
-    <button type="button" className="btn primary" onClick={() => setCreating('Untitled')}>
+    <button type="button" className="btn primary new-file-btn" aria-label="New file" onClick={() => setCreating('Untitled')}>
       <Icon name="plus" size={14} />
-      New file
+      <span className="btn-label">New file</span>
     </button>
   );
 
@@ -343,7 +345,10 @@ export function Dashboard({ page = 'recents', menuOpen, onCloseMenu }: { page?: 
                     <div className={`list-row${menu?.slug === d.slug ? ' menu-open' : ''}`} aria-label={d.slug} {...h}>
                       <span className="list-name">
                         <Thumb doc={d} size="mini" archived={archivedPage} />
-                        <span>{d.slug}</span>
+                        <span className="list-text">
+                          <span className="list-title">{d.slug}</span>
+                          <span className="list-sub">Edited {relativeTime(d.updatedAt)}</span>
+                        </span>
                       </span>
                       <span>{d.boardCount}</span>
                       <span className="mono">r{d.rev}</span>
