@@ -7,17 +7,39 @@
 // Layer manual (aplikasi 4): `execute` (POST /execute dari sesi viewer sendiri, kode dari codegen.ts), unggah
 // gambar (POST /viewer/assets, byte mentah), dan cari ikon (POST /icons/search).
 // Folder (aplikasi 10): GET/POST /viewer/folders*, tulis lewat antrean yang sama (memanggil pendengar `onDocsChanged`).
+// Sinkron antar jendela: setiap permintaan membawa id jendela (`x-lakar-origin`, acak per muat halaman) sehingga event
+// `change` dari jendela ini bisa dikenali sebagai gema; perubahan dari jendela lain diterapkan lewat `applyRemote`.
+// Memori: blob URL PNG di-revoke saat entri cache dibuang (dengan jeda, supaya <img> yang masih memakainya sempat
+// diganti); cache versi lama (`#revDocs`, `#revShots`) dibatasi LRU.
 // Bentuk respons AD-11: {ok:true,data} | {ok:false,error}.
 import type { Finding, FindingSummary, LakarDocument } from '@lakar/schema';
 
 /** Header sesi (sama dengan SESSION_HEADER @lakar/schema; disalin agar bundle tidak menarik zod). */
 const SESSION_HEADER = 'x-lakar-session';
 const CLIENT = 'lakar-viewer';
+/** Header id jendela (sama dengan ORIGIN_HEADER events.ts). */
+const ORIGIN_HEADER = 'x-lakar-origin';
+
+/** Id acak jendela ini (pola `[A-Za-z0-9_-]`, cocok dengan validasi daemon). */
+function newOrigin(): string {
+  const c = (globalThis as { crypto?: { randomUUID?: () => string } }).crypto;
+  return c?.randomUUID ? c.randomUUID() : `w${Math.random().toString(36).slice(2)}${Date.now().toString(36)}`;
+}
+const ORIGIN = newOrigin();
+
+/** Batas entri cache versi lama (LRU). */
+export const REV_DOCS_MAX = 40;
+export const REV_SHOTS_MAX = 60;
+/** Jeda sebelum blob URL yang dibuang dari cache di-revoke (<img> lama sempat diganti PNG baru). */
+export const REVOKE_DELAY_MS = 30_000;
 
 /** Board awal New file (sama dengan `BoardChoice` di files.ts; tanpa impor relatif agar api.ts bisa dites di Node). */
 export type BoardChoice = { preset: 'desktop' | 'tablet' | 'mobile' } | { preset: 'custom'; width: number; height: number };
 /** Kelola file dari aplikasi yang memengaruhi tab title bar (dipancarkan setelah tulis sukses). */
-export type FileEvent = { type: 'rename'; from: string; to: string } | { type: 'archive'; slug: string } | { type: 'delete'; slug: string; archived: boolean };
+export type FileEvent = ({ type: 'rename'; from: string; to: string } | { type: 'archive'; slug: string } | { type: 'delete'; slug: string; archived: boolean }) & {
+  /** Terjadi di jendela lain (diterima lewat stream). */
+  remote?: boolean;
+};
 /** Folder viewer (metadata, bukan direktori); id stabil `f` + 10 karakter. */
 export type Folder = { id: string; name: string; createdAt: string };
 /** `GET /viewer/folders`: folder urut nama + keanggotaan slug → id folder (slug aktif saja). */
@@ -96,6 +118,7 @@ async function request<T>(method: 'GET' | 'POST' | 'DELETE', path: string, body?
       headers: {
         ...(body !== undefined ? { 'content-type': 'application/json' } : {}),
         ...(session ? { [SESSION_HEADER]: session } : {}),
+        [ORIGIN_HEADER]: ORIGIN,
       },
       ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
     });
@@ -121,6 +144,32 @@ async function request<T>(method: 'GET' | 'POST' | 'DELETE', path: string, body?
     throw new ApiError(err.code, err.message, err.hint, res.status);
   }
   return json.data as T;
+}
+
+/** Revoke blob URL screenshot `shot` sesudah `REVOKE_DELAY_MS` (gagal render → tidak ada URL). */
+function revokeLater(shot: Promise<Screenshot>) {
+  shot.then(
+    (s) => {
+      const t = setTimeout(() => URL.revokeObjectURL(s.url), REVOKE_DELAY_MS);
+      (t as { unref?: () => void }).unref?.();
+    },
+    () => {},
+  );
+}
+
+/** Pakai entri LRU: pindah ke ujung terbaru. */
+function touch<V>(map: Map<string, V>, key: string, value: V) {
+  map.delete(key);
+  map.set(key, value);
+}
+
+/** Buang entri tertua sampai `map` ≤ `max`; `evicted` dipanggil untuk tiap entri yang dibuang. */
+function trim<V>(map: Map<string, V>, max: number, evicted?: (v: V) => void) {
+  while (map.size > max) {
+    const [k, v] = map.entries().next().value as [string, V];
+    map.delete(k);
+    evicted?.(v);
+  }
 }
 
 const pagesPath = (slug: string, pageId?: string) => `/viewer/docs/${encodeURIComponent(slug)}/pages${pageId ? `/${encodeURIComponent(pageId)}` : ''}`;
@@ -151,6 +200,31 @@ class ViewerClient {
   #changed = new Set<() => void>();
   /** Pendengar rename/archive/delete dengan slug (tab title bar). */
   #fileEvents = new Set<(e: FileEvent) => void>();
+
+  /** Id jendela ini (dikirim di setiap permintaan sebagai `x-lakar-origin`). */
+  readonly origin = ORIGIN;
+
+  /**
+   * Terapkan perubahan dari jendela lain (`remoteEffect` activity.ts): buang cache slug terkait, beri tahu
+   * pendengar daftar, lalu pendengar tab bila ada event file.
+   */
+  applyRemote(effect: { invalidate: string[]; fileEvent?: FileEvent }) {
+    this.#invalidate(...effect.invalidate);
+    if (effect.fileEvent) {
+      const e = { ...effect.fileEvent, remote: true };
+      for (const l of this.#fileEvents) l(e);
+    }
+  }
+
+  /** Daftar mungkin usang (restore/halaman di jendela lain, stream tersambung ulang): beri tahu pendengar daftar. */
+  notifyDocsChanged() {
+    this.#invalidate();
+  }
+
+  /** Ukuran cache (untuk test kebocoran memori). */
+  cacheSizes() {
+    return { shots: this.#shots.size, latest: this.#latest.size, revDocs: this.#revDocs.size, revShots: this.#revShots.size };
+  }
 
   status() {
     return request<DaemonStatus>('GET', '/status');
@@ -205,7 +279,14 @@ class ViewerClient {
     for (const slug of slugs) {
       this.#known.delete(slug);
       if (this.#active === slug) this.#active = undefined;
-      for (const map of [this.#shots, this.#pending, this.#revDocs, this.#revShots] as Map<string, unknown>[]) for (const k of [...map.keys()]) if (k.startsWith(`${slug}@`)) map.delete(k);
+      for (const map of [this.#shots, this.#revShots]) {
+        for (const [k, shot] of [...map]) {
+          if (!k.startsWith(`${slug}@`)) continue;
+          map.delete(k);
+          revokeLater(shot);
+        }
+      }
+      for (const map of [this.#pending, this.#revDocs] as Map<string, unknown>[]) for (const k of [...map.keys()]) if (k.startsWith(`${slug}@`)) map.delete(k);
       for (const k of [...this.#latest.keys()]) if (k.startsWith(`${slug}:`)) this.#latest.delete(k);
     }
     for (const l of this.#changed) l();
@@ -316,8 +397,9 @@ class ViewerClient {
     if (!hit) {
       hit = request<{ doc: LakarDocument }>('GET', `/viewer/docs/${encodeURIComponent(slug)}/revs/${rev}`).then((d) => d.doc);
       hit.catch(() => this.#revDocs.get(key) === hit && this.#revDocs.delete(key));
-      this.#revDocs.set(key, hit);
     }
+    touch(this.#revDocs, key, hit);
+    trim(this.#revDocs, REV_DOCS_MAX);
     return hit;
   }
 
@@ -333,8 +415,9 @@ class ViewerClient {
         url: pngUrl(d.png),
       }));
       hit.catch(() => this.#revShots.get(key) === hit && this.#revShots.delete(key));
-      this.#revShots.set(key, hit);
     }
+    touch(this.#revShots, key, hit);
+    trim(this.#revShots, REV_SHOTS_MAX, revokeLater);
     return hit;
   }
 
@@ -508,7 +591,15 @@ class ViewerClient {
             });
             this.#shots.set(key, hit);
             const prev = this.#latest.get(latestKey);
-            if (!prev || prev.rev <= rev) this.#latest.set(latestKey, entry);
+            if (!prev || prev.rev <= rev) {
+              this.#latest.set(latestKey, entry);
+              // PNG rev lama board ini tidak dipakai lagi (rev hanya naik): buang dan revoke URL-nya.
+              if (prev && prev.rev < rev) {
+                const oldKey = `${slug}@${prev.rev}:${boardId}`;
+                if (this.#shots.get(oldKey) === prev.shot) this.#shots.delete(oldKey);
+                revokeLater(prev.shot);
+              }
+            }
           }
           return hit;
         },

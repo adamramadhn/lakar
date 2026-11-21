@@ -13,9 +13,12 @@
 // Responsif (aplikasi 9): tablet (≤1100px) → panel kiri jadi laci di atas kanvas (tombol "Layers" + scrim); mobile
 // (<768px) → top bar viewer (back, nama file + halaman yang membuka laci, History) dan panel kanan jadi bottom sheet
 // (BottomSheet.tsx). Di desktop elemen tambahan disembunyikan CSS; hanya state tata letak yang ditambah di sini.
-import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type ReactNode } from 'react';
+// Sinkron antar jendela: stream dibagi lewat `activityHub`; layer manual dari jendela lain (`change` `edit`) memuat
+// ulang dokumen, dan dokumen yang diarsip/dihapus di jendela lain menampilkan pesan dengan jalan kembali ke
+// Dashboard/Archive (`requestCloseTab`), bukan 404 mentah. Rename di jendela lain ditangani App (tab ikut pindah).
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import type { LakarDocument } from '@lakar/schema';
-import { activityReducer, connectActivity, initialActivity, revChange, sessionsForSlug, type ActivityEvent } from './activity';
+import { activityHub, editChange, goneReason, revChange, sessionsForSlug, slugAppeared, type StreamEvent } from './activity';
 import { ActivityPanel } from './ActivityPanel';
 import { BottomSheet } from './BottomSheet';
 import { AddLayerButton, IconPicker, Toast, type ToastState } from './AddLayer';
@@ -33,6 +36,7 @@ import { Modal } from './NewFileDialog';
 import { ChecksPanel, InspectPanel } from './panels';
 import { agentPresence, layerMarks, type LayerMarkInfo } from './presence';
 import { sheetForTab, type SheetState } from './sheet';
+import { requestCloseTab } from './tabs';
 import { getCamera, getViewState, saveCamera, saveViewState, type PanelTab } from './viewState';
 
 const FOLLOW_KEY = 'lakar.viewer.followAgent';
@@ -88,7 +92,11 @@ export function Viewer({ slug }: { slug: string }) {
   const [checks, setChecks] = useState<Loaded<LayoutCheck> | undefined>(undefined);
   const [tab, setTab] = useState<Tab>(saved?.panel ?? 'activity');
   const [attempt, setAttempt] = useState(0);
-  const [activity, dispatch] = useReducer(activityReducer, initialActivity);
+  const activity = useSyncExternalStore(activityHub.subscribeState, activityHub.getState);
+  /** Dokumen diarsip/dihapus di jendela lain selagi terbuka. */
+  const [gone, setGone] = useState<'archived' | 'deleted' | undefined>(undefined);
+  /** Dokumen tidak ditemukan tetapi ada di arsip (pesan + tombol Open Archive). */
+  const [inArchive, setInArchive] = useState(false);
   const [follow, setFollowState] = useState(readFollow);
   const [focus, setFocus] = useState<Focus | undefined>(undefined);
   /** Rev dasar semua board (muat penuh) dan rev terakhir per board tersentuh menurut event execute. */
@@ -260,8 +268,34 @@ export function Viewer({ slug }: { slug: string }) {
   // Follow agent → pindah halaman dan geser kamera ke board yang berubah. Reconnect → muat ulang penuh.
   const followRef = useRef(follow);
   followRef.current = follow;
-  const onEvent = useRef<(e: ActivityEvent) => void>(() => {});
+  const onEvent = useRef<(e: StreamEvent) => void>(() => {});
   onEvent.current = (e) => {
+    if (e.type === 'change') {
+      // Perubahan dari jendela lain; gema jendela ini disaring helper (origin sama).
+      const reason = goneReason(e, slug, api.origin);
+      if (reason) {
+        setGone(reason);
+        return;
+      }
+      if (slugAppeared(e, slug) && (gone !== undefined || doc.state === 'error')) {
+        setGone(undefined);
+        loadDoc();
+        return;
+      }
+      const shown = docRef.current;
+      const ch = shown && !gone ? editChange(e, slug, shown.rev, api.origin) : undefined;
+      if (ch) {
+        if (ch.boards.length) {
+          setTouched((t) => {
+            const next = { ...t };
+            for (const b of ch.boards) next[b] = Math.max(next[b] ?? -1, ch.rev);
+            return next;
+          });
+        }
+        loadDoc(true, ch.boards.length === 0);
+      }
+      return;
+    }
     if (e.type !== 'call') return;
     const c = e.call;
     // Klien viewer sendiri disaring oleh `revChange` (satu-satunya gerbang aturan itu).
@@ -284,17 +318,26 @@ export function Viewer({ slug }: { slug: string }) {
   reload.current = loadDoc;
   useEffect(
     () =>
-      connectActivity({
-        onHello: (hello) => dispatch({ type: 'hello', hello }),
-        onEvent: (event) => {
-          dispatch({ type: 'event', event });
-          onEvent.current(event);
-        },
-        onConnection: (connected) => dispatch({ type: 'connection', connected }),
+      activityHub.listen({
+        onEvent: (event) => onEvent.current(event),
         onReconnect: () => reload.current(true),
       }),
     [],
   );
+  // Tidak ditemukan: cek arsip supaya pesan bisa menunjuk ke Archive.
+  const notFound = doc.state === 'error' && doc.notFound === true;
+  useEffect(() => {
+    setInArchive(false);
+    if (!notFound) return;
+    let live = true;
+    api.listArchive().then(
+      (docs) => live && setInArchive(docs.some((d) => d.slug === slug)),
+      () => {},
+    );
+    return () => {
+      live = false;
+    };
+  }, [notFound, slug]);
   const setFollow = useCallback((v: boolean) => {
     setFollowState(v);
     writeFollow(v);
@@ -534,6 +577,36 @@ export function Viewer({ slug }: { slug: string }) {
     return () => window.removeEventListener('keydown', onKey);
   }, [editable, runEdit, offerUndo]);
 
+  if (gone || (doc.state === 'error' && doc.notFound)) {
+    const archived = gone === 'archived' || (!gone && inArchive);
+    return (
+      <div className="viewer-message">
+        <div className="empty-state" role="alert">
+          <Icon name={archived ? 'archive' : 'alert'} size={22} />
+          <strong>
+            {gone === 'archived'
+              ? `“${slug}” was archived in another window`
+              : gone === 'deleted'
+                ? `“${slug}” was deleted in another window`
+                : archived
+                  ? `“${slug}” is in the Archive`
+                  : `Document “${slug}” not found`}
+          </strong>
+          <span>{archived ? 'Unarchive it from the Archive to keep working on it.' : gone ? 'This file no longer exists.' : 'It may have been renamed, archived, or deleted.'}</span>
+          <div className="empty-actions">
+            <button type="button" className="btn" onClick={() => requestCloseTab(slug, '#/')}>
+              Back to Dashboard
+            </button>
+            {archived && (
+              <button type="button" className="btn" onClick={() => requestCloseTab(slug, '#/archive')}>
+                Open Archive
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
   if (doc.state === 'loading') {
     return (
       <div className="viewer-message">
@@ -546,7 +619,7 @@ export function Viewer({ slug }: { slug: string }) {
       <div className="viewer-message">
         <div className="empty-state">
           <Icon name="alert" size={22} />
-          <strong>{doc.notFound ? `Document “${slug}” not found` : doc.corrupt ? `Document “${slug}” can't be read` : "Couldn't open this document"}</strong>
+          <strong>{doc.corrupt ? `Document “${slug}” can't be read` : "Couldn't open this document"}</strong>
           <span>{doc.message}</span>
           <a className="btn" href="#/">
             Back to Dashboard
