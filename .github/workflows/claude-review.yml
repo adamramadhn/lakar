@@ -22,6 +22,11 @@ jobs:
     env:
       ANTHROPIC_BASE_URL: https://api.z.ai/api/anthropic
       API_TIMEOUT_MS: 3000000
+      # Map every Claude Code model tier to GLM 5.3 on Z.ai.
+      ANTHROPIC_MODEL: glm-5.3
+      ANTHROPIC_DEFAULT_OPUS_MODEL: glm-5.3
+      ANTHROPIC_DEFAULT_SONNET_MODEL: glm-5.3
+      ANTHROPIC_DEFAULT_HAIKU_MODEL: glm-5.3
     steps:
       - name: Harden runner
         uses: step-security/harden-runner@a5ad31d6a139d249332a2605b85202e8c0b78450 # v2
@@ -33,20 +38,6 @@ jobs:
         with:
           fetch-depth: 1
           persist-credentials: false
-
-      # Diagnostic: report which model names the gateway accepts (status only, never the key).
-      - name: Probe gateway models
-        continue-on-error: true
-        env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-        run: |
-          for m in claude-opus-5-5 claude-sonnet-5-5 claude-haiku-5-5 claude-sonnet-4-5 glm-4.6 glm-4.5-air glm-5; do
-            code=$(curl -sS -m 60 -o resp.json -w '%{http_code}' "$ANTHROPIC_BASE_URL/v1/messages" \
-              -H "x-api-key: $ANTHROPIC_API_KEY" -H "anthropic-version: 2023-06-01" -H "content-type: application/json" \
-              -d "{\"model\":\"$m\",\"max_tokens\":8,\"messages\":[{\"role\":\"user\",\"content\":\"ping\"}]}" || echo 000)
-            msg=$(jq -r '.error.message // .model // empty' resp.json 2>/dev/null | head -c 160)
-            echo "$m -> HTTP $code $msg"
-          done
 
       - name: Run Claude Code Review
         id: claude-review
@@ -61,3 +52,4 @@ jobs:
           plugin_marketplaces: 'https://github.com/anthropics/claude-code.git'
           plugins: 'code-review@claude-code-plugins'
           prompt: '/code-review:code-review ${{ github.repository }}/pull/${{ github.event.pull_request.number }}'
+          claude_args: '--model glm-5.3'
