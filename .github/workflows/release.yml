@@ -5,6 +5,8 @@ name: Release desktop
 on:
   push:
     tags: ['v*']
+    # SEMENTARA: build installer untuk uji di branch ini; hapus sebelum merge.
+    branches: ['claude/app-design-parity']
   workflow_dispatch:
 
 concurrency:
