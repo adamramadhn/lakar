@@ -4,14 +4,20 @@
 // tanpa deadlock), dan menjaga salinan memori `docs` serta `activeSlug` sesi tetap konsisten dengan disk.
 // History (aplikasi 3): baca snapshot per rev (`GET /viewer/docs/:slug/revs/:rev`) dan Restore
 // (`POST /viewer/docs/:slug/restore`), yang meng-commit isi snapshot sebagai rev baru di bawah kunci dokumen.
+// Layer manual (aplikasi 4): unggah gambar `POST /viewer/assets` (byte mentah, maks 20 MB) ke store aset; node
+// image sendiri disisipkan viewer lewat `/execute` biasa.
 import type { FastifyInstance } from 'fastify';
 import { IdAllocator, createDocument, transact, type DocumentLocks } from '@lakar/core';
 import { LakarError, SLUG_PATTERN, errorMessage, type HistoryEntry, type LakarDocument } from '@lakar/schema';
 import { z } from 'zod';
+import { imageSize, writeAsset } from './assets.js';
 import { VIEWER_CLIENT, publicSessionId, type ActivityBus, type ActivityCall } from './events.js';
 import type { Sessions } from './sessions.js';
 import type { DocStore } from './store.js';
 import { peekDocument, summarize, type ViewerDocSummary } from './viewer.js';
+
+/** Batas byte unggahan gambar `POST /viewer/assets` (route lain tetap 1 MB). */
+export const ASSET_UPLOAD_MAX = 20 * 1024 * 1024;
 
 /** Panjang maksimum slug (sama dengan `SLUG_PATTERN`). */
 export const SLUG_MAX = 64;
@@ -76,6 +82,8 @@ export type FileRoutesOptions = {
   docLocks: DocumentLocks;
   /** Bus aktivitas: Restore dipancarkan seperti tool call supaya viewer lain ikut memuat ulang. */
   activity?: ActivityBus;
+  /** Direktori data daemon: unggahan gambar ditulis ke `<dataDir>/assets`. Tanpa ini route unggah tidak didaftarkan. */
+  dataDir?: string;
   /** Pencatat masalah non-fatal (file arsip rusak dilewati). Default `console.warn`. */
   log?: (message: string) => void;
 };
@@ -136,7 +144,7 @@ const historyEntry = (rev: number, description: string, opsSummary = ''): Histor
   at: new Date().toISOString(),
 });
 
-export function registerFileRoutes(app: FastifyInstance, { docs, store, sessions, docLocks, activity, log = (m) => console.warn(m) }: FileRoutesOptions): void {
+export function registerFileRoutes(app: FastifyInstance, { docs, store, sessions, docLocks, activity, dataDir, log = (m) => console.warn(m) }: FileRoutesOptions): void {
   /** Jalankan `fn` memegang kunci setiap slug (urut, unik); `locked` memegang `#files` dulu. Kunci tidak reentrant. */
   const lockSlugs = <T>(slugs: string[], fn: () => Promise<T>): Promise<T> => {
     const keys = [...new Set(slugs)].sort();
@@ -308,6 +316,49 @@ export function registerFileRoutes(app: FastifyInstance, { docs, store, sessions
       throw e;
     }
   });
+
+  // Unggah gambar (Image… di viewer): byte mentah (application/octet-stream atau image/*), maks 20 MB. Jenis
+  // dikenali dari magic bytes (`rasterType` lewat `writeAsset`), bukan dari content-type. Parser dan batas byte
+  // hanya berlaku di scope plugin ini, jadi route JSON lain tidak berubah.
+  if (dataDir !== undefined) {
+    const notImage = () =>
+      new LakarError('SCHEMA_INVALID', 'file bukan gambar PNG, JPEG, WebP, atau GIF', { hint: 'pilih file png/jpeg/webp/gif (maks 20 MB)' });
+    void app.register(async (scope) => {
+      const raw = (_req: unknown, body: Buffer, done: (err: Error | null, body?: Buffer) => void) => done(null, body);
+      scope.addContentTypeParser('application/octet-stream', { parseAs: 'buffer', bodyLimit: ASSET_UPLOAD_MAX }, raw);
+      scope.addContentTypeParser(/^image\//, { parseAs: 'buffer', bodyLimit: ASSET_UPLOAD_MAX }, raw);
+      scope.post(
+        '/viewer/assets',
+        {
+          bodyLimit: ASSET_UPLOAD_MAX,
+          // Body melebihi batas → 413 (handler global memetakan 4xx lain ke 400); error lain diteruskan ke handler induk.
+          errorHandler: (err, _req, reply) => {
+            if ((err as { statusCode?: number }).statusCode === 413) {
+              return reply.code(413).send({
+                ok: false,
+                error: { code: 'SCHEMA_INVALID', message: 'gambar melebihi 20 MB', hint: 'perkecil gambar lalu unggah lagi (maks 20 MB)', retryable: false },
+              });
+            }
+            throw err;
+          },
+        },
+        async (req, reply) => {
+          const body = req.body;
+          if (!Buffer.isBuffer(body) || body.length === 0) throw notImage();
+          const size = imageSize(body);
+          if (!size) throw notImage();
+          let saved;
+          try {
+            saved = await writeAsset(dataDir, body);
+          } catch (e) {
+            if (e instanceof Error && /raster/.test(e.message)) throw notImage();
+            throw e;
+          }
+          return reply.code(200).send({ ok: true, data: { assetId: saved.sha, mime: saved.mime, width: size.width, height: size.height } });
+        },
+      );
+    });
+  }
 
   // Daftar arsip: bentuk sama dengan GET /viewer/docs, urut terakhir diubah.
   app.get('/viewer/archive', async (_req, reply) => {

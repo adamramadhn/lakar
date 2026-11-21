@@ -11,9 +11,9 @@ import { Modal } from './NewFileDialog';
 export type MenuTarget = { slug: string; x: number; y: number };
 export type FileAction = 'rename' | 'delete' | 'duplicate' | 'archive';
 
-type Item = { label: string; icon: IconName; shortcut?: string; danger?: boolean; separator?: boolean; run: () => void };
+export type Item = { label: string; icon: IconName; shortcut?: string; danger?: boolean; separator?: boolean; disabled?: boolean; title?: string; run: () => void };
 
-function Menu({ x, y, items, onClose }: { x: number; y: number; items: Item[]; onClose: () => void }) {
+export function Menu({ x, y, items, onClose }: { x: number; y: number; items: Item[]; onClose: () => void }) {
   const ref = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState({ left: x, top: y });
   useLayoutEffect(() => {
@@ -21,10 +21,10 @@ function Menu({ x, y, items, onClose }: { x: number; y: number; items: Item[]; o
     if (!el) return;
     const r = el.getBoundingClientRect();
     setPos({ left: Math.max(8, Math.min(x, window.innerWidth - r.width - 8)), top: Math.max(8, Math.min(y, window.innerHeight - r.height - 8)) });
-    el.querySelector<HTMLElement>('[role=menuitem]')?.focus();
+    el.querySelector<HTMLElement>('[role=menuitem]:not(:disabled)')?.focus();
   }, [x, y]);
   const move = (d: number) => {
-    const all = [...(ref.current?.querySelectorAll<HTMLElement>('[role=menuitem]') ?? [])];
+    const all = [...(ref.current?.querySelectorAll<HTMLElement>('[role=menuitem]:not(:disabled)') ?? [])];
     const i = all.indexOf(document.activeElement as HTMLElement);
     all[(i + d + all.length) % all.length]?.focus();
   };
@@ -58,7 +58,7 @@ function Menu({ x, y, items, onClose }: { x: number; y: number; items: Item[]; o
         {items.map((it) => (
           <div key={it.label} className="menu-group">
             {it.separator && <div className="menu-separator" role="separator" />}
-            <button type="button" role="menuitem" className={`menu-item${it.danger ? ' danger' : ''}`} onClick={it.run}>
+            <button type="button" role="menuitem" className={`menu-item${it.danger ? ' danger' : ''}`} onClick={it.run} disabled={it.disabled} title={it.title}>
               <Icon name={it.icon} size={15} />
               <span className="menu-label">{it.label}</span>
               {it.shortcut && <span className="menu-shortcut">{it.shortcut}</span>}

@@ -3,16 +3,21 @@
 // aktivitas (`/viewer/events`) memuat ulang dokumen dan PNG board tersentuh saat rev berubah.
 // History (aplikasi 3): klik entri → pratinjau versi lama (snapshot) di kanvas baca-saja dengan banner; Restore
 // (dari banner atau entri) meminta konfirmasi lalu meng-commit versi itu sebagai rev baru.
+// Layer manual (aplikasi 4): tool sisip di kanvas dan menu "+" di header Layers menjalankan `execute` dari sesi
+// viewer dengan kode codegen.ts; Delete/Backspace menghapus node terpilih. Sesudahnya dokumen dimuat ulang
+// (event sesi viewer tidak dipancarkan daemon) dan node baru dipilih. Gagal → toast, dokumen tidak berubah.
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type ReactNode } from 'react';
 import type { LakarDocument } from '@lakar/schema';
 import { activityReducer, connectActivity, harnessColor, harnessLabel, initialActivity, isDocChangeFromViewer, revChange, sessionsForSlug, VIEWER_CLIENT, type ActivityEvent } from './activity';
 import { ActivityPanel } from './ActivityPanel';
+import { AddLayerButton, IconPicker, Toast } from './AddLayer';
 import { api, ApiError, errorText, OfflineError, type HistoryEntry, type InspectResult, type LayoutCheck } from './api';
-import { Canvas, type AgentMark, type CanvasPreview, type Focus, type Highlight } from './Canvas';
+import { Canvas, type AgentMark, type CanvasPreview, type Focus, type Highlight, type InsertPoint } from './Canvas';
+import { failureText, imageFileProblem, insertBoardAt, insertBoardPlaced, insertIntoBoard, MENU_OFFSET, removeNode, type InsertExtra, type InsertKind } from './codegen';
 import { indexDocument, relativeTime, type NodeInfo, type TreeNode } from './format';
 import { HistoryPanel, timeOf } from './HistoryPanel';
 import { canRestore, previewLabel } from './history';
-import { useNow, useRetry } from './hooks';
+import { useNow, useOffline, useRetry } from './hooks';
 import { Icon, NODE_ICON } from './icons';
 import { Modal } from './NewFileDialog';
 import { ChecksPanel, InspectPanel } from './panels';
@@ -41,6 +46,13 @@ const TABS: { id: Tab; label: string }[] = [
   { id: 'history', label: 'History' },
 ];
 
+/** Tujuan sisipan yang sudah ditentukan (klik kanvas atau menu "+"); Image/Icon menunggu file/ikon dulu. */
+type InsertTarget = { kind: InsertKind; board?: { id: string; name: string }; x: number; y: number; placed?: boolean };
+
+/** Fokus di kolom ketik (input, textarea, select, contentEditable): Delete/Backspace milik kolom itu. */
+const typingTarget = (t: EventTarget | null) =>
+  t instanceof HTMLElement && (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || t instanceof HTMLSelectElement || t.isContentEditable);
+
 type Loaded<T> = { state: 'loading' } | { state: 'ok'; value: T } | { state: 'error'; message: string; notFound?: boolean; corrupt?: boolean };
 
 export function Viewer({ slug }: { slug: string }) {
@@ -63,6 +75,19 @@ export function Viewer({ slug }: { slug: string }) {
   const [restoreAsk, setRestoreAsk] = useState<HistoryEntry | undefined>(undefined);
   const [restoring, setRestoring] = useState(false);
   const [restoreError, setRestoreError] = useState<string | undefined>(undefined);
+  const offline = useOffline();
+  /** Toast gagal sisip/hapus/unggah. */
+  const [toast, setToast] = useState<string | undefined>(undefined);
+  const closeToast = useCallback(() => setToast(undefined), []);
+  /** Sisipan Icon menunggu pilihan di pemilih ikon. */
+  const [iconAsk, setIconAsk] = useState<InsertTarget | undefined>(undefined);
+  /** Sisipan Image menunggu file dari pemilih file. */
+  const imageTarget = useRef<InsertTarget | undefined>(undefined);
+  const fileInput = useRef<HTMLInputElement>(null);
+  /** Node baru yang dipilih begitu dokumen termuat ulang (halaman ikut pindah). */
+  const pendingSelect = useRef<string | undefined>(undefined);
+  /** Execute dari viewer yang sedang berjalan (Delete berulang tidak dikirim dua kali). */
+  const editing = useRef(0);
 
   const docRef = useRef<LakarDocument | undefined>(undefined);
   /**
@@ -266,6 +291,111 @@ export function Viewer({ slug }: { slug: string }) {
     [index, pageIndex],
   );
 
+  // Node baru (sisipan) terpilih begitu ada di dokumen yang tampil; halaman ikut pindah.
+  useEffect(() => {
+    const id = pendingSelect.current;
+    if (id && index.has(id)) {
+      pendingSelect.current = undefined;
+      select(id);
+    }
+  }, [index, select]);
+
+  const editable = doc.state === 'ok' && !preview && !offline;
+
+  /** Jalankan snippet viewer; sukses → muat ulang (board tersentuh saja) dan pilih node baru. */
+  const runEdit = useCallback(
+    (code: string, description: string, after?: (created: string | undefined) => void) => {
+      editing.current++;
+      return api.execute(slug, code, description).then(
+        (r) => {
+          editing.current--;
+          const created = r.created[0]?.id;
+          const boardsTouched = r.check?.boards ?? [];
+          if (boardsTouched.length) {
+            setTouched((t) => {
+              const next = { ...t };
+              for (const b of boardsTouched) next[b] = Math.max(next[b] ?? -1, r.rev);
+              return next;
+            });
+          }
+          after?.(created);
+          loadDoc(true, boardsTouched.length === 0);
+        },
+        (e) => {
+          editing.current--;
+          setToast(e instanceof ApiError ? failureText(e.message, e.hint) : errorText(e));
+        },
+      );
+    },
+    [slug, loadDoc],
+  );
+
+  const insert = useCallback(
+    (t: InsertTarget, extra: InsertExtra = {}) => {
+      const { code, description } = t.board ? insertIntoBoard(t.kind, t.board, t.x, t.y, extra) : t.placed ? insertBoardPlaced() : insertBoardAt(t.x, t.y);
+      void runEdit(code, description, (id) => {
+        if (!id) return;
+        pendingSelect.current = id;
+        setSelectedId(id);
+      });
+    },
+    [runEdit],
+  );
+
+  /** Tujuan sudah diketahui: Image → pemilih file, Icon → pemilih ikon, lainnya langsung disisipkan. */
+  const beginInsert = useCallback(
+    (t: InsertTarget) => {
+      if (t.kind === 'image') {
+        imageTarget.current = t;
+        const input = fileInput.current;
+        if (input) {
+          input.value = '';
+          input.click();
+        }
+      } else if (t.kind === 'icon') setIconAsk(t);
+      else insert(t);
+    },
+    [insert],
+  );
+
+  const onImageFile = useCallback(
+    (file: File | undefined) => {
+      const t = imageTarget.current;
+      imageTarget.current = undefined;
+      if (!file || !t) return;
+      const problem = imageFileProblem(file);
+      if (problem) {
+        setToast(problem);
+        return;
+      }
+      api.uploadAsset(file).then(
+        (a) => insert(t, { image: a }),
+        (e) => setToast(e instanceof ApiError ? failureText(e.message, e.hint) : errorText(e)),
+      );
+    },
+    [insert],
+  );
+
+  // Delete/Backspace: hapus node terpilih (board juga), kecuali saat mengetik atau dialog/menu terbuka.
+  const selectedRef = useRef<{ id: string; name: string; type: string } | undefined>(undefined);
+  const selInfo = selectedId ? index.get(selectedId) : undefined;
+  selectedRef.current = selInfo && !previewDoc ? { id: selInfo.id, name: selInfo.name, type: selInfo.type } : undefined;
+  useEffect(() => {
+    if (!editable) return;
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.key !== 'Delete' && e.key !== 'Backspace') || e.metaKey || e.ctrlKey || e.altKey) return;
+      if (typingTarget(e.target) || document.querySelector('.modal-scrim, .menu-layer')) return;
+      const node = selectedRef.current;
+      if (!node) return;
+      e.preventDefault();
+      if (e.repeat || editing.current > 0) return;
+      const { code, description } = removeNode(node);
+      void runEdit(code, description, () => setSelectedId((s) => (s === node.id ? undefined : s)));
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [editable, runEdit]);
+
   if (doc.state === 'loading') {
     return (
       <div className="viewer-message">
@@ -316,6 +446,16 @@ export function Viewer({ slug }: { slug: string }) {
         : undefined;
   const summary = checks?.state === 'ok' ? checks.value.summary : undefined;
   /** Rev terakhir tiap board berubah (≤ rev dokumen): PNG board lain dipakai ulang dari cache. */
+  const onCanvasInsert = (kind: InsertKind, at: InsertPoint) => {
+    const b = at.boardId ? boards.find((x) => x.id === at.boardId) : undefined;
+    beginInsert(b ? { kind, board: { id: b.id, name: b.name }, x: at.x, y: at.y } : { kind, x: at.x, y: at.y });
+  };
+  /** Menu "+": board terpilih (atau board pertama halaman) di kiri atas + 40px; tanpa board → Frame jadi board baru (`place`). */
+  const menuBoard = (selectedInfo && boards.find((b) => b.id === selectedInfo.boardId)) ?? boards[0];
+  const onMenuInsert = (kind: InsertKind) => {
+    if (menuBoard) beginInsert({ kind, board: { id: menuBoard.id, name: menuBoard.name }, x: MENU_OFFSET, y: MENU_OFFSET });
+    else if (kind === 'frame') beginInsert({ kind, x: 0, y: 0, placed: true });
+  };
   const boardRevs: Record<string, number> = {};
   for (const b of boards) boardRevs[b.id] = Math.min(d.rev, Math.max(baseRev, touched[b.id] ?? -1));
 
@@ -341,7 +481,10 @@ export function Viewer({ slug }: { slug: string }) {
           ))}
         </div>
         <div className="layer-tree">
-          <div className="section-label">Layers</div>
+          <div className="section-header">
+            <span className="section-label">Layers</span>
+            <AddLayerButton disabled={!editable} disabledReason={preview ? 'Not available while previewing a version' : 'lakard is offline'} hasBoard={boards.length > 0} onPick={onMenuInsert} />
+          </div>
           {boards.length === 0 ? <div className="muted-note">No boards on this page yet.</div> : <LayerTree key={page?.id} nodes={boards} selectedId={selectedId} selectedPath={selectedInfo} index={index} onSelect={select} />}
         </div>
       </aside>
@@ -361,6 +504,8 @@ export function Viewer({ slug }: { slug: string }) {
         onSelect={select}
         onOpenChecks={() => setTab('checks')}
         preview={canvasPreview}
+        editable={editable}
+        onInsert={onCanvasInsert}
       />
 
       <aside className="side-panel">
@@ -389,6 +534,18 @@ export function Viewer({ slug }: { slug: string }) {
           )}
         </div>
       </aside>
+      <input ref={fileInput} type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden onChange={(e) => onImageFile(e.currentTarget.files?.[0])} />
+      {iconAsk && (
+        <IconPicker
+          onClose={() => setIconAsk(undefined)}
+          onPick={(icon) => {
+            const t = iconAsk;
+            setIconAsk(undefined);
+            insert(t, { icon });
+          }}
+        />
+      )}
+      {toast && <Toast message={toast} onClose={closeToast} />}
       {restoreAsk && <RestoreDialog entry={restoreAsk} busy={restoring} error={restoreError} onCancel={() => !restoring && setRestoreAsk(undefined)} onConfirm={() => restore(restoreAsk)} />}
     </div>
   );

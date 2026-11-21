@@ -1027,6 +1027,12 @@ button.panel-tab:hover {
 .canvas.panning {
   cursor: grabbing;
 }
+.canvas.inserting {
+  cursor: crosshair;
+}
+.canvas.inserting .board:hover {
+  cursor: crosshair;
+}
 .board-label {
   position: absolute;
   height: 14px;
@@ -1147,6 +1153,12 @@ button.panel-tab:hover {
   background: var(--surface);
   border: 1px solid var(--border);
   box-shadow: 0 4px 16px #00000024;
+  max-width: calc(100% - 24px);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.view-controls > * {
+  flex: none;
 }
 .tool {
   display: grid;
@@ -1162,6 +1174,14 @@ button.panel-tab:hover {
 .tool.active {
   background: var(--accent);
   color: #fff;
+}
+.tool:disabled {
+  color: var(--text-muted);
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.tool:disabled:hover {
+  background: none;
 }
 .divider {
   width: 1px;
@@ -1219,7 +1239,8 @@ button.panel-tab:hover {
 }
 
 /* Canvas sempit: pill check naik supaya tidak tertutup kontrol view. */
-@container (max-width: 600px) {
+/* Toolbar dengan tool sisip (aplikasi 4) ~470px: pill naik di atas toolbar sebelum bertabrakan. */
+@container (max-width: 860px) {
   .checks-pill {
     bottom: 72px;
   }
@@ -2407,4 +2428,142 @@ button.panel-tab:hover {
   .switch i {
     transition: none;
   }
+}
+
+/* ---- Layer manual (aplikasi 4): menu "+", pemilih ikon, toast ---- */
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-right: 6px;
+}
+.add-layer-btn {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 5px;
+  background: var(--surface-hover);
+  color: var(--text-secondary);
+}
+.add-layer-btn:hover:not(:disabled),
+.add-layer-btn[aria-expanded='true'] {
+  color: var(--text-primary);
+}
+.add-layer-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.menu-item:disabled {
+  color: var(--text-muted);
+  cursor: not-allowed;
+}
+.menu-item:disabled:hover {
+  background: none;
+}
+.modal.icon-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: 520px;
+}
+.icon-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+  padding: 0 10px;
+  border-radius: 8px;
+  background: var(--input);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+}
+.icon-search:focus-within {
+  border-color: var(--accent);
+}
+.icon-search input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 13px;
+}
+.icon-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(76px, 1fr));
+  gap: 6px;
+  min-height: 120px;
+  max-height: 320px;
+  overflow-y: auto;
+  align-content: start;
+}
+.icon-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 4px 8px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+.icon-cell span {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.icon-cell:hover,
+.icon-cell:focus-visible {
+  background: var(--surface-hover);
+  border-color: var(--border);
+  outline: none;
+}
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 84px;
+  z-index: 60;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  width: max-content;
+  max-width: min(520px, calc(100vw - 32px));
+  padding: 10px 10px 10px 12px;
+  border-radius: 8px;
+  background: var(--modal);
+  border: 1px solid var(--border);
+  box-shadow: 0 8px 24px #00000033;
+  color: var(--text-primary);
+  font-size: 13px;
+  line-height: 1.4;
+}
+.toast.error {
+  border-color: var(--danger);
+}
+.toast.error > svg {
+  flex: none;
+  margin-top: 2px;
+  color: var(--danger);
+}
+.toast-text {
+  flex: 1;
+  overflow-wrap: anywhere;
+}
+.toast-close {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  color: var(--text-muted);
+}
+.toast-close:hover {
+  background: var(--surface-hover);
+  color: var(--text-primary);
 }

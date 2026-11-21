@@ -279,3 +279,47 @@ describe('exportPng (aplikasi 2)', () => {
     expect(mod.exportFileName(null, 'f.png')).toBe('f.png');
   });
 });
+
+describe('layer manual (aplikasi 4)', () => {
+  it('execute: /docs/open lalu POST /execute {code, description} dengan sesi viewer; gagal → ApiError berisi hint', async () => {
+    let fail = false;
+    const calls = fakeFetch((c) => {
+      if (c.path === '/viewer/docs') return docs(['a']);
+      if (c.path === '/viewer/docs/a') return doc('a');
+      if (c.path === '/sessions') return ok({ sessionId: 's1' });
+      if (c.path === '/docs/open') return ok({ docId: 'Dddddddd', slug: 'a', rev: 1, created: false });
+      if (c.path === '/execute') {
+        if (fail) return { status: 422, body: { ok: false, error: { code: 'RENDER_FAILED', message: 'render gagal', hint: 'periksa font', retryable: false } } };
+        return ok({ docId: 'Dddddddd', rev: 2, created: [{ id: 'Nnnnnnn1', name: 'Rectangle' }], check: { boards: ['Bbbbbbb1'] } });
+      }
+      throw new Error(`tak terduga ${c.path}`);
+    });
+    const api = await freshApi();
+    const r = await api.execute('a', 'add("B", {})', 'Insert rectangle into Desktop board');
+    expect(r).toMatchObject({ rev: 2, created: [{ id: 'Nnnnnnn1' }] });
+    const ex = calls.find((c) => c.path === '/execute')!;
+    expect(ex).toMatchObject({ method: 'POST', session: 's1', body: { code: 'add("B", {})', description: 'Insert rectangle into Desktop board' } });
+    expect(calls.findIndex((c) => c.path === '/docs/open')).toBeLessThan(calls.indexOf(ex));
+    fail = true;
+    await expect(api.execute('a', 'x', 'Insert rectangle into Desktop board')).rejects.toMatchObject({ code: 'RENDER_FAILED', hint: 'periksa font', status: 422 });
+  });
+
+  it('uploadAsset: byte mentah + content-type file; 413 → ApiError; iconSearch memakai sesi', async () => {
+    const seen: { path: string; type: string | undefined; body: unknown }[] = [];
+    let big = false;
+    vi.stubGlobal('fetch', async (path: string, init: { method: string; headers: Record<string, string>; body?: unknown }) => {
+      seen.push({ path, type: init.headers['content-type'], body: init.body });
+      if (path === '/sessions') return new Response(JSON.stringify({ ok: true, data: { sessionId: 's1' } }));
+      if (path === '/icons/search') return new Response(JSON.stringify({ ok: true, data: { query: 'star', results: [{ lib: 'lucide', icon: 'star' }] } }));
+      if (big) return new Response(JSON.stringify({ ok: false, error: { code: 'SCHEMA_INVALID', message: 'gambar melebihi 20 MB', hint: 'perkecil', retryable: false } }), { status: 413 });
+      return new Response(JSON.stringify({ ok: true, data: { assetId: 'f'.repeat(64), mime: 'image/png', width: 1200, height: 800 } }));
+    });
+    const api = await freshApi();
+    const file = new Blob([new Uint8Array([137, 80, 78, 71])], { type: 'image/png' });
+    expect(await api.uploadAsset(file)).toMatchObject({ width: 1200, height: 800 });
+    expect(seen[0]).toMatchObject({ path: '/viewer/assets', type: 'image/png', body: file });
+    big = true;
+    await expect(api.uploadAsset(file)).rejects.toMatchObject({ status: 413, code: 'SCHEMA_INVALID' });
+    expect(await api.iconSearch('star')).toEqual([{ lib: 'lucide', icon: 'star' }]);
+  });
+});

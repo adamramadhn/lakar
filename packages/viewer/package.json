@@ -16,6 +16,9 @@
     "react-dom": "19.3.1"
   },
   "devDependencies": {
+    "@lakar/core": "workspace:*",
+    "@lakar/exec": "workspace:*",
+    "@lakar/icons": "workspace:*",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
     "@vitejs/plugin-react": "6.3.0",

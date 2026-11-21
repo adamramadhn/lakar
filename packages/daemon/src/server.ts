@@ -63,6 +63,18 @@ const STATUS: Record<ErrorCode, number> = {
 };
 
 /** Route statis (modul render, font, aset): `<what> tidak ada`. */
+const SVG_TAGS = new Set(['path', 'circle', 'ellipse', 'rect', 'line', 'polyline', 'polygon']);
+const xmlAttr = (v: string) => v.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+/** Glyph katalog → SVG mandiri (warna netral, terbaca di tema gelap dan terang). */
+function glyphSvg(g: IconGlyph): string {
+  const paint = g.kind === 'stroke' ? 'fill="none" stroke="#8A8A8A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"' : 'fill="#8A8A8A"';
+  const body = g.nodes
+    .filter(([tag]) => SVG_TAGS.has(tag))
+    .map(([tag, attrs]) => `<${tag} ${Object.entries(attrs).filter(([k]) => /^[a-z-]+$/i.test(k)).map(([k, v]) => `${k}="${xmlAttr(String(v))}"`).join(' ')}/>`)
+    .join('');
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${g.viewBox.join(' ')}" ${paint}>${body}</svg>`;
+}
+
 const fileNotFound = (what: string) => notFound(`${what} tidak ada`, 'periksa path');
 
 /** assetId fill gambar di subtree `n` (untuk catatan placeholder aset jarak jauh). */
@@ -634,9 +646,22 @@ export function buildServer({
 
   // Viewer baca-saja (Viewer B slice 1): `/viewer/*` dan `/app/*`. Route lama tidak berubah.
   registerViewerRoutes(app, { docs, store, sessions, distDir: config.viewerDir ?? VIEWER_DIST_DIR });
-  registerFileRoutes(app, { docs, store, sessions, docLocks, activity });
+  registerFileRoutes(app, { docs, store, sessions, docLocks, activity, dataDir: config.dataDir });
   registerExportRoutes(app, { docs, store, render, icons });
   registerConnectionRoutes(app, { host: config.host, port: config.port, ...(config.mcpEntry ? { mcpEntry: config.mcpEntry } : {}) });
+
+  // Pratinjau ikon untuk pemilih Icon… di viewer (aplikasi 4): glyph katalog sebagai SVG statis. Pencarian tetap lewat
+  // `/icons/search`; route ini hanya menggambar hasilnya. Tag di luar daftar putih dilewati.
+  app.get<{ Params: { lib: string; icon: string } }>('/viewer/icons/:lib/:icon', async (req, reply) => {
+    const { lib, icon } = req.params;
+    const glyph = (ICON_LIBS as readonly string[]).includes(lib) ? (icons.glyph(lib as (typeof ICON_LIBS)[number], icon) as IconGlyph | undefined) : undefined;
+    if (!glyph) throw fileNotFound(`ikon ${lib}/${icon}`);
+    return reply
+      .type('image/svg+xml; charset=utf-8')
+      .header('cache-control', 'public, max-age=86400')
+      .header('content-security-policy', "default-src 'none'; style-src 'unsafe-inline'")
+      .send(glyphSvg(glyph));
+  });
 
   // Aset gambar (story 8): `<dataDir>/assets/<sha256>`, hanya raster dari magic bytes; lainnya → 404.
   // Aset jarak jauh (Unsplash): meta tanpa byte di `assets/`, disajikan dari cache render daemon (hotlink resmi saat

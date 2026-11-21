@@ -3,12 +3,16 @@
 // Mode pratinjau versi (History, aplikasi 3): board dari snapshot (POST revs/:rev/screenshot), banner
 // "Previewing …" dengan Back to latest / Restore this version; Export, Checks, dan outline agen disembunyikan.
 // Tool edit (batch 4) wajib nonaktif selama `preview` ada.
+// Layer manual (aplikasi 4): tool sisip Frame (F), Rectangle (R), Ellipse (O), Text (T), Image (Shift+Ctrl/Cmd+K),
+// Icon (I). Klik di board → `onInsert` dengan koordinat board; Frame di area kosong → koordinat halaman (board baru).
+// Sesudah satu sisipan tool kembali ke Select. `editable` false (pratinjau versi, offline) → tool sisip nonaktif.
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import type { FindingSummary } from '@lakar/schema';
 import { api, errorText } from './api';
+import { INSERT_KINDS, type InsertKind } from './codegen';
 import { ExportButton } from './ExportPopover';
 import { useRetry } from './hooks';
-import { Icon } from './icons';
+import { Icon, type IconName } from './icons';
 
 export type CanvasBoard = { id: string; name: string; x: number; y: number; width: number; height: number };
 export type Highlight = { boardId: string; bounds?: [number, number, number, number] };
@@ -31,6 +35,15 @@ export type CanvasPreview = {
   onRestore: () => void;
 };
 type Camera = { x: number; y: number; z: number };
+/** Titik sisip: dalam board (`boardId`, koordinat board) atau di halaman (tanpa board, koordinat halaman). */
+export type InsertPoint = { boardId: string; x: number; y: number } | { boardId?: undefined; x: number; y: number };
+type Tool = 'select' | 'hand' | InsertKind;
+const isInsertTool = (t: Tool): t is InsertKind => t !== 'select' && t !== 'hand';
+const TOOL_ICON: Record<InsertKind, IconName> = { frame: 'frame', rect: 'square', ellipse: 'circle', text: 'text', image: 'image', icon: 'shapes' };
+const TOOL_KEYS: Record<string, InsertKind> = { f: 'frame', r: 'rect', o: 'ellipse', t: 'text', i: 'icon' };
+const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
+/** Label shortcut untuk tooltip/menu (Image: Shift+Ctrl/⌘+K). */
+export const shortcutLabel = (kind: InsertKind) => (kind === 'image' ? (isMac ? '⇧⌘K' : 'Ctrl Shift K') : (INSERT_KINDS.find((k) => k.kind === kind)?.key ?? ''));
 
 const ZOOM_MIN = 0.05;
 const ZOOM_MAX = 8;
@@ -107,6 +120,8 @@ export function Canvas({
   onSelect,
   onOpenChecks,
   preview,
+  editable = false,
+  onInsert,
 }: {
   slug: string;
   rev: number;
@@ -123,12 +138,21 @@ export function Canvas({
   onOpenChecks: () => void;
   /** Pratinjau versi lama (History); `undefined` = versi terkini. */
   preview?: CanvasPreview | undefined;
+  /** Tool sisip aktif (bukan pratinjau, daemon online). */
+  editable?: boolean;
+  /** Klik dengan tool sisip: board di bawah kursor (koordinat board) atau halaman (hanya Frame). */
+  onInsert?: (kind: InsertKind, at: InsertPoint) => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ w: 0, h: 0 });
   const [cam, setCam] = useState<Camera>({ x: 0, y: 0, z: 1 });
   const [fitted, setFitted] = useState(false);
-  const [tool, setTool] = useState<'select' | 'hand'>('select');
+  const [tool, setTool] = useState<Tool>('select');
+  const canInsert = editable && !preview && onInsert !== undefined;
+  // Pratinjau/offline: tool sisip yang aktif kembali ke Select.
+  useEffect(() => {
+    if (!canInsert) setTool((t) => (isInsertTool(t) ? 'select' : t));
+  }, [canInsert]);
   const [spaceHeld, setSpaceHeld] = useState(false);
   const [panning, setPanning] = useState(false);
   const drag = useRef<{ x: number; y: number; cam: Camera; moved: boolean; pan: boolean; target: string | undefined } | null>(null);
@@ -227,16 +251,32 @@ export function Canvas({
       return t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || t instanceof HTMLSelectElement || t.isContentEditable || t.closest('[role="treeitem"]') !== null;
     };
     const down = (e: KeyboardEvent) => {
-      if (typing(e) || e.metaKey || e.ctrlKey || e.altKey) return;
+      // Dialog atau menu terbuka: shortcut kanvas tidak berlaku.
+      if (typing(e) || document.querySelector('.modal-scrim, .menu-layer')) return;
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && !e.altKey && e.key.toLowerCase() === 'k') {
+        if (canInsert) {
+          e.preventDefault();
+          setTool('image');
+        }
+        return;
+      }
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const insertKey = TOOL_KEYS[e.key.toLowerCase()];
       if (e.code === 'Space') {
         setSpaceHeld(true);
         if (e.target === document.body) e.preventDefault();
       } else if (e.key === 'v' || e.key === 'V') setTool('select');
       else if (e.key === 'h' || e.key === 'H') setTool('hand');
+      else if (insertKey && !e.shiftKey) {
+        if (canInsert) setTool(insertKey);
+      }
       else if (e.key === '!' || (e.shiftKey && e.code === 'Digit1')) fit();
       else if (e.key === '+' || e.key === '=') zoomAt(1.25, size.w / 2, size.h / 2);
       else if (e.key === '-') zoomAt(1 / 1.25, size.w / 2, size.h / 2);
-      else if (e.key === 'Escape') onSelect(undefined);
+      else if (e.key === 'Escape') {
+        setTool((t) => (isInsertTool(t) ? 'select' : t));
+        onSelect(undefined);
+      }
     };
     const up = (e: KeyboardEvent) => e.code === 'Space' && setSpaceHeld(false);
     const blur = () => setSpaceHeld(false);
@@ -248,7 +288,7 @@ export function Canvas({
       window.removeEventListener('keyup', up);
       window.removeEventListener('blur', blur);
     };
-  }, [fit, zoomAt, size, onSelect]);
+  }, [fit, zoomAt, size, onSelect, canInsert]);
 
   const onPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
     if ((e.target as HTMLElement).closest('.canvas-overlay-ui')) return;
@@ -272,7 +312,25 @@ export function Canvas({
     const d = drag.current;
     drag.current = null;
     setPanning(false);
-    if (d && !d.pan && !d.moved) onSelect(d.target);
+    if (!d || d.pan || d.moved) return;
+    if (isInsertTool(tool)) {
+      insertAt(tool, d.x, d.y, d.target);
+      return;
+    }
+    onSelect(d.target);
+  };
+  /** Klik tool sisip di (clientX, clientY): koordinat board = (clientX − kiri kanvas − cam.x)/z − board.x. */
+  const insertAt = (kind: InsertKind, clientX: number, clientY: number, boardId: string | undefined) => {
+    const el = ref.current;
+    if (!el || !canInsert) return;
+    const r = el.getBoundingClientRect();
+    const px = (clientX - r.left - cam.x) / cam.z;
+    const py = (clientY - r.top - cam.y) / cam.z;
+    const b = boardId ? boards.find((x) => x.id === boardId) : undefined;
+    if (b) onInsert?.(kind, { boardId: b.id, x: Math.round(px - b.x), y: Math.round(py - b.y) });
+    else if (kind === 'frame') onInsert?.(kind, { x: Math.round(px), y: Math.round(py) });
+    else return; // tipe lain butuh board: klik di luar board diabaikan, tool tetap aktif
+    setTool('select');
   };
   /** Gestur dibatalkan (mis. sistem mengambil alih pointer): bersihkan tanpa memilih apa pun. */
   const onPointerCancel = () => {
@@ -296,7 +354,7 @@ export function Canvas({
   return (
     <section
       ref={ref}
-      className={`canvas${handMode ? ' hand' : ''}${panning ? ' panning' : ''}${preview ? ' previewing' : ''}`}
+      className={`canvas${handMode ? ' hand' : isInsertTool(tool) ? ' inserting' : ''}${panning ? ' panning' : ''}${preview ? ' previewing' : ''}`}
       aria-label="Canvas"
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
@@ -383,6 +441,24 @@ export function Canvas({
         <button type="button" className={`tool${tool === 'hand' ? ' active' : ''}`} aria-label="Hand (H)" title="Hand (H)" aria-pressed={tool === 'hand'} onClick={() => setTool('hand')}>
           <Icon name="hand" />
         </button>
+        <span className="divider" />
+        {INSERT_KINDS.map(({ kind, label }) => {
+          const tip = `${label} (${shortcutLabel(kind)})`;
+          return (
+            <button
+              key={kind}
+              type="button"
+              className={`tool${tool === kind ? ' active' : ''}`}
+              aria-label={tip}
+              title={canInsert ? tip : preview ? `${label}: not available while previewing a version` : `${label}: lakard is offline`}
+              aria-pressed={tool === kind}
+              disabled={!canInsert}
+              onClick={() => setTool(tool === kind ? 'select' : kind)}
+            >
+              <Icon name={TOOL_ICON[kind]} />
+            </button>
+          );
+        })}
         <span className="divider" />
         <button type="button" className="tool" aria-label="Zoom out" title="Zoom out (-)" onClick={() => zoomAt(1 / 1.25, ...center())}>
           <Icon name="minus" />

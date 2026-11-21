@@ -7,7 +7,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createDocument, transact } from '@lakar/core';
 import { LakarError } from '@lakar/schema';
-import { buildServer, exportFileName, loadConfig, slugify, withSuffix } from './index.js';
+import { ASSET_UPLOAD_MAX, buildServer, exportFileName, loadConfig, slugify, withSuffix } from './index.js';
+import { solidPng } from './assets.js';
 import { readPngSize } from './png.js';
 
 const baseConfig = { ...loadConfig({}), unsplashKeyFile: '/nonexistent/lakar-test/unsplash-access-key', pexelsKeyFile: '/nonexistent/lakar-test/pexels-api-key' };
@@ -360,5 +361,71 @@ describe('POST /viewer/docs/:slug/export (aplikasi 2)', () => {
   it('exportFileName: nama board di-slugify; kosong → id board', () => {
     expect(exportFileName('shop', { id: 'b1', name: 'Hero / Mobile' }, 2)).toBe('shop-hero-mobile@2x.png');
     expect(exportFileName('shop', { id: 'B1', name: '!!!' }, 1)).toBe('shop-b1@1x.png');
+  });
+});
+
+// Layer manual (aplikasi 4): unggah gambar mentah untuk node Image.
+describe('POST /viewer/assets', () => {
+  const upload = (app: Awaited<ReturnType<typeof setup>>['app'], payload: Buffer, type = 'application/octet-stream') =>
+    app.inject({ method: 'POST', url: '/viewer/assets', payload, headers: { 'content-type': type } });
+
+  it('PNG 1200×800 → aset tersimpan {assetId, width, height}; bisa dipakai fill image lewat execute', async () => {
+    const t = await setup();
+    const png = solidPng(1200, 800, [200, 100, 50]);
+    const r = await upload(t.app, png, 'image/png');
+    expect(r.statusCode, r.body).toBe(200);
+    const data = r.json().data;
+    expect(data).toMatchObject({ width: 1200, height: 800, mime: 'image/png' });
+    expect(data.assetId).toMatch(/^[0-9a-f]{64}$/);
+    expect(existsSync(join(t.dataDir, 'assets', data.assetId))).toBe(true);
+    const served = await t.get(`/assets/${data.assetId}`);
+    expect(served.statusCode).toBe(200);
+    expect(served.headers['content-type']).toBe('image/png');
+    // Unggah ulang byte sama → assetId sama (idempoten); octet-stream juga diterima.
+    expect((await upload(t.app, png)).json().data.assetId).toBe(data.assetId);
+
+    const { slug } = await t.create('Assets');
+    const s = await t.session();
+    expect((await t.post('/docs/open', { slug }, s)).statusCode).toBe(200);
+    const board = (await t.get(`/viewer/docs/${slug}`)).json().data.doc.pages[0].children[0].id as string;
+    const code = `add(${JSON.stringify(board)}, ${JSON.stringify({ type: 'rect', name: 'Image', position: 'absolute', x: 10, y: 10, width: 400, height: 267, fills: [{ type: 'image', assetId: data.assetId, fit: 'cover' }] })})`;
+    const ex = await t.post('/execute', { code, description: 'Insert image into Desktop board' }, s);
+    expect(ex.statusCode, ex.body).toBe(200);
+    expect(ex.json().data.rev).toBe(2);
+  });
+
+  it('bukan gambar → 400 SCHEMA_INVALID; body kosong → 400', async () => {
+    const t = await setup();
+    const r = await upload(t.app, Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"/>'), 'image/svg+xml');
+    expect(r.statusCode).toBe(400);
+    expect(r.json().error.code).toBe('SCHEMA_INVALID');
+    expect((await upload(t.app, Buffer.from('hello'))).json().error.code).toBe('SCHEMA_INVALID');
+    expect((await upload(t.app, Buffer.alloc(0))).statusCode).toBe(400);
+  });
+
+  it('> 20 MB → 413; route JSON lain tetap dibatasi 1 MB (400)', async () => {
+    const t = await setup();
+    const big = Buffer.concat([PNG_1x1, Buffer.alloc(ASSET_UPLOAD_MAX)]);
+    const r = await upload(t.app, big, 'image/png');
+    expect(r.statusCode).toBe(413);
+    expect(r.json()).toMatchObject({ ok: false, error: { code: 'SCHEMA_INVALID' } });
+    // Gambar < 20 MB tapi > 1 MB diterima (batas khusus route ini).
+    const mid = Buffer.concat([PNG_1x1, Buffer.alloc(2 * 1024 * 1024)]);
+    expect((await upload(t.app, mid, 'image/png')).statusCode).toBe(200);
+    const json = await t.post('/viewer/docs', { name: 'x'.repeat(2 * 1024 * 1024) });
+    expect(json.statusCode).toBe(400);
+  });
+});
+
+describe('GET /viewer/icons/:lib/:icon', () => {
+  it('glyph katalog → SVG; tidak dikenal → 404', async () => {
+    const t = await setup();
+    const r = await t.get('/viewer/icons/lucide/star');
+    expect(r.statusCode).toBe(200);
+    expect(r.headers['content-type']).toMatch(/^image\/svg\+xml/);
+    expect(r.body).toMatch(/^<svg xmlns="http:\/\/www.w3.org\/2000\/svg" viewBox="0 0 24 24"/);
+    expect(r.body).toContain('<path');
+    expect((await t.get('/viewer/icons/lucide/no-such-icon-xyz')).statusCode).toBe(404);
+    expect((await t.get('/viewer/icons/evil/star')).statusCode).toBe(404);
   });
 });

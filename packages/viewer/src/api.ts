@@ -3,6 +3,8 @@
 // sesudahnya cache dokumen/screenshot slug terkait dibuang dan pendengar `onDocsChanged` dipanggil.
 // History (aplikasi 3): versi lama dari snapshot (GET revs/:rev, POST revs/:rev/screenshot, di-cache per
 // `slug@rev`, isinya tidak pernah berubah) dan Restore (tulis, lewat antrean yang sama).
+// Layer manual (aplikasi 4): `execute` (POST /execute dari sesi viewer sendiri, kode dari codegen.ts), unggah
+// gambar (POST /viewer/assets, byte mentah), dan cari ikon (POST /icons/search).
 // Bentuk respons AD-11: {ok:true,data} | {ok:false,error}.
 import type { Finding, FindingSummary, LakarDocument } from '@lakar/schema';
 
@@ -23,6 +25,10 @@ export type Screenshot = { boardId: string; width: number; height: number; url: 
 export type InspectNode = Record<string, unknown> & { id: string; name: string; type?: string; bounds?: [number, number, number, number]; children?: InspectNode[]; childCount?: number };
 export type InspectResult = { docId: string; rev: number; boardId: string; node: InspectNode; truncated?: boolean };
 export type HistoryEntry = { rev: number; description: string; opsSummary: string; opCount: number; at: string; session: string; client?: string; snapshot?: boolean };
+/** Hasil execute dari viewer (subset respons `/execute`). */
+export type ExecuteResult = { docId: string; rev: number; created: { id: string; name: string }[]; check?: { boards?: string[] } };
+export type UploadedAsset = { assetId: string; mime: string; width: number; height: number };
+export type IconResult = { lib: string; icon: string; title?: string; aliasOf?: string };
 export type LayoutCheck = { docId: string; rev: number; boards: unknown; summary: FindingSummary; findings: Finding[]; ranAt: number };
 
 /** lakard tidak bisa dihubungi (jaringan). */
@@ -416,6 +422,61 @@ class ViewerClient {
     return this.#withDoc(slug, (s) => request<InspectResult>('POST', '/inspect', { id, depth }, s));
   }
 
+  /**
+   * Jalankan snippet `code` pada dokumen `slug` dari sesi viewer (layer manual). Transaksi, history, dan
+   * `layout_check` sama dengan execute agen; gagal → ApiError (dokumen di-rollback daemon).
+   */
+  execute(slug: string, code: string, description: string): Promise<ExecuteResult> {
+    return this.#withDoc(slug, async (s) => {
+      const r = await request<ExecuteResult>('POST', '/execute', { code, description }, s);
+      if (this.#active === slug) this.#activeRev = Math.max(this.#activeRev, r.rev);
+      return r;
+    });
+  }
+
+  /** Unggah gambar (byte mentah) ke store aset daemon. Bukan gambar → 400, > 20 MB → 413 (ApiError). */
+  async uploadAsset(file: Blob): Promise<UploadedAsset> {
+    let res: Response;
+    try {
+      res = await fetch('/viewer/assets', { method: 'POST', headers: { 'content-type': file.type || 'application/octet-stream' }, body: file });
+    } catch (e) {
+      setOffline(true);
+      throw new OfflineError(e instanceof Error ? e.message : String(e));
+    }
+    let json: { ok?: boolean; data?: UploadedAsset; error?: { code: string; message: string; hint: string } } | undefined;
+    try {
+      json = await res.json();
+    } catch {
+      json = undefined;
+    }
+    if (!json && (res.status === 502 || res.status === 503 || res.status === 504)) {
+      setOffline(true);
+      throw new OfflineError(`HTTP ${res.status}`);
+    }
+    setOffline(false);
+    if (json?.ok && json.data) return json.data;
+    const err = json?.error ?? { code: res.status === 413 ? 'SCHEMA_INVALID' : 'EXEC_ERROR', message: res.status === 413 ? 'Image is larger than 20 MB' : `HTTP ${res.status}`, hint: '' };
+    throw new ApiError(err.code, err.message, err.hint, res.status);
+  }
+
+  /** Cari ikon katalog (POST /icons/search, butuh sesi; tanpa dokumen aktif). Sesi hilang → buat ulang sekali. */
+  async iconSearch(query: string, limit = 48): Promise<IconResult[]> {
+    for (let attempt = 0; ; attempt++) {
+      const session = await this.#sessionId();
+      try {
+        const { results } = await request<{ results: IconResult[] }>('POST', '/icons/search', { query, limit }, session);
+        return results;
+      } catch (e) {
+        if (attempt === 0 && e instanceof ApiError && e.status === 401) {
+          this.#session = undefined;
+          this.#active = undefined;
+          continue;
+        }
+        throw e;
+      }
+    }
+  }
+
   layoutCheck(slug: string): Promise<LayoutCheck> {
     return this.#withDoc(slug, async (s) => ({ ...(await request<Omit<LayoutCheck, 'ranAt'>>('POST', '/layout-check', {}, s)), ranAt: Date.now() }));
   }
@@ -438,6 +499,9 @@ export function exportFileName(disposition: string | null, fallback: string): st
 }
 
 export const api = new ViewerClient();
+
+/** URL pratinjau SVG ikon katalog (GET /viewer/icons/:lib/:icon). */
+export const iconPreviewUrl = (lib: string, icon: string) => `/viewer/icons/${encodeURIComponent(lib)}/${encodeURIComponent(icon)}`;
 
 export function errorText(e: unknown): string {
   if (e instanceof OfflineError) return "Can't reach lakard";

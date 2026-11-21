@@ -2,7 +2,8 @@
 title: 'Aplikasi 4: tambah dan hapus layer manual dari kanvas'
 type: 'feature'
 created: '2026-11-21'
-status: 'ready-for-dev'
+status: 'in-review'
+baseline_commit: '04f532bf26e75306f1e835b02d13968bd42c13a4'
 route: 'dispatch'
 review_loop_iteration: 0
 context:
@@ -71,13 +72,21 @@ context:
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] daemon `POST /viewer/assets` + test.
-- [ ] viewer: tool, menu "+", pemilih ikon, upload, delete, `codegen.ts` + test.
+- [x] daemon `POST /viewer/assets` + test.
+- [x] viewer: tool, menu "+", pemilih ikon, upload, delete, `codegen.ts` + test.
 
 **Acceptance Criteria:**
 - Given Viewer dengan board, when pilih Rectangle lalu klik di board, then persegi muncul di posisi klik, terpilih di Layers, dan entri history baru tercatat.
 
 ## Implementation Notes
+
+- `POST /viewer/assets` didaftarkan di scope plugin fastify sendiri (parser byte mentah `application/octet-stream` dan `image/*`, `bodyLimit` 20 MB hanya di route ini). Error handler route mengembalikan 413 untuk body terlalu besar; error lain diteruskan ke handler global (route JSON lain tetap 1 MB → 400).
+- Pratinjau ikon di grid pemilih: route baca-saja baru `GET /viewer/icons/:lib/:icon` (glyph katalog → SVG). Pencarian tetap lewat `/icons/search`; tool MCP tidak berubah.
+- Menu "+": board terpilih (atau board pertama halaman) di (40, 40). Tanpa board, hanya Frame aktif dan membuat board 400×300 di posisi `place`; tipe lain dinonaktifkan ("Add a frame first"). Klik tool selain Frame di luar board diabaikan (tool tetap aktif).
+- Shift+Ctrl/Cmd+K mengaktifkan tool Image (klik board lalu pemilih file), sama seperti shortcut tool lain.
+- Viewer memuat ulang hanya board tersentuh (`check.boards` dari respons execute), lalu memilih node baru begitu ada di dokumen (halaman ikut pindah).
+- `codegen.test.ts` menjalankan kode hasil codegen di sandbox exec sungguhan, jadi viewer mendapat devDependencies `@lakar/core`, `@lakar/exec`, `@lakar/icons` (lockfile berubah).
+- Toolbar lebih lebar: pill `layout_check` naik di atas toolbar saat lebar kanvas ≤ 860px.
 
 ## Spec Change Log
 
