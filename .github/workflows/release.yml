@@ -1,0 +1,170 @@
+name: Release desktop
+
+# Tag v* → bangun installer tiga OS dan unggah ke GitHub Release.
+# workflow_dispatch → bangun saja; installer tersedia sebagai artefak run (tanpa rilis).
+on:
+  push:
+    tags: ['v*']
+    # SEMENTARA (validasi sebelum PR; workflow_dispatch baru bisa dipicu setelah file ada di main): hapus sebelum merge.
+    branches: ['claude/desktop-tauri-f5e05a']
+  workflow_dispatch:
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: build (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: windows-x64
+            os: windows-latest
+            target: x86_64-pc-windows-msvc
+            bundles: nsis,msi
+          - name: macos-arm64
+            os: macos-latest
+            target: aarch64-apple-darwin
+            bundles: app,dmg
+          - name: macos-x64
+            os: macos-latest
+            target: x86_64-apple-darwin
+            bundles: app,dmg
+          - name: linux-x64
+            os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            bundles: deb,appimage
+    defaults:
+      run:
+        shell: bash
+    env:
+      # Signing opsional: hanya aktif bila secret ada (lihat apps/desktop/README.md).
+      HAS_APPLE_CERT: ${{ secrets.APPLE_CERTIFICATE != '' }}
+      HAS_WINDOWS_CERT: ${{ secrets.WINDOWS_CERTIFICATE != '' }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+
+      - name: Install Linux build dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev libssl-dev patchelf file
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/desktop/src-tauri -> target
+          key: ${{ matrix.target }}
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build workspace
+        run: pnpm build
+
+      - name: Prepare sidecar (lakard + Node runtime)
+        run: node apps/desktop/scripts/prepare-sidecar.mjs --target ${{ matrix.target }}
+
+      - name: Set version from tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          # MSI hanya menerima x.y.z numerik; tag pra-rilis memakai versi di tauri.conf.json.
+          if [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "{\"version\":\"$version\"}" > apps/desktop/src-tauri/version.json
+            echo "TAURI_EXTRA_CONFIG=--config src-tauri/version.json" >> "$GITHUB_ENV"
+          fi
+
+      - name: Enable macOS signing
+        if: runner.os == 'macOS' && env.HAS_APPLE_CERT == 'true'
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          for v in APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD APPLE_SIGNING_IDENTITY APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID; do
+            if [ -n "${!v}" ]; then echo "$v=${!v}" >> "$GITHUB_ENV"; fi
+          done
+
+      - name: Enable Windows signing
+        if: runner.os == 'Windows' && env.HAS_WINDOWS_CERT == 'true'
+        shell: pwsh
+        env:
+          WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}
+          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+        run: |
+          $pfx = Join-Path $env:RUNNER_TEMP 'cert.pfx'
+          [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:WINDOWS_CERTIFICATE))
+          $pass = ConvertTo-SecureString -String $env:WINDOWS_CERTIFICATE_PASSWORD -Force -AsPlainText
+          $cert = Import-PfxCertificate -FilePath $pfx -CertStoreLocation Cert:\CurrentUser\My -Password $pass
+          Remove-Item $pfx
+          $json = @{ bundle = @{ windows = @{ certificateThumbprint = $cert.Thumbprint; digestAlgorithm = 'sha256'; timestampUrl = 'http://timestamp.digicert.com' } } } | ConvertTo-Json -Depth 5
+          Set-Content -Path apps/desktop/src-tauri/signing.json -Value $json -Encoding utf8
+          "TAURI_SIGNING_CONFIG=--config src-tauri/signing.json" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Build installers
+        working-directory: apps/desktop
+        run: pnpm tauri build --ci --target ${{ matrix.target }} --bundles ${{ matrix.bundles }} $TAURI_EXTRA_CONFIG $TAURI_SIGNING_CONFIG
+
+      - name: Collect installers
+        run: |
+          out="dist-installers/${{ matrix.name }}"
+          mkdir -p "$out"
+          bundle="apps/desktop/src-tauri/target/${{ matrix.target }}/release/bundle"
+          # Nama file Tauri sudah memuat arsitektur (mis. Lakar_0.1.0_aarch64.dmg, Lakar_0.1.0_x64-setup.exe).
+          find "$bundle" -maxdepth 2 -type f \( -name '*.msi' -o -name '*-setup.exe' -o -name '*.dmg' -o -name '*.AppImage' -o -name '*.deb' \) -print -exec cp {} "$out/" \;
+          ls -la "$out"
+          test -n "$(ls -A "$out")"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: lakar-${{ matrix.name }}
+          path: dist-installers/${{ matrix.name }}/*
+          if-no-files-found: error
+
+  publish:
+    name: publish release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: installers
+          merge-multiple: true
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          ls -la installers
+          prerelease=""
+          if [[ "$TAG" == *-* ]]; then prerelease="--prerelease"; fi
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$TAG" installers/* --clobber --repo "$GITHUB_REPOSITORY"
+          else
+            gh release create "$TAG" installers/* --repo "$GITHUB_REPOSITORY" --verify-tag --generate-notes --title "Lakar $TAG" $prerelease
+          fi
