@@ -521,3 +521,108 @@ describe('slug arsip dianggap terpakai', () => {
     expect((await t.post('/viewer/docs/shelf/unarchive')).statusCode).toBe(200);
   });
 });
+
+describe('dokumen hanya di memori (file dihapus dari luar aplikasi)', () => {
+  it('rename menulis balik salinan memori lalu memindahkannya; isi dan riwayat ikut', async () => {
+    const t = await setup();
+    await t.create('Ghost');
+    const s = await t.session();
+    await t.post('/docs/open', { slug: 'ghost' }, s);
+    await rm(t.docFile('ghost'));
+    const r = await t.post('/viewer/docs/ghost/rename', { name: 'Spirit' });
+    expect(r.statusCode, r.body).toBe(200);
+    expect(r.json().data).toEqual({ slug: 'spirit', from: 'ghost' });
+    expect(existsSync(t.docFile('ghost'))).toBe(false);
+    expect(JSON.parse(await readFile(t.docFile('spirit'), 'utf8')).rev).toBe(1);
+    expect((await t.history('spirit')).map((e) => e.rev)).toEqual([1]);
+    expect(await t.listed()).toEqual(['spirit']);
+    expect(t.sessions.byId(s)!.activeSlug).toBe('spirit');
+  });
+
+  it('archive menulis balik salinan memori lalu memindahkannya ke arsip', async () => {
+    const t = await setup();
+    await t.create('Ghost');
+    await rm(t.docFile('ghost'));
+    const r = await t.post('/viewer/docs/ghost/archive');
+    expect(r.statusCode, r.body).toBe(200);
+    expect(await t.listed()).toEqual([]);
+    expect(await t.archived()).toEqual(['ghost']);
+    expect(existsSync(t.docFile('ghost', t.archiveDir))).toBe(true);
+    expect((await t.post('/viewer/docs/ghost/unarchive')).statusCode).toBe(200);
+    expect(await t.listed()).toEqual(['ghost']);
+  });
+
+  it('delete cukup melupakan salinan memori: 200, hilang dari daftar, sesi agen dikosongkan; delete kedua → 404', async () => {
+    const t = await setup();
+    await t.create('Ghost');
+    const s = await t.session();
+    await t.post('/docs/open', { slug: 'ghost' }, s);
+    await rm(t.docFile('ghost'));
+    const r = await t.del('/viewer/docs/ghost');
+    expect(r.statusCode, r.body).toBe(200);
+    expect(r.json().data).toEqual({ slug: 'ghost', deleted: true });
+    expect(await t.listed()).toEqual([]);
+    expect(t.sessions.byId(s)!.activeSlug).toBeUndefined();
+    expect(existsSync(t.docFile('ghost'))).toBe(false);
+    expect((await t.del('/viewer/docs/ghost')).statusCode).toBe(404);
+  });
+});
+
+describe('event change untuk sinkron antar jendela', () => {
+  it('setiap tulis kelola file/folder sukses → satu event change dengan origin pengirim; gagal → tidak ada event', async () => {
+    const t = await setup();
+    const changes: unknown[] = [];
+    const plain: unknown[] = [];
+    t.activity.subscribeAll((e) => e.type === 'change' && changes.push(e.change));
+    t.activity.subscribe((e) => plain.push(e));
+    const send = (method: 'POST' | 'DELETE', url: string, payload?: unknown, origin = 'win-1') =>
+      t.app.inject({ method, url, ...(payload !== undefined ? { payload: payload as object } : {}), headers: { 'x-lakar-origin': origin } });
+    expect((await send('POST', '/viewer/docs', { name: 'Alpha' })).statusCode).toBe(200);
+    expect((await send('POST', '/viewer/docs/alpha/rename', { name: 'Beta' })).statusCode).toBe(200);
+    expect((await send('POST', '/viewer/docs/beta/rename', { name: 'Beta' })).statusCode).toBe(200); // no-op: tanpa event
+    expect((await send('POST', '/viewer/docs/beta/duplicate')).statusCode).toBe(200);
+    expect((await send('POST', '/viewer/docs/beta/archive')).statusCode).toBe(200);
+    expect((await send('POST', '/viewer/docs/beta/unarchive', undefined, 'bad origin!')).statusCode).toBe(200);
+    expect((await send('DELETE', '/viewer/docs/beta-copy')).statusCode).toBe(200);
+    const folder = await send('POST', '/viewer/folders', { name: 'Work' });
+    const id = folder.json().data.folder.id as string;
+    expect((await send('POST', '/viewer/folders/move', { slug: 'beta', folder: id })).statusCode).toBe(200);
+    expect((await send('POST', `/viewer/folders/${id}/rename`, { name: 'Play' })).statusCode).toBe(200);
+    expect((await send('DELETE', `/viewer/folders/${id}`)).statusCode).toBe(200);
+    expect((await send('POST', '/viewer/docs/zz/archive')).statusCode).toBe(404);
+    expect(changes).toEqual([
+      { kind: 'create', slug: 'alpha', rev: 1, origin: 'win-1' },
+      { kind: 'rename', slug: 'beta', from: 'alpha', origin: 'win-1' },
+      { kind: 'duplicate', slug: 'beta-copy', from: 'beta', rev: 0, origin: 'win-1' },
+      { kind: 'archive', slug: 'beta', origin: 'win-1' },
+      { kind: 'unarchive', slug: 'beta' },
+      { kind: 'delete', slug: 'beta-copy', archived: false, origin: 'win-1' },
+      { kind: 'folders', origin: 'win-1' },
+      { kind: 'folders', slug: 'beta', origin: 'win-1' },
+      { kind: 'folders', origin: 'win-1' },
+      { kind: 'folders', origin: 'win-1' },
+    ]);
+    // Pelanggan lama (`subscribe`) tidak menerima event change.
+    expect(plain).toEqual([]);
+  });
+
+  it('restore membawa origin di event call; tanpa header → tanpa origin', async () => {
+    const t = await setup();
+    const calls: { status: string; origin?: string }[] = [];
+    t.activity.subscribe((e) => e.type === 'call' && calls.push(e.call));
+    await t.create('a');
+    const s = await t.session();
+    await t.post('/docs/open', { slug: 'a' }, s);
+    expect((await t.post('/execute', { code: BOARD, description: 'tambah board ekstra mobile' }, s)).statusCode).toBe(200);
+    calls.length = 0;
+    const r = await t.app.inject({ method: 'POST', url: '/viewer/docs/a/restore', payload: { rev: 1 }, headers: { 'x-lakar-origin': 'win-2' } });
+    expect(r.statusCode, r.body).toBe(200);
+    expect(calls.map((c) => [c.status, c.origin])).toEqual([
+      ['running', 'win-2'],
+      ['done', 'win-2'],
+    ]);
+    calls.length = 0;
+    expect((await t.post('/viewer/docs/a/restore', { rev: 2 })).statusCode).toBe(200);
+    expect(calls.every((c) => c.origin === undefined)).toBe(true);
+  });
+});
