@@ -11,6 +11,7 @@ export type DaemonStatus = { version: string; host: string; port: number; dataDi
 export type Screenshot = { boardId: string; width: number; height: number; url: string };
 export type InspectNode = Record<string, unknown> & { id: string; name: string; type?: string; bounds?: [number, number, number, number]; children?: InspectNode[]; childCount?: number };
 export type InspectResult = { docId: string; rev: number; boardId: string; node: InspectNode; truncated?: boolean };
+export type HistoryEntry = { rev: number; description: string; opsSummary: string; opCount: number; at: string; session: string; client?: string };
 export type LayoutCheck = { docId: string; rev: number; boards: unknown; summary: FindingSummary; findings: Finding[]; ranAt: number };
 
 /** lakard tidak bisa dihubungi (jaringan). */
@@ -109,6 +110,8 @@ class ViewerClient {
   #activeRev = -1;
   /** Screenshot per `slug@rev:boardId` (rev dari daemon). */
   #shots = new Map<string, Promise<Screenshot>>();
+  /** Screenshot terbaru per `slug:boardId` dengan rev render-nya: board yang tidak berubah sejak `seenRev` dipakai ulang. */
+  #latest = new Map<string, { rev: number; shot: Promise<Screenshot> }>();
   /** Permintaan screenshot yang sedang antre, per argumen pemanggil. */
   #pending = new Map<string, Promise<Screenshot>>();
 
@@ -126,6 +129,12 @@ class ViewerClient {
     const { doc } = await request<{ doc: LakarDocument }>('GET', `/viewer/docs/${encodeURIComponent(slug)}`);
     this.#known.add(slug);
     return doc;
+  }
+
+  /** Riwayat revisi dokumen (GET /viewer/docs/:slug/history), urut rev turun. */
+  async getHistory(slug: string): Promise<HistoryEntry[]> {
+    const { entries } = await request<{ entries: HistoryEntry[] }>('GET', `/viewer/docs/${encodeURIComponent(slug)}/history`);
+    return entries;
   }
 
   #sessionId(): Promise<string> {
@@ -188,8 +197,12 @@ class ViewerClient {
   /**
    * PNG board (renderer yang sama dengan bench, AD-6), di-cache per `slug@rev:boardId` dengan rev yang
    * benar-benar dirender daemon (respons `/docs/open`), bukan rev dari pemanggil (`seenRev` hanya petunjuk).
+   * `seenRev` = rev terakhir board ini berubah: PNG yang dirender pada rev ≥ `seenRev` masih benar dan dipakai ulang,
+   * jadi saat rev dokumen naik hanya board tersentuh yang dirender ulang.
    */
   screenshot(slug: string, seenRev: number, boardId: string): Promise<Screenshot> {
+    const latest = this.#latest.get(`${slug}:${boardId}`);
+    if (latest && latest.rev >= seenRev) return latest.shot;
     const pendingKey = `${slug}@${seenRev}:${boardId}`;
     let pending = this.#pending.get(pendingKey);
     if (!pending) {
@@ -205,8 +218,15 @@ class ViewerClient {
               height: d.height,
               url: pngUrl(d.png),
             }));
-            hit.catch(() => this.#shots.delete(key));
+            const latestKey = `${slug}:${boardId}`;
+            const entry = { rev, shot: hit };
+            hit.catch(() => {
+              this.#shots.delete(key);
+              if (this.#latest.get(latestKey) === entry) this.#latest.delete(latestKey);
+            });
             this.#shots.set(key, hit);
+            const prev = this.#latest.get(latestKey);
+            if (!prev || prev.rev <= rev) this.#latest.set(latestKey, entry);
           }
           return hit;
         },

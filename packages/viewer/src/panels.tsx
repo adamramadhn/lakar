@@ -1,5 +1,5 @@
-// Panel kanan Viewer: Inspect (properti dari POST /inspect), Checks (temuan layout_check), dan empty state
-// "Segera hadir" untuk Activity/History (di luar slice 1).
+// Panel kanan Viewer: Inspect (properti dari POST /inspect) dan Checks (temuan layout_check). Activity dan
+// History ada di ActivityPanel.tsx dan HistoryPanel.tsx.
 import { useState, type ReactNode } from 'react';
 import { G0_RULES, isGateRule, type Finding } from '@lakar/schema';
 import type { InspectResult, LayoutCheck } from './api';
@@ -39,14 +39,6 @@ function Empty({ icon, title, text, children }: { icon: IconName; title: string;
       <span>{text}</span>
       {children}
     </div>
-  );
-}
-
-export function SoonPanel({ icon, title, text }: { icon: IconName; title: string; text: string }) {
-  return (
-    <Empty icon={icon} title="Segera hadir" text={text}>
-      <span className="soon-tag">{title}</span>
-    </Empty>
   );
 }
 

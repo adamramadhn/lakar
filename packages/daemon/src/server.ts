@@ -41,6 +41,7 @@ import { INSPECT_DEPTH_DEFAULT, INSPECT_DEPTH_MAX, WIP_PREFIX, boundsMap, inspec
 import { readPngSize } from './png.js';
 import { Sessions, UnknownSessionError, logExecute, recallFailed, rememberFailed } from './sessions.js';
 import { DocStore } from './store.js';
+import { ActivityBus, registerActivityHooks } from './events.js';
 import { VIEWER_DIST_DIR, registerViewerRoutes } from './viewer.js';
 
 const STATUS: Record<ErrorCode, number> = {
@@ -161,6 +162,8 @@ export type BuildOptions = {
   skillsDir?: string;
   /** Layanan foto stok (default: Unsplash → Wikimedia → Openverse dengan key dari `config.unsplashKeyFile`). */
   photos?: PhotoService;
+  /** Interval heartbeat SSE `/viewer/events` (default 15 dtk; untuk test). */
+  activityHeartbeatMs?: number;
 };
 
 export type Daemon = {
@@ -170,6 +173,8 @@ export type Daemon = {
   fonts: FontRegistry;
   icons: IconCatalogPort<string, IconGlyph>;
   photos: PhotoService;
+  /** Bus event aktivitas viewer (`GET /viewer/events`). */
+  activity: ActivityBus;
   startedAt: string;
 };
 
@@ -180,11 +185,13 @@ export function buildServer({
   icons = IconCatalog.load(),
   skillsDir = SKILLS_DIR,
   photos = new PhotoService({ dataDir: config.dataDir, keyFile: config.pexelsKeyFile, unsplashKeyFile: config.unsplashKeyFile, unsplashAppName: config.unsplashAppName }),
+  activityHeartbeatMs,
 }: BuildOptions): Daemon {
   const app = Fastify({ logger: false, bodyLimit: 1024 * 1024 });
   const startedAt = new Date();
   const store = new DocStore(config.dataDir);
   const sessions = new Sessions();
+  const activity = new ActivityBus();
   const docLocks = new DocumentLocks();
   /** Daemon pemilik tunggal (AD-1): salinan terkini per slug. */
   const docs = new Map<string, LakarDocument>();
@@ -216,6 +223,10 @@ export function buildServer({
       500,
     );
   });
+
+  // Stream aktivitas viewer (Viewer B slice 2): hook di luar handler + `GET /viewer/events`. Didaftarkan
+  // sebelum route supaya hook berlaku untuk semua route tool.
+  registerActivityHooks(app, { sessions, bus: activity, ...(activityHeartbeatMs !== undefined ? { heartbeatMs: activityHeartbeatMs } : {}) });
 
   const parse = <T>(schema: z.ZodType<T>, body: unknown, hint: string): T => {
     const r = schema.safeParse(body);
@@ -619,7 +630,7 @@ export function buildServer({
   });
 
   // Viewer baca-saja (Viewer B slice 1): `/viewer/*` dan `/app/*`. Route lama tidak berubah.
-  registerViewerRoutes(app, { docs, store, distDir: config.viewerDir ?? VIEWER_DIST_DIR });
+  registerViewerRoutes(app, { docs, store, sessions, distDir: config.viewerDir ?? VIEWER_DIST_DIR });
 
   // Aset gambar (story 8): `<dataDir>/assets/<sha256>`, hanya raster dari magic bytes; lainnya → 404.
   // Aset jarak jauh (Unsplash): meta tanpa byte di `assets/`, disajikan dari cache render daemon (hotlink resmi saat
@@ -632,5 +643,5 @@ export function buildServer({
     return reply.type(remote.type).header('cache-control', remote.placeholder ? 'no-store' : 'no-cache').send(remote.body);
   });
 
-  return { app, store, sessions, fonts, icons, photos, startedAt: startedAt.toISOString() };
+  return { app, store, sessions, fonts, icons, photos, activity, startedAt: startedAt.toISOString() };
 }

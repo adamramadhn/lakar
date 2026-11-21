@@ -8,6 +8,10 @@ import { Icon } from './icons';
 
 export type CanvasBoard = { id: string; name: string; x: number; y: number; width: number; height: number };
 export type Highlight = { boardId: string; bounds?: [number, number, number, number] };
+/** Board yang sedang dikerjakan agen: garis tepi berdenyut + label agen. */
+export type AgentMark = { session: string; boardId: string; label: string; color: 'agent' | 'codex'; running: boolean };
+/** Permintaan Follow agent: geser kamera ke board ini (sekali per `nonce`). */
+export type Focus = { boardId: string; nonce: number };
 type Camera = { x: number; y: number; z: number };
 
 const ZOOM_MIN = 0.05;
@@ -27,6 +31,23 @@ function fitCamera(boards: CanvasBoard[], w: number, h: number): Camera {
   const z = clampZoom(Math.min(1, (w - FIT_PAD * 2) / bw, (h - FIT_PAD * 2 - 24) / bh));
   return { z, x: (w - bw * z) / 2 - minX * z, y: (h - bh * z) / 2 - minY * z + 12 };
 }
+
+/** Board terlihat utuh di viewport dengan kamera `c`? */
+function boardVisible(b: CanvasBoard, c: Camera, w: number, h: number): boolean {
+  const left = c.x + b.x * c.z;
+  const top = c.y + b.y * c.z;
+  return left >= 0 && top >= 18 && left + b.width * c.z <= w && top + b.height * c.z <= h;
+}
+
+/** Kamera yang memusatkan board `b`; zoom saat ini dipertahankan kecuali board tidak muat. */
+function focusCamera(b: CanvasBoard, c: Camera, w: number, h: number): Camera {
+  const z = clampZoom(Math.min(c.z, (w - FIT_PAD * 2) / Math.max(1, b.width), (h - FIT_PAD * 2 - 24) / Math.max(1, b.height)));
+  return { z, x: w / 2 - (b.x + b.width / 2) * z, y: h / 2 - (b.y + b.height / 2) * z + 12 };
+}
+
+const reducedMotion = () => typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+/** Durasi geser kamera Follow agent (desain bagian 04: 500ms). */
+const FOLLOW_MS = 500;
 
 function BoardImage({ slug, rev, board }: { slug: string; rev: number; board: CanvasBoard }) {
   const [state, setState] = useState<{ url?: string; error?: string }>({});
@@ -57,7 +78,11 @@ function BoardImage({ slug, rev, board }: { slug: string; rev: number; board: Ca
 export function Canvas({
   slug,
   rev,
+  boardRevs,
   boards,
+  agents,
+  focus,
+  onFocused,
   highlight,
   summary,
   checksLoading,
@@ -66,7 +91,12 @@ export function Canvas({
 }: {
   slug: string;
   rev: number;
+  /** Rev terakhir board berubah (default `rev`): board yang tidak tersentuh tidak dirender ulang. */
+  boardRevs?: Readonly<Record<string, number>>;
   boards: CanvasBoard[];
+  agents?: readonly AgentMark[];
+  focus?: Focus | undefined;
+  onFocused?: (nonce: number) => void;
   highlight: Highlight | undefined;
   summary: FindingSummary | undefined;
   checksLoading: boolean;
@@ -81,6 +111,14 @@ export function Canvas({
   const [spaceHeld, setSpaceHeld] = useState(false);
   const [panning, setPanning] = useState(false);
   const drag = useRef<{ x: number; y: number; cam: Camera; moved: boolean; pan: boolean; target: string | undefined } | null>(null);
+  const camRef = useRef(cam);
+  camRef.current = cam;
+  const anim = useRef<number | undefined>(undefined);
+  const stopAnim = useCallback(() => {
+    if (anim.current !== undefined) cancelAnimationFrame(anim.current);
+    anim.current = undefined;
+  }, []);
+  useEffect(() => stopAnim, [stopAnim]);
 
   useLayoutEffect(() => {
     const el = ref.current;
@@ -91,7 +129,11 @@ export function Canvas({
     return () => ro.disconnect();
   }, []);
 
-  const fit = useCallback(() => setCam(fitCamera(boards, size.w, size.h)), [boards, size]);
+  const fit = useCallback(() => {
+    if (anim.current !== undefined) cancelAnimationFrame(anim.current);
+    anim.current = undefined;
+    setCam(fitCamera(boards, size.w, size.h));
+  }, [boards, size]);
   // Board pertama muncul (0 → >0, mis. setelah dokumen dimuat ulang): fit ulang.
   const prevCount = useRef(boards.length);
   useEffect(() => {
@@ -105,7 +147,32 @@ export function Canvas({
     }
   }, [fitted, size, fit]);
 
+  // Follow agent: geser ke board yang berubah bila belum terlihat utuh (500ms ease-out; reduced motion → langsung).
+  useEffect(() => {
+    if (!focus || !fitted || size.w <= 0) return;
+    const b = boards.find((x) => x.id === focus.boardId);
+    if (!b) return;
+    onFocused?.(focus.nonce);
+    const from = camRef.current;
+    if (boardVisible(b, from, size.w, size.h)) return;
+    const to = focusCamera(b, from, size.w, size.h);
+    stopAnim();
+    if (reducedMotion()) {
+      setCam(to);
+      return;
+    }
+    const t0 = performance.now();
+    const step = (t: number) => {
+      const k = Math.min(1, (t - t0) / FOLLOW_MS);
+      const e = 1 - (1 - k) ** 3;
+      setCam({ x: from.x + (to.x - from.x) * e, y: from.y + (to.y - from.y) * e, z: from.z + (to.z - from.z) * e });
+      anim.current = k < 1 ? requestAnimationFrame(step) : undefined;
+    };
+    anim.current = requestAnimationFrame(step);
+  }, [focus, fitted, size, boards, onFocused, stopAnim]);
+
   const zoomAt = useCallback((factor: number, sx: number, sy: number) => {
+    stopAnim();
     setCam((c) => {
       const z = clampZoom(c.z * factor);
       const k = z / c.z;
@@ -119,6 +186,7 @@ export function Canvas({
     if (!el) return;
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
+      stopAnim();
       const r = el.getBoundingClientRect();
       // deltaMode: 0 piksel, 1 baris (Firefox), 2 halaman.
       const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? el.clientHeight : 1;
@@ -129,7 +197,7 @@ export function Canvas({
     };
     el.addEventListener('wheel', onWheel, { passive: false });
     return () => el.removeEventListener('wheel', onWheel);
-  }, [zoomAt]);
+  }, [zoomAt, stopAnim]);
 
   useEffect(() => {
     const typing = (e: KeyboardEvent) => {
@@ -165,6 +233,7 @@ export function Canvas({
     if ((e.target as HTMLElement).closest('.canvas-overlay-ui')) return;
     const pan = tool === 'hand' || spaceHeld || e.button === 1;
     if (e.button !== 0 && e.button !== 1) return;
+    stopAnim();
     const boardEl = (e.target as HTMLElement).closest<HTMLElement>('[data-board]');
     drag.current = { x: e.clientX, y: e.clientY, cam, moved: false, pan, target: boardEl?.dataset.board };
     e.currentTarget.setPointerCapture(e.pointerId);
@@ -228,8 +297,19 @@ export function Canvas({
               {b.name}
             </div>
             <div className={`board${selected ? ' selected' : ''}`} data-board={b.id} style={{ left, top, width: b.width * cam.z, height: b.height * cam.z }}>
-              <BoardImage slug={slug} rev={rev} board={b} />
+              <BoardImage slug={slug} rev={Math.min(rev, boardRevs?.[b.id] ?? rev)} board={b} />
             </div>
+          </div>
+        );
+      })}
+      {(agents ?? []).map((a) => {
+        const b = boardById.get(a.boardId);
+        if (!b) return null;
+        const left = cam.x + b.x * cam.z;
+        const top = cam.y + b.y * cam.z;
+        return (
+          <div key={`${a.session}:${a.boardId}`} className={`agent-outline ${a.color}${a.running ? ' working' : ''}`} style={{ left: left - 3, top: top - 3, width: b.width * cam.z + 6, height: b.height * cam.z + 6 }}>
+            <span className="agent-label">{a.label}</span>
           </div>
         );
       })}

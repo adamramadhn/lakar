@@ -9,6 +9,18 @@ export { rasterType, readAsset, writeAsset, readAssetMeta, imageSize, type Asset
 export { PhotoService, type PhotoServiceOptions, type PhotoStatus, type SearchResponse } from './photos/service.js';
 export { SafeNet, NetError, isBlockedIp, DEFAULT_ALLOWLIST, type HostAllowlist, type SafeNetOptions } from './photos/net.js';
 export { DocStore } from './store.js';
-export { VIEWER_DIST_DIR, registerViewerRoutes, type ViewerDocSummary } from './viewer.js';
+export { VIEWER_DIST_DIR, registerViewerRoutes, type ViewerDocSummary, type ViewerHistoryEntry } from './viewer.js';
+export {
+  ACTIVITY_HEARTBEAT_MS,
+  ACTIVITY_RING_MAX,
+  ActivityBus,
+  TOOL_ROUTES,
+  registerActivityHooks,
+  type ActivityCall,
+  type ActivityEvent,
+  type ActivitySession,
+  type CallStatus,
+  type CallSummary,
+} from './events.js';
 export { startDaemon, type RunningDaemon, type StartOptions } from './start.js';
 export { IconCatalog } from '@lakar/icons';

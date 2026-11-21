@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { migrateDocument, parseDocument } from '@lakar/core';
 import { LakarError, SLUG_PATTERN, errorMessage, type LakarDocument } from '@lakar/schema';
 import { notFound } from './errors.js';
+import type { Sessions } from './sessions.js';
 import type { DocStore } from './store.js';
 
 /** Default dist viewer: `packages/viewer/dist` (relatif terhadap `packages/daemon/{src,dist}`). */
@@ -20,10 +21,25 @@ export type ViewerDocSummary = {
   firstBoardId: string | null;
 };
 
+/** Entri riwayat untuk viewer: id sesi hanya versi publik (8 karakter), bukan kredensial penuh. */
+export type ViewerHistoryEntry = {
+  rev: number;
+  description: string;
+  opsSummary: string;
+  /** Jumlah op dari `opsSummary` (`kind×n, …`). */
+  opCount: number;
+  at: string;
+  session: string;
+  /** Klien sesi bila sesi masih dikenal daemon (hilang setelah restart). */
+  client?: string;
+};
+
 export type ViewerRoutesOptions = {
   /** Salinan memori daemon (AD-1); dibaca saja. */
   docs: ReadonlyMap<string, LakarDocument>;
   store: DocStore;
+  /** Sesi daemon (untuk nama klien di riwayat); dibaca saja. */
+  sessions?: Sessions;
   /** Direktori hasil build viewer (berisi `index.html`). */
   distDir: string;
   /** Pencatat masalah non-fatal (file rusak dilewati). Default `console.warn`. */
@@ -82,6 +98,18 @@ async function peekDocument(store: DocStore, slug: string): Promise<LakarDocumen
   return parseDocument(migrateDocument(json));
 }
 
+/** Jumlah op dari `kind×n, …`; bagian tanpa `×n` dihitung satu. */
+export function opCountOf(opsSummary: string): number {
+  let n = 0;
+  for (const part of opsSummary.split(',')) {
+    const t = part.trim();
+    if (!t) continue;
+    const m = /×(\d+)$/.exec(t);
+    n += m ? Number(m[1]) : 1;
+  }
+  return n;
+}
+
 const summarize = (slug: string, doc: LakarDocument, mtimeMs: number): ViewerDocSummary => ({
   slug,
   rev: doc.rev,
@@ -90,7 +118,7 @@ const summarize = (slug: string, doc: LakarDocument, mtimeMs: number): ViewerDoc
   firstBoardId: doc.pages.find((p) => p.children.length > 0)?.children[0]?.id ?? null,
 });
 
-export function registerViewerRoutes(app: FastifyInstance, { docs, store, distDir, log = (m) => console.warn(m) }: ViewerRoutesOptions): void {
+export function registerViewerRoutes(app: FastifyInstance, { docs, store, sessions, distDir, log = (m) => console.warn(m) }: ViewerRoutesOptions): void {
   const root = resolve(distDir);
   /** Ringkasan dokumen dari file per `slug@mtime`: file yang tidak berubah tidak di-parse ulang. */
   const cache = new Map<string, { mtimeMs: number; summary: ViewerDocSummary }>();
@@ -130,6 +158,37 @@ export function registerViewerRoutes(app: FastifyInstance, { docs, store, distDi
     const doc = docs.get(slug) ?? (await peekDocument(store, slug));
     if (!doc) throw docNotFound(slug);
     return reply.code(200).send({ ok: true, data: { doc } });
+  });
+
+  // Riwayat revisi (baca-saja): urut rev turun; baris rusak dilewati oleh `readHistory`.
+  app.get<{ Params: { slug: string } }>('/viewer/docs/:slug/history', async (req, reply) => {
+    const { slug } = req.params;
+    if (!SLUG_PATTERN.test(slug)) throw invalidSlug(slug);
+    if (!docs.has(slug)) {
+      const exists = await stat(store.docPath(slug)).then(
+        (s) => s.isFile(),
+        () => false,
+      );
+      if (!exists) throw docNotFound(slug);
+    }
+    const history = await store.readHistory(slug);
+    const entries: ViewerHistoryEntry[] = history
+      // `isHistoryEntry` store hanya memeriksa rev/opsSummary: lewati baris tanpa field yang dipakai di sini.
+      .filter((h) => typeof h.sessionId === 'string' && typeof h.at === 'string' && typeof h.description === 'string')
+      .map((h) => {
+        const client = sessions?.byId(h.sessionId)?.client;
+        return {
+          rev: h.rev,
+          description: h.description,
+          opsSummary: h.opsSummary,
+          opCount: opCountOf(h.opsSummary),
+          at: h.at,
+          session: h.sessionId.slice(0, 8),
+          ...(client ? { client } : {}),
+        };
+      })
+      .sort((a, b) => b.rev - a.rev);
+    return reply.code(200).send({ ok: true, data: { entries } });
   });
 
   // Viewer statis. `/app` → `/app/` supaya path relatif aset benar.
