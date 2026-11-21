@@ -34,6 +34,20 @@ jobs:
           fetch-depth: 1
           persist-credentials: false
 
+      # Diagnostic: report which model names the gateway accepts (status only, never the key).
+      - name: Probe gateway models
+        continue-on-error: true
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          for m in claude-opus-5-5 claude-sonnet-5-5 claude-haiku-5-5 claude-sonnet-4-5 glm-4.6 glm-4.5-air glm-5; do
+            code=$(curl -sS -m 60 -o resp.json -w '%{http_code}' "$ANTHROPIC_BASE_URL/v1/messages" \
+              -H "x-api-key: $ANTHROPIC_API_KEY" -H "anthropic-version: 2023-06-01" -H "content-type: application/json" \
+              -d "{\"model\":\"$m\",\"max_tokens\":8,\"messages\":[{\"role\":\"user\",\"content\":\"ping\"}]}" || echo 000)
+            msg=$(jq -r '.error.message // .model // empty' resp.json 2>/dev/null | head -c 160)
+            echo "$m -> HTTP $code $msg"
+          done
+
       - name: Run Claude Code Review
         id: claude-review
         uses: anthropics/claude-code-action@acfe7992852970efb4fee683d63d628e3e52df67 # v1
