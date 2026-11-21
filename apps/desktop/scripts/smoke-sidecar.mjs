@@ -69,6 +69,17 @@ try {
   assert(conn.ok && conn.data.mcp && resolve(conn.data.mcp.args[0]) === resolve(mcpMain), `/viewer/connections: ${JSON.stringify(conn)}`);
   assert(conn.data.mcp.env.LAKAR_URL === url, 'LAKAR_URL tidak sama dengan URL daemon');
 
+  // Tulis dokumen persis seperti aplikasi (New file → commit pertama → restore): menangkap regresi tulis per OS,
+  // mis. fsync direktori yang ditolak Windows.
+  const post = async (path, body) => (await fetch(`${url}${path}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })).json();
+  const created = await post('/viewer/docs', { name: 'Smoke Test', board: { preset: 'desktop' } });
+  assert(created.ok && created.data.slug === 'smoke-test' && created.data.rev === 1, `New file: ${JSON.stringify(created)}`);
+  const doc = await (await fetch(`${url}/viewer/docs/smoke-test`)).json();
+  assert(doc.ok && doc.data.doc.pages[0].children[0].width === 1440, `dokumen baru: ${JSON.stringify(doc).slice(0, 200)}`);
+  const dup = await post('/viewer/docs/smoke-test/duplicate', {});
+  assert(dup.ok, `Duplicate: ${JSON.stringify(dup)}`);
+  log('New file + duplicate OK');
+
   const app = await fetch(`${url}/app/`);
   assert(app.ok && (app.headers.get('content-type') ?? '').startsWith('text/html'), `/app/ HTTP ${app.status}`);
 
