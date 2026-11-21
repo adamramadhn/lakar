@@ -4,7 +4,7 @@
 import { useEffect, useRef, useState, type DragEvent, type MouseEvent } from 'react';
 import { api, ApiError, errorText, type Folder } from './api';
 import { Menu, type Item } from './FileMenu';
-import { folderHash, folderMeta, memberOf } from './files';
+import { fileErrorText, folderHash, folderMeta, memberOf } from './files';
 import { Icon } from './icons';
 import { Modal } from './NewFileDialog';
 
@@ -67,30 +67,16 @@ export function FolderItem({
   onDropFile: (slug: string) => void;
 }) {
   const drop = useDropTarget(onDropFile);
-  const open = () => {
-    location.hash = folderHash(folder.id);
-  };
+  // Kartu folder bukan tombol: tautan nama memegang fokus (Enter membuka, Shift F10 menu); tombol "…" saudaranya.
   return (
     <div
       className={`folder-item${menuOpen ? ' menu-open' : ''}${drop.active ? ' drop-target' : ''}`}
-      role="button"
-      tabIndex={0}
-      aria-label={`Folder ${folder.name}, ${folderMeta(count)}`}
-      onClick={open}
+      onClick={() => {
+        location.hash = folderHash(folder.id);
+      }}
       onContextMenu={(e) => {
         e.preventDefault();
         onMenu(e.clientX, e.clientY);
-      }}
-      onKeyDown={(e) => {
-        if (e.target !== e.currentTarget) return;
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          open();
-        } else if (e.key === 'ContextMenu' || (e.key === 'F10' && e.shiftKey)) {
-          e.preventDefault();
-          const r = e.currentTarget.getBoundingClientRect();
-          onMenu(r.left + 16, r.top + 16);
-        }
       }}
       {...drop.props}
     >
@@ -98,15 +84,32 @@ export function FolderItem({
         <Icon name="folder" size={16} />
       </span>
       <span className="folder-info">
-        <span className="folder-name">{folder.name}</span>
-        <span className="folder-meta">{folderMeta(count)}</span>
+        <a
+          className="folder-name folder-link"
+          href={folderHash(folder.id)}
+          aria-label={`Folder ${folder.name}, ${folderMeta(count)}`}
+          aria-keyshortcuts="Enter Shift+F10"
+          onClick={(e) => e.stopPropagation()}
+          onKeyDown={(e) => {
+            if (e.key === 'ContextMenu' || (e.key === 'F10' && e.shiftKey)) {
+              e.preventDefault();
+              const r = (e.currentTarget.closest('.folder-item') ?? e.currentTarget).getBoundingClientRect();
+              onMenu(r.left + 16, r.top + 16);
+            }
+          }}
+        >
+          {folder.name}
+        </a>
+        <span className="folder-meta" aria-hidden="true">
+          {folderMeta(count)}
+        </span>
       </span>
       <button
         type="button"
         className="icon-btn more-btn"
-        aria-label="Folder actions"
+        aria-label={`Actions for folder ${folder.name}`}
         aria-haspopup="menu"
-        onKeyDown={(e) => e.stopPropagation()}
+        title="Folder actions (Shift+F10)"
         onClick={(e: MouseEvent<HTMLElement>) => {
           e.stopPropagation();
           const r = e.currentTarget.getBoundingClientRect();
@@ -144,7 +147,7 @@ export function FolderNameDialog({ folder, folders, onClose }: { folder?: Folder
       else await api.createFolder(trimmed);
       onClose();
     } catch (e) {
-      setError(e instanceof ApiError && e.code === 'CONFLICT' ? `A folder named “${trimmed}” already exists.` : errorText(e));
+      setError(e instanceof ApiError && e.code === 'CONFLICT' ? `A folder named “${trimmed}” already exists.` : fileErrorText(e, 'folder', undefined, errorText));
       setBusy(false);
     }
   };
@@ -188,12 +191,12 @@ function DeleteFolderDialog({ folder, count, onClose, onDeleted }: { folder: Fol
       onClose();
       onDeleted?.();
     } catch (e) {
-      setError(errorText(e));
+      setError(fileErrorText(e, 'folder', undefined, errorText));
       setBusy(false);
     }
   };
   return (
-    <Modal label="Delete folder" onClose={onClose} className="small confirm">
+    <Modal label="Delete folder" onClose={onClose} className="small confirm" role="alertdialog">
       <span className="confirm-icon">
         <Icon name="trash" size={18} />
       </span>
@@ -269,12 +272,12 @@ export function MoveToDialog({ slug, folders: given, current: givenCurrent, onCl
     if (given) return;
     api.listFolders().then(
       (s) => setState({ folders: s.folders, current: memberOf(s.membership, slug) }),
-      (e: unknown) => setError(errorText(e)),
+      (e: unknown) => setError(fileErrorText(e, 'folder', undefined, errorText)),
     );
   }, [given, slug]);
   const move = (folder: string | null) => {
     onClose();
-    api.moveToFolder(slug, folder).catch((e: unknown) => onError(errorText(e)));
+    api.moveToFolder(slug, folder).catch((e: unknown) => onError(fileErrorText(e, 'move', slug, errorText)));
   };
   const options: { id: string | null; name: string; icon: 'file' | 'folder' }[] = [{ id: null, name: 'Files', icon: 'file' }, ...(state?.folders ?? []).map((f) => ({ id: f.id, name: f.name, icon: 'folder' as const }))];
   /** Fokus awal: pilihan aktif pertama; tidak ada → Cancel. */

@@ -1,7 +1,7 @@
 // Logika murni kelola file + routing hash viewer. Slugify viewer harus sama dengan daemon (sumber kebenaran).
 import { describe, expect, it } from 'vitest';
 import { slugify as daemonSlugify, withSuffix as daemonWithSuffix } from '../../daemon/src/files.ts';
-import { byName, CONNECTIONS_HASH, docHash, docLink, folderHash, folderMeta, inFolder, parseRoute, previewSlug, searchDocs, SETTINGS_HASH, slugify, validSize, withSuffix, wrapIndex } from './files.ts';
+import { byEdited, byName, CONNECTIONS_HASH, docHash, docLink, fileErrorText, folderHash, folderMeta, inFolder, parseRoute, parseSort, previewSlug, searchDocs, SETTINGS_HASH, slugify, sortDocs, validSize, withSuffix, wrapIndex } from './files.ts';
 
 describe('slugify (pratinjau = daemon)', () => {
   const names = ['My Landing', '  Café — Menu 2  ', '--a__b--', '!!!', '', 'Ünïcödé Ñame', 'x'.repeat(80), `a${'-'.repeat(70)}b`, 'Landing 2026 / v2'];
@@ -125,5 +125,49 @@ describe('folderMeta / inFolder', () => {
     expect(inFolder(docs, membership, null).map((d) => d.slug)).toEqual(['c']);
     expect(inFolder(docs, membership, 'f1').map((d) => d.slug)).toEqual(['a', 'd']);
     expect(inFolder(docs, membership, 'f9')).toEqual([]);
+  });
+});
+
+describe('sortDocs (halaman Files: Last edited / Name)', () => {
+  const docs = [
+    { slug: 'b', updatedAt: '2026-11-20T10:00:00.000Z' },
+    { slug: 'a', updatedAt: '2026-11-21T10:00:00.000Z' },
+    { slug: 'c', updatedAt: '2026-11-21T10:00:00.000Z' },
+  ];
+  it('edited: terbaru dulu, seri diurut nama; name: abjad', () => {
+    expect(byEdited(docs).map((d) => d.slug)).toEqual(['a', 'c', 'b']);
+    expect(sortDocs(docs, 'edited').map((d) => d.slug)).toEqual(['a', 'c', 'b']);
+    expect(sortDocs(docs, 'name').map((d) => d.slug)).toEqual(['a', 'b', 'c']);
+  });
+  it('parseSort: nilai tidak dikenal → edited', () => {
+    expect(parseSort('name')).toBe('name');
+    expect(parseSort('edited')).toBe('edited');
+    expect(parseSort(null)).toBe('edited');
+    expect(parseSort('size')).toBe('edited');
+  });
+});
+
+describe('fileErrorText: pesan daemon (bahasa Indonesia) tidak tampil di UI', () => {
+  const apiError = (code: string, message: string, retryable = false) => Object.assign(new Error(message), { code, retryable });
+  const fallback = (e: unknown) => `fallback:${(e as Error).message}`;
+  const indonesian = /dokumen|sudah|tidak|arsip|pilih|kesalahan/;
+  it.each([
+    ['rename', apiError('CONFLICT', 'dokumen pricing sudah ada'), 'A file named “pricing” already exists. Choose another name.'],
+    ['rename', apiError('CONFLICT', 'dokumen pricing sudah ada di arsip'), 'An archived file is already named “pricing”. Choose another name, or delete it from Archive first.'],
+    ['unarchive', apiError('CONFLICT', 'dokumen pricing sudah ada'), 'A file named “pricing” is already in your files. Rename or delete it first, then unarchive.'],
+    ['duplicate', apiError('CONFLICT', 'dokumen pricing-copy baru saja dibuat', true), 'Another file with this name was just created. Try again.'],
+    ['delete', apiError('NOT_FOUND', 'dokumen pricing tidak ada'), '“pricing” no longer exists. It may have been renamed or deleted in another window.'],
+    ['move', apiError('NOT_FOUND', 'folder f1 tidak ada'), 'This folder or file no longer exists. It may have been deleted in another window.'],
+    ['archive', apiError('EXEC_ERROR', 'kesalahan internal daemon: EPERM: operation not permitted, rename', true), 'Lakar couldn’t save this change (EPERM: operation not permitted, rename). Try again.'],
+    ['create', apiError('SCHEMA_INVALID', 'name: nama tidak valid'), 'That name or size isn’t valid. Use letters or numbers, and board sizes from 1 to 10000 px.'],
+    ['archive', apiError('RENDER_FAILED', 'render gagal'), 'Something went wrong (RENDER_FAILED). Try again.'],
+  ] as const)('%s %#', (op, e, text) => {
+    const out = fileErrorText(e, op, 'pricing', fallback);
+    expect(out).toBe(text);
+    expect(out).not.toMatch(indonesian);
+  });
+  it('tanpa kode (jaringan/offline) → fallback; copy tanpa kode → pesan clipboard', () => {
+    expect(fileErrorText(new Error('Failed to fetch'), 'rename', 'a', fallback)).toBe('fallback:Failed to fetch');
+    expect(fileErrorText(new Error('clipboard tidak tersedia'), 'copy', 'a', fallback)).toBe('Couldn’t copy to the clipboard. Select the text and copy it manually.');
   });
 });

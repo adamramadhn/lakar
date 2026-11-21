@@ -184,7 +184,7 @@ export function App() {
         {route.name === 'viewer' ? (
           <Viewer key={route.slug} slug={route.slug} />
         ) : (
-          <Dashboard page={route.name} {...(route.name === 'files' && route.folder ? { folder: route.folder } : {})} menuOpen={menuOpen} onCloseMenu={() => setMenuOpen(false)} />
+          <Dashboard page={route.name} {...(route.name === 'files' && route.folder ? { folder: route.folder } : {})} menuOpen={menuOpen} onCloseMenu={() => setMenuOpen(false)} onOpenMenu={() => setMenuOpen((v) => !v)} />
         )}
       </main>
       {creating && <NewFileDialog taken={creating} onClose={() => setCreating(undefined)} />}

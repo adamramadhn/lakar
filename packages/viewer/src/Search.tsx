@@ -10,6 +10,9 @@ import { searchDocs, wrapIndex } from './files';
 import { Icon } from './icons';
 import { docSubtitle, Thumb } from './Thumb';
 
+const IS_MAC = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
+/** Petunjuk pintasan di kotak Search (desain: "⌘F"); Dashboard memasang Ctrl/⌘ F. */
+const FIND_LABEL = IS_MAC ? '⌘F' : 'Ctrl F';
 const WIDTH = 340;
 const GAP = 6;
 const MARGIN = 8;
@@ -186,6 +189,7 @@ export function Search({
           role="combobox"
           aria-label="Search documents"
           aria-autocomplete="list"
+          aria-keyshortcuts={IS_MAC ? 'Meta+F' : 'Control+F'}
           aria-expanded={shown}
           aria-controls={shown && results.length > 0 ? listId : undefined}
           aria-activedescendant={activeDoc ? `${id}-opt-${current}` : undefined}
@@ -201,11 +205,9 @@ export function Search({
           onBlur={close}
           onKeyDown={onKeyDown}
         />
-        {shown && (
-          <kbd className="search-hint" aria-hidden="true">
-            esc
-          </kbd>
-        )}
+        <kbd className="search-hint" aria-hidden="true">
+          {shown ? 'esc' : FIND_LABEL}
+        </kbd>
       </label>
       {dropdown}
     </>
