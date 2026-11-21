@@ -39,6 +39,20 @@ jobs:
           fetch-depth: 1
           persist-credentials: false
 
+      # Temporary diagnostic: show the gateway's raw answer (status + error text, never the key).
+      - name: Probe gateway
+        continue-on-error: true
+        env:
+          KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          echo "key length: ${#KEY}"
+          for m in glm-5.3 GLM-5.3 glm-5 glm-4.6; do
+            code=$(curl -sS -m 60 -o resp.json -w '%{http_code}' "$ANTHROPIC_BASE_URL/v1/messages" \
+              -H "x-api-key: $KEY" -H "anthropic-version: 2023-06-01" -H "content-type: application/json" \
+              -d "{\"model\":\"$m\",\"max_tokens\":8,\"messages\":[{\"role\":\"user\",\"content\":\"ping\"}]}" || echo 000)
+            echo "$m -> HTTP $code $(head -c 300 resp.json)"
+          done
+
       - name: Run Claude Code Review
         id: claude-review
         uses: anthropics/claude-code-action@acfe7992852970efb4fee683d63d628e3e52df67 # v1
