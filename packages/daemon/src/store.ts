@@ -4,11 +4,11 @@
 // - commit: riwayat dulu (append + fsync), LALU dokumen; dokumen gagal ditulis → riwayat dipotong balik;
 // - buka: tmp sisa dihapus, riwayat direkonsiliasi (baris parsial/rusak dan entri `rev > doc.rev` dibuang),
 //   dokumen hasil migrasi ditulis balik.
-import { mkdir, open, readFile, readdir, rename, rm, truncate, type FileHandle } from 'node:fs/promises';
+import { mkdir, open, readFile, readdir, rename, rm, stat, truncate, type FileHandle } from 'node:fs/promises';
 import { join } from 'node:path';
 import { randomBytes } from 'node:crypto';
 import { migrateDocument, parseDocument, type MigrationRegistry } from '@lakar/core';
-import { LakarError, errorMessage, type HistoryEntry, type LakarDocument } from '@lakar/schema';
+import { LakarError, SLUG_PATTERN, errorMessage, type HistoryEntry, type LakarDocument } from '@lakar/schema';
 
 export type DocStoreOptions = {
   /** Registri migrasi (default: registri resmi core). */
@@ -16,6 +16,8 @@ export type DocStoreOptions = {
   /** Pengganti langkah migrasi (khusus tes write-back): mentah → dokumen versi kini. */
   migrate?: (raw: unknown) => unknown;
 };
+
+const DOC_SUFFIX = '.lakar.json';
 
 const isEnoent = (e: unknown) => (e as NodeJS.ErrnoException)?.code === 'ENOENT';
 
@@ -143,6 +145,34 @@ export class DocStore {
       await truncate(hp, before).catch(() => {});
       throw e;
     }
+  }
+
+  /**
+   * Slug dokumen yang ada di `docsDir` beserta mtime file (untuk daftar viewer). Hanya `<slug>.lakar.json`
+   * dengan slug valid; tmp, riwayat, dan file lain diabaikan. Direktori belum ada → `[]`.
+   */
+  async list(): Promise<{ slug: string; mtimeMs: number }[]> {
+    let names: string[];
+    try {
+      names = await readdir(this.docsDir);
+    } catch (e) {
+      if (isEnoent(e)) return [];
+      throw e;
+    }
+    const out: { slug: string; mtimeMs: number }[] = [];
+    for (const name of names) {
+      if (!name.endsWith(DOC_SUFFIX)) continue;
+      const slug = name.slice(0, -DOC_SUFFIX.length);
+      if (!SLUG_PATTERN.test(slug)) continue;
+      try {
+        const st = await stat(join(this.docsDir, name));
+        if (st.isFile()) out.push({ slug, mtimeMs: st.mtimeMs });
+      } catch (e) {
+        // Terhapus di antara readdir dan stat: lewati.
+        if (!isEnoent(e)) throw e;
+      }
+    }
+    return out;
   }
 
   /** Entri riwayat yang terbaca (baris rusak dilewati). */
