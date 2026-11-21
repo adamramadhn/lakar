@@ -6,13 +6,15 @@
 // Layer manual (aplikasi 4): tool sisip di kanvas dan menu "+" di header Layers menjalankan `execute` dari sesi
 // viewer dengan kode codegen.ts; Delete/Backspace menghapus node terpilih. Sesudahnya dokumen dimuat ulang
 // (event sesi viewer tidak dipancarkan daemon) dan node baru dipilih. Gagal → toast, dokumen tidak berubah.
+// Kehadiran agen (aplikasi 5): `agentPresence` (presence.ts) dari stream → kursor + outline di Canvas dan state
+// baris Layers (agent / created / changed); disembunyikan saat pratinjau versi.
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type ReactNode } from 'react';
 import type { LakarDocument } from '@lakar/schema';
-import { activityReducer, connectActivity, harnessColor, harnessLabel, initialActivity, revChange, sessionsForSlug, type ActivityEvent } from './activity';
+import { activityReducer, connectActivity, initialActivity, revChange, sessionsForSlug, type ActivityEvent } from './activity';
 import { ActivityPanel } from './ActivityPanel';
 import { AddLayerButton, IconPicker, Toast, type ToastState } from './AddLayer';
 import { api, ApiError, errorText, OfflineError, type HistoryEntry, type InspectResult, type LayoutCheck } from './api';
-import { Canvas, type AgentMark, type CanvasPreview, type Focus, type Highlight, type InsertPoint } from './Canvas';
+import { Canvas, type CanvasPreview, type Focus, type Highlight, type InsertPoint } from './Canvas';
 import { failureText, imageFileProblem, insertBoardAt, insertBoardPlaced, insertIntoBoard, MENU_OFFSET, removeNode, type InsertExtra, type InsertKind } from './codegen';
 import { indexDocument, relativeTime, type NodeInfo, type TreeNode } from './format';
 import { HistoryPanel, timeOf } from './HistoryPanel';
@@ -21,6 +23,7 @@ import { useNow, useOffline, useRetry } from './hooks';
 import { Icon, NODE_ICON } from './icons';
 import { Modal } from './NewFileDialog';
 import { ChecksPanel, InspectPanel } from './panels';
+import { agentPresence, layerMarks, type LayerMarkInfo } from './presence';
 
 const FOLLOW_KEY = 'lakar.viewer.followAgent';
 function readFollow(): boolean {
@@ -235,26 +238,12 @@ export function Viewer({ slug }: { slug: string }) {
 
   const now = useNow(5000);
   const views = useMemo(() => sessionsForSlug(activity, slug, now), [activity, slug, now]);
-  /** Board yang sedang dikerjakan: board dari call terakhir (yang punya board) tiap sesi Live pada dokumen ini. */
-  const agents = useMemo<AgentMark[]>(() => {
-    const out: AgentMark[] = [];
-    for (const v of views) {
-      if (!v.live) continue;
-      const running = v.calls.find((c) => c.status === 'running');
-      const boardOf = (c: (typeof v.calls)[number]) => c.boards?.[0] ?? (c.target ? index.get(c.target)?.boardId : undefined);
-      // Call terbaru masih running tanpa board (mis. execute): board targetnya belum diketahui → tanpa outline.
-      const newest = v.calls[0];
-      if (newest && newest.status === 'running' && !boardOf(newest)) continue;
-      for (const c of v.calls) {
-        const boardId = boardOf(c);
-        if (!boardId) continue;
-        const who = harnessLabel(v.session.client);
-        out.push({ session: v.session.id, boardId, color: harnessColor(v.session.client), running: running !== undefined, label: running ? `${who} · ${running.tool}` : who });
-        break;
-      }
-    }
-    return out;
-  }, [views, index]);
+  /**
+   * Kehadiran agen (kursor, outline, baris Layers) tiap sesi Live pada dokumen ini. `now` (5 dtk) cukup untuk
+   * jendela sorotan 10 dtk: pudarnya sendiri berjalan di CSS (`forwards`).
+   */
+  const presence = useMemo(() => agentPresence(views, index, now), [views, index, now]);
+  const marks = useMemo(() => layerMarks(presence), [presence]);
   const nameOf = useCallback((id: string) => index.get(id)?.name, [index]);
 
   const runChecks = useCallback(() => {
@@ -532,7 +521,7 @@ export function Viewer({ slug }: { slug: string }) {
             <span className="section-label">Layers</span>
             <AddLayerButton disabled={!editable} disabledReason={preview ? 'Not available while previewing a version' : 'lakard is offline'} hasBoard={boards.length > 0} onPick={onMenuInsert} />
           </div>
-          {boards.length === 0 ? <div className="muted-note">No boards on this page yet.</div> : <LayerTree key={page?.id} nodes={boards} selectedId={selectedId} selectedPath={selectedInfo} index={index} onSelect={select} />}
+          {boards.length === 0 ? <div className="muted-note">No boards on this page yet.</div> : <LayerTree key={page?.id} nodes={boards} selectedId={selectedId} selectedPath={selectedInfo} index={index} onSelect={select} marks={preview ? undefined : marks} />}
         </div>
       </aside>
 
@@ -542,7 +531,7 @@ export function Viewer({ slug }: { slug: string }) {
         rev={d.rev}
         boardRevs={boardRevs}
         boards={boards}
-        agents={agents}
+        presence={presence}
         focus={focus && boards.some((b) => b.id === focus.boardId) ? focus : undefined}
         onFocused={onFocused}
         highlight={highlight}
@@ -628,12 +617,15 @@ function LayerTree({
   selectedPath,
   index,
   onSelect,
+  marks,
 }: {
   nodes: TreeNode[];
   selectedId: string | undefined;
   selectedPath: NodeInfo | undefined;
   index: Map<string, NodeInfo>;
   onSelect: (id: string) => void;
+  /** State agen per baris (aplikasi 5): agent (working), created (slide-in), changed (titik memudar). */
+  marks?: ReadonlyMap<string, LayerMarkInfo> | undefined;
 }) {
   const [open, setOpen] = useState<Set<string>>(() => new Set(nodes.map((n) => n.id)));
   // Buka leluhur node terpilih (mis. dipilih dari Checks) supaya barisnya terlihat.
@@ -660,6 +652,9 @@ function LayerTree({
     const kids = n.children ?? [];
     const isOpen = open.has(n.id);
     const selected = n.id === selectedId;
+    const m = marks?.get(n.id);
+    const mark = m?.mark;
+    const markClass = m ? ` ${m.mark}${m.color === 'codex' ? ' codex' : ''}` : '';
     rows.push(
       <div
         key={n.id}
@@ -668,7 +663,7 @@ function LayerTree({
         aria-selected={selected}
         aria-expanded={kids.length ? isOpen : undefined}
         tabIndex={0}
-        className={`layer-row${selected ? ' selected' : ''}${depth === 0 ? ' top' : ''}`}
+        className={`layer-row${selected ? ' selected' : ''}${depth === 0 ? ' top' : ''}${markClass}`}
         style={{ paddingLeft: 8 + depth * 16 }}
         onClick={() => onSelect(n.id)}
         onKeyDown={(e) => {
@@ -690,6 +685,8 @@ function LayerTree({
         </span>
         <Icon name={NODE_ICON[n.type] ?? 'square'} size={13} className="type-icon" />
         <span className="layer-label">{n.name}</span>
+        {/* Kunci per execute: execute berikutnya pada node yang sama memutar ulang pudar titik. */}
+        {(mark === 'agent' || mark === 'changed') && <i key={m?.key ?? mark} className="layer-agent-dot" aria-hidden="true" />}
       </div>,
     );
     if (isOpen) for (const c of kids) walk(c, depth + 1);
