@@ -3,6 +3,7 @@
 // cache dokumen/screenshot slug terkait dibuang, lalu pendengar `onDocsChanged` dan `onFileEvent` dipanggil), Restore, dan layer manual di bawah.
 // History (aplikasi 3): versi lama dari snapshot (GET revs/:rev, POST revs/:rev/screenshot, di-cache per
 // `slug@rev`, isinya tidak pernah berubah) dan Restore (tulis, lewat antrean yang sama).
+// Kelola halaman (aplikasi 8): tambah/rename/pindah/hapus halaman (tulis, lewat antrean yang sama).
 // Layer manual (aplikasi 4): `execute` (POST /execute dari sesi viewer sendiri, kode dari codegen.ts), unggah
 // gambar (POST /viewer/assets, byte mentah), dan cari ikon (POST /icons/search).
 // Bentuk respons AD-11: {ok:true,data} | {ok:false,error}.
@@ -31,6 +32,8 @@ export type HistoryEntry = { rev: number; description: string; opsSummary: strin
 export type ExecuteResult = { docId: string; rev: number; created: { id: string; name: string }[]; check?: { boards?: string[] } };
 export type UploadedAsset = { assetId: string; mime: string; width: number; height: number };
 export type IconResult = { lib: string; icon: string; title?: string; aliasOf?: string };
+/** Hasil operasi halaman (`/viewer/docs/:slug/pages…`). */
+export type PageResult = { slug: string; rev: number; pageId: string };
 export type LayoutCheck = { docId: string; rev: number; boards: unknown; summary: FindingSummary; findings: Finding[]; ranAt: number };
 
 /** lakard tidak bisa dihubungi (jaringan). */
@@ -114,6 +117,8 @@ async function request<T>(method: 'GET' | 'POST' | 'DELETE', path: string, body?
   }
   return json.data as T;
 }
+
+const pagesPath = (slug: string, pageId?: string) => `/viewer/docs/${encodeURIComponent(slug)}/pages${pageId ? `/${encodeURIComponent(pageId)}` : ''}`;
 
 // ---- Klien ----
 
@@ -300,6 +305,40 @@ class ViewerClient {
           rev,
           ...(baseRev !== undefined ? { baseRev } : {}),
         }),
+      () => [slug],
+    );
+  }
+
+  // ---- Kelola halaman (aplikasi 8): POST/DELETE /viewer/docs/:slug/pages…, lewat antrean tulis yang sama. ----
+
+  /** Halaman baru di akhir (nama default "Page N" bila `name` kosong). */
+  addPage(slug: string, name?: string): Promise<PageResult> {
+    return this.#write(
+      () => request<PageResult>('POST', pagesPath(slug), name === undefined ? {} : { name }),
+      () => [slug],
+    );
+  }
+
+  /** Ganti nama halaman (di-trim daemon, 1–100 karakter). */
+  renamePage(slug: string, pageId: string, name: string): Promise<PageResult> {
+    return this.#write(
+      () => request<PageResult>('POST', `${pagesPath(slug, pageId)}/rename`, { name }),
+      () => [slug],
+    );
+  }
+
+  /** Pindah halaman ke indeks `index` (0..n-1); indeks sama → rev tetap. */
+  movePage(slug: string, pageId: string, index: number): Promise<PageResult> {
+    return this.#write(
+      () => request<PageResult>('POST', `${pagesPath(slug, pageId)}/move`, { index }),
+      () => [slug],
+    );
+  }
+
+  /** Hapus halaman beserta board-nya; halaman terakhir → ApiError CONFLICT. */
+  deletePage(slug: string, pageId: string): Promise<PageResult> {
+    return this.#write(
+      () => request<PageResult>('DELETE', pagesPath(slug, pageId)),
       () => [slug],
     );
   }

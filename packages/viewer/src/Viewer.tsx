@@ -8,6 +8,8 @@
 // (event sesi viewer tidak dipancarkan daemon) dan node baru dipilih. Gagal → toast, dokumen tidak berubah.
 // Kehadiran agen (aplikasi 5): `agentPresence` (presence.ts) dari stream → kursor + outline di Canvas dan state
 // baris Layers (agent / created / changed); disembunyikan saat pratinjau versi.
+// Kelola halaman (aplikasi 8): section Pages (PagesPanel.tsx) menambah/rename/mengurutkan/menghapus halaman lewat
+// route `/viewer/docs/:slug/pages…`. Halaman aktif dilacak per ID; board baru dari viewer masuk ke halaman aktif.
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type ReactNode } from 'react';
 import type { LakarDocument } from '@lakar/schema';
 import { activityReducer, connectActivity, initialActivity, revChange, sessionsForSlug, type ActivityEvent } from './activity';
@@ -15,7 +17,9 @@ import { ActivityPanel } from './ActivityPanel';
 import { AddLayerButton, IconPicker, Toast, type ToastState } from './AddLayer';
 import { api, ApiError, errorText, OfflineError, type HistoryEntry, type InspectResult, type LayoutCheck } from './api';
 import { Canvas, type CanvasPreview, type Focus, type Highlight, type InsertPoint } from './Canvas';
-import { failureText, imageFileProblem, insertBoardAt, insertBoardPlaced, insertIntoBoard, MENU_OFFSET, removeNode, type InsertExtra, type InsertKind } from './codegen';
+import { failureText, imageFileProblem, insertBoardAt, insertBoardPlaced, insertIntoBoard, canvasInsertTarget, menuInsertTarget, removeNode, type InsertExtra, type InsertKind, type InsertTarget } from './codegen';
+import { resolvePageIndex } from './pages';
+import { PagesPanel } from './PagesPanel';
 import { indexDocument, relativeTime, type NodeInfo, type TreeNode } from './format';
 import { HistoryPanel, timeOf } from './HistoryPanel';
 import { canRestore, previewLabel } from './history';
@@ -50,8 +54,6 @@ const TABS: { id: Tab; label: string }[] = [
   { id: 'history', label: 'History' },
 ];
 
-/** Tujuan sisipan yang sudah ditentukan (klik kanvas atau menu "+"); Image/Icon menunggu file/ikon dulu. */
-type InsertTarget = { kind: InsertKind; board?: { id: string; name: string }; x: number; y: number; placed?: boolean };
 
 /** Fokus di kolom ketik (input, textarea, select, contentEditable): Delete/Backspace milik kolom itu. */
 const typingTarget = (t: EventTarget | null) =>
@@ -67,7 +69,12 @@ export function Viewer({ slug }: { slug: string }) {
   const [doc, setDoc] = useState<Loaded<{ doc: LakarDocument; loadedAt: number }>>({ state: 'loading' });
   // State tampilan dipulihkan dari kunjungan tab sebelumnya (viewState.ts, memori sesi) dan disimpan tiap berubah.
   const [saved] = useState(() => getViewState(slug));
-  const [pageIndex, setPageIndex] = useState(saved?.pageIndex ?? 0);
+  /** Halaman aktif per ID (undefined = belum ditentukan: indeks tersimpan viewState dipakai). */
+  const [pageId, setPageId] = useState<string | undefined>(undefined);
+  /** Indeks halaman aktif pada dokumen terkini terakhir: tetangga saat halaman aktif dihapus. */
+  const lastPageIndex = useRef(saved?.pageIndex ?? 0);
+  /** Halaman baru dari "+" yang belum ada di dokumen termuat (jangan dianggap terhapus). */
+  const pendingPage = useRef<string | undefined>(undefined);
   const [selectedId, setSelectedId] = useState<string | undefined>(saved?.selectedId);
   const [inspect, setInspect] = useState<Loaded<InspectResult> | undefined>(undefined);
   const [checks, setChecks] = useState<Loaded<LayoutCheck> | undefined>(undefined);
@@ -136,7 +143,6 @@ export function Viewer({ slug }: { slug: string }) {
     [slug],
   );
   useEffect(() => loadDoc(), [loadDoc]);
-  useEffect(() => saveViewState(slug, { pageIndex, selectedId, panel: tab }), [slug, pageIndex, selectedId, tab]);
   // Perubahan agen terlihat saat tab kembali aktif (pola sama dengan Dashboard).
   useEffect(() => {
     const onVisible = () => document.visibilityState === 'visible' && loadDoc(true);
@@ -149,6 +155,29 @@ export function Viewer({ slug }: { slug: string }) {
   const previewDoc = preview?.doc.state === 'ok' ? preview.doc.value : undefined;
   const shown = previewDoc ?? current;
   const index = useMemo(() => (shown ? indexDocument(shown) : new Map<string, NodeInfo>()), [shown]);
+  // Halaman aktif per ID. Tidak ada di dokumen: pratinjau versi lama atau halaman baru yang belum termuat → indeks
+  // terakhir; selain itu halaman sudah dihapus → tetangga (resolvePageIndex).
+  const pageFound = pageId !== undefined && !!shown?.pages.some((p) => p.id === pageId);
+  const pageWaiting = !pageFound && (previewDoc !== undefined || (pageId !== undefined && pageId === pendingPage.current));
+  const pageIndex = shown ? resolvePageIndex(shown.pages, pageWaiting ? undefined : pageId, lastPageIndex.current) : lastPageIndex.current;
+  // Sinkronkan ID dan indeks terakhir dengan dokumen terkini (bukan pratinjau).
+  useEffect(() => {
+    if (previewDoc || !current || pageWaiting) return;
+    const p = current.pages[pageIndex];
+    if (!p) return;
+    if (pendingPage.current && current.pages.some((x) => x.id === pendingPage.current)) pendingPage.current = undefined;
+    lastPageIndex.current = pageIndex;
+    if (p.id !== pageId) setPageId(p.id);
+  }, [current, previewDoc, pageIndex, pageId, pageWaiting]);
+  useEffect(() => saveViewState(slug, { pageIndex, selectedId, panel: tab }), [slug, pageIndex, selectedId, tab]);
+  /** Pindah ke halaman indeks `i` dokumen yang tampil. */
+  const goPage = useCallback(
+    (i: number) => {
+      const id = shown?.pages[i]?.id;
+      if (id) setPageId(id);
+    },
+    [shown],
+  );
   // Seleksi yang dipulihkan dari viewState bisa menunjuk node yang sudah tidak ada: dicek sekali saat dokumen
   // pertama termuat. Seleksi langsung oleh pengguna tidak disentuh.
   const restoredSelection = useRef(saved?.selectedId);
@@ -245,8 +274,8 @@ export function Viewer({ slug }: { slug: string }) {
   // Board fokus di halaman lain → pindah halaman (Canvas halaman baru lalu menggeser kamera).
   useEffect(() => {
     const info = focus ? index.get(focus.boardId) : undefined;
-    if (info && info.pageIndex !== pageIndex) setPageIndex(info.pageIndex);
-  }, [focus, index, pageIndex]);
+    if (info && info.pageIndex !== pageIndex) goPage(info.pageIndex);
+  }, [focus, index, pageIndex, goPage]);
   const onFocused = useCallback((nonce: number) => setFocus((f) => (f?.nonce === nonce ? undefined : f)), []);
 
   const now = useNow(5000);
@@ -296,9 +325,9 @@ export function Viewer({ slug }: { slug: string }) {
     (id: string | undefined) => {
       setSelectedId(id);
       const info = id ? index.get(id) : undefined;
-      if (info && info.pageIndex !== pageIndex) setPageIndex(info.pageIndex);
+      if (info && info.pageIndex !== pageIndex) goPage(info.pageIndex);
     },
-    [index, pageIndex],
+    [index, pageIndex, goPage],
   );
 
   // Node baru (sisipan) terpilih begitu ada di dokumen yang tampil; halaman ikut pindah.
@@ -342,7 +371,11 @@ export function Viewer({ slug }: { slug: string }) {
 
   const insert = useCallback(
     (t: InsertTarget, extra: InsertExtra = {}) => {
-      const { code, description } = t.board ? insertIntoBoard(t.kind, t.board, t.x, t.y, extra) : t.placed ? insertBoardPlaced() : insertBoardAt(t.x, t.y);
+      const { code, description } = t.board
+        ? insertIntoBoard(t.kind, t.board, t.x, t.y, extra)
+        : t.placed
+          ? insertBoardPlaced(t.placed.pageId, t.placed.pageBoards)
+          : insertBoardAt(t.x, t.y, t.pageId);
       void runEdit(code, description, (id) => {
         if (!id) return;
         pendingSelect.current = id;
@@ -422,6 +455,33 @@ export function Viewer({ slug }: { slug: string }) {
     [slug, loadDoc, setToast],
   );
 
+  /** Operasi halaman: sukses → muat ulang dokumen; gagal → toast (dokumen dimuat ulang bila sudah usang). */
+  const pageWrite = useCallback(
+    (op: Promise<{ pageId: string }>, after?: (pageId: string) => void): Promise<void> =>
+      op.then(
+        (r) => {
+          after?.(r.pageId);
+          loadDoc();
+        },
+        (e) => {
+          setToast(errorText(e));
+          if (e instanceof ApiError && (e.code === 'NOT_FOUND' || e.code === 'CONFLICT')) loadDoc(true);
+        },
+      ),
+    [loadDoc, setToast],
+  );
+  const addPage = useCallback(
+    () =>
+      void pageWrite(api.addPage(slug), (id) => {
+        pendingPage.current = id;
+        setPageId(id);
+      }),
+    [slug, pageWrite],
+  );
+  const renamePage = useCallback((id: string, name: string) => void pageWrite(api.renamePage(slug, id, name)), [slug, pageWrite]);
+  const movePage = useCallback((id: string, to: number) => void pageWrite(api.movePage(slug, id, to)), [slug, pageWrite]);
+  const deletePage = useCallback((id: string) => pageWrite(api.deletePage(slug, id)), [slug, pageWrite]);
+
   // Delete/Backspace: hapus node terpilih (board juga), kecuali saat mengetik atau dialog/menu terbuka.
   const selectedRef = useRef<{ id: string; name: string; type: string } | undefined>(undefined);
   const selInfo = selectedId ? index.get(selectedId) : undefined;
@@ -496,14 +556,13 @@ export function Viewer({ slug }: { slug: string }) {
   const summary = checks?.state === 'ok' ? checks.value.summary : undefined;
   /** Rev terakhir tiap board berubah (≤ rev dokumen): PNG board lain dipakai ulang dari cache. */
   const onCanvasInsert = (kind: InsertKind, at: InsertPoint) => {
-    const b = at.boardId ? boards.find((x) => x.id === at.boardId) : undefined;
-    beginInsert(b ? { kind, board: { id: b.id, name: b.name }, x: at.x, y: at.y } : { kind, x: at.x, y: at.y });
+    beginInsert(canvasInsertTarget(kind, at, boards, page));
   };
-  /** Menu "+": board terpilih (atau board pertama halaman) di kiri atas + 40px; tanpa board → Frame jadi board baru (`place`). */
+  /** Menu "+": board terpilih (atau board pertama halaman) di kiri atas + 40px; tanpa board → Frame jadi board baru di halaman aktif. */
   const menuBoard = (selectedInfo && boards.find((b) => b.id === selectedInfo.boardId)) ?? boards[0];
   const onMenuInsert = (kind: InsertKind) => {
-    if (menuBoard) beginInsert({ kind, board: { id: menuBoard.id, name: menuBoard.name }, x: MENU_OFFSET, y: MENU_OFFSET });
-    else if (kind === 'frame') beginInsert({ kind, x: 0, y: 0, placed: true });
+    const t = menuInsertTarget(kind, menuBoard, boards, page);
+    if (t) beginInsert(t);
   };
   const boardRevs: Record<string, number> = {};
   for (const b of boards) boardRevs[b.id] = Math.min(d.rev, Math.max(baseRev, touched[b.id] ?? -1));
@@ -520,15 +579,17 @@ export function Viewer({ slug }: { slug: string }) {
         <div className="panel-tabs">
           <span className="panel-tab active">Layers</span>
         </div>
-        <div className="pages">
-          <div className="section-label">Pages</div>
-          {d.pages.map((p, i) => (
-            <button key={p.id} type="button" className={`page-row${p === page ? ' active' : ''}`} onClick={() => setPageIndex(i)}>
-              <Icon name="file" size={12} />
-              <span>{p.name}</span>
-            </button>
-          ))}
-        </div>
+        <PagesPanel
+          pages={d.pages.map((p) => ({ id: p.id, name: p.name, boardCount: p.children.length }))}
+          activeId={page?.id}
+          editable={editable}
+          disabledReason={preview ? 'Not available while previewing a version' : 'lakard is offline'}
+          onSelect={setPageId}
+          onAdd={addPage}
+          onRename={renamePage}
+          onMove={movePage}
+          onDelete={deletePage}
+        />
         <div className="layer-tree">
           <div className="section-header">
             <span className="section-label">Layers</span>

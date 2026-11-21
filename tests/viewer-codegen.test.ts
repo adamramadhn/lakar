@@ -5,6 +5,7 @@ import { createDocument, transact } from '../packages/core/src/index.ts';
 import { runSnippet } from '../packages/exec/src/index.ts';
 import { IconCatalog } from '../packages/icons/src/index.ts';
 import {
+  canvasInsertTarget,
   failureText,
   imageBox,
   imageFileProblem,
@@ -12,6 +13,8 @@ import {
   insertBoardPlaced,
   insertIntoBoard,
   INSERT_KINDS,
+  menuInsertTarget,
+  nextBoardPosition,
   nodeProps,
   removeNode,
   wordCount,
@@ -92,11 +95,20 @@ describe('board baru dan hapus', () => {
     expect(b).toMatchObject({ type: 'board', x: 1600, y: -40, width: 400, height: 300, screen: 'app', fills: [{ type: 'solid', color: '#FFFFFF' }] });
   });
 
-  it('menu "+" tanpa board → board di posisi place (tidak tumpang tindih)', async () => {
-    const { doc } = await baseDoc();
-    const r = await run(doc, insertBoardPlaced().code);
-    const b = r.doc.pages[0]!.children.find((x) => x.id === r.created[0]!.id)!;
-    expect(b.x).toBeGreaterThanOrEqual(1440);
+  it('halaman 2 aktif: Frame di kanvas kosong dan menu "+" → board di halaman 2 (add(pageId)), bukan halaman 1', async () => {
+    const base = await baseDoc();
+    const doc = structuredClone(base.doc);
+    doc.pages.push({ id: 'PageTwo2', name: 'Page 2', children: [] });
+    const at = await run(doc, insertBoardAt(100, 50, 'PageTwo2').code);
+    expect(at.doc.pages[0]!.children).toHaveLength(1);
+    expect(at.doc.pages[1]!.children[0]).toMatchObject({ id: at.created[0]!.id, x: 100, y: 50, width: 400, height: 300 });
+    // Tanpa klik: kanan board terakhir halaman + 80, atau (0,0) bila halaman kosong.
+    const first = await run(doc, insertBoardPlaced('PageTwo2', []).code);
+    expect(first.doc.pages[1]!.children[0]).toMatchObject({ x: 0, y: 0 });
+    const next = await run(at.doc, insertBoardPlaced('PageTwo2', at.doc.pages[1]!.children).code);
+    expect(next.doc.pages[1]!.children[1]).toMatchObject({ x: 100 + 400 + 80, y: 50 });
+    expect(nextBoardPosition([])).toEqual({ x: 0, y: 0 });
+    expect(insertBoardAt(0, 0).code.startsWith('add(null, ')).toBe(true);
   });
 
   it('remove node dan board; deskripsi 3–8 kata', async () => {
@@ -142,5 +154,19 @@ describe('util', () => {
     expect(imageFileProblem({ name: 'a.webp', type: '', size: 10 })).toBeUndefined();
     expect(imageFileProblem({ name: 'a.svg', type: 'image/svg+xml', size: 10 })).toMatch(/PNG/);
     expect(imageFileProblem({ name: 'a.png', type: 'image/png', size: 21 * 1024 * 1024 })).toMatch(/20 MB/);
+  });
+});
+
+describe('board baru dari viewer membawa ID halaman aktif', () => {
+  const page2 = { id: 'PageTwo2' };
+  const boards = [{ id: 'B1', name: 'Mobile', x: 0, y: 0, width: 375 }];
+  it('Frame di kanvas kosong → pageId halaman aktif; di atas board → sisip ke board', () => {
+    expect(canvasInsertTarget('frame', { x: 10, y: 20 }, boards, page2)).toEqual({ kind: 'frame', x: 10, y: 20, pageId: 'PageTwo2' });
+    expect(canvasInsertTarget('rect', { boardId: 'B1', x: 5, y: 6 }, boards, page2)).toEqual({ kind: 'rect', board: { id: 'B1', name: 'Mobile' }, x: 5, y: 6 });
+  });
+  it('menu "+" tanpa board → placed.pageId halaman aktif; tipe lain → undefined; dengan board → board itu', () => {
+    expect(menuInsertTarget('frame', undefined, [], page2)).toEqual({ kind: 'frame', x: 0, y: 0, placed: { pageId: 'PageTwo2', pageBoards: [] } });
+    expect(menuInsertTarget('rect', undefined, [], page2)).toBeUndefined();
+    expect(menuInsertTarget('rect', boards[0], boards, page2)).toEqual({ kind: 'rect', board: { id: 'B1', name: 'Mobile' }, x: 40, y: 40 });
   });
 });

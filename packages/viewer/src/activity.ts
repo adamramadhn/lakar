@@ -51,10 +51,10 @@ export const initialActivity: ActivityState = { sessions: {}, calls: [], seq: 0,
 
 const isViewer = (client: string | undefined) => client === VIEWER_CLIENT;
 /**
- * Restore dari aplikasi (tool `restore`, client `lakar-viewer`) tidak tampil di Activity, tetapi tetap
- * mengubah dokumen: viewer lain (dan viewer yang sama) memuat ulang karenanya.
+ * Restore dan kelola halaman dari aplikasi (tool `restore`/`pages`, client `lakar-viewer`) tidak tampil di
+ * Activity, tetapi tetap mengubah dokumen: viewer lain (dan viewer yang sama) memuat ulang karenanya.
  */
-export const isDocChangeFromViewer = (c: Pick<ActivityCall, 'client' | 'tool'>) => isViewer(c.client) && c.tool === 'restore';
+export const isDocChangeFromViewer = (c: Pick<ActivityCall, 'client' | 'tool'>) => isViewer(c.client) && (c.tool === 'restore' || c.tool === 'pages');
 
 function applyEvent(state: ActivityState, event: ActivityEvent): ActivityState {
   if (event.seq <= state.seq) return state;
@@ -188,6 +188,8 @@ export function callTitle(c: ActivityCall, nameOf: (id: string) => string | unde
       return c.slug ? `Open ${c.slug}` : 'Open document';
     case 'restore':
       return c.description ?? 'Restore version';
+    case 'pages':
+      return c.description ?? 'Edit pages';
     case 'list_boards':
       return 'List boards';
     case 'read_skill':

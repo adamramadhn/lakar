@@ -56,3 +56,9 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-app-7-titlebar-tabs.md`
   summary: Resize jendela tanpa dekorasi di Linux (tepi jendela) belum terverifikasi; tidak ada `start_resize_dragging`.
   evidence: maybe-false; tao biasanya menangani resize jendela undecorated, perlu dicek di build release Linux.
+- source_spec: `_bmad-output/implementation-artifacts/spec-app-8-pages.md`
+  summary: Pelacakan halaman aktif per ID di Viewer.tsx (`pendingPage`, `pageWaiting`, efek sinkron) tidak punya test otomatis.
+  evidence: Repo belum punya harness test komponen React (`*.test.tsx`); hanya `resolvePageIndex` yang teruji. Bisa diselesaikan dengan menarik state machine ke reducer murni.
+- source_spec: `_bmad-output/implementation-artifacts/spec-app-8-pages.md`
+  summary: Agen hanya bisa menambah board ke halaman pertama (`add(null)`, `children(null)`, `place`); halaman lain yang dibuat pengguna tidak terjangkau agen.
+  evidence: Disengaja agar `/execute` dan tool MCP tidak berubah untuk bench; butuh keputusan desain API agen (mis. `pages()` + `add(pageId)` terdokumentasi).

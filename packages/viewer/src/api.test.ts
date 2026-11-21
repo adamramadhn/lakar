@@ -263,6 +263,25 @@ describe('History (aplikasi 3)', () => {
     expect(calls.at(-1)).toMatchObject({ path: '/viewer/docs/a/restore', body: { rev: 3, baseRev: 7 } });
   });
 
+  it('kelola halaman: path, method, dan body; gagal → ApiError', async () => {
+    const calls = fakeFetch((c) => {
+      if (c.path === '/viewer/docs/a/pages/Pg000001' && c.method === 'DELETE') return { status: 409, body: { ok: false, error: { code: 'CONFLICT', message: 'satu-satunya halaman', hint: 'dokumen butuh setidaknya satu halaman' } } };
+      return ok({ slug: 'a', rev: 2, pageId: 'Pg000002' });
+    });
+    const api = await freshApi();
+    await expect(api.addPage('a')).resolves.toEqual({ slug: 'a', rev: 2, pageId: 'Pg000002' });
+    expect(calls.at(-1)).toMatchObject({ method: 'POST', path: '/viewer/docs/a/pages', body: {} });
+    await api.addPage('a', 'Home');
+    expect(calls.at(-1)).toMatchObject({ body: { name: 'Home' } });
+    await api.renamePage('a', 'Pg000002', 'About');
+    expect(calls.at(-1)).toMatchObject({ method: 'POST', path: '/viewer/docs/a/pages/Pg000002/rename', body: { name: 'About' } });
+    await api.movePage('a', 'Pg000002', 0);
+    expect(calls.at(-1)).toMatchObject({ method: 'POST', path: '/viewer/docs/a/pages/Pg000002/move', body: { index: 0 } });
+    await api.deletePage('a', 'Pg000002');
+    expect(calls.at(-1)).toMatchObject({ method: 'DELETE', path: '/viewer/docs/a/pages/Pg000002', body: undefined });
+    await expect(api.deletePage('a', 'Pg000001')).rejects.toMatchObject({ code: 'CONFLICT', status: 409 });
+  });
+
   it('restore dengan baseRev usang → ApiError CONFLICT 409 dengan hint', async () => {
     fakeFetch((c) => {
       if (c.path === '/viewer/docs/a/restore') return { status: 409, body: { ok: false, error: { code: 'CONFLICT', message: 'dokumen a sudah berubah ke r9', hint: 'ada perubahan yang lebih baru', retryable: false } } };
