@@ -1,6 +1,6 @@
 /// <reference lib="dom" />
-// Pemetaan 1:1 dokumen → DOM/CSS flexbox (AD-5). Aturan sizing/gap/posisi/teks ditulis sekali di sini;
-// nilai yang semantiknya dipakai bersama Copy as/codegen berasal dari css.ts.
+// Dokumen → DOM/CSS flexbox (AD-5). Aturan sizing/gap/posisi/teks/efek ditulis sekali sebagai deklarasi di css.ts
+// (dipakai juga codegen); di sini hanya pembuatan elemen dan penerapan deklarasi dengan urutan tetap.
 // Elemen node TIDAK memakai CSS `border` (padding-box = border-box untuk x/y absolute); stroke memakai
 // overlay internal + box-shadow (paint.ts) atau overlay SVG (shape.ts).
 import type {
@@ -14,9 +14,8 @@ import type {
   ResolvedTextNode as TextNode,
 } from '@lakar/schema';
 import { cssFamily, textFont } from './fonts.js';
-// Nilai bersama render/Copy as/codegen (radius, padding, teks, bayangan teks, align/justify) dari css.ts (AD-5).
-import { ALIGN, gridLineCss, gridTemplateCss, JUSTIFY, letterSpacingCss, lineHeightCss, paddingCss, radiusCss, textShadowCss } from './css.js';
-import { applyEffects, boxShadowCss, DEFAULT_ASSET_BASE, dropShadowFilters, applyFills, strokeOverlay } from './paint.js';
+import { boardDecls, BOARD_DEFAULT_BACKGROUND, boxPaintDecls, childLayoutDecls, frameDecls, frameLayout, radiusCss, textDecls, type ParentLayout } from './css.js';
+import { applyDecls, applyEffects, DEFAULT_ASSET_BASE, dropShadowFilters, applyFills, strokeOverlay } from './paint.js';
 import { ellipseShape, fillLayer, pathShape, strokeSvg, type Shape } from './shape.js';
 import { iconKey, renderIconElement } from './icon.js';
 
@@ -24,43 +23,21 @@ import { iconKey, renderIconElement } from './icon.js';
 export const NODE_ATTR = 'data-lakar-id';
 
 type Dim = number | 'hug' | 'fill' | undefined;
-type Sized = {
-  width?: Dim;
-  height?: Dim;
-  minWidth?: number | undefined;
-  maxWidth?: number | undefined;
-  minHeight?: number | undefined;
-  maxHeight?: number | undefined;
-};
-type Positioned = { position?: 'absolute' | undefined; x?: number | undefined; y?: number | undefined };
 
 /** Konteks parent: arah flow (`none` = semua anak absolute) dan geser `scrollY` anak-anaknya. */
-type Parent = { layout: 'row' | 'column' | 'grid' | 'none'; scrollY: number };
+type Parent = { layout: ParentLayout; scrollY: number };
 
 /** Konteks render: prefiks URL aset gambar dan glyph ikon (kunci `lib/icon`). */
 export type RenderContext = { assetBase: string; icons: ReadonlyMap<string, IconGlyph> };
 const DEFAULT_CTX: RenderContext = { assetBase: DEFAULT_ASSET_BASE, icons: new Map() };
-
-const px = (n: number) => `${n}px`;
 
 /** Mount board ke `root` (ganti isinya). Board: kolom flex dari kiri atas, ukuran fixed, selalu clip. */
 export function mountBoardNode(board: BoardNode, root: HTMLElement, ctx: RenderContext = DEFAULT_CTX): HTMLElement {
   const d = root.ownerDocument;
   const el = d.createElement('div');
   el.setAttribute(NODE_ATTR, board.id);
-  Object.assign(el.style, {
-    position: 'relative',
-    boxSizing: 'border-box',
-    width: px(board.width),
-    height: px(board.height),
-    overflow: 'hidden', // board selalu clip (AD-15)
-    isolation: 'isolate', // blend anak dibatasi pada isi board
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'flex-start',
-    justifyContent: 'flex-start',
-  } satisfies Partial<CSSStyleDeclaration>);
-  if (!applyFills(el.style, board.fills, { assetBase: ctx.assetBase, doc: d, width: board.width, height: board.height })) el.style.background = '#FFFFFF';
+  applyDecls(el.style, boardDecls(board));
+  if (!applyFills(el.style, board.fills, { assetBase: ctx.assetBase, doc: d, width: board.width, height: board.height })) el.style.background = BOARD_DEFAULT_BACKGROUND;
   appendChildren(d, el, board.children, { layout: 'column', scrollY: 0 }, undefined, ctx);
   root.replaceChildren(el);
   return el;
@@ -76,21 +53,18 @@ function appendChildren(
 ): void {
   let flowIndex = 0;
   for (const c of children) {
-    const child = renderChild(d, c, parent, ctx);
-    // Gap negatif: CSS `gap` menolak nilai < 0 → margin pada anak flow ke-2 dst. Anak absolute dilewati.
-    // Hanya flex row/column; grid mengabaikan gap negatif (CSS grid tidak punya padanan margin per sumbu).
+    // Gap negatif: CSS `gap` menolak nilai < 0 → margin pada anak flow ke-2 dst. (childLayoutDecls). Anak absolute
+    // dilewati. Hanya flex row/column; grid mengabaikan gap negatif.
+    let negativeGap: number | undefined;
     if (gap !== undefined && gap < 0 && (parent.layout === 'row' || parent.layout === 'column') && c.position !== 'absolute') {
-      if (flowIndex > 0) {
-        if (parent.layout === 'row') child.style.marginLeft = px(gap);
-        else child.style.marginTop = px(gap);
-      }
+      if (flowIndex > 0) negativeGap = gap;
       flowIndex++;
     }
-    el.appendChild(child);
+    el.appendChild(renderChild(d, c, parent, ctx, negativeGap));
   }
 }
 
-function renderChild(d: Document, n: ChildNode, parent: Parent, ctx: RenderContext): HTMLElement {
+function renderChild(d: Document, n: ChildNode, parent: Parent, ctx: RenderContext, negativeGap: number | undefined): HTMLElement {
   let el: HTMLElement;
   /** Filter awal (drop-shadow bentuk mask) yang mendahului blur. */
   let filters: string[] = [];
@@ -123,107 +97,10 @@ function renderChild(d: Document, n: ChildNode, parent: Parent, ctx: RenderConte
       filters = dropShadowFilters(n.shadows);
       break;
   }
-  const s = el.style;
-  s.boxSizing = 'border-box';
-  s.margin = '0';
-  const sizing = sizingOf(n);
-  if (parent.layout === 'none' || n.position === 'absolute') applyAbsolute(s, n, sizing);
-  else if (parent.layout === 'grid') applyGridItem(s, n, sizing);
-  else applyFlowSizing(s, sizing, parent.layout);
-  applyMinMax(s, sizing);
+  applyDecls(el.style, childLayoutDecls(n, parent.layout, { negativeGap }));
   // Efek bersama (termasuk text/icon) + geser scrollY parent di depan rotasi.
-  applyEffects(s, n, parent.scrollY, filters);
+  applyEffects(el.style, n, parent.scrollY, filters);
   return el;
-}
-
-/** Sizing efektif node (icon: `size` × `size`; path tanpa width/height atau hug: ukuran viewBox). */
-function sizingOf(n: ChildNode): Sized {
-  if (n.type === 'icon') return { width: n.size, height: n.size };
-  if (n.type === 'path') {
-    const [, , vw, vh] = n.viewBox;
-    return { ...n, width: n.width === undefined || n.width === 'hug' ? vw : n.width, height: n.height === undefined || n.height === 'hug' ? vh : n.height };
-  }
-  // Teks `wrap`: lebar mengikuti sizing, tinggi selalu hug.
-  if (n.type === 'text' && textWrap(n) === 'wrap') return { ...n, height: 'hug' };
-  return n;
-}
-
-/** `wrap` default: `auto` bila width tidak diisi/hug, `wrap` bila width angka/fill. */
-function textWrap(n: TextNode): 'auto' | 'wrap' | 'fixed' {
-  return n.wrap ?? (typeof n.width === 'number' || n.width === 'fill' ? 'wrap' : 'auto');
-}
-
-/** Anak flow di parent flex. Sumbu utama = arah parent. */
-function applyFlowSizing(s: CSSStyleDeclaration, z: Sized, layout: 'row' | 'column'): void {
-  const mainKey = layout === 'row' ? 'width' : 'height';
-  const crossKey = layout === 'row' ? 'height' : 'width';
-  const main = z[mainKey];
-  const cross = z[crossKey];
-  if (typeof main === 'number') {
-    s.flex = `0 0 ${px(main)}`;
-    s[mainKey] = px(main);
-  } else if (main === 'fill') {
-    s.flex = '1 1 0px';
-    s[layout === 'row' ? 'minWidth' : 'minHeight'] = '0';
-  } else {
-    s.flex = '0 0 auto';
-  }
-  if (typeof cross === 'number') s[crossKey] = px(cross);
-  else if (cross === 'fill') {
-    s.alignSelf = 'stretch';
-    s[crossKey] = 'auto';
-  } else if (cross === 'hug') s[crossKey] = 'fit-content';
-  // tidak diisi → auto (ikut align parent)
-}
-
-/**
- * Anak flow di sel grid (v4): angka → px; `fill` → regang di sel (justify/align-self stretch, min 0); `hug` →
- * fit-content (tidak diregang); tidak diisi → default CSS grid (regang, tinggi ikut `align` parent). Penempatan
- * `gridColumn`/`gridRow` hanya di sini (anak absolute tidak memakai area grid sebagai containing block).
- */
-function applyGridItem(s: CSSStyleDeclaration, n: { gridColumn?: unknown; gridRow?: unknown }, z: Sized): void {
-  for (const [key, self, min] of [
-    ['width', 'justifySelf', 'minWidth'],
-    ['height', 'alignSelf', 'minHeight'],
-  ] as const) {
-    const v = z[key];
-    if (typeof v === 'number') s[key] = px(v);
-    else if (v === 'fill') {
-      s[self] = 'stretch';
-      s[key] = 'auto';
-      s[min] = '0';
-    } else if (v === 'hug') s[key] = 'fit-content';
-  }
-  const col = gridLineCss(n.gridColumn);
-  const row = gridLineCss(n.gridRow);
-  if (col) s.gridColumn = col;
-  if (row) s.gridRow = row;
-}
-
-/** Anak absolute (atau anak frame `none`): left/top relatif border-box parent, keluar dari flow. */
-function applyAbsolute(s: CSSStyleDeclaration, n: Positioned & Sized, z: Sized): void {
-  s.position = 'absolute';
-  s.left = px(n.x ?? 0);
-  s.top = px(n.y ?? 0);
-  s.flex = '0 0 auto';
-  for (const [key, end] of [
-    ['width', 'right'],
-    ['height', 'bottom'],
-  ] as const) {
-    const v = z[key];
-    if (typeof v === 'number') s[key] = px(v);
-    else if (v === 'fill') s[end] = '0';
-    // hug/tidak diisi → ukuran konten sendiri, TIDAK diperas lebar containing block (bukan fit-content).
-    else s[key] = 'max-content';
-  }
-}
-
-/** min/max → CSS; menimpa `min-<dim>:0` milik fill. */
-function applyMinMax(s: CSSStyleDeclaration, z: Sized): void {
-  if (z.minWidth !== undefined) s.minWidth = px(z.minWidth);
-  if (z.maxWidth !== undefined) s.maxWidth = px(z.maxWidth);
-  if (z.minHeight !== undefined) s.minHeight = px(z.minHeight);
-  if (z.maxHeight !== undefined) s.maxHeight = px(z.maxHeight);
 }
 
 /**
@@ -236,11 +113,8 @@ function paintBox(
   radius: string | undefined,
   ctx: RenderContext,
 ): HTMLElement | undefined {
-  const s = el.style;
-  applyFills(s, n.fills, fillContext(el.ownerDocument, n, ctx));
-  if (radius) s.borderRadius = radius;
-  const shadow = boxShadowCss(n.stroke, n.shadows);
-  if (shadow) s.boxShadow = shadow;
+  applyFills(el.style, n.fills, fillContext(el.ownerDocument, n, ctx));
+  applyDecls(el.style, boxPaintDecls(n, radius));
   return n.stroke ? strokeOverlay(el.ownerDocument, n.stroke, radius) : undefined;
 }
 
@@ -276,34 +150,9 @@ function renderShape(d: Document, n: EllipseNode | PathNode, shape: Shape | unde
 function renderFrame(d: Document, n: FrameNode, ctx: RenderContext): HTMLElement {
   const el = d.createElement('div');
   el.setAttribute(NODE_ATTR, n.id);
-  const s = el.style;
-  s.position = 'relative'; // acuan anak absolute (border-box = padding-box: tanpa border)
-  const layout = n.layout ?? 'none';
-  if (layout === 'none') {
-    s.display = 'block';
-  } else {
-    if (layout === 'grid') {
-      s.display = 'grid';
-      const cols = gridTemplateCss(n.gridTemplateColumns);
-      const rows = gridTemplateCss(n.gridTemplateRows);
-      if (cols) s.gridTemplateColumns = cols;
-      if (rows) s.gridTemplateRows = rows;
-    } else {
-      s.display = 'flex';
-      s.flexDirection = layout;
-    }
-    if (n.gap !== undefined && n.gap >= 0) s.gap = px(n.gap);
-    // Gap per sumbu menimpa `gap` (CSS column-gap/row-gap; berlaku juga di flex).
-    if (n.columnGap !== undefined) s.columnGap = px(n.columnGap);
-    if (n.rowGap !== undefined) s.rowGap = px(n.rowGap);
-    // Grid: align → align-items (posisi item di sel), justify → justify-content (distribusi track); peta sama.
-    if (n.align) s.alignItems = ALIGN[n.align]!;
-    if (n.justify) s.justifyContent = JUSTIFY[n.justify]!;
-  }
-  if (n.padding !== undefined) s.padding = paddingCss(n.padding)!;
-  if (n.clip) s.overflow = 'hidden';
+  applyDecls(el.style, frameDecls(n));
   const overlay = paintBox(el, n, radiusCss(n.radius), ctx);
-  appendChildren(d, el, n.children, { layout, scrollY: n.scrollY ?? 0 }, n.gap, ctx);
+  appendChildren(d, el, n.children, { layout: frameLayout(n), scrollY: n.scrollY ?? 0 }, n.gap, ctx);
   // Stroke dalam di atas anak (seperti Figma), tidak ikut scrollY.
   if (overlay) el.appendChild(overlay);
   return el;
@@ -313,29 +162,8 @@ function renderText(d: Document, n: TextNode): HTMLElement {
   const el = d.createElement('div');
   el.setAttribute(NODE_ATTR, n.id);
   el.dataset.lakarText = '';
-  const s = el.style;
-  const f = textFont(n);
-  s.fontFamily = cssFamily(f.family); // satu keluarga terdaftar, tanpa generic fallback
-  s.fontWeight = String(f.weight);
-  s.fontStyle = f.style;
-  s.fontSize = px(n.size);
-  if (n.lineHeight !== undefined) s.lineHeight = lineHeightCss(n.lineHeight)!;
-  if (n.letterSpacing !== undefined) s.letterSpacing = letterSpacingCss(n.letterSpacing)!;
-  if (n.align) s.textAlign = n.align;
-  if (n.numeric === 'tabular') s.fontVariantNumeric = 'tabular-nums';
-  s.color = n.color ?? '#000000';
-  const shadow = textShadowCss(n.shadows);
-  if (shadow) s.textShadow = shadow;
-  const wrap = textWrap(n);
-  if (wrap === 'auto') {
-    s.whiteSpace = 'pre';
-  } else {
-    s.whiteSpace = 'pre-wrap';
-    s.overflowWrap = 'break-word';
-  }
-  // `fixed`: width/height angka dari sizing; overflow tidak dipotong agar teks yang meluber tetap terlihat
-  // (check LC-02b/LC-11 menilai luberan dari `measure.texts[].ink`, bukan dari bounds elemen).
-  if (wrap === 'fixed') s.overflow = 'visible';
+  // Satu keluarga terdaftar, tanpa generic fallback (cssFamily); sisanya dari css.ts.
+  applyDecls(el.style, textDecls(n, cssFamily(textFont(n).family)));
   el.textContent = n.content;
   return el;
 }

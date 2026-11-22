@@ -1,53 +1,32 @@
 /// <reference lib="dom" />
-// Properti visual bersama → CSS (Design Notes story 8), ditulis sekali di sini dan dipakai
-// board/frame/rect/ellipse/path/text/icon. Elemen node TIDAK pernah mendapat CSS `border`: tinta stroke
-// bagian dalam memakai overlay internal (tanpa data-lakar-id), bagian luar memakai box-shadow spread.
-import type { ResolvedFill as Fill, ResolvedShadow as Shadow, ResolvedStroke as Stroke } from '@lakar/schema';
-// Nilai bersama (lapisan solid/gradien, stops, bayangan) dari pemetaan tunggal css.ts (AD-5); noise, mesh,
-// image, overlay stroke, dan drop-shadow tetap di sini.
-import { boxShadowsCss, gradientLayerCss } from './css.js';
-import { meshLayer, NOISE_DEFAULTS, noiseLayer } from './effects.js';
+// Properti visual bersama → DOM (Design Notes story 8), dipakai board/frame/rect/ellipse/path/text/icon. Elemen node
+// TIDAK pernah mendapat CSS `border`: tinta stroke bagian dalam memakai overlay internal (tanpa data-lakar-id),
+// bagian luar memakai box-shadow spread. Semua nilai dan deklarasi berasal dari pemetaan tunggal css.ts (AD-5);
+// yang tersisa di sini hanya bitmap mesh (canvas) dan penerapan ke DOM.
+import type { ResolvedFill as Fill, ResolvedShadow as Shadow } from '@lakar/schema';
+import { DEFAULT_ASSET_BASE, dropShadowFilterList, effectDecls, fillLayerCss, fillsBlendModeCss, strokeOverlayDecls, type CssDecl, type EffectsLike, type StrokeLike } from './css.js';
+import { meshLayer } from './effects.js';
 
-/** Prefiks URL aset default (daemon dan harness menyajikan `/assets/<sha256>`). */
-export const DEFAULT_ASSET_BASE = '/assets/';
+export { boxShadowWithStrokeCss as boxShadowCss, DEFAULT_ASSET_BASE, DROP_SHADOW_BLUR_FACTOR } from './css.js';
 
-const px = (n: number) => `${n}px`;
-
-/** URL aset gambar: `assetBase` + sha256. */
+/** URL aset gambar: `assetBase` + sha256 (format sama dengan lapisan image di css.ts). */
 export const assetUrl = (assetBase: string, assetId: string): string => `${assetBase}${assetId}`;
 
 /** Konteks lapisan fill: prefiks aset, dokumen DOM (canvas mesh), dan ukuran kotak bila sudah tetap (px). */
 export type FillContext = { assetBase: string; doc?: Document | undefined; width?: number | undefined; height?: number | undefined };
 
-/** Satu fill → satu lapisan CSS `background`. */
+/** Terapkan deklarasi ke style elemen (urutan dipertahankan; deklarasi berikutnya menimpa yang sebelumnya). */
+export function applyDecls(st: CSSStyleDeclaration, decls: readonly CssDecl[]): void {
+  for (const [p, v] of decls) st.setProperty(p, v);
+}
+
+/** Satu fill → satu lapisan CSS `background`: mesh → bitmap canvas; lainnya dari css.ts. */
 function fillLayer(f: Fill, fc: FillContext): string {
-  const assetBase = fc.assetBase;
-  switch (f.type) {
-    case 'solid':
-    case 'linear':
-    case 'radial':
-    case 'conic':
-      // Lapisan berlapis (bukan `solo`): solid → `linear-gradient(c, c)`.
-      return gradientLayerCss(f)!;
-    case 'noise':
-      return noiseLayer(f);
-    case 'mesh': {
-      if (!fc.doc) throw new Error('fill mesh butuh dokumen DOM (canvas 2D)');
-      return meshLayer(f, fc.width, fc.height, fc.doc);
-    }
-    case 'image': {
-      const url = `url("${assetUrl(assetBase, f.assetId)}")`;
-      switch (f.fit) {
-        case 'cover':
-        case 'contain':
-          return `${url} center / ${f.fit} no-repeat`;
-        case 'fill':
-          return `${url} 0 0 / 100% 100% no-repeat`;
-        case 'tile':
-          return `${url} 0 0 / auto repeat`;
-      }
-    }
+  if (f.type === 'mesh') {
+    if (!fc.doc) throw new Error('fill mesh butuh dokumen DOM (canvas 2D)');
+    return meshLayer(f, fc.width, fc.height, fc.doc);
   }
+  return fillLayerCss(f, fc.assetBase ?? DEFAULT_ASSET_BASE)!;
 }
 
 /** fills → CSS `background` berlapis: `fills[0]` paling bawah (CSS: lapisan pertama paling atas). */
@@ -60,17 +39,8 @@ export function fillsBackground(fills: readonly Fill[] | undefined, ctx: string 
     .join(', ');
 }
 
-/**
- * `background-blend-mode` per lapisan (urutan CSS = fills terbalik): noise memakai `blend`-nya (default overlay),
- * lapisan lain normal. Tanpa noise → undefined (properti tidak disetel).
- */
-export function fillsBlendMode(fills: readonly Fill[] | undefined): string | undefined {
-  if (!fills?.some((f) => f.type === 'noise')) return undefined;
-  return fills
-    .map((f) => (f.type === 'noise' ? (f.blend ?? NOISE_DEFAULTS.blend) : 'normal'))
-    .reverse()
-    .join(', ');
-}
+/** `background-blend-mode` per lapisan (lihat css.ts `fillsBlendModeCss`). */
+export const fillsBlendMode = (fills: readonly Fill[] | undefined): string | undefined => fillsBlendModeCss(fills);
 
 /** Pasang fills ke style elemen: `background` + `background-blend-mode` (bila ada noise). */
 export function applyFills(st: CSSStyleDeclaration, fills: readonly Fill[] | undefined, fc: FillContext): boolean {
@@ -82,95 +52,25 @@ export function applyFills(st: CSSStyleDeclaration, fills: readonly Fill[] | und
   return true;
 }
 
-type Side = 'top' | 'right' | 'bottom' | 'left';
-const SIDES: readonly Side[] = ['top', 'right', 'bottom', 'left'];
-
-/** Lebar tinta stroke di dalam dan di luar tepi box. */
-function strokeSplit(s: Stroke): { inside: number; outside: number } {
-  if (s.align === 'inside') return { inside: s.width, outside: 0 };
-  if (s.align === 'outside') return { inside: 0, outside: s.width };
-  return { inside: s.width / 2, outside: s.width / 2 };
-}
-
-/** Bagian luar stroke box → box-shadow spread (semua sisi) atau offset ke arah sisi tertentu. */
-function outerStrokeShadows(s: Stroke): string[] {
-  const { outside: w } = strokeSplit(s);
-  if (w <= 0) return [];
-  const sides = s.sides ?? SIDES;
-  if (sides.length === 4) return [`0 0 0 ${px(w)} ${s.color}`];
-  const off: Record<Side, string> = { top: `0 ${px(-w)}`, right: `${px(w)} 0`, bottom: `0 ${px(w)}`, left: `${px(-w)} 0` };
-  return sides.map((side) => `${off[side]} 0 0 ${s.color}`);
-}
-
-/** `box-shadow` box: stroke luar (paling atas) lalu shadows sesuai urutan (css.ts). */
-export function boxShadowCss(stroke: Stroke | undefined, shadows: readonly Shadow[] | undefined): string | undefined {
-  const own = boxShadowsCss(shadows);
-  const list = [...(stroke ? outerStrokeShadows(stroke) : []), ...(own ? [own] : [])];
-  return list.length ? list.join(', ') : undefined;
-}
-
-/**
- * Faktor `drop-shadow()` agar σ sama dengan box-shadow (σ = blur/2). Chromium menafsirkan panjang blur
- * `drop-shadow()` sebagai σ langsung, jadi blur/2 (dikunci tes `bayangan-path-vs-rect`).
- */
-export const DROP_SHADOW_BLUR_FACTOR = 0.5;
-
 /** Bentuk mask (ellipse busur, path): drop → `drop-shadow()`; spread dan inner tidak didukung. */
-export function dropShadowFilters(shadows: readonly Shadow[] | undefined): string[] {
-  return (shadows ?? [])
-    .filter((s) => s.type !== 'inner')
-    .map((s) => `drop-shadow(${px(s.x)} ${px(s.y)} ${px(s.blur * DROP_SHADOW_BLUR_FACTOR)} ${s.color})`);
-}
+export const dropShadowFilters = (shadows: readonly Shadow[] | undefined): string[] => dropShadowFilterList(shadows);
 
 /**
- * Overlay stroke box bagian dalam: div internal absolute inset 0, border hanya pada `sides`, radius sama,
- * ditambahkan terakhir (di atas anak). Tanpa bagian dalam → undefined.
+ * Overlay stroke box bagian dalam: div internal dengan deklarasi `strokeOverlayDecls`, ditambahkan terakhir
+ * (di atas anak). Tanpa bagian dalam → undefined.
  */
-export function strokeOverlay(d: Document, s: Stroke, radius: string | undefined): HTMLElement | undefined {
-  const { inside: w } = strokeSplit(s);
-  if (w <= 0) return undefined;
+export function strokeOverlay(d: Document, s: StrokeLike, radius: string | undefined): HTMLElement | undefined {
+  const decls = strokeOverlayDecls(s, radius);
+  if (!decls) return undefined;
   const el = d.createElement('div');
-  const st = el.style;
-  st.position = 'absolute';
-  st.inset = '0';
-  st.boxSizing = 'border-box';
-  st.pointerEvents = 'none';
-  st.margin = '0';
-  st.zIndex = 'auto';
-  if (radius) st.borderRadius = radius;
-  const sides = s.sides ?? SIDES;
-  for (const side of SIDES) {
-    // Satu-satunya pemakaian `border` di render: elemen overlay internal tanpa data-lakar-id.
-    if (sides.includes(side)) st.setProperty(`border-${side}`, `${px(w)} solid ${s.color}`);
-  }
+  applyDecls(el.style, decls);
   return el;
 }
 
 /** Efek bersama node anak (termasuk text/icon). */
-export type Effects = {
-  opacity?: number | undefined;
-  blend?: string | undefined;
-  blur?: number | undefined;
-  backdropBlur?: number | undefined;
-  rotation?: number | undefined;
-};
+export type Effects = EffectsLike;
 
-/**
- * opacity, blend, blur (σ = blur/2), backdropBlur (σ sama), dan transform `translateY(-scrollY) rotate(r)`
- * (origin tengah, tidak memengaruhi layout). `filters` awal (mis. drop-shadow) mendahului blur.
- */
+/** Terapkan `effectDecls` (opacity, blend, filter, backdrop, transform). */
 export function applyEffects(st: CSSStyleDeclaration, e: Effects, scrollY: number, filters: readonly string[] = []): void {
-  if (e.opacity !== undefined && e.opacity < 1) st.opacity = String(e.opacity);
-  if (e.blend && e.blend !== 'normal') st.mixBlendMode = e.blend;
-  const filter = [...filters];
-  if (e.blur) filter.push(`blur(${px(e.blur / 2)})`);
-  if (filter.length) st.filter = filter.join(' ');
-  if (e.backdropBlur) st.backdropFilter = `blur(${px(e.backdropBlur / 2)})`;
-  const transform: string[] = [];
-  if (scrollY) transform.push(`translateY(${px(-scrollY)})`);
-  if (e.rotation) transform.push(`rotate(${e.rotation}deg)`);
-  if (transform.length) {
-    st.transform = transform.join(' ');
-    st.transformOrigin = '50% 50%';
-  }
+  applyDecls(st, effectDecls(e, scrollY, filters));
 }

@@ -2,6 +2,7 @@
 // Geometri bentuk non-box (Design Notes story 8): busur ellipse dan path. Bentuk diisi lewat lapisan
 // fill ber-`mask-image` SVG dan diberi stroke lewat overlay `<svg>` internal (keduanya tanpa data-lakar-id).
 import type { ResolvedEllipseNode as EllipseNode, ResolvedPathNode as PathNode, ResolvedStroke as Stroke } from '@lakar/schema';
+import { isTokenRef, tokenVar, type CssDecl, type StrokeLike, type SvgSpec } from './css.js';
 
 export type ViewBox = readonly [number, number, number, number];
 /** Bentuk di ruang `viewBox`, dipetakan non-uniform ke box node. */
@@ -57,90 +58,135 @@ function maskImage(shape: Shape): string {
   return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
 }
 
-/** Lapisan fill internal bentuk: mask bentuk; background fills dipasang pemanggil (`applyFills`). */
-export function fillLayer(d: Document, shape: Shape): HTMLElement {
-  const el = d.createElement('div');
-  const st = el.style;
-  st.position = 'absolute';
-  st.inset = '0';
-  st.pointerEvents = 'none';
-  const mask = maskImage(shape);
-  for (const [k, v] of [
-    ['mask-image', mask],
+/** Deklarasi lapisan fill bentuk (AD-5; render dan codegen): absolute inset 0 + mask bentuk. Latar dipasang pemanggil. */
+export function shapeFillLayerDecls(shape: Shape): CssDecl[] {
+  return [
+    ['position', 'absolute'],
+    ['inset', '0'],
+    ['pointer-events', 'none'],
+    ['mask-image', maskImage(shape)],
     ['mask-size', '100% 100%'],
     ['mask-repeat', 'no-repeat'],
     ['mask-position', '0 0'],
     ['mask-mode', 'alpha'],
-  ] as const) {
-    st.setProperty(k, v);
+  ];
+}
+
+/** Lapisan fill internal bentuk: mask bentuk; background fills dipasang pemanggil (`applyFills`). */
+export function fillLayer(d: Document, shape: Shape): HTMLElement {
+  const el = d.createElement('div');
+  for (const [k, v] of shapeFillLayerDecls(shape)) el.style.setProperty(k, v);
+  return el;
+}
+
+/**
+ * Atribut paint SVG (`stroke`/`fill`): hex → atribut; ref token → `currentColor` + `color: var(--…)` di style elemen
+ * (var() tidak sah sebagai atribut presentasi). Mengembalikan nilai atribut.
+ */
+export function svgPaint(color: unknown, style: CssDecl[]): string {
+  if (isTokenRef(color)) {
+    style.push(['color', tokenVar(color)]);
+    return 'currentColor';
   }
+  return typeof color === 'string' ? color : 'none';
+}
+
+/**
+ * Spesifikasi overlay stroke `<svg>` bentuk (render dan codegen): path sama, `vector-effect:non-scaling-stroke`.
+ * center = w; inside = 2w + clipPath bentuk; outside = 2w + mask (rect putih besar, bentuk hitam). `sides` diabaikan.
+ * `id` = id clipPath/mask (pemanggil menjamin unik). Lebar 0 → undefined. Lebar token → `stroke-width` di style path.
+ */
+export function strokeSvgSpec(shape: Shape, s: StrokeLike, id: string): SvgSpec | undefined {
+  const numeric = typeof s.width === 'number';
+  if (numeric ? !((s.width as number) > 0) : !isTokenRef(s.width)) return undefined;
+  const svgStyle: CssDecl[] = [
+    ['position', 'absolute'],
+    ['left', '0'],
+    ['top', '0'],
+    ['width', '100%'],
+    ['height', '100%'],
+    ['overflow', 'visible'],
+    ['pointer-events', 'none'],
+  ];
+  const pathStyle: CssDecl[] = [];
+  const stroke = svgPaint(s.color, svgStyle);
+  const pathAttrs: [string, string][] = [
+    ['d', shape.d],
+    ['fill', 'none'],
+    ['stroke', stroke],
+  ];
+  if (numeric) pathAttrs.push(['stroke-width', num(s.align === 'center' ? (s.width as number) : 2 * (s.width as number))]);
+  else {
+    const v = tokenVar(s.width as { $token: string });
+    pathStyle.push(['stroke-width', s.align === 'center' ? v : `calc(2 * ${v})`]);
+  }
+  pathAttrs.push(['vector-effect', 'non-scaling-stroke'], ['stroke-linejoin', 'miter']);
+  const children: SvgSpec[] = [];
+  if (s.align !== 'center') {
+    if (s.align === 'inside') {
+      pathAttrs.push(['clip-path', `url(#${id})`]);
+      children.push({
+        tag: 'defs',
+        attrs: [],
+        style: [],
+        children: [{ tag: 'clipPath', attrs: [['id', id]], style: [], children: [{ tag: 'path', attrs: [['d', shape.d], ['clip-rule', shape.rule]], style: [], children: [] }] }],
+      });
+    } else {
+      const [x, y, w, h] = shape.viewBox;
+      const big = Math.max(w, h) * 1000;
+      const box: [string, string][] = [
+        ['x', num(x - big)],
+        ['y', num(y - big)],
+        ['width', num(w + 2 * big)],
+        ['height', num(h + 2 * big)],
+      ];
+      pathAttrs.push(['mask', `url(#${id})`]);
+      children.push({
+        tag: 'defs',
+        attrs: [],
+        style: [],
+        children: [
+          {
+            tag: 'mask',
+            attrs: [['id', id], ['maskUnits', 'userSpaceOnUse'], ...box],
+            style: [],
+            children: [
+              { tag: 'rect', attrs: [...box, ['fill', '#fff']], style: [], children: [] },
+              { tag: 'path', attrs: [['d', shape.d], ['fill', '#000'], ['fill-rule', shape.rule]], style: [], children: [] },
+            ],
+          },
+        ],
+      });
+    }
+  }
+  children.push({ tag: 'path', attrs: pathAttrs, style: pathStyle, children: [] });
+  return {
+    tag: 'svg',
+    attrs: [
+      ['viewBox', shape.viewBox.map(num).join(' ')],
+      ['preserveAspectRatio', 'none'],
+      ['aria-hidden', 'true'],
+    ],
+    style: svgStyle,
+    children,
+  };
+}
+
+/** Bangun elemen SVG dari spesifikasi (createElementNS, tanpa innerHTML). */
+export function buildSvg(d: Document, spec: SvgSpec): SVGElement {
+  const el = d.createElementNS(SVG_NS, spec.tag);
+  for (const [k, v] of spec.attrs) el.setAttribute(k, v);
+  for (const [k, v] of spec.style) el.style.setProperty(k, v);
+  for (const c of spec.children) el.appendChild(buildSvg(d, c));
   return el;
 }
 
 let clipSeq = 0;
 
-/**
- * Overlay stroke `<svg>` internal: path sama, `vector-effect:non-scaling-stroke`.
- * center = w; inside = 2w + clipPath bentuk; outside = 2w + mask (rect putih besar, bentuk hitam).
- * `sides` diabaikan untuk bentuk ini.
- */
-export function strokeSvg(d: Document, shape: Shape, s: Stroke): SVGSVGElement | undefined {
+/** Overlay stroke `<svg>` internal bentuk (lihat `strokeSvgSpec`); id clip/mask unik per halaman. */
+export function strokeSvg(d: Document, shape: Shape, s: Stroke): SVGElement | undefined {
   if (s.width <= 0) return undefined;
-  const svg = d.createElementNS(SVG_NS, 'svg');
-  svg.setAttribute('viewBox', shape.viewBox.map(num).join(' '));
-  svg.setAttribute('preserveAspectRatio', 'none');
-  svg.setAttribute('aria-hidden', 'true');
-  const st = svg.style;
-  st.position = 'absolute';
-  st.left = '0';
-  st.top = '0';
-  st.width = '100%';
-  st.height = '100%';
-  st.overflow = 'visible';
-  st.pointerEvents = 'none';
-  const path = d.createElementNS(SVG_NS, 'path');
-  path.setAttribute('d', shape.d);
-  path.setAttribute('fill', 'none');
-  path.setAttribute('stroke', s.color);
-  path.setAttribute('stroke-width', num(s.align === 'center' ? s.width : 2 * s.width));
-  path.setAttribute('vector-effect', 'non-scaling-stroke');
-  path.setAttribute('stroke-linejoin', 'miter');
-  if (s.align !== 'center') {
-    const id = `lakar-stroke-${++clipSeq}`;
-    const defs = d.createElementNS(SVG_NS, 'defs');
-    const shapeEl = () => {
-      const p = d.createElementNS(SVG_NS, 'path');
-      p.setAttribute('d', shape.d);
-      return p;
-    };
-    if (s.align === 'inside') {
-      const clip = d.createElementNS(SVG_NS, 'clipPath');
-      clip.id = id;
-      const p = shapeEl();
-      p.setAttribute('clip-rule', shape.rule);
-      clip.appendChild(p);
-      defs.appendChild(clip);
-      path.setAttribute('clip-path', `url(#${id})`);
-    } else {
-      const mask = d.createElementNS(SVG_NS, 'mask');
-      mask.id = id;
-      mask.setAttribute('maskUnits', 'userSpaceOnUse');
-      const [x, y, w, h] = shape.viewBox;
-      const big = Math.max(w, h) * 1000;
-      const box = { x: num(x - big), y: num(y - big), width: num(w + 2 * big), height: num(h + 2 * big) };
-      for (const [k, v] of Object.entries(box)) mask.setAttribute(k, v);
-      const rect = d.createElementNS(SVG_NS, 'rect');
-      for (const [k, v] of Object.entries(box)) rect.setAttribute(k, v);
-      rect.setAttribute('fill', '#fff');
-      const p = shapeEl();
-      p.setAttribute('fill', '#000');
-      p.setAttribute('fill-rule', shape.rule);
-      mask.append(rect, p);
-      defs.appendChild(mask);
-      path.setAttribute('mask', `url(#${id})`);
-    }
-    svg.appendChild(defs);
-  }
-  svg.appendChild(path);
-  return svg;
+  const spec = strokeSvgSpec(shape, s, `lakar-stroke-${++clipSeq}`);
+  return spec ? buildSvg(d, spec) : undefined;
 }
+

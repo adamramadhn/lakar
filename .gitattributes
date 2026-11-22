@@ -1,0 +1,2 @@
+# Golden codegen (tests/codegen.test.ts) dibandingkan byte-per-byte: selalu LF di semua OS.
+tests/fixtures/codegen/*.txt text eol=lf

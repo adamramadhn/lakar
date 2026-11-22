@@ -4,6 +4,7 @@
 // Render selalu mengirim nilai ter-resolve; Copy as/codegen boleh mengirim ref token atau nilai yang belum
 // tervalidasi, jadi setiap fungsi menerima `unknown` dan mengembalikan undefined untuk nilai yang tak terpetakan.
 // Format angka mengikuti render: angka apa adanya, tanpa pembulatan.
+import { NOISE_DEFAULTS, noiseLayer } from './effects.js';
 
 /** Referensi token tersimpan (`{$token:"colors.primary"}`). */
 export type TokenRef = { readonly $token: string };
@@ -238,3 +239,470 @@ export function strokeBorderDecls(stroke: unknown): CssDecl[] {
   const v = `${w} solid ${c}`;
   return Array.isArray(s.sides) ? s.sides.map((side): CssDecl => [`border-${String(side)}`, v]) : [['border', v]];
 }
+
+// ---------------------------------------------------------------------------
+// Deklarasi node (AD-5, epic kode story 2): aturan tata letak, teks, efek, paint box, dan stroke ditulis sekali di
+// sini sebagai `CssDecl[]`. Render (layout.ts, paint.ts) menerapkannya ke DOM dengan urutan yang sama; codegen
+// menulisnya ke CSS/Tailwind. Render mengirim node ter-resolve (angka), codegen node tersimpan (angka atau ref token):
+// angka menghasilkan string yang sama persis dengan render lama, ref token menjadi var(--…) atau calc(var(--…)).
+// ---------------------------------------------------------------------------
+
+/** Konteks layout parent: arah flow, `grid`, atau `none` (semua anak absolute). */
+export type ParentLayout = 'row' | 'column' | 'grid' | 'none';
+
+/** Properti sizing node (angka, ref token, `hug`, `fill`). */
+export type SizingLike = {
+  readonly width?: unknown;
+  readonly height?: unknown;
+  readonly minWidth?: unknown;
+  readonly maxWidth?: unknown;
+  readonly minHeight?: unknown;
+  readonly maxHeight?: unknown;
+};
+
+/** Node anak sejauh yang dibutuhkan deklarasi tata letak. */
+export type ChildLike = SizingLike & {
+  readonly type?: unknown;
+  readonly position?: unknown;
+  readonly x?: unknown;
+  readonly y?: unknown;
+  readonly gridColumn?: unknown;
+  readonly gridRow?: unknown;
+  readonly size?: unknown;
+  readonly viewBox?: unknown;
+  readonly wrap?: unknown;
+};
+
+const isLen = (v: unknown): boolean => lengthCss(v) !== undefined;
+
+/** `wrap` teks: nilai tersimpan, atau default `wrap` bila width tetap/fill dan `auto` bila tidak diisi/hug. */
+export function textWrapMode(n: { readonly wrap?: unknown; readonly width?: unknown }): 'auto' | 'wrap' | 'fixed' {
+  if (n.wrap === 'auto' || n.wrap === 'wrap' || n.wrap === 'fixed') return n.wrap;
+  return isLen(n.width) || n.width === 'fill' ? 'wrap' : 'auto';
+}
+
+/** Sizing efektif: icon `size`×`size`; path tanpa width/height atau hug → ukuran viewBox; teks `wrap` → tinggi hug. */
+export function effectiveSizing(n: ChildLike): SizingLike {
+  if (n.type === 'icon') return { width: n.size, height: n.size };
+  if (n.type === 'path' && Array.isArray(n.viewBox)) {
+    const vb = n.viewBox as readonly unknown[];
+    return { ...n, width: n.width === undefined || n.width === 'hug' ? vb[2] : n.width, height: n.height === undefined || n.height === 'hug' ? vb[3] : n.height };
+  }
+  if (n.type === 'text' && textWrapMode(n) === 'wrap') return { ...n, height: 'hug' };
+  return n;
+}
+
+/**
+ * Deklarasi tata letak node anak terhadap parent-nya: `box-sizing`, `margin`, lalu salah satu dari absolute
+ * (parent `none` atau `position:'absolute'`), item grid, atau flow flex; lalu min/max (menimpa `min-*:0` milik fill).
+ * `negativeGap` (< 0, hanya anak flow ke-2 dst. di parent row/column): CSS `gap` menolak nilai negatif, jadi jarak
+ * ditulis sebagai margin sisi awal (`margin: 0 0 0 g` di row, `margin: g 0 0 0` di column).
+ */
+export function childLayoutDecls(n: ChildLike, parent: ParentLayout, opts: { negativeGap?: number | undefined } = {}): CssDecl[] {
+  const out: CssDecl[] = [['box-sizing', 'border-box']];
+  const g = opts.negativeGap;
+  const flow = (parent === 'row' || parent === 'column') && n.position !== 'absolute';
+  if (flow && isNum(g) && g < 0) out.push(['margin', parent === 'row' ? `0 0 0 ${g}px` : `${g}px 0 0 0`]);
+  else out.push(['margin', '0']);
+  const z = effectiveSizing(n);
+  if (parent === 'none' || n.position === 'absolute') absoluteDecls(out, n, z);
+  else if (parent === 'grid') gridItemDecls(out, n, z);
+  else flowDecls(out, z, parent);
+  for (const [key, prop] of [
+    ['minWidth', 'min-width'],
+    ['maxWidth', 'max-width'],
+    ['minHeight', 'min-height'],
+    ['maxHeight', 'max-height'],
+  ] as const) {
+    const v = lengthCss(z[key]);
+    if (v !== undefined) out.push([prop, v]);
+  }
+  return out;
+}
+
+/** Anak flow di parent flex. Sumbu utama = arah parent. */
+function flowDecls(out: CssDecl[], z: SizingLike, layout: 'row' | 'column'): void {
+  const mainKey = layout === 'row' ? 'width' : 'height';
+  const crossKey = layout === 'row' ? 'height' : 'width';
+  const main = lengthCss(z[mainKey]);
+  if (main !== undefined) {
+    out.push(['flex', `0 0 ${main}`], [mainKey, main]);
+  } else if (z[mainKey] === 'fill') {
+    out.push(['flex', '1 1 0px'], [layout === 'row' ? 'min-width' : 'min-height', '0']);
+  } else {
+    out.push(['flex', '0 0 auto']);
+  }
+  const cross = lengthCss(z[crossKey]);
+  if (cross !== undefined) out.push([crossKey, cross]);
+  else if (z[crossKey] === 'fill') out.push(['align-self', 'stretch'], [crossKey, 'auto']);
+  else if (z[crossKey] === 'hug') out.push([crossKey, 'fit-content']);
+  // tidak diisi → auto (ikut align parent)
+}
+
+/**
+ * Anak flow di sel grid (v4): angka → px; `fill` → regang di sel (justify/align-self stretch, min 0); `hug` →
+ * fit-content; tidak diisi → default CSS grid. Penempatan `gridColumn`/`gridRow` hanya di sini.
+ */
+function gridItemDecls(out: CssDecl[], n: ChildLike, z: SizingLike): void {
+  for (const [key, self, min] of [
+    ['width', 'justify-self', 'min-width'],
+    ['height', 'align-self', 'min-height'],
+  ] as const) {
+    const v = z[key];
+    const len = lengthCss(v);
+    if (len !== undefined) out.push([key, len]);
+    else if (v === 'fill') out.push([self, 'stretch'], [key, 'auto'], [min, '0']);
+    else if (v === 'hug') out.push([key, 'fit-content']);
+  }
+  const col = gridLineCss(n.gridColumn);
+  const row = gridLineCss(n.gridRow);
+  if (col) out.push(['grid-column', col]);
+  if (row) out.push(['grid-row', row]);
+}
+
+/** Anak absolute (atau anak frame `none`): left/top relatif border-box parent, keluar dari flow. */
+function absoluteDecls(out: CssDecl[], n: ChildLike, z: SizingLike): void {
+  out.push(['position', 'absolute'], ['left', lengthCss(n.x ?? 0) ?? '0px'], ['top', lengthCss(n.y ?? 0) ?? '0px'], ['flex', '0 0 auto']);
+  for (const [key, end] of [
+    ['width', 'right'],
+    ['height', 'bottom'],
+  ] as const) {
+    const v = z[key];
+    const len = lengthCss(v);
+    if (len !== undefined) out.push([key, len]);
+    else if (v === 'fill') out.push([end, '0']);
+    // hug/tidak diisi → ukuran konten sendiri, TIDAK diperas lebar containing block (bukan fit-content).
+    else out.push([key, 'max-content']);
+  }
+}
+
+/** Board: kolom flex dari kiri atas, ukuran tetap, selalu clip, blend anak dibatasi pada isi board. Latar terpisah. */
+export function boardDecls(b: { readonly width?: unknown; readonly height?: unknown }): CssDecl[] {
+  return [
+    ['position', 'relative'],
+    ['box-sizing', 'border-box'],
+    ['width', lengthCss(b.width) ?? '0px'],
+    ['height', lengthCss(b.height) ?? '0px'],
+    ['overflow', 'hidden'],
+    ['isolation', 'isolate'],
+    ['display', 'flex'],
+    ['flex-direction', 'column'],
+    ['align-items', 'flex-start'],
+    ['justify-content', 'flex-start'],
+  ];
+}
+
+/** Latar board tanpa fill. */
+export const BOARD_DEFAULT_BACKGROUND = '#FFFFFF';
+
+export type FrameLike = {
+  readonly layout?: unknown;
+  readonly gap?: unknown;
+  readonly columnGap?: unknown;
+  readonly rowGap?: unknown;
+  readonly align?: unknown;
+  readonly justify?: unknown;
+  readonly padding?: unknown;
+  readonly clip?: unknown;
+  readonly gridTemplateColumns?: unknown;
+  readonly gridTemplateRows?: unknown;
+};
+
+/** Layout frame efektif (`none` bila tidak diisi). */
+export const frameLayout = (n: { readonly layout?: unknown }): ParentLayout =>
+  n.layout === 'row' || n.layout === 'column' || n.layout === 'grid' ? n.layout : 'none';
+
+/**
+ * Deklarasi milik frame (tanpa paint): acuan anak absolute, display/arah atau template grid, gap (negatif tidak
+ * ditulis; lihat `childLayoutDecls`), gap per sumbu, align/justify, padding, clip.
+ */
+export function frameDecls(n: FrameLike): CssDecl[] {
+  const out: CssDecl[] = [['position', 'relative']]; // acuan anak absolute (border-box = padding-box: tanpa border)
+  const layout = frameLayout(n);
+  if (layout === 'none') {
+    out.push(['display', 'block']);
+  } else {
+    if (layout === 'grid') {
+      out.push(['display', 'grid']);
+      const cols = gridTemplateCss(n.gridTemplateColumns);
+      const rows = gridTemplateCss(n.gridTemplateRows);
+      if (cols) out.push(['grid-template-columns', cols]);
+      if (rows) out.push(['grid-template-rows', rows]);
+    } else {
+      out.push(['display', 'flex'], ['flex-direction', layout]);
+    }
+    if ((isNum(n.gap) && n.gap >= 0) || isTokenRef(n.gap)) out.push(['gap', lengthCss(n.gap)!]);
+    // Gap per sumbu menimpa `gap` (CSS column-gap/row-gap; berlaku juga di flex).
+    const cg = lengthCss(n.columnGap);
+    const rg = lengthCss(n.rowGap);
+    if (cg !== undefined) out.push(['column-gap', cg]);
+    if (rg !== undefined) out.push(['row-gap', rg]);
+    // Grid: align → align-items (posisi item di sel), justify → justify-content (distribusi track); peta sama.
+    if (typeof n.align === 'string' && ALIGN[n.align]) out.push(['align-items', ALIGN[n.align]!]);
+    if (typeof n.justify === 'string' && JUSTIFY[n.justify]) out.push(['justify-content', JUSTIFY[n.justify]!]);
+  }
+  const pad = paddingCss(n.padding);
+  if (pad !== undefined) out.push(['padding', pad]);
+  if (n.clip === true) out.push(['overflow', 'hidden']);
+  return out;
+}
+
+export type TextLike = {
+  readonly weight?: unknown;
+  readonly style?: unknown;
+  readonly size?: unknown;
+  readonly lineHeight?: unknown;
+  readonly letterSpacing?: unknown;
+  readonly align?: unknown;
+  readonly numeric?: unknown;
+  readonly color?: unknown;
+  readonly shadows?: readonly ShadowLike[] | undefined;
+  readonly wrap?: unknown;
+  readonly width?: unknown;
+};
+
+/** Warna teks tanpa `color`. */
+export const DEFAULT_TEXT_COLOR = '#000000';
+
+/**
+ * Deklarasi milik teks. `family` = nilai `font-family` dari pemanggil (render: satu keluarga terdaftar lewat
+ * `cssFamily`; kode: `fontFamilyCss`). Bobot/gaya default 400/normal (sama dengan `DEFAULT_FONT`).
+ */
+export function textDecls(n: TextLike, family: string): CssDecl[] {
+  const out: CssDecl[] = [
+    ['font-family', family],
+    ['font-weight', fontWeightCss(n.weight ?? 400) ?? '400'],
+    ['font-style', n.style === 'italic' ? 'italic' : 'normal'],
+    ['font-size', lengthCss(n.size) ?? '16px'],
+  ];
+  const lh = lineHeightCss(n.lineHeight);
+  const ls = letterSpacingCss(n.letterSpacing);
+  if (lh !== undefined) out.push(['line-height', lh]);
+  if (ls !== undefined) out.push(['letter-spacing', ls]);
+  if (typeof n.align === 'string') out.push(['text-align', n.align]);
+  if (n.numeric === 'tabular') out.push(['font-variant-numeric', 'tabular-nums']);
+  out.push(['color', colorCss(n.color ?? DEFAULT_TEXT_COLOR) ?? DEFAULT_TEXT_COLOR]);
+  const shadow = textShadowCss(n.shadows);
+  if (shadow) out.push(['text-shadow', shadow]);
+  const wrap = textWrapMode(n);
+  if (wrap === 'auto') out.push(['white-space', 'pre']);
+  else out.push(['white-space', 'pre-wrap'], ['overflow-wrap', 'break-word']);
+  // `fixed`: overflow tidak dipotong agar teks yang meluber tetap terlihat.
+  if (wrap === 'fixed') out.push(['overflow', 'visible']);
+  return out;
+}
+
+export type EffectsLike = {
+  readonly opacity?: unknown;
+  readonly blend?: unknown;
+  readonly blur?: unknown;
+  readonly backdropBlur?: unknown;
+  readonly rotation?: unknown;
+};
+
+/**
+ * Efek bersama node anak: opacity (< 1), blend, filter (`filters` awal seperti drop-shadow mendahului blur;
+ * σ = blur/2), backdropBlur, dan transform `translateY(-scrollY) rotate(r)` (origin tengah).
+ */
+export function effectDecls(e: EffectsLike, scrollY = 0, filters: readonly string[] = []): CssDecl[] {
+  const out: CssDecl[] = [];
+  if (isNum(e.opacity) && e.opacity < 1) out.push(['opacity', String(e.opacity)]);
+  if (typeof e.blend === 'string' && e.blend !== 'normal') out.push(['mix-blend-mode', e.blend]);
+  const filter = [...filters];
+  if (isNum(e.blur) && e.blur) filter.push(`blur(${e.blur / 2}px)`);
+  if (filter.length) out.push(['filter', filter.join(' ')]);
+  if (isNum(e.backdropBlur) && e.backdropBlur) out.push(['backdrop-filter', `blur(${e.backdropBlur / 2}px)`]);
+  const transform: string[] = [];
+  if (scrollY) transform.push(`translateY(${-scrollY}px)`);
+  if (isNum(e.rotation) && e.rotation) transform.push(`rotate(${e.rotation}deg)`);
+  if (transform.length) out.push(['transform', transform.join(' ')], ['transform-origin', '50% 50%']);
+  return out;
+}
+
+/**
+ * Faktor `drop-shadow()` agar σ sama dengan box-shadow (σ = blur/2). Chromium menafsirkan panjang blur
+ * `drop-shadow()` sebagai σ langsung, jadi blur/2 (dikunci tes `bayangan-path-vs-rect`).
+ */
+export const DROP_SHADOW_BLUR_FACTOR = 0.5;
+
+/** Bentuk mask (ellipse busur, path, ikon): drop → `drop-shadow()`; spread dan inner tidak didukung. */
+export function dropShadowFilterList(shadows: readonly ShadowLike[] | undefined): string[] {
+  const n = (v: unknown) => (isNum(v) ? v : 0);
+  return (shadows ?? [])
+    .filter((s) => s.type !== 'inner')
+    .map((s) => `drop-shadow(${n(s.x)}px ${n(s.y)}px ${n(s.blur) * DROP_SHADOW_BLUR_FACTOR}px ${colorCss(s.color) ?? ''})`);
+}
+
+type Side = 'top' | 'right' | 'bottom' | 'left';
+const SIDES: readonly Side[] = ['top', 'right', 'bottom', 'left'];
+
+/** Panjang stroke: angka (px) atau ekspresi CSS (token). */
+type StrokeLen = { n?: number; css: string };
+
+const lenOf = (n: number): StrokeLen => ({ n, css: `${n}px` });
+const negLen = (l: StrokeLen): string => (l.n !== undefined ? `${-l.n}px` : `calc(-1 * ${l.css})`);
+
+export type StrokeLike = { readonly color?: unknown; readonly width?: unknown; readonly align?: unknown; readonly sides?: unknown };
+
+/** Tinta stroke box di dalam dan di luar tepi (tidak ada = 0). Token: setengah lebar `center` → `calc(var / 2)`. */
+function strokeSplit(s: StrokeLike): { inside?: StrokeLen; outside?: StrokeLen } {
+  if (isNum(s.width)) {
+    const w = s.width;
+    const inside = s.align === 'inside' ? w : s.align === 'outside' ? 0 : w / 2;
+    const outside = s.align === 'inside' ? 0 : s.align === 'outside' ? w : w / 2;
+    return { ...(inside > 0 ? { inside: lenOf(inside) } : {}), ...(outside > 0 ? { outside: lenOf(outside) } : {}) };
+  }
+  if (!isTokenRef(s.width)) return {};
+  const v = tokenVar(s.width);
+  const half = { css: `calc(${v} / 2)` };
+  if (s.align === 'inside') return { inside: { css: v } };
+  if (s.align === 'outside') return { outside: { css: v } };
+  return { inside: half, outside: half };
+}
+
+const strokeSides = (s: StrokeLike): readonly Side[] => (Array.isArray(s.sides) ? (s.sides as Side[]) : SIDES);
+
+/** Bagian luar stroke box → box-shadow spread (semua sisi) atau offset ke arah sisi tertentu. */
+function outerStrokeShadows(s: StrokeLike): string[] {
+  const w = strokeSplit(s).outside;
+  const c = colorCss(s.color);
+  if (!w || !c) return [];
+  const sides = strokeSides(s);
+  if (sides.length === 4) return [`0 0 0 ${w.css} ${c}`];
+  const off: Record<Side, string> = { top: `0 ${negLen(w)}`, right: `${w.css} 0`, bottom: `0 ${w.css}`, left: `${negLen(w)} 0` };
+  return sides.map((side) => `${off[side]} 0 0 ${c}`);
+}
+
+/** `box-shadow` box: stroke luar (paling atas) lalu shadows sesuai urutan. */
+export function boxShadowWithStrokeCss(stroke: StrokeLike | undefined, shadows: readonly ShadowLike[] | undefined): string | undefined {
+  const own = boxShadowsCss(shadows);
+  const list = [...(stroke ? outerStrokeShadows(stroke) : []), ...(own ? [own] : [])];
+  return list.length ? list.join(', ') : undefined;
+}
+
+/** Paint box tanpa latar: `border-radius` lalu `box-shadow` (stroke luar + shadows). */
+export function boxPaintDecls(
+  n: { readonly stroke?: StrokeLike | undefined; readonly shadows?: readonly ShadowLike[] | undefined },
+  radius: string | undefined,
+): CssDecl[] {
+  const out: CssDecl[] = [];
+  if (radius) out.push(['border-radius', radius]);
+  const shadow = boxShadowWithStrokeCss(n.stroke, n.shadows);
+  if (shadow) out.push(['box-shadow', shadow]);
+  return out;
+}
+
+/**
+ * Overlay stroke box bagian dalam (render: div internal terakhir; kode: `::after`): absolute inset 0, border hanya
+ * pada `sides`, radius sama, di atas anak. Tanpa bagian dalam → undefined.
+ */
+export function strokeOverlayDecls(s: StrokeLike | undefined, radius: string | undefined): CssDecl[] | undefined {
+  if (!s) return undefined;
+  const w = strokeSplit(s).inside;
+  const c = colorCss(s.color);
+  if (!w || !c) return undefined;
+  const out: CssDecl[] = [
+    ['position', 'absolute'],
+    ['inset', '0'],
+    ['box-sizing', 'border-box'],
+    ['pointer-events', 'none'],
+    ['margin', '0'],
+    ['z-index', 'auto'],
+  ];
+  if (radius) out.push(['border-radius', radius]);
+  const sides = strokeSides(s);
+  for (const side of SIDES) if (sides.includes(side)) out.push([`border-${side}`, `${w.css} solid ${c}`]);
+  return out;
+}
+
+export type FillLike = PaintLike & {
+  readonly assetId?: unknown;
+  readonly fit?: unknown;
+  readonly opacity?: unknown;
+  readonly size?: unknown;
+  readonly seed?: unknown;
+  readonly blend?: unknown;
+  readonly mono?: unknown;
+};
+
+/** Prefiks URL aset default (daemon dan harness menyajikan `/assets/<sha256>`). */
+export const DEFAULT_ASSET_BASE = '/assets/';
+
+/**
+ * Satu fill → satu lapisan `background` berlapis (solid → `linear-gradient(c, c)`): solid/gradien, image, noise.
+ * Mesh butuh bitmap canvas (milik paint.ts) → undefined.
+ */
+export function fillLayerCss(f: FillLike, assetBase: string = DEFAULT_ASSET_BASE): string | undefined {
+  switch (f.type) {
+    case 'image': {
+      if (typeof f.assetId !== 'string') return undefined;
+      const url = `url("${assetBase}${f.assetId}")`;
+      switch (f.fit) {
+        case 'cover':
+        case 'contain':
+          return `${url} center / ${f.fit} no-repeat`;
+        case 'fill':
+          return `${url} 0 0 / 100% 100% no-repeat`;
+        case 'tile':
+          return `${url} 0 0 / auto repeat`;
+      }
+      return undefined;
+    }
+    case 'noise':
+      return noiseLayer(f as Parameters<typeof noiseLayer>[0]);
+    default:
+      return gradientLayerCss(f);
+  }
+}
+
+/**
+ * `background-blend-mode` per lapisan (urutan CSS = fills terbalik): noise memakai `blend`-nya (default overlay),
+ * lapisan lain normal. Tanpa noise → undefined.
+ */
+export function fillsBlendModeCss(fills: readonly FillLike[] | undefined): string | undefined {
+  if (!fills?.some((f) => f.type === 'noise')) return undefined;
+  return fills
+    .map((f) => (f.type === 'noise' ? (typeof f.blend === 'string' ? f.blend : NOISE_DEFAULTS.blend) : 'normal'))
+    .reverse()
+    .join(', ');
+}
+
+/**
+ * Latar untuk kode (codegen): satu fill solid → `background-color`; selain itu `background` berlapis yang sama
+ * dengan render (+ `background-blend-mode` bila ada noise). Fill tanpa padanan CSS (mesh) dilewati dan dihitung di
+ * `skipped`.
+ */
+export function codeBackgroundDecls(fills: unknown, assetBase: string = DEFAULT_ASSET_BASE): { decls: CssDecl[]; skipped: number } {
+  if (!Array.isArray(fills) || !fills.length) return { decls: [], skipped: 0 };
+  const usable = (fills as FillLike[]).filter((f) => fillLayerCss(f, assetBase) !== undefined);
+  const skipped = fills.length - usable.length;
+  if (!usable.length) return { decls: [], skipped };
+  if (usable.length === 1 && usable[0]!.type === 'solid') return { decls: [['background-color', gradientLayerCss(usable[0]!, { solo: true })!]], skipped };
+  const decls: CssDecl[] = [['background', usable.map((f) => fillLayerCss(f, assetBase)!).reverse().join(', ')]];
+  const blend = fillsBlendModeCss(usable);
+  if (blend) decls.push(['background-blend-mode', blend]);
+  return { decls, skipped };
+}
+
+/** Nilai token (AD-11) → nilai CSS variabel: warna hex, panjang px, bobot angka, family, letterSpacing em. */
+export function tokenValueCss(type: string, value: unknown): string | undefined {
+  switch (type) {
+    case 'color':
+      return colorCss(value);
+    case 'fontWeight':
+      return fontWeightCss(value);
+    case 'fontFamily':
+      return fontFamilyCss(value);
+    case 'letterSpacing':
+      return letterSpacingCss(value);
+    default:
+      return lengthCss(value);
+  }
+}
+
+/**
+ * Spesifikasi elemen SVG murni (ikon, stroke bentuk): render membangun DOM darinya, codegen menulis JSX.
+ * `attrs` = atribut SVG apa adanya; `style` = deklarasi CSS (dipakai untuk nilai token, yang tidak sah sebagai
+ * atribut presentasi).
+ */
+export type SvgSpec = { tag: string; attrs: [name: string, value: string][]; style: CssDecl[]; children: SvgSpec[] };

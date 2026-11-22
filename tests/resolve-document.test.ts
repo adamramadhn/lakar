@@ -59,9 +59,21 @@ describe('pipa resolveDocument: repo nyata', () => {
   });
 
   it('tidak ada kode produksi di luar packages/schema yang memanggil resolveTokens', () => {
-    const map = Object.fromEntries(files.map((f) => [f, readFileSync(join(root, f), 'utf8')]));
+    // Pengecualian AD-10: codegen menerima dokumen tersimpan dan boleh memanggil `expandInstances` saja.
+    const map = Object.fromEntries(files.filter((f) => !f.startsWith('packages/codegen/')).map((f) => [f, readFileSync(join(root, f), 'utf8')]));
     const bad = violations(map);
     expect(bad, `pakai resolveDocument (AD-10), bukan resolveTokens/expandInstances, di: ${bad.join(', ')}`).toEqual([]);
+  });
+});
+
+describe('pipa resolveDocument: codegen (AD-10)', () => {
+  it('codegen boleh expandInstances tetapi tidak resolveTokens', () => {
+    const files = productionSources(root).filter((f) => f.startsWith('packages/codegen/'));
+    expect(files).toContain('packages/codegen/src/tree.ts');
+    for (const f of files) {
+      const text = readFileSync(join(root, f), 'utf8');
+      expect(/\bresolveTokens\b/.test(text), `${f} memakai resolveTokens`).toBe(false);
+    }
   });
 });
 

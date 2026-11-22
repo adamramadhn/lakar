@@ -216,6 +216,15 @@ importers:
         specifier: workspace:*
         version: link:../schema
 
+  packages/codegen:
+    dependencies:
+      '@lakar/render':
+        specifier: workspace:*
+        version: link:../render
+      '@lakar/schema':
+        specifier: workspace:*
+        version: link:../schema
+
   packages/core:
     dependencies:
       '@lakar/schema':

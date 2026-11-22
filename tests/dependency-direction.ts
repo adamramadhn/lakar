@@ -11,17 +11,18 @@ export const EDGES: Readonly<Record<string, readonly string[]>> = {
   skills: [],
   core: ['schema'],
   render: ['schema', 'ports'],
+  codegen: ['schema', 'render'],
   check: ['schema', 'ports'],
   exec: ['core', 'ports'],
   icons: ['schema'],
-  daemon: ['core', 'exec', 'render', 'check', 'icons', 'skills'],
+  daemon: ['core', 'exec', 'render', 'check', 'icons', 'skills', 'codegen'],
   mcp: ['schema'],
   bench: ['schema'],
-  viewer: ['schema', 'render'],
+  viewer: ['schema', 'render', 'codegen'],
 };
 
 /** Paket yang tidak boleh menyentuh IO (builtin Node atau pustaka IO). */
-export const IO_FORBIDDEN: ReadonlySet<string> = new Set(['schema', 'ports', 'core', 'render']);
+export const IO_FORBIDDEN: ReadonlySet<string> = new Set(['schema', 'ports', 'core', 'render', 'codegen']);
 
 /** Pustaka IO terlarang; entri berakhiran `/*` berarti seluruh scope. */
 export const IO_LIBRARIES: readonly string[] = [

@@ -26,9 +26,37 @@ export {
 export { assetIds } from './assets.js';
 export { DEFAULT_ICON_COLOR, DEFAULT_ICON_STROKE_WIDTH, iconKey, iconRefs, type IconRef } from './icon.js';
 export { DEFAULT_ASSET_BASE, DROP_SHADOW_BLUR_FACTOR } from './paint.js';
-export { ellipseShape, type Shape } from './shape.js';
-// Pemetaan CSS tunggal (AD-5): dipakai render, Copy as viewer, dan nanti codegen.
+export { ellipseShape, pathShape, shapeFillLayerDecls, strokeSvgSpec, svgPaint, type Shape, type ViewBox } from './shape.js';
+export { iconSvgSpec } from './icon.js';
+// Pemetaan CSS tunggal (AD-5): dipakai render, Copy as viewer, dan codegen.
 export {
+  BOARD_DEFAULT_BACKGROUND,
+  boardDecls,
+  boxPaintDecls,
+  boxShadowWithStrokeCss,
+  childLayoutDecls,
+  codeBackgroundDecls,
+  DEFAULT_TEXT_COLOR,
+  dropShadowFilterList,
+  effectDecls,
+  effectiveSizing,
+  fillLayerCss,
+  fillsBlendModeCss,
+  frameDecls,
+  frameLayout,
+  strokeOverlayDecls,
+  textDecls,
+  textWrapMode,
+  tokenValueCss,
+  type ChildLike,
+  type EffectsLike,
+  type FillLike,
+  type FrameLike,
+  type ParentLayout,
+  type SizingLike,
+  type StrokeLike,
+  type SvgSpec,
+  type TextLike,
   ALIGN,
   backgroundCss,
   boxShadowsCss,

@@ -164,3 +164,6 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-komponen-5-props-slots.md`
   summary: Penanda temuan Checks pada node di dalam isi slot instance tidak tampil karena POST /inspect (route lama) membalas 404 untuk node itu.
   evidence: Review k5 (vgap). Efek penanda temuan di Viewer.tsx memanggil api.inspect untuk setiap node temuan dan menelan error; locateNode di route /inspect hanya menelusuri children (pra-ada sejak isi slot story 3). Usul: kotak penanda dari geometri canvas live (sceneBounds) untuk node inSlotContent, seperti highlight seleksi.
+- source_spec: `_bmad-output/implementation-artifacts/spec-kode-2-codegen.md`
+  summary: Codegen menulis semua elemen sebagai `div` karena skema v5 belum punya `tag` semantik (AD-1); allowlist tag HTML untuk ekspor belum ada.
+  evidence: AD-1 mengizinkan `tag` opsional dari allowlist, tetapi menambah kunci butuh kenaikan schemaVersion (AD-3), pemetaan render/codegen, korpus, dan UI. Usul: story skema berikutnya menambah `tag` (mis. `section|header|nav|main|footer|h1..h6|p|button|a|ul|li`) dan codegen memakainya sebagai nama elemen.
