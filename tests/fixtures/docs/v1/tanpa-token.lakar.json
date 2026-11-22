@@ -1,0 +1,56 @@
+{
+  "schemaVersion": 1,
+  "id": "CorpV1Nt",
+  "rev": 3,
+  "pages": [
+    {
+      "id": "PageNt01",
+      "name": "Page 1",
+      "children": [
+        {
+          "type": "board",
+          "id": "BrdNt001",
+          "name": "Pengaturan",
+          "x": 0,
+          "y": 0,
+          "width": 640,
+          "height": 400,
+          "screen": "app",
+          "fills": [{ "type": "solid", "color": "#F5F5F2" }],
+          "children": [
+            {
+              "type": "frame",
+              "id": "FrmNt001",
+              "name": "Panel",
+              "layout": "column",
+              "gap": 12,
+              "padding": [24, 24, 24, 24],
+              "width": "fill",
+              "height": "hug",
+              "radius": 8,
+              "fills": [{ "type": "solid", "color": "#FFFFFF" }],
+              "stroke": { "color": "#DDDDDD", "width": 1, "align": "inside" },
+              "children": [
+                { "type": "text", "id": "TxtNt001", "name": "Judul", "content": "Pengaturan akun", "weight": 600, "size": 20, "lineHeight": 28, "color": "#1A1A1A" },
+                { "type": "text", "id": "TxtNt002", "name": "Keterangan", "content": "Ubah nama dan surel yang tampil di profil.", "size": 14, "lineHeight": 20, "color": "#555555", "width": "fill", "wrap": "wrap" },
+                {
+                  "type": "frame",
+                  "id": "FrmNt002",
+                  "name": "Baris",
+                  "layout": "row",
+                  "gap": 8,
+                  "align": "center",
+                  "width": "fill",
+                  "children": [
+                    { "type": "rect", "id": "RctNt001", "name": "Kotak centang", "width": 16, "height": 16, "radius": 4, "fills": [{ "type": "solid", "color": "#2F6FEB" }] },
+                    { "type": "text", "id": "TxtNt003", "name": "Label", "content": "Kirim ringkasan mingguan", "weight": 500, "size": 14, "lineHeight": 20, "color": "#1A1A1A" }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
