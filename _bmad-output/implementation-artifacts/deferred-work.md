@@ -83,3 +83,9 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-editor-2-ops-route.md`
   summary: Op core `insert` (sisip ulang subtree dengan ID asli, dipakai invers `remove`) belum diekspos di sandbox `execute`, padahal AD-2 meminta kemampuan tulis baru diekspos di `execute` dan route ops.
   evidence: Agen tidak memakai tumpukan undo (AD-8), jadi belum ada kebutuhan. Mengekspos berarti menambah entri `api.ts`/`api.md` exec dan tes ukuran skill (aditif, AD-4).
+- source_spec: `_bmad-output/implementation-artifacts/spec-editor-3-live-canvas.md`
+  summary: Siklus mount board live (`mountLive`, `ensureFaces`, efek `BoardLive` di Canvas.tsx, tanpa `/screenshot`, remount hanya board berubah) hanya diverifikasi lewat smoke Playwright manual; belum ada tes otomatis di permukaan canvas.
+  evidence: Tes viewer berjalan di Node tanpa DOM. Usul: tes halaman Chromium untuk `mountLive` seperti `packages/render/test/text.test.ts`, atau e2e Playwright `/app/` (cek `[data-lakar-id]` di shadow root, remount sesudah ops, tanpa POST /screenshot).
+- source_spec: `_bmad-output/implementation-artifacts/spec-editor-3-live-canvas.md`
+  summary: Bundle viewer naik 397 kB → 523 kB (gzip 161 kB) karena `resolveDocument` menarik zod lewat `tokens.ts` @lakar/schema.
+  evidence: Diukur dari `vite build`. Usul: entry schema tanpa zod (resolve + tipe) atau pisahkan validasi zod dari logika resolve token.

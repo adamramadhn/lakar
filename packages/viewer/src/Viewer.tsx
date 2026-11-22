@@ -939,6 +939,7 @@ export function Viewer({ slug }: { slug: string }) {
         camera={page ? getCamera(slug, page.id) : undefined}
         onCamera={(c) => page && saveCamera(slug, page.id, c)}
         slug={slug}
+        doc={latestDoc}
         rev={d.rev}
         boardRevs={boardRevs}
         boards={boards}

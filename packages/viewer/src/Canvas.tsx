@@ -1,4 +1,6 @@
-// Canvas viewer: PNG per board dari POST /screenshot (renderer yang sama, AD-6) di posisi x/y dokumen.
+// Canvas viewer: board di posisi x/y dokumen. Versi terkini = DOM hidup (editor-canvas story 3, AD-6): dokumen
+// di-resolve sekali per objek dokumen (`resolveDocument`, AD-10), tiap board di-mount `mountBoard` ke shadow root
+// (liveBoard.ts) dan diskalakan transform kamera; tanpa POST /screenshot. Pratinjau versi tetap PNG snapshot.
 // Pan, zoom, Fit, seleksi, Export PNG (ExportPopover), dan tool sisip layer (aplikasi 4, di bawah); tanpa drag/resize.
 // Mode pratinjau versi (History, aplikasi 3): board dari snapshot (POST revs/:rev/screenshot), banner
 // "Previewing …" dengan Back to latest / Restore this version; Export, Checks, dan outline agen disembunyikan.
@@ -13,14 +15,17 @@
 // Select/Hand = pan; tap (gerak ≤8px) = pilih/sisip seperti klik. Jari kedua dilepas → pan satu jari tanpa lompat.
 // Paritas desain: state Waiting (kotak putus-putus + petunjuk `open_doc slug: …`), marker temuan layout_check
 // (outline putus-putus + lingkaran di sudut kanan atas node/board), mode offline (board diredupkan + pill
-// "Last synced …"), dan slot `overlay` untuk toast rollback / chip Follow dari Viewer. PNG board lama tetap tampil
-// sampai PNG rev baru selesai dimuat (tanpa kedip skeleton sesudah edit).
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
-import type { FindingLevel, FindingSummary } from '@lakar/schema';
+// "Last synced …"), dan slot `overlay` untuk toast rollback / chip Follow dari Viewer. Jalur PNG (pratinjau versi,
+// atau tanpa `doc`): PNG board lama tetap tampil sampai PNG rev baru selesai dimuat (tanpa kedip skeleton); jalur
+// live: DOM lama tetap tampil sampai mount baru siap.
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
+import { findBoard } from '@lakar/render';
+import { resolveDocument, type FindingLevel, type FindingSummary, type LakarDocument, type ResolvedDocument } from '@lakar/schema';
+import { boardDepKeys, boardSignature, boardSource, ensureFaces, mountLive, RenderDepsCache } from './liveBoard';
 import { api, errorText } from './api';
 import { INSERT_KINDS, type InsertKind } from './codegen';
 import { ExportButton } from './ExportPopover';
-import { useRetry } from './hooks';
+import { useOffline, useRetry } from './hooks';
 import { Icon, type IconName } from './icons';
 import type { AgentPresence, Rect } from './presence';
 import { pinchCamera, pointerIntent, TAP_SLOP, type Point } from './sheet';
@@ -206,15 +211,80 @@ function BoardImage({ slug, rev, board, previewRev }: { slug: string; rev: numbe
     };
   }, [slug, rev, board.id, attempt, previewRev]);
   if (state.url) return <img src={state.url} alt={board.name} draggable={false} />;
-  if (state.error)
-    return (
-      <div className="board-error">
-        <Icon name="alert" size={16} />
-        <span>{state.error}</span>
-      </div>
-    );
+  if (state.error) return <BoardError message={state.error} />;
   return <div className="skeleton" />;
 }
+
+function BoardError({ message }: { message: string }) {
+  return (
+    <div className="board-error">
+      <Icon name="alert" size={16} />
+      <span>{message}</span>
+    </div>
+  );
+}
+
+/** Deps render (font + glyph) bersama semua board live, di-cache per kunci (liveBoard.ts). */
+const liveDeps = new RenderDepsCache((keys) => api.renderDeps(keys));
+
+/** Hasil `resolveDocument` dokumen terkini (AD-10), atau pesan error. */
+type LiveDoc = { ok: true; doc: ResolvedDocument } | { ok: false; error: string };
+
+/**
+ * Board sebagai DOM hidup (AD-6): `mountBoard` ke shadow root host berukuran natural, diskalakan `transform` kamera.
+ * Mount ulang hanya bila isi board ter-resolve berubah (tanda tangan); DOM lama tetap tampil sampai yang baru siap.
+ * Deps gagal diambil (offline) → board tetap di-mount, lalu dicoba lagi saat koneksi pulih (otomatis
+ * atau tombol Retry, `useRetry`).
+ */
+const BoardLive = memo(function BoardLive({ live, board, zoom }: { live: LiveDoc; board: CanvasBoard; zoom: number }) {
+  const host = useRef<HTMLDivElement>(null);
+  const [state, setState] = useState<{ mounted?: boolean; error?: string; partial?: boolean }>({});
+  const [attempt, setAttempt] = useState(0);
+  useRetry(() => state.partial && setAttempt((a) => a + 1));
+  // Koneksi pulih tanpa tombol Retry: deps yang gagal dicoba lagi.
+  const offline = useOffline();
+  useEffect(() => {
+    if (!offline && state.partial) setAttempt((a) => a + 1);
+  }, [offline]);
+  const resolved = live.ok ? findBoard(live.doc, board.id) : undefined;
+  // Resolve gagal: pesan error ikut tanda tangan supaya error baru menggantikan yang lama.
+  const signature = useMemo(() => (live.ok ? boardSignature(resolved) : `error:${live.error}`), [live, resolved]);
+  const liveRef = useRef(live);
+  liveRef.current = live;
+  useEffect(() => {
+    const cur = liveRef.current;
+    if (!cur.ok) {
+      setState({ error: cur.error });
+      return;
+    }
+    const target = findBoard(cur.doc, board.id);
+    const el = host.current;
+    if (!target || !el) return;
+    let current = true;
+    (async () => {
+      const deps = await liveDeps.ensure(boardDepKeys(target));
+      await ensureFaces(el.ownerDocument, deps.fonts);
+      if (!current) return;
+      mountLive(el, cur.doc, board.id, deps);
+      setState({ mounted: true, ...(deps.complete ? {} : { partial: true }) });
+    })().catch((e) => current && setState({ error: errorText(e) }));
+    return () => {
+      current = false;
+    };
+    // Hanya isi board (tanda tangan) yang memicu mount; objek dokumen baru dengan board sama tidak.
+  }, [signature, board.id, attempt]);
+  return (
+    <>
+      <div
+        ref={host}
+        className="board-live"
+        data-live-board={board.id}
+        style={{ width: board.width, height: board.height, transform: `scale(${zoom})`, visibility: state.mounted && !state.error ? 'visible' : 'hidden' }}
+      />
+      {state.error ? <BoardError message={state.error} /> : !state.mounted && <div className="skeleton" />}
+    </>
+  );
+});
 
 export function Canvas({
   slug,
@@ -239,7 +309,10 @@ export function Canvas({
   markers,
   onMarker,
   overlay,
+  doc,
 }: {
+  /** Dokumen tersimpan terkini: board versi terkini di-mount sebagai DOM hidup dari `resolveDocument(doc)`. */
+  doc?: LakarDocument | undefined;
   /** Dokumen belum punya board sama sekali (state Waiting desain); false = hanya halaman ini yang kosong. */
   docEmpty?: boolean;
   /** lakard offline: teks "Last synced …" dan board diredupkan. */
@@ -276,6 +349,15 @@ export function Canvas({
   onInsert?: (kind: InsertKind, at: InsertPoint) => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
+  // Sekali per objek dokumen (bukan per frame kamera); error resolve tampil di setiap board.
+  const live = useMemo<LiveDoc | undefined>(() => {
+    if (!doc) return undefined;
+    try {
+      return { ok: true, doc: resolveDocument(doc) };
+    } catch (e) {
+      return { ok: false, error: errorText(e) };
+    }
+  }, [doc]);
   const [size, setSize] = useState({ w: 0, h: 0 });
   const [cam, setCam] = useState<Camera>(() => camera ?? { x: 0, y: 0, z: 1 });
   const [fitted, setFitted] = useState(camera !== undefined);
@@ -575,7 +657,11 @@ export function Canvas({
               {b.name}
             </div>
             <div className={`board${selected ? ' selected' : ''}`} data-board={b.id} style={{ left, top, width: b.width * cam.z, height: b.height * cam.z }}>
-              <BoardImage slug={slug} rev={Math.min(rev, boardRevs?.[b.id] ?? rev)} board={b} previewRev={previewRev} />
+              {live && boardSource(live !== undefined, preview !== undefined) === 'live' ? (
+                <BoardLive live={live} board={b} zoom={cam.z} />
+              ) : (
+                <BoardImage slug={slug} rev={Math.min(rev, boardRevs?.[b.id] ?? rev)} board={b} previewRev={previewRev} />
+              )}
             </div>
           </div>
         );

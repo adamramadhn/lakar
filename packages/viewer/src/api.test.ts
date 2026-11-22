@@ -441,3 +441,15 @@ describe('layer manual (aplikasi 4)', () => {
     expect(await api.iconSearch('star')).toEqual([{ lib: 'lucide', icon: 'star' }]);
   });
 });
+
+describe('renderDeps (canvas live)', () => {
+  it('GET /viewer/render-deps dengan font/icon berulang ter-encode; tanpa kunci tanpa query', async () => {
+    const data = { fonts: [], icons: [], missing: { fonts: [], icons: [] } };
+    const calls = fakeFetch(() => ok(data));
+    const api = await freshApi();
+    expect(await api.renderDeps({ fonts: ['Space Grotesk:700:normal', 'Inter:400:normal'], icons: ['lucide/star'] })).toEqual(data);
+    expect(calls[0]).toMatchObject({ method: 'GET', path: '/viewer/render-deps?font=Space+Grotesk%3A700%3Anormal&font=Inter%3A400%3Anormal&icon=lucide%2Fstar' });
+    await api.renderDeps({ fonts: [], icons: [] });
+    expect(calls[1]!.path).toBe('/viewer/render-deps');
+  });
+});

@@ -47,6 +47,7 @@ import { registerConnectionRoutes } from './connections.js';
 import { registerFileRoutes } from './files.js';
 import { registerPageRoutes } from './pages.js';
 import { registerOpsRoutes } from './ops.js';
+import { registerRenderDepsRoutes } from './render-deps.js';
 import { registerExportRoutes } from './export.js';
 import { VIEWER_DIST_DIR, registerViewerRoutes } from './viewer.js';
 
@@ -676,6 +677,7 @@ export function buildServer({
   registerFileRoutes(app, { docs, store, sessions, docLocks, activity, dataDir: config.dataDir });
   registerPageRoutes(app, { docs, store, docLocks, activity });
   registerOpsRoutes(app, { docs, store, docLocks, activity, icons });
+  registerRenderDepsRoutes(app, { fonts, icons });
   registerExportRoutes(app, { docs, store, render, icons });
   registerConnectionRoutes(app, { host: config.host, port: config.port, ...(config.mcpEntry ? { mcpEntry: config.mcpEntry } : {}) });
 

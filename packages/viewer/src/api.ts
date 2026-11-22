@@ -13,7 +13,11 @@
 // Memori: blob URL PNG di-revoke saat entri cache dibuang (dengan jeda, supaya <img> yang masih memakainya sempat
 // diganti); cache versi lama (`#revDocs`, `#revShots`) dibatasi LRU.
 // Bentuk respons AD-11: {ok:true,data} | {ok:false,error}.
-import type { DocOp, Finding, FindingSummary, LakarDocument } from '@lakar/schema';
+import type { FontFaceSource } from '@lakar/render';
+import type { DocOp, Finding, FindingSummary, IconGlyph, LakarDocument } from '@lakar/schema';
+
+/** Respons GET /viewer/render-deps (dipakai liveBoard.ts; tanpa impor relatif agar api.ts bisa dites di Node). */
+export type RenderDepsResult = { fonts: FontFaceSource[]; icons: IconGlyph[]; missing: { fonts: string[]; icons: string[] } };
 
 /** Header sesi (sama dengan SESSION_HEADER @lakar/schema; disalin agar bundle tidak menarik zod). */
 const SESSION_HEADER = 'x-lakar-session';
@@ -264,6 +268,18 @@ class ViewerClient {
     const { doc } = await request<{ doc: LakarDocument }>('GET', `/viewer/docs/${encodeURIComponent(slug)}`);
     this.#known.add(slug);
     return doc;
+  }
+
+  /**
+   * Deps render canvas live (GET /viewer/render-deps): face font (`family:weight:style`) dan glyph ikon (`lib/nama`).
+   * Kunci yang tidak dikenal daemon kembali di `missing`, bukan error.
+   */
+  async renderDeps(keys: { fonts: readonly string[]; icons: readonly string[] }): Promise<RenderDepsResult> {
+    const qs = new URLSearchParams();
+    for (const f of keys.fonts) qs.append('font', f);
+    for (const i of keys.icons) qs.append('icon', i);
+    const s = qs.toString();
+    return request<RenderDepsResult>('GET', `/viewer/render-deps${s ? `?${s}` : ''}`);
   }
 
   /** Riwayat revisi dokumen (GET /viewer/docs/:slug/history), urut rev turun. */
