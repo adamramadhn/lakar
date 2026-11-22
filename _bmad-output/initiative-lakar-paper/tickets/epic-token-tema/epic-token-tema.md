@@ -4,7 +4,7 @@ title: "Token dan tema dikelola dan dipakai di seluruh desain"
 parent: initiative-lakar-paper
 covers: [R3]
 after: [epic-editor-canvas]
-refined: false
+refined: true
 risk: medium
 ---
 
@@ -39,3 +39,4 @@ Fatmuh menjaga desain konsisten: mengubah satu nilai mengubah semua pemakainya.
 
 - Waits on epic-editor-canvas because: panel properti yang bisa diedit.
 - Decision: 2026-11-22 — story pertama epic ini adalah desain UI/UX/motion yang belum ada di `design/lakar-ui.pen` (hitl, disetujui Fatmuh). Story kode mengikuti desain itu lewat MCP pencil (C6).
+- Decision: 2026-11-22 — epic dipecah menjadi 4 story (tickets/tickets.toml) atas delegasi Fatmuh.
