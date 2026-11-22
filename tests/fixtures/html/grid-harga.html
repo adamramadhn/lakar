@@ -1,0 +1,26 @@
+<style>
+  .pricing { box-sizing: border-box; width: 960px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; padding: 32px; background: #f8fafc; font-family: Inter, sans-serif; }
+  .plan { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 24px; display: flex; flex-direction: column; gap: 12px; }
+  .plan.featured { background: linear-gradient(180deg, #eef2ff 0%, #ffffff 100%); border-color: #6366f1; box-shadow: 0 12px 32px rgba(79, 70, 229, 0.18); }
+  .name { font-size: 13px; font-weight: 600; line-height: 16px; color: #6366f1; text-transform: uppercase; letter-spacing: 0.08em; }
+  .price { font-size: 36px; font-weight: 700; line-height: 44px; color: #0f172a; }
+  ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+  li { font-size: 14px; line-height: 20px; color: #475569; }
+</style>
+<section class="pricing">
+  <div class="plan">
+    <div class="name">Starter</div>
+    <div class="price">$12</div>
+    <ul><li>3 projects</li><li>Basic analytics</li><li>Email support</li></ul>
+  </div>
+  <div class="plan featured">
+    <div class="name">Studio</div>
+    <div class="price">$48</div>
+    <ul><li>Unlimited projects</li><li>Advanced analytics</li><li>Priority support</li><li>Custom domains</li></ul>
+  </div>
+  <div class="plan">
+    <div class="name">Enterprise</div>
+    <div class="price">$120</div>
+    <ul><li>Dedicated manager</li><li>SSO and audit logs</li></ul>
+  </div>
+</section>

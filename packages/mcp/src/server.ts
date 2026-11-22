@@ -173,16 +173,18 @@ export function formatExportCode(data: ExportCodeData): CallToolResult['content'
   return [{ type: 'text', text: JSON.stringify(head) }, ...files.map((f) => ({ type: 'text' as const, text: `----- ${f.path} -----\n${f.contents}` }))];
 }
 
-/** Deskripsi tool `paste` (epic paste-vektor story 3, AD-15). */
+/** Deskripsi tool `paste` (epic paste-vektor story 3–4, AD-15). */
 export const PASTE_DESCRIPTION =
-  'Tempel SVG ke board/frame dokumen aktif sebagai layer yang bisa diedit (importer yang sama dengan Ctrl+V di viewer; hasil identik). ' +
-  'content = dokumen SVG utuh berakar <svg>; parentId = ID board atau frame tujuan; x/y opsional (default: tengah parent; parent auto layout → ditambahkan di akhir tanpa x/y); ' +
-  'name opsional (nama layer akar); description opsional (label riwayat, default "Paste SVG"). ' +
+  'Tempel SVG atau HTML ke board/frame dokumen aktif sebagai layer yang bisa diedit (importer yang sama dengan Ctrl+V di viewer; hasil identik). ' +
+  'content = dokumen SVG utuh berakar <svg> (kind "svg", default) atau potongan HTML (kind "html"); parentId = ID board atau frame tujuan; x/y opsional (default: tengah parent; parent auto layout → ditambahkan di akhir tanpa x/y); ' +
+  'name opsional (nama layer akar); description opsional (label riwayat, default "Paste SVG"/"Paste HTML"); width opsional (lebar viewport HTML, default lebar tujuan). ' +
+  'HTML dirender di Chromium terisolasi (JavaScript mati, jaringan diblokir; gambar hanya data URI): flex/grid → auto layout, teks → text, <img> data → rect gambar, <svg> → path, tag semantik (nav, h1, p, button, …) → tag; ' +
+  'computed style dipetakan ke properti Lakar; HTML/CSS mentah tidak disimpan. Report HTML: {kind:"html", layers, autoLayout, texts, images, vectors, dropped:[{kind: element|attribute|request|property|value|font|layout, name, count}]}. ' +
   'Satu bentuk → node path; beberapa bentuk → frame berisi path (path, rect, circle, ellipse, line, polyline, polygon; <g> diratakan, transform dipanggang ke d). ' +
   'fill/stroke solid, stroke-width, fill-rule, stroke-linecap/linejoin/miterlimit/dasharray/dashoffset, fill/stroke-opacity, paint-order, shape-rendering, opacity dipetakan ke properti path; ' +
   'yang lain (filter, mask, clip-path, gradien url(), <text>, <image>, <use>, <style>, <script>, …) dibuang dan dilaporkan. Satu paste = satu rev. ' +
   'Mengembalikan {docId, slug, rev, created, nodeId, boards, report:{kind, paths, kept:[atribut], dropped:[{kind: element|attribute|value, name, count}]}}. ' +
-  'SVG rusak/tanpa bentuk atau parent bukan board/frame → SCHEMA_INVALID; ID tidak ada → NOT_FOUND; belum open_doc → NO_ACTIVE_DOC.';
+  'SVG rusak/tanpa bentuk, HTML tanpa isi terlihat, atau parent bukan board/frame → SCHEMA_INVALID; ID tidak ada → NOT_FOUND; belum open_doc → NO_ACTIVE_DOC; daemon tanpa Chromium (HTML) → RENDER_FAILED.';
 
 /** Deskripsi tool `layout_check` (aturan gerbang G0). */
 export const LAYOUT_CHECK_DESCRIPTION =
@@ -370,13 +372,14 @@ export function createLakarMcpServer(daemonUrl: string): McpServer {
     {
       description: PASTE_DESCRIPTION,
       inputSchema: z.object({
-        content: z.string().describe('dokumen SVG utuh (<svg …>…</svg>)'),
+        content: z.string().describe('dokumen SVG utuh (<svg …>…</svg>) atau potongan HTML (kind html)'),
         parentId: z.string().describe('ID board atau frame tujuan'),
         x: z.number().optional().describe('posisi x di parent (default tengah)'),
         y: z.number().optional().describe('posisi y di parent (default tengah)'),
-        name: z.string().optional().describe('nama layer akar (default <title> SVG atau "SVG")'),
-        description: z.string().optional().describe('label riwayat (default "Paste SVG")'),
-        kind: z.enum(['svg']).optional().describe("jenis isi; sekarang hanya 'svg'"),
+        name: z.string().optional().describe('nama layer akar (default <title> SVG atau "SVG"; HTML: aria-label/id/kelas/tag akar)'),
+        description: z.string().optional().describe('label riwayat (default "Paste SVG"/"Paste HTML")'),
+        kind: z.enum(['svg', 'html']).optional().describe("jenis isi: 'svg' (default) atau 'html'"),
+        width: z.number().optional().describe('HTML: lebar viewport px (default lebar board/frame tujuan)'),
       }),
     },
     (args) =>

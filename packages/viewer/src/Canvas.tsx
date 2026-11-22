@@ -349,7 +349,10 @@ export function Canvas({
   actions,
   components,
   onDropComponent,
+  pastedTag,
 }: {
+  /** Label "Pasted · nama" node hasil paste HTML (desain rkIyP). */
+  pastedTag?: { id: string; label: string } | undefined;
   /** Info komponen dokumen tersimpan (epic komponen story 4): penanda master/instance dan tag di canvas live. */
   components?: ComponentInfo | undefined;
   /** Kartu Assets dilepas di canvas: id master dan titik halaman (koordinat dokumen). */
@@ -454,6 +457,7 @@ export function Canvas({
     onSelectIds: selectIds,
     onCommit,
     components,
+    pastedTag,
   });
   /** Seleksi terkini untuk listener keyboard (Escape keluar dari isi instance). */
   const selectionRef = useRef(selection);

@@ -12,6 +12,7 @@ import { notFound } from './errors.js';
 import type { Browser, LaunchOptions, Page } from 'playwright-core';
 import type { BrowserChannel } from './config.js';
 import type { FontRegistry } from './fonts.js';
+import { snapshotHtml, type HtmlSnapshot } from './paste/html-page.js';
 import { BrowserLaunchError, RenderPool, type Lease } from './pool.js';
 
 /** Lokasi dist render (entry) yang disajikan apa adanya ke halaman Chromium. */
@@ -231,6 +232,19 @@ export class ChromiumRenderer implements RenderPort<ResolvedDocument> {
     return this.#pool.lease(async (lease) => {
       await this.#hook(lease);
       return this.#renderOnPage(lease.page, doc, boardId, opts.allowGlyphs ?? []);
+    });
+  }
+
+  /**
+   * Snapshot HTML paste (AD-15) di context terisolasi browser yang sama (JavaScript mati, jaringan diblokir; lihat
+   * `paste/html-page.ts`). Berjalan di dalam sewa pool: batas waktu dan antrean sama dengan render. Halaman sewaan
+   * tidak disentuh; context paste selalu ditutup.
+   */
+  snapshotHtml(html: string, opts: { width: number }): Promise<HtmlSnapshot> {
+    return this.#pool.lease(async (lease) => {
+      const browser = lease.page.context().browser();
+      if (!browser) throw new Error('browser render tidak tersedia untuk paste HTML');
+      return snapshotHtml(browser, html, { width: opts.width, fonts: this.#opts.fonts, timeoutMs: this.#opts.timeoutMs });
     });
   }
 

@@ -94,9 +94,12 @@ export function useCanvasEdit({
   onSelectIds,
   onCommit,
   components,
+  pastedTag,
 }: {
   /** Info komponen dokumen tersimpan terkini (epic komponen story 4): penanda master/instance, tag, breadcrumb. */
   components?: ComponentInfo | undefined;
+  /** Label "Pasted · nama" di bawah node hasil paste HTML (desain rkIyP Pasted Tag), selama node itu terpilih. */
+  pastedTag?: { id: string; label: string } | undefined;
   section: RefObject<HTMLElement | null>;
   cam: Camera;
   boards: readonly EditBoard[];
@@ -755,6 +758,16 @@ export function useCanvasEdit({
       );
     }
     if (components && !reorder && !marquee) overlay.push(...componentMarks(components, selection, index, boxOf, scr, onSelectIds));
+    const pb = pastedTag && !gesture && selection.includes(pastedTag.id) ? boxOf(pastedTag.id) : undefined;
+    if (pb) {
+      const s = scr(pb);
+      overlay.push(
+        <span key="pasted-tag" className="change-tag pasted-tag" aria-hidden="true" style={{ left: s.left, top: s.top + s.height + 24 }}>
+          <Icon name="clipboardPaste" size={10} />
+          Pasted · {pastedTag!.label}
+        </span>,
+      );
+    }
   }
 
   return {

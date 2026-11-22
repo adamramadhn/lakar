@@ -301,7 +301,7 @@ export function callTitle(c: ActivityCall, nameOf: (id: string) => string | unde
     case 'get_selection':
       return 'Read selection';
     case 'paste':
-      return 'Paste SVG';
+      return 'Paste layers';
     case 'read_skill':
       return t ? `Load ${t} skill` : 'List skills';
     case 'icon_search':

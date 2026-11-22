@@ -243,6 +243,11 @@ describe('@lakar/mcp', () => {
     expect(bad.isError).toBe(true);
     expect((bad.content as any[])[0].text).toContain('NOT_FOUND: paste: node Zzzzzzzz tidak ada');
     expect(PASTE_DESCRIPTION).toContain('NO_ACTIVE_DOC');
+    // kind html + width diteruskan apa adanya (story 4).
+    fake.seen.length = 0;
+    await c.callTool({ name: 'paste', arguments: { content: '<nav>x</nav>', parentId: 'Bbbbbbbb', kind: 'html', width: 640 } });
+    expect(fake.seen.find((s) => s.path === '/viewer/paste')!.body).toEqual({ content: '<nav>x</nav>', parentId: 'Bbbbbbbb', kind: 'html', width: 640 });
+    expect(PASTE_DESCRIPTION).toContain('kind "html"');
   });
 
   it('photo_search → teks JSON (tanpa data thumbnail) + maks 6 image content; argumen diteruskan; error terformat', async () => {

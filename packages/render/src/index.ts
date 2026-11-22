@@ -88,6 +88,7 @@ export {
   strokeBorderDecls,
   textShadowCss,
   textShadowItemCss,
+  tagResetDecls,
   tokenVar,
   type CssDecl,
   type PaintLike,
@@ -97,6 +98,35 @@ export {
 } from './css.js';
 // Impor CSS variables (epic token-tema story 2): kebalikan cssVarName, dipakai execute (lewat daemon) dan viewer.
 export { CSS_IMPORT_MODE_NAME, CSS_IMPORT_TOKEN_NAME, parseCssColor, parseCssVariables } from './css-vars.js';
+// Tabel kebalikan AD-5 (epic paste-vektor story 4): computed style → nilai skema, dipakai importer HTML daemon.
+export {
+  BLEND_MODES,
+  alignFromCss,
+  blendFromCss,
+  blurFromFilterCss,
+  boxShadowsFromCss,
+  cssColorHex,
+  cssPx,
+  fontWeightFromCss,
+  gradientFromCss,
+  gridPlacementFromCss,
+  gridTemplateFromCss,
+  gridTracksFromPx,
+  isClearHex,
+  justifyFromCss,
+  letterSpacingFromCss,
+  lineHeightFromCss,
+  radiusFromCss,
+  rotationFromTransformCss,
+  splitTopLevel,
+  textAlignFromCss,
+  textShadowsFromCss,
+  type GradientFill,
+  type PlacementValue,
+  type ShadowValue,
+  type StopValue,
+  type TrackValue,
+} from './css-reverse.js';
 export { measureBoard, type BoardMeasure, type NodeBounds, type TextMeasure } from './measure.js';
 
 /** Argumen Chromium bersama daemon dan harness tes (stabilitas golden). */

@@ -1,5 +1,5 @@
 // Toast paste SVG dan Paste Report (epic paste-vektor story 3; desain G0vf1/nE6dL memakai Toast r69qO, Details
-// membuka Paste Report w2am0). Toast naik 8px dalam 200ms dan hilang sendiri sesudah 6 dtk (berhenti saat di-hover);
+// membuka Paste Report w2am0). Paste HTML (story 4, desain rkIyP/GXHxW) langsung membuka Paste Report. Toast naik 8px dalam 200ms dan hilang sendiri sesudah 6 dtk (berhenti saat di-hover);
 // report tetap terbuka sampai ditutup. Teks dari paste.ts (murni).
 import { useEffect, useState } from 'react';
 import { copyText } from './Connections';
@@ -7,13 +7,13 @@ import { Icon } from './icons';
 import { pasteDescription, pasteReportDescription, pasteReportItems, pasteReportText, pasteTitle, type PasteReport } from './paste';
 import { UNDO_SKIPPED_MS } from './UndoSkippedToast';
 
-export type PasteToastState = { key: number; report: PasteReport; layer: string };
+export type PasteToastState = { key: number; report: PasteReport; layer: string; nodeId?: string | undefined };
 
 const IS_MAC = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
 
 export function PasteToast({ toast, onUndo, onClose }: { toast: PasteToastState; onUndo: () => void; onClose: () => void }) {
   const [hover, setHover] = useState(false);
-  const [details, setDetails] = useState(false);
+  const [details, setDetails] = useState(toast.report.kind === 'html');
   const [copied, setCopied] = useState<'ok' | 'failed' | undefined>(undefined);
   useEffect(() => {
     if (hover || details) return;

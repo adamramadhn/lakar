@@ -24,10 +24,10 @@ const chain: MigrationRegistry = {
 };
 
 describe('migrateDocument', () => {
-  it('registri resmi: 1→2 identitas, 2→3 token bertipe, 3→4 identitas (grid), 4→5 identitas (komponen), 5→6 identitas (vektor); versi kini → apa adanya (objek yang sama)', () => {
-    expect(Object.keys(MIGRATIONS)).toEqual(['1', '2', '3', '4', '5']);
+  it('registri resmi: 1→2 identitas, 2→3 token bertipe, 3→4 identitas (grid), 4→5 identitas (komponen), 5→6 identitas (vektor), 6→7 identitas (tag); versi kini → apa adanya (objek yang sama)', () => {
+    expect(Object.keys(MIGRATIONS)).toEqual(['1', '2', '3', '4', '5', '6']);
     const doc = JSON.parse(JSON.stringify(createDocument()));
-    expect(doc.schemaVersion).toBe(6);
+    expect(doc.schemaVersion).toBe(7);
     expect(migrateDocument(doc)).toBe(doc);
   });
 
@@ -50,7 +50,7 @@ describe('migrateDocument', () => {
   });
 
   it('lebih baru dari target → VERSION_MISMATCH', () => {
-    expect(codeOf(() => migrateDocument({ schemaVersion: 7 }))).toBe('VERSION_MISMATCH');
+    expect(codeOf(() => migrateDocument({ schemaVersion: 8 }))).toBe('VERSION_MISMATCH');
     expect(codeOf(() => parseDocument({ ...createDocument(), schemaVersion: 99 }))).toBe('VERSION_MISMATCH');
   });
 
@@ -174,7 +174,7 @@ describe('migrasi 2 → 3', () => {
     const snapshot = structuredClone(v3);
     expect(MIGRATIONS[3]!(v3)).toEqual({ ...snapshot, schemaVersion: 4 });
     expect(v3).toEqual(snapshot);
-    expect(parseDocument(v3).schemaVersion).toBe(6);
+    expect(parseDocument(v3).schemaVersion).toBe(7);
   });
 
   it('langkah 4 → 5 (komponen): identitas yang hanya menaikkan versi, input tidak dimutasi', () => {
@@ -182,7 +182,7 @@ describe('migrasi 2 → 3', () => {
     const snapshot = structuredClone(v4);
     expect(MIGRATIONS[4]!(v4)).toEqual({ ...snapshot, schemaVersion: 5 });
     expect(v4).toEqual(snapshot);
-    expect(parseDocument(v4)).toEqual({ ...snapshot, schemaVersion: 6 });
+    expect(parseDocument(v4)).toEqual({ ...snapshot, schemaVersion: 7 });
   });
 
   it('langkah 5 → 6 (vektor): identitas yang hanya menaikkan versi, input tidak dimutasi', () => {
@@ -190,7 +190,15 @@ describe('migrasi 2 → 3', () => {
     const snapshot = structuredClone(v5);
     expect(MIGRATIONS[5]!(v5)).toEqual({ ...snapshot, schemaVersion: 6 });
     expect(v5).toEqual(snapshot);
-    expect(parseDocument(v5)).toEqual({ ...snapshot, schemaVersion: 6 });
+    expect(parseDocument(v5)).toEqual({ ...snapshot, schemaVersion: 7 });
+  });
+
+  it('langkah 6 → 7 (tag semantik): identitas yang hanya menaikkan versi, input tidak dimutasi', () => {
+    const v6 = { ...JSON.parse(JSON.stringify(createDocument())), schemaVersion: 6 };
+    const snapshot = structuredClone(v6);
+    expect(MIGRATIONS[6]!(v6)).toEqual({ ...snapshot, schemaVersion: 7 });
+    expect(v6).toEqual(snapshot);
+    expect(parseDocument(v6)).toEqual({ ...snapshot, schemaVersion: 7 });
   });
 
   it('langkah 2 murni: input tidak dimutasi', () => {

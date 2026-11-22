@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { beginTransaction, migrateDocument, parseDocument } from '../packages/core/src/index.ts';
-import { expandInstances, instanceIssues, NODE_TYPES, resolveDocument, resolveTokens, SCHEMA_VERSION, SVG_PRESENTATION_ATTRS, TOKEN_TYPES, type LakarDocument } from '../packages/schema/src/index.ts';
+import { expandInstances, HTML_TAGS, instanceIssues, NODE_TYPES, resolveDocument, resolveTokens, SCHEMA_VERSION, SVG_PRESENTATION_ATTRS, TOKEN_TYPES, type LakarDocument } from '../packages/schema/src/index.ts';
 import { boardsOf, loadDocCorpus, missingVersions, type CorpusDoc } from './support/doc-corpus.ts';
 
 const corpus = loadDocCorpus();
@@ -264,7 +264,7 @@ describe('korpus dokumen: migrasi v4 → v5 (komponen, AD-12)', () => {
 
 describe('korpus dokumen: migrasi v5 → v6 (vektor, AD-14)', () => {
   it.each(corpus.filter((d) => d.version === 5).map((d): [string, CorpusDoc] => [`v${d.version}/${d.name}`, d]))('identitas: %s', (_label, d) => {
-    expect(migrateDocument(d.raw), d.path).toEqual({ ...d.raw, schemaVersion: 6 });
+    expect(migrateDocument(d.raw, { target: 6 }), d.path).toEqual({ ...d.raw, schemaVersion: 6 });
   });
 
   it.each(corpus.filter((d) => d.version < 6).map((d): [string, CorpusDoc] => [`v${d.version}/${d.name}`, d]))('%s: hasil v5 = hasil versi kini kecuali versi', (_label, d) => {
@@ -302,6 +302,42 @@ describe('korpus dokumen: migrasi v5 → v6 (vektor, AD-14)', () => {
       })).toBe('SCHEMA_INVALID');
     }
     expect(doc).toEqual(before);
+  });
+});
+
+describe('korpus dokumen: migrasi v6 → v7 (tag semantik, AD-1)', () => {
+  it.each(corpus.filter((d) => d.version === 6).map((d): [string, CorpusDoc] => [`v${d.version}/${d.name}`, d]))('identitas: %s', (_label, d) => {
+    expect(migrateDocument(d.raw), d.path).toEqual({ ...d.raw, schemaVersion: 7 });
+  });
+
+  it.each(corpus.filter((d) => d.version < 7).map((d): [string, CorpusDoc] => [`v${d.version}/${d.name}`, d]))('%s: hasil v6 = hasil versi kini kecuali versi', (_label, d) => {
+    const v6 = migrateDocument(d.raw, { target: 6 }) as Record<string, unknown>;
+    expect(parseDocument(d.raw), d.path).toEqual({ ...v6, schemaVersion: SCHEMA_VERSION });
+  });
+
+  it('fixture v7 (hasil paste HTML sampel) memakai tag pada frame dan text, dan auto layout row/column/grid', () => {
+    const nodes = corpus.filter((d) => d.version === 7).flatMap((d) => allNodes(parseDocument(d.raw))) as Record<string, unknown>[];
+    const tags = new Set(nodes.map((n) => n.tag).filter(Boolean));
+    for (const t of ['article', 'nav', 'section', 'h3', 'p', 'button', 'a', 'ul', 'li']) expect(tags.has(t), t).toBe(true);
+    for (const t of tags) expect((HTML_TAGS as readonly unknown[]).includes(t)).toBe(true);
+    expect(new Set(nodes.filter((n) => n.tag).map((n) => n.type))).toEqual(new Set(['frame', 'text']));
+    expect(new Set(nodes.map((n) => n.layout).filter(Boolean))).toEqual(new Set(['row', 'column', 'grid']));
+  });
+
+  it('jalur mutasi core: tag di allowlist diterima; tag asing dan tag pada rect ditolak SCHEMA_INVALID', () => {
+    const doc = parseDocument(corpus.find((x) => x.version === 7)!.raw);
+    const frame = (allNodes(doc) as Record<string, unknown>[]).find((n) => n.type === 'frame' && n.tag === 'nav')!;
+    const rect = (allNodes(doc) as Record<string, unknown>[]).find((n) => n.type === 'rect')!;
+    const ok = beginTransaction(doc, { sessionId: 'tes-korpus' });
+    ok.update(frame.id as string, { tag: 'header' });
+    expect(byAddress(ok.commit('tag').doc).get(frame.id as string)).toMatchObject({ tag: 'header' });
+    for (const [id, patch] of [[frame.id, { tag: 'div' }], [rect.id, { tag: 'p' }]] as const) {
+      const tx = beginTransaction(doc, { sessionId: 'tes-korpus' });
+      expect(thrownCode(() => {
+        tx.update(id as string, patch);
+        tx.commit('tag salah');
+      })).toBe('SCHEMA_INVALID');
+    }
   });
 });
 

@@ -23,6 +23,7 @@ import {
   shapeFillLayerDecls,
   strokeOverlayDecls,
   strokeSvgSpec,
+  tagResetDecls,
   textDecls,
   type CssDecl,
   type ParentLayout,
@@ -269,7 +270,10 @@ function instanceMark(ctx: TreeCtx, n: ExpandedChildNode): InstanceMark | undefi
 
 /** Elemen satu node anak dalam konteks parent-nya (layout, scrollY, gap negatif). */
 export function nodeElement(ctx: TreeCtx, n: ExpandedChildNode, parent: ParentLayout, scrollY: number, negativeGap: number | undefined): CodeElement {
-  const e = el('div', camelName(n.name, n.type), n.id, []);
+  // Tag semantik (v7, AD-1) menjadi nama elemen; reset UA lebih dulu supaya deklarasi node menimpanya.
+  // p/h1–h6 pada frame ditulis <div>: anak frame selalu elemen blok (<div>), yang tidak sah di dalam <p>/<hN>.
+  const tag = (n.type === 'frame' || n.type === 'text') && typeof n.tag === 'string' && !(n.type === 'frame' && /^(p|h[1-6])$/.test(n.tag)) ? n.tag : undefined;
+  const e = el(tag ?? 'div', camelName(n.name, n.type), n.id, tagResetDecls(tag));
   let filters: string[] = [];
   switch (n.type) {
     case 'frame': {

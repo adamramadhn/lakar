@@ -47,7 +47,7 @@ import { registerConnectionRoutes } from './connections.js';
 import { registerFileRoutes } from './files.js';
 import { registerPageRoutes } from './pages.js';
 import { registerOpsRoutes } from './ops.js';
-import { registerPasteRoutes } from './paste.js';
+import { registerPasteRoutes, type HtmlSnapshotter } from './paste.js';
 import { SelectionStore, registerSelectionRoutes } from './selection.js';
 import { registerRenderDepsRoutes } from './render-deps.js';
 import { registerExportRoutes } from './export.js';
@@ -687,7 +687,18 @@ export function buildServer({
   registerFileRoutes(app, { docs, store, sessions, docLocks, activity, dataDir: config.dataDir, onChange: (c) => selections.onFileChange(c) });
   registerPageRoutes(app, { docs, store, docLocks, activity });
   registerOpsRoutes(app, { docs, store, docLocks, activity, icons });
-  registerPasteRoutes(app, { docs, store, docLocks, sessions, activity });
+  // Paste HTML (story 4): render terisolasi lewat renderer Chromium bila ada (renderer palsu tes → RENDER_FAILED).
+  const snapshotter = typeof (render as Partial<HtmlSnapshotter>).snapshotHtml === 'function' ? (render as unknown as HtmlSnapshotter) : undefined;
+  registerPasteRoutes(app, {
+    docs,
+    store,
+    docLocks,
+    sessions,
+    activity,
+    ...(snapshotter ? { html: snapshotter } : {}),
+    fonts: (family) => fonts.entry(family),
+    dataDir: config.dataDir,
+  });
   registerSelectionRoutes(app, { docs, store, sessions, selections, activity, render, assertIcons });
   registerRenderDepsRoutes(app, { fonts, icons });
   registerExportRoutes(app, { docs, store, render, icons });

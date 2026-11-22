@@ -9,7 +9,9 @@ import { join } from 'node:path';
 import { SESSION_HEADER, type LakarDocument } from '@lakar/schema';
 import { buildServer, loadConfig } from './index.js';
 import type { DocChange } from './events.js';
-import { PASTE_CONTENT_MAX } from './paste.js';
+import { PASTE_CONTENT_MAX, htmlViewportWidth } from './paste.js';
+import { solidPng } from './assets.js';
+import type { HtmlSnapshot } from './paste/html-page.js';
 
 const baseConfig = { ...loadConfig({}), unsplashKeyFile: '/nonexistent/lakar-test/unsplash-access-key', pexelsKeyFile: '/nonexistent/lakar-test/pexels-api-key' };
 const fakeRender = {
@@ -28,9 +30,9 @@ afterAll(async () => {
   await rm(root, { recursive: true, force: true });
 });
 
-async function setup() {
+async function setup(render: unknown = fakeRender) {
   const dataDir = await mkdtemp(join(root, 'data-'));
-  const daemon = buildServer({ config: { ...baseConfig, port: 7466, dataDir }, render: fakeRender });
+  const daemon = buildServer({ config: { ...baseConfig, port: 7466, dataDir }, render: render as never });
   const { app } = daemon;
   const docsDir = join(dataDir, 'docs');
   const post = (url: string, payload?: unknown, headers: Record<string, string> = {}) =>
@@ -51,7 +53,7 @@ async function setup() {
   daemon.activity.subscribeAll((e) => {
     if (e.type === 'change') changes.push(e.change);
   });
-  return { ...daemon, post, doc, history, create, changes };
+  return { ...daemon, dataDir, post, doc, history, create, changes };
 }
 
 const node = (d: LakarDocument, id: string): any => {
@@ -135,7 +137,10 @@ describe('POST /viewer/docs/:slug/paste', () => {
         [{ content: ICON, parentId: 'Zzzzzzzz' }, 404, 'NOT_FOUND'],
         [{ content: ICON, parentId: 'Aaaaaaaa/Bbbbbbbb' }, 400, 'SCHEMA_INVALID', 'isi instance'],
         [{ content: ICON }, 400, 'SCHEMA_INVALID'],
-        [{ content: ICON, parentId: board, kind: 'html' }, 400, 'SCHEMA_INVALID'],
+        [{ content: ICON, parentId: board, kind: 'png' }, 400, 'SCHEMA_INVALID'],
+        [{ content: '<p>x</p>', parentId: board, kind: 'html', width: 0 }, 400, 'SCHEMA_INVALID'],
+        // Renderer palsu tanpa snapshotHtml: paste HTML butuh Chromium daemon.
+        [{ content: '<p>x</p>', parentId: board, kind: 'html' }, 503, 'RENDER_FAILED', 'butuh Chromium'],
         [{ content: ICON, parentId: board, extra: 1 }, 400, 'SCHEMA_INVALID'],
         [{ content: 'x'.repeat(PASTE_CONTENT_MAX + 1), parentId: board }, 400, 'SCHEMA_INVALID'],
       ];
@@ -197,5 +202,88 @@ describe('POST /viewer/paste (tool MCP paste)', () => {
     } finally {
       await t.app.close();
     }
+  });
+});
+
+describe('paste HTML (snapshot palsu; integrasi Chromium di paste-html.test.ts)', () => {
+  const style = (s: Record<string, string>) => ({ display: 'block', 'background-color': 'rgba(0, 0, 0, 0)', 'background-image': 'none', 'box-shadow': 'none', color: 'rgb(0, 0, 0)', 'font-size': '16px', 'font-family': 'Inter', 'font-weight': '400', ...s });
+  const png = solidPng(2, 2, [1, 2, 3]);
+  const snapshot = (width: number): HtmlSnapshot => ({
+    width,
+    scripts: 1,
+    requests: [],
+    truncated: false,
+    body: {
+      k: 'el', tag: 'body', box: [0, 0, width, 100], style: style({}), spec: {},
+      children: [
+        {
+          k: 'el', tag: 'nav', box: [0, 0, 200, 40], style: style({ display: 'flex', 'column-gap': '8px' }), spec: {},
+          children: [
+            { k: 'el', tag: 'div', box: [0, 0, 100, 40], style: style({ display: 'flex' }), spec: {}, children: [{ k: 'el', tag: 'img', box: [0, 0, 40, 40], style: style({}), spec: {}, children: [], img: { src: `data:image/png;base64,${png.toString('base64')}` } }] },
+            { k: 'el', tag: 'a', box: [108, 10, 50, 20], style: style({}), spec: {}, children: [], text: { content: 'Docs', lines: 1, mixed: [] } },
+          ],
+        },
+      ],
+    },
+  });
+
+  it('kind html → snapshot dengan lebar tujuan, op bersarang, aset ditulis, deskripsi Paste HTML, laporan html', async () => {
+    const widths: number[] = [];
+    const render = { ...(fakeRender as object), snapshotHtml: async (_html: string, o: { width: number }) => (widths.push(o.width), snapshot(o.width)) };
+    const t = await setup(render);
+    try {
+      const { slug, board } = await t.create('Paste Html');
+      const beforeDoc = await t.doc(slug);
+      const before = beforeDoc.rev;
+      const r = await t.post(`/viewer/docs/${slug}/paste`, { kind: 'html', content: '<nav>…</nav>', parentId: board });
+      expect(r.statusCode, r.body).toBe(200);
+      const data = r.json().data;
+      expect(widths).toEqual([375]);
+      expect(data.rev).toBe(before + 1);
+      expect(data.report).toEqual({ kind: 'html', layers: 4, autoLayout: 2, texts: 1, images: 1, vectors: 0, dropped: [{ kind: 'element', name: '<script>', count: 1 }] });
+      expect(Object.keys(data.refs).sort()).toEqual(['paste', 'paste-1']);
+      const d = await t.doc(slug);
+      const nav = node(d, data.nodeId);
+      expect(nav).toMatchObject({ type: 'frame', tag: 'nav', layout: 'row', gap: 8, position: 'absolute', width: 200 });
+      const assetId = nav.children[0].children[0].fills[0].assetId as string;
+      expect(readFileSync(join(t.dataDir, 'assets', assetId))).toEqual(png);
+      expect((await t.history(slug)).at(-1)).toMatchObject({ description: 'Paste HTML', rev: data.rev });
+      // Undo lewat inverse (op bersarang paste-N) mengembalikan isi dokumen.
+      const undo = await t.post(`/viewer/docs/${slug}/ops`, { ops: data.inverse });
+      expect(undo.statusCode, undo.body).toBe(200);
+      expect(content(await t.doc(slug))).toEqual(content(beforeDoc));
+      // Lebar eksplisit menang.
+      await t.post(`/viewer/docs/${slug}/paste`, { kind: 'html', content: '<nav>…</nav>', parentId: board, width: 640 });
+      expect(widths).toEqual([375, 640]);
+      // Parent salah / dokumen tak ada: gagal sebelum render Chromium (tanpa panggilan snapshot).
+      expect((await t.post(`/viewer/docs/${slug}/paste`, { kind: 'html', content: '<p>x</p>', parentId: 'Zzzzzzzz' })).statusCode).toBe(404);
+      expect((await t.post('/viewer/docs/tidak-ada/paste', { kind: 'html', content: '<p>x</p>', parentId: board })).statusCode).toBe(404);
+      expect(widths).toEqual([375, 640]);
+    } finally {
+      await t.app.close();
+    }
+  });
+
+  it('HTML tanpa isi terlihat → 400 SCHEMA_INVALID dengan hint HTML; tidak ada commit', async () => {
+    const empty = (width: number): HtmlSnapshot => ({ ...snapshot(width), scripts: 0, body: { ...snapshot(width).body, children: [] } });
+    const t = await setup({ ...(fakeRender as object), snapshotHtml: async (_h: string, o: { width: number }) => empty(o.width) });
+    try {
+      const { slug, board } = await t.create('Paste Kosong');
+      const rev = (await t.doc(slug)).rev;
+      const r = await t.post(`/viewer/docs/${slug}/paste`, { kind: 'html', content: '<!-- x -->', parentId: board });
+      expect(r.statusCode, r.body).toBe(400);
+      expect(r.json().error).toMatchObject({ code: 'SCHEMA_INVALID', hint: expect.stringContaining('HTML') });
+      expect((await t.doc(slug)).rev).toBe(rev);
+    } finally {
+      await t.app.close();
+    }
+  });
+
+  it('lebar viewport default: board, frame dikurangi padding horizontal, selain itu 1280', () => {
+    expect(htmlViewportWidth({ id: 'a', type: 'board', width: 1440 })).toBe(1440);
+    expect(htmlViewportWidth({ id: 'a', type: 'frame', width: 400, padding: [8, 16] })).toBe(368);
+    expect(htmlViewportWidth({ id: 'a', type: 'frame', width: 400, padding: [0, 10, 0, 30] })).toBe(360);
+    expect(htmlViewportWidth({ id: 'a', type: 'frame', width: 'fill' })).toBe(1280);
+    expect(htmlViewportWidth(undefined)).toBe(1280);
   });
 });

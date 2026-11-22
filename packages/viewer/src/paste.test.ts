@@ -1,7 +1,7 @@
 // Paste SVG viewer (epic paste-vektor story 3): deteksi clipboard, target parent, teks toast dan report (desain
 // G0vf1/nE6dL, r69qO, w2am0).
 import { describe, expect, it } from 'vitest';
-import { PASTE_NO_TARGET, canUndoPaste, clipboardSvg, fileLayerName, isSvgFile, joinList, pasteDescription, pasteReportDescription, pasteReportItems, pasteReportText, pasteTarget, pasteTitle, svgFromText, type PasteReport } from './paste.js';
+import { PASTE_NO_TARGET, canUndoPaste, clipboardPaste, clipboardSvg, htmlKept, htmlSource, fileLayerName, isSvgFile, joinList, pasteDescription, pasteReportDescription, pasteReportItems, pasteReportText, pasteTarget, pasteTitle, svgFromText, type PasteReport } from './paste.js';
 
 const doc = {
   pages: [
@@ -106,5 +106,67 @@ describe('clipboardSvg / canUndoPaste', () => {
     expect(canUndoPaste([paste, later], paste)).toBe(false);
     expect(canUndoPaste([], paste)).toBe(false);
     expect(canUndoPaste([], undefined)).toBe(false);
+  });
+});
+
+describe('paste HTML (story 4, desain rkIyP/GXHxW)', () => {
+  const html: PasteReport = {
+    kind: 'html',
+    layers: 14,
+    autoLayout: 3,
+    texts: 6,
+    images: 2,
+    vectors: 0,
+    dropped: [
+      { kind: 'element', name: '<script>', count: 2 },
+      { kind: 'request', name: 'external image', count: 1 },
+      { kind: 'property', name: 'backdrop-filter', count: 1 },
+      { kind: 'property', name: 'outline', count: 3 },
+      { kind: 'font', name: 'Satoshi', count: 4 },
+      { kind: 'attribute', name: 'onclick', count: 1 },
+      { kind: 'layout', name: 'margins', count: 1 },
+      { kind: 'value', name: 'border-style', count: 1 },
+      { kind: 'request', name: 'external stylesheet', count: 2 },
+    ],
+  };
+
+  it('clipboard: SVG didahulukan (teks SVG dari editor kode juga membawa text/html); text/html bermarkup → html; teks biasa dibiarkan', () => {
+    const svg = '<svg viewBox="0 0 1 1"><path d="M0 0"/></svg>';
+    expect(clipboardPaste({ files: [], text: svg, html: '<pre><span>&lt;svg</span></pre>' })).toEqual({ text: svg });
+    expect(clipboardPaste({ files: [], text: 'Card', html: '<meta charset="utf-8"><div class="card">Card</div>' })).toEqual({ html: '<meta charset="utf-8"><div class="card">Card</div>' });
+    expect(clipboardPaste({ files: [], text: 'hello', html: '' })).toBeUndefined();
+    expect(clipboardPaste({ files: [], text: 'hello', html: 'hello' })).toBeUndefined();
+    // Kode HTML dari editor (text/plain = markup, text/html = pewarnaan sintaks) → markup text/plain yang diimpor.
+    const code = '<div class="card">\n  <h3>Title</h3>\n</div>';
+    expect(clipboardPaste({ files: [], text: code, html: '<pre><span>&lt;div</span></pre>' })).toEqual({ html: code });
+    expect(htmlSource('<a < b')).toBe(false);
+    expect(htmlSource('<img src="data:x" />')).toBe(true);
+    // Salin gambar dari browser: file gambar + text/html satu <img> → dibiarkan.
+    const png = { type: 'image/png', name: 'image.png' };
+    expect(clipboardPaste({ files: [png], text: '', html: '<meta charset="utf-8"><img src="https://x/a.png" alt="">' })).toBeUndefined();
+    expect(clipboardPaste({ files: [png], text: '', html: '<div><img src="https://x/a.png"> Caption</div>' })).toEqual({ html: '<div><img src="https://x/a.png"> Caption</div>' });
+  });
+
+  it('snapshot terpotong punya alasan sendiri di report', () => {
+    const r: PasteReport = { kind: 'html', layers: 1, autoLayout: 0, texts: 1, images: 0, vectors: 0, dropped: [{ kind: 'element', name: 'elements beyond the import limit', count: 1 }] };
+    expect(pasteReportItems(r)).toEqual([{ icon: 'code', what: 'Elements beyond the import limit', why: 'Too many elements — paste a smaller snippet' }]);
+  });
+
+  it('judul, deskripsi, baris report, dan teks salin', () => {
+    expect(pasteTitle(html)).toBe('Pasted 14 layers from HTML');
+    expect(pasteReportDescription(html, 'Card')).toBe('Auto layout, text and 2 images kept as layers · 1 change in History');
+    expect(htmlKept({ ...html, autoLayout: 0, texts: 0, images: 0, vectors: 1 })).toBe('1 vector kept as layers');
+    expect(htmlKept({ ...html, autoLayout: 0, texts: 0, images: 0 })).toBe('Layers kept');
+    expect(pasteReportItems(html)).toEqual([
+      { icon: 'code', what: '2 × <script>', why: 'Scripts never run and are not stored' },
+      { icon: 'imageOff', what: '1 external image', why: 'Network is blocked while importing' },
+      { icon: 'paintbrush', what: 'backdrop-filter, outline', why: 'No matching Lakar property' },
+      { icon: 'type', what: 'font “Satoshi”', why: 'Not installed — replaced with Inter' },
+      { icon: 'code', what: 'onclick', why: 'Scripts never run and are not stored' },
+      { icon: 'paintbrush', what: 'margins', why: 'Kept with fixed positions' },
+      { icon: 'paintbrush', what: 'border-style', why: 'Value not supported' },
+      { icon: 'imageOff', what: '2 external stylesheets', why: 'Network is blocked while importing' },
+    ]);
+    expect(pasteReportText(html, 'Card').split('\n').slice(0, 3)).toEqual(['Pasted 14 layers from HTML', 'Auto layout, text and 2 images kept as layers · 1 change in History', 'Not imported (8):']);
   });
 });

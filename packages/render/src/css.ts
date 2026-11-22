@@ -376,6 +376,46 @@ function absoluteDecls(out: CssDecl[], n: ChildLike, z: SizingLike): void {
   }
 }
 
+/**
+ * Reset gaya bawaan browser (UA) untuk elemen bertag semantik (v7, AD-1), ditulis codegen sebelum deklarasi node.
+ * Hanya longhand yang sama dengan properti deklarasi node (`padding`, `background-color`, `font-*`, `color`), supaya
+ * `mergeDecls` membuang reset yang ditimpa node dan Tailwind tidak bergantung pada urutan kelas. Margin selalu 0 lewat
+ * `childLayoutDecls`; tag lain tidak butuh reset. Render canvas tidak memakai tag.
+ */
+export function tagResetDecls(tag: unknown): CssDecl[] {
+  switch (tag) {
+    case 'ul':
+    case 'ol':
+      return [
+        ['list-style', 'none'],
+        ['padding', '0'],
+      ];
+    case 'li':
+      return [['list-style', 'none']];
+    case 'button':
+      return [
+        ['background-color', 'transparent'],
+        ['border-width', '0'],
+        ['padding', '0'],
+        ['font-family', 'inherit'],
+        ['font-size', 'inherit'],
+        ['font-weight', 'inherit'],
+        ['font-style', 'inherit'],
+        ['line-height', 'inherit'],
+        ['letter-spacing', 'inherit'],
+        ['color', 'inherit'],
+        ['text-align', 'inherit'],
+      ];
+    case 'a':
+      return [
+        ['color', 'inherit'],
+        ['text-decoration', 'none'],
+      ];
+    default:
+      return [];
+  }
+}
+
 /** Board: kolom flex dari kiri atas, ukuran tetap, selalu clip, blend anak dibatasi pada isi board. Latar terpisah. */
 export function boardDecls(b: { readonly width?: unknown; readonly height?: unknown }): CssDecl[] {
   return [

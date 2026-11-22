@@ -6115,6 +6115,11 @@ button.panel-tab:hover {
   left: 4px;
   top: 4px;
 }
+/* Pasted Tag (desain rkIyP): "Pasted · nama" di bawah node hasil paste HTML selama Paste Report terbuka. */
+.change-tag.pasted-tag {
+  --who: var(--accent);
+  z-index: 2;
+}
 .change-tag.board-tag {
   z-index: 1;
   animation: change-tag-out 1.5s ease-out both;

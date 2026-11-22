@@ -24,6 +24,8 @@ export type MigrationRegistry = Readonly<Record<number, Migration>>;
  *   valid apa adanya, jadi langkahnya identitas yang menaikkan versi.
  * - 5 → 6 (epic paste-vektor story 2, AD-14): v6 hanya menambah atribut vektor bertipe dan `svg` pada node `path`;
  *   dokumen v5 valid apa adanya, jadi langkahnya identitas yang menaikkan versi.
+ * - 6 → 7 (epic paste-vektor story 4, AD-1): v7 hanya menambah `tag` semantik opsional pada frame dan text;
+ *   dokumen v6 valid apa adanya, jadi langkahnya identitas yang menaikkan versi.
  */
 export const MIGRATIONS: MigrationRegistry = Object.freeze({
   1: (d: RawDocument): RawDocument => ({ ...d, schemaVersion: 2 }),
@@ -35,6 +37,7 @@ export const MIGRATIONS: MigrationRegistry = Object.freeze({
   3: (d: RawDocument): RawDocument => ({ ...d, schemaVersion: 4 }),
   4: (d: RawDocument): RawDocument => ({ ...d, schemaVersion: 5 }),
   5: (d: RawDocument): RawDocument => ({ ...d, schemaVersion: 6 }),
+  6: (d: RawDocument): RawDocument => ({ ...d, schemaVersion: 7 }),
 });
 
 export type MigrateOptions = { migrations?: MigrationRegistry; target?: number };

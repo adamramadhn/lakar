@@ -23,6 +23,7 @@ import {
   textDecls,
   type CssDecl,
   type ParentLayout,
+  tagResetDecls,
 } from '../packages/render/src/css.ts';
 import { ellipseShape } from '../packages/render/src/shape.ts';
 import { parseCssVariables } from '../packages/render/src/css-vars.ts';
@@ -290,7 +291,9 @@ function expected({ n, layout, scrollY, negativeGap }: Walked): { decls: CssDecl
       filters = dropShadowFilterList(n.shadows);
       break;
   }
-  return { decls: mergeDecls([...own, ...childLayoutDecls(n, layout, { negativeGap }), ...effectDecls(n, scrollY, filters)]), after };
+  // Tag semantik (v7): reset UA mendahului deklarasi node.
+  const reset = n.type === 'frame' || n.type === 'text' ? tagResetDecls(n.tag) : [];
+  return { decls: mergeDecls([...reset, ...own, ...childLayoutDecls(n, layout, { negativeGap }), ...effectDecls(n, scrollY, filters)]), after };
 }
 
 describe('codegen: deklarasi per properti sama dengan css.ts', () => {

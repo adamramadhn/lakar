@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { LakarDocument } from '@lakar/schema';
 import { CSS_IMPORT_MAX_CHARS, importPlan, tokenVarHint } from './cssImport.js';
 
-const doc = (extra: Record<string, unknown> = {}) => ({ schemaVersion: 6, id: 'Doc00001', rev: 1, pages: [{ id: 'Page0001', name: 'Page', children: [] }], ...extra }) as unknown as LakarDocument;
+const doc = (extra: Record<string, unknown> = {}) => ({ schemaVersion: 7, id: 'Doc00001', rev: 1, pages: [{ id: 'Page0001', name: 'Page', children: [] }], ...extra }) as unknown as LakarDocument;
 
 const CSS = `:root {
   --colors-bg: #ffffff;

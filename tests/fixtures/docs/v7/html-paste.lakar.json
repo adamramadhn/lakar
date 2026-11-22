@@ -1,0 +1,729 @@
+{
+  "schemaVersion": 7,
+  "id": "5Qon1N3l",
+  "rev": 6,
+  "tokens": {},
+  "pages": [
+    {
+      "id": "C6EAN2E5",
+      "name": "Page 1",
+      "children": [
+        {
+          "type": "board",
+          "name": "Card sample",
+          "x": 0,
+          "y": 0,
+          "width": 400,
+          "height": 440,
+          "screen": "landing",
+          "id": "Sv0jOb4h",
+          "children": [
+            {
+              "type": "frame",
+              "name": "Card",
+              "position": "absolute",
+              "x": 39,
+              "y": 0,
+              "tag": "article",
+              "layout": "column",
+              "padding": 1,
+              "width": 322,
+              "clip": true,
+              "fills": [
+                {
+                  "type": "solid",
+                  "color": "#FFFFFF"
+                }
+              ],
+              "stroke": {
+                "color": "#E2E8F0",
+                "width": 1,
+                "align": "inside"
+              },
+              "shadows": [
+                {
+                  "x": 0,
+                  "y": 8,
+                  "blur": 24,
+                  "color": "#0F172A1F"
+                }
+              ],
+              "radius": 16,
+              "id": "n2qINRI5",
+              "children": [
+                {
+                  "type": "rect",
+                  "name": "Media",
+                  "width": 320,
+                  "height": 160,
+                  "fills": [
+                    {
+                      "type": "image",
+                      "assetId": "e14414c7fc0f20c2a299aed9471ccf3f5056d94248f7a5948d8a067917faa153",
+                      "fit": "cover"
+                    }
+                  ],
+                  "id": "bzbsqjQV"
+                },
+                {
+                  "type": "frame",
+                  "name": "Content",
+                  "layout": "column",
+                  "gap": 8,
+                  "padding": 20,
+                  "id": "VG6B3ilz",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "name": "Tag",
+                      "layout": "column",
+                      "padding": [
+                        4,
+                        8
+                      ],
+                      "width": "hug",
+                      "fills": [
+                        {
+                          "type": "solid",
+                          "color": "#EEF2FF"
+                        }
+                      ],
+                      "radius": 999,
+                      "id": "pK2V02jl",
+                      "children": [
+                        {
+                          "type": "text",
+                          "name": "New season",
+                          "content": "New season",
+                          "weight": 600,
+                          "size": 12,
+                          "lineHeight": 16,
+                          "color": "#4338CA",
+                          "width": "fill",
+                          "id": "lQaJc3ih"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "text",
+                      "name": "Make bold work, faster",
+                      "tag": "h3",
+                      "content": "Make bold work, faster",
+                      "weight": 600,
+                      "size": 20,
+                      "lineHeight": 28,
+                      "color": "#0F172A",
+                      "width": "fill",
+                      "id": "ojnbAw84"
+                    },
+                    {
+                      "type": "text",
+                      "name": "An independent studio shaping brands, pr",
+                      "tag": "p",
+                      "content": "An independent studio shaping brands, products and spaces with warmth and intent.",
+                      "size": 14,
+                      "lineHeight": 20,
+                      "color": "#475569",
+                      "width": "fill",
+                      "id": "nEhXDDms"
+                    },
+                    {
+                      "type": "frame",
+                      "name": "Actions",
+                      "layout": "row",
+                      "gap": 8,
+                      "padding": [
+                        8,
+                        0,
+                        0,
+                        0
+                      ],
+                      "id": "CEXD4Zov",
+                      "children": [
+                        {
+                          "type": "frame",
+                          "name": "Btn",
+                          "tag": "button",
+                          "layout": "column",
+                          "padding": [
+                            10,
+                            16
+                          ],
+                          "fills": [
+                            {
+                              "type": "solid",
+                              "color": "#4F46E5"
+                            }
+                          ],
+                          "radius": 10,
+                          "id": "HRVOU3Su",
+                          "children": [
+                            {
+                              "type": "text",
+                              "name": "Start a project",
+                              "content": "Start a project",
+                              "weight": 500,
+                              "size": 14,
+                              "lineHeight": 20,
+                              "align": "center",
+                              "color": "#FFFFFF",
+                              "width": "fill",
+                              "id": "YkTLC1wz"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "name": "Btn",
+                          "tag": "button",
+                          "layout": "column",
+                          "padding": [
+                            11,
+                            17
+                          ],
+                          "fills": [
+                            {
+                              "type": "solid",
+                              "color": "#FFFFFF"
+                            }
+                          ],
+                          "stroke": {
+                            "color": "#CBD5E1",
+                            "width": 1,
+                            "align": "inside"
+                          },
+                          "radius": 10,
+                          "id": "ftrldWPa",
+                          "children": [
+                            {
+                              "type": "text",
+                              "name": "Learn more",
+                              "content": "Learn more",
+                              "weight": 500,
+                              "size": 14,
+                              "lineHeight": 20,
+                              "align": "center",
+                              "color": "#0F172A",
+                              "width": "fill",
+                              "id": "a5kYE8TQ"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "board",
+          "name": "Navbar sample",
+          "x": 500,
+          "y": 0,
+          "width": 1200,
+          "height": 120,
+          "screen": "landing",
+          "id": "fIdwg3YQ",
+          "children": [
+            {
+              "type": "frame",
+              "name": "Main navigation",
+              "position": "absolute",
+              "x": 0,
+              "y": 0,
+              "tag": "nav",
+              "layout": "row",
+              "padding": [
+                16,
+                32
+              ],
+              "align": "center",
+              "justify": "space-between",
+              "width": 1200,
+              "fills": [
+                {
+                  "type": "solid",
+                  "color": "#0F172A"
+                }
+              ],
+              "id": "PjuifgqD",
+              "children": [
+                {
+                  "type": "frame",
+                  "name": "Brand",
+                  "layout": "row",
+                  "gap": 10,
+                  "align": "center",
+                  "id": "SCa7a3Bx",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "name": "SVG",
+                      "width": 28,
+                      "height": 28,
+                      "id": "xMs3gQVE",
+                      "children": [
+                        {
+                          "type": "path",
+                          "name": "Path 1",
+                          "d": "M12 2L22 20H2Z",
+                          "viewBox": [
+                            0,
+                            0,
+                            24,
+                            24
+                          ],
+                          "width": 28,
+                          "height": 28,
+                          "fills": [
+                            {
+                              "type": "solid",
+                              "color": "#38BDF8"
+                            }
+                          ],
+                          "id": "g9EAuBSl"
+                        },
+                        {
+                          "type": "path",
+                          "name": "Path 2",
+                          "d": "M9 14A3 3 0 1 0 15 14A3 3 0 1 0 9 14Z",
+                          "viewBox": [
+                            0,
+                            0,
+                            24,
+                            24
+                          ],
+                          "width": 28,
+                          "height": 28,
+                          "fills": [
+                            {
+                              "type": "solid",
+                              "color": "#0F172A"
+                            }
+                          ],
+                          "id": "KLoO2MBF"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "text",
+                      "name": "Halcyon",
+                      "content": "Halcyon",
+                      "weight": 700,
+                      "size": 18,
+                      "lineHeight": 24,
+                      "color": "#FFFFFF",
+                      "id": "lflvvDpx"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "name": "Links",
+                  "layout": "row",
+                  "gap": 24,
+                  "id": "BrPSF6g0",
+                  "children": [
+                    {
+                      "type": "text",
+                      "name": "Work",
+                      "tag": "a",
+                      "content": "Work",
+                      "weight": 500,
+                      "size": 14,
+                      "lineHeight": 20,
+                      "color": "#CBD5E1",
+                      "id": "bDQtUvLU"
+                    },
+                    {
+                      "type": "text",
+                      "name": "Studio",
+                      "tag": "a",
+                      "content": "Studio",
+                      "weight": 500,
+                      "size": 14,
+                      "lineHeight": 20,
+                      "color": "#CBD5E1",
+                      "id": "6VuiTXVD"
+                    },
+                    {
+                      "type": "text",
+                      "name": "Journal",
+                      "tag": "a",
+                      "content": "Journal",
+                      "weight": 500,
+                      "size": 14,
+                      "lineHeight": 20,
+                      "color": "#CBD5E1",
+                      "id": "veyC5aWD"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "name": "Cta",
+                  "tag": "a",
+                  "layout": "column",
+                  "padding": [
+                    8,
+                    14
+                  ],
+                  "fills": [
+                    {
+                      "type": "solid",
+                      "color": "#38BDF8"
+                    }
+                  ],
+                  "radius": 999,
+                  "id": "Hr2vX5by",
+                  "children": [
+                    {
+                      "type": "text",
+                      "name": "Get in touch",
+                      "content": "Get in touch",
+                      "weight": 600,
+                      "size": 14,
+                      "lineHeight": 20,
+                      "color": "#0F172A",
+                      "width": "fill",
+                      "id": "YOUKhrB5"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "board",
+          "name": "Pricing sample",
+          "x": 1800,
+          "y": 0,
+          "width": 1024,
+          "height": 380,
+          "screen": "landing",
+          "id": "UwrGw3xt",
+          "children": [
+            {
+              "type": "frame",
+              "name": "Pricing",
+              "position": "absolute",
+              "x": 32,
+              "y": 0,
+              "tag": "section",
+              "layout": "grid",
+              "padding": 32,
+              "gridTemplateColumns": [
+                {
+                  "fr": 1
+                },
+                {
+                  "fr": 1
+                },
+                {
+                  "fr": 1
+                }
+              ],
+              "columnGap": 24,
+              "rowGap": 24,
+              "width": 960,
+              "fills": [
+                {
+                  "type": "solid",
+                  "color": "#F8FAFC"
+                }
+              ],
+              "id": "e8opl1zh",
+              "children": [
+                {
+                  "type": "frame",
+                  "name": "Plan",
+                  "layout": "column",
+                  "gap": 12,
+                  "padding": 25,
+                  "fills": [
+                    {
+                      "type": "solid",
+                      "color": "#FFFFFF"
+                    }
+                  ],
+                  "stroke": {
+                    "color": "#E2E8F0",
+                    "width": 1,
+                    "align": "inside"
+                  },
+                  "radius": 12,
+                  "id": "RpTRf6cQ",
+                  "children": [
+                    {
+                      "type": "text",
+                      "name": "STARTER",
+                      "content": "STARTER",
+                      "weight": 600,
+                      "size": 13,
+                      "lineHeight": 16,
+                      "letterSpacing": 0.08,
+                      "color": "#6366F1",
+                      "width": "fill",
+                      "id": "9ADQhttg"
+                    },
+                    {
+                      "type": "text",
+                      "name": "$12",
+                      "content": "$12",
+                      "weight": 700,
+                      "size": 36,
+                      "lineHeight": 44,
+                      "color": "#0F172A",
+                      "width": "fill",
+                      "id": "ZZrJEPBD"
+                    },
+                    {
+                      "type": "frame",
+                      "name": "List",
+                      "tag": "ul",
+                      "layout": "column",
+                      "gap": 8,
+                      "id": "211SJ4Fp",
+                      "children": [
+                        {
+                          "type": "text",
+                          "name": "3 projects",
+                          "tag": "li",
+                          "content": "3 projects",
+                          "size": 14,
+                          "lineHeight": 20,
+                          "color": "#475569",
+                          "width": "fill",
+                          "id": "qVVyWGLd"
+                        },
+                        {
+                          "type": "text",
+                          "name": "Basic analytics",
+                          "tag": "li",
+                          "content": "Basic analytics",
+                          "size": 14,
+                          "lineHeight": 20,
+                          "color": "#475569",
+                          "width": "fill",
+                          "id": "1Td6PWFi"
+                        },
+                        {
+                          "type": "text",
+                          "name": "Email support",
+                          "tag": "li",
+                          "content": "Email support",
+                          "size": 14,
+                          "lineHeight": 20,
+                          "color": "#475569",
+                          "width": "fill",
+                          "id": "3qybXybd"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "name": "Plan",
+                  "layout": "column",
+                  "gap": 12,
+                  "padding": 25,
+                  "fills": [
+                    {
+                      "type": "linear",
+                      "angle": 180,
+                      "stops": [
+                        {
+                          "offset": 0,
+                          "color": "#EEF2FF"
+                        },
+                        {
+                          "offset": 1,
+                          "color": "#FFFFFF"
+                        }
+                      ]
+                    }
+                  ],
+                  "stroke": {
+                    "color": "#6366F1",
+                    "width": 1,
+                    "align": "inside"
+                  },
+                  "shadows": [
+                    {
+                      "x": 0,
+                      "y": 12,
+                      "blur": 32,
+                      "color": "#4F46E52E"
+                    }
+                  ],
+                  "radius": 12,
+                  "id": "0Z247NIT",
+                  "children": [
+                    {
+                      "type": "text",
+                      "name": "STUDIO",
+                      "content": "STUDIO",
+                      "weight": 600,
+                      "size": 13,
+                      "lineHeight": 16,
+                      "letterSpacing": 0.08,
+                      "color": "#6366F1",
+                      "width": "fill",
+                      "id": "QVJ5isb8"
+                    },
+                    {
+                      "type": "text",
+                      "name": "$48",
+                      "content": "$48",
+                      "weight": 700,
+                      "size": 36,
+                      "lineHeight": 44,
+                      "color": "#0F172A",
+                      "width": "fill",
+                      "id": "L12DvmAs"
+                    },
+                    {
+                      "type": "frame",
+                      "name": "List",
+                      "tag": "ul",
+                      "layout": "column",
+                      "gap": 8,
+                      "id": "7R3DUC85",
+                      "children": [
+                        {
+                          "type": "text",
+                          "name": "Unlimited projects",
+                          "tag": "li",
+                          "content": "Unlimited projects",
+                          "size": 14,
+                          "lineHeight": 20,
+                          "color": "#475569",
+                          "width": "fill",
+                          "id": "Xer7cxEE"
+                        },
+                        {
+                          "type": "text",
+                          "name": "Advanced analytics",
+                          "tag": "li",
+                          "content": "Advanced analytics",
+                          "size": 14,
+                          "lineHeight": 20,
+                          "color": "#475569",
+                          "width": "fill",
+                          "id": "9vlQZKk0"
+                        },
+                        {
+                          "type": "text",
+                          "name": "Priority support",
+                          "tag": "li",
+                          "content": "Priority support",
+                          "size": 14,
+                          "lineHeight": 20,
+                          "color": "#475569",
+                          "width": "fill",
+                          "id": "xquslvQI"
+                        },
+                        {
+                          "type": "text",
+                          "name": "Custom domains",
+                          "tag": "li",
+                          "content": "Custom domains",
+                          "size": 14,
+                          "lineHeight": 20,
+                          "color": "#475569",
+                          "width": "fill",
+                          "id": "8iBwVuF9"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "name": "Plan",
+                  "layout": "column",
+                  "gap": 12,
+                  "padding": 25,
+                  "fills": [
+                    {
+                      "type": "solid",
+                      "color": "#FFFFFF"
+                    }
+                  ],
+                  "stroke": {
+                    "color": "#E2E8F0",
+                    "width": 1,
+                    "align": "inside"
+                  },
+                  "radius": 12,
+                  "id": "sy4arija",
+                  "children": [
+                    {
+                      "type": "text",
+                      "name": "ENTERPRISE",
+                      "content": "ENTERPRISE",
+                      "weight": 600,
+                      "size": 13,
+                      "lineHeight": 16,
+                      "letterSpacing": 0.08,
+                      "color": "#6366F1",
+                      "width": "fill",
+                      "id": "nMWKxPer"
+                    },
+                    {
+                      "type": "text",
+                      "name": "$120",
+                      "content": "$120",
+                      "weight": 700,
+                      "size": 36,
+                      "lineHeight": 44,
+                      "color": "#0F172A",
+                      "width": "fill",
+                      "id": "RnRHkWtK"
+                    },
+                    {
+                      "type": "frame",
+                      "name": "List",
+                      "tag": "ul",
+                      "layout": "column",
+                      "gap": 8,
+                      "id": "rqYBcyXM",
+                      "children": [
+                        {
+                          "type": "text",
+                          "name": "Dedicated manager",
+                          "tag": "li",
+                          "content": "Dedicated manager",
+                          "size": 14,
+                          "lineHeight": 20,
+                          "color": "#475569",
+                          "width": "fill",
+                          "id": "uXhCyP2O"
+                        },
+                        {
+                          "type": "text",
+                          "name": "SSO and audit logs",
+                          "tag": "li",
+                          "content": "SSO and audit logs",
+                          "size": 14,
+                          "lineHeight": 20,
+                          "color": "#475569",
+                          "width": "fill",
+                          "id": "vrRi6GRi"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

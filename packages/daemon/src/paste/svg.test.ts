@@ -2,7 +2,7 @@
 // round trip korpus ikon-vektor (impor → layer identik dengan fixture v6 → `vectorToSvg` memuat ulang atribut sumber).
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { applyOps, transact } from '@lakar/core';
+import { applyOps, parseDocument, transact } from '@lakar/core';
 import { parsePath, serializePath, transformPath, vectorToSvg } from '@lakar/render';
 import { findBoard, resolveDocument, type LakarDocument, type ResolvedFrameNode, type ResolvedPathNode } from '@lakar/schema';
 import { locateNode } from '../inspect.js';
@@ -13,7 +13,8 @@ import { parseXml, type XmlElement } from './xml.js';
 
 const fixture = (p: string) => readFileSync(new URL(`../../../../tests/fixtures/${p}`, import.meta.url), 'utf8');
 const ICONS = { lonceng: 'BrdBel01', cincin: 'BrdCin01', zigzag: 'BrdZig01' } as const;
-const corpus = (): LakarDocument => JSON.parse(fixture('docs/v6/ikon-vektor.lakar.json'));
+// Fixture v6 dibawa ke versi terkini (migrasi identitas) supaya bisa di-commit.
+const corpus = (): LakarDocument => parseDocument(JSON.parse(fixture('docs/v6/ikon-vektor.lakar.json')));
 
 /** Buang id/nama (rekursif) untuk perbandingan struktur. */
 function shape(n: Record<string, unknown>): Record<string, unknown> {

@@ -57,7 +57,7 @@ import { attachSelectionReporter } from './selectionSync';
 import { lastAgentLabel, pruneSelection, shareBadgeText, undoSkippedFor } from './liveChanges';
 import { UndoSkippedToast, type UndoSkipped } from './UndoSkippedToast';
 import { PasteToast, type PasteToastState } from './PasteToast';
-import { canUndoPaste, clipboardSvg, pasteTarget } from './paste';
+import { canUndoPaste, clipboardPaste, pasteTarget } from './paste';
 import { activityHub, editChange, goneReason, harnessLabel, revChange, sessionsForSlug, slugAppeared, type StreamEvent } from './activity';
 import { ActivityPanel } from './ActivityPanel';
 import { BottomSheet } from './BottomSheet';
@@ -886,15 +886,15 @@ export function Viewer({ slug }: { slug: string }) {
     [runEdit],
   );
 
-  // ---- Paste SVG (epic paste-vektor story 3; desain G0vf1/nE6dL) ----
-  // Ctrl+V dengan teks/file SVG → importer daemon (AD-15) lewat route paste: satu commit, invers ke tumpukan undo
-  // jendela ini (AD-8), node baru dipilih, toast r69qO + Paste Report w2am0.
+  // ---- Paste SVG/HTML (epic paste-vektor story 3–4; desain G0vf1/nE6dL, rkIyP/GXHxW) ----
+  // Ctrl+V dengan teks/file SVG atau text/html → importer daemon (AD-15) lewat route paste: satu commit, invers ke
+  // tumpukan undo jendela ini (AD-8), node baru dipilih, toast r69qO (SVG) atau Paste Report w2am0 + Pasted Tag (HTML).
   const [pasteToast, setPasteToast] = useState<PasteToastState | undefined>(undefined);
   const closePasteToast = useCallback(() => setPasteToast(undefined), []);
   /** Entri undo milik paste yang toast-nya tampil ("Undo paste" hanya bila entri ini masih teratas). */
   const pasteEntry = useRef<unknown>(undefined);
-  const pasteSvg = useCallback(
-    (content: string, name?: string) => {
+  const pasteContent = useCallback(
+    (content: string, kind: 'svg' | 'html', name?: string) => {
       const d = docRef.current;
       if (!editableRef.current || !d) return;
       // Satu tulis viewer sekaligus: paste tidak dibuang diam-diam (preventDefault sudah dipanggil).
@@ -908,15 +908,15 @@ export function Viewer({ slug }: { slug: string }) {
         return;
       }
       editing.current++;
-      api.paste(slug, { content, parentId: target.parentId, ...(name ? { name } : {}) }).then(
+      api.paste(slug, { content, parentId: target.parentId, ...(kind === 'html' ? { kind } : {}), ...(name ? { name } : {}) }).then(
         (r) => {
           editing.current--;
-          setStacks(recordCommit(stacks.current, r.inverse, 'Paste SVG', Date.now()));
+          setStacks(recordCommit(stacks.current, r.inverse, kind === 'html' ? 'Paste HTML' : 'Paste SVG', Date.now()));
           pasteEntry.current = stacks.current.undo[stacks.current.undo.length - 1];
           pendingSelect.current = r.nodeId;
           setSelectedId(r.nodeId);
           loadDoc(true);
-          setPasteToast({ key: Date.now(), report: r.report, layer: r.created.find((c) => c.id === r.nodeId)?.name ?? name ?? 'SVG' });
+          setPasteToast({ key: Date.now(), report: r.report, layer: r.created.find((c) => c.id === r.nodeId)?.name ?? name ?? (kind === 'html' ? 'HTML' : 'SVG'), nodeId: r.nodeId });
         },
         (e) => {
           editing.current--;
@@ -931,26 +931,27 @@ export function Viewer({ slug }: { slug: string }) {
     else if (canUndoPaste(stacks.current.undo, pasteEntry.current)) stepHistory('undo');
     else setToast("Couldn't undo this paste: it was already undone or newer edits were made.");
   }, [stepHistory, setToast]);
-  // Event `paste` (Ctrl/⌘+V): file SVG dulu, lalu teks yang diawali <svg/<?xml; bukan saat mengetik atau dialog terbuka.
+  // Event `paste` (Ctrl/⌘+V): file SVG, teks yang diawali <svg/<?xml, lalu text/html; bukan saat mengetik atau dialog terbuka.
   useEffect(() => {
     if (!editable) return;
     const onPaste = (e: ClipboardEvent) => {
       if (typingTarget(e) || document.querySelector('.modal-scrim, .menu-layer')) return;
       const dt = e.clipboardData;
       if (!dt) return;
-      const pick = clipboardSvg({ files: [...dt.files], text: dt.getData('text/plain') });
+      const pick = clipboardPaste({ files: [...dt.files], text: dt.getData('text/plain'), html: dt.getData('text/html') });
       if (!pick) return;
       e.preventDefault();
-      if ('text' in pick) pasteSvg(pick.text);
+      if ('html' in pick) pasteContent(pick.html, 'html');
+      else if ('text' in pick) pasteContent(pick.text, 'svg');
       else
         void pick.file.text().then(
-          (text) => pasteSvg(text, pick.name),
+          (text) => pasteContent(text, 'svg', pick.name),
           () => setToast("Couldn't read the pasted file."),
         );
     };
     window.addEventListener('paste', onPaste);
     return () => window.removeEventListener('paste', onPaste);
-  }, [editable, pasteSvg, setToast]);
+  }, [editable, pasteContent, setToast]);
 
   /** Tujuan sudah diketahui: Image → pemilih file, Icon → pemilih ikon, lainnya langsung disisipkan. */
   const beginInsert = useCallback(
@@ -1590,6 +1591,7 @@ export function Viewer({ slug }: { slug: string }) {
         onSceneChange={onSceneChange}
         onContextMenu={(x, y, ids) => setEditMenu({ x, y, ids })}
         components={latestComponents}
+        pastedTag={pasteToast?.report.kind === 'html' && pasteToast.nodeId ? { id: pasteToast.nodeId, label: pasteToast.layer } : undefined}
         onDropComponent={(id, at) => latestComponents && insertInstance(id, dropTarget(latestComponents, id, sceneRef.current?.() ?? [], at))}
         onOpenChecks={() => openTab('checks')}
         onExportCode={setCodeExport}

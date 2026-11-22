@@ -1,4 +1,4 @@
-// Skema dokumen Lakar v6 (AD-2, AD-11, AD-12, AD-13, AD-14, AD-15, AD-16): primitif, token, properti visual, katalog node, dokumen.
+// Skema dokumen Lakar v7 (AD-2, AD-11, AD-12, AD-13, AD-14, AD-15, AD-16): primitif, token, properti visual, katalog node, dokumen.
 // v2 (story 22) menambah fill `conic`, `noise`, `mesh`; dokumen v1 dimigrasi identitas (`@lakar/core` MIGRATIONS[1]).
 // v3 (epic model-dokumen story 2) mengganti token datar dengan token bertipe + mode tema; dokumen v2 dimigrasi
 // lewat inferensi tipe (`@lakar/core` MIGRATIONS[2]).
@@ -16,7 +16,9 @@ import { NODE_ADDRESS_PATTERN } from './selection.js';
 // v6 (epic paste-vektor story 2, AD-14) menambah atribut presentasi SVG bertipe pada node `path` (`fillRule`,
 // `strokeLinecap`, `strokeLinejoin`, `strokeDasharray`, `strokeMiterlimit`) dan record `svg` terbatas allowlist;
 // dokumen v5 dimigrasi identitas (`@lakar/core` MIGRATIONS[5]).
-export const SCHEMA_VERSION = 6 as const;
+// v7 (epic paste-vektor story 4, AD-1) menambah `tag` semantik opsional (allowlist `HTML_TAGS`) pada frame dan text
+// untuk ekspor kode; render canvas mengabaikannya. Dokumen v6 dimigrasi identitas (`@lakar/core` MIGRATIONS[6]).
+export const SCHEMA_VERSION = 7 as const;
 
 // ---------------------------------------------------------------------------
 // Primitif
@@ -331,6 +333,14 @@ const gridItemShape = {
 
 const childBase = { name: Name, ...positionShape, ...gridItemShape };
 
+/**
+ * Tag semantik HTML untuk ekspor (v7, AD-1): hanya tag yang reset UA-nya ditulis codegen (`tagResetDecls` di render
+ * css.ts). Render canvas tidak memakainya. Diisi importer HTML (story 4) atau agen.
+ */
+export const HTML_TAGS = ['header', 'nav', 'main', 'section', 'article', 'aside', 'footer', 'figure', 'figcaption', 'blockquote', 'ul', 'ol', 'li', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'button', 'a'] as const;
+export type HtmlTag = (typeof HTML_TAGS)[number];
+const tagShape = { tag: z.enum(HTML_TAGS).optional() };
+
 // ---------------------------------------------------------------------------
 // Komponen (v5, AD-12): master = node anak non-instance yang membawa `component`; instance = tipe node `instance`.
 // Ekspansi dan validasi lintas node ada di components.ts.
@@ -442,6 +452,7 @@ const frameShape = {
   type: z.literal('frame'),
   ...childBase,
   ...masterShape,
+  ...tagShape,
   layout: Layout.optional(),
   gap: tok(Px).optional(),
   padding: Padding.optional(),
@@ -463,6 +474,7 @@ const textShape = {
   type: z.literal('text'),
   ...childBase,
   ...masterShape,
+  ...tagShape,
   content: z.string(),
   family: tok(FontFamily).optional(),
   weight: tok(Weight).optional(),
