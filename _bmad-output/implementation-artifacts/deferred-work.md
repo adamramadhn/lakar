@@ -65,6 +65,15 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-app-10-folders.md`
   summary: Alur UI folder (seret ke folder, Move to…, New file di halaman folder) hanya diverifikasi manual; viewer belum punya tes komponen.
   evidence: setelan tes komponen (jsdom/testing-library) belum ada di repo; kontrak klien api.ts sudah dites.
+- source_spec: `_bmad-output/implementation-artifacts/spec-app-11-list-columns.md`
+  summary: Hasil check untuk kolom Checks hanya disimpan di memori daemon (`CheckLedger`), jadi setelah restart semua dokumen tampil "—" sampai agen menjalankan execute/layout_check lagi; file baru dari aplikasi juga "—" karena New file tidak menjalankan check.
+  evidence: Disengaja agar daftar tidak pernah merender/menjalankan check. Opsi: simpan ringkasan per board di `<dataDir>/checks.json` (kunci id dokumen + rev) atau jalankan check board kosong saat New file.
+- source_spec: `_bmad-output/implementation-artifacts/spec-app-11-list-columns.md`
+  summary: Halaman Archive (List view) menampilkan "—" untuk Created/Last agent/Checks karena `GET /viewer/archive` tidak membaca riwayat arsip.
+  evidence: `readHistory` hanya membaca path aktif; tambahkan varian arsip lalu pakai `historyMeta` di `files.ts`.
+- source_spec: `_bmad-output/implementation-artifacts/spec-app-11-list-columns.md`
+  summary: Edit manual tampil sebagai "You" (avatar Y), bukan nama pengguna seperti "Muhammad F." di desain; Edited/Created memakai format `relativeTime` ("1 h ago") yang sama dengan Grid, bukan "1 hour ago".
+  evidence: Aplikasi tidak punya nama pengguna (profil tertulis "Lakar"); mengubah `relativeTime` menyentuh kartu Grid, History, dan Activity (di luar cakupan).
 - source_spec: `_bmad-output/implementation-artifacts/spec-app-12-splash-theme.md`
   summary: Belum terverifikasi di build release bahwa tema native jendela (Light/Dark dari Settings) diteruskan ke `prefers-color-scheme` layar mulai, terutama di Linux (WebKitGTK mengikuti preferensi gelap GTK).
   evidence: maybe-false. Windows dan macOS didukung lewat jalur Tauri yang terdokumentasi (`window.theme()` saat membuat WebView2, NSAppearance). Bila Linux tidak ikut, tambahkan atribut `data-theme` di layar mulai dari nilai tema yang disuntikkan Rust.

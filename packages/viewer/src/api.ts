@@ -44,7 +44,20 @@ export type FileEvent = ({ type: 'rename'; from: string; to: string } | { type: 
 export type Folder = { id: string; name: string; createdAt: string };
 /** `GET /viewer/folders`: folder urut nama + keanggotaan slug → id folder (slug aktif saja). */
 export type FolderState = { folders: Folder[]; membership: Record<string, string> };
-export type DocSummary = { slug: string; rev: number; updatedAt: string; boardCount: number; firstBoardId: string | null };
+/**
+ * Ringkasan `GET /viewer/docs`. Field opsional (aplikasi 11, kolom List view): `createdAt` = entri riwayat pertama,
+ * `lastClient` = klien penulis terakhir, `check` = hasil check terakhir yang mencakup semua board pada rev ini.
+ */
+export type DocSummary = {
+  slug: string;
+  rev: number;
+  updatedAt: string;
+  boardCount: number;
+  firstBoardId: string | null;
+  createdAt?: string;
+  lastClient?: string;
+  check?: { error: number; warning: number };
+};
 /** Status pool render (`/status` → `pool`); `lastError` mis. "Chrome atau Edge tidak ditemukan …" di aplikasi desktop. */
 export type PoolStatus = { size: number; ready: number; browserVersion?: string; lastError?: string };
 export type DaemonStatus = { version: string; host: string; port: number; dataDir: string; pool?: PoolStatus | null };

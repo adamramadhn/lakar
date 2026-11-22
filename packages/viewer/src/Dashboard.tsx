@@ -21,6 +21,7 @@ import { HARNESSES } from './harnesses';
 import { relativeTime } from './format';
 import { useNow, useRetry } from './hooks';
 import { Icon, type IconName } from './icons';
+import { checkView, lastAgentView } from './listColumns';
 import { liveDocs, type LiveDoc } from './live';
 import { NewFileDialog } from './NewFileDialog';
 import { Search } from './Search';
@@ -210,6 +211,51 @@ function FileLink({ d, archived, className, onOpen, onKeyDown }: { d: DocSummary
     <a className={`file-link ${className}`} href={docHash(d.slug)} aria-keyshortcuts={SHORTCUT.file.aria} title={SHORTCUT.file.title} onClick={click} onAuxClick={(e) => e.button === 1 && click(e)} onKeyDown={onKeyDown} draggable={false}>
       {d.slug}
     </a>
+  );
+}
+
+/** Nilai kolom List yang belum diketahui daemon (tanpa riwayat, sesi lama, atau belum dicek sejak perubahan). */
+function Unknown({ title }: { title?: string }) {
+  return (
+    <span className="list-unknown" title={title}>
+      —
+    </span>
+  );
+}
+
+/** Kolom "Last agent" (desain `List Row`): avatar huruf awal + nama harness; edit dari aplikasi = "You". */
+function LastAgent({ client }: { client: string | undefined }) {
+  const v = lastAgentView(client);
+  return (
+    <span className="list-col list-agent">
+      {v ? (
+        <>
+          <span className={`list-avatar ${v.kind}`} aria-hidden="true">
+            {v.initial}
+          </span>
+          <span className="list-agent-name">{v.label}</span>
+        </>
+      ) : (
+        <Unknown />
+      )}
+    </span>
+  );
+}
+
+/** Kolom "Checks": hasil check terakhir yang mencakup semua board pada rev terkini. */
+function CheckStatus({ check }: { check: DocSummary['check'] }) {
+  const v = checkView(check);
+  return (
+    <span className="list-col list-check">
+      {v ? (
+        <>
+          <span className={`check-dot ${v.tone}`} aria-hidden="true" />
+          {v.text}
+        </>
+      ) : (
+        <Unknown title="Not checked since the last change" />
+      )}
+    </span>
   );
 }
 
@@ -633,8 +679,9 @@ export function Dashboard({
         <div className="list-head" aria-hidden="true">
           <span>Name</span>
           <span>Edited</span>
-          <span>Boards</span>
-          <span>Revision</span>
+          <span>Created</span>
+          <span>Last agent</span>
+          <span>Checks</span>
           <span />
         </div>
         <div role="list" aria-label={currentFolder ? currentFolder.name : TITLES[page as keyof typeof TITLES]}>
@@ -654,8 +701,9 @@ export function Dashboard({
                   </span>
                 </span>
                 <span className="list-col">{relativeTime(d.updatedAt)}</span>
-                <span className="list-col">{d.boardCount}</span>
-                <span className="list-col mono">r{d.rev}</span>
+                <span className="list-col">{d.createdAt ? relativeTime(d.createdAt) : <Unknown />}</span>
+                <LastAgent client={d.lastClient} />
+                <CheckStatus check={d.check} />
                 <MoreButton onClick={h.menuBelow} />
               </div>
             );

@@ -155,6 +155,19 @@ describe('ViewerClient', () => {
   });
 });
 
+describe('kolom List view (aplikasi 11)', () => {
+  it('listDocs meneruskan field opsional createdAt/lastClient/check; ringkasan lama tanpa field tetap utuh', async () => {
+    const rich = { slug: 'a', rev: 3, updatedAt: '2026-01-02T00:00:00.000Z', boardCount: 2, firstBoardId: 'Bbbbbbb1', createdAt: '2026-01-01T00:00:00.000Z', lastClient: 'codex-cli', check: { error: 1, warning: 0 } };
+    const plain = { slug: 'b', rev: 1, updatedAt: '2026-01-01T00:00:00.000Z', boardCount: 0, firstBoardId: null };
+    const calls = fakeFetch(() => ok({ docs: [rich, plain] }));
+    const api = await freshApi();
+    const list = await api.listDocs();
+    expect(calls.map((c) => `${c.method} ${c.path}`)).toEqual(['GET /viewer/docs']);
+    expect(list).toEqual([rich, plain]);
+    expect(list[1]).not.toHaveProperty('check');
+  });
+});
+
 describe('kelola file', () => {
   it('rute + metode tulis; sukses → cache screenshot slug terkait dibuang dan pendengar dipanggil', async () => {
     let deleted = false;
