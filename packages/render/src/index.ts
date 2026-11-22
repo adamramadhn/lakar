@@ -2,7 +2,7 @@
 // Render murni: dokumen (sudah di-resolve) → DOM (AD-5, AD-6).
 // HANYA `import type` dari luar paket dan impor relatif `./x.js`: dist/*.js dimuat apa adanya sebagai
 // module di halaman Chromium (dan nanti browser B), tanpa bundler, tanpa API Node.
-// Dokumen yang diterima sudah di-resolve token-nya oleh daemon (`resolveTokens`), jadi tipe `Resolved*`.
+// Dokumen yang diterima sudah di-resolve token-nya oleh daemon lewat pipa `resolveDocument` (AD-10), jadi tipe `Resolved*`.
 import type { IconGlyph, ResolvedBoardNode as BoardNode, ResolvedDocument as LakarDocument } from '@lakar/schema';
 import { codePointLabel, fontKey, fontRequests, loadFaces, missingFaces, uncoveredGlyphs, type FontFaceSource, type FontRequest } from './fonts.js';
 import { assetIds, decodeAssets, decodeDataUrls, inlineDataUrls } from './assets.js';

@@ -9,6 +9,7 @@ export * from './findings.js';
 export * from './glyphs.js';
 export * from './icons.js';
 export * from './nodes.js';
+export * from './resolve.js';
 export * from './tokens.js';
 export * from './version.js';
 

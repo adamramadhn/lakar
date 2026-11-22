@@ -15,7 +15,7 @@ const dist = (p) => import(pathToFileURL(join(root, p)).href);
 const { decodePng } = await dist('packages/daemon/dist/png.js');
 const { FontRegistry, DAEMON_BROWSER_ARGS } = await dist('packages/daemon/dist/index.js');
 const { CHROMIUM_ARGS, NODE_ATTR, fontRequests } = await dist('packages/render/dist/index.js');
-const { resolveTokens, findBoard } = await dist('packages/schema/dist/index.js');
+const { resolveDocument, findBoard } = await dist('packages/schema/dist/index.js');
 
 const BASE = (process.env.LAKAR_URL || 'http://127.0.0.1:7466').replace(/\/+$/, '');
 // Default: 'kamar hotel' untuk Pexels (locale id-ID); Wikimedia Commons/Openverse praktis hanya berbahasa Inggris → 'hotel room'.
@@ -82,7 +82,7 @@ const shot = await post('/screenshot', { boardId }, sid);
 const daemonPng = Buffer.from(shot.png, 'base64');
 
 // 3. Render ulang di Playwright terpisah, semua host selain 127.0.0.1 dibatalkan.
-const doc = resolveTokens(JSON.parse(readFileSync(join(status.dataDir, 'docs', `${SLUG}.lakar.json`), 'utf8')));
+const doc = resolveDocument(JSON.parse(readFileSync(join(status.dataDir, 'docs', `${SLUG}.lakar.json`), 'utf8')));
 const board = findBoard(doc, boardId);
 const fonts = FontRegistry.load().resolveFaces(fontRequests(board));
 process.env.PLAYWRIGHT_BROWSERS_PATH = process.env.LAKAR_BROWSERS_PATH || join(homedir(), '.cache', 'lakar', 'ms-playwright');

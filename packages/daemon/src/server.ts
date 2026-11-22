@@ -18,7 +18,7 @@ import {
   errorMessage,
   VERSION_HINT,
   findBoard,
-  resolveTokens,
+  resolveDocument,
   summarizeFindings,
   type ApiErrorBody,
   type ErrorCode,
@@ -446,8 +446,8 @@ export function buildServer({
         // AD-8: render board tersentuh pada salinan kerja + check sekali, LALU commit. Temuan tidak
         // menolak commit; error render (dokumen tidak bisa dirender) → rollback (belum ditulis).
         const t0 = performance.now();
-        const before = resolveTokens(doc);
-        const after = resolveTokens(committed.doc);
+        const before = resolveDocument(doc);
+        const after = resolveDocument(committed.doc);
         const touched = touchedBoards(before, after);
         let ran;
         try {
@@ -503,7 +503,7 @@ export function buildServer({
       throw new LakarError('SCHEMA_INVALID', 'kirim boardId ATAU nodeId, bukan keduanya', { hint: SCREENSHOT_HINT });
     }
     // AD-6/AD-16: render hanya menerima dokumen ter-resolve; token diselesaikan di daemon.
-    const doc = resolveTokens(docs.get(slug)!);
+    const doc = resolveDocument(docs.get(slug)!);
     if (body?.nodeId !== undefined) {
       const hit = locateNode(doc, body.nodeId);
       if (!hit) throw nodeNotFound(body.nodeId, slug);
@@ -530,7 +530,7 @@ export function buildServer({
     const { slug } = activeDoc(req.headers[SESSION_HEADER]);
     parse(BoardsBody, req.body ?? undefined, 'kirim {} (tanpa argumen)');
     const stored = docs.get(slug)!;
-    const resolved = resolveTokens(stored);
+    const resolved = resolveDocument(stored);
     const boards = resolved.pages.flatMap((p) =>
       p.children.map((b) => ({
         id: b.id,
@@ -554,7 +554,7 @@ export function buildServer({
     const { slug } = activeDoc(req.headers[SESSION_HEADER]);
     const body = parse(InspectBody, req.body, `kirim {id, depth?} (depth 0–${INSPECT_DEPTH_MAX}, default ${INSPECT_DEPTH_DEFAULT})`);
     const stored = docs.get(slug)!;
-    const resolved = resolveTokens(stored);
+    const resolved = resolveDocument(stored);
     const hit = locateNode(stored, body.id);
     const rBoard = hit ? findBoard(resolved, hit.board.id) : undefined;
     if (!hit || !rBoard) throw nodeNotFound(body.id, slug);
@@ -570,7 +570,7 @@ export function buildServer({
     const { slug } = activeDoc(req.headers[SESSION_HEADER]);
     const body = parse(ExportBody, req.body ?? undefined, 'kirim {id?, scale?}: id board/node (default board pertama), scale 1 atau 2 (default 1)');
     const stored = docs.get(slug)!;
-    const doc = resolveTokens(stored);
+    const doc = resolveDocument(stored);
     const id = body?.id ?? firstBoardId(doc);
     if (!id) throw notFound(`dokumen ${slug} belum punya board`, 'buat board dulu lewat execute');
     const hit = locateNode(doc, id);
@@ -618,7 +618,7 @@ export function buildServer({
     const { slug } = activeDoc(req.headers[SESSION_HEADER]);
     const body = parse(LayoutCheckBody, req.body ?? undefined, 'kirim {boardId?} (tanpa boardId = semua board dokumen aktif)');
     const stored = docs.get(slug)!;
-    const doc = resolveTokens(stored);
+    const doc = resolveDocument(stored);
     let boardIds: string[];
     if (body?.boardId !== undefined) {
       if (!findBoard(doc, body.boardId)) {

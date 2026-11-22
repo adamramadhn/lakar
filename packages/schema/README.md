@@ -4,7 +4,7 @@ Satu sumber kebenaran untuk bentuk data Lakar: skema dokumen v3 (zod, tipe TS di
 token, kontrak error, temuan check, dan konstanta yang dipakai lebih dari satu paket. Tanpa IO.
 
 - **AD terkait:** AD-2 (skema + JSON Schema hasil zod), AD-11 (bentuk `{ok, data|error}`, enum `ErrorCode`),
-  AD-15/AD-16 (token, `resolveTokens`), AD-17 (`SESSION_HEADER`), AD-9 (tipe ikon, batas pencarian).
+  AD-15/AD-16 (token, `resolveTokens`), AD-10 spine model-dokumen (`resolveDocument`), AD-17 (`SESSION_HEADER`), AD-9 (tipe ikon, batas pencarian).
 - **Arah dependensi:** tidak bergantung pada paket `@lakar/*` lain; semua paket lain boleh memakainya.
 
 ## Ekspor utama
@@ -12,7 +12,9 @@ token, kontrak error, temuan check, dan konstanta yang dipakai lebih dari satu p
 - Dokumen: `LakarDocument`, `NodeInput`, `BoardNode`, `SCHEMA_VERSION`, `ID_PATTERN`, `SLUG_PATTERN`,
   `ASSET_ID_PATTERN`, `findBoard`, `zodToLakarError`, `jsonSchemas()`.
 - Error: `ErrorCode`, `LakarError`, `ApiResult`, `errorMessage`.
-- Token: `resolveTokens`, tipe `Resolved*`.
+- Resolusi (AD-10): `resolveDocument` adalah satu-satunya pintu dokumen tersimpan → ter-resolve; render, check, daemon,
+  dan core wajib memakainya (dijaga `tests/resolve-document.test.ts`).
+- Token: `resolveTokens` (tahap resolusi token, tetap diekspor untuk codegen), tipe `Resolved*`.
 - Temuan: `Finding`, `summarizeFindings`, `findingLine`, `G0_RULES`.
 - Glyph/emoji (LC-01a/LC-01b): `isEmojiGrapheme`, `graphemes`, `codePoints`, `cpLabel`, `LC01B_GLYPHS`.
 - Versi dan koneksi: `LAKAR_VERSION`, `VERSION_HINT`, `SESSION_HEADER`, `DEFAULT_LAKARD_PORT`, `DEFAULT_LAKARD_URL`.

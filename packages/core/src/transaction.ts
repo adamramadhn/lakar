@@ -11,7 +11,7 @@ import {
   TokenValue,
   XY_HINT,
   isTokenValueOf,
-  resolveTokens,
+  resolveDocument,
   zodToLakarError,
   type AnyNode,
   type BoardNode,
@@ -423,7 +423,7 @@ export function beginTransaction(doc: Doc, opts: TransactionOptions): Transactio
       }
       // AD-16: ref token tak dikenal → TOKEN_UNKNOWN, token salah tipe → SCHEMA_INVALID, keduanya saat
       // commit. Transaksi sudah tertutup; dokumen asli tidak tersentuh (salinan kerja dibuang).
-      resolveTokens(w);
+      resolveDocument(w);
       w.rev = doc.rev + 1;
       const opsSummary = [...ops].map(([kind, n]) => `${kind}×${n}`).join(', ');
       const entry: HistoryEntry = { rev: w.rev, sessionId: opts.sessionId, description, opsSummary, at: now().toISOString() };

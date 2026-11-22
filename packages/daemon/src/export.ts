@@ -6,7 +6,7 @@
 import type { FastifyInstance } from 'fastify';
 import type { IconCatalogPort, RenderPort } from '@lakar/ports';
 import { iconRefs } from '@lakar/render';
-import { LakarError, SLUG_PATTERN, findBoard, resolveTokens, type IconGlyph, type LakarDocument, type ResolvedDocument } from '@lakar/schema';
+import { LakarError, SLUG_PATTERN, findBoard, resolveDocument, type IconGlyph, type LakarDocument, type ResolvedDocument } from '@lakar/schema';
 import { z } from 'zod';
 import { notFound } from './errors.js';
 import { parseRevParam, readRevision, slugify } from './files.js';
@@ -43,7 +43,7 @@ export function registerExportRoutes(app: FastifyInstance, { docs, store, render
     const { boardId, scale } = r.data;
     const stored = docs.get(slug) ?? (await peekDocument(store, slug));
     if (!stored) throw notFound(`dokumen ${slug} tidak ada`, 'pakai slug dari GET /viewer/docs');
-    const doc = resolveTokens(stored);
+    const doc = resolveDocument(stored);
     const board = findBoard(doc, boardId);
     if (!board) throw notFound(`board ${boardId} tidak ada di dokumen ${slug}`, 'pilih board lain');
     // AD-9: ikon yang tidak dikenal katalog → ICON_UNKNOWN sebelum render.
@@ -67,7 +67,7 @@ export function registerExportRoutes(app: FastifyInstance, { docs, store, render
     if (!r.success) {
       throw new LakarError('SCHEMA_INVALID', r.error.issues.map((i) => `${i.path.join('.') || 'body'}: ${i.message}`).join('; '), { hint: 'kirim {boardId} dari dokumen versi itu' });
     }
-    const doc = resolveTokens(await readRevision(docs, store, slug, rev));
+    const doc = resolveDocument(await readRevision(docs, store, slug, rev));
     const board = findBoard(doc, r.data.boardId);
     if (!board) throw notFound(`board ${r.data.boardId} tidak ada di dokumen ${slug} r${rev}`, 'pilih board dari versi itu');
     for (const ref of iconRefs(board)) icons.canonical(ref.lib, ref.icon);

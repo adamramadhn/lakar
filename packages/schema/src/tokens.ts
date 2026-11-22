@@ -1,4 +1,5 @@
-// Resolusi token (AD-11, AD-16): satu fungsi murni dipakai daemon (sebelum render), core (saat commit), dan check.
+// Resolusi token (AD-11, AD-16): tahap token di pipa `resolveDocument` (resolve.ts, AD-10); konsumen di luar schema
+// memanggil `resolveDocument`, bukan fungsi ini (kecuali codegen nanti, yang memakai tahap ini terpisah).
 // Di sini juga tabel jenis-slot ↔ tipe-token (AD-11), satu-satunya sumber untuk validasi tipe dan inferensi tipe.
 import { z } from 'zod';
 import { LakarError } from './errors.js';
