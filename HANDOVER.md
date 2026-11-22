@@ -12,7 +12,7 @@ Semua PR ada di repo GitHub `fatmuh/lakar` (dulu `adamramadhn/lakar`; alamat lam
 | `claude/app-design-parity` | Semua fitur edit di aplikasi + audit desain (lihat di bawah) | #6 → `claude/desktop-tauri-f5e05a` | Draft, CI hijau |
 | (sudah di-merge ke `claude/app-design-parity`) | #7 presence agen, #8 search + Settings General, #9 tab title bar + window chrome, #10 Pages, #11 tablet/mobile, #12 folder, #13 tema layar mulai desktop, #14 kolom List Dashboard | — | Merged |
 | `g1` | Pekerjaan G1 dari VPS (2026-11-19): aturan `layout_check` sisa, skill per domain, rubrik v2.3, golden A–E di Lakar | #15 → `main` | Terbuka; merge tanpa konflik dengan #6 |
-| `docs/new-initiative` | Inisiatif baru `initiative-lakar-paper`, inisiatif lama ditutup | — | Lokal |
+| `docs/new-initiative` | Inisiatif baru `initiative-lakar-paper`, inisiatif lama ditutup | #16 → `claude/app-design-parity` | Terbuka |
 
 **Urutan ke `main`:**
 1. Approve dan merge #5.
