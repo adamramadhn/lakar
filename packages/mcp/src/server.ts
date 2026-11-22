@@ -129,9 +129,9 @@ export const STATUS_DESCRIPTION =
 /** Deskripsi tool `read_skill`. */
 export const READ_SKILL_DESCRIPTION =
   'Baca panduan skill Lakar (Markdown). Baca core (alur kerja, prelude helper, token, konvensi) + polish (spacing, komponen, tipografi, kontras) ' +
-  '+ skill jenis layar (landing, mobile, atau webapp; aplikasi desktop/dashboard → webapp; berisi contoh teruji) di giliran yang sama (panggilan paralel); icons bila ragu nama ikon; api hanya untuk referensi lengkap. ' +
+  '+ skill jenis layar (landing, mobile, atau webapp; aplikasi desktop/dashboard → webapp; berisi contoh teruji) di giliran yang sama (panggilan paralel); icons bila ragu nama ikon; api hanya untuk referensi lengkap; selection bila permintaan merujuk node yang dipilih pengguna di viewer (varian responsif, cek konsistensi). ' +
   'Tanpa name → daftar {skills:[{name, available}]}; dengan name → isi skill. ' +
-  'Nama: core, polish, landing, mobile, webapp, icons, api. Nama lain atau skill yang belum tersedia → NOT_FOUND dengan daftar yang tersedia.';
+  'Nama: core, polish, landing, mobile, webapp, icons, api, selection. Nama lain atau skill yang belum tersedia → NOT_FOUND dengan daftar yang tersedia.';
 
 /** Instruksi server MCP (dikirim saat initialize): urutan kerja singkat. */
 export const SERVER_INSTRUCTIONS =
@@ -251,7 +251,7 @@ export const GET_SELECTION_DESCRIPTION =
   'addresses = urutan pilihan pengguna (ID atau alamat komposit id/id); bounds [x,y,w,h] hasil render, dibulatkan, relatif board (board = [0,0,w,h]); ' +
   'missing = alamat yang tidak ada lagi di dokumen; unmeasured = board yang gagal dirender (node tetap tercantum tanpa bounds). ' +
   'addresses kosong = pengguna belum memilih apa pun. Pakai id untuk inspect, execute (get/update), atau open_doc {slug} dulu bila slug bukan dokumen aktif. ' +
-  'Tanpa dokumen aktif dan tanpa seleksi → NO_ACTIVE_DOC.';
+  'Tanpa dokumen aktif dan tanpa seleksi → NO_ACTIVE_DOC. Alur varian responsif dan cek konsistensi atas seleksi: read_skill selection.';
 
 export function createLakarMcpServer(daemonUrl: string): McpServer {
   const client = new DaemonClient(daemonUrl);
@@ -268,7 +268,7 @@ export function createLakarMcpServer(daemonUrl: string): McpServer {
     'read_skill',
     {
       description: READ_SKILL_DESCRIPTION,
-      inputSchema: z.object({ name: z.string().optional().describe('core | landing | mobile | icons | api; kosongkan untuk daftar') }),
+      inputSchema: z.object({ name: z.string().optional().describe('core | polish | landing | mobile | webapp | icons | api | selection; kosongkan untuk daftar') }),
     },
     ({ name }) =>
       guarded(async () => {

@@ -12,8 +12,8 @@ import { testLog } from './support/log.ts';
 const read = (name: string) => readFileSync(join(SKILLS_DIR, `${name}.md`), 'utf8');
 const REGEN = 'regenerasi: /opt/node-26/bin/pnpm build && /opt/node-26/bin/node scripts/gen-skill-api.mjs';
 
-/** Batas token (DESIGN.md §Turunan): core total; polish/landing/mobile/webapp prosa + total. */
-const LIMITS = { core: { total: 4000 }, polish: { prose: 3000, total: 3200 }, landing: { prose: 1500, total: 3500 }, mobile: { prose: 1500, total: 3500 }, webapp: { prose: 1500, total: 3500 } } as const;
+/** Batas token (DESIGN.md §Turunan): core total; polish/landing/mobile/webapp prosa + total; selection: spec-agen-4-variant-flow. */
+const LIMITS = { core: { total: 4000 }, polish: { prose: 3000, total: 3200 }, landing: { prose: 1500, total: 3500 }, mobile: { prose: 1500, total: 3500 }, webapp: { prose: 1500, total: 3500 }, selection: { prose: 1200, total: 2600 } } as const;
 
 describe('skill: batas token (estimateTokens = karakter / 3.2)', () => {
   it.each(Object.entries(LIMITS))('%s', (name, lim) => {

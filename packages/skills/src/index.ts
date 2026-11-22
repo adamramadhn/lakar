@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 export const PACKAGE = '@lakar/skills';
 
 /** Nama skill yang dikenal (tertutup). */
-export const SKILL_NAMES = ['core', 'polish', 'landing', 'mobile', 'webapp', 'icons', 'api'] as const;
+export const SKILL_NAMES = ['core', 'polish', 'landing', 'mobile', 'webapp', 'icons', 'api', 'selection'] as const;
 export type SkillName = (typeof SKILL_NAMES)[number];
 
 /** Direktori file skill: `packages/skills/skills/` (sama dari `src/` maupun `dist/`). */

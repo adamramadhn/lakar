@@ -128,3 +128,6 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-agen-3-live-changes.md`
   summary: Pratinjau tertahan sesudah commit yang tidak mengubah isi board (tanpa mount ulang) bertahan sampai mount berikutnya.
   evidence: Pra-ada sejak editor story 4; gaya sementara bernilai sama dengan hasil commit. Usul: lepas juga saat dokumen ber-rev ≥ commit termuat dan tanda tangan board tidak berubah.
+- source_spec: `_bmad-output/implementation-artifacts/spec-agen-4-variant-flow.md`
+  summary: Cek konsistensi `literal` di skill `selection` hanya membandingkan dengan node sejawat bertoken, bukan dengan nilai token dokumen.
+  evidence: Sandbox execute belum bisa membaca nilai token (API baca token = epic token-tema story 2), jadi literal yang nilainya sama dengan token tanpa sejawat bertoken tidak terlapor. Usul: sesudah API baca token ada, bandingkan nilai literal dengan nilai token (mode aktif) di contoh skill dan tes selection-flow.

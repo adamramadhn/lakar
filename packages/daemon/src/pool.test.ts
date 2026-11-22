@@ -450,6 +450,7 @@ describe.skipIf(!browserInstalled)('pool render (AD-18) + endpoint story 12, Chr
       { name: 'webapp', available: false },
       { name: 'icons', available: false },
       { name: 'api', available: false },
+      { name: 'selection', available: false },
     ]);
     expect((await c.call('/skills/read', { name: 'core' }, s)).body.data).toEqual({ name: 'core', content: '# Lakar core\nisi uji' });
     for (const name of ['landing', 'x']) {

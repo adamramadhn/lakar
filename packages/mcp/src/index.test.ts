@@ -14,7 +14,7 @@ import { chromiumInstalled, DEFAULT_BROWSERS_PATH } from '../../../tests/support
 import { testLog } from '../../../tests/support/log.ts';
 
 /** Skill v1 (packages/skills; mcp tidak bergantung pada paket itu, hanya membaca file untuk perbandingan). */
-const SKILL_NAMES = ['core', 'polish', 'landing', 'mobile', 'webapp', 'icons', 'api'] as const;
+const SKILL_NAMES = ['core', 'polish', 'landing', 'mobile', 'webapp', 'icons', 'api', 'selection'] as const;
 const readSkill = (name: string) => readFile(fileURLToPath(new URL(`../../skills/skills/${name}.md`, import.meta.url)), 'utf8');
 
 const PNG_B64 = Buffer.from('fake-png').toString('base64');
@@ -192,6 +192,8 @@ describe('@lakar/mcp', () => {
     expect(gone.isError).toBe(true);
     expect((gone.content as any[])[0].text).toContain('NOT_FOUND: dokumen hilang tidak ada');
     expect(GET_SELECTION_DESCRIPTION).toContain('NO_ACTIVE_DOC');
+    expect(GET_SELECTION_DESCRIPTION).toContain('read_skill selection');
+    expect(READ_SKILL_DESCRIPTION).toMatch(/selection bila permintaan merujuk node yang dipilih pengguna/);
   });
 
   it('photo_search → teks JSON (tanpa data thumbnail) + maks 6 image content; argumen diteruskan; error terformat', async () => {
@@ -227,7 +229,7 @@ describe('@lakar/mcp', () => {
     expect(ins).toContain('sedikit execute besar');
     expect(READ_SKILL_DESCRIPTION).toMatch(/core .*\+ polish .*\+ skill jenis layar \(landing, mobile, atau webapp.*giliran yang sama/);
     expect(READ_SKILL_DESCRIPTION).toMatch(/aplikasi desktop\/dashboard → webapp/);
-    expect(READ_SKILL_DESCRIPTION).toContain('Nama: core, polish, landing, mobile, webapp, icons, api.');
+    expect(READ_SKILL_DESCRIPTION).toContain('Nama: core, polish, landing, mobile, webapp, icons, api, selection.');
   });
 
   it('sesi dibuat dengan versi mcp: POST /sessions {client, version, schemaVersion}', async () => {
@@ -634,7 +636,7 @@ describe.skipIf(!browserInstalled)('layout_check dengan respons lakard asli', ()
     testLog(`[mcp] layout_check:\n${text}`);
   }, 60_000);
 
-  it('read_skill terhadap lakard asli: ketujuh skill tersedia, isi sama dengan file skill', async () => {
+  it('read_skill terhadap lakard asli: kedelapan skill tersedia, isi sama dengan file skill', async () => {
     const c = await connect(proxyUrl);
     const list = await c.callTool({ name: 'read_skill', arguments: {} });
     expect(list.isError).toBeFalsy();
@@ -649,6 +651,7 @@ describe.skipIf(!browserInstalled)('layout_check dengan respons lakard asli', ()
     const none = await c.callTool({ name: 'read_skill', arguments: { name: 'dashboard' } });
     expect(none.isError).toBe(true);
     expect((none.content as any)[0].text).toContain('NOT_FOUND');
+    expect((none.content as any)[0].text).toContain('selection');
   }, 60_000);
 
   it('status terhadap lakard asli: versi cocok, pool 2 halaman', async () => {

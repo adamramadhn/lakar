@@ -102,7 +102,7 @@ Font terpasang (weight): Inter 100–900, DM Sans 100–900, Plus Jakarta Sans 2
 - Flex di mana-mana; absolut hanya `Overlay / …`. Satu wrapper konten per board, tanpa spacer kosong.
 - Revisi: ubah hanya yang diminta (`update`).
 - Prefiks: `Seksi /`, `Overlay /` (sengaja menumpuk), `Crop /` (sengaja memotong), `Scroll /` (area gulir), `Ekstra /`, `Image /`, `Button /`, `IconButton /`, `Input /`, `Tab /`, `Link /`, `Badge /`, `KPI / Nilai`, `Display /`.
-- Layar app desktop/dashboard: `webapp`.
+- Layar app desktop/dashboard: `webapp`. Kerja dari seleksi pengguna (varian, cek konsistensi): `selection`.
 - Teks rata kiri (tengah hanya hero/header seksi landing); tanpa potongan/luberan: detail di `polish`.
 
 ## Komponen
