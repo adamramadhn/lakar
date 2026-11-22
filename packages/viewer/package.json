@@ -12,6 +12,7 @@
     "test": "vitest run --root ../.. packages/viewer/"
   },
   "dependencies": {
+    "@lakar/codegen": "workspace:*",
     "@lakar/render": "workspace:*",
     "@lakar/schema": "workspace:*",
     "react": "19.3.1",

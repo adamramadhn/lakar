@@ -381,3 +381,35 @@ describe('generateCode dengan komponen', () => {
     expect(generateCode(d, { nodeId: BOARD, target: 'react-css', components: false }).files.map((f) => f.path)).toEqual(['Page.tsx', 'Page.module.css', 'tokens.css']);
   });
 });
+
+describe('opsi dialog ekspor (story 5): tokens dan typescript', () => {
+  const d = () => doc([button(), inst('Inst0001')]);
+  it('default identik dengan tokens:true, typescript:true', () => {
+    for (const target of ['react-css', 'react-tailwind'] as const) {
+      expect(generateCode(d(), { nodeId: BOARD, target, tokens: true, typescript: true })).toEqual(generateCode(d(), { nodeId: BOARD, target }));
+    }
+  });
+  it('tokens:false membuang tokens.css; Tailwind tetap theme.css', () => {
+    expect(generateCode(d(), { nodeId: BOARD, target: 'react-css', tokens: false }).files.map((f) => f.path)).toEqual(['Page.tsx', 'Page.module.css', 'components/Button.tsx', 'components/Button.module.css']);
+    expect(generateCode(d(), { nodeId: BOARD, target: 'react-tailwind', tokens: false }).files.map((f) => f.path)).toEqual(['Page.tsx', 'components/Button.tsx', 'theme.css']);
+    expect(generateCode(d(), { nodeId: BOARD, target: 'react-tailwind', tokens: false, components: false }).files.map((f) => f.path)).toEqual(['Page.tsx', 'theme.css']);
+  });
+  it('typescript:false → .jsx tanpa anotasi tipe; selain itu sama dengan TSX', () => {
+    for (const components of [true, false]) {
+      const ts = generateCode(d(), { nodeId: BOARD, target: 'react-tailwind', components });
+      const js = generateCode(d(), { nodeId: BOARD, target: 'react-tailwind', components, typescript: false });
+      expect(js.files.map((f) => f.path)).toEqual(ts.files.map((f) => f.path.replace(/\.tsx$/, '.jsx')));
+      expect(js.warnings).toEqual(ts.warnings);
+      js.files.forEach((f, i) => {
+        const strip = ts.files[i]!.contents
+          .replace(/^import type \{[^}]*\} from 'react';\n/m, '')
+          .replace(/^export type \w+Props = \{\n(?:.*\n)*?\};\n\n/m, '')
+          .replace(/\}: \w+Props\) \{/, '}) {');
+        expect(f.contents).toBe(strip);
+        expect(f.contents).not.toMatch(/import type|Props = \{|: \w+Props\)/);
+      });
+    }
+    const btn = generateCode(d(), { nodeId: BOARD, target: 'react-tailwind', typescript: false }).files.find((f) => f.path === 'components/Button.jsx')!.contents;
+    expect(btn).toContain('export function Button({ label = "Click", className, style }) {');
+  });
+});

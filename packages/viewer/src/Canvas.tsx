@@ -323,6 +323,7 @@ export function Canvas({
   checksLoading,
   onSelect,
   onOpenChecks,
+  onExportCode,
   preview,
   editable = false,
   onInsert,
@@ -403,6 +404,8 @@ export function Canvas({
   checksLoading: boolean;
   onSelect: (id: string | undefined) => void;
   onOpenChecks: () => void;
+  /** Dialog Export code untuk board (popover Export, epic kode story 5). */
+  onExportCode?: ((boardId: string) => void) | undefined;
   /** Pratinjau versi lama (History); `undefined` = versi terkini. */
   preview?: CanvasPreview | undefined;
   /** Tool sisip aktif (bukan pratinjau, daemon online). */
@@ -901,7 +904,7 @@ export function Canvas({
       {!preview && (
         <div className="canvas-actions">
           {actions}
-          <ExportButton slug={slug} boards={boards} selectedBoardId={highlight?.boardId} />
+          <ExportButton slug={slug} boards={boards} selectedBoardId={highlight?.boardId} onExportCode={onExportCode} />
         </div>
       )}
 

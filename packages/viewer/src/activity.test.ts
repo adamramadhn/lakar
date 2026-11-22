@@ -170,6 +170,8 @@ describe('label', () => {
     expect(callTitle({ ...base, tool: 'layout_check' })).toBe('Check all boards');
     expect(callTitle({ ...base, tool: 'read_skill', target: 'webapp' })).toBe('Load webapp skill');
     expect(callTitle({ ...base, tool: 'get_selection' })).toBe('Read selection');
+    expect(callTitle({ ...base, tool: 'export_code', target: 'N1' }, (id) => (id === 'N1' ? 'Headline' : undefined))).toBe('Export code for Headline');
+    expect(callTitle({ ...base, tool: 'export_code' })).toBe('Export code for first board');
     expect(callMeta({ ...base, tool: 'execute', durationMs: 800, nodes: 3 }, T0)).toBe('0.8s · 3 nodes');
   });
 });

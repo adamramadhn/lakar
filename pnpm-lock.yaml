@@ -272,6 +272,9 @@ importers:
       '@lakar/check':
         specifier: workspace:*
         version: link:../check
+      '@lakar/codegen':
+        specifier: workspace:*
+        version: link:../codegen
       '@lakar/core':
         specifier: workspace:*
         version: link:../core
@@ -382,6 +385,9 @@ importers:
 
   packages/viewer:
     dependencies:
+      '@lakar/codegen':
+        specifier: workspace:*
+        version: link:../codegen
       '@lakar/render':
         specifier: workspace:*
         version: link:../render

@@ -32,6 +32,10 @@ export type CodegenOptions = {
   assetBase?: string | undefined;
   /** Master sebagai berkas komponen terpisah dan instance sebagai pemakaiannya (default true); false = semua di-inline. */
   components?: boolean | undefined;
+  /** Sertakan `tokens.css` (default true); false = tanpa berkas token (`theme.css` Tailwind tetap). */
+  tokens?: boolean | undefined;
+  /** TypeScript (default true): `.tsx` dengan props bertipe; false = JavaScript `.jsx` tanpa anotasi tipe. */
+  typescript?: boolean | undefined;
 };
 
 export type CodegenFile = { path: string; contents: string };
@@ -101,18 +105,19 @@ export function generateCode(doc: LakarDocument, opts: CodegenOptions): CodegenR
   if (opts.components === false) return generateInline(doc, opts);
   const m = exportModel(doc, opts);
   const css = opts.target === 'react-css';
+  const ts = opts.typescript !== false;
+  const ext = ts ? '.tsx' : '.jsx';
   const files: CodegenFile[] = [];
   const add = (dir: string, base: string, w: { tsx: string; css?: string | undefined }) => {
-    files.push({ path: `${dir}${base}.tsx`, contents: w.tsx });
+    files.push({ path: `${dir}${base}${ext}`, contents: w.tsx });
     if (css) files.push({ path: `${dir}${base}.module.css`, contents: w.css ?? '' });
   };
-  if (m.main) add('', m.name, writeComponent(m.main, opts.target, headerOf(m.source, css, 'component '), `./${COMPONENTS_DIR}`));
+  if (m.main) add('', m.name, writeComponent(m.main, opts.target, headerOf(m.source, css, 'component '), `./${COMPONENTS_DIR}`, ts));
   else add('', m.name, writeMain(m.name, m.root!, opts.target, headerOf(m.source, css, ''), `./${COMPONENTS_DIR}`));
   for (const c of m.components) {
-    add(COMPONENTS_DIR, c.name, writeComponent(c, opts.target, headerOf(c.source, css, 'component '), './'));
+    add(COMPONENTS_DIR, c.name, writeComponent(c, opts.target, headerOf(c.source, css, 'component '), './', ts));
   }
-  files.push({ path: 'tokens.css', contents: tokensCss(doc) });
-  if (!css) files.push({ path: 'theme.css', contents: tailwindThemeCss(doc) });
+  addTokenFiles(files, doc, opts);
   return { files, warnings: m.warnings };
 }
 
@@ -129,11 +134,16 @@ function generateInline(doc: LakarDocument, opts: CodegenOptions): CodegenResult
   const header = headerOf(tree.node.name, css, '');
   const imports = css ? `import styles from './${name}.module.css';\n\n` : '\n';
   const tsx = `${header}${imports}export function ${name}() {\n  return (\n${emitJsx(tree.root, opts.target, classNames, 2)}\n  );\n}\n\nexport default ${name};\n`;
-  const files: CodegenFile[] = [{ path: `${name}.tsx`, contents: tsx }];
+  const files: CodegenFile[] = [{ path: `${name}${opts.typescript === false ? '.jsx' : '.tsx'}`, contents: tsx }];
   if (css) files.push({ path: `${name}.module.css`, contents: emitCssModule(tree.root, classNames) });
-  files.push({ path: 'tokens.css', contents: tokensCss(doc) });
-  if (!css) files.push({ path: 'theme.css', contents: tailwindThemeCss(doc) });
+  addTokenFiles(files, doc, opts);
   return { files, warnings };
+}
+
+/** Berkas token di akhir: `tokens.css` (kecuali `tokens: false`) lalu `theme.css` untuk Tailwind. */
+function addTokenFiles(files: CodegenFile[], doc: LakarDocument, opts: CodegenOptions): void {
+  if (opts.tokens !== false) files.push({ path: 'tokens.css', contents: tokensCss(doc) });
+  if (opts.target !== 'react-css') files.push({ path: 'theme.css', contents: tailwindThemeCss(doc) });
 }
 
 /**

@@ -17,6 +17,9 @@
       "path": "../render"
     },
     {
+      "path": "../codegen"
+    },
+    {
       "path": "../check"
     },
     {

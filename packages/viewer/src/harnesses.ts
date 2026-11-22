@@ -18,6 +18,7 @@ export const MCP_TOOLS = [
   'layout_check',
   'screenshot',
   'export',
+  'export_code',
   'icon_search',
   'photo_search',
   'get_selection',

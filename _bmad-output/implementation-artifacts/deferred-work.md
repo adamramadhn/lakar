@@ -173,3 +173,15 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-kode-4-pixel-parity.md`
   summary: Fill `mesh` tidak diekspor codegen (dilewati dengan warning `mesh-fill`), sehingga board ber-mesh di canvas berbeda dari kode; uji paritas membuang mesh dari acuan.
   evidence: Review c4 (intent). Keterbatasan sejak story 2 (README codegen). Usul: ekspor mesh sebagai lapisan gambar data URL (PNG mesh yang sama dengan render) atau `background-image` beraset, lalu hapus `withoutMeshFills` dari tes paritas.
+- source_spec: `_bmad-output/implementation-artifacts/spec-kode-5-export-ui.md`
+  summary: Impor `tokens.css` ke dokumen yang belum punya token itu tidak selalu mengembalikan nama dan tipe token yang sama (nama bertanda `-` di segmen, mis. `font.line-hero` → `font.line.hero`; px tanpa petunjuk nama, mis. lineHeight → fontSize).
+  evidence: `cssVarName` tidak injektif (titik dan `-` sama-sama menjadi `-`), dan CSS variables tidak membawa tipe. Impor ulang ke dokumen asal (atau dokumen yang punya token bernama sama) identik (tests/code-export.test.ts); ke dokumen kosong, mode, variabel, dan nilai per mode sama, dan `tokens.css` hasil ekspor ulang identik byte. Usul: komentar petunjuk `/* lakar: name type */` per variabel di `tokens.css` yang dibaca `parseCssVariables` (mengubah golden codegen).
+- source_spec: `_bmad-output/implementation-artifacts/spec-kode-5-export-ui.md`
+  summary: Dialog Import CSS variables menampilkan pemetaan selektor → mode sebagai label baca-saja, bukan Select seperti desain wvCMu.
+  evidence: Pemetaan mode ditentukan parser spec-token-2 secara deterministik (root = mode default, `[data-theme=x]` = mode x); remap butuh aturan gabung baru di `parseCssVariables` (opsi `modeMap`). Usul: opsi `modeMap` di parser + Select per selektor.
+- source_spec: `_bmad-output/implementation-artifacts/spec-kode-5-export-ui.md`
+  summary: Wiring komponen dialog Export code, popover Copy tokens, dan dialog Import CSS variables tanpa tes otomatis.
+  evidence: Viewer belum punya harness tes komponen/DOM (pra-ada). Logika murni dites (`codeExport.test.ts`, `cssImport.test.ts`, `zip.test.ts`, `tests/code-export.test.ts`); UI diverifikasi smoke msedge.
+- source_spec: `_bmad-output/implementation-artifacts/spec-kode-5-export-ui.md`
+  summary: Instance yang override-nya tidak bisa dinyatakan sebagai prop diekspor sebagai salinan inline (statis) master, bertentangan dengan AD-16 "master bukan salinan statis".
+  evidence: Review c5 (intent). Fallback inline story 3 (warning `instance-inlined`); di fixture landing InsLDxB2 (override fill + stroke inside pada akar) di-inline sehingga ubah padding master juga mengubah berkas utama (tests/code-export.test.ts). Usul: override akar seperti stroke `::after` sebagai kelas pemakai, atau props className/style per elemen dalam.

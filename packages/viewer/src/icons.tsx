@@ -160,6 +160,13 @@ const ICONS = {
   squareDashedBottom: [['path', 'M5 21a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2M9 21h1M14 21h1']],
   link2: [['path', 'M9 17H7A5 5 0 0 1 7 7h2M15 7h2a5 5 0 1 1 0 10h-2M8 12h8']],
   unlink: [['path', 'm18.84 12.25 1.72-1.71h-.02a5.004 5.004 0 0 0-.12-7.07 5.006 5.006 0 0 0-6.95 0l-1.72 1.71M5.17 11.75l-1.71 1.71a5.004 5.004 0 0 0 .12 7.07 5.006 5.006 0 0 0 6.95 0l1.71-1.71M8 2v3M2 8h3M16 19v3M19 16h3']],
+  // Ekspor kode dan impor token (desain 09 Code).
+  codeXml: [['path', 'm18 16 4-4-4-4'], ['path', 'm6 8-4 4 4 4'], ['path', 'm14.5 4-5 16']],
+  fileCode: [['path', 'M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z'], ['path', 'M14 2v4a2 2 0 0 0 2 2h4'], ['path', 'M10 12.5 8 15l2 2.5'], ['path', 'm14 12.5 2 2.5-2 2.5']],
+  fileType: [['path', 'M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z'], ['path', 'M14 2v4a2 2 0 0 0 2 2h4'], ['path', 'M9 13v-1h6v1'], ['path', 'M12 12v6'], ['path', 'M11 18h2']],
+  fileDown: [['path', 'M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z'], ['path', 'M14 2v4a2 2 0 0 0 2 2h4'], ['path', 'M12 18v-6'], ['path', 'm9 15 3 3 3-3']],
+  wind: [['path', 'M12.8 19.6A2 2 0 1 0 14 16H2'], ['path', 'M17.5 8a2.5 2.5 0 1 1 2 4H2'], ['path', 'M9.8 4.4A2 2 0 1 1 11 8H2']],
+  clipboard: [['rect', 8, 2, 8, 4, 1], ['path', 'M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2']],
 } satisfies Record<string, Shape[]>;
 
 export type IconName = keyof typeof ICONS;

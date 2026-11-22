@@ -110,11 +110,8 @@ import { Icon, NODE_ICON, type IconName } from './icons';
 type Commit = (ops: DocOp[], description: string) => Promise<boolean>;
 
 const TYPE_LABEL: Record<string, string> = { board: 'Board', frame: 'Frame', text: 'Text', rect: 'Rectangle', ellipse: 'Ellipse', path: 'Path', icon: 'Icon' };
-const COPY_FORMATS: readonly [CopyFormat, string][] = [
-  ['css', 'CSS'],
-  ['tailwind', 'Tailwind'],
-  ['json', 'JSON'],
-];
+// Copy as CSS/Tailwind per node digantikan dialog Export code (epic kode story 5); JSON tetap untuk debug.
+const COPY_FORMATS: readonly [CopyFormat, string][] = [['json', 'JSON']];
 const ALIGN_OPTIONS = [
   ['start', 'Start'],
   ['center', 'Center'],
@@ -1582,6 +1579,8 @@ export type DesignPanelProps = {
   component?: ComponentPanel | undefined;
   /** Penjalan aksi props/slot komponen (story 5): op dari dokumen terbaru, satu permintaan ops per aksi. */
   componentEdit?: ComponentEdit | undefined;
+  /** Buka dialog Export code untuk node primer (epic kode story 5); undefined = item disembunyikan. */
+  onExportCode?: ((id: string) => void) | undefined;
 };
 
 /** Info komponen node primer untuk panel (dihitung Viewer dari dokumen tersimpan). */
@@ -1669,7 +1668,7 @@ function AlignGroup({ align, disabled }: { align: NonNullable<DesignPanelProps['
   );
 }
 
-export function DesignPanel({ targets, path, editable, fonts, inspectNode, rev, onCommit, align, tokenModes, tokens, component, componentEdit }: DesignPanelProps) {
+export function DesignPanel({ targets, path, editable, fonts, inspectNode, rev, onCommit, align, tokenModes, tokens, component, componentEdit, onExportCode }: DesignPanelProps) {
   const [menu, setMenu] = useState<{ x: number; y: number } | undefined>(undefined);
   const [picker, setPicker] = useState<{ anchor: HTMLElement; spec: TokenSpec; trigger: HTMLElement | undefined } | undefined>(undefined);
   // Picker ditutup saat seleksi berganti, panel menjadi baca-saja (pratinjau/offline), atau field jangkarnya hilang
@@ -1791,10 +1790,10 @@ export function DesignPanel({ targets, path, editable, fonts, inspectNode, rev, 
           <button
             type="button"
             className={`dp-icon-btn copy-menu-btn${copied ? ' done' : ''}`}
-            title={copied ? 'Copied' : 'Copy as…'}
-            aria-label="Copy as"
+            title={copied ? 'Copied' : 'Export code or copy as…'}
+            aria-label="Export code or copy as"
             aria-haspopup="menu"
-            disabled={!node}
+            disabled={!node && !onExportCode}
             onClick={(e) => {
               const r = e.currentTarget.getBoundingClientRect();
               setMenu({ x: r.right - 160, y: r.bottom + 4 });
@@ -1809,14 +1808,29 @@ export function DesignPanel({ targets, path, editable, fonts, inspectNode, rev, 
           x={menu.x}
           y={menu.y}
           onClose={() => setMenu(undefined)}
-          items={COPY_FORMATS.map(([f, label]) => ({
-            label: `Copy as ${label}`,
-            icon: 'copy',
-            run: () => {
-              setMenu(undefined);
-              void copy(f);
-            },
-          }))}
+          items={[
+            ...(onExportCode
+              ? [
+                  {
+                    label: 'Export code…',
+                    icon: 'codeXml' as const,
+                    run: () => {
+                      setMenu(undefined);
+                      onExportCode(primary.id);
+                    },
+                  },
+                ]
+              : []),
+            ...COPY_FORMATS.map(([f, label]) => ({
+              label: `Copy as ${label}`,
+              icon: 'copy' as const,
+              disabled: !node,
+              run: () => {
+                setMenu(undefined);
+                void copy(f);
+              },
+            })),
+          ]}
         />
       )}
       {picker && editable && <TokenPicker anchor={picker.anchor} trigger={picker.trigger} spec={picker.spec} ctx={ctx} onClose={() => setPicker(undefined)} />}

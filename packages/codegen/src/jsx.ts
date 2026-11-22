@@ -549,8 +549,11 @@ export function writeMain(name: string, root: JChild, target: CodegenTarget, hea
 
 const tsType = (p: ExportedProp) => (p.type === 'text' ? 'string' : p.type === 'boolean' ? 'boolean' : p.options!.map((o) => JSON.stringify(o)).join(' | '));
 
-/** Tulis berkas komponen. `componentDir` = prefiks impor komponen lain dari berkas ini. */
-export function writeComponent(c: JComponent, target: CodegenTarget, header: string, componentDir: string): WrittenFile {
+/**
+ * Tulis berkas komponen. `componentDir` = prefiks impor komponen lain dari berkas ini. `typescript: false` (story 5,
+ * opsi dialog "TypeScript") = JavaScript: tanpa `import type`, blok `export type <X>Props`, dan anotasi parameter.
+ */
+export function writeComponent(c: JComponent, target: CodegenTarget, header: string, componentDir: string, typescript = true): WrittenFile {
   const w = new FileWriter(target, c.name);
   w.node(c.root, 2);
   const used = usedNames([c.root]);
@@ -565,9 +568,9 @@ export function writeComponent(c: JComponent, target: CodegenTarget, header: str
   const reactTypes = c.slots.length ? 'CSSProperties, ReactNode' : 'CSSProperties';
   const guard = c.rootWhen ? `  if (!(${condExpr(c.rootWhen)})) return null;\n` : '';
   const tsx =
-    `${header}import type { ${reactTypes} } from 'react';\n${importsOf(w.uses, componentDir)}${w.stylesImport()}\n` +
-    `export type ${c.name}Props = {\n${typeLines.join('\n')}\n};\n\n` +
-    `export function ${c.name}({ ${params.join(', ')} }: ${c.name}Props) {\n${guard}  return (\n${w.body()}\n  );\n}\n\nexport default ${c.name};\n`;
+    `${header}${typescript ? `import type { ${reactTypes} } from 'react';\n` : ''}${importsOf(w.uses, componentDir)}${w.stylesImport()}\n` +
+    (typescript ? `export type ${c.name}Props = {\n${typeLines.join('\n')}\n};\n\n` : '') +
+    `export function ${c.name}({ ${params.join(', ')} }${typescript ? `: ${c.name}Props` : ''}) {\n${guard}  return (\n${w.body()}\n  );\n}\n\nexport default ${c.name};\n`;
   return { tsx, css: w.css ? w.cssText() : undefined, uses: w.uses };
 }
 

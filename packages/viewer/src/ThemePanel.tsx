@@ -3,10 +3,12 @@
 // tabel token jenis aktif dengan satu kolom per mode. Setiap aksi = satu permintaan ops lewat `onCommit` Viewer
 // (History + undo per jendela, AD-7/AD-8); pembangun op di themeModel.ts (murni). Edit mengantre sampai rev commit
 // sebelumnya tampil, supaya edit cepat kedua pada token yang sama dibangun dari definisi terbaru.
+// Header: Import CSS variables dan Copy tokens as CSS (epic kode story 5, desain 09; TokensCss.tsx).
 import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { TOKEN_TYPES, type DocOp, type LakarDocument, type TokenType } from '@lakar/schema';
 import { withHex } from './designValues';
 import { Icon } from './icons';
+import { CopyTokensPopover } from './TokensCss';
 import {
   addModeOps,
   addTokenOps,
@@ -177,7 +179,27 @@ function TokenSwatch({ color, disabled, label, onPick }: { color: string; disabl
 
 type Editing = { kind: 'cell'; name: string; mode: string | undefined } | { kind: 'name'; name: string } | { kind: 'mode'; mode: string } | { kind: 'newMode' } | undefined;
 
-export function ThemePanel({ doc, rev, editable, onCommit, onClose }: { doc: LakarDocument; rev: number; editable: boolean; onCommit: Commit; onClose: () => void }) {
+/**
+ * `onImportCss`: buka dialog Import CSS variables. Dialog dirender Viewer di luar pohon Canvas: modal di-portal ke body
+ * tidak boleh menerima event React gestur canvas (`.canvas-overlay-ui` diperiksa lewat DOM, bukan pohon React).
+ */
+export function ThemePanel({
+  doc,
+  rev,
+  editable,
+  onCommit,
+  onClose,
+  onImportCss,
+  importOpen = false,
+}: {
+  doc: LakarDocument;
+  rev: number;
+  editable: boolean;
+  onCommit: Commit;
+  onClose: () => void;
+  onImportCss?: (() => void) | undefined;
+  importOpen?: boolean;
+}) {
   const head = doc as unknown as ThemeDoc;
   const tokens = head.tokens ?? {};
   const modes = head.tokenModes ?? [];
@@ -189,6 +211,7 @@ export function ThemePanel({ doc, rev, editable, onCommit, onClose }: { doc: Lak
   const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(new Set());
   const [error, setError] = useState<string | undefined>(undefined);
   const [confirm, setConfirm] = useState<{ name: string; top: number } | undefined>(undefined);
+  const [copyOpen, setCopyOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
   const counts = useMemo(() => typeCounts(tokens), [tokens]);
   const usage = useMemo(() => usageCounts(head), [head]);
@@ -202,6 +225,8 @@ export function ThemePanel({ doc, rev, editable, onCommit, onClose }: { doc: Lak
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
+      // Dialog impor (modal) menangani Escape sendiri.
+      if (importOpen) return;
       const t = e.target;
       if (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || t instanceof HTMLSelectElement) return;
       // Hanya fokus di dalam panel atau tanpa fokus (body); panel tersembunyi (lebar mobile) tidak menelan Escape.
@@ -209,11 +234,12 @@ export function ThemePanel({ doc, rev, editable, onCommit, onClose }: { doc: Lak
       if (!el || el.offsetParent === null || !(t instanceof Node) || (t !== document.body && !el.contains(t))) return;
       e.stopPropagation();
       if (confirm) setConfirm(undefined);
+      else if (copyOpen) setCopyOpen(false);
       else onClose();
     };
     window.addEventListener('keydown', onKey, { capture: true });
     return () => window.removeEventListener('keydown', onKey, { capture: true });
-  }, [confirm, onClose]);
+  }, [confirm, copyOpen, importOpen, onClose]);
   // Klik di luar popover hapus menutupnya.
   useEffect(() => {
     if (!confirm) return;
@@ -316,6 +342,25 @@ export function ThemePanel({ doc, rev, editable, onCommit, onClose }: { doc: Lak
         <strong>Theme</strong>
         <span className="badge">{countLabel(tokens, modes)}</span>
         <span className="theme-spacer" />
+        {editable && onImportCss && (
+          <button type="button" className="btn small" onClick={onImportCss}>
+            <Icon name="fileDown" size={13} />
+            Import CSS variables
+          </button>
+        )}
+        <button
+          type="button"
+          className={`btn small theme-copy-btn${copyOpen ? ' active' : ''}`}
+          aria-expanded={copyOpen}
+          aria-haspopup="dialog"
+          disabled={Object.keys(tokens).length === 0}
+          title={Object.keys(tokens).length === 0 ? 'No tokens yet' : undefined}
+          onClick={() => setCopyOpen((o) => !o)}
+        >
+          <Icon name="copy" size={13} />
+          Copy tokens as CSS
+        </button>
+        {copyOpen && <CopyTokensPopover doc={doc} onClose={() => setCopyOpen(false)} />}
         <button type="button" className="dp-icon-btn boxed" title="Close" aria-label="Close Theme" onClick={onClose}>
           <Icon name="x" size={14} />
         </button>

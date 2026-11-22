@@ -3,6 +3,8 @@
 // forward, Send backward, Align ›, Distribute ›. Dibuka dari klik kanan di
 // canvas live dan di baris Layers; item yang tidak berlaku untuk seleksi nonaktif (opacity desain 0.4). Pola posisi,
 // fokus, dan keyboard mengikuti `Menu` (FileMenu.tsx); ArrowRight/Enter membuka submenu, ArrowLeft/Escape menutupnya.
+// Item terakhir "Export code…" (epic kode story 5) membuka dialog Export code untuk satu node; bukan aksi edit, jadi
+// tetap aktif saat offline (kode dihasilkan di viewer) dan hanya tampil bila `onExportCode` diberikan.
 import { useLayoutEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import type { EditAction } from './editActions';
 import { Icon, type IconName } from './icons';
@@ -63,7 +65,22 @@ const SUB: Record<'align' | 'distribute', { label: string; icon: IconName; items
 
 const enabledItems = (root: HTMLElement | null) => [...(root?.querySelectorAll<HTMLElement>(':scope > .menu-group > .menu-item:not(:disabled)') ?? [])];
 
-export function EditMenu({ x, y, enabled, onAction, onClose }: { x: number; y: number; enabled: Record<EditAction, boolean>; onAction: (a: EditAction) => void; onClose: () => void }) {
+export function EditMenu({
+  x,
+  y,
+  enabled,
+  onAction,
+  onClose,
+  onExportCode,
+}: {
+  x: number;
+  y: number;
+  enabled: Record<EditAction, boolean>;
+  onAction: (a: EditAction) => void;
+  onClose: () => void;
+  /** undefined = item Export code… disembunyikan; null = tampil nonaktif (seleksi lebih dari satu node). */
+  onExportCode?: (() => void) | null | undefined;
+}) {
   const ref = useRef<HTMLDivElement>(null);
   const subRef = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState({ left: x, top: y });
@@ -186,6 +203,26 @@ export function EditMenu({ x, y, enabled, onAction, onClose }: { x: number; y: n
             </div>
           );
         })}
+        {onExportCode !== undefined && (
+          <div className="menu-group" role="none">
+            <div className="menu-separator" role="separator" />
+            <button
+              type="button"
+              role="menuitem"
+              className="menu-item"
+              disabled={!onExportCode}
+              onMouseEnter={() => setSub(undefined)}
+              onClick={() => {
+                if (!onExportCode) return;
+                onClose();
+                onExportCode();
+              }}
+            >
+              <Icon name="codeXml" size={15} />
+              <span className="menu-label">Export code…</span>
+            </button>
+          </div>
+        )}
       </div>
       {sub && (
         <div ref={subRef} className="menu edit-menu edit-submenu" role="menu" aria-label={SUB[sub.key].label} style={{ left: sub.left, top: sub.top }} onKeyDown={(e) => nav(e, subRef.current, true)}>

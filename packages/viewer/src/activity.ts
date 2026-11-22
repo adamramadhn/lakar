@@ -288,6 +288,8 @@ export function callTitle(c: ActivityCall, nameOf: (id: string) => string | unde
       return t ? `Screenshot ${t}` : 'Screenshot first board';
     case 'export':
       return t ? `Export ${t}` : 'Export first board';
+    case 'export_code':
+      return t ? `Export code for ${t}` : 'Export code for first board';
     case 'open_doc':
       return c.slug ? `Open ${c.slug}` : 'Open document';
     case 'restore':

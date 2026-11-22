@@ -1,5 +1,6 @@
-// Server MCP Lakar: 12 tool (AD-11 + photo_search + get_selection) → HTTP lakard: status, read_skill, open_doc,
-// list_boards, execute, inspect, layout_check, screenshot, export, icon_search, photo_search, get_selection.
+// Server MCP Lakar: 13 tool (AD-11 + photo_search + get_selection + export_code) → HTTP lakard: status, read_skill,
+// open_doc, list_boards, execute, inspect, layout_check, screenshot, export, export_code, icon_search, photo_search,
+// get_selection.
 import { McpServer, type CallToolResult } from '@modelcontextprotocol/server';
 import { z } from 'zod';
 import { LAKAR_VERSION, SCHEMA_VERSION, VERSION_HINT, errorMessage, findingLine, summaryText, type ApiResult, type Finding, type FindingSummary } from '@lakar/schema';
@@ -155,6 +156,22 @@ export const EXPORT_DESCRIPTION =
   'Ekspor board/node dokumen aktif ke file PNG di disk daemon: <dataDir>/exports/<slug>/<id>-r<rev>@<scale>x.png. ' +
   'id = board atau node (default board pertama); scale 1 atau 2 (default 1; 2 = render asli 2× piksel). ' +
   'Mengembalikan {path, id, name, rev, scale, width, height, bytes} (width/height = piksel PNG). Gagal menulis → EXPORT_FAILED.';
+
+/** Deskripsi tool `export_code` (epic kode story 5). */
+export const EXPORT_CODE_DESCRIPTION =
+  'Ekspor board/node dokumen aktif menjadi kode React (generator yang sama dengan dialog Export code di viewer; berkas identik). ' +
+  "target 'react-tailwind' (default: <Nama>.tsx, components/*.tsx, tokens.css, theme.css Tailwind v4) atau 'react-css' (+ *.module.css). " +
+  'Token menjadi var(--nama) dan master komponen menjadi components/<Nama>.tsx dengan props bertipe; instance menjadi pemakaiannya. ' +
+  'components:false = semua di-inline; tokens:false = tanpa tokens.css; typescript:false = .jsx tanpa tipe. ' +
+  'Mengembalikan blok JSON {docId, slug, rev, id, name, target, files:[{path, bytes}], warnings} lalu satu blok teks per berkas.';
+
+/** Teks `export_code`: ringkasan JSON (tanpa isi berkas) lalu satu blok per berkas `----- path -----`. */
+export type ExportCodeData = { files: { path: string; contents: string; bytes: number }[] } & Record<string, unknown>;
+export function formatExportCode(data: ExportCodeData): CallToolResult['content'] {
+  const { files, ...rest } = data;
+  const head = { ...rest, files: files.map((f) => ({ path: f.path, bytes: f.bytes })) };
+  return [{ type: 'text', text: JSON.stringify(head) }, ...files.map((f) => ({ type: 'text' as const, text: `----- ${f.path} -----\n${f.contents}` }))];
+}
 
 /** Deskripsi tool `layout_check` (aturan gerbang G0). */
 export const LAYOUT_CHECK_DESCRIPTION =
@@ -315,6 +332,25 @@ export function createLakarMcpServer(daemonUrl: string): McpServer {
         if (id !== undefined) body.id = id;
         if (scale !== undefined) body.scale = scale;
         return asText(await client.call('/export', body));
+      }),
+  );
+
+  server.registerTool(
+    'export_code',
+    {
+      description: EXPORT_CODE_DESCRIPTION,
+      inputSchema: z.object({
+        id: z.string().optional().describe('ID board/node; kosongkan untuk board pertama'),
+        target: z.enum(['react-tailwind', 'react-css']).optional().describe("'react-tailwind' (default) atau 'react-css'"),
+        components: z.boolean().optional().describe('master sebagai berkas komponen terpisah (default true)'),
+        tokens: z.boolean().optional().describe('sertakan tokens.css (default true)'),
+        typescript: z.boolean().optional().describe('TSX bertipe (default true); false = JSX'),
+      }),
+    },
+    (args) =>
+      guarded(async () => {
+        const body = Object.fromEntries(Object.entries(args).filter(([, v]) => v !== undefined));
+        return asResult(await client.call<ExportCodeData>('/viewer/export-code', body), formatExportCode);
       }),
   );
 

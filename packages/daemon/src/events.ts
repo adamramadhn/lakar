@@ -40,6 +40,7 @@ export const TOOL_ROUTES: Readonly<Record<string, string>> = {
   '/icons/search': 'icon_search',
   '/photos/search': 'photo_search',
   '/viewer/selection': 'get_selection',
+  '/viewer/export-code': 'export_code',
 };
 
 export const publicSessionId = (id: string) => id.slice(0, 8);
@@ -234,6 +235,7 @@ function targetOf(tool: string, body: Record<string, unknown> | undefined): stri
     case 'screenshot':
       return str(body.boardId) ?? str(body.nodeId);
     case 'export':
+    case 'export_code':
       return str(body.id);
     case 'layout_check':
       return str(body.boardId);

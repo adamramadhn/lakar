@@ -75,6 +75,8 @@ import { Modal } from './NewFileDialog';
 import { ChecksPanel } from './panels';
 import { DesignPanel } from './DesignPanel';
 import { ThemeButton, ThemePanel } from './ThemePanel';
+import { CodeExportDialog } from './CodeExportDialog';
+import { ImportCssDialog } from './TokensCss';
 import { effectiveMode } from './themeModel';
 import { parentLayoutOf, type DesignTarget } from './designModel';
 import { measureLiveSize } from './liveGeometry';
@@ -281,6 +283,16 @@ export function Viewer({ slug }: { slug: string }) {
   /** Panel Theme (epic token-tema story 3); ditutup saat pratinjau versi (tombol Theme tidak tampil). */
   const [themeOpen, setThemeOpen] = useState(false);
   const closeTheme = useCallback(() => setThemeOpen(false), []);
+  /** Dialog Export code (epic kode story 5): id node sumber; ditutup saat pratinjau versi. */
+  const [codeExport, setCodeExport] = useState<string | undefined>(undefined);
+  /** Dialog Import CSS variables (panel Theme, epic kode story 5). */
+  const [cssImportOpen, setCssImportOpen] = useState(false);
+  // Pratinjau versi menutup kedua dialog (bukan hanya menyembunyikan), supaya tidak muncul lagi sesudah pratinjau.
+  useEffect(() => {
+    if (!preview) return;
+    setCodeExport(undefined);
+    setCssImportOpen(false);
+  }, [preview]);
   useEffect(() => {
     if (preview) setThemeOpen(false);
   }, [preview]);
@@ -1512,6 +1524,7 @@ export function Viewer({ slug }: { slug: string }) {
         components={latestComponents}
         onDropComponent={(id, at) => latestComponents && insertInstance(id, dropTarget(latestComponents, id, sceneRef.current?.() ?? [], at))}
         onOpenChecks={() => openTab('checks')}
+        onExportCode={setCodeExport}
         preview={canvasPreview}
         editable={editable}
         onInsert={onCanvasInsert}
@@ -1524,7 +1537,9 @@ export function Viewer({ slug }: { slug: string }) {
         }}
         overlay={
           <>
-            {themeOpen && !preview && <ThemePanel doc={latestDoc} rev={latestDoc.rev} editable={editable} onCommit={commitOps} onClose={closeTheme} />}
+            {themeOpen && !preview && (
+              <ThemePanel doc={latestDoc} rev={latestDoc.rev} editable={editable} onCommit={commitOps} onClose={closeTheme} onImportCss={() => setCssImportOpen(true)} importOpen={cssImportOpen} />
+            )}
             {undoSkipped && <UndoSkippedToast key={undoSkipped.key} toast={undoSkipped} onHistory={() => openTab('history')} onClose={closeUndoSkipped} />}
             {rollback && (
               <div key={rollback.key} className="rollback-toast canvas-overlay-ui" role="alert">
@@ -1557,6 +1572,7 @@ export function Viewer({ slug }: { slug: string }) {
               tokens={d.tokens}
               component={componentPanel}
               componentEdit={componentEdit}
+              onExportCode={preview ? undefined : setCodeExport}
               align={designTargets.length > 1 ? { enabled: editable ? actionState(sceneRef.current?.() ?? [], selection) : NO_ACTIONS, run: (a) => runAction(a) } : undefined}
             />
           )}
@@ -1588,6 +1604,19 @@ export function Viewer({ slug }: { slug: string }) {
         />
       )}
       {toast && <Toast toast={toast} onClose={closeToast} />}
+      {codeExport && !preview && <CodeExportDialog doc={latestDoc} nodeId={codeExport} onClose={() => setCodeExport(undefined)} />}
+      {cssImportOpen && !preview && (
+        <ImportCssDialog
+          doc={latestDoc}
+          editable={editable}
+          onImport={async (build) => {
+            const b = build(latestDoc);
+            if ('error' in b) return b.error;
+            return (await commitOps(b.ops, b.label)) ? undefined : 'Import failed. Your tokens were not changed.';
+          }}
+          onClose={() => setCssImportOpen(false)}
+        />
+      )}
       {editMenu && (
         <EditMenu
           x={editMenu.x}
@@ -1595,6 +1624,7 @@ export function Viewer({ slug }: { slug: string }) {
           enabled={editable ? actionState(sceneRef.current?.() ?? [], editMenu.ids) : NO_ACTIONS}
           onAction={(a) => runAction(a, editMenu.ids)}
           onClose={() => setEditMenu(undefined)}
+          onExportCode={preview ? undefined : editMenu.ids.length === 1 ? () => setCodeExport(editMenu.ids[0]) : null}
         />
       )}
       {fileMenu && (

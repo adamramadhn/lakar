@@ -50,6 +50,7 @@ import { registerOpsRoutes } from './ops.js';
 import { SelectionStore, registerSelectionRoutes } from './selection.js';
 import { registerRenderDepsRoutes } from './render-deps.js';
 import { registerExportRoutes } from './export.js';
+import { registerCodeExportRoutes } from './code-export.js';
 import { VIEWER_DIST_DIR, registerViewerRoutes } from './viewer.js';
 
 const STATUS: Record<ErrorCode, number> = {
@@ -688,6 +689,7 @@ export function buildServer({
   registerSelectionRoutes(app, { docs, store, sessions, selections, activity, render, assertIcons });
   registerRenderDepsRoutes(app, { fonts, icons });
   registerExportRoutes(app, { docs, store, render, icons });
+  registerCodeExportRoutes(app, { docs, sessions, icons });
   registerConnectionRoutes(app, { host: config.host, port: config.port, ...(config.mcpEntry ? { mcpEntry: config.mcpEntry } : {}) });
 
   // Pratinjau ikon untuk pemilih Icon… di viewer (aplikasi 4): glyph katalog sebagai SVG statis. Pencarian tetap lewat
