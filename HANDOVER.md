@@ -6,22 +6,17 @@ Catatan serah-terima untuk melanjutkan di ADE atau IDE lain. Aturan dan jebakan 
 
 Semua PR ada di repo GitHub `fatmuh/lakar` (dulu `adamramadhn/lakar`; alamat lama di-redirect).
 
-| Branch | Isi | PR | Status |
-|---|---|---|---|
-| `claude/desktop-tauri-f5e05a` | Aplikasi desktop Tauri + release workflow + halaman Connections (MCP) | #5 → `main` | CI hijau, **perlu approval reviewer** |
-| `claude/app-design-parity` | Semua fitur edit di aplikasi + audit desain (lihat di bawah) | #6 → `claude/desktop-tauri-f5e05a` | Draft, CI hijau |
-| (sudah di-merge ke `claude/app-design-parity`) | #7 presence agen, #8 search + Settings General, #9 tab title bar + window chrome, #10 Pages, #11 tablet/mobile, #12 folder, #13 tema layar mulai desktop, #14 kolom List Dashboard | — | Merged |
-| `g1` | Pekerjaan G1 dari VPS (2026-11-19): aturan `layout_check` sisa, skill per domain, rubrik v2.3, golden A–E di Lakar | #15 → `main` | Terbuka; merge tanpa konflik dengan #6 |
-| `docs/new-initiative` | Inisiatif baru `initiative-lakar-paper`, inisiatif lama ditutup | #16 → `claude/app-design-parity` | Merged |
-| `docs/new-initiative` | Spine arsitektur model dokumen (epic 1) + penyelarasan inisiatif, AGENTS.md | #17 → `claude/app-design-parity` | Terbuka |
-| `feat/model-dokumen` | Build ketujuh epic `initiative-lakar-paper` (model dokumen, editor canvas, agen di canvas, token dan tema, komponen, kode, paste dan vektor), skema v7 | #18 → `docs/new-initiative` | Draft |
+Semua PR di bawah sudah di-merge ke `main`.
 
-**Urutan ke `main`:**
-1. Approve dan merge #5.
-2. Ubah base #6 ke `main`.
-3. Perbarui deskripsi #6, keluarkan dari draft, lalu merge.
-4. Merge #15 (G1) ke `main`.
-5. Push tag `v0.1.0`. `release.yml` membangun installer Windows/macOS/Linux dan menerbitkan GitHub Release beserta `SHA256SUMS.txt`.
+| Branch | Isi | PR |
+|---|---|---|
+| `claude/desktop-tauri-f5e05a` | Aplikasi desktop Tauri + release workflow + halaman Connections (MCP) | #5 |
+| `claude/app-design-parity` | Semua fitur edit di aplikasi + audit desain (#7 sampai #14 sudah masuk ke sini) | #6 |
+| `g1` | Pekerjaan G1 dari VPS: aturan `layout_check` sisa, skill per domain, rubrik v2.3, golden A–E | #15 |
+| `docs/new-initiative` | Inisiatif `initiative-lakar-paper`, inisiatif lama ditutup, spine arsitektur model dokumen | #16, #17 |
+| `feat/model-dokumen` | Build ketujuh epic `initiative-lakar-paper`, skema v7 | #18 |
+
+**Rilis.** Tag `v0.1.0` ada di `20b913c` (merge #18). `release.yml` menerbitkan GitHub Release dengan installer Windows (exe, msi), macOS (arm64, x64), Linux (AppImage, deb) dan `SHA256SUMS.txt`: https://github.com/fatmuh/lakar/releases/tag/v0.1.0. Job `macos-x64` gagal sekali di langkah Smoke-test sidecar lalu lolos saat dijalankan ulang. Lognya tidak sempat terbaca, jadi penyebabnya belum diketahui. Awasi bila terulang.
 
 ## Isi `claude/app-design-parity`
 
@@ -56,8 +51,8 @@ Perubahan sesudah gelombang fitur di atas:
 
 ## Langkah berikutnya
 
-1. **Bawa ke `main`.** Ikuti urutan di bagian "Branch dan PR".
-2. **Build `initiative-lakar-paper` selesai (branch `feat/model-dokumen`, PR #18 → `docs/new-initiative`, draft).** Semua story dijalankan lewat `bmad-build-auto`. Spec ada di `_bmad-output/implementation-artifacts/spec-{model-dokumen,editor,agen,token,komponen,kode,vektor}-*.md`. Spine arsitektur ada di `_bmad-output/initiative-lakar-paper/tickets/epic-model-dokumen/architecture-model-dokumen/architecture-model-dokumen.md`. Skema kini v7.
+1. **Uji manual `v0.1.0` oleh Fatmuh.** Pasang installer rilis, lalu cek butir Done-when yang tersisa (lihat "Sisa" di bawah).
+2. **Build `initiative-lakar-paper` selesai dan sudah di `main` (#18).** Semua 34 tiket berstatus done. Semua story dijalankan lewat `bmad-build-auto`. Spec ada di `_bmad-output/implementation-artifacts/spec-{model-dokumen,editor,agen,token,komponen,kode,vektor}-*.md`. Spine arsitektur ada di `_bmad-output/initiative-lakar-paper/tickets/epic-model-dokumen/architecture-model-dokumen/architecture-model-dokumen.md`. Skema kini v7.
    - **Model dokumen.** Korpus v1/v2, token bertipe dengan mode tema (v3), `resolveDocument` sebagai satu pintu resolusi, dan `css.ts` sebagai pemetaan CSS tunggal.
    - **Editor canvas.** Route `/viewer/docs/:slug/ops` dengan op invers untuk undo/redo, board sebagai DOM hidup, select/move/resize, panel Design, aksi edit, dan grid (v4).
    - **Agen di canvas.** Seleksi bersama lewat `get_selection`, perubahan agen tampil live tanpa menimpa edit manual, dan skill `selection`.
@@ -65,7 +60,7 @@ Perubahan sesudah gelombang fitur di atas:
    - **Komponen.** Master dan instance (v5), op komponen, UI komponen di viewer, serta props dan slot.
    - **Kode.** Paket `@lakar/codegen` (React + Tailwind atau CSS), komponen sebagai file React, uji paritas piksel, dialog Export code, tool `export_code`, dan impor CSS variables.
    - **Paste dan vektor.** Atribut SVG bertipe pada path (v6), importer SVG dan HTML dengan tool `paste` (tag v7), Pen tool, dan edit titik.
-   - **Sisa sebelum rilis.** Butir Done-when yang butuh installer release desktop dan demo manual Fatmuh: membuat landing page dari nol dan alur varian lewat agen.
+   - **Sisa (butuh Fatmuh).** Butir Done-when yang butuh installer release desktop dan demo manual Fatmuh: membuat landing page dari nol dan alur varian lewat agen.
    - **Tema tertunda utama.** Viewer belum punya harness tes DOM/komponen, jadi wiring UI hanya dites lewat logika murni. Dokumen nyata v1/v2 pengguna dan bench (termasuk di VPS) belum masuk korpus; caranya ada di `tests/fixtures/docs/README.md`. Item lain ada di `deferred-work.md`.
 3. **Item tertunda.** Lihat `_bmad-output/implementation-artifacts/deferred-work.md`.
 
