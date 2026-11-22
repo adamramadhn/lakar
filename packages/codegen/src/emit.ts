@@ -18,26 +18,26 @@ export function assignClassNames(root: CodeElement): Map<CodeElement, string> {
   return out;
 }
 
-const camelProp = (p: string) => p.replace(/-([a-z])/g, (_m, c: string) => c.toUpperCase());
+export const camelProp = (p: string) => p.replace(/-([a-z])/g, (_m, c: string) => c.toUpperCase());
 
 /** Atribut SVG → nama prop React (`stroke-width` → `strokeWidth`; `aria-*`/`data-*` tetap). */
-const reactAttr = (name: string) => (name.startsWith('aria-') || name.startsWith('data-') ? name : camelProp(name));
+export const reactAttr = (name: string) => (name.startsWith('aria-') || name.startsWith('data-') ? name : camelProp(name));
 
 /**
  * Atribut JSX: string polos bila aman, selain itu ekspresi string literal. Backslash boleh polos (string atribut JSX
  * tidak memproses escape), jadi kelas Tailwind `\_` tetap terbaca pemindai; `&` diproses sebagai entitas → ekspresi.
  */
-function jsxAttr(name: string, value: string): string {
+export function jsxAttr(name: string, value: string): string {
   return /^[^"{}<>&\r\n]*$/.test(value) ? `${name}="${value}"` : `${name}={${JSON.stringify(value)}}`;
 }
 
 /** Prop `style` React dari deklarasi. */
-function styleProp(decls: readonly CssDecl[]): string {
+export function styleProp(decls: readonly CssDecl[]): string {
   return `style={{ ${decls.map(([p, v]) => `${camelProp(p)}: ${JSON.stringify(v)}`).join(', ')} }}`;
 }
 
 /** Teks JSX: polos bila aman (tanpa karakter khusus JSX, tanpa spasi tepi/baris baru), selain itu `{"…"}`. */
-function jsxText(text: string): string {
+export function jsxText(text: string): string {
   return text !== '' && /^[^{}<>&"'\r\n\u2028\u2029`]*$/.test(text) && text.trim() === text ? text : `{${JSON.stringify(text)}}`;
 }
 
@@ -90,7 +90,7 @@ export function emitJsx(root: CodeElement, target: CodegenTarget, classNames: Ma
   return lines.join('\n');
 }
 
-function rule(selector: string, decls: readonly CssDecl[]): string {
+export function rule(selector: string, decls: readonly CssDecl[]): string {
   return `${selector} {\n${decls.map(([p, v]) => `  ${p}: ${v};`).join('\n')}\n}\n`;
 }
 

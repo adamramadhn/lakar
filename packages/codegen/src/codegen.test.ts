@@ -92,6 +92,17 @@ describe('generateCode: berkas dan target', () => {
     expect(tsx).not.toContain('[font-family:');
   });
 
+  it('Tailwind: nilai berisi backtick atau `$` → prop style (aman di template String.raw)', () => {
+    for (const family of ['Cash$Sans', 'Tick`Sans']) {
+      const d2 = doc([text('Text0001', 'Hi', { family })]);
+      for (const components of [false, true]) {
+        const tsx = file(generateCode(d2, { nodeId: BOARD, target: 'react-tailwind', components }), 'LandingHero.tsx');
+        expect(tsx).toContain('style={{ fontFamily: ');
+        expect(tsx).not.toContain('[font-family:');
+      }
+    }
+  });
+
   it('peringatan token tingkat dokumen tanpa nodeId', () => {
     const d2 = doc([]);
     (d2.tokens as Record<string, unknown>)['colors-bg'] = { type: 'color', value: '#000000' };
@@ -204,11 +215,11 @@ describe('generateCode: stroke, bentuk, ikon', () => {
 });
 
 describe('generateCode: instance dan mode', () => {
-  it('instance di-inline lewat expandInstances, override diterapkan', () => {
+  it('components:false: instance di-inline lewat expandInstances, override diterapkan', () => {
     const master = frame('Mast0001', { name: 'Button', component: { props: [], slots: [] } }, [text('Labl0001', 'Click')]);
     const inst = { type: 'instance', id: 'Inst0001', name: 'Buy', componentId: 'Mast0001', overrides: { Labl0001: { content: 'Buy now' } } };
     const d = doc([master, inst]);
-    const tsx = file(generateCode(d, { nodeId: BOARD, target: 'react-css' }), 'LandingHero.tsx');
+    const tsx = file(generateCode(d, { nodeId: BOARD, target: 'react-css', components: false }), 'LandingHero.tsx');
     expect(tsx).toContain('Click');
     expect(tsx).toContain('Buy now');
     expect(declsOf(d, 'Inst0001/Labl0001').get('font-size')).toBe('16px');

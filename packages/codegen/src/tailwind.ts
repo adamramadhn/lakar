@@ -76,6 +76,6 @@ export function declToTailwind(prop: string, value: string): string {
 
 /**
  * Deklarasi yang ditulis ke prop `style` React di target Tailwind: url() data/aset, dan nilai berkutip tunggal atau
- * berkarakter `&{}<>` (tidak bisa ditulis sebagai kelas arbitrer di atribut JSX polos tanpa merusak nilai/pemindai).
+ * berkarakter `&{}<>`, backtick, atau `$` (tidak bisa ditulis sebagai kelas arbitrer di atribut JSX polos tanpa merusak nilai/pemindai, atau di dalam template `String.raw` pada ekspresi kelas).
  */
-export const needsInlineStyle = (value: string): boolean => /url\(|['&{}<>]/.test(value);
+export const needsInlineStyle = (value: string): boolean => /url\(|['&{}<>`$]/.test(value);

@@ -1,7 +1,7 @@
 // Tes @lakar/codegen atas korpus (spec kode-2): golden deterministik per dokumen/target, deklarasi CSS sama dengan
 // css.ts, var() token sama dengan Copy as, pulang-pergi tokens.css lewat parseCssVariables, dan typecheck TSX.
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -26,7 +26,24 @@ import {
 } from '../packages/render/src/css.ts';
 import { ellipseShape } from '../packages/render/src/shape.ts';
 import { parseCssVariables } from '../packages/render/src/css-vars.ts';
-import { assignClassNames, buildTree, declToTailwind, generateCode, mergeDecls, tailwindClasses, tokensCss, type CodeElement, type CodegenTarget } from '../packages/codegen/src/index.ts';
+import {
+  assignClassNames,
+  buildTree,
+  declToTailwind,
+  evalComponent,
+  evalNodes,
+  exportModel,
+  fullProps,
+  generateCode,
+  iconRefs,
+  mergeDecls,
+  needsInlineStyle,
+  sameTree,
+  tailwindClasses,
+  tokensCss,
+  type CodeElement,
+  type CodegenTarget,
+} from '../packages/codegen/src/index.ts';
 import { copyAs } from '../packages/viewer/src/copyas.ts';
 import { loadDocCorpus } from './support/doc-corpus.ts';
 
@@ -66,14 +83,21 @@ function glyphsOf(doc: LakarDocument): IconGlyph[] {
   return IconCatalog.load().glyphs(refs);
 }
 
+/** Glyph yang diminta ekspor satu node dengan komponen (termasuk varian enum), lewat `iconRefs`. */
+const glyphsFor = (doc: LakarDocument, nodeId: string): IconGlyph[] => IconCatalog.load().glyphs(iconRefs(doc, { nodeId }));
+
 const boards = (doc: LakarDocument) => doc.pages.flatMap((p) => p.children);
 
-/** Semua keluaran satu dokumen untuk satu target, digabung per board dengan pemisah berkas. */
-function bundle(doc: LakarDocument, target: CodegenTarget): string {
-  const icons = glyphsOf(doc);
+/** Fixture komponen (master, instance ber-override, slot, row/absolute) khusus tes codegen. */
+const fixture = parseDocument(JSON.parse(readFileSync(join(root, 'tests', 'fixtures', 'codegen', 'komponen.lakar.json'), 'utf8'))) as LakarDocument;
+const docs = [...corpus, { label: 'komponen', doc: fixture }];
+
+/** Semua keluaran satu dokumen untuk satu target, digabung per board dengan pemisah berkas. `components:false` = story 2. */
+function bundle(doc: LakarDocument, target: CodegenTarget, components: boolean): string {
+  const all = glyphsOf(doc);
   return boards(doc)
     .map((b) => {
-      const r = generateCode(doc, { nodeId: b.id, target, icons });
+      const r = generateCode(doc, { nodeId: b.id, target, icons: components ? glyphsFor(doc, b.id) : all, components });
       const files = r.files.map((f) => `----- ${f.path} -----\n${f.contents}`).join('\n');
       const warnings = r.warnings.map((w) => `${w.code} ${w.nodeId ?? '-'}: ${w.message}`).join('\n');
       return `===== board ${b.id} (${b.name}) =====\n${files}${warnings ? `\n----- warnings -----\n${warnings}\n` : ''}`;
@@ -86,10 +110,129 @@ describe('codegen: golden korpus', () => {
     expect(corpus.length).toBeGreaterThan(0);
   });
 
-  it.each(corpus.flatMap((c) => TARGETS.map((t): [string, CodegenTarget, LakarDocument] => [c.label, t, c.doc])))('%s %s: deterministik dan sama dengan golden', async (label, target, doc) => {
-    const a = bundle(doc, target);
-    expect(bundle(structuredClone(doc), target)).toBe(a);
+  it.each(corpus.flatMap((c) => TARGETS.map((t): [string, CodegenTarget, LakarDocument] => [c.label, t, c.doc])))('%s %s components:false: deterministik dan sama dengan golden story 2', async (label, target, doc) => {
+    const a = bundle(doc, target, false);
+    expect(bundle(structuredClone(doc), target, false)).toBe(a);
     await expect(a).toMatchFileSnapshot(join(root, 'tests', 'fixtures', 'codegen', `${label}.${target}.txt`));
+  });
+
+  const withComponents = (d: LakarDocument) => JSON.stringify(d).includes('"componentId"');
+  it.each(docs.filter((c) => withComponents(c.doc)).flatMap((c) => TARGETS.map((t): [string, CodegenTarget, LakarDocument] => [c.label, t, c.doc])))(
+    '%s %s dengan komponen: deterministik dan sama dengan golden',
+    async (label, target, doc) => {
+      const a = bundle(doc, target, true);
+      expect(bundle(structuredClone(doc), target, true)).toBe(a);
+      await expect(a).toMatchFileSnapshot(join(root, 'tests', 'fixtures', 'codegen', `${label}.${target}.components.txt`));
+    },
+  );
+
+  it.each(corpus.filter((c) => !withComponents(c.doc)).flatMap((c) => TARGETS.map((t): [string, CodegenTarget, LakarDocument] => [c.label, t, c.doc])))(
+    '%s %s tanpa komponen: keluaran default identik byte dengan components:false',
+    (_label, target, doc) => {
+      expect(bundle(doc, target, true)).toBe(bundle(doc, target, false));
+    },
+  );
+});
+
+/** Pohon efektif ekspor dengan komponen: berkas utama dievaluasi (komponen dengan props, kelas pemakai, slot). */
+function effectiveTree(doc: LakarDocument, nodeId: string, icons: readonly IconGlyph[]): CodeElement {
+  const m = exportModel(doc, { nodeId, icons });
+  if (m.main) return evalComponent(m.main, fullProps(m.main, []), new Map())!;
+  return evalNodes([m.root!])[0] as CodeElement;
+}
+
+describe('codegen: komponen setara dengan inline (story 2)', () => {
+  it.each(docs.map((c): [string, LakarDocument] => [c.label, c.doc]))('%s: setiap board, setiap master, dan setiap instance', (_label, doc) => {
+    const nodes = boards(doc).flatMap((b) => [b.id, ...walkBoard(doc, b.id).filter(({ n }) => !n.id.includes('/') && (n as { component?: unknown }).component !== undefined).map(({ n }) => n.id)]);
+    const stored: string[] = [];
+    const walk = (list: readonly { id: string; type: string; children?: unknown }[]) => {
+      for (const x of list) {
+        if (x.type === 'instance') stored.push(x.id);
+        if (Array.isArray(x.children)) walk(x.children);
+      }
+    };
+    for (const p of doc.pages) for (const b of p.children) walk(b.children);
+    for (const id of [...nodes, ...stored]) {
+      const icons = glyphsFor(doc, id);
+      const inline = buildTree(doc, { nodeId: id, icons }, []).root;
+      expect(sameTree(effectiveTree(doc, id, icons), inline, false), id).toBe(true);
+    }
+  });
+});
+
+describe('codegen: fixture komponen', () => {
+  const files = (target: CodegenTarget, d: LakarDocument = fixture) =>
+    Object.fromEntries(generateCode(d, { nodeId: 'BrdCgK01', target, icons: glyphsFor(d, 'BrdCgK01') }).files.map((f) => [f.path, f.contents]));
+
+  it('satu berkas per komponen di components/, berkas utama mengimpor dan memakainya', () => {
+    const css = files('react-css');
+    expect(Object.keys(css)).toEqual(['Halaman.tsx', 'Halaman.module.css', 'components/Tombol.tsx', 'components/Tombol.module.css', 'components/Kartu.tsx', 'components/Kartu.module.css', 'tokens.css']);
+    const main = css['Halaman.tsx']!;
+    expect(main).toContain("import { Tombol } from './components/Tombol';");
+    expect(main).toContain("import { Kartu } from './components/Kartu';");
+    expect(main).toContain('<Kartu title="Promo" className={styles.kartuPromo} />');
+    expect(main).toContain('<Kartu title="Diganti" />');
+    expect(main).toContain('<Tombol label="Lanjut" showIcon={false} />');
+    expect(css['Halaman.module.css']).toContain('.kartuPromo {\n  background-color: #FEF3C7 !important;\n}');
+    expect(css['Halaman.module.css']).toContain('.tombolAbsolut {\n  position: absolute !important;');
+    expect(css['components/Kartu.tsx']).toContain("import { Tombol } from './Tombol';");
+    expect(css['components/Kartu.tsx']).toContain('{body ?? (');
+    expect(css['components/Tombol.tsx']).toContain('export type TombolProps = {\n  label?: string;\n  showIcon?: boolean;\n  arah?: "row" | "column";');
+    expect(css['components/Tombol.tsx']).toContain('{showIcon && (');
+    const tw = files('react-tailwind');
+    expect(Object.keys(tw)).toEqual(['Halaman.tsx', 'components/Tombol.tsx', 'components/Kartu.tsx', 'tokens.css', 'theme.css']);
+    expect(tw['Halaman.tsx']).toContain('<Kartu title="Promo" className="bg-[#FEF3C7]!" />');
+  });
+
+  it('override yang tidak bisa dinyatakan → inline + warning; instance bersarang di dalamnya tetap dicoba', () => {
+    const r = generateCode(fixture, { nodeId: 'BrdCgK01', target: 'react-css' });
+    expect(r.warnings.filter((w) => w.code === 'instance-inlined').map((w) => w.nodeId)).toEqual(['InsKrt06', 'InsKrt06/InsTmb01']);
+    // v5: Card / promo di-inline (override di dalam Badge bersarang), Badge di dalamnya tetap pemakaian dengan prop.
+    const v5 = corpus.find((c) => c.label === 'v5-komponen-kartu')!.doc;
+    const tsx = generateCode(v5, { nodeId: 'BrdKm001', target: 'react-css' }).files[0]!.contents;
+    expect(tsx).toContain('<Badge label="Hemat" className={styles.badge} />');
+    expect(tsx).toContain('<Card\n            showBadge={false}\n            tone="check"\n            body={');
+  });
+
+  it('mengubah master mengubah berkas komponen tanpa mengubah berkas utama', () => {
+    // Tanpa instance yang memang di-inline (InsKrt06): isinya salinan master.
+    const base = structuredClone(fixture);
+    const daftar = base.pages[0]!.children[0]!.children[1] as { children: { id: string }[] };
+    daftar.children = daftar.children.filter((c) => c.id !== 'InsKrt06');
+    const files = (target: CodegenTarget, d: LakarDocument) =>
+      Object.fromEntries(generateCode(d, { nodeId: 'BrdCgK01', target, icons: glyphsFor(d, 'BrdCgK01') }).files.map((f) => [f.path, f.contents]));
+    const changed = structuredClone(base);
+    const krt = (changed.pages[0]!.children[0]!.children[0] as { children: Record<string, unknown>[] }).children[1]!;
+    krt.padding = 24;
+    krt.fills = [{ type: 'solid', color: '#F9FAFB' }];
+    for (const target of TARGETS) {
+      const before = files(target, base);
+      const after = files(target, changed);
+      expect(after['components/Kartu.tsx'] !== before['components/Kartu.tsx'] || after['components/Kartu.module.css'] !== before['components/Kartu.module.css'], target).toBe(true);
+      expect(after['Halaman.tsx'], target).toBe(before['Halaman.tsx']);
+      expect(after['Halaman.module.css'], target).toBe(before['Halaman.module.css']);
+    }
+  });
+
+  it('nodeId master → berkas utama adalah komponen itu; iconRefs memuat varian ikon', () => {
+    const r = generateCode(fixture, { nodeId: 'MstKrt01', target: 'react-css' });
+    expect(r.files.map((f) => f.path)).toEqual(['Kartu.tsx', 'Kartu.module.css', 'components/Tombol.tsx', 'components/Tombol.module.css', 'tokens.css']);
+    expect(r.files[0]!.contents).toContain("import { Tombol } from './components/Tombol';");
+    expect(iconRefs(fixture, { nodeId: 'BrdCgK01' })).toEqual([{ lib: 'lucide', icon: 'arrow-right' }]);
+    const v5 = corpus.find((c) => c.label === 'v5-komponen-kartu')!.doc;
+    expect(iconRefs(v5, { nodeId: 'BrdKm001' })).toEqual([
+      { lib: 'lucide', icon: 'check' },
+      { lib: 'lucide', icon: 'star' },
+    ]);
+    // components:false: ikon pohon inline saja; cukup untuk ekspor inline tanpa icon-glyph-missing.
+    const inlineRefs = iconRefs(v5, { nodeId: 'BrdKm001', components: false });
+    expect(inlineRefs).toEqual([
+      { lib: 'lucide', icon: 'check' },
+      { lib: 'lucide', icon: 'star' },
+    ]);
+    const inline = generateCode(v5, { nodeId: 'BrdKm001', target: 'react-css', components: false, icons: IconCatalog.load().glyphs(inlineRefs) });
+    expect(inline.warnings.filter((w) => w.code === 'icon-glyph-missing')).toEqual([]);
+    expect(iconRefs(fixture, { nodeId: 'FrmBrs01', components: false })).toEqual([{ lib: 'lucide', icon: 'arrow-right' }]);
   });
 });
 
@@ -148,8 +291,8 @@ describe('codegen: deklarasi per properti sama dengan css.ts', () => {
     for (const b of boards(doc)) {
       const tree = buildTree(doc, { nodeId: b.id, icons }, []);
       const classes = assignClassNames(tree.root);
-      const css = parseCssModule(generateCode(doc, { nodeId: b.id, target: 'react-css', icons }).files[1]!.contents);
-      const tsx = generateCode(doc, { nodeId: b.id, target: 'react-tailwind', icons }).files[0]!.contents;
+      const css = parseCssModule(generateCode(doc, { nodeId: b.id, target: 'react-css', icons, components: false }).files[1]!.contents);
+      const tsx = generateCode(doc, { nodeId: b.id, target: 'react-tailwind', icons, components: false }).files[0]!.contents;
       const byId = new Map<string, CodeElement>();
       const index = (e: CodeElement) => {
         if (!e.svgChild && !byId.has(e.nodeId)) byId.set(e.nodeId, e);
@@ -167,7 +310,7 @@ describe('codegen: deklarasi per properti sama dengan css.ts', () => {
         if (want.after) expect(css.get(`${cls}::after`)).toEqual([['content', "''"], ...want.after]);
         // Tailwind: setiap kelas = declToTailwind dari deklarasi yang sama, tertulis utuh di TSX.
         const { classes: tw, style } = tailwindClasses(e);
-        const inline = (v: string) => /url\(|['&{}<>]/.test(v);
+        const inline = needsInlineStyle;
         expect(tw.filter((c) => !c.startsWith('after:'))).toEqual(want.decls.filter(([, v]) => !inline(v)).map(([p, v]) => declToTailwind(p, v)));
         expect(style).toEqual(want.decls.filter(([, v]) => inline(v)));
         if (tw.length) expect(tsx).toContain(`className="${tw.join(' ')}"`);
@@ -190,7 +333,7 @@ describe('codegen: var() token sama dengan Copy as', () => {
       };
       index(tree.root);
       const code = TARGETS.map((target) =>
-        generateCode(doc, { nodeId: b.id, target, icons })
+        generateCode(doc, { nodeId: b.id, target, icons, components: false })
           .files.filter((f) => f.path.endsWith('.tsx') || f.path.endsWith('.module.css'))
           .map((f) => f.contents)
           .join('\n'),
@@ -240,15 +383,18 @@ describe('codegen: TSX lolos typecheck', () => {
   const dir = mkdtempSync(join(tmpdir(), 'lakar-codegen-tsc-'));
   afterAll(() => rmSync(dir, { recursive: true, force: true }));
 
-  it('semua board korpus, kedua target: tsc strict 0 error', () => {
+  it('semua board korpus + fixture komponen (dan master fixture), kedua target, dengan/tanpa komponen: tsc strict 0 error', () => {
     const types = join(root, 'packages', 'viewer', 'node_modules', '@types', 'react');
     let n = 0;
-    for (const c of corpus) {
-      for (const b of boards(c.doc)) {
-        for (const target of TARGETS) {
-          const sub = join(dir, `${c.label}-${b.id}-${target}`);
-          mkdirSync(sub, { recursive: true });
-          for (const f of generateCode(c.doc, { nodeId: b.id, target, icons: glyphsOf(c.doc) }).files) writeFileSync(join(sub, f.path), f.contents);
+    const exports = docs.flatMap((c) => [...boards(c.doc).map((b) => ({ c, id: b.id })), ...(c.label === 'komponen' ? [{ c, id: 'MstKrt01' }, { c, id: 'InsKrt02' }] : [])]);
+    for (const { c, id } of exports) {
+      for (const target of TARGETS) {
+        for (const components of [false, true]) {
+          const sub = join(dir, `${c.label}-${id}-${target}-${components ? 'k' : 'i'}`);
+          for (const f of generateCode(c.doc, { nodeId: id, target, icons: glyphsFor(c.doc, id), components }).files) {
+            mkdirSync(join(sub, f.path, '..'), { recursive: true });
+            writeFileSync(join(sub, f.path), f.contents);
+          }
           n++;
         }
       }
