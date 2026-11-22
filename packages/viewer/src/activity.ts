@@ -167,14 +167,14 @@ export function sessionsForSlug(state: ActivityState, slug: string, now: number)
 
 /**
  * Event selesai yang membuat dokumen `slug` yang tampil (rev `shownRev`) usang: rev baru dan board tersentuh.
- * `boards` hanya diketahui dari execute (`check.boards`); tool lain → `undefined` (muat ulang semua board).
+ * `boards` hanya diketahui dari execute (`check.boards`) dan paste; tool lain → `undefined` (muat ulang semua board).
  */
 export function revChange(event: StreamEvent, slug: string, shownRev: number): { rev: number; boards?: string[] } | undefined {
   if (event.type !== 'call') return undefined;
   const c = event.call;
   if ((isViewer(c.client) && !isDocChangeFromViewer(c)) || c.status === 'running' || c.status === 'error' || c.slug !== slug) return undefined;
   if (typeof c.rev !== 'number' || c.rev <= shownRev) return undefined;
-  return c.tool === 'execute' ? { rev: c.rev, boards: c.boards ?? [] } : { rev: c.rev };
+  return c.tool === 'execute' || c.tool === 'paste' ? { rev: c.rev, boards: c.boards ?? [] } : { rev: c.rev };
 }
 
 // ---- Sinkron antar jendela ----
@@ -300,6 +300,8 @@ export function callTitle(c: ActivityCall, nameOf: (id: string) => string | unde
       return 'List boards';
     case 'get_selection':
       return 'Read selection';
+    case 'paste':
+      return 'Paste SVG';
     case 'read_skill':
       return t ? `Load ${t} skill` : 'List skills';
     case 'icon_search':

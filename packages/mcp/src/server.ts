@@ -1,6 +1,6 @@
-// Server MCP Lakar: 13 tool (AD-11 + photo_search + get_selection + export_code) → HTTP lakard: status, read_skill,
-// open_doc, list_boards, execute, inspect, layout_check, screenshot, export, export_code, icon_search, photo_search,
-// get_selection.
+// Server MCP Lakar: 14 tool (AD-11 + photo_search + get_selection + export_code + paste) → HTTP lakard: status,
+// read_skill, open_doc, list_boards, execute, inspect, layout_check, screenshot, export, export_code, icon_search,
+// photo_search, get_selection, paste.
 import { McpServer, type CallToolResult } from '@modelcontextprotocol/server';
 import { z } from 'zod';
 import { LAKAR_VERSION, SCHEMA_VERSION, VERSION_HINT, errorMessage, findingLine, summaryText, type ApiResult, type Finding, type FindingSummary } from '@lakar/schema';
@@ -172,6 +172,17 @@ export function formatExportCode(data: ExportCodeData): CallToolResult['content'
   const head = { ...rest, files: files.map((f) => ({ path: f.path, bytes: f.bytes })) };
   return [{ type: 'text', text: JSON.stringify(head) }, ...files.map((f) => ({ type: 'text' as const, text: `----- ${f.path} -----\n${f.contents}` }))];
 }
+
+/** Deskripsi tool `paste` (epic paste-vektor story 3, AD-15). */
+export const PASTE_DESCRIPTION =
+  'Tempel SVG ke board/frame dokumen aktif sebagai layer yang bisa diedit (importer yang sama dengan Ctrl+V di viewer; hasil identik). ' +
+  'content = dokumen SVG utuh berakar <svg>; parentId = ID board atau frame tujuan; x/y opsional (default: tengah parent; parent auto layout → ditambahkan di akhir tanpa x/y); ' +
+  'name opsional (nama layer akar); description opsional (label riwayat, default "Paste SVG"). ' +
+  'Satu bentuk → node path; beberapa bentuk → frame berisi path (path, rect, circle, ellipse, line, polyline, polygon; <g> diratakan, transform dipanggang ke d). ' +
+  'fill/stroke solid, stroke-width, fill-rule, stroke-linecap/linejoin/miterlimit/dasharray/dashoffset, fill/stroke-opacity, paint-order, shape-rendering, opacity dipetakan ke properti path; ' +
+  'yang lain (filter, mask, clip-path, gradien url(), <text>, <image>, <use>, <style>, <script>, …) dibuang dan dilaporkan. Satu paste = satu rev. ' +
+  'Mengembalikan {docId, slug, rev, created, nodeId, boards, report:{kind, paths, kept:[atribut], dropped:[{kind: element|attribute|value, name, count}]}}. ' +
+  'SVG rusak/tanpa bentuk atau parent bukan board/frame → SCHEMA_INVALID; ID tidak ada → NOT_FOUND; belum open_doc → NO_ACTIVE_DOC.';
 
 /** Deskripsi tool `layout_check` (aturan gerbang G0). */
 export const LAYOUT_CHECK_DESCRIPTION =
@@ -351,6 +362,27 @@ export function createLakarMcpServer(daemonUrl: string): McpServer {
       guarded(async () => {
         const body = Object.fromEntries(Object.entries(args).filter(([, v]) => v !== undefined));
         return asResult(await client.call<ExportCodeData>('/viewer/export-code', body), formatExportCode);
+      }),
+  );
+
+  server.registerTool(
+    'paste',
+    {
+      description: PASTE_DESCRIPTION,
+      inputSchema: z.object({
+        content: z.string().describe('dokumen SVG utuh (<svg …>…</svg>)'),
+        parentId: z.string().describe('ID board atau frame tujuan'),
+        x: z.number().optional().describe('posisi x di parent (default tengah)'),
+        y: z.number().optional().describe('posisi y di parent (default tengah)'),
+        name: z.string().optional().describe('nama layer akar (default <title> SVG atau "SVG")'),
+        description: z.string().optional().describe('label riwayat (default "Paste SVG")'),
+        kind: z.enum(['svg']).optional().describe("jenis isi; sekarang hanya 'svg'"),
+      }),
+    },
+    (args) =>
+      guarded(async () => {
+        const body = Object.fromEntries(Object.entries(args).filter(([, v]) => v !== undefined));
+        return asText(await client.call('/viewer/paste', body));
       }),
   );
 

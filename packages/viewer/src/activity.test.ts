@@ -152,6 +152,7 @@ describe('deteksi rev baru', () => {
   });
   it('tool lain dengan rev lebih baru → muat ulang semua board (boards tidak diketahui)', () => {
     expect(revChange(callEv({ callId: 'f', status: 'done', rev: 6, tool: 'layout_check' }), 'a', 4)).toEqual({ rev: 6 });
+    expect(revChange(callEv({ callId: 'g', status: 'done', rev: 7, tool: 'paste', boards: ['B1'] }), 'a', 4)).toEqual({ rev: 7, boards: ['B1'] });
   });
 });
 
@@ -170,6 +171,7 @@ describe('label', () => {
     expect(callTitle({ ...base, tool: 'layout_check' })).toBe('Check all boards');
     expect(callTitle({ ...base, tool: 'read_skill', target: 'webapp' })).toBe('Load webapp skill');
     expect(callTitle({ ...base, tool: 'get_selection' })).toBe('Read selection');
+    expect(callTitle({ ...base, tool: 'paste', target: 'B1' })).toBe('Paste SVG');
     expect(callTitle({ ...base, tool: 'export_code', target: 'N1' }, (id) => (id === 'N1' ? 'Headline' : undefined))).toBe('Export code for Headline');
     expect(callTitle({ ...base, tool: 'export_code' })).toBe('Export code for first board');
     expect(callMeta({ ...base, tool: 'execute', durationMs: 800, nodes: 3 }, T0)).toBe('0.8s · 3 nodes');

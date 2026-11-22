@@ -29,6 +29,7 @@ export { DEFAULT_ASSET_BASE, DROP_SHADOW_BLUR_FACTOR } from './paint.js';
 export { ellipseShape, pathShape, shapeFillLayerDecls, strokeSvgSpec, svgPaint, type Shape, type ViewBox } from './shape.js';
 export { iconSvgSpec } from './icon.js';
 export { vectorToSvg, type SvgDropped, type SvgExport } from './svg.js';
+export { IDENTITY, PathDataError, arcToCubics, flattenArcs, isIdentity, multiply, parsePath, pathBounds, serializePath, transformPath, type Matrix, type PathSeg } from './path-data.js';
 // Pemetaan CSS tunggal (AD-5): dipakai render, Copy as viewer, dan codegen.
 export {
   BOARD_DEFAULT_BACKGROUND,

@@ -6268,6 +6268,95 @@ button.panel-tab:hover {
 .undo-skipped-actions .link-btn.accent {
   color: var(--accent);
 }
+/* Paste SVG (G0vf1/nE6dL): Toast r69qO dengan ikon success; Details = Paste Report w2am0. */
+.undo-skipped-icon.paste-icon {
+  background: color-mix(in srgb, var(--success) 15%, transparent);
+  color: var(--success);
+}
+.paste-report {
+  position: absolute;
+  left: 50%;
+  bottom: 72px;
+  z-index: 8;
+  display: flex;
+  flex-direction: column;
+  width: min(420px, calc(100% - 32px));
+  box-sizing: border-box;
+  border-radius: 10px;
+  background: var(--modal);
+  border: 1px solid var(--border);
+  box-shadow: 0 12px 32px #00000052;
+  transform: translateX(-50%);
+  animation: undo-skipped-in 200ms ease-out;
+}
+.paste-report-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 14px;
+}
+.paste-report-dropped {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 14px;
+  border-top: 1px solid var(--border);
+}
+.paste-report-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-bottom: 4px;
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+}
+.paste-report-label svg {
+  color: var(--warning);
+}
+.paste-report-item {
+  display: flex;
+  gap: 8px;
+  padding: 4px 0;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+.paste-report-item > div {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.paste-report-what {
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
+}
+.paste-report-why {
+  color: var(--text-muted);
+}
+.paste-report-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 14px;
+  border-top: 1px solid var(--border);
+}
+.paste-report-actions .link-btn {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+.paste-report-actions .link-btn.accent {
+  color: var(--accent);
+}
+.paste-report-spacer {
+  flex: 1;
+}
+.paste-report-shortcut {
+  color: var(--text-muted);
+  font-family: inherit;
+  font-size: 11px;
+}
 @keyframes undo-skipped-in {
   from {
     opacity: 0;
@@ -6282,6 +6371,7 @@ button.panel-tab:hover {
     animation: change-label-in 1.5s step-end both;
   }
   .undo-skipped,
+  .paste-report,
   .agent-commit {
     animation: none;
   }

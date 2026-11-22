@@ -41,6 +41,7 @@ export const TOOL_ROUTES: Readonly<Record<string, string>> = {
   '/photos/search': 'photo_search',
   '/viewer/selection': 'get_selection',
   '/viewer/export-code': 'export_code',
+  '/viewer/paste': 'paste',
 };
 
 export const publicSessionId = (id: string) => id.slice(0, 8);
@@ -237,6 +238,8 @@ function targetOf(tool: string, body: Record<string, unknown> | undefined): stri
     case 'export':
     case 'export_code':
       return str(body.id);
+    case 'paste':
+      return str(body.parentId);
     case 'layout_check':
       return str(body.boardId);
     case 'read_skill':
@@ -300,6 +303,17 @@ function finish(call: ActivityCall, statusCode: number, json: unknown): Activity
     case 'list_boards':
       if (Array.isArray(data.boards)) out.nodes = data.boards.length;
       break;
+    case 'paste': {
+      // Paste agen (epic paste-vektor story 3): node baru dan board tersentuh, seperti execute.
+      const created = ids(data.created);
+      if (created) {
+        out.created = created;
+        out.nodes = created.length;
+      }
+      const boards = ids(data.boards);
+      if (boards) out.boards = boards;
+      break;
+    }
     case 'get_selection': {
       // Viewer menampilkan "… read your selection: {nama}" (agen-di-canvas story 3): dokumen yang benar-benar dibaca
       // (fallback bisa berbeda dari dokumen aktif sesi), alamat primer (terakhir dipilih), dan jumlah alamat.

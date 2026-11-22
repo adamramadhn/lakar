@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { Client, InMemoryTransport } from '@modelcontextprotocol/client';
 import { StdioClientTransport } from '@modelcontextprotocol/client/stdio';
 import { LAKAR_VERSION, SCHEMA_VERSION } from '@lakar/schema';
-import { EXPORT_CODE_DESCRIPTION, GET_SELECTION_DESCRIPTION, PACKAGE, PHOTO_SEARCH_DESCRIPTION, READ_SKILL_DESCRIPTION, SERVER_INSTRUCTIONS, SERVER_VERSION, createLakarMcpServer, formatStatus } from './index.js';
+import { EXPORT_CODE_DESCRIPTION, GET_SELECTION_DESCRIPTION, PACKAGE, PASTE_DESCRIPTION, PHOTO_SEARCH_DESCRIPTION, READ_SKILL_DESCRIPTION, SERVER_INSTRUCTIONS, SERVER_VERSION, createLakarMcpServer, formatStatus } from './index.js';
 import { readFile } from 'node:fs/promises';
 import { chromiumInstalled, DEFAULT_BROWSERS_PATH } from '../../../tests/support/browser.ts';
 import { testLog } from '../../../tests/support/log.ts';
@@ -122,6 +122,10 @@ function fakeDaemon() {
       ];
       return send(200, { ok: true, data: { docId: 'Dddddddd', slug: 'a', rev: 3, id: body.id ?? 'Bbbbbbbb', name: 'Home', target: body.target ?? 'react-tailwind', files, warnings: [] } });
     }
+    if (req.url === '/viewer/paste') {
+      if (body.parentId === 'Zzzzzzzz') return send(404, { ok: false, error: { code: 'NOT_FOUND', message: 'paste: node Zzzzzzzz tidak ada di dokumen a', hint: 'pakai ID', retryable: false } });
+      return send(200, { ok: true, data: { docId: 'Dddddddd', slug: 'a', rev: 5, created: [{ id: 'Pppppppp', name: 'SVG', path: ['Home', 'SVG'] }], nodeId: 'Pppppppp', boards: ['Bbbbbbbb'], report: { kind: 'svg', paths: 1, kept: [], dropped: [] } } });
+    }
     if (req.url === '/boards') return send(200, { ok: true, data: { docId: 'Dddddddd', slug: 'a', rev: 1, boards: [{ id: 'Bbbbbbbb', name: '[WIP] Home', wip: true }] } });
     if (req.url === '/inspect') {
       if (body.id === 'Zzzzzzzz') return send(404, { ok: false, error: { code: 'NOT_FOUND', message: 'node Zzzzzzzz tidak ada', hint: 'pakai ID', retryable: false } });
@@ -174,11 +178,11 @@ describe('@lakar/mcp', () => {
     expect(PACKAGE).toBe('@lakar/mcp');
   });
 
-  it('daftar tool lengkap (10 AD-11 + photo_search + get_selection + export_code); SERVER_VERSION = LAKAR_VERSION', async () => {
+  it('daftar tool lengkap (10 AD-11 + photo_search + get_selection + export_code + paste); SERVER_VERSION = LAKAR_VERSION', async () => {
     const c = await connect(url);
     const { tools } = await c.listTools();
     expect(tools.map((t) => t.name).sort()).toEqual(
-      ['execute', 'export', 'export_code', 'get_selection', 'icon_search', 'inspect', 'layout_check', 'list_boards', 'open_doc', 'photo_search', 'read_skill', 'screenshot', 'status'].sort(),
+      ['execute', 'export', 'export_code', 'get_selection', 'icon_search', 'inspect', 'layout_check', 'list_boards', 'open_doc', 'paste', 'photo_search', 'read_skill', 'screenshot', 'status'].sort(),
     );
     expect(SERVER_VERSION).toBe(LAKAR_VERSION);
     expect(c.getServerVersion()?.version).toBe(LAKAR_VERSION);
@@ -223,6 +227,22 @@ describe('@lakar/mcp', () => {
     const wrong = await c.callTool({ name: 'export_code', arguments: { target: 'vue' } });
     expect(wrong.isError).toBe(true);
     expect(EXPORT_CODE_DESCRIPTION).toContain('react-tailwind');
+  });
+
+  it('paste → POST /viewer/paste dalam sesi; argumen diteruskan; teks JSON; error terformat', async () => {
+    fake.seen.length = 0;
+    const c = await connect(url);
+    const svg = '<svg viewBox="0 0 24 24"><path d="M0 0h24v24z"/></svg>';
+    const r = await c.callTool({ name: 'paste', arguments: { content: svg, parentId: 'Bbbbbbbb', x: 10 } });
+    expect(r.isError).toBeFalsy();
+    expect(JSON.parse((r.content as any[])[0].text)).toMatchObject({ rev: 5, nodeId: 'Pppppppp', report: { kind: 'svg', paths: 1 } });
+    const call = fake.seen.find((s) => s.path === '/viewer/paste')!;
+    expect(call.body).toEqual({ content: svg, parentId: 'Bbbbbbbb', x: 10 });
+    expect(call.session).toMatch(/^s\d+$/);
+    const bad = await c.callTool({ name: 'paste', arguments: { content: svg, parentId: 'Zzzzzzzz' } });
+    expect(bad.isError).toBe(true);
+    expect((bad.content as any[])[0].text).toContain('NOT_FOUND: paste: node Zzzzzzzz tidak ada');
+    expect(PASTE_DESCRIPTION).toContain('NO_ACTIVE_DOC');
   });
 
   it('photo_search → teks JSON (tanpa data thumbnail) + maks 6 image content; argumen diteruskan; error terformat', async () => {
@@ -563,7 +583,7 @@ describe('@lakar/mcp', () => {
       const r = await c2.callTool({ name: 'execute', arguments: { code: '1' } });
       expect(r.isError).toBe(true);
       expect((r.content as any)[0].text).toContain('http://127.0.0.1:1');
-      expect((await c2.listTools()).tools).toHaveLength(13);
+      expect((await c2.listTools()).tools).toHaveLength(14);
     } finally {
       await c2.close();
       await deadTransport.close();

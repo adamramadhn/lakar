@@ -56,6 +56,8 @@ import { EMPTY_STACKS, recordCommit, settleStep, takeStep, type UndoStacks } fro
 import { attachSelectionReporter } from './selectionSync';
 import { lastAgentLabel, pruneSelection, shareBadgeText, undoSkippedFor } from './liveChanges';
 import { UndoSkippedToast, type UndoSkipped } from './UndoSkippedToast';
+import { PasteToast, type PasteToastState } from './PasteToast';
+import { canUndoPaste, clipboardSvg, pasteTarget } from './paste';
 import { activityHub, editChange, goneReason, harnessLabel, revChange, sessionsForSlug, slugAppeared, type StreamEvent } from './activity';
 import { ActivityPanel } from './ActivityPanel';
 import { BottomSheet } from './BottomSheet';
@@ -884,6 +886,72 @@ export function Viewer({ slug }: { slug: string }) {
     [runEdit],
   );
 
+  // ---- Paste SVG (epic paste-vektor story 3; desain G0vf1/nE6dL) ----
+  // Ctrl+V dengan teks/file SVG → importer daemon (AD-15) lewat route paste: satu commit, invers ke tumpukan undo
+  // jendela ini (AD-8), node baru dipilih, toast r69qO + Paste Report w2am0.
+  const [pasteToast, setPasteToast] = useState<PasteToastState | undefined>(undefined);
+  const closePasteToast = useCallback(() => setPasteToast(undefined), []);
+  /** Entri undo milik paste yang toast-nya tampil ("Undo paste" hanya bila entri ini masih teratas). */
+  const pasteEntry = useRef<unknown>(undefined);
+  const pasteSvg = useCallback(
+    (content: string, name?: string) => {
+      const d = docRef.current;
+      if (!editableRef.current || !d) return;
+      // Satu tulis viewer sekaligus: paste tidak dibuang diam-diam (preventDefault sudah dipanggil).
+      if (editing.current > 0) {
+        setToast('Another edit is still saving. Paste again in a moment.');
+        return;
+      }
+      const target = pasteTarget(d, selectionRef.current);
+      if ('error' in target) {
+        setToast(target.error);
+        return;
+      }
+      editing.current++;
+      api.paste(slug, { content, parentId: target.parentId, ...(name ? { name } : {}) }).then(
+        (r) => {
+          editing.current--;
+          setStacks(recordCommit(stacks.current, r.inverse, 'Paste SVG', Date.now()));
+          pasteEntry.current = stacks.current.undo[stacks.current.undo.length - 1];
+          pendingSelect.current = r.nodeId;
+          setSelectedId(r.nodeId);
+          loadDoc(true);
+          setPasteToast({ key: Date.now(), report: r.report, layer: r.created.find((c) => c.id === r.nodeId)?.name ?? name ?? 'SVG' });
+        },
+        (e) => {
+          editing.current--;
+          setToast(e instanceof ApiError ? failureText(e.message, e.hint) : errorText(e));
+        },
+      );
+    },
+    [slug, loadDoc, setToast, setStacks, setSelectedId],
+  );
+  const undoPaste = useCallback(() => {
+    if (editing.current > 0) setToast("Couldn't undo the paste while another edit is saving. Try again in a moment.");
+    else if (canUndoPaste(stacks.current.undo, pasteEntry.current)) stepHistory('undo');
+    else setToast("Couldn't undo this paste: it was already undone or newer edits were made.");
+  }, [stepHistory, setToast]);
+  // Event `paste` (Ctrl/⌘+V): file SVG dulu, lalu teks yang diawali <svg/<?xml; bukan saat mengetik atau dialog terbuka.
+  useEffect(() => {
+    if (!editable) return;
+    const onPaste = (e: ClipboardEvent) => {
+      if (typingTarget(e) || document.querySelector('.modal-scrim, .menu-layer')) return;
+      const dt = e.clipboardData;
+      if (!dt) return;
+      const pick = clipboardSvg({ files: [...dt.files], text: dt.getData('text/plain') });
+      if (!pick) return;
+      e.preventDefault();
+      if ('text' in pick) pasteSvg(pick.text);
+      else
+        void pick.file.text().then(
+          (text) => pasteSvg(text, pick.name),
+          () => setToast("Couldn't read the pasted file."),
+        );
+    };
+    window.addEventListener('paste', onPaste);
+    return () => window.removeEventListener('paste', onPaste);
+  }, [editable, pasteSvg, setToast]);
+
   /** Tujuan sudah diketahui: Image → pemilih file, Icon → pemilih ikon, lainnya langsung disisipkan. */
   const beginInsert = useCallback(
     (t: InsertTarget) => {
@@ -1541,6 +1609,7 @@ export function Viewer({ slug }: { slug: string }) {
               <ThemePanel doc={latestDoc} rev={latestDoc.rev} editable={editable} onCommit={commitOps} onClose={closeTheme} onImportCss={() => setCssImportOpen(true)} importOpen={cssImportOpen} />
             )}
             {undoSkipped && <UndoSkippedToast key={undoSkipped.key} toast={undoSkipped} onHistory={() => openTab('history')} onClose={closeUndoSkipped} />}
+            {pasteToast && !undoSkipped && <PasteToast key={pasteToast.key} toast={pasteToast} onUndo={undoPaste} onClose={closePasteToast} />}
             {rollback && (
               <div key={rollback.key} className="rollback-toast canvas-overlay-ui" role="alert">
                 <Icon name="undo2" size={14} />

@@ -361,6 +361,20 @@ describe('History (aplikasi 3)', () => {
     await expect(api.applyOps('a', [{ op: 'remove', id: 'Zzzzzzzz' }])).rejects.toMatchObject({ code: 'NOT_FOUND', status: 404 });
   });
 
+  it('paste: POST /viewer/docs/:slug/paste tanpa sesi, body apa adanya, invalidasi slug; gagal → ApiError', async () => {
+    const result = { slug: 'a', rev: 5, created: [], inverse: [{ op: 'remove', id: 'Pppppppp' }], refs: { paste: 'Pppppppp' }, nodeId: 'Pppppppp', report: { kind: 'svg', paths: 1, kept: [], dropped: [] } };
+    const calls = fakeFetch((c) =>
+      c.body?.parentId === 'Zzzzzzzz' ? { status: 404, body: { ok: false, error: { code: 'NOT_FOUND', message: 'paste: node Zzzzzzzz tidak ada', hint: '' } } } : ok(result),
+    );
+    const api = await freshApi();
+    const changed = vi.fn();
+    api.onDocsChanged(changed);
+    await expect(api.paste('a', { content: '<svg/>', parentId: 'Bbbbbbbb', name: 'Logo' })).resolves.toEqual(result);
+    expect(calls.at(-1)).toMatchObject({ method: 'POST', path: '/viewer/docs/a/paste', body: { content: '<svg/>', parentId: 'Bbbbbbbb', name: 'Logo' }, session: undefined });
+    expect(changed).toHaveBeenCalledOnce();
+    await expect(api.paste('a', { content: '<svg/>', parentId: 'Zzzzzzzz' })).rejects.toMatchObject({ code: 'NOT_FOUND', status: 404 });
+  });
+
   it('putSelection: PUT /viewer/docs/:slug/selection tanpa sesi, tanpa invalidasi; gagal → ApiError', async () => {
     const calls = fakeFetch((c) => (c.path === '/viewer/docs/hilang/selection' ? { status: 404, body: { ok: false, error: { code: 'NOT_FOUND', message: 'dokumen hilang tidak ada', hint: '' } } } : ok({ slug: 'a', rev: 2, addresses: c.body.addresses })));
     const api = await freshApi();

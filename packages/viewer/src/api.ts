@@ -15,6 +15,7 @@
 // Bentuk respons AD-11: {ok:true,data} | {ok:false,error}.
 import type { FontFaceSource } from '@lakar/render';
 import type { DocOp, Finding, FindingSummary, IconGlyph, LakarDocument } from '@lakar/schema';
+import type { PasteReport } from './paste.js';
 
 /** Respons GET /viewer/render-deps (dipakai liveBoard.ts; tanpa impor relatif agar api.ts bisa dites di Node). */
 export type RenderDepsResult = { fonts: FontFaceSource[]; icons: IconGlyph[]; missing: { fonts: string[]; icons: string[] } };
@@ -85,6 +86,10 @@ export type PageResult = { slug: string; rev: number; pageId: string };
  * di commit ini, termasuk subtree yang disisip ulang `insert` (undo hapus) dengan ID lamanya, jadi bukan hanya node baru.
  */
 export type OpsResult = { slug: string; rev: number; created: { id: string; name: string; path: string[] }[]; inverse: DocOp[]; refs: Record<string, string> };
+/** Body paste (route `POST /viewer/docs/:slug/paste`, epic paste-vektor story 3). */
+export type PasteBody = { content: string; parentId: string; x?: number; y?: number; name?: string; description?: string };
+/** Hasil paste: seperti ops (`inverse` untuk undo) + node akar baru dan laporan importer. */
+export type PasteResult = OpsResult & { nodeId: string; report: PasteReport };
 /** Font terpasang (GET /viewer/fonts). */
 export type FontFamily = { family: string; weights: number[]; styles: string[] };
 export type LayoutCheck = { docId: string; rev: number; boards: unknown; summary: FindingSummary; findings: Finding[]; ranAt: number };
@@ -510,6 +515,17 @@ class ViewerClient {
   applyOps(slug: string, ops: DocOp[], description?: string): Promise<OpsResult> {
     return this.#write(
       () => request<OpsResult>('POST', `/viewer/docs/${encodeURIComponent(slug)}/ops`, { ops, ...(description !== undefined ? { description } : {}) }),
+      () => [slug],
+    );
+  }
+
+  /**
+   * Tempel SVG (importer daemon, AD-15) ke board/frame `parentId` sebagai satu commit (lewat antrean tulis).
+   * Respons membawa `inverse` seperti `applyOps` (undo paste) dan laporan atribut yang dibuang.
+   */
+  paste(slug: string, body: PasteBody): Promise<PasteResult> {
+    return this.#write(
+      () => request<PasteResult>('POST', `/viewer/docs/${encodeURIComponent(slug)}/paste`, body),
       () => [slug],
     );
   }
