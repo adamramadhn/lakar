@@ -145,3 +145,12 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-token-3-theme-panel.md`
   summary: Wiring komponen ThemePanel (antrean commit, input sel, popover hapus) tanpa tes otomatis.
   evidence: Viewer belum punya harness tes komponen/DOM (pra-ada); pembangun op dites murni di `themeModel.test.ts` dan alur diverifikasi smoke msedge.
+- source_spec: `_bmad-output/implementation-artifacts/spec-token-4-token-picker.md`
+  summary: Warna shadow tidak punya Token Picker (slot `shadows.color` ada di tabel slot).
+  evidence: Ticket story 4 tidak menyebut efek; baris shadow berupa teks sintaks `drop x y blur` tanpa kotak warna terpisah. Usul: tombol token di swatch shadow dengan `TokenSpec` `['shadows', i, 'color']` (editShadow).
+- source_spec: `_bmad-output/implementation-artifacts/spec-token-4-token-picker.md`
+  summary: Wiring komponen Token Picker/Token Field (posisi popover, keyboard, status open) tanpa tes otomatis.
+  evidence: Viewer belum punya harness tes komponen/DOM (pra-ada); logika saring/pasang/detach/buat dites murni (`tokenPicker.test.ts`) dan lewat core (`tests/token-picker-ops.test.ts`), UI diverifikasi smoke msedge.
+- source_spec: `_bmad-output/implementation-artifacts/spec-token-4-token-picker.md`
+  summary: Verify ticket story 4 (picker tersaring, canvas berubah sesudah ubah token, Detach) dan jalur DesignPanel → route ops hanya dites di tingkat model/core; UI dan canvas live hanya smoke msedge.
+  evidence: Review t4 (intent). Harness komponen/E2E viewer belum ada (pra-ada). Usul: skrip playwright di `scripts/` atau harness DOM yang membuka picker, memasang token, dan membaca gaya computed canvas.

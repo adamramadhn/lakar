@@ -6,6 +6,7 @@ import {
   cellOf,
   countLabel,
   deleteTokenOps,
+  effectiveMode,
   firstType,
   modeIcon,
   modeLabel,
@@ -246,5 +247,14 @@ describe('mode', () => {
     expect(themeModeOps([board('B1')], 'dark', MODES)).toEqual([{ op: 'update', id: 'B1', patch: { themeMode: 'dark' } }]);
     expect(themeModeOps([board('B1', 'dark'), board('B2')], 'light', MODES)).toEqual([{ op: 'update', id: 'B1', patch: { themeMode: null } }]);
     expect(themeModeOps([board('B1', 'dark')], 'dark', MODES)).toEqual([]);
+  });
+});
+
+describe('effectiveMode (mode aktif board untuk Design panel, detach, dan hapus token)', () => {
+  it('themeMode board, lalu mode pertama, lalu undefined tanpa mode', () => {
+    expect(effectiveMode({ type: 'board', themeMode: 'dark' }, ['light', 'dark'])).toBe('dark');
+    expect(effectiveMode({ type: 'board' }, ['light', 'dark'])).toBe('light');
+    expect(effectiveMode(undefined, ['light', 'dark'])).toBe('light');
+    expect(effectiveMode({ type: 'board' }, undefined)).toBeUndefined();
   });
 });

@@ -2232,6 +2232,316 @@ button.panel-tab:hover {
 .dp-token.static {
   cursor: default;
 }
+/* Token Field (desain 07 zjtyn): swatch/ikon jenis, pill token, nilai mode aktif, Detach saat hover; open = garis accent. */
+.dp-tokenfield {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 4px 0 6px;
+  border-radius: 5px;
+  background: var(--input);
+  min-width: 0;
+  flex: 1;
+}
+.dp-tokenfield:hover,
+.dp-tokenfield.open,
+.dp-tokenfield:focus-within {
+  background: var(--surface-hover);
+}
+.dp-tokenfield.open,
+.dp-paint-box:has(.dp-tokenfield-pill[aria-expanded='true'], .dp-token-btn[aria-expanded='true']),
+.dp-field:has(.dp-token-btn[aria-expanded='true']),
+.dp-select:has(.dp-token-btn[aria-expanded='true']) {
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+.dp-tokenfield.disabled {
+  opacity: 0.6;
+}
+.dp-tokenfield-swatch {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+.dp-tokenfield-icon {
+  flex: none;
+  color: var(--text-secondary);
+}
+.dp-tokenfield-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+  max-width: calc(100% - 40px);
+  height: 20px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 4px;
+  background: var(--accent-soft);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  cursor: pointer;
+  min-width: 0;
+}
+.dp-tokenfield-pill svg {
+  flex: none;
+  color: var(--accent);
+}
+.dp-tokenfield-pill span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dp-tokenfield-pill:disabled {
+  cursor: default;
+}
+.dp-tokenfield-value {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+.dp-paint-value:has(.dp-tokenfield-pill) {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.dp-tokenfield-detach,
+.dp-token-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  opacity: 0;
+}
+.dp-tokenfield-detach:hover,
+.dp-token-btn:hover {
+  background: var(--input);
+  color: var(--text-primary);
+}
+.dp-tokenfield:hover .dp-tokenfield-detach,
+.dp-tokenfield:focus-within .dp-tokenfield-detach,
+.dp-paint-box:hover .dp-tokenfield-detach,
+.dp-paint-box:focus-within .dp-tokenfield-detach,
+.dp-field:hover .dp-token-btn,
+.dp-field:focus-within .dp-token-btn,
+.dp-select:hover .dp-token-btn,
+.dp-select:focus-within .dp-token-btn,
+.dp-paint-box:hover .dp-token-btn,
+.dp-paint-box:focus-within .dp-token-btn,
+.dp-token-btn.open {
+  opacity: 1;
+}
+.dp-tokenfield-detach:disabled,
+.dp-token-btn:disabled {
+  opacity: 0 !important;
+  pointer-events: none;
+}
+/* Di kolom angka/select tombol token menumpang di ujung kanan (teks rata kiri), bukan memakan lebar input. */
+.dp-field > .dp-token-btn {
+  position: absolute;
+  right: 3px;
+  top: 3px;
+  background: var(--input);
+}
+.dp-select > .dp-token-btn {
+  position: absolute;
+  right: 22px;
+  top: 3px;
+  background: var(--input);
+}
+.dp-field > .dp-token-btn:hover,
+.dp-select > .dp-token-btn:hover {
+  background: var(--surface-hover);
+}
+.dp-paint-box > .dp-token-btn {
+  width: 20px;
+  height: 20px;
+  margin-right: -2px;
+}
+/* Token Picker (desain 07 ISYSp): 300 lebar, --modal, radius 10, bayangan 0 16 40. */
+.token-picker {
+  position: fixed;
+  display: flex;
+  flex-direction: column;
+  width: 300px;
+  max-height: min(520px, calc(100vh - 16px));
+  border-radius: 10px;
+  background: var(--modal);
+  border: 1px solid var(--border);
+  box-shadow: 0 16px 40px #00000066;
+  overflow: hidden;
+  font-size: 12px;
+}
+.token-picker-search {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 10px 8px;
+  border-bottom: 1px solid var(--border);
+}
+.token-picker-input {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 8px;
+  border-radius: 6px;
+  background: var(--input);
+  box-shadow: inset 0 0 0 1px var(--accent);
+  color: var(--text-muted);
+}
+.token-picker-input input,
+.token-picker-create input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 12px;
+}
+.token-picker-input input::placeholder {
+  color: var(--text-muted);
+}
+.token-picker-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+.token-picker-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  max-height: 320px;
+  padding: 6px;
+  overflow-y: auto;
+}
+.token-picker-group {
+  padding: 6px 8px 2px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+}
+.token-picker-empty {
+  padding: 10px 8px;
+  color: var(--text-muted);
+}
+.token-picker-item,
+.token-picker-action {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+  height: 30px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+.token-picker-item.active,
+.token-picker-action:hover:not(:disabled),
+.token-picker-action:focus-visible {
+  background: var(--surface-hover);
+}
+.token-picker-item.current {
+  background: var(--accent-soft);
+}
+.token-picker-action:disabled {
+  color: var(--text-muted);
+  cursor: default;
+}
+.token-picker-action svg,
+.token-picker-create svg,
+.token-picker-icon {
+  flex: none;
+  color: var(--text-secondary);
+}
+.token-picker-swatch {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+.token-picker-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.token-picker-item .token-picker-name {
+  font-family: var(--font-mono);
+}
+.token-picker-value {
+  flex: none;
+  max-width: 96px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+.token-picker-check {
+  flex: none;
+  color: var(--accent);
+}
+.token-picker-footer {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px;
+  border-top: 1px solid var(--border);
+}
+.token-picker-create {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 30px;
+  padding: 0 8px;
+  border-radius: 6px;
+  background: var(--input);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+.token-picker-create input {
+  font-family: var(--font-mono);
+}
+.token-picker-create input.invalid {
+  color: var(--danger);
+}
+.token-picker-error {
+  padding: 2px 8px 4px;
+  color: var(--danger);
+  font-size: 11px;
+}
 .dp-seg {
   display: flex;
   gap: 2px;

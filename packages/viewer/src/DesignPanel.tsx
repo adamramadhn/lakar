@@ -3,7 +3,7 @@
 // dari node tersimpan (ref token tampil sebagai chip) dan setiap edit yang di-commit (Enter/blur, lepas scrub, pilih
 // segmen/select, tutup color picker) menjadi satu permintaan ops berisi op `update` untuk semua node terpilih (AD-7),
 // lewat `onCommit` Viewer (History + undo, AD-8). Parsing/patch di designValues.ts dan designModel.ts (murni).
-import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react';
+import { Fragment, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { gradientLayerCss } from '@lakar/render';
 import { Blend, type DocOp } from '@lakar/schema';
 import type { FontFamily, InspectNode } from './api';
@@ -80,7 +80,27 @@ import {
   WEIGHT_NAMES,
 } from './designValues';
 import { Menu } from './FileMenu';
-import { modeIcon, modeLabel, readThemeMode, themeModeOps } from './themeModel';
+import { cellOf, modeIcon, modeLabel, newTokenName, readThemeMode, themeModeOps, TYPE_META, type TokenMap } from './themeModel';
+import {
+  anyRef,
+  applyTokenOps,
+  createTokenOps,
+  createValue,
+  fillColorSpec,
+  propSpec,
+  radiusSpec,
+  stopColorSpec,
+  strokeSpec,
+  detachOps,
+  pickerEmpty,
+  pickerGroups,
+  pickerHint,
+  refAt,
+  slotAccepts,
+  specState,
+  tokenValueText,
+  type TokenSpec,
+} from './tokenPicker';
 import { Icon, NODE_ICON, type IconName } from './icons';
 
 type Commit = (ops: DocOp[], description: string) => Promise<boolean>;
@@ -109,7 +129,20 @@ const ALL_WEIGHTS = [100, 200, 300, 400, 500, 600, 700, 800, 900];
 /** Pembangun op dari target terbaru (dievaluasi saat giliran commit-nya tiba). */
 type Build = (targets: DesignTarget[]) => DocOp[];
 /** Kontrol non-aktif bila panel baca-saja (pratinjau versi/offline); `run` mengantre satu edit (satu commit). */
-type Ctx = { disabled: boolean; run: (build: Build, label: string) => void };
+type Ctx = {
+  disabled: boolean;
+  run: (build: Build, label: string) => void;
+  /** Target terpilih saat ini (saringan slot, nilai picker). */
+  targets: DesignTarget[];
+  /** Token dan mode dokumen tampil (epic token-tema story 4). */
+  tokens: TokenMap;
+  modes: readonly string[];
+  /** Kunci spec yang picker-nya sedang terbuka (status "open" Token Field). */
+  pickerKey: string | undefined;
+  openPicker: (anchor: HTMLElement, spec: TokenSpec) => void;
+  /** Token dan mode dokumen terbaru (dibaca pembangun op saat gilirannya tiba, bukan salinan saat klik). */
+  latest: () => { tokens: TokenMap; modes: readonly string[] };
+};
 /** Batas tunggu rev commit sebelumnya sebelum antrean edit dilanjutkan (dokumen gagal dimuat ulang). */
 const PENDING_MAX_MS = 3000;
 
@@ -122,6 +155,311 @@ function TokenChip({ name, onClick, disabled }: { name: string; onClick: () => v
     <button type="button" className="dp-token" title={`Token ${name}. Edit the value to detach it.`} disabled={disabled} onClick={onClick}>
       {name}
     </button>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Token Field dan Token Picker (epic token-tema story 4, desain 07 u5v2n/XvZQy, komponen Token Field zjtyn)
+// ---------------------------------------------------------------------------
+
+/** Kunci spec (status open Token Field / tombol token). */
+const specKey = (s: TokenSpec) => `${s.label}:${s.propPath.join('.')}`;
+/** Jangkar posisi picker: kotak field terdekat. */
+const anchorOf = (el: HTMLElement) => el.closest<HTMLElement>('.dp-tokenfield, .dp-paint-box, .dp-field, .dp-select') ?? el;
+
+/** Detach slot `spec` di semua node terpilih: literal nilai mode efektif board masing-masing (satu commit). */
+function runDetach(ctx: Ctx, spec: TokenSpec) {
+  const now = detachOps(ctx.targets, spec, ctx.tokens, ctx.modes);
+  if ('error' in now || now.ops.length === 0) return;
+  ctx.run((ts) => {
+    const { tokens, modes } = ctx.latest();
+    const b = detachOps(ts, spec, tokens, modes);
+    return 'error' in b ? [] : b.ops;
+  }, now.label);
+}
+
+/** Tombol ikon diamond di ujung field literal: membuka picker (title "Apply token"). Tanpa slot token → tidak tampil. */
+function TokenButton({ spec, ctx, disabled }: { spec: TokenSpec; ctx: Ctx; disabled?: boolean | undefined }) {
+  if (!slotAccepts(ctx.targets, spec.propPath)) return null;
+  const open = ctx.pickerKey === specKey(spec);
+  return (
+    <button
+      type="button"
+      className={`dp-token-btn${open ? ' open' : ''}`}
+      title="Apply token"
+      aria-label={`Apply token to ${spec.label}`}
+      aria-haspopup="dialog"
+      aria-expanded={open}
+      disabled={ctx.disabled || disabled}
+      onClick={(e) => {
+        e.preventDefault();
+        ctx.openPicker(anchorOf(e.currentTarget), spec);
+      }}
+    >
+      <Icon name="diamond" size={12} />
+    </button>
+  );
+}
+
+/** Isi Token Field: pill nama (klik = picker), nilai mode aktif (dobel-klik = ketik literal), tombol Detach. */
+function TokenParts({ name, spec, ctx, text, onEditValue }: { name: string; spec: TokenSpec; ctx: Ctx; text: string; onEditValue?: (() => void) | undefined }) {
+  const open = ctx.pickerKey === specKey(spec);
+  return (
+    <>
+      <button
+        type="button"
+        className="dp-tokenfield-pill"
+        title={`Token ${name}`}
+        aria-label={`${spec.label}: token ${name}. Change token`}
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        disabled={ctx.disabled}
+        onClick={(e) => ctx.openPicker(anchorOf(e.currentTarget), spec)}
+      >
+        <Icon name="diamond" size={10} />
+        <span>{name}</span>
+      </button>
+      <span
+        className="dp-tokenfield-value"
+        title={onEditValue && !ctx.disabled ? 'Double-click to type a value (detaches the token)' : undefined}
+        {...(onEditValue && !ctx.disabled ? { role: 'button', tabIndex: 0, 'aria-label': `Type a value for ${spec.label} (detaches the token)` } : {})}
+        onDoubleClick={() => !ctx.disabled && onEditValue?.()}
+        onKeyDown={(e) => {
+          if (!ctx.disabled && onEditValue && (e.key === 'Enter' || e.key === 'F2')) {
+            e.preventDefault();
+            onEditValue();
+          }
+        }}
+      >
+        {text}
+      </span>
+      <button type="button" className="dp-tokenfield-detach" title="Detach token" aria-label={`Detach token ${name}`} disabled={ctx.disabled} onClick={() => runDetach(ctx, spec)}>
+        <Icon name="unlink" size={13} />
+      </button>
+    </>
+  );
+}
+
+/** Token Field (zjtyn): ikon jenis menggantikan label (desain Gap/Radius), lalu pill, nilai, Detach. */
+function TokenField({ name, spec, ctx, text, className, onEditValue }: { name: string; spec: TokenSpec; ctx: Ctx; text: string; className?: string | undefined; onEditValue?: (() => void) | undefined }) {
+  const def = ctx.tokens[name];
+  const open = ctx.pickerKey === specKey(spec);
+  return (
+    <div className={`dp-tokenfield${open ? ' open' : ''}${ctx.disabled ? ' disabled' : ''}${className ? ` ${className}` : ''}`} title={spec.label}>
+      {def?.type === 'color' ? (
+        <i className="dp-tokenfield-swatch" style={{ background: swatchCss(cellOf(def, ctx.targets[0]?.mode, ctx.modes).value) }} />
+      ) : (
+        <Icon name={def ? TYPE_META[def.type].icon : 'diamond'} size={13} className="dp-tokenfield-icon" />
+      )}
+      <TokenParts name={name} spec={spec} ctx={ctx} text={text} onEditValue={onEditValue} />
+    </div>
+  );
+}
+
+const PICKER_W = 300;
+
+/**
+ * Token Picker (ISYSp): pencarian, token bertipe cocok slot per grup (nilai mode efektif node pertama), Detach token,
+ * Create token from value. ↑/↓ + Enter memilih, Escape/klik luar menutup. Setiap aksi = satu `ctx.run` (satu commit).
+ */
+function TokenPicker({ anchor, trigger, spec, ctx, onClose }: { anchor: HTMLElement; trigger: HTMLElement | undefined; spec: TokenSpec; ctx: Ctx; onClose: () => void }) {
+  const targets = ctx.targets;
+  const slot = slotAccepts(targets, spec.propPath);
+  const state = specState(targets, spec);
+  const current = refAt(state);
+  const mode = targets[0]?.mode;
+  const [query, setQuery] = useState('');
+  const [active, setActive] = useState<number | undefined>(undefined);
+  const [naming, setNaming] = useState<string | undefined>(undefined);
+  const [error, setError] = useState<string | undefined>(undefined);
+  const ref = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<{ left: number; top: number } | undefined>(undefined);
+  const groups = slot ? pickerGroups(ctx.tokens, slot.accepts, query, mode, ctx.modes) : [];
+  const rows = groups.flatMap((g) => g.rows);
+  // Fokus kembali ke pemicu saat picker ditutup (pola Menu). Pemicu direkam saat dibuka: autoFocus pencarian sudah
+  // memindah fokus sebelum efek ini jalan. Pemicu yang sudah hilang (Token Field ↔ Field) → jangkar.
+  useLayoutEffect(
+    () => () => {
+      const back = trigger?.isConnected ? trigger : anchor.isConnected ? anchor.querySelector<HTMLElement>('button, input') : null;
+      back?.focus({ preventScroll: true });
+    },
+    [],
+  );
+  // Kiri panel Design (jarak 12) sejajar atas field; tidak muat (bottom sheet) → di bawah field. Dijepit ke viewport.
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const a = anchor.getBoundingClientRect();
+    const panel = anchor.closest('.design-panel')?.getBoundingClientRect();
+    const h = el.offsetHeight;
+    const side = panel ? panel.left - PICKER_W - 12 : -1;
+    const left = side >= 8 ? side : Math.max(8, Math.min(a.left, window.innerWidth - PICKER_W - 8));
+    const top0 = side >= 8 ? a.top - 10 : a.bottom + 4;
+    setPos({ left, top: Math.max(8, Math.min(top0, window.innerHeight - h - 8)) });
+  }, [anchor, rows.length, naming !== undefined, error]);
+  const activeId = (i: number) => `token-picker-opt-${i}`;
+  useEffect(() => {
+    ref.current?.querySelector('.token-picker-item.active')?.scrollIntoView({ block: 'nearest' });
+  });
+  if (!slot) return null;
+  const at = active !== undefined && active < rows.length ? active : Math.max(0, rows.findIndex((r) => r.name === current));
+  const pick = (name: string) => {
+    onClose();
+    const now = applyTokenOps(targets, spec, name);
+    if ('error' in now || now.ops.length === 0) return;
+    ctx.run((ts) => {
+      const b = applyTokenOps(ts, spec, name);
+      return 'error' in b ? [] : b.ops;
+    }, now.label);
+  };
+  const create = (name: string) => {
+    const now = createTokenOps(ctx.tokens, name, slot.primary, state, targets, spec);
+    if ('error' in now) return setError(now.error);
+    onClose();
+    ctx.run((ts) => {
+      const b = createTokenOps(ctx.latest().tokens, name, slot.primary, specState(ts, spec), ts, spec);
+      return 'error' in b ? [] : b.ops;
+    }, now.label);
+  };
+  const detachable = anyRef(targets, spec.read);
+  const curDef = current ? ctx.tokens[current] : undefined;
+  const value = createValue(state, slot.primary);
+  const onKey = (e: React.KeyboardEvent) => {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      e.stopPropagation();
+      onClose();
+    }
+  };
+  return (
+    <div className="menu-layer" onMouseDown={(e) => e.target === e.currentTarget && onClose()} onContextMenu={(e) => { e.preventDefault(); onClose(); }}>
+      <div
+        ref={ref}
+        className="token-picker"
+        role="dialog"
+        aria-label={`${spec.label} tokens`}
+        style={pos ? { left: pos.left, top: pos.top } : { left: -9999, top: -9999 }}
+        onKeyDown={onKey}
+      >
+        <div className="token-picker-search">
+          <label className="token-picker-input">
+            <Icon name="search" size={13} />
+            <input
+              autoFocus
+              value={query}
+              placeholder="Search tokens"
+              aria-label="Search tokens"
+              spellCheck={false}
+              role="combobox"
+              aria-expanded
+              aria-controls="token-picker-list"
+              aria-activedescendant={rows.length ? activeId(at) : undefined}
+              onChange={(e) => {
+                setQuery(e.currentTarget.value);
+                setActive(0);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+                  e.preventDefault();
+                  if (rows.length) setActive((at + (e.key === 'ArrowDown' ? 1 : -1) + rows.length) % rows.length);
+                } else if (e.key === 'Enter') {
+                  e.preventDefault();
+                  const r = rows[at];
+                  if (r) pick(r.name);
+                }
+              }}
+            />
+          </label>
+          <div className="token-picker-meta">
+            <Icon name={slot.accepts.length === 1 ? TYPE_META[slot.accepts[0]!].icon : 'diamond'} size={12} />
+            <span>{pickerHint(slot.accepts, mode, ctx.modes)}</span>
+          </div>
+        </div>
+        <div className="token-picker-list" id="token-picker-list" role="listbox" aria-label="Tokens">
+          {rows.length === 0 && <div className="token-picker-empty">{pickerEmpty(slot.accepts, query)}</div>}
+          {groups.map((g) => (
+            <Fragment key={g.group}>
+              {g.group && <div className="token-picker-group">{g.group}</div>}
+              {g.rows.map((r) => {
+                const i = rows.indexOf(r);
+                const on = r.name === current;
+                return (
+                  <button
+                    key={r.name}
+                    id={activeId(i)}
+                    type="button"
+                    tabIndex={-1}
+                    role="option"
+                    aria-selected={on}
+                    className={`token-picker-item${on ? ' current' : ''}${i === at ? ' active' : ''}`}
+                    onMouseEnter={() => setActive(i)}
+                    onClick={() => pick(r.name)}
+                  >
+                    {r.type === 'color' ? <i className="token-picker-swatch" style={{ background: swatchCss(r.value) }} /> : <Icon name={TYPE_META[r.type].icon} size={13} className="token-picker-icon" />}
+                    <span className="token-picker-name">{r.name}</span>
+                    <span className="token-picker-value">{r.text}</span>
+                    {on && <Icon name="check" size={13} className="token-picker-check" />}
+                  </button>
+                );
+              })}
+            </Fragment>
+          ))}
+        </div>
+        <div className="token-picker-footer">
+          {detachable && (
+            <button type="button" className="token-picker-action" onClick={() => { onClose(); runDetach(ctx, spec); }}>
+              <Icon name="unlink" size={13} />
+              <span className="token-picker-name">Detach token</span>
+              {curDef && <span className="token-picker-value">{`keeps ${tokenValueText(curDef, mode, ctx.modes)}`}</span>}
+            </button>
+          )}
+          {naming === undefined ? (
+            <button
+              type="button"
+              className="token-picker-action"
+              disabled={value === undefined}
+              title={value === undefined ? (state.mixed ? 'Selected layers have different values' : `This value can't be a ${TYPE_META[slot.primary].label.toLowerCase()} token`) : undefined}
+              onClick={() => {
+                setError(undefined);
+                setNaming(newTokenName(ctx.tokens, slot.primary));
+              }}
+            >
+              <Icon name="plus" size={13} />
+              <span className="token-picker-name">Create token from value</span>
+            </button>
+          ) : (
+            <div className="token-picker-create">
+              <Icon name="plus" size={13} />
+              <input
+                autoFocus
+                value={naming}
+                aria-label="New token name"
+                spellCheck={false}
+                className={error ? 'invalid' : undefined}
+                onFocus={(e) => e.currentTarget.select()}
+                onChange={(e) => {
+                  setNaming(e.currentTarget.value);
+                  setError(undefined);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    create(naming);
+                  } else if (e.key === 'Escape') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setNaming(undefined);
+                    setError(undefined);
+                  }
+                }}
+              />
+              <span className="token-picker-value">{value === undefined ? '' : TYPE_META[slot.primary].format(value)}</span>
+            </div>
+          )}
+          {error && <div className="token-picker-error" role="alert">{error}</div>}
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -140,13 +478,15 @@ type FieldProps = {
   placeholder?: string | undefined;
   className?: string | undefined;
   title?: string | undefined;
+  /** Slot token field (story 4): ref = Token Field, literal = tombol token. */
+  token?: { spec: TokenSpec; ctx: Ctx } | undefined;
 };
 
 /**
  * Kolom angka/teks (komponen Field): Enter/blur commit, Escape batal, ref token = chip (klik → input berisi nilai
  * resolve; nilai sama = ref tetap). Scrub: drag horizontal pada label, pratinjau hanya di kolom, commit saat lepas.
  */
-function Field({ label, state, format, parse, onCommit, disabled, scrub, placeholder, className, title }: FieldProps) {
+function Field({ label, state, format, parse, onCommit, disabled, scrub, placeholder, className, title, token: slot }: FieldProps) {
   const [draft, setDraft] = useState<string | undefined>(undefined);
   const [scrubText, setScrubText] = useState<string | undefined>(undefined);
   const input = useRef<HTMLInputElement>(null);
@@ -209,6 +549,9 @@ function Field({ label, state, format, parse, onCommit, disabled, scrub, placeho
     target.addEventListener('pointercancel', onCancel);
     window.addEventListener('keydown', onKey, true);
   };
+  if (token && slot && !tokenOpen && draft === undefined && scrubText === undefined) {
+    return <TokenField name={token} spec={slot.spec} ctx={slot.ctx} text={shown} className={className} onEditValue={() => setTokenOpen(true)} />;
+  }
   return (
     // div (bukan label): klik label untuk scrub tidak boleh memfokuskan input (draft lama akan tertahan).
     <div className={`dp-field${disabled ? ' disabled' : ''}${className ? ` ${className}` : ''}`} title={title}>
@@ -256,6 +599,7 @@ function Field({ label, state, format, parse, onCommit, disabled, scrub, placeho
           }}
         />
       )}
+      {slot && !token && scrubText === undefined && <TokenButton spec={slot.spec} ctx={slot.ctx} disabled={disabled} />}
     </div>
   );
 }
@@ -312,6 +656,7 @@ function SelectField({
   onPick,
   disabled,
   className,
+  token: slot,
 }: {
   label?: string;
   state: FieldState;
@@ -319,8 +664,11 @@ function SelectField({
   onPick: (v: string) => void;
   disabled: boolean;
   className?: string;
+  /** Slot token (story 4): ref = Token Field, literal = tombol token di dalam kotak select. */
+  token?: { spec: TokenSpec; ctx: Ctx } | undefined;
 }) {
   const token = !state.mixed && isTokenRef(state.value) ? state.value.$token : undefined;
+  if (token && slot) return <TokenField name={token} spec={slot.spec} ctx={slot.ctx} text={state.mixed ? '' : String(state.resolved ?? '')} className={className} />;
   const cur = state.mixed ? '__mixed' : token ? '__token' : state.value === undefined ? '__unset' : String(state.value);
   const known = options.some(([v]) => v === cur);
   return (
@@ -358,6 +706,7 @@ function SelectField({
         ))}
       </select>
       <Icon name="chevronDown" size={12} className="dp-select-chevron" />
+      {slot && !token && <TokenButton spec={slot.spec} ctx={slot.ctx} disabled={disabled} />}
     </label>
   );
 }
@@ -391,10 +740,13 @@ function Swatch({ background, pick, onClick, disabled, title }: { background: st
 }
 
 /** Nilai warna di Paint Row: hex yang bisa diketik; ref token = chip, klik → input berisi hex resolve (detach). */
-function ColorValue({ stored, resolved, onHex, disabled, mixed, placeholder, label }: { stored: unknown; resolved: unknown; onHex: (hex: string) => void; disabled: boolean; mixed?: boolean; placeholder?: string; label: string }) {
+function ColorValue({ stored, resolved, onHex, disabled, mixed, placeholder, label, token: slot }: { stored: unknown; resolved: unknown; onHex: (hex: string) => void; disabled: boolean; mixed?: boolean; placeholder?: string; label: string; token?: { spec: TokenSpec; ctx: Ctx } | undefined }) {
   const [open, setOpen] = useState(false);
   const token = !mixed && isTokenRef(stored) ? stored.$token : undefined;
   useEffect(() => setOpen(false), [token]);
+  if (token && slot && !open) {
+    return <TokenParts name={token} spec={slot.spec} ctx={slot.ctx} text={hexText(resolved).replace(/^#/, '')} onEditValue={() => setOpen(true)} />;
+  }
   if (token && !open) {
     return <TokenChip name={token} disabled={disabled} onClick={() => setOpen(true)} />;
   }
@@ -412,13 +764,14 @@ function ColorValue({ stored, resolved, onHex, disabled, mixed, placeholder, lab
 }
 
 /** Paint Row: kotak (swatch + nilai + opacity) + tombol hapus. */
-function PaintRow({ swatch, value, opacity, onRemove, disabled, removeTitle, drag }: { swatch: ReactNode; value: ReactNode; opacity?: ReactNode; onRemove?: (() => void) | undefined; disabled: boolean; removeTitle?: string; drag?: DragProps | undefined }) {
+function PaintRow({ swatch, value, opacity, extra, onRemove, disabled, removeTitle, drag }: { swatch: ReactNode; value: ReactNode; opacity?: ReactNode; extra?: ReactNode; onRemove?: (() => void) | undefined; disabled: boolean; removeTitle?: string; drag?: DragProps | undefined }) {
   return (
     <div className={`dp-paint${drag?.over ? ' drop-over' : ''}`} {...(drag ? { draggable: !disabled, onDragStart: drag.onDragStart, onDragOver: drag.onDragOver, onDragLeave: drag.onDragLeave, onDrop: drag.onDrop, onDragEnd: drag.onDragEnd } : {})}>
       <div className="dp-paint-box">
         {swatch}
         <div className="dp-paint-value">{value}</div>
         {opacity !== undefined && <div className="dp-paint-opacity">{opacity}</div>}
+        {extra}
       </div>
       {onRemove && (
         <button type="button" className="dp-icon-btn" title={removeTitle ?? 'Remove'} aria-label={removeTitle ?? 'Remove'} disabled={disabled} onClick={onRemove}>
@@ -559,6 +912,7 @@ function PositionGroup({ targets, ctx, bounds }: { targets: DesignTarget[]; ctx:
           placeholder={measured !== undefined ? formatNumber(measured) : mode === 'fill' ? 'Fill' : 'Hug'}
           disabled={ctx.disabled}
           scrub={{ step: 1, min: 0, base: measured }}
+          token={{ spec: propSpec(axis, axis === 'width' ? 'Width' : 'Height'), ctx }}
           onCommit={(v) => ctx.run((ts) => setProp(ts, axis, Math.round(Number(v) * 100) / 100), `Change ${axis}`)}
         />
         {!board && (
@@ -598,6 +952,7 @@ function AutoLayoutGroup({ targets, ctx }: { targets: DesignTarget[]; ctx: Ctx }
   const padding = (
     <Field
       label="Padding"
+      token={{ spec: propSpec('padding', 'Padding', (n) => n.padding ?? 0), ctx }}
       state={readField(targets, (n) => n.padding ?? 0)}
       format={(v) => formatPadding(v)}
       parse={parsePadding}
@@ -617,6 +972,7 @@ function AutoLayoutGroup({ targets, ctx }: { targets: DesignTarget[]; ctx: Ctx }
       scrub={{ step: 1, min: 0 }}
       disabled={ctx.disabled}
       onCommit={(v) => ctx.run((ts) => setProp(ts, key, v), `Change ${label.toLowerCase()}`)}
+      token={{ spec: propSpec(key, label, (n) => axisGapOf(n, key)), ctx }}
     />
   );
   return (
@@ -680,7 +1036,7 @@ function AutoLayoutGroup({ targets, ctx }: { targets: DesignTarget[]; ctx: Ctx }
       {!grid && (on || dir.mixed) && (
         <>
           <div className="dp-row">
-            <Field label="Gap" state={readField(targets, (n) => n.gap ?? 0)} format={num} parse={(t) => parseNumber(t)} scrub={{ step: 1 }} disabled={ctx.disabled} onCommit={(v) => ctx.run((ts) => setProp(ts, 'gap', v), 'Change gap')} />
+            <Field label="Gap" state={readField(targets, (n) => n.gap ?? 0)} format={num} parse={(t) => parseNumber(t)} scrub={{ step: 1 }} disabled={ctx.disabled} onCommit={(v) => ctx.run((ts) => setProp(ts, 'gap', v), 'Change gap')} token={{ spec: propSpec('gap', 'Gap', (n) => n.gap ?? 0), ctx }} />
             {padding}
           </div>
           <div className="dp-row">
@@ -702,7 +1058,10 @@ function ColorRow({
   removeTitle,
   value,
   placeholder,
+  token,
 }: {
+  /** Slot token warna (story 4): ref = pill + Detach (opacity disembunyikan), literal = tombol token. */
+  token?: { spec: TokenSpec; ctx: Ctx } | undefined;
   state: FieldState;
   /** Warna baru lengkap `#RRGGBB[AA]` (alpha lama sudah dipertahankan pemanggil bila perlu). */
   onColor: (next: { hex?: string; alpha?: number }) => void;
@@ -713,14 +1072,16 @@ function ColorRow({
   placeholder?: string;
 }) {
   const resolved = state.mixed ? undefined : state.resolved;
+  const ref = token && refAt(state) !== undefined;
   return (
     <PaintRow
       disabled={disabled}
       onRemove={onRemove}
       {...(removeTitle ? { removeTitle } : {})}
       swatch={<Swatch background={swatchCss(resolved)} disabled={disabled} title="Pick color" pick={(hex) => onColor({ hex })} />}
-      value={value ?? <ColorValue label="Hex color" stored={state.mixed ? undefined : state.value} resolved={resolved} mixed={state.mixed} placeholder={placeholder} disabled={disabled} onHex={(hex) => onColor({ hex })} />}
-      opacity={<InlineInput label="Opacity" className="dp-opacity" value={state.mixed ? '' : alphaText(resolved)} disabled={disabled || state.mixed || !splitHex(resolved)} onCommit={(t) => { const a = parsePercent(t); if (a !== undefined) onColor({ alpha: a }); }} />}
+      value={value ?? <ColorValue label="Hex color" stored={state.mixed ? undefined : state.value} resolved={resolved} mixed={state.mixed} placeholder={placeholder} disabled={disabled} onHex={(hex) => onColor({ hex })} token={token} />}
+      extra={token && !ref ? <TokenButton spec={token.spec} ctx={token.ctx} disabled={disabled} /> : undefined}
+      opacity={ref ? undefined : <InlineInput label="Opacity" className="dp-opacity" value={state.mixed ? '' : alphaText(resolved)} disabled={disabled || state.mixed || !splitHex(resolved)} onCommit={(t) => { const a = parsePercent(t); if (a !== undefined) onColor({ alpha: a }); }} />}
     />
   );
 }
@@ -739,14 +1100,14 @@ function TypographyGroup({ targets, ctx, fonts }: { targets: DesignTarget[]; ctx
   return (
     <Group title="Typography">
       <div className="dp-row">
-        <SelectField state={family} options={familyOptions} className="dp-grow" disabled={ctx.disabled} onPick={(v) => ctx.run((ts) => setProp(ts, 'family', v), 'Change font family')} />
+        <SelectField state={family} options={familyOptions} className="dp-grow" disabled={ctx.disabled} onPick={(v) => ctx.run((ts) => setProp(ts, 'family', v), 'Change font family')} token={{ spec: propSpec('family', 'Font family', (n) => n.family ?? 'Inter'), ctx }} />
       </div>
       <div className="dp-row">
-        <SelectField state={weightState} options={weightOptions} className="dp-grow" disabled={ctx.disabled} onPick={(v) => ctx.run((ts) => setProp(ts, 'weight', Number(v)), 'Change font weight')} />
-        <Field className="dp-w96" label="Size" state={readField(targets, (n) => n.size)} format={num} parse={parsePositive} scrub={{ step: 1, min: 1 }} disabled={ctx.disabled} onCommit={(v) => ctx.run((ts) => setProp(ts, 'size', v), 'Change font size')} />
+        <SelectField state={weightState} options={weightOptions} className="dp-grow" disabled={ctx.disabled} onPick={(v) => ctx.run((ts) => setProp(ts, 'weight', Number(v)), 'Change font weight')} token={{ spec: propSpec('weight', 'Font weight', (n) => n.weight ?? 400), ctx }} />
+        <Field className="dp-w96" label="Size" state={readField(targets, (n) => n.size)} format={num} parse={parsePositive} scrub={{ step: 1, min: 1 }} disabled={ctx.disabled} onCommit={(v) => ctx.run((ts) => setProp(ts, 'size', v), 'Change font size')} token={{ spec: propSpec('size', 'Font size'), ctx }} />
       </div>
       <div className="dp-row">
-        <Field label="Line height" state={readField(targets, (n) => n.lineHeight)} format={num} parse={parsePositive} placeholder="Auto" scrub={{ step: 1, min: 1 }} disabled={ctx.disabled} onCommit={(v) => ctx.run((ts) => setProp(ts, 'lineHeight', v), 'Change line height')} />
+        <Field label="Line height" state={readField(targets, (n) => n.lineHeight)} format={num} parse={parsePositive} placeholder="Auto" scrub={{ step: 1, min: 1 }} disabled={ctx.disabled} onCommit={(v) => ctx.run((ts) => setProp(ts, 'lineHeight', v), 'Change line height')} token={{ spec: propSpec('lineHeight', 'Line height'), ctx }} />
         <Field
           label="Letter spacing"
           title="Letter spacing as a fraction of the font size (em)"
@@ -756,6 +1117,7 @@ function TypographyGroup({ targets, ctx, fonts }: { targets: DesignTarget[]; ctx
           scrub={{ step: 0.01 }}
           disabled={ctx.disabled}
           onCommit={(v) => ctx.run((ts) => setProp(ts, 'letterSpacing', v), 'Change letter spacing')}
+          token={{ spec: propSpec('letterSpacing', 'Letter spacing', (n) => n.letterSpacing ?? 0), ctx }}
         />
       </div>
       <div className="dp-row">
@@ -775,6 +1137,7 @@ function TypographyGroup({ targets, ctx, fonts }: { targets: DesignTarget[]; ctx
       </div>
       <ColorRow
         state={color}
+        token={{ spec: propSpec('color', 'Color'), ctx }}
         placeholder="Default"
         disabled={ctx.disabled}
         onColor={(c) => {
@@ -791,10 +1154,11 @@ function IconGroup({ targets, ctx }: { targets: DesignTarget[]; ctx: Ctx }) {
   return (
     <Group title="Icon">
       <div className="dp-row">
-        <Field label="Size" state={readField(targets, (n) => n.size)} format={num} parse={parsePositive} scrub={{ step: 1, min: 1 }} disabled={ctx.disabled} onCommit={(v) => ctx.run((ts) => setProp(ts, 'size', v), 'Change icon size')} />
+        <Field label="Size" state={readField(targets, (n) => n.size)} format={num} parse={parsePositive} scrub={{ step: 1, min: 1 }} disabled={ctx.disabled} onCommit={(v) => ctx.run((ts) => setProp(ts, 'size', v), 'Change icon size')} token={{ spec: propSpec('size', 'Icon size'), ctx }} />
       </div>
       <ColorRow
         state={color}
+        token={{ spec: propSpec('color', 'Color'), ctx }}
         placeholder="Default"
         disabled={ctx.disabled}
         onColor={(c) => {
@@ -829,7 +1193,8 @@ function FillEditor({ index, fill, resolved, ctx }: { index: number; fill: FillL
         <PaintRow
           disabled={ctx.disabled}
           swatch={<Swatch background={swatchCss(resolved.color)} title="Pick color" disabled={ctx.disabled} pick={(hex) => edit((f, r) => solidColor(f, r, hex), 'Change fill')} />}
-          value={<ColorValue label="Fill color" stored={fill.color} resolved={resolved.color} disabled={ctx.disabled} onHex={(hex) => edit((f, r) => solidColor(f, r, hex), 'Change fill')} />}
+          value={<ColorValue label="Fill color" stored={fill.color} resolved={resolved.color} disabled={ctx.disabled} onHex={(hex) => edit((f, r) => solidColor(f, r, hex), 'Change fill')} token={{ spec: fillColorSpec(index), ctx }} />}
+          extra={isTokenRef(fill.color) ? undefined : <TokenButton spec={fillColorSpec(index)} ctx={ctx} />}
         />
       )}
       {fill.type === 'linear' && (
@@ -850,7 +1215,8 @@ function FillEditor({ index, fill, resolved, ctx }: { index: number; fill: FillL
           key={k}
           disabled={ctx.disabled}
           swatch={<Swatch background={swatchCss(rStops[k]?.color)} title="Pick stop color" disabled={ctx.disabled} pick={(hex) => edit((f, r) => editStop(f, r, k, { hex }), 'Change gradient stop')} />}
-          value={<ColorValue label="Stop color" stored={s.color} resolved={rStops[k]?.color} disabled={ctx.disabled} onHex={(hex) => edit((f, r) => editStop(f, r, k, { hex }), 'Change gradient stop')} />}
+          value={<ColorValue label="Stop color" stored={s.color} resolved={rStops[k]?.color} disabled={ctx.disabled} onHex={(hex) => edit((f, r) => editStop(f, r, k, { hex }), 'Change gradient stop')} token={{ spec: stopColorSpec(index, k), ctx }} />}
+          extra={isTokenRef(s.color) ? undefined : <TokenButton spec={stopColorSpec(index, k)} ctx={ctx} />}
           opacity={
             <InlineInput
               label="Stop position"
@@ -936,13 +1302,14 @@ function FillGroup({ targets, ctx }: { targets: DesignTarget[]; ctx: Ctx }) {
               swatch={<Swatch background={isSolid ? swatchCss(resolved.color) : fillCss(resolved)} title={editable ? 'Edit fill' : label} disabled={!editable} onClick={toggle} />}
               value={
                 isSolid ? (
-                  <ColorValue label="Hex color" stored={fill.color} resolved={resolved.color} disabled={ctx.disabled} onHex={(hex) => ctx.run((ts) => editFill(ts, index, (f, r) => solidColor(f, r, hex)), 'Change fill')} />
+                  <ColorValue label="Hex color" stored={fill.color} resolved={resolved.color} disabled={ctx.disabled} onHex={(hex) => ctx.run((ts) => editFill(ts, index, (f, r) => solidColor(f, r, hex)), 'Change fill')} token={{ spec: fillColorSpec(index), ctx }} />
                 ) : (
                   <span className="dp-muted">{label}</span>
                 )
               }
+              extra={isSolid && !isTokenRef(fill.color) ? <TokenButton spec={fillColorSpec(index)} ctx={ctx} /> : undefined}
               opacity={
-                isSolid ? (
+                isSolid && isTokenRef(fill.color) ? undefined : isSolid ? (
                   <InlineInput
                     label="Fill opacity"
                     className="dp-opacity"
@@ -983,6 +1350,7 @@ function StrokeGroup({ targets, ctx }: { targets: DesignTarget[]; ctx: Ctx }) {
         <>
           <ColorRow
             state={color}
+            token={{ spec: strokeSpec('color', 'Stroke color'), ctx }}
             disabled={ctx.disabled || !has}
             onRemove={() => ctx.run((ts) => removeStroke(ts), 'Remove stroke')}
             removeTitle="Remove stroke"
@@ -994,7 +1362,7 @@ function StrokeGroup({ targets, ctx }: { targets: DesignTarget[]; ctx: Ctx }) {
             }}
           />
           <div className="dp-row">
-            <Field className="dp-w64" label="W" state={width} format={num} parse={parseSize} scrub={{ step: 1, min: 0 }} disabled={ctx.disabled || !has} onCommit={(v) => ctx.run((ts) => setStroke(ts, { width: v }), 'Change stroke width')} />
+            <Field className="dp-w64" label="W" state={width} format={num} parse={parseSize} scrub={{ step: 1, min: 0 }} disabled={ctx.disabled || !has} onCommit={(v) => ctx.run((ts) => setStroke(ts, { width: v }), 'Change stroke width')} token={{ spec: strokeSpec('width', 'Stroke width'), ctx }} />
             <Segmented<'inside' | 'center' | 'outside'>
               label="Stroke align"
               className="dp-grow"
@@ -1045,7 +1413,7 @@ function RadiusGroup({ targets, ctx }: { targets: DesignTarget[]; ctx: Ctx }) {
   return (
     <Group title="Radius">
       <div className="dp-row">
-        <Field label="All" className="dp-grow" state={allState} format={num} parse={parseSize} scrub={{ step: 1, min: 0 }} disabled={ctx.disabled} onCommit={(v) => ctx.run((ts) => setRadiusAll(ts, v), 'Change radius')} />
+        <Field label="All" className="dp-grow" state={allState} format={num} parse={parseSize} scrub={{ step: 1, min: 0 }} disabled={ctx.disabled} onCommit={(v) => ctx.run((ts) => setRadiusAll(ts, v), 'Change radius')} token={{ spec: radiusSpec(), ctx }} />
         <button
           type="button"
           className={`dp-icon-btn boxed${corners ? ' active' : ''}`}
@@ -1061,7 +1429,7 @@ function RadiusGroup({ targets, ctx }: { targets: DesignTarget[]; ctx: Ctx }) {
       {corners && (
         <div className="dp-row">
           {CORNERS.map((c, i) => (
-            <Field key={c} label={c} state={corner(i)} format={num} parse={parseSize} scrub={{ step: 1, min: 0 }} disabled={ctx.disabled} onCommit={(v) => ctx.run((ts) => setRadiusCorner(ts, i, v), 'Change corner radius')} />
+            <Field key={c} label={c} state={corner(i)} format={num} parse={parseSize} scrub={{ step: 1, min: 0 }} disabled={ctx.disabled} onCommit={(v) => ctx.run((ts) => setRadiusCorner(ts, i, v), 'Change corner radius')} token={{ spec: radiusSpec(i, `${c} radius`), ctx }} />
           ))}
         </div>
       )}
@@ -1168,6 +1536,8 @@ export type DesignPanelProps = {
   align?: { enabled: Record<EditAction, boolean>; run: (a: EditAction) => void } | undefined;
   /** `tokenModes` dokumen tampil (epic token-tema story 3): grup Theme mode untuk board. */
   tokenModes?: readonly string[] | undefined;
+  /** Token dokumen tampil (epic token-tema story 4): Token Field dan Token Picker. */
+  tokens?: TokenMap | undefined;
 };
 
 /** Grup "Theme mode" board (desain tuEOt/mjY37): ≤ 3 mode = segmented, lebih = select; mode pertama = default. */
@@ -1201,13 +1571,21 @@ function AlignGroup({ align, disabled }: { align: NonNullable<DesignPanelProps['
   );
 }
 
-export function DesignPanel({ targets, path, editable, fonts, inspectNode, rev, onCommit, align, tokenModes }: DesignPanelProps) {
+export function DesignPanel({ targets, path, editable, fonts, inspectNode, rev, onCommit, align, tokenModes, tokens }: DesignPanelProps) {
   const [menu, setMenu] = useState<{ x: number; y: number } | undefined>(undefined);
+  const [picker, setPicker] = useState<{ anchor: HTMLElement; spec: TokenSpec; trigger: HTMLElement | undefined } | undefined>(undefined);
+  // Picker ditutup saat seleksi berganti, panel menjadi baca-saja (pratinjau/offline), atau field jangkarnya hilang
+  // sesudah rev baru (fill/stroke dihapus agen, undo): spec lama tidak boleh menulis ke slot yang sudah bergeser.
+  const selKey = targets.map((t) => t.id).join(',');
+  useEffect(() => setPicker(undefined), [selKey, editable]);
+  useEffect(() => {
+    if (picker && !picker.anchor.isConnected) setPicker(undefined);
+  }, [rev, picker]);
   const [copied, setCopied] = useState<string | undefined>(undefined);
   // Antrean edit: patch fills/shadows/stroke berupa array/objek utuh, jadi edit berikutnya baru dibangun sesudah commit
   // sebelumnya tampil di dokumen (rev berubah) — tanpa itu edit cepat kedua menimpa yang pertama dengan data basi.
-  const live = useRef({ targets, editable, rev, onCommit });
-  live.current = { targets, editable, rev, onCommit };
+  const live = useRef({ targets, editable, rev, onCommit, tokens, tokenModes });
+  live.current = { targets, editable, rev, onCommit, tokens, tokenModes };
   const queue = useRef<{ build: Build; label: string }[]>([]);
   const pending = useRef<{ rev: number; timer: ReturnType<typeof setTimeout> } | undefined>(undefined);
   const flush = useRef(() => {});
@@ -1263,6 +1641,14 @@ export function DesignPanel({ targets, path, editable, fonts, inspectNode, rev, 
       queue.current.push({ build, label });
       flush.current();
     },
+    targets,
+    tokens: tokens ?? {},
+    modes: tokenModes ?? [],
+    pickerKey: picker ? specKey(picker.spec) : undefined,
+    openPicker: (anchor, spec) => {
+      if (editable) setPicker({ anchor, spec, trigger: document.activeElement instanceof HTMLElement ? document.activeElement : undefined });
+    },
+    latest: () => ({ tokens: live.current.tokens ?? {}, modes: live.current.tokenModes ?? [] }),
   };
   const types = new Set(targets.map((t) => t.type));
   const typeLabel = TYPE_LABEL[primary.type] ?? primary.type;
@@ -1324,7 +1710,8 @@ export function DesignPanel({ targets, path, editable, fonts, inspectNode, rev, 
           }))}
         />
       )}
-      <Fragment key={targets.map((t) => t.id).join(',')}>
+      {picker && editable && <TokenPicker anchor={picker.anchor} trigger={picker.trigger} spec={picker.spec} ctx={ctx} onClose={() => setPicker(undefined)} />}
+      <Fragment key={selKey}>
       {multi && align && <AlignGroup align={align} disabled={!editable} />}
       {tokenModes && tokenModes.length > 0 && targets.every((t) => t.type === 'board') && <ThemeModeGroup targets={targets} ctx={ctx} modes={tokenModes} />}
       {groups.includes('position') && <PositionGroup targets={targets} ctx={ctx} bounds={bounds} />}

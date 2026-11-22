@@ -50,6 +50,7 @@ import { Modal } from './NewFileDialog';
 import { ChecksPanel } from './panels';
 import { DesignPanel } from './DesignPanel';
 import { ThemeButton, ThemePanel } from './ThemePanel';
+import { effectiveMode } from './themeModel';
 import { parentLayoutOf, type DesignTarget } from './designModel';
 import { measureLiveSize } from './liveGeometry';
 import { agentPresence, layerMarks, type LayerMarkInfo } from './presence';
@@ -1061,7 +1062,8 @@ export function Viewer({ slug }: { slug: string }) {
           if (!info || !n) return [];
           const parentLayout = parentLayoutOf(info.type, info.parentId ? findNode(d, info.parentId) : undefined);
           const r = resolvedShown ? findNode(resolvedShown, id) : undefined;
-          return [{ id, type: n.type, name: n.name, stored: n, resolved: r ?? n, parentLayout, measured: measureLiveSize(document, info.boardId, id) }];
+          const mode = effectiveMode(findNode(d, info.boardId), d.tokenModes);
+          return [{ id, type: n.type, name: n.name, stored: n, resolved: r ?? n, parentLayout, measured: measureLiveSize(document, info.boardId, id), mode }];
         })
       : [];
   const docHasBoards = d.pages.some((p) => p.children.length > 0);
@@ -1290,6 +1292,7 @@ export function Viewer({ slug }: { slug: string }) {
               rev={d.rev}
               onCommit={commitOps}
               tokenModes={d.tokenModes}
+              tokens={d.tokens}
               align={designTargets.length > 1 ? { enabled: editable ? actionState(sceneRef.current?.() ?? [], selection) : NO_ACTIONS, run: (a) => runAction(a) } : undefined}
             />
           )}

@@ -21,6 +21,8 @@ export type DesignTarget = {
   parentLayout: ParentLayout | undefined;
   /** Ukuran terukur DOM live (koordinat desain). */
   measured?: { w: number; h: number } | undefined;
+  /** Mode tema efektif board pemilik (`themeMode` ?? mode pertama; AD-11): nilai token di picker dan detach. */
+  mode?: string | undefined;
 };
 
 export type Group = 'position' | 'autoLayout' | 'typography' | 'icon' | 'fill' | 'stroke' | 'radius' | 'effects';

@@ -177,6 +177,10 @@ export function renameTokenOps(tokens: TokenMap = {}, from: string, rawTo: strin
   return { ops: [{ op: 'renameToken', from, to }], label: `Rename token ${from} to ${to}` };
 }
 
+/** Mode efektif board (AD-11): `themeMode` ?? mode pertama; dokumen tanpa mode → undefined. Satu sumber untuk Viewer. */
+export const effectiveMode = (board: Readonly<Record<string, unknown>> | undefined, modes: readonly string[] | undefined): string | undefined =>
+  (typeof board?.themeMode === 'string' ? board.themeMode : undefined) ?? modes?.[0];
+
 /** Node (id) yang memakai token `name` beserta mode efektif board pemiliknya. */
 function usersOf(doc: ThemeDoc, name: string): { id: string; node: Record<string, unknown>; mode: string | undefined; props: Set<string> }[] {
   const out = new Map<string, { id: string; node: Record<string, unknown>; mode: string | undefined; props: Set<string> }>();
@@ -188,7 +192,7 @@ function usersOf(doc: ThemeDoc, name: string): { id: string; node: Record<string
     const node = cur as Record<string, unknown> | undefined;
     if (!node || typeof node.id !== 'string') continue;
     const board = doc.pages[use.page]?.children[use.board];
-    const mode = (typeof board?.themeMode === 'string' ? board.themeMode : undefined) ?? doc.tokenModes?.[0];
+    const mode = effectiveMode(board, doc.tokenModes);
     let u = out.get(node.id);
     if (!u) {
       u = { id: node.id, node, mode, props: new Set() };
