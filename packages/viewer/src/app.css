@@ -107,14 +107,14 @@ code {
 .window-controls {
   flex: none;
   display: flex;
-  align-self: flex-start;
+  align-self: stretch;
   margin-right: -12px;
 }
 .window-btn {
   display: grid;
   place-items: center;
   width: 44px;
-  height: 32px;
+  height: 100%;
   color: var(--text-secondary);
 }
 .window-btn:hover {
