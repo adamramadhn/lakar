@@ -9,7 +9,7 @@ import { loadProtocol } from '../protocol.js';
 import type { TimedLine } from '../stream-metrics.js';
 import { timedLines, toolResultEvent, toolUseEvent } from '../../../tests/support/stream.ts';
 import { LakardClient } from './lakard-client.js';
-import { boardSizeProblems, boardSizeProblemsFor, findCommittedSlug, lakarPreflightProblems, runLakar, snapshotLakarDocs } from './run.js';
+import { boardSizeProblems, boardSizeProblemsFor, findCommittedSlug, lakarPreflightProblems, runLakar, sizeRuleFor, snapshotLakarDocs } from './run.js';
 
 const protocol = loadProtocol();
 const L = (evs: unknown[]): TimedLine[] => timedLines(evs, 100);
@@ -59,7 +59,42 @@ describe('preflight dan ukuran board', () => {
     expect(boardSizeProblemsFor({ width: 1440, height: null }, [{ id: 'l', width: 1440, height: 7000 }])).toEqual([]);
     expect(boardSizeProblemsFor({ width: 390, height: 844 }, [{ id: 'm', width: 375, height: 844 }])).toEqual(['board m 375×844 ≠ 390×844']);
     expect(boardSizeProblemsFor(undefined, [{ id: 'x', width: 1, height: 1 }])).toEqual([]);
-    expect(boardSizeProblems('C', [{ id: 'x', width: 1, height: 1 }])).toEqual([]);
+    expect(boardSizeProblems('P1', [{ id: 'x', width: 1, height: 1 }])).toEqual([]);
+  });
+
+  it('C 1440×1024 dan E 1440×900 persis; D 390 × ≥ 844 apa pun versi rubrik', () => {
+    const b = (id: string, width: number, height: number) => ({ id, width, height });
+    for (const rule of ['exact', 'mobile-min-height'] as const) {
+      expect(boardSizeProblems('C', [b('c', 1440, 1024)], rule)).toEqual([]);
+      expect(boardSizeProblems('C', [b('c', 1440, 1025)], rule)).toEqual(['board c 1440×1025 ≠ 1440×1024']);
+      expect(boardSizeProblems('E', [b('e', 1440, 900)], rule)).toEqual([]);
+      expect(boardSizeProblems('E', [b('e', 1440, 1025)], rule)).toEqual(['board e 1440×1025 ≠ 1440×900']);
+      expect(boardSizeProblems('D', [b('d', 390, 1600)], rule)).toEqual([]);
+      expect(boardSizeProblems('D', [b('d', 390, 844), b('d2', 390, 1200)], rule)).toEqual([]);
+      expect(boardSizeProblems('D', [b('d', 390, 800)], rule)).toEqual(['board d 390×800 ≠ 390×≥844']);
+      expect(boardSizeProblems('D', [b('d', 400, 900)], rule)).toEqual(['board d 400×900 ≠ 390×≥844']);
+      expect(boardSizeProblems('D', [], rule)).toEqual(['tidak ada board']);
+    }
+    // B tetap mengikuti versi rubrik (persis < 2.2).
+    expect(boardSizeProblems('B', [b('b', 390, 1600)], 'exact')).toEqual(['board b 390×1600 ≠ 390×844']);
+    expect(boardSizeProblems('B', [b('b', 390, 1600)], 'mobile-min-height')).toEqual([]);
+  });
+
+  it('rubrik v2.3 (golden B1 lebar 390 × tinggi ≥ 844; D2 satu board panjang): aturan ukuran konsisten', () => {
+    const b = (id: string, width: number, height: number) => ({ id, width, height });
+    const rule = sizeRuleFor('2.3');
+    expect(rule).toBe('mobile-min-height');
+    expect(sizeRuleFor('2.2')).toBe(rule);
+    for (const p of ['B', 'D']) {
+      // Satu board 390 × ≥ 844 sah (tinggi mengikuti konten); lebih pendek atau lebar lain gagal.
+      expect(boardSizeProblems(p, [b('m', 390, 844)], rule), p).toEqual([]);
+      expect(boardSizeProblems(p, [b('m', 390, 1720)], rule), p).toEqual([]);
+      expect(boardSizeProblems(p, [b('m', 390, 843)], rule), p).toEqual([`board m 390×843 ≠ 390×≥844`]);
+      expect(boardSizeProblems(p, [b('m', 375, 1200)], rule), p).toEqual([`board m 375×1200 ≠ 390×≥844`]);
+    }
+    // C/E (app) tetap persis di v2.3.
+    expect(boardSizeProblems('C', [b('c', 1440, 1200)], rule)).toEqual(['board c 1440×1200 ≠ 1440×1024']);
+    expect(boardSizeProblems('E', [b('e', 1440, 1200)], rule)).toEqual(['board e 1440×1200 ≠ 1440×900']);
   });
 });
 
@@ -82,7 +117,7 @@ async function fakeLakard(dataDir: string, boards: { id: string; width: number; 
       if (req.url === '/docs/open') return ok({ docId: 'd', slug: parsed.slug, rev: 3, created: false });
       if (req.url === '/boards') return ok({ docId: 'd', slug: 's', rev: 3, boards: boards.map((b, i) => ({ ...b, name: `Board ${i}`, page: 'P', x: 0, y: 0, wip: false })) });
       if (req.url === '/layout-check')
-        return ok({ docId: 'd', rev: 3, boards: [], summary: { error: 1, warning: 0, gate: 1 }, findings: [{ level: 'error', rule: 'LC-01a', nodeId: 'n', nodeName: 'T', detail: '👋', expected: 'x' }] });
+        return ok({ docId: 'd', rev: 3, boards: [], summary: { error: 1, warning: 0, gate: 1, info: 0 }, findings: [{ level: 'error', rule: 'LC-01a', nodeId: 'n', nodeName: 'T', detail: '👋', expected: 'x' }] });
       if (req.url === '/export') {
         const b = boards.find((x) => x.id === parsed.id)!;
         const p = join(dataDir, `${b.id}.png`);

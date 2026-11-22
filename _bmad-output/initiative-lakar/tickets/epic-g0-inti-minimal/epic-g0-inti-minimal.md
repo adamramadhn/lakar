@@ -10,6 +10,7 @@ companions:
   - _bmad-output/initiative-lakar/ux-lakar/golden-set.md
 after: []
 refined: true
+status: done
 risk: high
 ---
 
@@ -114,3 +115,4 @@ Catatan: R10–R13 di bawah adalah ID lokal epic dan berbeda arti dari R10–R13
 - Decision: 2026-11-19 — keputusan 2026-11-18 yang menolak Unsplash dibalik oleh Adam. Adam mendaftar API Unsplash, dan Access Key disimpan di `~/.config/lakar/unsplash-access-key` (mode 600). Urutan penyedia: Unsplash (bila ada key) → Wikimedia → Openverse. Konflik hotlink dengan AD-10 diselesaikan dengan aset jarak jauh + cache render lokal (AD-10). Risiko kepatuhannya tetap terbuka sampai Unsplash mengonfirmasi saat pengajuan mode produksi. `utm_source` = `unsplash_app_name` (default `lakar`).
 - Decision: 2026-11-19 — batas paket pen.dev periode tagihan ini tercapai. Atas keputusan Adam, seri polish iterasi 3 memakai ulang PNG pen.dev iterasi 1 untuk P7–P9. Hasilnya: P7 Lebih baik, P8 Setara, P9 Lebih baik, dengan kumulatif $18,08. Adam menyetujui PNG, `g0` di-merge ke `main` secara lokal, dan putaran resmi 3 tidak diperlukan. G0 selesai (story 1–24 `built`).
 - Decision: 2026-11-19 — nama aplikasi Unsplash Adam: "Lakar Design Agent (internal)". `unsplash_app_name = "lakar_design_agent_internal"` diatur di `~/.config/lakar/config.toml` (lokal, bukan rahasia), sehingga `utm_source` atribusi memakai nama itu. Default kode tetap `lakar`.
+- Decision: 2026-11-19 — epic G0 ditutup `done` atas konfirmasi Adam (G0 lolos, story 1–24 selesai, branch g0 di-merge ke main).

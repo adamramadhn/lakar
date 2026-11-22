@@ -3,7 +3,7 @@ title: 'Monorepo Lakar terbangun dan teruji kosong'
 type: chore
 ticket: '2'
 created: '2026-11-17'
-status: built
+status: done
 baseline_revision: '9e0db3c01ff7c70aa9a3c0617276c9eac70bb62f'
 route: full
 route_source: auto

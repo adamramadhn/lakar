@@ -1,0 +1,201 @@
+# Story epic G1, urut build. Tracer bullet = 1 (+2): bench A–E end-to-end, dibuktikan tanpa pen.dev lewat dry-run dan rejudge.
+# pen.dev terblokir batas paket per 2026-11-19: story 10, 11, 14 butuh run pen.dev baru; 12 dan 13 menunggu 10 dan 11.
+# Anggaran ($) = biaya claude -p (agen bench/latihan + juri) yang tercatat di laporan; biaya sesi builder dicatat terpisah di plan.
+
+[[entry]]
+id = 1
+type = "story"
+title = "Harness bench menjalankan dan memutuskan A–E"
+description = "Memperluas bench dari A/B ke A–E: PromptId, prompts.json/protocol.json, penjaga C7, aturan ukuran mengikat per prompt (C/E app persis, D mobile lebar 390 tinggi ≥ 844), pendev-baseline per prompt, dan decideG1 (≥ 4/5 Setara/Lebih baik, ≥ 1 Lebih baik, nol emoji, waktu ≤ 1,5× median baseline); kecocokan baseline A/B G0 dengan protokol baru ditangani sesuai keputusan Adam (hash protokol per prompt atau ukur ulang A/B)."
+verify = "pnpm --filter @lakar/bench test lulus termasuk decideG1 dan aturan ukuran C/D/E; round --dry-run dan pendev-baseline --dry-run mencetak rencana A–E tanpa masalah pembekuan selain teks juri C–E yang belum di-snapshot; verify.sh lulus."
+covers = ["R4", "R7"]
+after = []
+hitl = false
+risk = "high"
+plan_checkpoint = true
+notes = ["Keputusan Adam 2026-11-19: hash protokol per prompt (pembungkus + config + teks prompt itu) agar baseline A/B G0 tetap sah; bila versi pen.dev atau Claude Code berubah, baseline A–E diukur ulang di story 11."]
+
+[[entry]]
+id = 2
+type = "story"
+title = "Rubrik v2.3: golden B1 dan D2 diubah lalu di-snapshot"
+description = "Mengubah golden-set.md B1 (lebar 390, tinggi ≥ 844) dan D2 (satu board panjang, bukan dua board) bersamaan, menaikkan baris Versi rubrik Lampiran B ke 2.3, memperluas rubric-snapshot ke teks juri A–E, lalu menjalankan rejudge strip round-2 A/B dengan v2.3 sebagai hold-out; rubrik v2.2 tetap sah sampai snapshot ini."
+verify = "bench/rubric/rubric.json = 2.3 dengan sha teks juri A–E dan bench/rubric/v2.3/ tercatat; round --dry-run A–E tanpa masalah pembekuan juri; bench/rejudge-r2-v2-3.md ada; verify.sh lulus."
+covers = ["R4"]
+after = [1]
+hitl = false
+risk = "medium"
+notes = ["Anggaran: rejudge ≤ $5, maks 2 kali."]
+
+[[entry]]
+id = 3
+type = "story"
+title = "Skill dipadatkan dan sidebar webapp selaras DESIGN.md"
+description = "Sesi baru (C7) memadatkan core, polish, landing, mobile, dan webapp (menghapus duplikasi lintas skill, tanpa mengubah perilaku yang diajarkan) tanpa mengubah batas di tests/skills.test.ts, lalu mengubah sidebar webapp 240 → 248 sesuai DESIGN.md; dibuktikan dengan seri latihan polish P7–P9 memakai ulang run pen.dev (--reuse-pendev, tanpa run pen.dev baru)."
+verify = "tests/skills.test.ts dan tests/skills-c7.test.ts lulus dengan sisa ruang token tercatat per skill; bench/polish-<k>.md menunjukkan P7–P9 tetap Setara/Lebih baik dengan gerbang waktu/emoji/gate; verify.sh lulus."
+covers = ["R5"]
+after = [2]
+hitl = false
+risk = "medium"
+notes = ["Anggaran: maks 2 iterasi seri polish, ≤ $12 (sisa anggaran seri $12,16)."]
+
+[[entry]]
+id = 4
+type = "story"
+title = "Check struktural: LC-13, 14, 15, 16, 21, 22"
+description = "Menerapkan nama layer default (info), absolut di dalam flex tanpa Overlay, > 1 pustaka ikon UI, ikon digambar manual (error), pemeriksaan struktural murah LC-21, dan jumlah node berkonvensi LC-22 (info) di @lakar/check, dengan fixture positif dan negatif per aturan, batas 3 warning per aturan per board, dan daftar aturan berjalan di Lampiran A diperbarui."
+verify = "pnpm --filter @lakar/check test lulus dengan fixture positif/negatif tiap aturan; pemindaian arsip bench/runs/**/*.lakar.json memberi 0 temuan LC-16 kecuali cacat nyata yang dicatat; verify.sh lulus."
+covers = ["R1"]
+after = []
+hitl = false
+risk = "medium"
+
+[[entry]]
+id = 15
+type = "story"
+title = "Check luapan non-teks dan konten terpotong di tepi board"
+description = "Menambah LC-02c (error · gerbang): anak flow non-teks (frame, rect, ellipse, path, icon, gambar) melewati content box induk ber-fill/stroke > 1px di sisi mana pun, dengan pengecualian setara LC-02b; dan memperluas LC-31 dari mockup hero ke tabel dan kartu yang terpotong rata di tepi bawah board atau seksi; Lampiran A diperbarui."
+verify = "pnpm --filter @lakar/check test lulus dengan fixture positif/negatif, termasuk kartu KPI P8 polish-4 (batang mini masuk padding kanan) dan tabel P8 yang terpotong di tepi board sebagai positif; pemindaian arsip bench memberi 0 positif palsu error (cacat nyata dicatat); verify.sh lulus."
+covers = ["R1"]
+after = [4]
+hitl = false
+risk = "high"
+plan_checkpoint = true
+notes = ["Permintaan Adam 2026-11-19 setelah melihat kartu KPI P8 polish-4 (spacing kanan ±6px vs kiri 24px) yang lolos layout_check."]
+
+[[entry]]
+id = 5
+type = "story"
+title = "Check tipografi dan spacing: LC-03, 06, 07, 08, 09, 10"
+description = "Menerapkan teks tetap berisiko meluber, paragraf di bawah minimum, spacing di luar himpunan, font di luar skala atau triple tak cocok, > 2 keluarga font, dan target sentuh < 44 di board mobile, membaca token dan skala dari sumber yang sama dengan skill; daftar aturan berjalan di Lampiran A diperbarui."
+verify = "pnpm --filter @lakar/check test lulus dengan fixture positif/negatif tiap aturan; laporan pemindaian arsip bench mencatat jumlah warning per aturan beserta contohnya; verify.sh lulus."
+covers = ["R1"]
+after = [4]
+hitl = false
+risk = "medium"
+
+[[entry]]
+id = 6
+type = "story"
+title = "Check konten dan struktur seksi: LC-17 dan LC-19"
+description = "Menerapkan struktur seksi mirip (Jaccard multiset tipe + ukuran font ≥ 0,9 antarpasangan Seksi /) dan frasa terlarang per bahasa per kata utuh dari daftar DESIGN.md (kecuali Input / dan Label); daftar aturan berjalan di Lampiran A diperbarui."
+verify = "pnpm --filter @lakar/check test lulus dengan fixture positif/negatif; pemindaian arsip bench dilaporkan; verify.sh lulus."
+covers = ["R1"]
+after = [5]
+hitl = false
+risk = "medium"
+
+[[entry]]
+id = 7
+type = "story"
+title = "LC-04 lengkap dan ambang kontras selaras dengan DESIGN.md"
+description = "Menyamakan ambang teks besar di tabel Ambang kontras, baris LC-04, dan kode, menambah cek stroke kontrol (Input /, Radio /, Checkbox /) dan ikon tanpa label ≥ 3:1 serta warning scrim untuk teks di atas foto/gradien/efek, dan menghapus catatan 'belum dicek' di Lampiran A; LC-04 aturan gerbang, jadi positif palsu pada arsip bench dianggap cacat."
+verify = "Fixture tiap baris tabel Ambang kontras lulus; pemindaian arsip bench tidak menambah error LC-04 kecuali cacat nyata yang dicatat; DESIGN.md dan kode memakai angka yang sama; verify.sh lulus."
+covers = ["R2"]
+after = [6]
+hitl = false
+risk = "high"
+plan_checkpoint = true
+notes = ["Keputusan Adam 2026-11-19: teks besar = ≥ 24px, atau ≥ 18,66px dengan berat ≥ 700 (WCAG 14pt bold); DESIGN.md 600 → 700, kode 19 → 18,66."]
+
+[[entry]]
+id = 8
+type = "story"
+title = "Golden A, B, D dibangun ulang di Lakar sebagai regresi check"
+description = "Membangun ulang desain target landing A dan mobile B dan D (D satu board panjang) lewat MCP Lakar sesuai kriteria golden-set.md, menyimpannya sebagai fixture regresi @lakar/check, dan memperbaiki aturan (bukan pengecualian per board) bila ada positif palsu; arsip pen.dev tidak dipakai (C6) dan isinya tidak masuk skill (C7)."
+verify = "Tes regresi memuat dokumen golden A, B, D dengan 0 error dan LC-17/18/19 = 0; PNG ada di design/golden-set-lakar/; verify.sh lulus."
+covers = ["R3"]
+after = [7]
+hitl = false
+risk = "high"
+notes = ["Anggaran: sesi builder saja (tanpa claude -p); maks 3 putaran perbaikan per desain."]
+
+[[entry]]
+id = 9
+type = "story"
+title = "Golden C dan E dibangun ulang di Lakar dan kelima PNG disetujui Adam"
+description = "Membangun ulang desain target dashboard C (sidebar 248) dan inventaris E (sidebar 72, panel detail) dengan aturan yang sama dengan story 8, lalu Adam meninjau kelima PNG golden Lakar."
+verify = "Tes regresi memuat kelima dokumen golden dengan 0 error dan LC-17/18/19 = 0; Adam menyetujui PNG A–E di design/golden-set-lakar/; verify.sh lulus."
+covers = ["R1", "R2", "R3"]
+after = [8]
+hitl = true
+risk = "high"
+done_checkpoint = true
+notes = ["Langkah Adam: meninjau dan menyetujui kelima PNG.", "Anggaran: sesi builder saja; maks 3 putaran perbaikan per desain."]
+
+[[entry]]
+id = 16
+type = "story"
+title = "Skill desain bawaan per domain setara cakupan pen.dev"
+description = "Sesi baru (C7) menyusun skill desain bawaan Lakar per domain dengan cakupan setara daftar built-in design skills pen.dev (aksesibilitas, warna, interface, layout, tipografi, UI, penulisan, dan review antarmuka), ditulis sendiri dari DESIGN.md dan sumber publik (C1, tanpa membaca atau menyalin isi skill pen.dev), dipasang lewat read_skill dengan batas token per skill dan aturan muat yang menjaga waktu run tetap ≤ 1,5× pen.dev."
+verify = "read_skill mengembalikan skill domain baru; tests/skills.test.ts (dengan batas untuk skill baru) dan skills-c7 lulus; seri latihan dengan run pen.dev yang dipakai ulang tidak turun dari polish-4 dan waktu Lakar tetap ≤ 1,5× pen.dev; verify.sh lulus."
+covers = ["R5"]
+after = [3, 7]
+hitl = true
+risk = "high"
+plan_checkpoint = true
+notes = ["Arahan Adam 2026-11-19: fokus ke built-in design skills, samakan dengan yang ada di pen.dev; fondasi UI library (shadcn/ui) dibatalkan.", "Anggaran: maks 2 iterasi latihan, ≤ $12.", "Arahan Adam 2026-11-19 (menyetujui usulan orkestrator, dari cacat PNG Lakar, bukan dari rubrik/golden): (1) disiplin geometri sebelum menggambar: hitung lebar konten − gap sebelum elemen lebar tetap sebaris, visual samping fill + maks, padding bawah = atas, warning spacing ikut dibereskan; (3) karakter tipografi landing: pasangan font display + teks per nada brief, satu seksi kontras dan satu momen angka besar, tanpa ruang kosong mati; (4) review diri: screenshot ulang area padat skala 2 + 6–8 pertanyaan tetap; (6) copy: angka saling konsisten, nama/lokasi Indonesia wajar, tanpa frasa generik.", "Arahan Adam 2026-11-19: Adam menilai cepat PNG setiap iterasi latihan (Setara/Kalah/Lebih baik per prompt); bila berulang berbeda dengan juri, juri dikalibrasi ulang sebelum putaran resmi."]
+
+[[entry]]
+id = 10
+type = "story"
+title = "Skill direvisi untuk pola G1 dan diuji dengan prompt latihan baru"
+description = "Sesi baru (C7) merevisi skill yang sudah dipadatkan untuk pola form/checkout mobile (stepper, field error, radio-card, bilah aksi tetap), tabel + panel detail gelap, dan foto relevan per konteks, lalu mengujinya dengan seri latihan hold-out baru (prompt bukan A–E, sha beku, penjaga n-gram) melawan run pen.dev baru; langkah Adam: memastikan paket pen.dev aktif kembali sebelum seri dijalankan."
+verify = "tests/skills.test.ts dan skills-c7 lulus tanpa menaikkan batas; seri latihan G1 lulus (setiap prompt Setara/Lebih baik, waktu ≤ 1,5× pen.dev, emoji 0, gate 0) dalam anggaran; verify.sh lulus."
+covers = ["R5", "R6"]
+after = [1, 3, 7, 16]
+hitl = true
+risk = "high"
+plan_checkpoint = true
+done_checkpoint = true
+notes = ["Butuh run pen.dev baru; menunggu batas paket pen.dev.", "Anggaran: maks 3 iterasi, ≤ $30.", "Arahan Adam 2026-11-19: (2) kelengkapan per pola — tabel (ID mono, angka kanan, badge status, aksi baris, header kecil, footer/pagination, filter), grafik (sumbu + 3–5 gridline, label nilai penting, legenda bernilai, penanda hari ini), KPI (ikon konteks, delta + pembanding, satu elemen pendukung), form (label, helper, error spesifik, state terpilih); (6) foto: tangga kata kunci Unsplash spesifik konteks Indonesia + cek relevansi dari screenshot, ganti bila tidak cocok; (7) mode gelap: 3 lapis permukaan tanpa bayangan, muted ≥ 4.5:1, aksen varian gelap, status teks + titik.", "Arahan Adam 2026-11-19: Adam menilai cepat PNG setiap iterasi latihan (Setara/Kalah/Lebih baik per prompt); bila berulang berbeda dengan juri, juri dikalibrasi ulang sebelum putaran resmi."]
+
+[[entry]]
+id = 11
+type = "story"
+title = "Baseline pen.dev C, D, E terukur"
+description = "Menjalankan pendev-baseline untuk C, D, E (3 run per prompt, median waktu dan biaya, runner dan pembungkus G0) ke bench/baseline-pendev.md|json, dengan dokumen baru lewat pen-newdoc.sh dan restart pen-desktop setelah seri; langkah Adam: memastikan paket pen.dev aktif kembali."
+verify = "bench/baseline-pendev.md berisi 3 run dan median C, D, E (dan A/B bila diukur ulang) dengan versi model, Claude Code, dan pen.dev; md5 .pen yang ada tidak berubah; verify.sh lulus."
+covers = ["R7"]
+after = [1]
+hitl = true
+risk = "medium"
+done_checkpoint = true
+notes = ["Menunggu batas paket pen.dev (cek get_app_state dulu).", "Anggaran: ≤ $12 untuk C/D/E (+ ≤ $8 bila A/B diukur ulang), maks 4 percobaan per prompt (protokol)."]
+
+[[entry]]
+id = 12
+type = "story"
+title = "Refactor sweep G1"
+description = "Pembersihan saja dari temuan review dan scope tunda di plan story 1–11, 15, dan 16; scope baru menjadi story baru."
+verify = "pnpm build dan pnpm test lulus; round --dry-run A–E tidak berubah (teks juri dan argv sama); verify.sh lulus."
+covers = []
+after = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 15, 16]
+hitl = false
+risk = "low"
+notes = ["Arahan Adam 2026-11-19: (5) ringkas keluaran execute untuk node besar (round-2 B: 53 ribu karakter melebihi batas tool result) tanpa menghilangkan temuan check."]
+
+[[entry]]
+id = 13
+type = "story"
+title = "Rilis G1 berjalan di lakard"
+description = "Membekukan versi paket G1, build dist, restart lakard lewat systemctl --user, dan membuktikan status/versi, pool render, font, dan penyedia foto unsplash siap untuk putaran resmi, termasuk dari Claude Code lewat MCP."
+verify = "Tool MCP status dari sesi Claude Code baru menunjukkan versi G1, schemaVersion = bench, fonts.missing kosong, photos = unsplash; tests/release.test.ts lulus; round --dry-run A–E lolos officialFreezeProblems; verify.sh lulus."
+covers = ["R8"]
+after = [12]
+hitl = false
+risk = "low"
+
+[[entry]]
+id = 14
+type = "story"
+title = "Putaran resmi A–E dijalankan dan G1 diputuskan"
+description = "Menjalankan putaran resmi berikutnya untuk A–E (satu run per alat per prompt, C8) dengan rubrik v2.3, menulis bench/round-<n>.md dengan keputusan G1 sementara, PNG kedua alat, foto D, waktu, dan biaya, lalu menunggu Konfirmasi Adam."
+verify = "bench/round-<n>.md lengkap untuk A–E dengan keputusan G1 sementara; bagian Konfirmasi Adam diisi dari jawaban Adam."
+covers = ["R6", "R7"]
+after = [10, 11, 13]
+hitl = true
+risk = "high"
+plan_checkpoint = true
+done_checkpoint = true
+notes = ["Langkah Adam: konfirmasi mulai putaran resmi dan Konfirmasi Adam.", "Menunggu batas paket pen.dev.", "Anggaran: ≤ $25 (run + juri), tanpa ulang per prompt."]

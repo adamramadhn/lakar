@@ -3,7 +3,22 @@
 // photo_search, get_selection, paste.
 import { McpServer, type CallToolResult } from '@modelcontextprotocol/server';
 import { z } from 'zod';
-import { LAKAR_VERSION, SCHEMA_VERSION, VERSION_HINT, errorMessage, findingLine, summaryText, type ApiResult, type Finding, type FindingSummary } from '@lakar/schema';
+import {
+  COMPONENT_SIZES,
+  CONTRAST_MIN,
+  CONTROL_PREFIXES,
+  DISPLAY_SIZES,
+  FORBIDDEN_PHRASES,
+  HOME_INDICATOR_INSET,
+  KPI_LINE_HEIGHT_RATIO,
+  KPI_SIZES,
+  LARGE_TEXT,
+  PARAGRAPH_MIN,
+  PARAGRAPH_MIN_IN_CARD,
+  SCRIM_MIN_ALPHA,
+  SPACING_VALUES,
+  TOUCH_MIN,
+  LAKAR_VERSION, SCHEMA_VERSION, VERSION_HINT, errorMessage, findingLine, summaryText, type ApiResult, type Finding, type FindingSummary } from '@lakar/schema';
 import { DaemonClient, formatError } from './client.js';
 
 export const SERVER_NAME = 'lakar';
@@ -129,16 +144,21 @@ export const STATUS_DESCRIPTION =
 
 /** Deskripsi tool `read_skill`. */
 export const READ_SKILL_DESCRIPTION =
-  'Baca panduan skill Lakar (Markdown). Baca core (alur kerja, prelude helper, token, konvensi) + polish (spacing, komponen, tipografi, kontras) ' +
-  '+ skill jenis layar (landing, mobile, atau webapp; aplikasi desktop/dashboard → webapp; berisi contoh teruji) di giliran yang sama (panggilan paralel); icons bila ragu nama ikon; api hanya untuk referensi lengkap; selection bila permintaan merujuk node yang dipilih pengguna di viewer (varian responsif, cek konsistensi). ' +
+  'Baca panduan skill Lakar (Markdown). Baca core (alur kerja, prelude helper, token, konvensi) + delapan skill domain ' +
+  '(layout, typography, color, accessibility, ui, interface, writing, review) + skill jenis layar (landing, mobile, atau webapp; ' +
+  'aplikasi desktop/dashboard → webapp; berisi contoh teruji) di giliran yang sama (10 panggilan paralel); icons bila ragu nama ikon; api hanya untuk referensi lengkap; ' +
+  'selection bila permintaan merujuk node yang dipilih pengguna di viewer (varian responsif, cek konsistensi). ' +
   'Tanpa name → daftar {skills:[{name, available}]}; dengan name → isi skill. ' +
-  'Nama: core, polish, landing, mobile, webapp, icons, api, selection. Nama lain atau skill yang belum tersedia → NOT_FOUND dengan daftar yang tersedia.';
+  'Nama: core, landing, mobile, webapp, layout, typography, color, accessibility, ui, interface, writing, review, icons, api, selection. ' +
+  'Nama lain atau skill yang belum tersedia → NOT_FOUND dengan daftar yang tersedia (polish sudah dipecah ke delapan skill domain).';
 
 /** Instruksi server MCP (dikirim saat initialize): urutan kerja singkat. */
 export const SERVER_INSTRUCTIONS =
-  'Lakar: canvas desain lewat kode. Sebelum menggambar, read_skill core + polish + landing/mobile/webapp di giliran yang sama (paralel); aplikasi desktop/dashboard → webapp. ' +
-  'Lalu open_doc dan bangun lewat sedikit execute besar (2–4 untuk landing, 1–2 untuk mobile dan webapp) yang diawali prelude dari skill core; ' +
-  'baca check di respons execute, perbaiki dengan editId/edits atau update, akhiri dengan satu screenshot, perbaikan, lalu export PNG.';
+  'Lakar: canvas desain lewat kode. Sebelum menggambar, read_skill core + layout + typography + color + accessibility + ui + interface + writing + review ' +
+  '+ landing/mobile/webapp di giliran yang sama (paralel); aplikasi desktop/dashboard → webapp. ' +
+  'Lalu open_doc, rencana singkat, dan langsung bangun lewat sedikit execute besar (2–4 untuk landing, 1–2 untuk mobile dan webapp) yang diawali prelude dari skill core; ' +
+  'baca check di respons execute, perbaiki dengan editId/edits atau update, akhiri dengan satu screenshot board + satu screenshot zoom (nodeId, scale 2) ' +
+  'area terpadat (skill review), satu execute perbaikan, lalu export PNG.';
 
 /** Deskripsi tool `list_boards`. */
 export const LIST_BOARDS_DESCRIPTION =
@@ -195,11 +215,26 @@ export const LAYOUT_CHECK_DESCRIPTION =
   "LC-20 konten tertutup zona bawah (bar 'Overlay / …' atau frame/rect absolut ber-fill yang menempel bawah atau mengambang, termasuk kapsul ber-fill di dalam pembungkus absolut transparan, ditumpuk): " +
   'konten terakhir posisi akhir scroll berakhir ≤ y zona − 8, tidak ada kartu/teks/gambar terpotong di tepi atas zona, ' +
   'tidak ada judul seksi yang isinya tertutup zona, dan tidak ada konten terlihat terpotong di celah di bawah bar mengambang atau mengintip di celah antar-bar bertumpuk; ' +
-  "LC-02b teks (ink terukur) meluap dari isi induk dan menabrak tepi/saudara (< 4px); LC-11 saudara tumpang tindih sebagian (kecuali 'Overlay / …', 'Crop / …', gap negatif); " +
-  'LC-04 kontras teks setelah komposit < 4.5:1 (teks ≥ 24 atau ≥ 19 tebal: < 3:1; di atas gradien/opacity/blend = warning, di atas foto/noise/mesh dilewati); ' +
+  "LC-02b teks (ink terukur) meluap dari isi induk dan menabrak tepi/saudara (< 4px); " +
+  'LC-02c non-teks (frame, rect, ikon, gambar) anak flow meluap dari isi induk ke padding/tepi wadah ber-cat terdekat dengan sisa < min(8, padding/2) atau tumpah keluar; ' +
+  'LC-31 kartu ber-cat berisi teks terpotong atau rata di tepi bawah seksi/board (mockup di Crop, kartu tanpa ruang bawah), dan baris terakhir daftar/tabel rata di tepi bawah kartunya tanpa ruang bawah padahal ada ruang atas; ' +
+  "LC-11 saudara tumpang tindih sebagian (kecuali 'Overlay / …', 'Crop / …', gap negatif); " +
+  `LC-04 kontras teks setelah komposit < ${CONTRAST_MIN.text}:1 (teks ≥ ${LARGE_TEXT.size} atau ≥ ${LARGE_TEXT.boldSize} berat ≥ ${LARGE_TEXT.boldWeight}: < ${CONTRAST_MIN.large}:1; layer 'Placeholder' selalu ${CONTRAST_MIN.placeholder}:1; di atas gradien/opacity/blend = warning, di atas foto/noise/mesh dilewati), ` +
+  `batas kontrol ${CONTROL_PREFIXES.map((p) => `'${p} …'`).join('/')} (stroke/fill, atau keturunan bercat) < ${CONTRAST_MIN.nonText}:1 terhadap latar, ` +
+  `ikon tanpa label teks (di komponen tanpa teks, atau deretan ikon seperti bintang rating tanpa nilai) < ${CONTRAST_MIN.nonText}:1, ` +
+  `dan warning scrim: teks di atas foto/gradien multi-hue/efek blur tanpa fill solid opacity ≥ ${String(SCRIM_MIN_ALPHA).replace('.', ',')} di antaranya; ` +
   'LC-12 (warning) ukuran board (mobile 390×844, app 1440×900 atau 1440×1024, landing lebar 1440, atau expectedSize) dan tabrakan antarboard (pakai place). ' +
   'Warning polesan: LC-18 kartu bersarang, LC-23 celah teks ↔ badge/tombol/ikon < 8, LC-24 proporsi badge di baris, LC-25 radius tidak konsentris, ' +
-  'LC-26 ruang di atas judul ≤ bawah, LC-27 > 6 ukuran huruf, LC-28 baris > 80 karakter, LC-29 bobot < 400 di < 18px, LC-30 tanda baca (... dan tanda hubung rentang); maks 3 per aturan per board. ' +
+  'LC-26 ruang di atas judul ≤ bawah, LC-27 > 6 ukuran huruf, LC-28 baris > 80 karakter, LC-29 bobot < 400 di < 18px, LC-30 tanda baca (... dan tanda hubung rentang). ' +
+  `Warning tipografi/spacing (token DESIGN.md): LC-03 teks wrap 'fixed' ≥ 2 baris atau teks melewati kotaknya, LC-06 paragraf (≥ 2 baris, ≥ 6 kata) < ${PARAGRAPH_MIN.landing}px di landing/mobile, < ${PARAGRAPH_MIN.app}px di app, < ${PARAGRAPH_MIN_IN_CARD}px di kartu ber-cat, ` +
+  `LC-07 gap/padding di luar ${[...SPACING_VALUES].sort((a, b) => a - b).join('/')} (padding bawah ${HOME_INDICATOR_INSET} sah) dan tinggi komponen di luar token atau ${COMPONENT_SIZES.join('/')}, ` +
+  `LC-08 ukuran di luar skala tipe atau line-height tak cocok token (KPI / Nilai ${KPI_SIZES.join('/')} dengan line-height × ${KPI_LINE_HEIGHT_RATIO} atau token, 'Display / …' ${DISPLAY_SIZES.join('/')}; < 12px = LC-05), LC-09 > 2 keluarga font (mono tidak dihitung), LC-10 target sentuh < ${TOUCH_MIN}×${TOUCH_MIN} di board mobile. ` +
+  `Warning konten/seksi: LC-17 struktur seksi mirip (pasangan 'Seksi / …', atau anak tumpukan utama kolom, dengan multiset tipe node + ukuran font Jaccard ≥ 0,9; variasikan komposisi), ` +
+  `LC-19 frasa terlarang (kata utuh, tanpa beda huruf; kecuali di 'Input / …' dan layer 'Label'): ${[...FORBIDDEN_PHRASES.id, ...FORBIDDEN_PHRASES.en].map((p) => `"${p}"`).join(', ')}. ` +
+  "Struktural: LC-16 (error bukan gerbang) path ≤ 32×32 sebagai ikon (pakai node icon; bentuk sengaja 'Shape / …', grafik 'Chart / …'); " +
+  "warning LC-14 absolut di dalam flex tanpa 'Overlay / …', LC-15 > 1 pustaka ikon UI, LC-21 radius > 3 nilai / spacer kosong / padding ganda mobile / teks langsung di baris tabel / > 1 bidang efek; " +
+  'info (hanya di layout_check, tidak di execute) LC-13 nama layer default, LC-22 jumlah node Crop/Overlay/Scroll/Ekstra. ' +
+  'Warning dan info maks 3 per aturan per board. ' +
   'Selesai bila 0 error gerbang. Output: satu baris ringkasan lalu satu baris per temuan ' +
   "'<level>[·gerbang] · <aturan> · <nama node> (<id>) · <terukur> · <seharusnya>' (maks 60 baris). " +
   'Board tidak ada → NOT_FOUND; dokumen yang tidak bisa dirender → error yang sama dengan screenshot.';
@@ -247,7 +282,7 @@ export const EXECUTE_DESCRIPTION =
   'Mengembalikan {docId, rev, created:[{id,name,path}], value?, valueTruncated?, logs?, check?, bounds?}: path = list nama dari board ke node (mis. [\'Home\',\'Hero / Card\',\'Judul\']), hanya untuk dibaca; alamati node lewat id. ' +
   'Snippet tanpa op yang sukses tidak menambah rev (tanpa check/bounds). ' +
   'Setelah snippet sukses, board yang tersentuh dirender dan dicek gerbang G0 sebelum commit (aturan: lihat tool layout_check): ' +
-  'check {boards, summary:{error, warning, gate}, findings:[{level, rule, nodeId, nodeName, detail, expected}]} ditampilkan sebagai baris ringkas (maks 20), ' +
+  'check {boards, summary:{error, warning, gate, info (selalu 0: temuan info hanya di layout_check)}, findings:[{level, rule, nodeId, nodeName, detail, expected}]} ditampilkan sebagai baris ringkas (maks 20), ' +
   'bounds {id:[x,y,w,h]} dibulatkan relatif board (board tersentuh, node baru, node berubah; maks 60, sisanya boundsTruncated). ' +
   'Temuan tidak membatalkan commit; perbaiki lalu execute lagi (daftar penuh: layout_check). ' +
   'Board tersentuh yang tidak bisa dirender (FONT_MISSING: keluarga tak terdaftar atau karakter di luar font; aset NOT_FOUND; ICON_UNKNOWN) → dokumen tidak di-commit, error membawa editId. ' +
@@ -303,7 +338,7 @@ export function createLakarMcpServer(daemonUrl: string): McpServer {
     'read_skill',
     {
       description: READ_SKILL_DESCRIPTION,
-      inputSchema: z.object({ name: z.string().optional().describe('core | polish | landing | mobile | webapp | icons | api | selection; kosongkan untuk daftar') }),
+      inputSchema: z.object({ name: z.string().optional().describe('core | landing | mobile | webapp | layout | typography | color | accessibility | ui | interface | writing | review | icons | api | selection; kosongkan untuk daftar') }),
     },
     ({ name }) =>
       guarded(async () => {
@@ -435,18 +470,21 @@ export function createLakarMcpServer(daemonUrl: string): McpServer {
     'screenshot',
     {
       description:
-        'Render board dokumen aktif ke PNG (skala 1). Tanpa argumen → board pertama di halaman pertama. ' +
-        'nodeId → potret satu node saja (ukuran bounds node). Kirim boardId ATAU nodeId, bukan keduanya (SCHEMA_INVALID).',
+        'Render board dokumen aktif ke PNG (default skala 1). Tanpa argumen → board pertama di halaman pertama. ' +
+        'nodeId → potret satu node saja (ukuran bounds node). Kirim boardId ATAU nodeId, bukan keduanya (SCHEMA_INVALID). ' +
+        'scale 2 → PNG 2× piksel untuk zoom review area terpadat (skill review); scale lain → SCHEMA_INVALID.',
       inputSchema: z.object({
         boardId: z.string().optional().describe('ID board dari created[] execute atau list_boards'),
         nodeId: z.string().optional().describe('ID node yang dipotret sendiri (bukan bersama boardId)'),
+        scale: z.number().int().optional().describe('1 (default) atau 2 (zoom review: 2× piksel)'),
       }),
     },
-    ({ boardId, nodeId }) =>
+    ({ boardId, nodeId, scale }) =>
       guarded(async () => {
         const body: Record<string, unknown> = {};
         if (boardId !== undefined) body.boardId = boardId;
         if (nodeId !== undefined) body.nodeId = nodeId;
+        if (scale !== undefined) body.scale = scale;
         const r = await client.call<{ boardId: string; nodeId?: string; width: number; height: number; mimeType: string; png: string }>('/screenshot', body);
         return asResult(r, ({ png, ...meta }) => [
           { type: 'image', data: png, mimeType: 'image/png' },

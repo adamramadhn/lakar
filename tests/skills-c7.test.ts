@@ -4,7 +4,7 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { GOLDEN_SET_PATH, PROTOCOL_DIR, forbiddenPhrases, forbiddenSources, loadProtocol, words } from '../bench/src/protocol.ts';
+import { C7_CRITERIA_IDS, GOLDEN_SET_PATH, PROTOCOL_DIR, forbiddenPhrases, forbiddenSources, loadProtocol, words } from '../bench/src/protocol.ts';
 import { EFFECT_PROMPTS_PATH, EFFECT_PROMPTS_SHA256, loadPracticePrompts, POLISH_PROMPTS_PATH, POLISH_PROMPTS_SHA256 } from '../bench/src/practice/prompts.ts';
 
 const ROOT = join(import.meta.dirname, '..');
@@ -16,11 +16,11 @@ const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 /** Prompt latihan beku (story 19: P1–P4; story 22: seri efek P5/P6; story 23: seri polish P7–P9): teksnya sumber terlarang, nama produknya token terlarang. */
 const practice = [...loadPracticePrompts().prompts, ...loadPracticePrompts(EFFECT_PROMPTS_PATH, EFFECT_PROMPTS_SHA256).prompts, ...loadPracticePrompts(POLISH_PROMPTS_PATH, POLISH_PROMPTS_SHA256).prompts];
 
-/** Token terlarang di skill (bahasa penilaian, nama produk prompt golden dan latihan, label rubrik R1–R10). */
+/** Token terlarang di skill (bahasa penilaian, nama produk prompt golden A–E dan latihan, label rubrik R1–R10). */
 export const SKILL_FORBIDDEN_TOKENS: readonly RegExp[] = [
   /rubrik|\bjuri\b|kriteria|golden|\bskor|benchmark|pen\.dev|pencil|Lampiran B/i,
   /\bR(?:[1-9]|10)\b/,
-  /\bKasku\b|\bGerak\b/,
+  /\bKasku\b|\bGerak\b|\bArus\b|\bSinggah\b|\bGudangku\b/,
   new RegExp(practice.map((p) => `\\b${escapeRe(p.name)}\\b`).join('|'), 'i'),
 ];
 
@@ -29,7 +29,7 @@ type Sources = { texts: string[]; missing: string[] };
 function loadSources(): Sources {
   const texts: string[] = [];
   const missing: string[] = [];
-  if (existsSync(GOLDEN_SET_PATH)) texts.push(...forbiddenSources(readFileSync(GOLDEN_SET_PATH, 'utf8'), ['A', 'B']));
+  if (existsSync(GOLDEN_SET_PATH)) texts.push(...forbiddenSources(readFileSync(GOLDEN_SET_PATH, 'utf8'), C7_CRITERIA_IDS));
   else missing.push(GOLDEN_SET_PATH);
   if (existsSync(DESIGN_PATH)) {
     const lines = readFileSync(DESIGN_PATH, 'utf8').split('\n');
@@ -69,8 +69,8 @@ describe('C7: isi skill bebas sumber terlarang', () => {
     if (!sources.missing.length) expect(phrases.size).toBeGreaterThan(50);
   });
 
-  it('kedelapan file skill ada', () => {
-    expect(skillFiles).toEqual(['api.md', 'core.md', 'icons.md', 'landing.md', 'mobile.md', 'polish.md', 'selection.md', 'webapp.md']);
+  it('kelima belas file skill ada (8 domain + selection, tanpa polish)', () => {
+    expect(skillFiles).toEqual(['accessibility.md', 'api.md', 'color.md', 'core.md', 'icons.md', 'interface.md', 'landing.md', 'layout.md', 'mobile.md', 'review.md', 'selection.md', 'typography.md', 'ui.md', 'webapp.md', 'writing.md']);
   });
 
   it.each(skillFiles)('%s tanpa frasa sumber dan token terlarang', (f) => {
@@ -92,6 +92,16 @@ describe('C7: isi skill bebas sumber terlarang', () => {
       expect(skillC7Problems(`Catatan: ${practicePhrase}.`, phrases), p.id).toContain(`frasa sumber terlarang: "${practicePhrase}"`);
     }
     expect(practice.map((p) => p.id)).toEqual(['P1', 'P2', 'P3', 'P4', 'P5', 'P6', 'P7', 'P8', 'P9']);
-    for (const t of ['skor akhir', 'lolos R3', 'naik di R9', 'R10 penuh', 'nilai juri', 'Kasku', 'lihat pen.dev', ...practice.map((p) => `contoh ${p.name}`)]) expect(skillC7Problems(t, phrases).length, t).toBeGreaterThan(0);
+    for (const t of ['skor akhir', 'lolos R3', 'naik di R9', 'R10 penuh', 'nilai juri', 'Kasku', 'Arus', 'Singgah', 'Gudangku', 'lihat pen.dev', ...practice.map((p) => `contoh ${p.name}`)]) expect(skillC7Problems(t, phrases).length, t).toBeGreaterThan(0);
+    // Sumber terlarang mencakup kriteria dan prompt C–E (C7_CRITERIA_IDS = A–E).
+    expect([...C7_CRITERIA_IDS]).toEqual(['A', 'B', 'C', 'D', 'E']);
+    if (!sources.missing.length) {
+      const protocol = loadProtocol();
+      for (const id of ['C', 'D', 'E'] as const) {
+        const promptPhrase = words(protocol.prompts[id]).slice(3, 9).join(' ');
+        expect(skillC7Problems(`Catatan: ${promptPhrase}.`, phrases), id).toContain(`frasa sumber terlarang: "${promptPhrase}"`);
+      }
+      expect(skillC7Problems('Catatan: sidebar 248 dengan 6 8 item ikon satu aktif.', phrases).length).toBeGreaterThan(0);
+    }
   });
 });

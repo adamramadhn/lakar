@@ -1,4 +1,6 @@
-// Agregasi skor juri, gerbang G0 Lakar, dan keputusan sementara per prompt (DESIGN.md Lampiran B). Murni.
+// Agregasi skor juri, gerbang Lakar (G0; G1 + R3/R7 mekanis), dan keputusan sementara per prompt dan per putaran
+// (DESIGN.md Lampiran B). Murni.
+import { isGateRule, type FindingLevel } from '@lakar/schema';
 import { median } from '../stats.js';
 import type { JudgeRepRecord, Tool } from '../judge/run.js';
 import { APPEAL_CRITERIA, JUDGE_CRITERIA, type JudgeCriterion } from '../judge/prompt.js';
@@ -56,15 +58,71 @@ export type GateInput = {
   sizeProblems: string[];
   wallMs: number | undefined;
   baselineMedianMs: number | undefined;
+  /**
+   * Hanya putaran G1 (A–E, `decideG1`): R3/R7 mekanis dari temuan layout_check final (`technicalScores`).
+   * `null` = putaran G1 tanpa temuan layout_check (gagal). Tidak diisi (G0, latihan) = tidak dihitung.
+   */
+  technical?: TechnicalScores | null;
 };
 export type GateResult = { ok: boolean; reasons: string[]; timeRatio: number | undefined };
 
-/** Gerbang G0 Lakar (otomatis): layout_check gate = 0, ukuran board, waktu ≤ 1,5 × median baseline. R3/R7 tidak dihitung di G0. */
+/** Aturan R3 (Lampiran B §Kualitas teknis): LC-07, LC-11, LC-06. */
+export const R3_RULES = ['LC-07', 'LC-11', 'LC-06'] as const;
+/** Warning struktural R7: LC-03/13/14/17/18/21. */
+export const R7_STRUCTURAL_RULES = ['LC-03', 'LC-13', 'LC-14', 'LC-17', 'LC-18', 'LC-21'] as const;
+export const R3_ONE_MAX = 5;
+export const R7_TWO_MAX_WARNINGS = 3;
+export const R7_ONE_MAX_WARNINGS = 8;
+export const R7_ONE_MAX_ERRORS = 2;
+export const ADAM_FALSE_POSITIVE_FLAG = 'periksa Adam: false positive?';
+
+export type TechnicalScores = {
+  R3: 0 | 1 | 2;
+  R7: 0 | 1 | 2;
+  /** Jumlah temuan per aturan R3 (aturan yang belum ada di katalog = 0). */
+  r3Counts: Record<(typeof R3_RULES)[number], number>;
+  /** Error dari aturan yang bukan gerbang menurut katalog `@lakar/schema` (`isGateRule`). */
+  nonGateErrors: number;
+  /** Warning dari aturan struktural R7. */
+  structuralWarnings: number;
+  /** Ditandai bila error non-gerbang > 0 (R7 skor 1 hanya sah bila Adam menganulirnya sebagai false positive). */
+  flags: string[];
+};
+
+/**
+ * R3/R7 mekanis (murni) dari temuan `layout_check` final board Lakar, per ID aturan (Lampiran B §Kualitas teknis).
+ * R3 = 2 bila LC-07, LC-11, LC-06 semuanya 0; 1 bila total ketiganya ≤ 5; 0 bila > 5.
+ * R7 = 2 bila 0 error non-gerbang dan ≤ 3 warning struktural; 1 bila ≤ 2 error non-gerbang dan ≤ 8 warning struktural
+ * (error non-gerbang > 0 ditandai "periksa Adam: false positive?"); 0 selebihnya.
+ */
+export function technicalScores(findings: readonly { rule: string; level: FindingLevel }[]): TechnicalScores {
+  const count = (rule: string) => findings.filter((f) => f.rule === rule).length;
+  const r3Counts = Object.fromEntries(R3_RULES.map((r) => [r, count(r)])) as TechnicalScores['r3Counts'];
+  const r3Total = R3_RULES.reduce((s, r) => s + r3Counts[r], 0);
+  const R3 = r3Total === 0 ? 2 : r3Total <= R3_ONE_MAX ? 1 : 0;
+  const nonGateErrors = findings.filter((f) => f.level === 'error' && !isGateRule(f.rule)).length;
+  const structuralWarnings = findings.filter((f) => f.level === 'warning' && (R7_STRUCTURAL_RULES as readonly string[]).includes(f.rule)).length;
+  const R7 =
+    nonGateErrors === 0 && structuralWarnings <= R7_TWO_MAX_WARNINGS ? 2 : nonGateErrors <= R7_ONE_MAX_ERRORS && structuralWarnings <= R7_ONE_MAX_WARNINGS ? 1 : 0;
+  const flags = nonGateErrors > 0 ? [`${ADAM_FALSE_POSITIVE_FLAG} (${nonGateErrors} error non-gerbang)`] : [];
+  return { R3, R7, r3Counts, nonGateErrors, structuralWarnings, flags };
+}
+
+/**
+ * Gerbang Lakar (otomatis): layout_check gate = 0, ukuran board, waktu ≤ 1,5 × median baseline. R3/R7 hanya bila
+ * `technical` diisi (putaran G1): R3 = 0 atau R7 = 0 → gagal. G0 dan latihan tidak menghitung R3/R7.
+ */
 export function lakarGate(g: GateInput): GateResult {
   const reasons: string[] = [];
   if (g.layoutGate === undefined) reasons.push('layout_check tidak tersedia');
   else if (g.layoutGate > 0) reasons.push(`layout_check gate = ${g.layoutGate}`);
   reasons.push(...g.sizeProblems.map((p) => `ukuran: ${p}`));
+  if (g.technical === null) reasons.push('R3/R7 tidak terukur (temuan layout_check tidak ada)');
+  else if (g.technical) {
+    const t = g.technical;
+    if (t.R3 === 0) reasons.push(`R3 = 0 (${R3_RULES.map((r) => `${r} ${t.r3Counts[r]}`).join(', ')}; > ${R3_ONE_MAX})`);
+    if (t.R7 === 0) reasons.push(`R7 = 0 (${t.nonGateErrors} error non-gerbang, ${t.structuralWarnings} warning struktural)`);
+  }
   const timeRatio = g.wallMs !== undefined && g.baselineMedianMs ? g.wallMs / g.baselineMedianMs : undefined;
   if (timeRatio === undefined) reasons.push('waktu tidak terukur');
   else if (timeRatio > TIME_GATE_FACTOR) reasons.push(`waktu ${(g.wallMs! / 1000).toFixed(1)} dtk > ${TIME_GATE_FACTOR} × baseline ${(g.baselineMedianMs! / 1000).toFixed(1)} dtk (rasio ${timeRatio.toFixed(2)})`);
@@ -174,4 +232,70 @@ export function decideG0(
   const notPass = G0_PROMPTS.filter((p) => !G0_PASS.includes(byPrompt.get(p)!));
   if (notPass.length === 0) return { decision: 'lolos', why: `${G0_PROMPTS.map((p) => `${p} ${byPrompt.get(p)}`).join(', ')}` };
   return { decision: 'tidak dapat diputuskan', why: notPass.map((p) => `${p} ${byPrompt.get(p)}`).join(', ') };
+}
+
+export type G1Decision = G0Decision;
+/** Prompt putaran G1 (Lampiran B: G1 lulus inti A). */
+export const G1_PROMPTS: readonly string[] = ['A', 'B', 'C', 'D', 'E'];
+/** G1: ≥ 4 dari 5 prompt Setara/Lebih baik dan ≥ 1 Lebih baik. */
+export const G1_MIN_PASS = 4;
+export const G1_MIN_BETTER = 1;
+
+export type G1PromptInput = {
+  prompt: string;
+  decision: Pick<DecisionResult, 'decision' | 'why'>;
+  /** Rasio wall Lakar / median baseline pen.dev (gerbang waktu); undefined = tidak terukur. */
+  timeRatio: number | undefined;
+  /** Emoji Lakar: (a) input tool_use agen, (b) LC-01a + LC-01b, (c) median juri. undefined = tidak terukur. */
+  emoji: { agent: number | undefined; lint: number | undefined; judge: number | undefined };
+};
+
+/**
+ * Keputusan G1 sementara (murni), sampai Adam mengonfirmasi. Putaran `dibatalkan` → tidak dapat diputuskan.
+ * Lolos: ≥ 4 dari A–E Setara/Lebih baik, ≥ 1 Lebih baik, emoji Lakar (a)/(b)/(c) = 0 dan rasio waktu ≤ 1,5 di semua prompt.
+ * Gagal: ada emoji > 0 atau rasio > 1,5, atau syarat jumlah tidak bisa tercapai lagi walau prompt yang belum pasti
+ * (hilang/tidak dapat dinilai) berakhir Lebih baik. Selebihnya (yang belum pasti masih bisa mengubah hasil, atau
+ * waktu/emoji tidak terukur) → tidak dapat diputuskan.
+ */
+export function decideG1(results: readonly G1PromptInput[], roundStatus: 'lengkap' | 'tidak lengkap' | 'dibatalkan'): { decision: G1Decision; why: string } {
+  if (roundStatus === 'dibatalkan') return { decision: 'tidak dapat diputuskan', why: 'putaran dibatalkan' };
+  const by = new Map(results.map((r) => [r.prompt, r]));
+  const fail: string[] = [];
+  const unknown: string[] = [];
+  let pass = 0;
+  let better = 0;
+  let open = 0;
+  for (const p of G1_PROMPTS) {
+    const r = by.get(p);
+    if (!r) {
+      open++;
+      unknown.push(`prompt ${p} tidak ada di putaran`);
+      continue;
+    }
+    const d = r.decision.decision;
+    if (d === 'Setara' || d === 'Lebih baik') pass++;
+    if (d === 'Lebih baik') better++;
+    if (d === 'tidak dapat dinilai') {
+      open++;
+      unknown.push(`${p} tidak dapat dinilai`);
+    }
+    if (r.timeRatio === undefined) unknown.push(`${p} waktu tidak terukur`);
+    else if (r.timeRatio > TIME_GATE_FACTOR) fail.push(`${p} rasio waktu ${r.timeRatio.toFixed(2)} > ${TIME_GATE_FACTOR}`);
+    const e = r.emoji;
+    const parts = [
+      ['(a)', e.agent],
+      ['(b)', e.lint],
+      ['(c)', e.judge],
+    ] as const;
+    const pos = parts.filter(([, v]) => v !== undefined && v > 0);
+    if (pos.length) fail.push(`${p} emoji Lakar ${pos.map(([k, v]) => `${k} ${v}`).join(', ')}`);
+    const miss = parts.filter(([, v]) => v === undefined);
+    if (miss.length) unknown.push(`${p} emoji ${miss.map(([k]) => k).join('/')} tidak terukur`);
+  }
+  const lost = G1_PROMPTS.filter((p) => by.get(p)?.decision.decision === 'Kalah');
+  if (pass + open < G1_MIN_PASS) fail.push(`Setara/Lebih baik paling banyak ${pass + open} dari ${G1_PROMPTS.length} < ${G1_MIN_PASS}${lost.length ? ` (Kalah di ${lost.join(', ')})` : ''}`);
+  if (better + open < G1_MIN_BETTER) fail.push(`tidak ada prompt Lebih baik`);
+  if (fail.length) return { decision: 'gagal', why: fail.join('; ') };
+  if (unknown.length) return { decision: 'tidak dapat diputuskan', why: unknown.join('; ') };
+  return { decision: 'lolos', why: `${pass} dari ${G1_PROMPTS.length} Setara/Lebih baik (${better} Lebih baik), emoji 0, rasio waktu ≤ ${TIME_GATE_FACTOR} di semua prompt` };
 }

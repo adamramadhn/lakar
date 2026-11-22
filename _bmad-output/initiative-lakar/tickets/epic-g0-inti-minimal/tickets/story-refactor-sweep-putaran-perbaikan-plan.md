@@ -3,7 +3,7 @@ title: 'Refactor sweep putaran perbaikan (sebelum putaran resmi 2)'
 type: refactor
 ticket: '20'
 created: '2026-11-18'
-status: built
+status: done
 baseline_revision: 'cacfc296d6d5de4af58df0adb66d667acb7bc8d6'
 route: full
 route_source: auto

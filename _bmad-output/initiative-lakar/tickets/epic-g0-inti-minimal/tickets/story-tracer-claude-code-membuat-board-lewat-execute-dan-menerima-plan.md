@@ -3,7 +3,7 @@ title: 'Tracer: Claude Code membuat board lewat execute dan menerima PNG'
 type: feature
 ticket: '3'
 created: '2026-11-17'
-status: built
+status: done
 baseline_revision: 'b61f9eff851fb33d2f61dc7b2d6958b3729a03d0'
 route: full
 route_source: auto

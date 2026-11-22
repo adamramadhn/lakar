@@ -92,11 +92,23 @@ export function openDocSlugsInLine(line: string, server = LAKAR_SERVER): string[
   return out;
 }
 
-/** Ukuran board mengikat: lebar selalu, tinggi bila bukan null (landing = tinggi bebas). */
-export type BoardSpec = { width: number; height: number | null };
+/**
+ * Ukuran board mengikat: lebar selalu, tinggi bila bukan null (landing = tinggi bebas). `heightMode: 'min'` = tinggi ≥ yang
+ * diminta apa pun versi rubrik (viewport, isi boleh bergulir: D).
+ */
+export type BoardSpec = { width: number; height: number | null; heightMode?: 'min' };
 
-/** Spesifikasi ukuran prompt golden A/B (A lebar 1440, B 390×844). Prompt lain: tidak ada spesifikasi. */
-export const GOLDEN_BOARD_SPECS: Readonly<Record<string, BoardSpec>> = { A: { width: 1440, height: null }, B: { width: 390, height: 844 } };
+/**
+ * Spesifikasi ukuran prompt golden (golden-set "Ukuran mengikat"): A lebar 1440, B 390×844, C 1440×1024 (persis),
+ * D lebar 390 dengan viewport 844 (tinggi ≥ 844, selalu), E 1440×900 (persis). Prompt lain: tidak ada spesifikasi.
+ */
+export const GOLDEN_BOARD_SPECS: Readonly<Record<string, BoardSpec>> = {
+  A: { width: 1440, height: null },
+  B: { width: 390, height: 844 },
+  C: { width: 1440, height: 1024 },
+  D: { width: 390, height: 844, heightMode: 'min' },
+  E: { width: 1440, height: 900 },
+};
 
 /**
  * Aturan ukuran mengikat. `exact` = lebar dan tinggi sama persis (rubrik < 2.2). `mobile-min-height` (rubrik ≥ 2.2) =
@@ -132,7 +144,7 @@ export function boardSizeProblemsFor(spec: BoardSpec | undefined, boards: readon
   if (!boards.length) return ['tidak ada board'];
   if (!spec) return [];
   const out: string[] = [];
-  const mobileMin = rule === 'mobile-min-height' && spec.height !== null && spec.width <= MOBILE_MAX_WIDTH;
+  const mobileMin = spec.heightMode === 'min' || (rule === 'mobile-min-height' && spec.height !== null && spec.width <= MOBILE_MAX_WIDTH);
   for (const b of boards) {
     if (spec.height === null) {
       if (b.width !== spec.width) out.push(`board ${b.id} lebar ${b.width} ≠ ${spec.width}`);
@@ -143,7 +155,10 @@ export function boardSizeProblemsFor(spec: BoardSpec | undefined, boards: readon
   return out;
 }
 
-/** Ukuran board mengikat (gerbang): A semua board lebar 1440; B semua board 390×844 (rubrik ≥ 2.2: 390 × ≥ 844). */
+/**
+ * Ukuran board mengikat (gerbang): A semua board lebar 1440; B semua board 390×844 (rubrik ≥ 2.2: 390 × ≥ 844);
+ * C 1440×1024 dan E 1440×900 persis; D 390 × ≥ 844 apa pun versi rubrik.
+ */
 export function boardSizeProblems(promptId: string, boards: readonly { id: string; width: number; height: number }[], rule: SizeRule = 'exact'): string[] {
   return boardSizeProblemsFor(GOLDEN_BOARD_SPECS[promptId], boards, rule);
 }

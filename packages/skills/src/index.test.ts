@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, sep } from 'node:path';
-import { PACKAGE, SKILL_NAMES, SKILLS_DIR, estimateTokens, isSkillName, listSkills, readSkill, splitCode } from './index.js';
+import { DOMAIN_SKILLS, PACKAGE, RETIRED_SKILLS, SKILL_NAMES, SKILLS_DIR, estimateTokens, isSkillName, listSkills, readSkill, splitCode } from './index.js';
 
 describe('@lakar/skills', () => {
   let dir: string;
@@ -15,9 +15,13 @@ describe('@lakar/skills', () => {
 
   it('mengekspor nama paket dan daftar nama tertutup', () => {
     expect(PACKAGE).toBe('@lakar/skills');
-    expect(SKILL_NAMES).toEqual(['core', 'polish', 'landing', 'mobile', 'webapp', 'icons', 'api', 'selection']);
+    expect(SKILL_NAMES).toEqual(['core', 'landing', 'mobile', 'webapp', 'layout', 'typography', 'color', 'accessibility', 'ui', 'interface', 'writing', 'review', 'icons', 'api', 'selection']);
+    expect(DOMAIN_SKILLS).toEqual(['layout', 'typography', 'color', 'accessibility', 'ui', 'interface', 'writing', 'review']);
     expect(isSkillName('core')).toBe(true);
     expect(isSkillName('lain')).toBe(false);
+    // Story 2.16: polish dipecah (bukan alias).
+    expect(isSkillName('polish')).toBe(false);
+    expect(RETIRED_SKILLS.polish).toBe('skill polish dipecah menjadi layout, typography, color, accessibility, ui, interface, writing, review');
   });
 
   it('SKILLS_DIR = packages/skills/skills/ (di luar dist)', () => {

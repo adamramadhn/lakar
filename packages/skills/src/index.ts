@@ -7,9 +7,36 @@ import { fileURLToPath } from 'node:url';
 
 export const PACKAGE = '@lakar/skills';
 
-/** Nama skill yang dikenal (tertutup). */
-export const SKILL_NAMES = ['core', 'polish', 'landing', 'mobile', 'webapp', 'icons', 'api', 'selection'] as const;
+/** Nama skill yang dikenal (tertutup): inti, jenis layar, delapan domain desain, lalu rujukan dan alur seleksi. */
+export const SKILL_NAMES = [
+  'core',
+  'landing',
+  'mobile',
+  'webapp',
+  'layout',
+  'typography',
+  'color',
+  'accessibility',
+  'ui',
+  'interface',
+  'writing',
+  'review',
+  'icons',
+  'api',
+  'selection',
+] as const;
 export type SkillName = (typeof SKILL_NAMES)[number];
+
+/** Skill domain yang dibaca bersama `core` dan satu skill jenis layar (story 2.16). */
+export const DOMAIN_SKILLS = ['layout', 'typography', 'color', 'accessibility', 'ui', 'interface', 'writing', 'review'] as const satisfies readonly SkillName[];
+
+/** Skill jenis layar. */
+export const SCREEN_SKILLS = ['landing', 'mobile', 'webapp'] as const satisfies readonly SkillName[];
+
+/** Nama skill lama yang sudah tidak ada → pesan pengganti (bukan alias; `read_skill` tetap NOT_FOUND). */
+export const RETIRED_SKILLS: Readonly<Record<string, string>> = {
+  polish: `skill polish dipecah menjadi ${DOMAIN_SKILLS.join(', ')}`,
+};
 
 /** Direktori file skill: `packages/skills/skills/` (sama dari `src/` maupun `dist/`). */
 export const SKILLS_DIR = fileURLToPath(new URL('../skills/', import.meta.url));

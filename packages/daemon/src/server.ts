@@ -6,7 +6,7 @@ import { photoRefsInCode, runSnippet } from '@lakar/exec';
 import { IconCatalog } from '@lakar/icons';
 import type { IconCatalogPort, RenderPort } from '@lakar/ports';
 import { iconRefs, parseCssVariables } from '@lakar/render';
-import { SKILL_NAMES, SKILLS_DIR, listSkills, readSkill } from '@lakar/skills';
+import { RETIRED_SKILLS, SKILL_NAMES, SKILLS_DIR, listSkills, readSkill } from '@lakar/skills';
 import {
   ICON_LIBS,
   ICON_SEARCH_MAX_LIMIT,
@@ -145,8 +145,11 @@ function applyEdits(code: string, edits: { find: string; replace: string }[]): s
   });
   return out;
 }
-const ScreenshotBody = z.object({ boardId: z.string().optional(), nodeId: z.string().optional() }).strict().optional();
-const SCREENSHOT_HINT = 'kirim {boardId?} (board; kosong = board pertama) ATAU {nodeId} (potret satu node), bukan keduanya';
+const ScreenshotBody = z
+  .object({ boardId: z.string().optional(), nodeId: z.string().optional(), scale: z.union([z.literal(1), z.literal(2)]).optional() })
+  .strict()
+  .optional();
+const SCREENSHOT_HINT = 'kirim {boardId?} (board; kosong = board pertama) ATAU {nodeId} (potret satu node), bukan keduanya; scale 1 atau 2 (default 1)';
 const SessionBody = z.object({ client: z.string().max(64).optional(), version: z.string().max(64).optional(), schemaVersion: z.number().int().optional() }).strict().optional();
 const InspectBody = z.object({ id: z.string().min(1), depth: z.number().int().min(0).max(INSPECT_DEPTH_MAX).optional() }).strict();
 const ExportBody = z.object({ id: z.string().min(1).optional(), scale: z.union([z.literal(1), z.literal(2)]).optional() }).strict().optional();
@@ -473,9 +476,11 @@ export function buildServer({
         }
         const ids = [...touched, ...committed.created.map((c) => c.id), ...changedNodeIds(before, after, touched)];
         const { bounds, truncated } = boundsOf(ran.measures, ids, BOUNDS_MAX);
-        const summary = summarizeFindings(ran.findings);
+        // AD-8: execute memuat error dan warning; temuan info (nama layer, jumlah konvensi) hanya di layout_check.
+        const findings = ran.findings.filter((f) => f.level !== 'info');
+        const summary = summarizeFindings(findings);
         checked = {
-          check: { boards: touched, summary, findings: ran.findings },
+          check: { boards: touched, summary, findings },
           bounds,
           ...(truncated > 0 ? { boundsTruncated: truncated } : {}),
           checkMs: Math.round((performance.now() - t0) * 10) / 10,
@@ -516,11 +521,13 @@ export function buildServer({
     }
     // AD-6/AD-16: render hanya menerima dokumen ter-resolve; token diselesaikan di daemon.
     const doc = resolveDocument(docs.get(slug)!);
+    // scale 2 = zoom review (piksel 2× bounds); default 1 = perilaku lama.
+    const scaleOpt = body?.scale === 2 ? { scale: 2 as const } : {};
     if (body?.nodeId !== undefined) {
       const hit = locateNode(doc, body.nodeId);
       if (!hit) throw nodeNotFound(body.nodeId, slug);
       assertIcons(hit.board);
-      const png = await render.screenshot(doc, hit.board.id, hit.node.id === hit.board.id ? {} : { nodeId: hit.node.id });
+      const png = await render.screenshot(doc, hit.board.id, { ...scaleOpt, ...(hit.node.id === hit.board.id ? {} : { nodeId: hit.node.id }) });
       const size = readPngSize(png);
       return ok(reply, { boardId: hit.board.id, nodeId: hit.node.id, ...size, mimeType: 'image/png', png: Buffer.from(png).toString('base64'), ...placeholderNote(hit.node) });
     }
@@ -533,8 +540,9 @@ export function buildServer({
     }
     // AD-9: ikon yang tidak dikenal katalog (mis. dokumen lama di disk) → ICON_UNKNOWN + 3 saran sebelum render.
     assertIcons(board);
-    const png = await render.screenshot(doc, board.id);
-    return ok(reply, { boardId: board.id, width: board.width, height: board.height, mimeType: 'image/png', png: Buffer.from(png).toString('base64'), ...placeholderNote(board) });
+    const png = await render.screenshot(doc, board.id, scaleOpt);
+    const dims = body?.scale === 2 ? readPngSize(png) : { width: board.width, height: board.height };
+    return ok(reply, { boardId: board.id, ...dims, mimeType: 'image/png', png: Buffer.from(png).toString('base64'), ...placeholderNote(board) });
   });
 
   // Daftar board dokumen aktif (AD-11 `list_boards`).
@@ -617,15 +625,16 @@ export function buildServer({
     const content = await readSkill(body.name, skillsDir);
     if (content === undefined) {
       const available = skills.filter((x) => x.available).map((x) => x.name);
+      const retired = Object.hasOwn(RETIRED_SKILLS, body.name) ? `: ${RETIRED_SKILLS[body.name]}` : '';
       throw notFound(
-        `skill ${JSON.stringify(body.name)} tidak ada`,
+        `skill ${JSON.stringify(body.name)} tidak ada${retired}`,
         `skill dikenal: ${SKILL_NAMES.join(', ')}; tersedia: ${available.length ? available.join(', ') : '-'}`,
       );
     }
     return ok(reply, { name: body.name, content });
   });
 
-  // Check G0 penuh (AD-8) pada board dokumen aktif. Dokumen immutable: dibaca tanpa kunci.
+  // Check penuh (AD-8) pada board dokumen aktif, termasuk temuan info. Dokumen immutable: dibaca tanpa kunci.
   app.post('/layout-check', async (req, reply) => {
     const { slug } = activeDoc(req.headers[SESSION_HEADER]);
     const body = parse(LayoutCheckBody, req.body ?? undefined, 'kirim {boardId?} (tanpa boardId = semua board dokumen aktif)');

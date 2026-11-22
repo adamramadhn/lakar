@@ -942,10 +942,11 @@ export const API_REFERENCE: readonly ApiReferenceSection[] = [
     ],
     example:
       `${BOARD}\nconst k = add(b, {type:'frame', name:'Kartu', layout:'column', gap:8, padding:16, fills:[{type:'solid', color:'#F2F4F7'}]});\n` +
-      "const t = add(k, {type:'text', name:'Judul', content:'Judul', size:16, weight:600});\nconst isi = add(k, {type:'frame', name:'Isi', layout:'column'});\n" +
+      "const t = add(k, {type:'text', name:'Judul', content:'Judul', size:16, lineHeight:24, weight:600});\nconst isi = add(k, {type:'frame', name:'Isi', layout:'column'});\n" +
+      "add(isi, {type:'text', name:'Teks', content:'Isi kartu', size:14, lineHeight:20});\n" +
       "setComponent(k, {props:[{name:'title', type:'text', default:'Judul', binds:[{nodeId:t, prop:'content'}]}], slots:[{name:'body', nodeId:isi}]});\n" +
       "const a = add(b, {type:'instance', name:'Kartu A', componentId:k, props:{title:'Promo'}});\n" +
-      "update(a + '/' + t, {color:'#B42318'});\nadd(a + '/' + isi, {type:'text', name:'Catatan', content:'Diskon 20%', size:14});\n" +
+      "update(a + '/' + t, {color:'#B42318'});\nadd(a + '/' + isi, {type:'text', name:'Catatan', content:'Diskon 20%', size:14, lineHeight:20});\n" +
       "update(k, {fills:[{type:'solid', color:'#FFFFFF'}]});\nget(a + '/' + t).content;",
   },
   {

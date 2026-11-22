@@ -144,8 +144,11 @@ export const EFFECTS_SERIES: SeriesConfig = {
 };
 
 /**
- * Seri polish (story 23 + 24): iterasi 1 = baseline skill/check lama, iterasi 2 = sesudah story 23 (reuse pen.dev
- * iterasi 1); iterasi 3–5 = story 24 (maks 3 iterasi tambahan, $17,50 → kumulatif seri ≤ $30,24), P7–P9 wajib lulus.
+ * Seri polish (story 23 + 24 + 2.16): iterasi 1 = baseline skill/check lama, iterasi 2 = sesudah story 23 (reuse pen.dev
+ * iterasi 1); iterasi 3–4 = story 24 ($17,50 → kumulatif seri ≤ $30,24, terpakai $22,58); iterasi 5–6 = story 2.16 (skill domain,
+ * `--reuse-pendev 1`; keputusan plan checkpoint 2026-11-19, didelegasikan Adam: maks 6 iterasi, anggaran kumulatif
+ * $34,58 = $22,58 terpakai sesudah iterasi 4 + $12 story 2.16; iterasi 6 hanya bila iterasi 5 turun dari polish-4 atau
+ * rasio waktu > 1,5). P7–P9 wajib lulus.
  */
 export const POLISH_SERIES: SeriesConfig = {
   id: 'polish',
@@ -153,8 +156,8 @@ export const POLISH_SERIES: SeriesConfig = {
   promptsPath: POLISH_PROMPTS_PATH,
   sha: POLISH_PROMPTS_SHA256,
   ids: POLISH_ID,
-  maxIter: 5,
-  budgetUsd: 30.24,
+  maxIter: 6,
+  budgetUsd: 34.58,
   costEstimate: POLISH_COST_ESTIMATE,
   passRule: 'all',
   reportPrefix: 'polish',

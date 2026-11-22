@@ -3,7 +3,7 @@ title: 'Skema dokumen v1 lengkap dengan token dan kode error'
 type: feature
 ticket: '5'
 created: '2026-11-17'
-status: built
+status: done
 baseline_revision: '2a14bf299428385bcf99d52a007b6f303f8ee0f2'
 route: full
 route_source: auto

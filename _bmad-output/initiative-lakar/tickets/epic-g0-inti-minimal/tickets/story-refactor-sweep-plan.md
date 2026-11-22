@@ -3,7 +3,7 @@ title: 'Refactor sweep G0 sebelum putaran resmi'
 type: refactor
 ticket: '15'
 created: '2026-11-18'
-status: built
+status: done
 baseline_revision: 'dcd6464755b1c54b9a1a3f78e031bd10734df5d6'
 route: full
 route_source: auto

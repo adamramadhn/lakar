@@ -3,7 +3,7 @@ title: 'Skill polish dan disiplin spacing dari ui-skills'
 type: feature
 ticket: '23'
 created: '2026-11-18'
-status: built
+status: done
 baseline_revision: '7fce0c5b13eafef6df9ef04fa73644fe1092f6a3'
 route: full
 route_source: auto

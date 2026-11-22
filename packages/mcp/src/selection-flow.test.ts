@@ -150,10 +150,11 @@ describe.skipIf(!browserInstalled)('alur agen dari seleksi: get_selection → ex
       const head = /^check board ([A-Za-z0-9]{8}), ([A-Za-z0-9]{8}): (.*)$/.exec(lines[1]!);
       expect(head, lines[1]).not.toBeNull();
       expect([head![1], head![2]].sort()).toEqual([...variants].sort());
-      expect(head![3]).toBe(summaryText({ error: 0, warning: 0, gate: 0 }));
+      // Satu-satunya warning: LC-07 gap 10 kartu fixture yang disengaja, tersalin ke tiap varian.
+      expect(head![3]).toBe(summaryText({ error: 0, warning: 2, gate: 0, info: 0 }));
 
       // Pelanggan /viewer/events menerima call execute selesai (pemicu mount ulang canvas, story 3).
-      const done = await stream.waitFor((e) => e.event === 'call' && e.data.call.tool === 'execute' && e.data.call.status === 'done' && e.data.call.rev === out.rev, 'call execute done');
+      const done = await stream.waitFor((e) => e.event === 'call' && e.data.call.tool === 'execute' && e.data.call.status === 'warning' && e.data.call.rev === out.rev, 'call execute selesai (warning LC-07 fixture)');
       expect(done.data.call).toMatchObject({ client: 'lakar-mcp', slug: SLUG, description: 'varian responsif 390 dan 768' });
       expect([...done.data.call.boards].sort()).toEqual([...variants].sort());
       expect(done.data.call.created).toEqual(expect.arrayContaining(variants));
@@ -214,7 +215,7 @@ describe.skipIf(!browserInstalled)('alur agen dari seleksi: get_selection → ex
       // layout_check terpisah atas varian (langkah tiket): sama dengan check di respons execute.
       const lc = await agent.callTool({ name: 'layout_check', arguments: { boardId: variants[0] } });
       expect(text(lc)).toMatch(new RegExp(`^layout_check rev ${out.rev}, 1 board \\(${variants[0]}\\): `));
-      expect(text(lc).split('\n')[0]!.endsWith(summaryText({ error: 0, warning: 0, gate: 0 }))).toBe(true);
+      expect(text(lc).split('\n')[0]!.endsWith(summaryText({ error: 0, warning: 1, gate: 0, info: 0 }))).toBe(true);
 
       // 6. Dua frame terpilih (bukan board) → masing-masing disalin ke board varian baru; sumber tetap.
       const fx = await agent.callTool({ name: 'execute', arguments: { code: withSelection(variantCode, [hero, fitur]), description: 'varian responsif hero' } });
@@ -222,7 +223,7 @@ describe.skipIf(!browserInstalled)('alur agen dari seleksi: get_selection → ex
       const fLines = text(fx).split('\n');
       const fOut = JSON.parse(fLines[0]!);
       expect(fOut.rev).toBe(out.rev + 1);
-      expect(fLines[1]!.endsWith(`: ${summaryText({ error: 0, warning: 0, gate: 0 })}`), fLines[1]).toBe(true);
+      expect(fLines[1]!.endsWith(`: ${summaryText({ error: 0, warning: 2, gate: 0, info: 0 })}`), fLines[1]).toBe(true);
       const after = (await getDoc()).pages[0].children as any[];
       expect(after).toHaveLength(7);
       for (const [i, [name, w]] of ([['Seksi / Hero', 390], ['Seksi / Hero', 768], ['Seksi / Fitur', 390], ['Seksi / Fitur', 768]] as const).entries()) {

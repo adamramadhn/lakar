@@ -163,7 +163,9 @@ const b = add(null, {type:'board', name:'Ikon / Contoh · mobile · Jernih', x:0
 const row = add(b, {type:'frame', name:'Baris ikon', layout:'row', gap:16, padding:20, align:'center'});
 const box = add(row, {type:'frame', name:'Wadah ikon', layout:'row', width:48, height:48, radius:12, justify:'center', align:'center', fills:[{type:'solid', color:'#0F766E14'}]});
 add(box, {type:'icon', lib:'lucide', icon:'truck', size:24, color:'#0F766E'});
-for (let i = 0; i < 5; i++) add(row, {type:'icon', name:'Bintang '+(i+1), lib:'lucide', icon:'star', size:16, color:'#F5B700', filled:true});
+const rating = add(row, {type:'frame', name:'Rating', layout:'row', gap:4, align:'center'}); // bintang + nilai teks
+for (let i = 0; i < 5; i++) add(rating, {type:'icon', name:'Bintang '+(i+1), lib:'lucide', icon:'star', size:16, color:'#F5B700', filled:true});
+add(rating, {type:'text', name:'Nilai', content:'4,8', family:'Inter', size:14, lineHeight:20, weight:600, color:'#101828'});
 add(row, {type:'icon', lib:'simple-icons', icon:'whatsapp', size:24});
 const [m] = iconSearch('receipt', {lib:'lucide', limit:1});
 add(row, {type:'icon', lib:m.lib, icon:m.icon, size:20, color:'#475467'});

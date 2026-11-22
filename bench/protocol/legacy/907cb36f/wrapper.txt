@@ -1,0 +1,6 @@
+Mode benchmark tanpa interaksi: tidak ada pengguna yang bisa menjawab pertanyaan atau memberi konfirmasi. Jangan bertanya; ambil keputusan sendiri dan kerjakan tugas sampai tuntas.
+Kerjakan di dokumen baru yang kosong dengan tool desain yang tersedia.
+Setelah tugas tuntas, akhiri jawabanmu dengan satu kata: selesai.
+
+Tugas:
+{{PROMPT}}

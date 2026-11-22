@@ -1,5 +1,6 @@
 #!/opt/node-26/bin/node
-// CLI bench. `pendev-baseline [--dry-run]`: preflight → seri berselang A1 B1 A2 B2 … → bench/baseline-pendev.{md,json}.
+// CLI bench. `pendev-baseline [--prompts X,Y] [--dry-run]`: preflight → seri berselang (mis. C1 D1 E1 C2 …) hanya untuk prompt
+// terpilih (default: prompt tanpa baseline sah) → bench/baseline-pendev-<IDS>-<tanggal>.{md,json} (eksklusif, dengan promptHashes).
 // `pendev-smoke`: satu run uji murah (prompt netral pendek) untuk membuktikan init memuat tool mcp__pencil__*; tidak masuk baseline.
 // `round --round <uji-k|n> [--dry-run] [--resume]`: putaran Lakar vs pen.dev + juri buta (lihat round/main.ts).
 // `rejudge --from <uji-k|n> --label <slug> [--resume] [--dry-run]`: nilai ulang strip putaran yang ada, tanpa agen (rejudge.ts).
@@ -11,7 +12,8 @@ import { join, relative } from 'node:path';
 import { errorMessage } from '@lakar/schema';
 import { buildArgs, buildEnv, shellQuote } from './claude-runner.js';
 import { Abort, log, stamp } from './log.js';
-import { BENCH_ROOT, GOLDEN_SET_PATH, loadProtocol, REPO_ROOT, renderPrompt, type PromptId } from './protocol.js';
+import { baselineOutputPaths, existingOutputs, baselineProblems, loadBaselines, parsePendevBaselineArgs, promptsWithoutValidBaseline } from './baselines.js';
+import { BENCH_ROOT, GOLDEN_SET_PATH, loadProtocol, promptHashes, REPO_ROOT, renderPrompt, type PromptId } from './protocol.js';
 import { renderJson, renderMarkdown, summarizeRuns, type BaselineReport, type RunRecord } from './report.js';
 import { isFatal, needsRun, seriesOutcome } from './series.js';
 import {
@@ -36,7 +38,7 @@ const SMOKE_PROMPT = 'Panggil tool get_app_state satu kali, lalu jawab satu kata
 const NOTES = [
   'Waktu gerbang (AD-13): `wall` = cap waktu monotonic saat baris event `result` diterima − cap waktu event stdout pertama. Setiap baris diberi cap waktu saat tiba; transkrip mentah byte-identik di `stream.jsonl`, cap waktu di `timing.json`.',
   'Offset `tool_use` pertama → `tool_result` terakhir dan spawn → event pertama hanya diagnostik, bukan waktu gerbang.',
-  'Run gagal (is_error, subtype ≠ success, tanpa result, timeout, exit ≠ 0, 0 frame) tidak masuk median. Run tidak dipilih-pilih (C8): urutan berselang A1 B1 A2 B2 …, maksimal percobaan per prompt dari protocol.json.',
+  'Run gagal (is_error, subtype ≠ success, tanpa result, timeout, exit ≠ 0, 0 frame) tidak masuk median. Run tidak dipilih-pilih (C8): urutan berselang hanya prompt yang diukur (mis. C1 D1 E1 C2 D2 E2 …), maksimal percobaan per prompt dari protocol.json.',
   '`save`, salinan `.pen` (COPYFILE_EXCL), daftar frame, dan Export PNG dilakukan harness setelah `result`, di luar waktu. pen.dev menahan dokumen di app, sedangkan Lakar menulis file di setiap execute; bias ini membuat baseline pen.dev sedikit lebih cepat, jadi konservatif bagi gerbang 1,5×.',
   'Export memakai `{scale:1}` (default pen.dev = 2, lihat `ExportOptions.scale` di execute.md dari read_skill). Ukuran frame diambil dari `ctx.bounds` karena `height` frame bisa null (fit content).',
   'Setiap run memakai dokumen baru (`pen-newdoc.sh`) yang diverifikasi klien MCP harness: URI sama dengan get_app_state, berbeda dari run sebelumnya, tidak ada sebelum newdoc, bukan dokumen golden, 0 node top-level.',
@@ -44,9 +46,10 @@ const NOTES = [
   'Event init divalidasi per run: hanya server MCP `pencil` (connected), semua tool berawalan `mcp__pencil__`, `mcp__pencil__execute` ada, cwd di luar repo. Pelanggaran = `invalid`, seri berhenti.',
 ];
 
-async function series(pre: Preflight): Promise<number> {
+async function series(pre: Preflight, ids: readonly PromptId[], out: { md: string; json: string }): Promise<number> {
   const { protocol } = pre;
-  const cfg = protocol.config;
+  // Seri hanya prompt terpilih: urutan berselang, kelengkapan (`seriesOutcome`) dan laporan memakai `promptIds` terpilih.
+  const cfg = { ...protocol.config, promptIds: [...ids] };
   const seriesId = stamp();
   const dir = join(RUNS_ROOT, 'pendev');
   mkdirSync(dir, { recursive: true });
@@ -85,6 +88,7 @@ async function series(pre: Preflight): Promise<number> {
     date: new Date().toISOString(),
     status: outcome.status,
     protocolHash: protocol.hash,
+    promptHashes: promptHashes(protocol, ids),
     model: cfg.model,
     modelUsageKeys: [...new Set(ok.flatMap((r) => r.modelUsageKeys))].sort(),
     claudeVersion: [...new Set(runs.flatMap((r) => (r.claudeCodeVersion ? [r.claudeCodeVersion] : [])))].join(', ') || pre.claudeVersion,
@@ -98,10 +102,11 @@ async function series(pre: Preflight): Promise<number> {
     runs,
     notes: [...NOTES, ...(fatal ? [`Seri dihentikan: ${fatal}`] : [])],
   };
-  writeFileSync(join(BENCH_ROOT, 'baseline-pendev.md'), renderMarkdown(report));
-  writeFileSync(join(BENCH_ROOT, 'baseline-pendev.json'), renderJson(report));
+  // Eksklusif: baseline lama (termasuk bench/baseline-pendev.{md,json} G0) tidak pernah ditimpa.
+  writeFileSync(out.md, renderMarkdown(report), { flag: 'wx' });
+  writeFileSync(out.json, renderJson(report), { flag: 'wx' });
   for (const s of summarizeRuns(runs, cfg.promptIds)) log(`${s.prompt}: ${s.successes}/${s.attempts} sukses, median ${s.wallMs.median ?? '–'} ms, $${s.costUsd.median ?? '–'}`);
-  log(`laporan: bench/baseline-pendev.md (${report.status})`);
+  log(`laporan: ${relative(REPO_ROOT, out.md)} (${report.status})`);
   return outcome.exitCode;
 }
 
@@ -119,7 +124,7 @@ async function smoke(pre: Preflight): Promise<number> {
 }
 
 const USAGE =
-  'pakai: node bench/dist/cli.js pendev-baseline [--dry-run] | pendev-smoke | round --round <uji-k|n> [--dry-run] [--resume] | rejudge --from <uji-k|n> --label <slug> [--resume] [--dry-run] | rubric-snapshot [--version <v>] | practice [--series practice|effects|polish] --iter <k> [--only P1,P3] [--reuse-pendev <j>] [--resume] [--dry-run]';
+  'pakai: node bench/dist/cli.js pendev-baseline [--prompts X,Y] [--dry-run] | pendev-smoke | round --round <uji-k|n> [--dry-run] [--resume] | rejudge --from <uji-k|n> --label <slug> [--resume] [--dry-run] | rubric-snapshot [--version <v>] | practice [--series practice|effects|polish] --iter <k> [--only P1,P3] [--reuse-pendev <j>] [--resume] [--dry-run]';
 
 /** `rubric-snapshot [--version <v>]`: tulis `bench/rubric/v<ver>/` (eksklusif) dan perbarui `bench/rubric/rubric.json`. */
 function rubricSnapshot(args: string[]): number {
@@ -159,6 +164,7 @@ async function main(args: string[]): Promise<number> {
     console.error(USAGE);
     return 64;
   }
+  if (cmd === 'pendev-baseline') return pendevBaseline(rest);
   const pre = preflight();
   const { protocol } = pre;
   console.log(`protocolHash ${protocol.hash}`);
@@ -169,7 +175,58 @@ async function main(args: string[]): Promise<number> {
   }
   console.log(`\nenv tambahan: ${JSON.stringify(protocol.config.env)}; dibuang: ${buildEnv(process.env, protocol.config).scrubbed.join(', ') || '-'}`);
   if (rest.includes('--dry-run')) return 0;
-  return cmd === 'pendev-smoke' ? smoke(pre) : series(pre);
+  return smoke(pre);
+}
+
+/**
+ * `pendev-baseline [--prompts X,Y] [--dry-run]`: baseline pen.dev per prompt. Default = prompt protokol tanpa baseline sah
+ * (belum diukur, hash prompt/model/claude/pen.dev ≠ baseline). Keluaran eksklusif `bench/baseline-pendev-<IDS>-<tanggal>.{md,json}`
+ * (sudah ada → exit 64, juga saat dry-run); `bench/baseline-pendev.{md,json}` G0 tidak pernah ditimpa.
+ */
+async function pendevBaseline(args: string[]): Promise<number> {
+  const parsed = parsePendevBaselineArgs(args, loadProtocol().config.promptIds);
+  if (!parsed.ok) {
+    console.error(`pendev-baseline: ${parsed.error}\n${USAGE}`);
+    return 64;
+  }
+  const pre = preflight();
+  const cfg = pre.protocol.config;
+  const hashes = promptHashes(pre.protocol);
+  const index = loadBaselines();
+  const current = { promptHashes: hashes, model: cfg.model, claude: pre.claudeVersion, pendevDesktop: penDesktopVersion() ?? null };
+  const ids = (parsed.value.prompts ?? promptsWithoutValidBaseline(index, current, cfg.promptIds)) as PromptId[];
+  console.log(`protocolHash ${pre.protocol.hash} (info; penjaga baseline = hash per prompt)`);
+  for (const p of cfg.promptIds) {
+    const b = index.byPrompt[p];
+    const problems = baselineProblems({ ...index, fileProblems: [] }, current, [p]);
+    console.log(`hash prompt ${p} ${hashes[p]}: ${b ? `baseline ${b.source} (${b.date})` : 'tanpa baseline'}; ${problems.length ? `belum sah (${problems.join('; ')})` : 'sah'}${ids.includes(p) ? ' → diukur' : ''}`);
+  }
+  for (const b of index.superseded) console.log(`baseline tergantikan: ${b.prompt} di ${b.source} (${b.date})`);
+  for (const f of index.fileProblems) console.log(`MASALAH file baseline: ${f}`);
+  for (const x of index.incomplete) console.log(`baseline tidak lengkap (tidak dipakai): ${x}`);
+  if (!ids.length) {
+    console.log('semua prompt sudah punya baseline sah; tidak ada yang diukur (pakai --prompts untuk memilih)');
+    return 0;
+  }
+  const out = baselineOutputPaths(BENCH_ROOT, ids, new Date().toISOString().slice(0, 10));
+  const exists = existingOutputs(out, existsSync);
+  if (exists.length) {
+    console.error(
+      `pendev-baseline: keluaran sudah ada (${exists.map((f) => relative(REPO_ROOT, f)).join(', ')}); tidak ditimpa. Mengukur ulang set prompt yang sama pada tanggal yang sama butuh file itu (mis. seri tidak lengkap) dipindahkan secara manual dulu; harness tidak menghapusnya.`,
+    );
+    return 64;
+  }
+  console.log(
+    `\nrencana: prompt ${ids.join(', ')}; seri berselang ${ids.map((p) => `${p}1`).join(' ')} ${ids.map((p) => `${p}2`).join(' ')} …, ${cfg.runsPerPrompt} sukses per prompt (maks ${cfg.maxAttemptsPerPrompt} percobaan); keluaran ${relative(REPO_ROOT, out.md)} + .json${parsed.value.dryRun ? ' (dry-run: tanpa spawn)' : ''}`,
+  );
+  for (const p of ids) {
+    const rendered = renderPrompt(p, pre.protocol);
+    const argv = ['claude', ...buildArgs({ prompt: rendered, config: cfg, mcpConfig: MCP_CONFIG, allowedTools: ALLOWED_TOOLS })];
+    console.log(`\n=== ${p}: hash prompt ${hashes[p]} ===\n=== ${p}: argv ===\n${shellQuote(argv)}\n=== ${p}: prompt hasil render ===\n${rendered}`);
+  }
+  console.log(`\nenv tambahan: ${JSON.stringify(cfg.env)}; dibuang: ${buildEnv(process.env, cfg).scrubbed.join(', ') || '-'}`);
+  if (parsed.value.dryRun) return 0;
+  return series(pre, ids, out);
 }
 
 try {

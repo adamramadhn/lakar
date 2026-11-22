@@ -3,7 +3,7 @@ title: 'Putaran G0 dijalankan dan diputuskan'
 type: feature
 ticket: '16'
 created: '2026-11-18'
-status: built
+status: done
 baseline_revision: 'd0b71a63a8284a0b04448be31af615c45bdb0e35'
 route: full
 route_source: auto

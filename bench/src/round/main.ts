@@ -1,5 +1,5 @@
-// Perintah `round --round <uji-k|n> [--dry-run] [--resume]`: satu putaran A dan B, Lakar vs pen.dev, lalu juri buta 3×
-// per prompt, lalu `bench/round-<round>.md|json` dan laporan skor (`scoreReportBase`: `bench/score-<id>` atau
+// Perintah `round --round <uji-k|n> [--dry-run] [--resume]`: satu putaran semua prompt protokol (`promptIds`, A–E),
+// Lakar vs pen.dev, lalu juri buta 3× per prompt, lalu `bench/round-<round>.md|json` dan laporan skor (`scoreReportBase`: `bench/score-<id>` atau
 // `bench/round-<n>/score-<id>` untuk putaran resmi ≥ 2).
 import { constants, copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
@@ -14,7 +14,8 @@ import { Abort, log, sleep, stamp } from '../log.js';
 import { emptyRecord, PENDEV_ALLOWED_TOOLS, PENDEV_MCP_CONFIG, penDesktopVersion, preflight, runOne, RUNS_ROOT, type Preflight } from '../pendev/run.js';
 import { encodePngRgb } from '../png/codec.js';
 import { buildStrip, judgeImages } from '../png/strip.js';
-import { BENCH_ROOT, GOLDEN_SET_PATH, PROTOCOL_DIR, PROTOCOL_FILES, REPO_ROOT, renderPrompt, type PromptId, type Protocol, type ProtocolConfig } from '../protocol.js';
+import { baselineProblems, claudeSemver, loadBaselines, type BaselineEntry, type BaselineIndex } from '../baselines.js';
+import { BENCH_ROOT, GOLDEN_SET_PATH, PROTOCOL_DIR, PROTOCOL_FILES, REPO_ROOT, promptHashes, renderPrompt, type PromptId, type Protocol, type ProtocolConfig } from '../protocol.js';
 import type { RunRecord } from '../report.js';
 import type { TimedLine } from '../stream-metrics.js';
 import {
@@ -40,15 +41,20 @@ import { applyLakarArchive, benchLakarSources, describeLakarArchive, planLakarAr
 import { countAgentEmoji, countLintEmoji } from './emoji.js';
 import { lakarReconnect, pendevReconnect } from './reconnect.js';
 import { isOfficialRound, OFFICIAL_CODE_PATHS, renderRoundJson, renderRoundMarkdown, renderScoreJson, renderScoreMarkdown, ROUND_ID, type FrozenVersions, type JudgeTextInfo, type PhotoProbe, type RoundPrompt, type RoundReport, type RoundRun } from './report.js';
-import { aggregateScores, decide, decideG0, lakarGate, NO_VALID_REPS } from './score.js';
+import { aggregateScores, decide, decideG0, decideG1, G1_PROMPTS, lakarGate, NO_VALID_REPS, technicalScores, type G1PromptInput } from './score.js';
 
-const ROUND_ORDER: readonly [PromptId, Tool][] = [
-  ['A', 'pendev'],
-  ['A', 'lakar'],
-  ['B', 'pendev'],
-  ['B', 'lakar'],
-];
-const BASELINE_JSON = join(BENCH_ROOT, 'baseline-pendev.json');
+/** Urutan run putaran: per prompt protokol pen.dev lalu Lakar (A-pen.dev, A-Lakar, B-pen.dev, …). */
+export function roundOrder(promptIds: readonly PromptId[]): [PromptId, Tool][] {
+  return promptIds.flatMap((p): [PromptId, Tool][] => [
+    [p, 'pendev'],
+    [p, 'lakar'],
+  ]);
+}
+
+/** Putaran G1 (R3/R7 mekanis + `decideG1`): protokol memuat semua prompt A–E. Putaran A/B lama tetap G0. */
+export function isG1Protocol(promptIds: readonly string[]): boolean {
+  return G1_PROMPTS.every((p) => promptIds.includes(p));
+}
 const SKILLS_DIR = join(REPO_ROOT, 'packages/skills/skills');
 const MCP_SERVER_TS = join(REPO_ROOT, 'packages/mcp/src/server.ts');
 const CHECK_DIST = join(REPO_ROOT, 'packages/check/dist');
@@ -56,17 +62,20 @@ const PACKAGES_DIR = join(REPO_ROOT, 'packages');
 const DAEMON_PKG = join(PACKAGES_DIR, 'daemon/package.json');
 const PLAYWRIGHT_PKG = join(PACKAGES_DIR, 'daemon/node_modules/playwright-core/package.json');
 
-/** Versi awal `claude --version` ("2.1.325 (Claude Code)" → "2.1.325"). */
-export const claudeSemver = (v: string): string => v.trim().split(/\s+/)[0] ?? '';
+export { claudeSemver };
 
 export type OfficialFreezeInput = {
   /** `git status --porcelain -- <OFFICIAL_CODE_PATHS>`. */
   porcelainCode: string;
-  protocolHash: string;
+  /** Prompt putaran (`promptIds` protokol). */
+  promptIds: readonly string[];
+  /** Hash per prompt saat ini (`promptHashes(protocol)`). */
+  promptHashes: Record<string, string>;
   model: string;
   claude: string;
   pendevDesktop: string | undefined;
-  baseline: { protocolHash: string; model: string; claude: string; pendevDesktop: string | undefined };
+  /** Baseline pen.dev per prompt (`loadBaselines`): prompt tanpa baseline sah = masalah. */
+  baselines: BaselineIndex;
   /** `/status` lakard: startedAt, fonts, pool, schemaVersion (f), photos (g). */
   lakard: Pick<LakardStatus, 'startedAt' | 'fonts' | 'pool' | 'schemaVersion' | 'photos'> | undefined;
   /** mtime (ms) file terbaru di `packages/*\/dist`. */
@@ -80,7 +89,8 @@ export type OfficialFreezeInput = {
 
 /**
  * Cek pembekuan putaran resmi (murni). Setiap masalah → Abort sebelum run apa pun.
- * (a) kode bersih, (b) protokol/model/claude/pen.dev = baseline (C9: tidak di-upgrade/downgrade),
+ * (a) kode bersih, (b) per prompt: baseline ada, hash prompt/model/claude/pen.dev = baseline yang mencakup prompt itu
+ * (C9: tidak di-upgrade/downgrade; baseline tanpa `promptHashes` = masalah),
  * (c) lakard startedAt > mtime dist terbaru (sesudah restart), (d) font lengkap dan pool siap,
  * (e) sha256 teks juri dan versi rubrik = `bench/rubric/rubric.json` (snapshot tracked),
  * (f) `schemaVersion` lakard = `SCHEMA_VERSION` bench, (g) penyedia foto lakard = `unsplash` (key Unsplash terpasang, keputusan Adam plan 1.24).
@@ -88,14 +98,7 @@ export type OfficialFreezeInput = {
 export function officialFreezeProblems(i: OfficialFreezeInput): string[] {
   const out: string[] = [];
   if (i.porcelainCode) out.push(`kode tidak beku: git status --porcelain -- ${OFFICIAL_CODE_PATHS.join(' ')} tidak kosong:\n${i.porcelainCode}`);
-  const b = i.baseline;
-  const cmp = (name: string, now: string | undefined, base: string | undefined) => {
-    if (now !== base) out.push(`${name} ${now ?? '(tidak terbaca)'} ≠ baseline ${base ?? '(tidak ada)'}: baseline pen.dev tidak sebanding`);
-  };
-  cmp('protocolHash', i.protocolHash, b.protocolHash);
-  cmp('model', i.model, b.model);
-  cmp('claude', claudeSemver(i.claude), b.claude);
-  cmp('pen.dev desktop', i.pendevDesktop, b.pendevDesktop);
+  out.push(...baselineProblems(i.baselines, { promptHashes: i.promptHashes, model: i.model, claude: i.claude, pendevDesktop: i.pendevDesktop ?? null }, i.promptIds));
   if (!i.lakard) out.push('lakard /status tidak terbaca');
   else {
     if (i.checkLakardFresh) {
@@ -187,11 +190,14 @@ export function parseRoundArgs(args: readonly string[]): { ok: true; value: Roun
   return { ok: true, value: { round, dryRun, resume } };
 }
 
-/** Penjaga awal putaran (murni): round md sudah ada tanpa --resume → 64; hash protokol ≠ baseline → 1. */
-export function roundStartProblem(i: { mdExists: boolean; resume: boolean; dryRun: boolean; protocolHash?: string; baselineHash?: string }): { exitCode: 64 | 1; message: string } | undefined {
+/**
+ * Penjaga awal putaran (murni): round md sudah ada tanpa --resume → 64; masalah baseline per prompt (belum diukur,
+ * hash prompt ≠ baseline, file tanpa `promptHashes`) → 1 untuk semua putaran non-dry-run (dry-run hanya mencetak).
+ */
+export function roundStartProblem(i: { mdExists: boolean; resume: boolean; dryRun: boolean; baselineProblems?: readonly string[] }): { exitCode: 64 | 1; message: string } | undefined {
   if (i.mdExists && !i.resume && !i.dryRun) return { exitCode: 64, message: 'round md sudah ada; pakai --resume untuk melanjutkan putaran ini' };
-  if (i.protocolHash !== undefined && i.protocolHash !== i.baselineHash)
-    return { exitCode: 1, message: `protocolHash ${i.protocolHash} ≠ baseline ${i.baselineHash}: protokol berubah, butuh baseline/putaran baru` };
+  if (!i.dryRun && i.baselineProblems?.length)
+    return { exitCode: 1, message: `baseline pen.dev per prompt tidak sah (butuh pendev-baseline untuk prompt ini):\n  ${i.baselineProblems.join('\n  ')}` };
   return undefined;
 }
 
@@ -248,15 +254,15 @@ export function judgeTextInfo(texts: JudgeTexts): JudgeTextInfo {
   return { rubricVersion: versions[0], textSha256: Object.fromEntries(Object.entries(texts).map(([id, t]) => [id, t.sha256])) };
 }
 
-/** Teks juri per prompt + penjaga kebocoran dan C7. Gagal → Abort sebelum spawn apa pun. */
-export function prepareJudgeTexts(protocol: Protocol): JudgeTexts {
+/** Teks juri per prompt (default: semua `promptIds`) + penjaga kebocoran dan C7. Gagal → Abort sebelum spawn apa pun. */
+export function prepareJudgeTexts(protocol: Protocol, ids: readonly string[] = protocol.config.promptIds): JudgeTexts {
   if (!existsSync(DESIGN_MD_PATH)) throw new Abort(`DESIGN.md tidak ada (${DESIGN_MD_PATH}); teks juri tidak bisa dibangun`);
   if (!existsSync(GOLDEN_SET_PATH)) throw new Abort(`golden-set.md tidak ada (${GOLDEN_SET_PATH})`);
   const design = readFileSync(DESIGN_MD_PATH, 'utf8');
   const golden = readFileSync(GOLDEN_SET_PATH, 'utf8');
   const out: JudgeTexts = {};
   const targets = c7Targets(protocol);
-  for (const id of protocol.config.promptIds) {
+  for (const id of ids as readonly PromptId[]) {
     const t = buildJudgeText(design, golden, id, protocol.prompts[id]);
     const leaks = judgeLeaks(t.text);
     if (leaks.length) throw new Abort(`teks juri ${id} bocor: ${leaks.join('; ')}`);
@@ -278,39 +284,40 @@ export function loadTimedLines(dir: string): TimedLine[] {
   return raw.map((line, i) => ({ t: timing[i]?.t ?? 0, line: line.replace(/\r$/, '') }));
 }
 
-type Baseline = {
-  protocolHash: string;
-  model: string;
-  claude: string;
-  pendevDesktop: string | undefined;
-  medians: Record<string, number | undefined>;
-  costMedians: Record<string, number | undefined>;
-};
-
-function loadBaseline(): Baseline {
-  const b = JSON.parse(readFileSync(BASELINE_JSON, 'utf8'));
-  const medians: Record<string, number | undefined> = {};
-  const costMedians: Record<string, number | undefined> = {};
-  for (const s of b.summary ?? []) {
-    medians[s.prompt] = s.wallMs?.median;
-    costMedians[s.prompt] = s.costUsd?.median;
-  }
-  return { protocolHash: b.protocolHash, model: b.model, claude: b.claudeVersion, pendevDesktop: b.toolVersions?.['pen.dev desktop (X-AppImage-Version)'], medians, costMedians };
+/** Daftar prompt untuk teks: "A dan B", "A, B, C, D, dan E". */
+export function promptList(ids: readonly string[]): string {
+  return ids.length <= 2 ? ids.join(' dan ') : `${ids.slice(0, -1).join(', ')}, dan ${ids.at(-1)}`;
 }
 
-const CONVENTION = [
-  'ID putaran dicek dengan `^(uji-[1-9]\\d*|[1-9]\\d*)$`: `uji-<k>` = putaran uji, angka polos = putaran resmi (story 16).',
-  'Satu putaran = A dan B, urutan run A-pen.dev, A-Lakar, B-pen.dev, B-Lakar, lalu juri 3× per prompt. Satu run per alat per prompt; run tidak diulang untuk memilih hasil (C8).',
+/** Konvensi putaran (dicatat di laporan); baris urutan dan pembekuan diturunkan dari prompt protokol. */
+export function conventionFor(promptIds: readonly PromptId[]): string[] {
+  const order = roundOrder(promptIds)
+    .map(([p, t]) => `${p}-${t === 'pendev' ? 'pen.dev' : 'Lakar'}`)
+    .join(', ');
+  return [
+    'ID putaran dicek dengan `^(uji-[1-9]\\d*|[1-9]\\d*)$`: `uji-<k>` = putaran uji, angka polos = putaran resmi (story 16).',
+    `Satu putaran = ${promptList(promptIds)}, urutan run ${order}, lalu juri 3× per prompt. Satu run per alat per prompt; run tidak diulang untuk memilih hasil (C8).`,
+    ...CONVENTION_REST,
+    ...(isG1Protocol(promptIds)
+      ? [
+          'Baseline pen.dev per prompt (`bench/baseline-pendev.json` + `bench/baseline-pendev-<IDS>-<tanggal>.json`, baseline terbaru per prompt menang): hash per prompt (pembungkus + config tanpa `promptIds` + teks prompt) wajib sama untuk semua putaran non-dry-run; prompt tanpa baseline = abort sebelum run.',
+          'Putaran G1 (A–E): gerbang Lakar menambah R3/R7 mekanis dari temuan layout_check final per ID aturan (R3 = 0 atau R7 = 0 → gerbang gagal); keputusan putaran `decideG1`.',
+        ]
+      : []),
+  ];
+}
+
+const CONVENTION_REST = [
   'Putaran yang md-nya sudah ada ditolak kecuali `--resume`. `--resume` memakai ulang run `success`/`failed` dan ulangan juri yang sudah selesai; run `aborted`/`invalid` (gagal-setup) dipindah ke `<key>.prev-<stamp>` dan dijalankan lagi, dan dicatat sebagai percobaan sebelumnya.',
   'Sebelum run, dokumen Lakar yang dibuat/dibuka agen di putaran bench lain (`run.json` → `lakar.slug`/`lakar.opened`; run terhenti tanpa `run.json` lewat `docs-before.json` + `lakar-docs.jsonl`/`stream.jsonl`; slug di `docs-before.json` run itu tidak dihitung) dipindah dari dataDir lakard ke `bench/runs/lakar-archive/<round>-<stamp>/`, lalu lakard di-restart (salinan dokumen di memori), agar slug pilihan agen tidak bentrok (`dokumen lama`). Dokumen non-bench tidak disentuh; pembungkus dan prompt tidak berubah.',
   'Versi beku dicatat sekali di awal putaran (`frozen.json`); `--resume` memakainya dan melaporkan perbedaan.',
   'Artefak di `bench/runs/rounds/<round>/` (gitignored): dir run per `<prompt>-<alat>`, strip `<prompt>-<alat>.png`, dan `judge/<prompt>/rep-<k>/` (pemetaan X/Y, transkrip juri).',
-  'Putaran resmi (ID angka) dibekukan ketat sebelum run: `git status --porcelain` kode produk + harness kosong; protocolHash, model, Claude Code, dan pen.dev desktop = `bench/baseline-pendev.json`; lakard selalu di-restart dan `startedAt` harus lebih baru dari file `packages/*/dist` terbaru; font lengkap dan pool siap; sha256 teks juri = `bench/rubric/rubric.json`; `schemaVersion` lakard = bench; penyedia foto `unsplash`. Sesudah restart lakard, satu probe `POST /photos/search` (kueri netral, tanpa retry otomatis) wajib dijawab Unsplash dengan ≥ 1 hasil; gagal → abort sebelum `frozen.json` dan run. Strip Lakar disalin ke `bench/round-<n>/` (tracked); strip dan `.pen` pen.dev tetap lokal di `bench/runs/` (EULA). Putaran resmi ≥ 2 menulis skor ke `bench/round-<n>/score-<prompt>.md|json`; putaran 1 dan uji ke `bench/score-<prompt>.md|json`.',
+  'Putaran resmi (ID angka) dibekukan ketat sebelum run: `git status --porcelain` kode produk + harness kosong; per prompt hash prompt, model, Claude Code, dan pen.dev desktop = baseline pen.dev yang mencakup prompt itu; lakard selalu di-restart dan `startedAt` harus lebih baru dari file `packages/*/dist` terbaru; font lengkap dan pool siap; sha256 teks juri = `bench/rubric/rubric.json`; `schemaVersion` lakard = bench; penyedia foto `unsplash`. Sesudah restart lakard, satu probe `POST /photos/search` (kueri netral, tanpa retry otomatis) wajib dijawab Unsplash dengan ≥ 1 hasil; gagal → abort sebelum `frozen.json` dan run. Strip Lakar disalin ke `bench/round-<n>/` (tracked); strip dan `.pen` pen.dev tetap lokal di `bench/runs/` (EULA). Putaran resmi ≥ 2 menulis skor ke `bench/round-<n>/score-<prompt>.md|json`; putaran 1 dan uji ke `bench/score-<prompt>.md|json`.',
 ];
 
 const DEFINITIONS = [
   'Waktu (AD-13): `wall` = cap waktu monotonic saat baris event `result` diterima − cap waktu event stdout pertama, sama untuk kedua alat. Offset tool_use/tool_result dan spawn → event pertama hanya diagnostik.',
-  'Gerbang waktu memakai median baseline pen.dev (`bench/baseline-pendev.json`): Lakar ≤ 1,5 × median baseline. Rasio Lakar/pen.dev putaran ini dilaporkan saja.',
+  'Gerbang waktu memakai median baseline pen.dev prompt itu (baseline terbaru yang mencakupnya, `bench/baseline-pendev*.json`): Lakar ≤ 1,5 × median baseline. Rasio Lakar/pen.dev putaran ini dilaporkan saja.',
   'Operasi harness setelah `result` di luar waktu: pen.dev `save` + salin `.pen` + Export `{scale:1}`; Lakar sesi HTTP sendiri → `/docs/open` → `/boards` → `/layout-check` → `/export {scale:1}` per board. Agen yang memanggil save/export sendiri ikut terhitung (alur normal alat).',
   'Reconnect Lakar: lakard restart (pid/startedAt/`NRestarts` systemd user berubah), halaman Chromium dibuat ulang (`pool.recreated` naik), atau tool_result `is_error` berisi `RENDER_FAILED`, `VERSION_MISMATCH`, "lakard tidak menjawab", atau pola putus transport. Reconnect pen.dev: `NRestarts`/`ActiveEnterTimestamp` pen-desktop berubah, atau tool_result `is_error` berpola putus transport (not connected, disconnect, connection closed, ECONNREFUSED/ECONNRESET/EPIPE, socket hang up, MCP error -32000). Error snippet biasa bukan reconnect. Dilaporkan terpisah, tidak dikurangkan dari waktu.',
   'Emoji: (a) di nilai string input tool_use agen (Emoji_Presentation, atau pictographic + VS16; © ® ™ dikecualikan; glyph LC-01b dihitung terpisah), (b) temuan LC-01a/LC-01b layout_check (Lakar saja; pen.dev tidak dilint, EULA), (c) emoji terlihat menurut juri (median).',
@@ -324,6 +331,7 @@ export function frozenDrift(first: FrozenVersions, now: FrozenVersions): string[
     head: f.head,
     porcelain: f.porcelain,
     protocolHash: f.protocolHash,
+    promptHashes: JSON.stringify(f.promptHashes),
     model: f.model,
     claude: f.claude,
     lakard: `${f.lakard.version}/${f.lakard.schemaVersion}/${f.lakard.browser ?? ''}`,
@@ -524,6 +532,21 @@ export async function runPhotoProbe(client = new LakardClient()): Promise<PhotoP
   return { query: PHOTO_PROBE.query, provider: res.provider, ...(res.fallbackReason ? { fallbackReason: res.fallbackReason } : {}), results: res.results.length, ms };
 }
 
+/** Masukan `decideG1` per prompt dari hasil putaran (murni): keputusan, rasio waktu gerbang, emoji Lakar (a)/(b)/(c). */
+export function g1Input(p: RoundPrompt): G1PromptInput {
+  const lakar = p.runs.lakar;
+  return {
+    prompt: p.prompt,
+    decision: p.decision,
+    timeRatio: p.gate?.timeRatio,
+    emoji: {
+      agent: lakar?.agentEmoji?.emoji,
+      lint: lakar?.lintEmoji ? lakar.lintEmoji.lc01a + lakar.lintEmoji.lc01b : undefined,
+      judge: p.score?.tools.lakar.emoji.median,
+    },
+  };
+}
+
 export async function roundMain(argv: string[]): Promise<number> {
   const parsed = parseRoundArgs(argv);
   if (!parsed.ok) {
@@ -541,10 +564,15 @@ export async function roundMain(argv: string[]): Promise<number> {
   // ---------- preflight gabungan ----------
   const pre: Preflight = preflight();
   const { protocol } = pre;
-  const baseline = loadBaseline();
-  const hashProblem = roundStartProblem({ mdExists: false, resume, dryRun, protocolHash: protocol.hash, baselineHash: baseline.protocolHash });
+  const cfg = protocol.config;
+  const g1 = isG1Protocol(cfg.promptIds);
+  const hashes = promptHashes(protocol);
+  const baselines = loadBaselines();
+  const baseOf = (p: string): BaselineEntry | undefined => baselines.byPrompt[p];
+  const startBaselineProblems = baselineProblems(baselines, { promptHashes: hashes }, cfg.promptIds);
+  const hashProblem = roundStartProblem({ mdExists: false, resume, dryRun, baselineProblems: startBaselineProblems });
   if (hashProblem) throw new Abort(hashProblem.message);
-  log(`protocolHash = baseline (${protocol.hash.slice(0, 12)}…)`);
+  log(startBaselineProblems.length ? `baseline per prompt: ${startBaselineProblems.join('; ')} (dry-run: hanya dicetak)` : `hash per prompt = baseline (${cfg.promptIds.join(', ')})`);
   const client = new LakardClient();
   let status: LakardStatus | undefined;
   try {
@@ -572,11 +600,12 @@ export async function roundMain(argv: string[]): Promise<number> {
   const porcelainAll = official ? gitPorcelain(REPO_ROOT) : undefined;
   const freezeInput = (st: LakardStatus, checkLakardFresh: boolean): OfficialFreezeInput => ({
     porcelainCode: porcelainCode ?? '',
-    protocolHash: protocol.hash,
+    promptIds: cfg.promptIds,
+    promptHashes: hashes,
     model: protocol.config.model,
     claude: pre.claudeVersion,
     pendevDesktop: penDesktopVersion(),
-    baseline: { protocolHash: baseline.protocolHash, model: baseline.model, claude: baseline.claude, pendevDesktop: baseline.pendevDesktop },
+    baselines,
     lakard: st,
     newestDistMtimeMs: newestDistMtime(),
     checkLakardFresh,
@@ -584,11 +613,19 @@ export async function roundMain(argv: string[]): Promise<number> {
     rubric,
   });
 
-  const cfg = protocol.config;
   const emptyMcpPath = join(RUNS_ROOT, 'rounds', round, 'judge', 'mcp-empty.json');
   const argvFor = (mcp: string, allowed: string, prompt = '<prompt hasil render>') => shellQuote(['claude', ...buildArgs({ prompt, config: cfg, mcpConfig: mcp, allowedTools: allowed })]);
   const judgeArgv = shellQuote(['claude', ...buildJudgeArgs(cfg.model, relative(REPO_ROOT, emptyMcpPath))]);
-  console.log(`round ${round}\nprotocolHash ${protocol.hash} (baseline ${baseline.protocolHash}: sama)`);
+  const order = roundOrder(cfg.promptIds);
+  console.log(`round ${round}\nprotocolHash ${protocol.hash} (info; penjaga = hash per prompt)`);
+  console.log(`rencana: ${cfg.promptIds.length} prompt (${cfg.promptIds.join(', ')}), ${order.length} run (${order.map(([p, t]) => `${p}-${t}`).join(', ')}) + juri ${JUDGE_REPS}× per prompt; keputusan ${g1 ? 'G1 (`decideG1`, gerbang + R3/R7 mekanis)' : 'G0 (`decideG0`)'}`);
+  for (const p of cfg.promptIds) {
+    const b = baseOf(p);
+    console.log(`hash prompt ${p} ${hashes[p]}: ${b ? `baseline ${b.source} (${b.date}) ${b.promptHash === hashes[p] ? '= baseline' : `≠ baseline ${b.promptHash}`}; median ${b.medianWallMs === undefined ? '–' : (b.medianWallMs / 1000).toFixed(1)} dtk` : 'baseline belum diukur'}`);
+  }
+  for (const b of baselines.superseded) console.log(`baseline tergantikan: ${b.prompt} di ${b.source} (${b.date})`);
+  for (const x of baselines.incomplete) console.log(`baseline tidak lengkap (tidak dipakai): ${x}`);
+  if (startBaselineProblems.length) console.log(`MASALAH baseline per prompt (non-dry-run → abort sebelum run):\n  ${startBaselineProblems.join('\n  ')}`);
   console.log(`C7 agen: lulus; C7 juri: lulus\ngit HEAD ${head}; porcelain packages/tools/.mcp.json: ${porcelain ? `TIDAK KOSONG\n${porcelain}` : 'kosong'}`);
   for (const p of cfg.promptIds) {
     const rendered = renderPrompt(p, protocol);
@@ -599,7 +636,7 @@ export async function roundMain(argv: string[]): Promise<number> {
   const shaProblems = rubricShaProblems({ version: judgeInfo.rubricVersion, sha: judgeInfo.textSha256 }, rubric);
   console.log(`\nrubrik juri: versi ${judgeInfo.rubricVersion ?? '1 (tanpa baris versi)'}; ${Object.entries(judgeInfo.textSha256).map(([id, x]) => `sha256 ${id} ${x}`).join('; ')}; bench/rubric/rubric.json: ${shaProblems.length ? `BERBEDA (${shaProblems.join('; ')})` : 'sama'}`);
   console.log(`\nenv tambahan: ${JSON.stringify(cfg.env)}; dibuang: ${buildEnv(process.env, cfg).scrubbed.join(', ') || '-'}`);
-  console.log(`\nkonvensi putaran:\n${CONVENTION.map((c) => `- ${c}`).join('\n')}`);
+  console.log(`\nkonvensi putaran:\n${conventionFor(cfg.promptIds).map((c) => `- ${c}`).join('\n')}`);
   // Dokumen Lakar buatan putaran bench lain: dipindah ke arsip bench sebelum run agar slug pilihan agen tidak bentrok
   // (`dokumen lama` → invalid). Dokumen non-bench tidak disentuh.
   const archiveDir = join(RUNS_ROOT, 'lakar-archive', `${round}-${stamp()}`);
@@ -613,7 +650,7 @@ export async function roundMain(argv: string[]): Promise<number> {
     console.log(
       `\nputaran resmi: cek pembekuan\n` +
         `- git status --porcelain -- ${OFFICIAL_CODE_PATHS.join(' ')}: ${porcelainCode ? `TIDAK KOSONG\n${porcelainCode}` : 'kosong'}\n` +
-        `- claude ${claudeSemver(pre.claudeVersion)} (baseline ${baseline.claude}); pen.dev desktop ${penDesktopVersion() ?? '?'} (baseline ${baseline.pendevDesktop ?? '?'}); model ${cfg.model} (baseline ${baseline.model}); protocolHash ${protocol.hash === baseline.protocolHash ? '= baseline' : '≠ baseline'}\n` +
+        `- claude ${claudeSemver(pre.claudeVersion)}; pen.dev desktop ${penDesktopVersion() ?? '?'}; model ${cfg.model}; baseline per prompt: ${cfg.promptIds.map((p) => { const b = baseOf(p); return b ? `${p} claude ${b.claude ?? '?'}/pen.dev ${b.pendevDesktop ?? '?'}/model ${b.model ?? '?'}/hash ${b.promptHash === hashes[p] ? '=' : '≠'}` : `${p} belum diukur`; }).join('; ')}\n` +
         `- font missing: ${JSON.stringify(status.fonts?.missing ?? null)}; pool ready ${status.pool?.ready ?? '?'}\n` +
         `- schemaVersion lakard ${status.schemaVersion} (bench ${SCHEMA_VERSION}); penyedia foto ${status.photos?.provider ?? '(tidak ada di /status)'} (wajib ${EXPECTED_PHOTO_PROVIDER}), key ${status.photos?.keyFile ?? '?'}\n` +
         `- rencana: restart lakard (wajib untuk putaran resmi${archivePlan.length ? ', sesudah arsip' : ''}), lalu startedAt harus > mtime dist terbaru ${distMs === undefined ? '(dist tidak ada)' : new Date(distMs).toISOString()} (lakard sekarang: startedAt ${status.startedAt}, ${fresh ? 'sudah lebih baru' : 'lebih tua; restart akan memuat build ini'})\n` +
@@ -673,7 +710,8 @@ export async function roundMain(argv: string[]): Promise<number> {
     head,
     porcelain,
     protocolHash: protocol.hash,
-    baselineProtocolHash: baseline.protocolHash,
+    promptHashes: hashes,
+    promptBaselines: Object.fromEntries(cfg.promptIds.map((p) => [p, baseOf(p) ? { promptHash: baseOf(p)!.promptHash, source: baseOf(p)!.source, date: baseOf(p)!.date } : null])),
     model: cfg.model,
     claude: pre.claudeVersion,
     ...(official ? { porcelainCode: porcelainCode ?? '', porcelainAll: porcelainAll ?? '' } : {}),
@@ -686,7 +724,7 @@ export async function roundMain(argv: string[]): Promise<number> {
     },
     distSha: Object.fromEntries(distDirs().map(([n, d]) => [n, sha256Dir(d)])),
     ...(status.photos ? { photos: { provider: status.photos.provider, keyFile: status.photos.keyFile, ...(photoProbe ? { probe: photoProbe } : {}) } } : {}),
-    baseline: { model: baseline.model, claude: baseline.claude, pendevDesktop: baseline.pendevDesktop },
+    baselinesByPrompt: Object.fromEntries(cfg.promptIds.map((p) => [p, baseOf(p) ? { model: baseOf(p)!.model, claude: baseOf(p)!.claude, pendevDesktop: baseOf(p)!.pendevDesktop } : null])),
     icons: status.icons ?? {},
     skills: Object.fromEntries(readdirSync(SKILLS_DIR).filter((f) => f.endsWith('.md')).sort().map((f) => [f, sha256(readFileSync(join(SKILLS_DIR, f)))])),
     g0Rules: JSON.stringify(G0_RULES),
@@ -711,7 +749,7 @@ export async function roundMain(argv: string[]): Promise<number> {
   let fatal: string | undefined;
   let pendevRan = 0;
 
-  for (const [p, tool] of ROUND_ORDER) {
+  for (const [p, tool] of order) {
     const key = `${p}-${tool}`;
     const dir = join(roundDir, key);
     const previous: string[] = readdirSync(roundDir)
@@ -829,8 +867,10 @@ export async function roundMain(argv: string[]): Promise<number> {
     }
     const lakarRec = r.lakar?.record;
     const sizeProblems = lakarRec?.lakar ? boardSizeProblems(p, lakarRec.lakar.boards, sizeRule) : [];
+    // Putaran G1: R3/R7 mekanis dari temuan layout_check final board Lakar (G0/latihan tidak menghitungnya).
+    const technical = g1 && lakarRec ? (lakarRec.lakar?.layout ? technicalScores(lakarRec.lakar.layout.findings) : null) : undefined;
     const gate = lakarRec
-      ? lakarGate({ promptId: p, layoutGate: lakarRec.lakar?.layout?.summary.gate, sizeProblems, wallMs: lakarRec.wallMs, baselineMedianMs: baseline.medians[p] })
+      ? lakarGate({ promptId: p, layoutGate: lakarRec.lakar?.layout?.summary.gate, sizeProblems, wallMs: lakarRec.wallMs, baselineMedianMs: baseOf(p)?.medianWallMs, ...(technical !== undefined ? { technical } : {}) })
       : undefined;
 
     const pendevRec = r.pendev?.record;
@@ -874,13 +914,25 @@ export async function roundMain(argv: string[]): Promise<number> {
         });
     // Juri dilewati karena putaran berhenti: alasannya itu, bukan "tidak ada ulangan juri yang valid".
     const decision = judgeSkipped && !reps.length && decided.why === NO_VALID_REPS ? { ...decided, why: `juri tidak dijalankan: putaran dihentikan (${fatal})` } : decided;
-    results.push({ prompt: p, scoreReport: `${scoreReportBase(round)}${p}.md`, baselineMedianMs: baseline.medians[p], baselineCostUsd: baseline.costMedians[p], runs: r, gate, sizeProblems, score, decision, pendevSizeProblems });
+    results.push({
+      prompt: p,
+      scoreReport: `${scoreReportBase(round)}${p}.md`,
+      baselineMedianMs: baseOf(p)?.medianWallMs,
+      baselineCostUsd: baseOf(p)?.medianCostUsd,
+      ...(g1 ? { baselineSource: baseOf(p)?.source, technical: technical ?? null } : {}),
+      runs: r,
+      gate,
+      sizeProblems,
+      score,
+      decision,
+      pendevSizeProblems,
+    });
   }
 
   // ---------- penjaga .pen + status ----------
   const penAfter = md5PenFiles();
   const cmp = comparePenHashes(penBefore, penAfter);
-  const allRuns = ROUND_ORDER.every(([p, t]) => runs.has(`${p}-${t}`));
+  const allRuns = order.every(([p, t]) => runs.has(`${p}-${t}`));
   const allReps = results.filter((x) => judgeablePrompts.has(x.prompt)).every((x) => x.score && x.score.reps.length === JUDGE_REPS);
   const mismatch = [...runs.values()].filter((x) => x.record.pngScaleMismatch).map((x) => x.key);
   const outcome = roundOutcome({ fatal, pen: cmp, allRuns, allReps, pngScaleMismatch: mismatch });
@@ -901,13 +953,14 @@ export async function roundMain(argv: string[]): Promise<number> {
     prompts: Object.fromEntries(cfg.promptIds.map((p) => [p, protocol.prompts[p]])),
     argv: { lakar: argvFor(relative(REPO_ROOT, LAKAR_MCP_CONFIG), LAKAR_ALLOWED_TOOLS), pendev: argvFor(relative(REPO_ROOT, PENDEV_MCP_CONFIG), PENDEV_ALLOWED_TOOLS), judge: judgeArgv },
     env: { set: cfg.env, scrubbed: buildEnv(process.env, cfg).scrubbed },
-    convention: CONVENTION,
+    convention: conventionFor(cfg.promptIds),
     definitions: DEFINITIONS,
     penGuard: { files: Object.keys(penBefore).length, changed: cmp.changed, removed: cmp.removed, added: cmp.added },
     lakardActiveAfter: isActive(LAKARD_UNIT, true),
     penDesktopRestart,
     results,
     g0: decideG0(results, roundStatus),
+    ...(g1 ? { g1: decideG1(results.map(g1Input), roundStatus) } : {}),
     pngs: results.flatMap((x) =>
       (['lakar', 'pendev'] as const).map((t) => {
         const run = x.runs[t];

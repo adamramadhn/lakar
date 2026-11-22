@@ -3,7 +3,7 @@ title: 'Efek visual gradien dan shader setara pen.dev'
 type: feature
 ticket: '22'
 created: '2026-11-18'
-status: built
+status: done
 baseline_revision: 'b8821fadee3bed64e77bac9b9edb53a70bb74b2a'
 route: full
 route_source: auto

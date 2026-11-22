@@ -436,12 +436,13 @@ add(b, {type:'frame', name:'Kartu terangkat', width:200, height:120, radius:12, 
 ```js
 const b = add(null, {type:'board', name:'Beranda', x:0, y:0, width:390, height:844, screen:'mobile'});
 const k = add(b, {type:'frame', name:'Kartu', layout:'column', gap:8, padding:16, fills:[{type:'solid', color:'#F2F4F7'}]});
-const t = add(k, {type:'text', name:'Judul', content:'Judul', size:16, weight:600});
+const t = add(k, {type:'text', name:'Judul', content:'Judul', size:16, lineHeight:24, weight:600});
 const isi = add(k, {type:'frame', name:'Isi', layout:'column'});
+add(isi, {type:'text', name:'Teks', content:'Isi kartu', size:14, lineHeight:20});
 setComponent(k, {props:[{name:'title', type:'text', default:'Judul', binds:[{nodeId:t, prop:'content'}]}], slots:[{name:'body', nodeId:isi}]});
 const a = add(b, {type:'instance', name:'Kartu A', componentId:k, props:{title:'Promo'}});
 update(a + '/' + t, {color:'#B42318'});
-add(a + '/' + isi, {type:'text', name:'Catatan', content:'Diskon 20%', size:14});
+add(a + '/' + isi, {type:'text', name:'Catatan', content:'Diskon 20%', size:14, lineHeight:20});
 update(k, {fills:[{type:'solid', color:'#FFFFFF'}]});
 get(a + '/' + t).content;
 ```

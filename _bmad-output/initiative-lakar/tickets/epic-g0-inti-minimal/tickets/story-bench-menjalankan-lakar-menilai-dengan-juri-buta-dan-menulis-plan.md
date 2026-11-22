@@ -3,7 +3,7 @@ title: 'Bench menjalankan Lakar, menilai dengan juri buta, dan menulis laporan p
 type: feature
 ticket: '14'
 created: '2026-11-18'
-status: built
+status: done
 baseline_revision: 'd7cf5794575f02b4ab198b1ed0e8a44f4ee2b587'
 route: full
 route_source: auto

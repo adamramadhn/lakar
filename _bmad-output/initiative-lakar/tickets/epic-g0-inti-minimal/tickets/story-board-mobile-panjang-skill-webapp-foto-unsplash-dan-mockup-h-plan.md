@@ -3,7 +3,7 @@ title: 'Board mobile panjang, skill webapp, foto Unsplash, dan mockup hero'
 type: feature
 ticket: '24'
 created: '2026-11-19'
-status: built
+status: done
 baseline_revision: '9b5652de1b71425b64d2855ac639328f560ab426'
 route: full
 route_source: auto

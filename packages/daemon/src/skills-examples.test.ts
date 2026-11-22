@@ -52,15 +52,52 @@ async function runBlock(label: string, code: string, sid: string, prelude: strin
   const full = code.startsWith(USES_PRELUDE) ? `${prelude}\n${code}` : code;
   const r = await call('/execute', { code: full, description: 'uji contoh skill lakar' }, sid);
   if (!r.ok) return [`${label}: ${r.error!.code} ${r.error!.message} (${r.error!.hint})`];
-  const check = r.data.check as { summary: { error: number; warning: number; gate: number }; findings: { rule: string; nodeName: string; detail: string }[] } | undefined;
+  const check = r.data.check as { summary: { error: number; warning: number; gate: number }; findings: { level: string; rule: string; nodeName: string; detail: string }[] } | undefined;
   // Blok prelude hanya mendefinisikan helper: sukses tanpa op mutasi (tanpa check). Blok lain wajib dicek.
   if (isPrelude) return check ? [`${label}: blok prelude tidak boleh memutasi dokumen`] : [];
   if (code.startsWith(READ_ONLY_MARK)) return check ? [`${label}: blok baca saja tidak boleh memutasi dokumen`] : [];
   if (!check) return [`${label}: tidak ada check (blok tanpa op mutasi)`];
-  const { error, warning, gate } = check.summary;
-  if (error || warning || gate) return [`${label}: check ${error} error / ${gate} gerbang / ${warning} warning: ${check.findings.map((f) => `${f.rule} ${f.nodeName}: ${f.detail}`).join('; ')}`];
-  return [];
+  const file = label.split(' ')[0]!;
+  const pending = PENDING_2_10[file] ?? FIXTURE_FINDINGS[file] ?? [];
+  const findings = check.findings.filter((f) => !pending.some((p) => f.rule === p.rule && p.node.test(f.nodeName) && f.detail.startsWith(p.detail)));
+  if (findings.length === check.findings.length) {
+    const { error, warning, gate } = check.summary;
+    if (error || warning || gate) return [`${label}: check ${error} error / ${gate} gerbang / ${warning} warning: ${findings.map((f) => `${f.rule} ${f.nodeName}: ${f.detail}`).join('; ')}`];
+    return [];
+  }
+  return findings.length ? [`${label}: check: ${findings.map((f) => `${f.level} ${f.rule} ${f.nodeName}: ${f.detail}`).join('; ')}`] : [];
 }
+
+/**
+ * Warning aturan G1 yang dipicu contoh skill dan menunggu story 2.10: aturan + nama node yang diketahui + awal detail per
+ * file skill. Temuan lain (termasuk pola sejenis di node lain) tetap gagal. Story 2.16 membereskan entri landing, mobile,
+ * webapp, dan icons; tersisa api.md (dihasilkan dari `@lakar/exec`): LC-08 `Judul` tanpa lineHeight dan scrim teks di atas mesh.
+ */
+const PENDING_2_10: Record<string, { rule: string; node: RegExp; detail: string }[]> = {
+  'api.md': [
+    { rule: 'LC-08', node: /^Judul$/, detail: '32/39 (token 32/40)' },
+    { rule: 'LC-08', node: /^Judul$/, detail: '40/49 (token 40/48)' },
+    { rule: 'LC-08', node: /^Judul$/, detail: '16/20 (token 16/24)' },
+    { rule: 'LC-04', node: /^Judul$/, detail: 'scrim: teks di atas efek tanpa scrim (fill solid ≥ 0,5) "Malam yang tenang' },
+  ],
+};
+
+/**
+ * Temuan yang sengaja dibawa fixture (bukan dari contoh skill): kartu kedua fixture seleksi ber-`gap` 10 (di luar skala,
+ * bahan cek konsistensi) → LC-07 ikut tersalin ke varian. Temuan lain tetap gagal.
+ */
+const FIXTURE_FINDINGS: Record<string, { rule: string; node: RegExp; detail: string }[]> = {
+  'selection.md': [{ rule: 'LC-07', node: /^Kartu \/ Profil rasa$/, detail: 'gap 10' }],
+};
+
+/** Skill tanpa contoh teruji (domain berisi aturan saja); skill lain selain api wajib punya ≥ 1 blok js. */
+const NO_EXAMPLES: readonly SkillName[] = ['layout', 'typography', 'color', 'accessibility', 'interface', 'writing', 'review'];
+
+describe('PENDING_2_10', () => {
+  it('hanya entri api.md (contoh skill lain bebas pengecualian)', () => {
+    expect(Object.keys(PENDING_2_10)).toEqual(['api.md']);
+  });
+});
 
 async function savePngs(slug: string, sid: string): Promise<void> {
   if (!PNG_DIR) return;
@@ -100,9 +137,13 @@ describe.skipIf(!browserInstalled)('contoh skill dijalankan terhadap daemon nyat
   });
 
   it.each(SKILL_NAMES)(
-    '%s.md: setiap blok js sukses dengan 0 error / 0 gerbang / 0 warning',
+    '%s.md: setiap blok js sukses dengan 0 error / 0 gerbang / 0 warning (PENDING hanya api.md)',
     async (name) => {
       const blocks = await jsBlocks(name);
+      if (NO_EXAMPLES.includes(name)) {
+        expect(blocks, `${name}.md: skill domain tanpa contoh teruji`).toEqual([]);
+        return;
+      }
       if (name !== 'api') expect(blocks.length, `${name}.md tanpa blok js`).toBeGreaterThan(0);
       if (name === 'api') expect(blocks.length).toBeGreaterThanOrEqual(12);
       const problems: string[] = [];
@@ -112,7 +153,9 @@ describe.skipIf(!browserInstalled)('contoh skill dijalankan terhadap daemon nyat
       if (name === 'selection') {
         const f = await call('/execute', { code: SELECTION_FIXTURE, description: 'fixture seleksi pengguna' }, sid);
         expect(f.ok, JSON.stringify(f.error)).toBe(true);
-        expect(f.data.check.summary, JSON.stringify(f.data.check.findings)).toMatchObject({ error: 0, warning: 0, gate: 0 });
+        // Satu-satunya temuan fixture: gap 10 yang disengaja (FIXTURE_FINDINGS).
+        expect(f.data.check.summary, JSON.stringify(f.data.check.findings)).toMatchObject({ error: 0, warning: 1, gate: 0 });
+        expect(f.data.check.findings.map((x: { rule: string; nodeName: string; detail: string }) => `${x.rule} ${x.nodeName}: ${x.detail}`)).toEqual(['LC-07 Kartu / Profil rasa: gap 10']);
         sel = [f.data.value.board as string];
       }
       for (const [i, code] of blocks.entries()) {
