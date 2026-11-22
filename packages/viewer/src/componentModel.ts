@@ -94,6 +94,17 @@ function masterNode(doc: LakarDocument, id: string | undefined): Raw | undefined
   return hit;
 }
 
+/**
+ * Node tersimpan di dalam isi slot instance (langsung atau lebih dalam): POST /inspect (route lama, AD-4) hanya
+ * menelusuri children, jadi viewer melewatinya seperti alamat komposit (story 5).
+ */
+export function inSlotContent(info: ComponentInfo, id: string): boolean {
+  for (let p = info.stored.get(id)?.parentId; p; p = info.stored.get(p)?.parentId) {
+    if (isComposite(p) || info.kinds.get(p) === 'instance') return true;
+  }
+  return false;
+}
+
 /** Kunci override untuk alamat: akar instance = `componentId`, komposit = sisa alamat sesudah instance terluar. */
 export function overrideKey(address: string, componentId: string): string {
   const i = address.indexOf('/');

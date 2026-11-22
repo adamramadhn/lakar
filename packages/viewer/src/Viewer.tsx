@@ -38,6 +38,7 @@ import {
   instanceRootOf,
   instancesText,
   instanceTarget,
+  inSlotContent,
   isComposite,
   overrideSummary,
   resetAllOps,
@@ -45,6 +46,9 @@ import {
   type InsertTargetResult,
 } from './componentModel';
 import type { ComponentPanel } from './DesignPanel';
+import { instanceModel, masterModel, slotFrameInfo } from './componentProps';
+import type { ComponentEdit } from './ComponentPropsPanel';
+import { createActionQueue } from './componentQueue';
 import { indexGeo, toggleSelection, type GeoNode } from './gesture';
 import { actionState, EDIT_ACTIONS, nudgeNodes, nudgeOps, planAction, selectAllIds, selectionAfter, shortcutAction, type EditAction, type EditPlan } from './editActions';
 import { EditMenu } from './EditMenu';
@@ -178,7 +182,7 @@ function panelInfo(
   id: string,
   index: ReadonlyMap<string, NodeInfo>,
   doc: LakarDocument,
-  act: { goTo: (id: string) => void; detach: (id: string, name: string) => void; resetAll: (id: string, name: string) => void },
+  act: { goTo: (id: string) => void; detach: (id: string, name: string) => void; resetAll: (id: string, name: string) => void; select: (address: string) => void },
 ): ComponentPanel | undefined {
   const masterOf = (instanceId: string) => info.masterById.get(info.instances.get(instanceId)?.componentId as string);
   if (isComposite(id)) {
@@ -186,11 +190,17 @@ function panelInfo(
     return { kind: 'inside', instanceName: index.get(root)?.name ?? info.stored.get(root)?.name ?? root, masterName: masterOf(root)?.name ?? 'Component' };
   }
   const kind = info.kinds.get(id);
-  if (kind === 'master') return { kind: 'master', instances: info.masterById.get(id)?.instances.length ?? 0 };
-  if (kind !== 'instance') return undefined;
+  if (kind === 'master') return { kind: 'master', instances: info.masterById.get(id)?.instances.length ?? 0, model: masterModel(doc, id) };
+  if (kind !== 'instance') {
+    // Frame di dalam master (story 5): grup Slot.
+    const sf = slotFrameInfo(doc, info, id);
+    return sf ? { kind: 'slotFrame', frameId: id, ...sf } : undefined;
+  }
   const inst = info.instances.get(id)!;
   const master = masterOf(id);
+  const model = instanceModel(doc, info, id);
   return {
+    props: model ? { model, masters: info.masters, doc, info, onSelect: act.select } : undefined,
     kind: 'instance',
     masterName: master?.name ?? 'Missing component',
     overrides: overrideSummary(inst, (key) => effectiveNode(doc, `${id}/${key}`)?.name),
@@ -323,6 +333,8 @@ export function Viewer({ slug }: { slug: string }) {
   }, [layersOpen]);
 
   const docRef = useRef<LakarDocument | undefined>(undefined);
+  /** Penunggu rev dokumen termuat (antrean aksi komponen story 5). */
+  const revWaiters = useRef<{ rev: number; resolve: () => void }[]>([]);
   /**
    * Muat dokumen. `onlyIfChanged`: abaikan hasil bila id dan rev sama (refresh diam). `full`: semua board
    * dianggap berubah (PNG dimuat ulang); event execute memakai `full=false` sehingga hanya board tersentuh dirender.
@@ -345,6 +357,8 @@ export function Viewer({ slug }: { slug: string }) {
           }
           setDoc({ state: 'ok', value: { doc: d, loadedAt: Date.now() } });
           if (prev && changed) setAttempt((a) => a + 1);
+          // Aksi komponen berikutnya menunggu rev aksi sebelumnya dimuat (componentEdit).
+          revWaiters.current = revWaiters.current.filter((w) => (w.rev <= d.rev ? (w.resolve(), false) : true));
         },
         (e) => {
           if (e instanceof OfflineError || onlyIfChanged) {
@@ -670,11 +684,13 @@ export function Viewer({ slug }: { slug: string }) {
     };
   }, [slug, checkFindings]);
 
+  // Isi slot instance (story 5): POST /inspect (route lama) tidak menelusuri slot.
+  const selectedInSlot = !!selectedId && !!components && inSlotContent(components, selectedId);
   // Inspect node terpilih: properti tersimpan + bounds terukur (POST /inspect).
   useEffect(() => {
     // Pratinjau: properti terukur hanya ada untuk versi terkini, jadi Inspect menampilkan data JSON versi itu saja.
     // Isi instance (alamat komposit): POST /inspect hanya menerima ID tersimpan (route lama, AD-4).
-    if (!selectedId || preview || isComposite(selectedId)) {
+    if (!selectedId || preview || isComposite(selectedId) || selectedInSlot) {
       setInspect(undefined);
       return;
     }
@@ -689,7 +705,7 @@ export function Viewer({ slug }: { slug: string }) {
       live = false;
     };
     // Panel Design: diukur ulang tiap rev (Copy as dan posisi terukur mengikuti edit); tab lain hanya saat seleksi berubah.
-  }, [slug, selectedId, attempt, preview, tab === 'design' ? currentRev : undefined]);
+  }, [slug, selectedId, selectedInSlot, attempt, preview, tab === 'design' ? currentRev : undefined]);
 
   useRetry(() => {
     loadDoc();
@@ -1080,6 +1096,42 @@ export function Viewer({ slug }: { slug: string }) {
     },
     [applyEdit],
   );
+  /**
+   * Aksi props/slot (story 5): antrean berurutan; op dibangun dari dokumen tersimpan terbaru sesudah rev aksi
+   * sebelumnya dimuat (maks. 3 detik), satu permintaan ops per aksi. Error pembangun → toast tanpa request.
+   */
+  const applyEditRef = useRef(applyEdit);
+  applyEditRef.current = applyEdit;
+  const [enqueueComponent] = useState(() =>
+    createActionQueue<LakarDocument, ComponentInfo>({
+      latest: () => docRef.current,
+      editable: () => editableRef.current,
+      info: componentInfo,
+      apply: (ops, label) => applyEditRef.current(ops, label),
+      waitRev: (rev) =>
+        new Promise<void>((resolve) => {
+          if ((docRef.current?.rev ?? -1) >= rev) return resolve();
+          const timer = setTimeout(() => {
+            revWaiters.current = revWaiters.current.filter((x) => x !== w);
+            resolve();
+          }, 3000);
+          const w = {
+            rev,
+            resolve: () => {
+              clearTimeout(timer);
+              resolve();
+            },
+          };
+          revWaiters.current.push(w);
+        }),
+      toast: (m) => setToast(m),
+      select: (id) => {
+        pendingSelect.current = id;
+        setSelection([id]);
+      },
+    }),
+  );
+  const componentEdit = useCallback<ComponentEdit>((label, build, select) => void enqueueComponent(label, build, select), [enqueueComponent]);
 
   if (gone || (doc.state === 'error' && doc.notFound)) {
     const archived = gone === 'archived' || (!gone && inArchive);
@@ -1156,7 +1208,7 @@ export function Viewer({ slug }: { slug: string }) {
   const highlight: Highlight | undefined =
     selectedInfo && inspect?.state === 'ok' && inspect.value.node.id === selectedId && inspect.value.node.bounds
       ? { boardId: inspect.value.boardId, bounds: inspect.value.node.bounds }
-      : selectedInfo && selectedId && isComposite(selectedId)
+      : selectedInfo && selectedId && (isComposite(selectedId) || selectedInSlot)
         ? { boardId: selectedInfo.boardId, bounds: sceneBounds(sceneRef.current?.() ?? [], selectedId, boards) ?? [0, 0, 0, 0] }
         : selectedInfo
           ? { boardId: selectedInfo.boardId }
@@ -1205,6 +1257,7 @@ export function Viewer({ slug }: { slug: string }) {
       goTo: (id) => locate(id),
       detach: detachInstance,
       resetAll: resetAllOverrides,
+      select: (address) => setSelection([address]),
     }) : undefined;
   const docHasBoards = d.pages.some((p) => p.children.length > 0);
   const meta = previewDoc
@@ -1503,6 +1556,7 @@ export function Viewer({ slug }: { slug: string }) {
               tokenModes={d.tokenModes}
               tokens={d.tokens}
               component={componentPanel}
+              componentEdit={componentEdit}
               align={designTargets.length > 1 ? { enabled: editable ? actionState(sceneRef.current?.() ?? [], selection) : NO_ACTIONS, run: (a) => runAction(a) } : undefined}
             />
           )}

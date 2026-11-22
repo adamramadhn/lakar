@@ -5,9 +5,11 @@
 // lewat `onCommit` Viewer (History + undo, AD-8). Parsing/patch di designValues.ts dan designModel.ts (murni).
 import { createContext, Fragment, useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { gradientLayerCss } from '@lakar/render';
-import { Blend, type DocOp } from '@lakar/schema';
+import { Blend, type DocOp, type LakarDocument } from '@lakar/schema';
 import type { FontFamily, InspectNode } from './api';
-import { groupOverrides, instancesText, markerLabel, resetGroupOps } from './componentModel';
+import { groupOverrides, instancesText, markerLabel, resetGroupOps, type ComponentInfo } from './componentModel';
+import { InstancePropsSlots, MasterComponentGroup, SlotFrameGroup, type ComponentEdit } from './ComponentPropsPanel';
+import type { InstanceModel, MasterModel } from './componentProps';
 import { copyText } from './Connections';
 import { copyAs, type CopyFormat } from './copyas';
 import { ALIGN_ACTIONS, DISTRIBUTE_ACTIONS, type EditAction } from './editActions';
@@ -1578,19 +1580,35 @@ export type DesignPanelProps = {
   tokens?: TokenMap | undefined;
   /** Seleksi tunggal master/instance/isi instance (epic komponen story 4): header dan grup Instance. */
   component?: ComponentPanel | undefined;
+  /** Penjalan aksi props/slot komponen (story 5): op dari dokumen terbaru, satu permintaan ops per aksi. */
+  componentEdit?: ComponentEdit | undefined;
 };
 
 /** Info komponen node primer untuk panel (dihitung Viewer dari dokumen tersimpan). */
 export type ComponentPanel =
-  | { kind: 'master'; instances: number }
-  | { kind: 'instance'; masterName: string; overrides: { count: number; text: string }; onGoToMaster: () => void; onDetach: () => void; onResetAll: () => void }
-  | { kind: 'inside'; instanceName: string; masterName: string };
+  | { kind: 'master'; instances: number; model?: MasterModel | undefined }
+  | {
+      kind: 'instance';
+      masterName: string;
+      overrides: { count: number; text: string };
+      onGoToMaster: () => void;
+      onDetach: () => void;
+      onResetAll: () => void;
+      /** Properties dan Slots (story 5); undefined bila master tidak ditemukan. */
+      props?: InstancePanelProps | undefined;
+    }
+  | { kind: 'inside'; instanceName: string; masterName: string }
+  /** Frame di dalam master (story 5): grup Slot. */
+  | { kind: 'slotFrame'; frameId: string; masterId: string; masterName: string; slot: string | undefined };
+
+/** Data Properties/Slots instance: model, master lain (sisip ke slot), dokumen tampil, pemilih alamat slot. */
+export type InstancePanelProps = { model: InstanceModel; masters: readonly { id: string; name: string }[]; doc: LakarDocument; info: ComponentInfo; onSelect: (address: string) => void };
 
 /**
  * Grup Instance (desain xTIr4 "Group Instance"): chip master (ke master), Detach, dan ringkasan override + Reset all.
- * Props dan Slots milik story 5.
+ * Lalu Properties dan Slots instance (story 5) bila master punya props/slots.
  */
-function InstanceGroup({ info, disabled }: { info: Extract<ComponentPanel, { kind: 'instance' }>; disabled: boolean }) {
+function InstanceGroup({ info, disabled, edit }: { info: Extract<ComponentPanel, { kind: 'instance' }>; disabled: boolean; edit: ComponentEdit | undefined }) {
   return (
     <section className="dp-group">
       <div className="dp-instance-row">
@@ -1615,6 +1633,7 @@ function InstanceGroup({ info, disabled }: { info: Extract<ComponentPanel, { kin
           </button>
         </div>
       )}
+      {info.props && edit && <InstancePropsSlots {...info.props} edit={edit} disabled={disabled} />}
     </section>
   );
 }
@@ -1650,7 +1669,7 @@ function AlignGroup({ align, disabled }: { align: NonNullable<DesignPanelProps['
   );
 }
 
-export function DesignPanel({ targets, path, editable, fonts, inspectNode, rev, onCommit, align, tokenModes, tokens, component }: DesignPanelProps) {
+export function DesignPanel({ targets, path, editable, fonts, inspectNode, rev, onCommit, align, tokenModes, tokens, component, componentEdit }: DesignPanelProps) {
   const [menu, setMenu] = useState<{ x: number; y: number } | undefined>(undefined);
   const [picker, setPicker] = useState<{ anchor: HTMLElement; spec: TokenSpec; trigger: HTMLElement | undefined } | undefined>(undefined);
   // Picker ditutup saat seleksi berganti, panel menjadi baca-saja (pratinjau/offline), atau field jangkarnya hilang
@@ -1803,7 +1822,9 @@ export function DesignPanel({ targets, path, editable, fonts, inspectNode, rev, 
       {picker && editable && <TokenPicker anchor={picker.anchor} trigger={picker.trigger} spec={picker.spec} ctx={ctx} onClose={() => setPicker(undefined)} />}
       <OverrideContext.Provider value={ctx}>
         <Fragment key={selKey}>
-          {comp?.kind === 'instance' && <InstanceGroup info={comp} disabled={!editable} />}
+          {comp?.kind === 'instance' && <InstanceGroup info={comp} disabled={!editable} edit={componentEdit} />}
+          {comp?.kind === 'master' && comp.model && componentEdit && <MasterComponentGroup model={comp.model} edit={componentEdit} disabled={!editable} />}
+          {comp?.kind === 'slotFrame' && componentEdit && <SlotFrameGroup {...comp} edit={componentEdit} disabled={!editable} />}
           {multi && align && <AlignGroup align={align} disabled={!editable} />}
           {tokenModes && tokenModes.length > 0 && targets.every((t) => t.type === 'board') && <ThemeModeGroup targets={targets} ctx={ctx} modes={tokenModes} />}
           {groups.includes('position') && <PositionGroup targets={targets} ctx={ctx} bounds={bounds} />}

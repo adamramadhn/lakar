@@ -161,3 +161,6 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-komponen-2-schema.md`
   summary: Canvas viewer dengan instance (mount isi terurai, seleksi alamat komposit, ikon/label Layers instance) belum dites otomatis.
   evidence: Review k2 (intent). Canvas memakai resolveDocument sehingga instance termount; harness DOM/E2E viewer belum ada (pra-ada). Layers memakai ikon cadangan untuk tipe instance; penanda mengikuti desain di story 4.
+- source_spec: `_bmad-output/implementation-artifacts/spec-komponen-5-props-slots.md`
+  summary: Penanda temuan Checks pada node di dalam isi slot instance tidak tampil karena POST /inspect (route lama) membalas 404 untuk node itu.
+  evidence: Review k5 (vgap). Efek penanda temuan di Viewer.tsx memanggil api.inspect untuk setiap node temuan dan menelan error; locateNode di route /inspect hanya menelusuri children (pra-ada sejak isi slot story 3). Usul: kotak penanda dari geometri canvas live (sceneBounds) untuk node inSlotContent, seperti highlight seleksi.

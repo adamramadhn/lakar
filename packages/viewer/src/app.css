@@ -1983,6 +1983,351 @@ button.panel-tab:hover {
   background: var(--surface-hover);
   color: var(--text-primary);
 }
+/* Props dan slot komponen (story 5, desain C2xbUQ grup Component + Prop Row zbNXr, xTIr4 Properties/Slot Box). */
+.menu-heading {
+  padding: 4px 10px 2px;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+}
+.cp-group {
+  gap: 4px;
+}
+.cp-section {
+  margin-top: 2px;
+}
+.dp-header-btn.open {
+  color: var(--text-primary);
+}
+.cp-gap {
+  height: 6px;
+}
+.cp-empty {
+  padding: 2px 0 4px;
+}
+.cp-item {
+  display: flex;
+  flex-direction: column;
+}
+.cp-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+  border-radius: 5px;
+}
+.cp-row:hover,
+.cp-row.open {
+  background: var(--surface-hover);
+}
+.cp-row-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  gap: 8px;
+  padding: 6px 0 6px 6px;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.cp-row-icon {
+  flex: none;
+  display: flex;
+  align-items: center;
+  width: 16px;
+  height: 18px;
+  color: var(--text-secondary);
+}
+.cp-row-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.cp-row-line1,
+.cp-row-line2 {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+.cp-row-line1 {
+  gap: 6px;
+}
+.cp-row-line2 {
+  gap: 8px;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+.cp-row-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-primary);
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 12px;
+}
+.cp-row-tag {
+  flex: none;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--input);
+  color: var(--text-secondary);
+  font-size: 10px;
+  font-weight: 500;
+}
+.cp-row-default {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cp-row-bind {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  max-width: 50%;
+}
+.cp-row-bind span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cp-row-more {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 30px;
+  margin-top: 6px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.cp-row-more:hover:not(:disabled) {
+  color: var(--text-primary);
+}
+.cp-row-more:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.cp-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 2px 0 6px;
+  padding: 8px;
+  border-radius: 5px;
+  border: 1px solid var(--border);
+}
+.cp-field {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.cp-field-label {
+  flex: 0 0 60px;
+  padding-top: 7px;
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+.cp-field-control {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.cp-input.mono input {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+}
+.cp-input.invalid {
+  box-shadow: inset 0 0 0 1px var(--danger);
+}
+.cp-problem {
+  color: var(--danger);
+  font-size: 11px;
+}
+.cp-binds {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 2px;
+}
+.cp-bind-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.cp-bind-row > .dp-select {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.cp-link-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  align-self: flex-start;
+  padding: 2px 0;
+  border: 0;
+  background: none;
+  color: var(--component);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.cp-link-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.cp-switch-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 28px;
+}
+.cp-switch-row .switch {
+  cursor: pointer;
+}
+.cp-switch-row .switch:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.cp-state {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+.cp-hint {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 4px 6px;
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.35;
+}
+.cp-hint svg {
+  flex: none;
+  margin-top: 1px;
+}
+.cp-slot-state {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-primary);
+  font-size: 12px;
+}
+.cp-slot-state > svg {
+  color: var(--component);
+}
+.cp-slot-state > span {
+  flex: 1;
+  min-width: 0;
+}
+.cp-slot-state code {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+}
+.cp-mark-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 28px;
+  font-size: 12px;
+}
+.cp-mark-btn > svg {
+  color: var(--component);
+}
+.cp-inst-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.cp-inst-label {
+  flex: 0 0 72px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+.cp-inst-control {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.cp-slot-box {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 4px 0 8px;
+  border: 1px dashed var(--component);
+  border-radius: 5px;
+}
+.cp-slot-box.open,
+.cp-slot-box:hover {
+  background: var(--component-soft);
+}
+.cp-slot-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 11px;
+  text-align: left;
+  cursor: pointer;
+}
+.cp-slot-main svg {
+  flex: none;
+  color: var(--component);
+}
+.cp-slot-main span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cp-slot-add {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.cp-slot-add:hover:not(:disabled) {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+.cp-slot-add:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
 /* Menu konteks editor (QvMyG) dan submenu Align/Distribute (S2WUHS). */
 .edit-menu .menu-item:disabled {
   opacity: 0.4;

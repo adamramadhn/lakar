@@ -10,6 +10,7 @@ import {
   instanceRootOf,
   instancesText,
   instanceTarget,
+  inSlotContent,
   isComposite,
   markerLabel,
   overrideEntry,
@@ -89,6 +90,14 @@ describe('componentInfo', () => {
     expect(info.kinds.has('HomeAAAA')).toBe(false);
     expect(info.stored.get('SlotAAAA')).toMatchObject({ parentId: 'InstAAAA/BodyAAAA', boardId: 'HomeAAAA' });
     expect(info.stored.get('InstAAAA')?.parentId).toBe('RowAAAAA');
+  });
+
+  it('isi slot instance dikenali (inspect dilewati), node lain tidak', () => {
+    const info = componentInfo(doc());
+    expect(inSlotContent(info, 'SlotAAAA')).toBe(true);
+    expect(inSlotContent(info, 'InstAAAA')).toBe(false);
+    expect(inSlotContent(info, 'TitleAAA')).toBe(false);
+    expect(inSlotContent(info, 'nope')).toBe(false);
   });
 });
 
