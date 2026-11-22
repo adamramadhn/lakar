@@ -125,6 +125,16 @@ describe('arah dependensi: fixture pelanggaran', () => {
     expect(checkPackage(pkg('daemon', "import '@lakar/schema';"))).toEqual([]);
   });
 
+  it('viewer boleh @lakar/render (pemetaan CSS tunggal AD-5), tetap dilarang core/exec/icons', () => {
+    expect([...allowedDeps('viewer')].sort()).toEqual(['ports', 'render', 'schema']);
+    expect(checkPackage(pkg('viewer', "import { colorCss } from '@lakar/render';"))).toEqual([]);
+    for (const target of ['core', 'exec', 'icons']) {
+      expect(checkPackage(pkg('viewer', `import { x } from '@lakar/${target}';`))).toMatchObject([
+        { pkg: 'viewer', kind: 'direction', specifier: `@lakar/${target}` },
+      ]);
+    }
+  });
+
   it('impor relatif dan pustaka non-IO tidak dilaporkan', () => {
     expect(checkPackage(pkg('core', "import { a } from './a.js';\nimport { z } from 'zod';"))).toEqual([]);
   });

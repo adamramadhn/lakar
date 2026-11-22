@@ -3,15 +3,15 @@
 // board/frame/rect/ellipse/path/text/icon. Elemen node TIDAK pernah mendapat CSS `border`: tinta stroke
 // bagian dalam memakai overlay internal (tanpa data-lakar-id), bagian luar memakai box-shadow spread.
 import type { ResolvedFill as Fill, ResolvedShadow as Shadow, ResolvedStroke as Stroke } from '@lakar/schema';
+// Nilai bersama (lapisan solid/gradien, stops, bayangan) dari pemetaan tunggal css.ts (AD-5); noise, mesh,
+// image, overlay stroke, dan drop-shadow tetap di sini.
+import { boxShadowsCss, gradientLayerCss } from './css.js';
 import { meshLayer, NOISE_DEFAULTS, noiseLayer } from './effects.js';
 
 /** Prefiks URL aset default (daemon dan harness menyajikan `/assets/<sha256>`). */
 export const DEFAULT_ASSET_BASE = '/assets/';
 
 const px = (n: number) => `${n}px`;
-const pct = (n: number) => `${+(n * 100).toFixed(4)}%`;
-
-const stopsCss = (stops: readonly { offset: number; color: string }[]) => stops.map((s) => `${s.color} ${pct(s.offset)}`).join(', ');
 
 /** URL aset gambar: `assetBase` + sha256. */
 export const assetUrl = (assetBase: string, assetId: string): string => `${assetBase}${assetId}`;
@@ -24,20 +24,11 @@ function fillLayer(f: Fill, fc: FillContext): string {
   const assetBase = fc.assetBase;
   switch (f.type) {
     case 'solid':
-      return `linear-gradient(${f.color}, ${f.color})`;
     case 'linear':
-      // Sudut CSS: 0 = ke atas, 90 = ke kanan, searah jarum jam.
-      return `linear-gradient(${f.angle}deg, ${stopsCss(f.stops)})`;
-    case 'radial': {
-      const [cx, cy] = f.center ?? [0.5, 0.5];
-      const r = f.radius ?? 0.5;
-      return `radial-gradient(${pct(r)} ${pct(r)} at ${pct(cx)} ${pct(cy)}, ${stopsCss(f.stops)})`;
-    }
-    case 'conic': {
-      // Sudut: 0 = atas, searah jarum jam (sama dengan CSS `from`).
-      const [cx, cy] = f.center ?? [0.5, 0.5];
-      return `conic-gradient(from ${f.angle ?? 0}deg at ${pct(cx)} ${pct(cy)}, ${stopsCss(f.stops)})`;
-    }
+    case 'radial':
+    case 'conic':
+      // Lapisan berlapis (bukan `solo`): solid → `linear-gradient(c, c)`.
+      return gradientLayerCss(f)!;
     case 'noise':
       return noiseLayer(f);
     case 'mesh': {
@@ -91,12 +82,6 @@ export function applyFills(st: CSSStyleDeclaration, fills: readonly Fill[] | und
   return true;
 }
 
-/** radius angka | [tl,tr,br,bl] → `border-radius`. */
-export function radiusCss(r: number | readonly number[] | undefined): string | undefined {
-  if (r === undefined) return undefined;
-  return typeof r === 'number' ? px(r) : r.map(px).join(' ');
-}
-
 type Side = 'top' | 'right' | 'bottom' | 'left';
 const SIDES: readonly Side[] = ['top', 'right', 'bottom', 'left'];
 
@@ -117,21 +102,11 @@ function outerStrokeShadows(s: Stroke): string[] {
   return sides.map((side) => `${off[side]} 0 0 ${s.color}`);
 }
 
-/** Bayangan box: drop → `x y blur spread c`, inner → `inset …`. Urutan array = urutan CSS (pertama di atas). */
-function shadowCss(sh: Shadow): string {
-  return `${sh.type === 'inner' ? 'inset ' : ''}${px(sh.x)} ${px(sh.y)} ${px(sh.blur)} ${px(sh.spread ?? 0)} ${sh.color}`;
-}
-
-/** `box-shadow` box: stroke luar (paling atas) lalu shadows sesuai urutan. */
+/** `box-shadow` box: stroke luar (paling atas) lalu shadows sesuai urutan (css.ts). */
 export function boxShadowCss(stroke: Stroke | undefined, shadows: readonly Shadow[] | undefined): string | undefined {
-  const list = [...(stroke ? outerStrokeShadows(stroke) : []), ...(shadows ?? []).map(shadowCss)];
+  const own = boxShadowsCss(shadows);
+  const list = [...(stroke ? outerStrokeShadows(stroke) : []), ...(own ? [own] : [])];
   return list.length ? list.join(', ') : undefined;
-}
-
-/** Text: drop → `text-shadow` (blur sama semantiknya dengan box-shadow); inner diabaikan. */
-export function textShadowCss(shadows: readonly Shadow[] | undefined): string | undefined {
-  const drop = (shadows ?? []).filter((s) => s.type !== 'inner');
-  return drop.length ? drop.map((s) => `${px(s.x)} ${px(s.y)} ${px(s.blur)} ${s.color}`).join(', ') : undefined;
 }
 
 /**

@@ -17,7 +17,7 @@ export const EDGES: Readonly<Record<string, readonly string[]>> = {
   daemon: ['core', 'exec', 'render', 'check', 'icons', 'skills'],
   mcp: ['schema'],
   bench: ['schema'],
-  viewer: ['schema'],
+  viewer: ['schema', 'render'],
 };
 
 /** Paket yang tidak boleh menyentuh IO (builtin Node atau pustaka IO). */

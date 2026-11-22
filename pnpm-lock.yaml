@@ -361,6 +361,9 @@ importers:
 
   packages/viewer:
     dependencies:
+      '@lakar/render':
+        specifier: workspace:*
+        version: link:../render
       '@lakar/schema':
         specifier: workspace:*
         version: link:../schema

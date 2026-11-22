@@ -1,5 +1,6 @@
 /// <reference lib="dom" />
-// Pemetaan 1:1 dokumen → DOM/CSS flexbox (AD-5). Aturan sizing/gap/posisi/teks ditulis sekali di sini.
+// Pemetaan 1:1 dokumen → DOM/CSS flexbox (AD-5). Aturan sizing/gap/posisi/teks ditulis sekali di sini;
+// nilai yang semantiknya dipakai bersama Copy as/codegen berasal dari css.ts.
 // Elemen node TIDAK memakai CSS `border` (padding-box = border-box untuk x/y absolute); stroke memakai
 // overlay internal + box-shadow (paint.ts) atau overlay SVG (shape.ts).
 import type {
@@ -13,24 +14,14 @@ import type {
   ResolvedTextNode as TextNode,
 } from '@lakar/schema';
 import { cssFamily, textFont } from './fonts.js';
-import {
-  applyEffects,
-  boxShadowCss,
-  DEFAULT_ASSET_BASE,
-  dropShadowFilters,
-  applyFills,
-  radiusCss,
-  strokeOverlay,
-  textShadowCss,
-} from './paint.js';
+// Nilai bersama render/Copy as/codegen (radius, padding, teks, bayangan teks, align/justify) dari css.ts (AD-5).
+import { ALIGN, JUSTIFY, letterSpacingCss, lineHeightCss, paddingCss, radiusCss, textShadowCss } from './css.js';
+import { applyEffects, boxShadowCss, DEFAULT_ASSET_BASE, dropShadowFilters, applyFills, strokeOverlay } from './paint.js';
 import { ellipseShape, fillLayer, pathShape, strokeSvg, type Shape } from './shape.js';
 import { iconKey, renderIconElement } from './icon.js';
 
 /** Atribut penanda node di DOM; daemon memakainya untuk screenshot elemen board. */
 export const NODE_ATTR = 'data-lakar-id';
-
-const ALIGN: Record<string, string> = { start: 'flex-start', center: 'center', end: 'flex-end', stretch: 'stretch' };
-const JUSTIFY: Record<string, string> = { start: 'flex-start', center: 'center', end: 'flex-end', 'space-between': 'space-between' };
 
 type Dim = number | 'hug' | 'fill' | undefined;
 type Sized = {
@@ -209,11 +200,6 @@ function applyMinMax(s: CSSStyleDeclaration, z: Sized): void {
   if (z.maxHeight !== undefined) s.maxHeight = px(z.maxHeight);
 }
 
-/** padding angka | [v,h] | [t,r,b,l] → CSS shorthand dengan urutan yang sama. */
-function paddingCss(p: number | readonly number[]): string {
-  return typeof p === 'number' ? px(p) : p.map(px).join(' ');
-}
-
 /**
  * Paint box (frame/rect/ellipse penuh): fills → background berlapis, radius, box-shadow (stroke luar +
  * shadows). Mengembalikan overlay stroke dalam yang harus ditambahkan TERAKHIR (di atas anak).
@@ -276,7 +262,7 @@ function renderFrame(d: Document, n: FrameNode, ctx: RenderContext): HTMLElement
     if (n.align) s.alignItems = ALIGN[n.align]!;
     if (n.justify) s.justifyContent = JUSTIFY[n.justify]!;
   }
-  if (n.padding !== undefined) s.padding = paddingCss(n.padding);
+  if (n.padding !== undefined) s.padding = paddingCss(n.padding)!;
   if (n.clip) s.overflow = 'hidden';
   const overlay = paintBox(el, n, radiusCss(n.radius), ctx);
   appendChildren(d, el, n.children, { layout, scrollY: n.scrollY ?? 0 }, n.gap, ctx);
@@ -295,8 +281,8 @@ function renderText(d: Document, n: TextNode): HTMLElement {
   s.fontWeight = String(f.weight);
   s.fontStyle = f.style;
   s.fontSize = px(n.size);
-  if (n.lineHeight !== undefined) s.lineHeight = px(n.lineHeight);
-  if (n.letterSpacing !== undefined) s.letterSpacing = `${n.letterSpacing}em`;
+  if (n.lineHeight !== undefined) s.lineHeight = lineHeightCss(n.lineHeight)!;
+  if (n.letterSpacing !== undefined) s.letterSpacing = letterSpacingCss(n.letterSpacing)!;
   if (n.align) s.textAlign = n.align;
   if (n.numeric === 'tabular') s.fontVariantNumeric = 'tabular-nums';
   s.color = n.color ?? '#000000';

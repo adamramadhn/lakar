@@ -27,6 +27,36 @@ export { assetIds } from './assets.js';
 export { DEFAULT_ICON_COLOR, DEFAULT_ICON_STROKE_WIDTH, iconKey, iconRefs, type IconRef } from './icon.js';
 export { DEFAULT_ASSET_BASE, DROP_SHADOW_BLUR_FACTOR } from './paint.js';
 export { ellipseShape, type Shape } from './shape.js';
+// Pemetaan CSS tunggal (AD-5): dipakai render, Copy as viewer, dan nanti codegen.
+export {
+  ALIGN,
+  backgroundCss,
+  boxShadowsCss,
+  colorCss,
+  cssVarName,
+  fontFamilyCss,
+  fontWeightCss,
+  gradientLayerCss,
+  isTokenRef,
+  JUSTIFY,
+  lengthCss,
+  letterSpacingCss,
+  lineHeightCss,
+  paddingCss,
+  percentCss,
+  radiusCss,
+  shadowCss,
+  stopsCss,
+  strokeBorderDecls,
+  textShadowCss,
+  textShadowItemCss,
+  tokenVar,
+  type CssDecl,
+  type PaintLike,
+  type ShadowLike,
+  type StopLike,
+  type TokenRef,
+} from './css.js';
 export { measureBoard, type BoardMeasure, type NodeBounds, type TextMeasure } from './measure.js';
 
 /** Argumen Chromium bersama daemon dan harness tes (stabilitas golden). */
