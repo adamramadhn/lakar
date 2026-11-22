@@ -42,6 +42,7 @@ import { readPngSize } from './png.js';
 import { Sessions, UnknownSessionError, logExecute, recallFailed, rememberFailed } from './sessions.js';
 import { DocStore } from './store.js';
 import { ActivityBus, registerActivityHooks } from './events.js';
+import { registerConnectionRoutes } from './connections.js';
 import { VIEWER_DIST_DIR, registerViewerRoutes } from './viewer.js';
 
 const STATUS: Record<ErrorCode, number> = {
@@ -631,6 +632,7 @@ export function buildServer({
 
   // Viewer baca-saja (Viewer B slice 1): `/viewer/*` dan `/app/*`. Route lama tidak berubah.
   registerViewerRoutes(app, { docs, store, sessions, distDir: config.viewerDir ?? VIEWER_DIST_DIR });
+  registerConnectionRoutes(app, { host: config.host, port: config.port, ...(config.mcpEntry ? { mcpEntry: config.mcpEntry } : {}) });
 
   // Aset gambar (story 8): `<dataDir>/assets/<sha256>`, hanya raster dari magic bytes; lainnya → 404.
   // Aset jarak jauh (Unsplash): meta tanpa byte di `assets/`, disajikan dari cache render daemon (hotlink resmi saat

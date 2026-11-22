@@ -1,0 +1,6 @@
+# Hasil prepare-sidecar dan build Tauri (dibuat ulang di CI).
+src-tauri/target/
+src-tauri/gen/
+src-tauri/binaries/
+src-tauri/resources/
+src-tauri/ci-config.json

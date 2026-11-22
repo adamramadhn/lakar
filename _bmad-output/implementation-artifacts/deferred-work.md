@@ -21,3 +21,6 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-viewer-b-slice-2.md`
   summary: `GET /viewer/docs/:slug/history` mengembalikan seluruh riwayat tanpa limit dan diambil ulang tiap rev saat tab History terbuka.
   evidence: Terasa pada dokumen dengan ribuan revisi; tambahkan `limit`/`before`.
+- source_spec: `_bmad-output/implementation-artifacts/spec-desktop-release-1.md`
+  summary: `RenderPool.close()` menunggu peluncuran browser yang sedang berjalan, sehingga shutdown (SIGTERM atau stdin ditutup) saat pool masih hangat bisa melewati batas 5 s dan keluar paksa dengan kode 1.
+  evidence: smoke test sidecar di release.yml (Linux, macOS x64, Windows) keluar 1 saat stdin ditutup ketika pool 0/2; perilaku pool sudah ada sebelum perubahan ini. Chrome ikut berhenti karena pipe Playwright tertutup, jadi dampaknya hanya kode keluar dan jeda 5 s.

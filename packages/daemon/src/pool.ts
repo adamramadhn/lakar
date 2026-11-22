@@ -17,6 +17,14 @@ export type PoolOptions = {
   openPage(browser: Browser, dpr: 1 | 2): Promise<Page>;
 };
 
+/**
+ * Kegagalan menjalankan browser yang pesannya sudah jelas untuk pengguna (mis. "Chrome atau Edge tidak ditemukan"):
+ * pool memakai pesannya apa adanya di `lastError`, tanpa awalan "browser gagal dijalankan:".
+ */
+export class BrowserLaunchError extends Error {
+  override name = 'BrowserLaunchError';
+}
+
 type Slot = {
   index: number;
   /** Naik setiap slot dibuang: sewa lama (mis. yang lewat batas waktu) tidak boleh menyentuh halaman baru. */
@@ -126,7 +134,11 @@ export class RenderPool {
       // Kesalahan dokumen: halaman sehat, tetap dipakai.
       if (e instanceof LakarError && e.code !== 'RENDER_FAILED') throw e;
       const message =
-        e instanceof LeaseTimeout ? `render melewati batas waktu ${this.#opts.timeoutMs} ms; halaman dibuat ulang` : `render Chromium gagal: ${firstLine(e)}`;
+        e instanceof LeaseTimeout
+          ? `render melewati batas waktu ${this.#opts.timeoutMs} ms; halaman dibuat ulang`
+          : e instanceof BrowserLaunchError
+            ? e.message
+            : `render Chromium gagal: ${firstLine(e)}`;
       this.#lastError = message;
       this.#discard(slot);
       throw renderFailed(message);
@@ -225,7 +237,7 @@ export class RenderPool {
       })();
       this.#browserPromise = p;
       p.catch((e: unknown) => {
-        this.#lastError = `browser gagal dijalankan: ${firstLine(e)}`;
+        this.#lastError = e instanceof BrowserLaunchError ? e.message : `browser gagal dijalankan: ${firstLine(e)}`;
         if (this.#browserPromise === p) this.#browserPromise = undefined;
       });
     }
@@ -268,7 +280,7 @@ export class RenderPool {
       };
       p.then(clear, (e: unknown) => {
         clear();
-        if (slot.gen === gen) this.#lastError = `halaman render gagal dibuat: ${firstLine(e)}`;
+        if (slot.gen === gen) this.#lastError = e instanceof BrowserLaunchError ? e.message : `halaman render gagal dibuat: ${firstLine(e)}`;
       });
     }
     return slot.creating;

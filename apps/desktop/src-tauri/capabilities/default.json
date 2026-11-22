@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Layar mulai lokal (ui/index.html). Viewer dari lakard (http://127.0.0.1) tidak mendapat akses IPC.",
+  "windows": ["main"],
+  "permissions": ["core:default"]
+}
