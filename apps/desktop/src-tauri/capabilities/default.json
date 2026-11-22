@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Layar mulai lokal (ui/index.html), termasuk kontrol jendela strip judulnya. Viewer dari lakard (http://127.0.0.1) hanya mendapat kontrol jendela lewat viewer-window.json.",
+  "description": "Layar mulai lokal (ui/index.html): status/restart lakard dan kontrol jendela strip judulnya. Viewer dari lakard (http://127.0.0.1) hanya mendapat izin lewat viewer-window.json.",
   "windows": ["main"],
   "permissions": [
     "core:default",
@@ -10,6 +10,8 @@
     "core:window:allow-internal-toggle-maximize",
     "core:window:allow-close",
     "core:window:allow-start-dragging",
-    "core:window:allow-is-maximized"
+    "core:window:allow-is-maximized",
+    "allow-daemon-state",
+    "allow-restart-daemon"
   ]
 }

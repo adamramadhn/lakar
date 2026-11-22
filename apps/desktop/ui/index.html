@@ -19,6 +19,8 @@
         --danger: #dc2626;
         --warning: #b45309;
       }
+      /* prefers-color-scheme mengikuti tema native jendela, yang diatur main.rs dari pilihan Settings viewer
+         (Light/Dark; System = ikut OS). Warna --bg sama dengan window_background di main.rs. */
       @media (prefers-color-scheme: dark) {
         :root {
           --bg: #111113;

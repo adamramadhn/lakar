@@ -1,6 +1,16 @@
 // Tema viewer: nilai tersimpan, resolusi system, dan penerapan atribut `data-theme` (global DOM dipalsukan).
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { parseTheme, resolveTheme } from './theme.ts';
+import { desktopInvoke, parseTheme, resolveTheme } from './theme.ts';
+
+describe('desktopInvoke', () => {
+  it('hanya bila __TAURI__.core.invoke berupa fungsi', () => {
+    const invoke = () => Promise.resolve();
+    expect(desktopInvoke({ __TAURI__: { core: { invoke } } })).toBe(invoke);
+    for (const g of [undefined, null, {}, { __TAURI__: {} }, { __TAURI__: { core: { invoke: 'x' } } }]) {
+      expect(desktopInvoke(g)).toBeUndefined();
+    }
+  });
+});
 
 describe('parseTheme / resolveTheme', () => {
   it('nilai sah dipakai, selain itu system', () => {
@@ -114,6 +124,40 @@ describe('initTheme / setTheme', () => {
     stop();
     t.setTheme('dark');
     expect(calls).toBe(2);
+  });
+
+  it('aplikasi desktop: pilihan dikirim ke set_ui_theme saat mulai dan saat berubah', async () => {
+    const calls: unknown[] = [];
+    const win = globalThis.window as unknown as Record<string, unknown>;
+    win.__TAURI__ = { core: { invoke: (cmd: string, args: unknown) => (calls.push([cmd, args]), Promise.resolve()) } };
+    store.set('lakar.viewer.theme', 'dark');
+    const t = await load();
+    t.initTheme();
+    expect(calls).toEqual([['set_ui_theme', { theme: 'dark' }]]);
+    t.setTheme('dark'); // tidak berubah → tidak dikirim lagi
+    t.setTheme('system');
+    expect(calls).toEqual([
+      ['set_ui_theme', { theme: 'dark' }],
+      ['set_ui_theme', { theme: 'system' }],
+    ]);
+  });
+
+  it('aplikasi desktop: invoke menolak atau melempar → tema tetap diterapkan', async () => {
+    const win = globalThis.window as unknown as Record<string, unknown>;
+    win.__TAURI__ = {
+      core: {
+        invoke: (_: string, args: { theme: string }) => {
+          if (args.theme === 'light') throw new Error('IPC');
+          return Promise.reject(new Error('not allowed'));
+        },
+      },
+    };
+    const t = await load();
+    t.initTheme();
+    t.setTheme('light');
+    expect(html.dataset.theme).toBe('light');
+    t.setTheme('dark');
+    expect(html.dataset.theme).toBe('dark');
   });
 
   it('perubahan dari tab lain (storage) ikut diterapkan', async () => {

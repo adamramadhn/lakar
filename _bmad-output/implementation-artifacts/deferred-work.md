@@ -47,9 +47,6 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-app-5-agent-presence.md`
   summary: Test komponen untuk `AgentLayer`/`AgentCursor`/`useGlide` dan tanda baris `LayerTree` (posisi, sembunyi saat pratinjau, reduced motion).
   evidence: viewer belum punya setup test DOM; regresi posisi kursor/outline atau guard `!preview` saat ini tidak tertangkap test mana pun.
-- source_spec: `_bmad-output/implementation-artifacts/spec-app-6-dashboard-search-settings.md`
-  summary: Layar awal aplikasi desktop (`apps/desktop/ui/index.html`) masih mengikuti `prefers-color-scheme`, tidak mengikuti pilihan tema Light/Dark di Settings → General.
-  evidence: pilihan tema disimpan di localStorage viewer (`lakar.viewer.theme`); layar awal desktop dimuat sebelum viewer dan tidak membacanya, sehingga warna awal bisa berlawanan.
 - source_spec: `_bmad-output/implementation-artifacts/spec-app-7-titlebar-tabs.md`
   summary: Belum terverifikasi bahwa halaman viewer remote (http://127.0.0.1:<port>/app/) mendapat `window.__TAURI__` + IPC lewat capability `viewer-window`; bila tidak, jendela tanpa dekorasi (Windows/Linux) tidak punya tombol jendela maupun drag region (keluar/tampil hanya lewat tray).
   evidence: maybe-false, dampak tinggi bila benar. Diselesaikan dengan menjalankan build release di Windows/Linux: tombol minimize/maximize/close tampil dan bekerja, drag + dobel-klik spacer jalan.
@@ -68,3 +65,6 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-app-10-folders.md`
   summary: Alur UI folder (seret ke folder, Move to…, New file di halaman folder) hanya diverifikasi manual; viewer belum punya tes komponen.
   evidence: setelan tes komponen (jsdom/testing-library) belum ada di repo; kontrak klien api.ts sudah dites.
+- source_spec: `_bmad-output/implementation-artifacts/spec-app-12-splash-theme.md`
+  summary: Belum terverifikasi di build release bahwa tema native jendela (Light/Dark dari Settings) diteruskan ke `prefers-color-scheme` layar mulai, terutama di Linux (WebKitGTK mengikuti preferensi gelap GTK).
+  evidence: maybe-false. Windows dan macOS didukung lewat jalur Tauri yang terdokumentasi (`window.theme()` saat membuat WebView2, NSAppearance). Bila Linux tidak ikut, tambahkan atribut `data-theme` di layar mulai dari nilai tema yang disuntikkan Rust.

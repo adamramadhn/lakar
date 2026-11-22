@@ -36,6 +36,26 @@ function darkQuery(): MediaQueryList | undefined {
   }
 }
 
+type Invoke = (cmd: string, args?: Record<string, unknown>) => Promise<unknown>;
+
+/** `invoke` IPC Tauri (global `window.__TAURI__.core`, `withGlobalTauri`) bila viewer berjalan di aplikasi desktop. */
+export function desktopInvoke(g: unknown): Invoke | undefined {
+  const invoke = (g as { __TAURI__?: { core?: { invoke?: unknown } } } | undefined)?.__TAURI__?.core?.invoke;
+  return typeof invoke === 'function' ? (invoke as Invoke) : undefined;
+}
+
+/** Kirim pilihan ke aplikasi desktop (command `set_ui_theme`): layar mulai berikutnya memakai tema yang sama,
+ *  karena layar mulai berasal dari origin lain dan tidak bisa membaca localStorage viewer. Gagal → diabaikan. */
+function syncDesktop(next: ThemePref) {
+  const invoke = desktopInvoke(typeof window !== 'undefined' ? window : undefined);
+  if (!invoke) return;
+  try {
+    invoke('set_ui_theme', { theme: next }).catch(() => {});
+  } catch {
+    // IPC tidak tersedia
+  }
+}
+
 let pref: ThemePref = 'system';
 let started = false;
 const listeners = new Set<() => void>();
@@ -49,13 +69,17 @@ function update(next: ThemePref) {
   const changed = next !== pref;
   pref = next;
   apply();
-  if (changed) for (const l of listeners) l();
+  if (!changed) return;
+  syncDesktop(next);
+  for (const l of listeners) l();
 }
 
 /** Terapkan tema tersimpan sebelum render pertama dan mulai mengikuti OS + tab lain. Aman dipanggil berulang. */
 export function initTheme(): void {
   pref = readPref();
   apply();
+  // Juga menyalin pilihan lama (sebelum sinkron ini ada) ke aplikasi desktop saat viewer pertama dimuat.
+  syncDesktop(pref);
   if (started) return;
   started = true;
   const mq = darkQuery();
