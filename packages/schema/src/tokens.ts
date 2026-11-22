@@ -2,18 +2,22 @@
 // memanggil `resolveDocument`, bukan fungsi ini (kecuali codegen nanti, yang memakai tahap ini terpisah).
 // Di sini juga tabel jenis-slot ↔ tipe-token (AD-11), satu-satunya sumber untuk validasi tipe dan inferensi tipe.
 import { z } from 'zod';
+import { hasInstances } from './component-issues.js';
 import { LakarError } from './errors.js';
 import {
+  ExpandedLakarDocument,
   LakarDocument,
   TokenModes,
   Tokens,
   tokenModeIssues,
   zodToLakarError,
   type BoardNode,
-  type ChildNode,
   type EllipseNode,
+  type ExpandedBoardNode,
+  type ExpandedChildNode,
+  type ExpandedDocument,
+  type ExpandedFrameNode,
   type Fill,
-  type FrameNode,
   type IconNode,
   type LakarDocument as Doc,
   type PathNode,
@@ -28,10 +32,11 @@ import {
 /** Tipe mapped rekursif: menghapus cabang `TokenRef` dari setiap slot `tok()`. */
 export type Resolved<T> = T extends TokenRef ? never : T extends object ? { [K in keyof T]: Resolved<T[K]> } : T;
 
-export type ResolvedDocument = Resolved<Doc>;
-export type ResolvedBoardNode = Resolved<BoardNode>;
-export type ResolvedChildNode = Resolved<ChildNode>;
-export type ResolvedFrameNode = Resolved<FrameNode>;
+/** Dokumen ter-resolve (hasil `resolveDocument`): instance sudah diurai (AD-12) dan ref token diganti nilai. */
+export type ResolvedDocument = Resolved<ExpandedDocument>;
+export type ResolvedBoardNode = Resolved<ExpandedBoardNode>;
+export type ResolvedChildNode = Resolved<ExpandedChildNode>;
+export type ResolvedFrameNode = Resolved<ExpandedFrameNode>;
 export type ResolvedTextNode = Resolved<TextNode>;
 export type ResolvedRectNode = Resolved<RectNode>;
 export type ResolvedEllipseNode = Resolved<EllipseNode>;
@@ -207,7 +212,10 @@ const MODE_HINT = 'daftarkan mode dengan setTokenModes(["light","dark"]) lalu pa
  * `tokenModes[0]`; nilai = `modes[mode]` ?? `value`), lalu parse ulang dengan skema yang sama. Sebelumnya tipe
  * token dicek terhadap tabel slot (token `color` di `padding` → SCHEMA_INVALID). Input tidak dimutasi.
  */
-export function resolveTokens(doc: Doc, opts: ResolveTokensOptions = {}): ResolvedDocument {
+export function resolveTokens(doc: ExpandedDocument, opts?: ResolveTokensOptions): ResolvedDocument;
+/** Dokumen tersimpan yang masih berisi instance (codegen): instance tetap utuh, hanya ref token yang diganti. */
+export function resolveTokens(doc: Doc, opts?: ResolveTokensOptions): Resolved<Doc>;
+export function resolveTokens(doc: Doc, opts: ResolveTokensOptions = {}): ResolvedDocument | Resolved<Doc> {
   assertTokensKnown(doc);
   const head = TokenHead.safeParse({ tokens: doc.tokens, tokenModes: doc.tokenModes });
   if (!head.success) throw zodToLakarError(head.error, 'token tidak valid');
@@ -244,7 +252,8 @@ export function resolveTokens(doc: Doc, opts: ResolveTokensOptions = {}): Resolv
   const modeOf = (b: BoardNode | undefined) => opts.mode ?? b?.themeMode ?? modes?.[0];
   const pages = doc.pages.map((p) => ({ ...p, children: p.children.map((b) => replace(b, modeOf(b))) }));
   const resolved = { ...doc, pages };
-  const r = LakarDocument.safeParse(resolved);
+  // Dokumen ter-ekspansi (id boleh alamat komposit, tanpa instance) atau dokumen tersimpan berisi instance.
+  const r = (hasInstances(doc) ? LakarDocument : ExpandedLakarDocument).safeParse(resolved);
   if (!r.success) {
     const refs = findTokenRefs(doc);
     const culprits = r.error.issues.flatMap((i) => {

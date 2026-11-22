@@ -1,11 +1,11 @@
 // Tes korpus dokumen (spine model-dokumen AD-3): setiap fixture `tests/fixtures/docs/v<n>/*.lakar.json` wajib
-// bermigrasi ke SCHEMA_VERSION, lolos validasi, dan lolos resolve token. Render ada di `packages/render/test/corpus.test.ts`.
+// bermigrasi ke SCHEMA_VERSION, lolos validasi, dan lolos `resolveDocument` (ekspansi instance + token). Render ada di `packages/render/test/corpus.test.ts`.
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { migrateDocument, parseDocument } from '../packages/core/src/index.ts';
-import { NODE_TYPES, resolveTokens, SCHEMA_VERSION, TOKEN_TYPES } from '../packages/schema/src/index.ts';
+import { beginTransaction, migrateDocument, parseDocument } from '../packages/core/src/index.ts';
+import { expandInstances, instanceIssues, NODE_TYPES, resolveDocument, resolveTokens, SCHEMA_VERSION, TOKEN_TYPES, type LakarDocument } from '../packages/schema/src/index.ts';
 import { boardsOf, loadDocCorpus, missingVersions, type CorpusDoc } from './support/doc-corpus.ts';
 
 const corpus = loadDocCorpus();
@@ -55,7 +55,7 @@ describe('korpus dokumen: cakupan versi', () => {
   });
 });
 
-describe('korpus dokumen: migrasi, validasi, resolve token', () => {
+describe('korpus dokumen: migrasi, validasi, resolveDocument', () => {
   it.each(corpus.map((d): [string, CorpusDoc] => [`v${d.version}/${d.name}`, d]))('%s', (_label, d) => {
     let doc;
     try {
@@ -65,9 +65,9 @@ describe('korpus dokumen: migrasi, validasi, resolve token', () => {
     }
     expect(doc.schemaVersion, d.path).toBe(SCHEMA_VERSION);
     try {
-      resolveTokens(doc);
+      resolveDocument(doc);
     } catch (e) {
-      throw new Error(`${d.path}: resolveTokens gagal: ${(e as Error).message}`);
+      throw new Error(`${d.path}: resolveDocument gagal: ${(e as Error).message}`);
     }
   });
 
@@ -156,12 +156,12 @@ describe('korpus dokumen: migrasi token v2 → v3 (AD-11)', () => {
 
 describe('korpus dokumen: migrasi v3 → v4 (grid, AD-13)', () => {
   it.each(corpus.filter((d) => d.version === 3).map((d): [string, CorpusDoc] => [`v${d.version}/${d.name}`, d]))('identitas: %s', (_label, d) => {
-    expect(migrateDocument(d.raw), d.path).toEqual({ ...d.raw, schemaVersion: 4 });
+    expect(migrateDocument(d.raw, { target: 4 }), d.path).toEqual({ ...d.raw, schemaVersion: 4 });
   });
 
-  it.each(corpus.filter((d) => d.version < 4).map((d): [string, CorpusDoc] => [`v${d.version}/${d.name}`, d]))('%s: hasil v3 = hasil v4 kecuali versi', (_label, d) => {
+  it.each(corpus.filter((d) => d.version < 4).map((d): [string, CorpusDoc] => [`v${d.version}/${d.name}`, d]))('%s: hasil v3 = hasil versi kini kecuali versi', (_label, d) => {
     const v3 = migrateDocument(d.raw, { target: 3 }) as Record<string, unknown>;
-    expect(parseDocument(d.raw), d.path).toEqual({ ...v3, schemaVersion: 4 });
+    expect(parseDocument(d.raw), d.path).toEqual({ ...v3, schemaVersion: SCHEMA_VERSION });
   });
 
   it('fixture v4 memakai grid: semua jenis track, rows, gap sumbu, penempatan span dan start/end', () => {
@@ -175,6 +175,90 @@ describe('korpus dokumen: migrasi v3 → v4 (grid, AD-13)', () => {
     const places = nodes.flatMap((n) => [n.gridColumn, n.gridRow]).filter(Boolean) as Record<string, number>[];
     expect(places.some((p) => p.span !== undefined)).toBe(true);
     expect(places.some((p) => p.start !== undefined && p.end !== undefined)).toBe(true);
+  });
+});
+
+/** Node ter-ekspansi berdasarkan alamat (id) di seluruh dokumen. */
+function byAddress(doc: unknown): Map<string, Record<string, unknown>> {
+  return new Map(allNodes(doc).map((n) => [String((n as { id?: unknown }).id), n as Record<string, unknown>]));
+}
+
+describe('korpus dokumen: migrasi v4 → v5 (komponen, AD-12)', () => {
+  it.each(corpus.filter((d) => d.version === 4).map((d): [string, CorpusDoc] => [`v${d.version}/${d.name}`, d]))('identitas: %s', (_label, d) => {
+    expect(migrateDocument(d.raw), d.path).toEqual({ ...d.raw, schemaVersion: 5 });
+  });
+
+  it.each(corpus.filter((d) => d.version < 5).map((d): [string, CorpusDoc] => [`v${d.version}/${d.name}`, d]))('%s: tanpa instance, expandInstances = dokumen itu sendiri', (_label, d) => {
+    const doc = parseDocument(d.raw);
+    expect(expandInstances(doc)).toBe(doc);
+    expect(resolveDocument(doc)).toEqual(resolveTokens(doc));
+  });
+
+  const v5 = () => parseDocument(corpus.find((x) => x.version === 5 && x.name === 'komponen-kartu')!.raw);
+
+  it('fixture v5 memakai master, prop text/boolean/enum, slot, override akar/anak/bersarang, dan instance bersarang', () => {
+    const nodes = allNodes(v5()) as Record<string, unknown>[];
+    const masters = nodes.filter((n) => n.component !== undefined) as { component: { props: { type: string }[]; slots: unknown[] } }[];
+    expect(new Set(masters.flatMap((m) => m.component.props.map((p) => p.type)))).toEqual(new Set(['text', 'boolean', 'enum']));
+    expect(masters.some((m) => m.component.slots.length > 0)).toBe(true);
+    const instances = nodes.filter((n) => n.type === 'instance') as { overrides?: Record<string, unknown>; slots?: unknown; componentId: string }[];
+    expect(instances.some((i) => Object.keys(i.overrides ?? {}).some((k) => k.includes('/')))).toBe(true);
+    expect(instances.some((i) => i.overrides && Object.hasOwn(i.overrides, i.componentId))).toBe(true);
+    expect(instances.some((i) => i.slots !== undefined)).toBe(true);
+  });
+
+  it('fixture v5 ter-resolve: alamat komposit, props, override, slot, dan token', () => {
+    const r = resolveDocument(v5());
+    expect(instanceIssues(r)).toEqual([]);
+    const at = byAddress(r);
+    expect(at.get('InsCard1')).toMatchObject({ type: 'frame', name: 'Card / promo', fills: [{ type: 'solid', color: '#FEF3C7' }] });
+    expect(at.get('InsCard1')!.component).toBeUndefined();
+    expect(at.get('InsCard1/TxtCard1')).toMatchObject({ content: 'Promo minggu ini', color: '#101828' });
+    expect(at.get('InsCard1/InsBadg0/TxtBadg1')).toMatchObject({ content: 'Hemat' });
+    expect(at.get('InsCard1/TxtCard2')).toMatchObject({ content: 'Isi bawaan kartu', color: '#7C2D12' });
+    expect(at.get('InsCard1/IcnCard1')).toMatchObject({ icon: 'star' });
+    expect(at.has('InsCard2/InsBadg0')).toBe(false);
+    expect(at.get('InsCard2/IcnCard1')).toMatchObject({ icon: 'check' });
+    expect((at.get('InsCard2/BdyCard1')!.children as { id: string }[]).map((c) => c.id)).toEqual(['TxtSlot1']);
+    expect(at.get('TxtSlot1')).toMatchObject({ color: '#101828' });
+    expect(at.get('InsBadg2/TxtBadg1')).toMatchObject({ content: 'Draf' });
+    // Master tetap tampil apa adanya; master bersarang di Card ikut terurai di tempat tersimpannya.
+    expect(at.get('MstCard1')!.component).toBeDefined();
+    expect(at.get('InsBadg0/TxtBadg1')).toMatchObject({ content: 'Baru' });
+  });
+
+  it('mengubah master memperbarui semua instance tanpa menimpa override', () => {
+    const doc = v5() as LakarDocument;
+    const master = byAddress(doc).get('MstCard1')!;
+    master.fills = [{ type: 'solid', color: '#E0F2FE' }];
+    master.radius = 20;
+    const desc = byAddress(doc).get('TxtCard2')!;
+    desc.content = 'Isi master baru';
+    desc.color = '#000000';
+    const at = byAddress(resolveDocument(doc));
+    expect(at.get('InsCard2')).toMatchObject({ fills: [{ type: 'solid', color: '#E0F2FE' }], radius: 20 });
+    expect(at.get('InsCard1')).toMatchObject({ fills: [{ type: 'solid', color: '#FEF3C7' }], radius: 20 });
+    expect(at.get('InsCard1/TxtCard2')).toMatchObject({ content: 'Isi master baru', color: '#7C2D12' });
+    expect(at.get('InsCard1/InsBadg0/TxtBadg1')).toMatchObject({ content: 'Hemat' });
+  });
+
+  it('jalur mutasi core: update master lewat transaksi memperbarui instance tanpa menimpa override', () => {
+    const tx = beginTransaction(v5(), { sessionId: 'tes-korpus' });
+    tx.update('MstCard1', { radius: 20, fills: [{ type: 'solid', color: '#E0F2FE' }] });
+    tx.update('TxtCard2', { content: 'Isi master baru', color: '#000000' });
+    const at = byAddress(resolveDocument(tx.commit('ubah master').doc));
+    expect(at.get('InsCard2')).toMatchObject({ fills: [{ type: 'solid', color: '#E0F2FE' }], radius: 20 });
+    expect(at.get('InsCard1')).toMatchObject({ fills: [{ type: 'solid', color: '#FEF3C7' }], radius: 20 });
+    expect(at.get('InsCard1/TxtCard2')).toMatchObject({ content: 'Isi master baru', color: '#7C2D12' });
+  });
+
+  it('jalur mutasi core: commit yang membuat siklus komponen ditolak SCHEMA_INVALID, dokumen asli utuh', () => {
+    const doc = v5();
+    const before = structuredClone(doc);
+    const tx = beginTransaction(doc, { sessionId: 'tes-korpus' });
+    tx.add('BdyCard1', { type: 'instance', name: 'Siklus', componentId: 'MstCard1' });
+    expect(thrownCode(() => tx.commit('siklus'))).toBe('SCHEMA_INVALID');
+    expect(doc).toEqual(before);
   });
 });
 

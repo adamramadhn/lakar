@@ -3,7 +3,7 @@
 Korpus ini adalah pengaman migrasi skema (spine `architecture-model-dokumen`, AD-3). Setiap fixture di sini wajib:
 
 1. bermigrasi ke `SCHEMA_VERSION` terbaru lewat `parseDocument` (`packages/core/src/migrate.ts`);
-2. lolos validasi skema dan `resolveTokens` (`tests/doc-corpus.test.ts`); fixture v1/v2 juga wajib tampil sama setelah migrasi token 2 → 3 (ref di-resolve = substitusi nilai datar lama);
+2. lolos validasi skema dan `resolveDocument` (ekspansi instance + token, `tests/doc-corpus.test.ts`); fixture v1/v2 juga wajib tampil sama setelah migrasi token 2 → 3 (ref di-resolve = substitusi nilai datar lama);
 3. dirender `ok: true` di Chromium untuk setiap board (`packages/render/test/corpus.test.ts`, dilewati bila Chromium Lakar tidak terpasang).
 
 Loader bersama ada di `tests/support/doc-corpus.ts`.
@@ -28,6 +28,7 @@ Loader bersama ada di `tests/support/doc-corpus.ts`.
 | `v2/mobile-gulir` | board `mobile` dengan frame `scrollY`, efek `opacity`/`blend`/`blur`/`backdropBlur`/`rotation`, teks italic, token tipografi (`family`, `weight`, `size`, `lineHeight`, `letterSpacing`) |
 | `v3/tema-mode` | token bertipe semua tipe (`color` … `letterSpacing`), `tokenModes: [light, dark]`, token dengan `modes` (warna, spacing, fontWeight), board `themeMode: dark` dan board tanpa `themeMode`, token di gap/padding/maxWidth/radius/size icon |
 | `v4/grid-galeri` | frame `layout:'grid'` dengan track px/`fr`/`auto`/`minmax`, `gridTemplateRows`, `columnGap`/`rowGap` token dan `gap`, `align`/`justify`, anak `gridColumn`/`gridRow` (`span`, `start`+`span`, `start`/`end` negatif), anak `hug`/`fill`/fixed/tanpa ukuran, anak absolute di grid |
+| `v5/komponen-kartu` | master `component` dengan prop `text`/`boolean` (`visible`)/`enum` dan slot, token di master, instance ber-override (akar, anak, dan path bersarang `InsBadg0/TxtBadg1`), instance dengan props dan isi slot, instance bersarang di dalam master (alamat tiga segmen), instance kedua dari master lain |
 
 Gabungan korpus wajib tetap mencakup semua tipe node, semua jenis fill, dan properti di atas. Bila skema bertambah properti, tambahkan pemakaiannya ke fixture versi baru.
 

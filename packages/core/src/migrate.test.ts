@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { LakarError } from '@lakar/schema';
-import { MIGRATIONS, createDocument, inferTokenType, inferTokens, migrateDocument, parseDocument, tokenTypeOfValue, type MigrationRegistry } from './index.js';
+import { LakarError, SCHEMA_VERSION, type LakarDocument } from '@lakar/schema';
+import { MIGRATIONS, collectIds, createDocument, inferTokenType, inferTokens, migrateDocument, parseDocument, tokenTypeOfValue, type MigrationRegistry } from './index.js';
 
 const codeOf = (fn: () => unknown): string => {
   try {
@@ -24,10 +24,10 @@ const chain: MigrationRegistry = {
 };
 
 describe('migrateDocument', () => {
-  it('registri resmi: 1→2 identitas, 2→3 token bertipe, 3→4 identitas (grid); versi kini → apa adanya (objek yang sama)', () => {
-    expect(Object.keys(MIGRATIONS)).toEqual(['1', '2', '3']);
+  it('registri resmi: 1→2 identitas, 2→3 token bertipe, 3→4 identitas (grid), 4→5 identitas (komponen); versi kini → apa adanya (objek yang sama)', () => {
+    expect(Object.keys(MIGRATIONS)).toEqual(['1', '2', '3', '4']);
     const doc = JSON.parse(JSON.stringify(createDocument()));
-    expect(doc.schemaVersion).toBe(4);
+    expect(doc.schemaVersion).toBe(5);
     expect(migrateDocument(doc)).toBe(doc);
   });
 
@@ -50,7 +50,7 @@ describe('migrateDocument', () => {
   });
 
   it('lebih baru dari target → VERSION_MISMATCH', () => {
-    expect(codeOf(() => migrateDocument({ schemaVersion: 5 }))).toBe('VERSION_MISMATCH');
+    expect(codeOf(() => migrateDocument({ schemaVersion: 6 }))).toBe('VERSION_MISMATCH');
     expect(codeOf(() => parseDocument({ ...createDocument(), schemaVersion: 99 }))).toBe('VERSION_MISMATCH');
   });
 
@@ -110,7 +110,7 @@ describe('migrasi 2 → 3', () => {
   it('warna dirujuk fill → color, ref tetap', () => {
     const raw = v2Doc({ 'colors.a': '#111111' }, [{ type: 'rect', id: 'Rrrrrrr1', name: 'R', fills: [{ type: 'solid', color: { $token: 'colors.a' } }] }]);
     const doc = parseDocument(raw);
-    expect(doc.schemaVersion).toBe(4);
+    expect(doc.schemaVersion).toBe(SCHEMA_VERSION);
     expect(doc.tokens).toEqual({ 'colors.a': { type: 'color', value: '#111111' } });
     expect(doc.tokenModes).toBeUndefined();
     expect(nodes(doc)[0]).toMatchObject({ fills: [{ color: { $token: 'colors.a' } }] });
@@ -174,7 +174,15 @@ describe('migrasi 2 → 3', () => {
     const snapshot = structuredClone(v3);
     expect(MIGRATIONS[3]!(v3)).toEqual({ ...snapshot, schemaVersion: 4 });
     expect(v3).toEqual(snapshot);
-    expect(parseDocument(v3).schemaVersion).toBe(4);
+    expect(parseDocument(v3).schemaVersion).toBe(5);
+  });
+
+  it('langkah 4 → 5 (komponen): identitas yang hanya menaikkan versi, input tidak dimutasi', () => {
+    const v4 = { ...JSON.parse(JSON.stringify(createDocument())), schemaVersion: 4 };
+    const snapshot = structuredClone(v4);
+    expect(MIGRATIONS[4]!(v4)).toEqual({ ...snapshot, schemaVersion: 5 });
+    expect(v4).toEqual(snapshot);
+    expect(parseDocument(v4)).toEqual({ ...snapshot, schemaVersion: 5 });
   });
 
   it('langkah 2 murni: input tidak dimutasi', () => {
@@ -207,5 +215,18 @@ describe('inferensi tipe token', () => {
     expect(r.detached).toBe(0);
     expect(r.pages).toBe(pages);
     expect(pages).toEqual(snapshot);
+  });
+});
+
+describe('collectIds (v5, AD-12)', () => {
+  it('menelusuri isi slot instance supaya ID baru tidak bertabrakan', () => {
+    const doc = createDocument() as LakarDocument;
+    const board = { type: 'board', id: 'Bbbbbbb1', name: 'B', x: 0, y: 0, width: 100, height: 100, screen: 'app', children: [] } as unknown as LakarDocument['pages'][number]['children'][number];
+    board.children.push(
+      { type: 'frame', id: 'Mmmmmmm1', name: 'M', component: { props: [], slots: [{ name: 'body', nodeId: 'Ffffffe1' }] }, children: [{ type: 'frame', id: 'Ffffffe1', name: 'Slot', children: [] }] },
+      { type: 'instance', id: 'Iiiiiii1', name: 'I', componentId: 'Mmmmmmm1', slots: { body: [{ type: 'text', id: 'Tsssss01', name: 'S', content: 'x', size: 14 }] } },
+    );
+    doc.pages[0]!.children.push(board);
+    expect(collectIds(doc)).toEqual(expect.arrayContaining(['Mmmmmmm1', 'Ffffffe1', 'Iiiiiii1', 'Tsssss01']));
   });
 });

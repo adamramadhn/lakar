@@ -1,4 +1,4 @@
-// Skema dokumen Lakar v4 (AD-2, AD-11, AD-13, AD-15, AD-16): primitif, token, properti visual, katalog node, dokumen.
+// Skema dokumen Lakar v5 (AD-2, AD-11, AD-12, AD-13, AD-15, AD-16): primitif, token, properti visual, katalog node, dokumen.
 // v2 (story 22) menambah fill `conic`, `noise`, `mesh`; dokumen v1 dimigrasi identitas (`@lakar/core` MIGRATIONS[1]).
 // v3 (epic model-dokumen story 2) mengganti token datar dengan token bertipe + mode tema; dokumen v2 dimigrasi
 // lewat inferensi tipe (`@lakar/core` MIGRATIONS[2]).
@@ -6,10 +6,14 @@
 import { z } from 'zod';
 import { LakarError } from './errors.js';
 import { ICON_LIBS, ICON_NAME_PATTERN } from './icons.js';
+import { componentIssues } from './component-issues.js';
+import { NODE_ADDRESS_PATTERN } from './selection.js';
 
 // v4 (epic editor-canvas story 7, AD-13) menambah `layout:'grid'` + track bertipe, `columnGap`/`rowGap`, dan
 // penempatan anak `gridColumn`/`gridRow`; dokumen v3 dimigrasi identitas (`@lakar/core` MIGRATIONS[3]).
-export const SCHEMA_VERSION = 4 as const;
+// v5 (epic komponen story 2, AD-12) menambah master `component {props, slots}` dan tipe node `instance`; dokumen v4
+// dimigrasi identitas (`@lakar/core` MIGRATIONS[4]). Ekspansi instance ada di components.ts.
+export const SCHEMA_VERSION = 5 as const;
 
 // ---------------------------------------------------------------------------
 // Primitif
@@ -149,7 +153,7 @@ export const Blend = z.enum([
 export const StrokeSide = z.enum(['top', 'right', 'bottom', 'left']);
 
 /** Katalog node v1 tertutup (AD-15). */
-export const NODE_TYPES = ['board', 'frame', 'text', 'rect', 'ellipse', 'path', 'icon'] as const;
+export const NODE_TYPES = ['board', 'frame', 'text', 'rect', 'ellipse', 'path', 'icon', 'instance'] as const;
 export type NodeType = (typeof NODE_TYPES)[number];
 export const CATALOG_HINT = `type harus salah satu katalog v1: ${NODE_TYPES.join(' | ')}`;
 
@@ -324,6 +328,90 @@ const gridItemShape = {
 
 const childBase = { name: Name, ...positionShape, ...gridItemShape };
 
+// ---------------------------------------------------------------------------
+// Komponen (v5, AD-12): master = node anak non-instance yang membawa `component`; instance = tipe node `instance`.
+// Ekspansi dan validasi lintas node ada di components.ts.
+// ---------------------------------------------------------------------------
+
+/** Nama prop/slot komponen: aman menjadi nama prop React (AD-16). */
+export const COMPONENT_NAME_PATTERN = /^[a-z][A-Za-z0-9]{0,31}$/;
+export const COMPONENT_PROPS_MAX = 64;
+export const COMPONENT_SLOTS_MAX = 32;
+export const COMPONENT_BINDS_MAX = 32;
+export const ENUM_OPTIONS_MAX = 32;
+/** Pseudo-properti bind boolean: `false` menghapus node terikat dari hasil ekspansi. */
+export const VISIBLE_BIND = 'visible';
+
+const ComponentName = z.string().regex(COMPONENT_NAME_PATTERN, `nama prop/slot komponen harus cocok ${COMPONENT_NAME_PATTERN.source} (mis. "title", "showBadge")`);
+/** Properti node yang boleh di-override/di-bind (diisi setelah semua shape didefinisikan; dipakai saat parse). */
+const overridableSet = new Set<string>();
+const OverridableKey = z.string().refine((p) => overridableSet.has(p), {
+  message: 'properti tidak bisa di-override/di-bind (type, id, children, dan component dilarang; pakai nama properti node)',
+});
+const BindProp = z.string().refine((p) => p === VISIBLE_BIND || overridableSet.has(p), {
+  message: `bind.prop harus properti node (mis. "content", "fills") atau "${VISIBLE_BIND}"`,
+});
+export const ComponentBind = z.object({ nodeId: Id, prop: BindProp }).strict();
+export type ComponentBind = z.infer<typeof ComponentBind>;
+const Binds = z.array(ComponentBind).max(COMPONENT_BINDS_MAX);
+
+export const ComponentProp = z.discriminatedUnion('type', [
+  z.object({ name: ComponentName, type: z.literal('text'), default: z.string(), binds: Binds }).strict(),
+  z.object({ name: ComponentName, type: z.literal('boolean'), default: z.boolean(), binds: Binds }).strict(),
+  z
+    .object({
+      name: ComponentName,
+      type: z.literal('enum'),
+      options: z
+        .array(z.string().min(1))
+        .min(1)
+        .max(ENUM_OPTIONS_MAX)
+        .refine((o) => new Set(o).size === o.length, 'options enum tidak boleh berulang'),
+      default: z.string().min(1),
+      binds: Binds,
+    })
+    .strict()
+    .refine((p) => p.options.includes(p.default), { message: 'default enum harus salah satu options', path: ['default'] }),
+]);
+export type ComponentProp = z.infer<typeof ComponentProp>;
+export const ComponentSlot = z.object({ name: ComponentName, nodeId: Id }).strict();
+export type ComponentSlot = z.infer<typeof ComponentSlot>;
+
+/** Definisi master: props dan slots (keduanya wajib, boleh kosong); nama unik di gabungan props + slots. */
+export const ComponentDef = z
+  .object({ props: z.array(ComponentProp).max(COMPONENT_PROPS_MAX), slots: z.array(ComponentSlot).max(COMPONENT_SLOTS_MAX) })
+  .strict()
+  .superRefine((c, ctx) => {
+    const seen = new Set<string>();
+    const names: [string, (string | number)[]][] = [
+      ...c.props.map((p, i): [string, (string | number)[]] => [p.name, ['props', i, 'name']]),
+      ...c.slots.map((s, i): [string, (string | number)[]] => [s.name, ['slots', i, 'name']]),
+    ];
+    for (const [n, path] of names) {
+      if (seen.has(n)) ctx.addIssue({ code: 'custom', path, message: `nama prop/slot komponen ${JSON.stringify(n)} dipakai lebih dari sekali` });
+      seen.add(n);
+    }
+  });
+export type ComponentDef = z.infer<typeof ComponentDef>;
+
+/** Kunci `component` pada shape node yang boleh menjadi master. */
+const masterShape = { component: ComponentDef.optional() };
+
+/** Kunci override: id node master, atau path relatif ke dalam instance bersarang (`<J>/<U>`). */
+const OverrideKey = z.string().regex(NODE_ADDRESS_PATTERN, 'kunci override: id node master atau path id dipisah "/" (mis. "Ab12Cd34/Ef56Gh78")');
+/** Nilai props instance. */
+export const InstancePropValue = z.union([z.string(), z.boolean()]);
+
+/** Shape instance tanpa `slots` (slots berisi node tersimpan, didefinisikan per keluarga skema). */
+const instanceShape = {
+  type: z.literal('instance'),
+  ...childBase,
+  componentId: Id,
+  props: z.record(ComponentName, InstancePropValue).optional(),
+  /** `{kunci: {properti: nilai}}`; `null` menghapus properti master. Nilai divalidasi pada node hasil ekspansi. */
+  overrides: z.record(OverrideKey, z.record(OverridableKey, z.unknown())).optional(),
+};
+
 const PadValue = tok(Size);
 export const Padding = z.union([PadValue, z.tuple([PadValue, PadValue]), z.tuple([PadValue, PadValue, PadValue, PadValue])]);
 
@@ -350,6 +438,7 @@ const boardShape = {
 const frameShape = {
   type: z.literal('frame'),
   ...childBase,
+  ...masterShape,
   layout: Layout.optional(),
   gap: tok(Px).optional(),
   padding: Padding.optional(),
@@ -370,6 +459,7 @@ const frameShape = {
 const textShape = {
   type: z.literal('text'),
   ...childBase,
+  ...masterShape,
   content: z.string(),
   family: tok(FontFamily).optional(),
   weight: tok(Weight).optional(),
@@ -388,6 +478,7 @@ const textShape = {
 const rectShape = {
   type: z.literal('rect'),
   ...childBase,
+  ...masterShape,
   ...sizingShape,
   ...visualShape,
 };
@@ -395,6 +486,7 @@ const rectShape = {
 const ellipseShape = {
   type: z.literal('ellipse'),
   ...childBase,
+  ...masterShape,
   ...sizingShape,
   ...paintShape,
   /** 0 = jam 12, positif searah jarum jam. */
@@ -407,6 +499,7 @@ const ellipseShape = {
 const pathShape = {
   type: z.literal('path'),
   ...childBase,
+  ...masterShape,
   d: z.string().min(1),
   viewBox: z.tuple([Px, Px, Positive, Positive]),
   ...sizingShape,
@@ -416,6 +509,7 @@ const pathShape = {
 const iconShape = {
   type: z.literal('icon'),
   ...childBase,
+  ...masterShape,
   lib: z.enum(ICON_LIBS),
   // `name` (dari childBase) = nama layer (AD-3, mis. "Icon / lucide / arrow-right"); nama ikon kanonik
   // pustaka disimpan terpisah di `icon` supaya tidak bertabrakan dengan nama layer (AD-9 Ã— AD-3).
@@ -443,7 +537,6 @@ export const RectInput = z.object(rectShape).strict().superRefine(xyOnlyWhenAbso
 export const EllipseInput = z.object(ellipseShape).strict().superRefine(xyOnlyWhenAbsolute);
 export const PathInput = z.object(pathShape).strict().superRefine(xyOnlyWhenAbsolute);
 export const IconInput = z.object(iconShape).strict().superRefine(xyOnlyWhenAbsolute);
-export const NodeInput = z.discriminatedUnion('type', [BoardInput, FrameInput, TextInput, RectInput, EllipseInput, PathInput, IconInput]);
 export type BoardInput = z.infer<typeof BoardInput>;
 export type FrameInput = z.infer<typeof FrameInput>;
 export type TextInput = z.infer<typeof TextInput>;
@@ -451,10 +544,19 @@ export type RectInput = z.infer<typeof RectInput>;
 export type EllipseInput = z.infer<typeof EllipseInput>;
 export type PathInput = z.infer<typeof PathInput>;
 export type IconInput = z.infer<typeof IconInput>;
-export type NodeInput = z.infer<typeof NodeInput>;
+type InstanceFields = z.infer<z.ZodObject<typeof instanceShape>>;
+/** Instance (AD-12): `slots` berisi node tersimpan (dengan id) per nama slot; isi master tidak pernah disimpan terurai. */
+export type InstanceInput = InstanceFields & { slots?: Record<string, ChildNode[]> | undefined };
+
+// Kunci yang boleh di-override/di-bind: semua kunci shape node anak kecuali type/id/children/component.
+for (const shape of [frameShape, textShape, rectShape, ellipseShape, pathShape, iconShape]) {
+  for (const k of Object.keys(shape)) if (k !== 'type' && k !== 'component') overridableSet.add(k);
+}
+/** Properti yang boleh menjadi kunci override instance dan target bind prop (urut abjad). */
+export const OVERRIDABLE_PROPS: readonly string[] = Object.freeze([...overridableSet].sort());
 
 // ---------------------------------------------------------------------------
-// Node tersimpan: input + id (+ children untuk kontainer).
+// Node tersimpan: input + id (+ children untuk kontainer, + slots untuk instance).
 // ---------------------------------------------------------------------------
 
 export type TextNode = TextInput & { id: string };
@@ -462,52 +564,131 @@ export type RectNode = RectInput & { id: string };
 export type EllipseNode = EllipseInput & { id: string };
 export type PathNode = PathInput & { id: string };
 export type IconNode = IconInput & { id: string };
+export type InstanceNode = InstanceInput & { id: string };
 export type FrameNode = FrameInput & { id: string; children: ChildNode[] };
 export type LeafNode = TextNode | RectNode | EllipseNode | PathNode | IconNode;
-export type ChildNode = FrameNode | LeafNode;
+export type ChildNode = FrameNode | LeafNode | InstanceNode;
 export type BoardNode = BoardInput & { id: string; children: ChildNode[] };
 export type AnyNode = BoardNode | ChildNode;
+export type NodeInput = BoardInput | FrameInput | TextInput | RectInput | EllipseInput | PathInput | IconInput | InstanceInput;
+
+/**
+ * Node hasil ekspansi instance (AD-10/AD-12): tanpa `instance`; `id` boleh alamat komposit `<instanceId>/<masterNodeId>…`.
+ * Bentuk ini yang diterima render, check, dan canvas (lewat `resolveDocument`).
+ */
+export type ExpandedFrameNode = FrameInput & { id: string; children: ExpandedChildNode[] };
+export type ExpandedChildNode = ExpandedFrameNode | LeafNode;
+export type ExpandedBoardNode = BoardInput & { id: string; children: ExpandedChildNode[] };
+export type ExpandedPage = { id: string; name: string; children: ExpandedBoardNode[] };
+
+/** Alamat node pada dokumen ter-ekspansi: id tersimpan atau alamat komposit. */
+const Address = z.string().regex(NODE_ADDRESS_PATTERN, 'alamat node: ID 8 karakter [A-Za-z0-9] atau ID dipisah "/"');
+
+/** Keluarga skema kontainer (frame, instance, union anak, board, page) di atas skema leaf yang diberikan. */
+function nodeBranch(id: z.ZodString, leaves: readonly z.ZodType[], withInstance: boolean) {
+  // Diisi sesudah frame/instance; getter rekursif baru membacanya saat parse.
+  let child: z.ZodType;
+  const frame = z
+    .object({
+      ...frameShape,
+      id,
+      get children() {
+        return z.array(child);
+      },
+    })
+    .strict()
+    .superRefine(xyOnlyWhenAbsolute);
+  const instance = z
+    .object({
+      ...instanceShape,
+      id,
+      get slots() {
+        return z.record(ComponentName, z.array(child)).optional();
+      },
+    })
+    .strict()
+    .superRefine(xyOnlyWhenAbsolute);
+  // discriminatedUnion (bukan union biasa) supaya issue menunjuk path terdalam; opsi di-cast (siklus tipe).
+  const options = [frame, ...leaves, ...(withInstance ? [instance] : [])] as unknown as [typeof TextInput, ...(typeof TextInput)[]];
+  child = z.discriminatedUnion('type', options);
+  const board = z.object({ ...boardShape, id, children: z.array(child) }).strict();
+  const page = z.object({ id: Id, name: Name, children: z.array(board) }).strict();
+  return { frame, instance, child, board, page };
+}
 
 export const TextNode = z.object({ ...textShape, id: Id }).strict().superRefine(xyOnlyWhenAbsolute);
 export const RectNode = z.object({ ...rectShape, id: Id }).strict().superRefine(xyOnlyWhenAbsolute);
 export const EllipseNode = z.object({ ...ellipseShape, id: Id }).strict().superRefine(xyOnlyWhenAbsolute);
 export const PathNode = z.object({ ...pathShape, id: Id }).strict().superRefine(xyOnlyWhenAbsolute);
 export const IconNode = z.object({ ...iconShape, id: Id }).strict().superRefine(xyOnlyWhenAbsolute);
-export const FrameNode: z.ZodType<FrameNode> = z
+const stored = nodeBranch(Id, [TextNode, RectNode, EllipseNode, PathNode, IconNode], true);
+export const FrameNode = stored.frame as unknown as z.ZodType<FrameNode>;
+export const InstanceNode = stored.instance as unknown as z.ZodType<InstanceNode>;
+export const ChildNode = stored.child as unknown as z.ZodType<ChildNode>;
+export const BoardNode = stored.board as unknown as z.ZodType<BoardNode>;
+
+/** Input instance (`add`/`update`): shape instance + `slots` berisi node tersimpan. */
+export const InstanceInput = z
   .object({
-    ...frameShape,
-    id: Id,
-    get children() {
-      return z.array(ChildNode);
+    ...instanceShape,
+    get slots() {
+      return z.record(ComponentName, z.array(ChildNode)).optional();
     },
   })
   .strict()
   .superRefine(xyOnlyWhenAbsolute);
-// discriminatedUnion (bukan union biasa) supaya issue menunjuk path terdalam. FrameNode dianotasi
-// `ZodType<T>` untuk memutus siklus tipe, jadi opsi di-cast; di runtime semuanya ZodObject.
-const childOptions = [FrameNode, TextNode, RectNode, EllipseNode, PathNode, IconNode] as unknown as [typeof TextNode, ...(typeof TextNode)[]];
-export const ChildNode = z.discriminatedUnion('type', childOptions) as unknown as z.ZodType<ChildNode>;
-export const BoardNode: z.ZodType<BoardNode> = z.object({ ...boardShape, id: Id, children: z.array(ChildNode) }).strict();
+export const NodeInput = z.discriminatedUnion('type', [
+  BoardInput,
+  FrameInput,
+  TextInput,
+  RectInput,
+  EllipseInput,
+  PathInput,
+  IconInput,
+  InstanceInput,
+] as unknown as [typeof TextInput, ...(typeof TextInput)[]]) as unknown as z.ZodType<NodeInput>;
 
 export const Page = z.object({ id: Id, name: Name, children: z.array(BoardNode) }).strict();
 export type Page = z.infer<typeof Page>;
 
+const documentShape = {
+  schemaVersion: z.literal(SCHEMA_VERSION),
+  id: Id,
+  rev: z.number().int().nonnegative(),
+  /** Peta nama bertitik → token bertipe. Opsional: dokumen tracer tanpa tokens tetap valid. */
+  tokens: Tokens.optional(),
+  /** Mode tema yang dideklarasikan (AD-11); elemen pertama = default. */
+  tokenModes: TokenModes.optional(),
+};
+
 export const LakarDocument = z
-  .object({
-    schemaVersion: z.literal(SCHEMA_VERSION),
-    id: Id,
-    rev: z.number().int().nonnegative(),
-    /** Peta nama bertitik â†’ token bertipe. Opsional: dokumen tracer tanpa tokens tetap valid. */
-    tokens: Tokens.optional(),
-    /** Mode tema yang dideklarasikan (AD-11); elemen pertama = default. */
-    tokenModes: TokenModes.optional(),
-    pages: z.array(Page).min(1),
-  })
+  .object({ ...documentShape, pages: z.array(Page).min(1) })
   .strict()
   .superRefine((d, ctx) => {
     for (const i of tokenModeIssues(d)) ctx.addIssue({ code: 'custom', path: i.path, message: i.message });
+    for (const i of componentIssues(d)) ctx.addIssue({ code: 'custom', path: i.path, message: i.message });
   });
 export type LakarDocument = z.infer<typeof LakarDocument>;
+export type ExpandedDocument = Omit<LakarDocument, 'pages'> & { pages: ExpandedPage[] };
+
+const expandedLeaves = [
+  z.object({ ...textShape, id: Address }).strict().superRefine(xyOnlyWhenAbsolute),
+  z.object({ ...rectShape, id: Address }).strict().superRefine(xyOnlyWhenAbsolute),
+  z.object({ ...ellipseShape, id: Address }).strict().superRefine(xyOnlyWhenAbsolute),
+  z.object({ ...pathShape, id: Address }).strict().superRefine(xyOnlyWhenAbsolute),
+  z.object({ ...iconShape, id: Address }).strict().superRefine(xyOnlyWhenAbsolute),
+];
+const expanded = nodeBranch(Address, expandedLeaves, false);
+/**
+ * Dokumen ter-ekspansi (hasil `expandInstances`): sama dengan `LakarDocument`, tetapi id node boleh alamat
+ * komposit dan tipe `instance` tidak ada. Validasi komponen (siklus, master) sudah dijalankan pada dokumen tersimpan.
+ */
+export const ExpandedLakarDocument = z
+  .object({ ...documentShape, pages: z.array(expanded.page).min(1) })
+  .strict()
+  .superRefine((d, ctx) => {
+    for (const i of tokenModeIssues(d)) ctx.addIssue({ code: 'custom', path: i.path, message: i.message });
+  }) as unknown as z.ZodType<ExpandedDocument>;
 
 export type TokenModeIssue = { path: (string | number)[]; message: string };
 

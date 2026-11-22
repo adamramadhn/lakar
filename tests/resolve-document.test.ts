@@ -1,5 +1,6 @@
 // Penjaga pipa resolusi (spine model-dokumen AD-10): kode produksi di luar `packages/schema` tidak boleh memanggil
-// `resolveTokens` sendiri; semua konsumen lewat `resolveDocument`. File tes dan `packages/render/test` dikecualikan.
+// tahap `resolveTokens` atau `expandInstances` sendiri; semua konsumen lewat `resolveDocument`. File tes dan
+// `packages/render/test` dikecualikan.
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -7,9 +8,9 @@ import { describe, expect, it } from 'vitest';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 
-/** Pemanggilan `resolveTokens(` atau impor `resolveTokens` (termasuk alias `resolveTokens as x`). */
-const CALL = /\bresolveTokens\s*\(/;
-const IMPORT = /\bimport\b[^;]*?\{[^}]*\bresolveTokens\b[^}]*\}[^;]*?from\b/s;
+/** Pemanggilan atau impor tahap `resolveTokens`/`expandInstances` (termasuk alias `resolveTokens as x`). */
+const CALL = /\b(?:resolveTokens|expandInstances)\s*\(/;
+const IMPORT = /\bimport\b[^;]*?\{[^}]*\b(?:resolveTokens|expandInstances)\b[^}]*\}[^;]*?from\b/s;
 
 /** True bila sumber memakai tahap `resolveTokens` langsung. */
 export function usesResolveTokens(text: string): boolean {
@@ -60,7 +61,7 @@ describe('pipa resolveDocument: repo nyata', () => {
   it('tidak ada kode produksi di luar packages/schema yang memanggil resolveTokens', () => {
     const map = Object.fromEntries(files.map((f) => [f, readFileSync(join(root, f), 'utf8')]));
     const bad = violations(map);
-    expect(bad, `pakai resolveDocument (AD-10), bukan resolveTokens, di: ${bad.join(', ')}`).toEqual([]);
+    expect(bad, `pakai resolveDocument (AD-10), bukan resolveTokens/expandInstances, di: ${bad.join(', ')}`).toEqual([]);
   });
 });
 
@@ -77,6 +78,8 @@ describe('pipa resolveDocument: fixture pelanggaran', () => {
     ['panggilan dengan spasi', 'const d = resolveTokens (doc, { mode });'],
     ['impor bernama', "import { LakarError, resolveTokens } from '@lakar/schema';"],
     ['impor dengan alias', "import {\n  resolveTokens as rt,\n} from '@lakar/schema';"],
+    ['panggilan tahap ekspansi', 'const e = expandInstances(doc);'],
+    ['impor tahap ekspansi', "import { expandInstances } from '@lakar/schema';"],
   ])('%s → terdeteksi', (_name, code) => {
     expect(usesResolveTokens(code)).toBe(true);
   });

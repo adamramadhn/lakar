@@ -41,6 +41,7 @@ const RULE_TITLE: Record<string, string> = {
   'LC-29': 'Thin weight on small text',
   'LC-30': 'Punctuation',
   'LC-31': 'Mockup cut flat at the section edge',
+  'LC-32': 'Instance no longer matches its master',
 };
 const ruleTitle = (rule: string) => RULE_TITLE[rule] ?? (G0_RULES as Record<string, { title: string }>)[rule]?.title ?? rule;
 const TOTAL_RULES = Object.keys(G0_RULES).length;

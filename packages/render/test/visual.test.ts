@@ -2,7 +2,7 @@
 // path, fill gambar, layar gulir hasil `duplicate`, dan fill efek conic/noise/mesh (story 22). Golden + piksel sampel +
 // bounds numerik + determinisme byte-identik + latensi.
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { resolveTokens, type ResolvedDocument } from '@lakar/schema';
+import { resolveDocument, type ResolvedDocument } from '@lakar/schema';
 // Tes boleh memakai core lewat path relatif (manifest render TIDAK bergantung pada @lakar/core).
 import { beginTransaction, createDocument } from '../../core/src/index.js';
 import type { BoardMeasure, NodeBounds } from '../src/index.js';
@@ -397,7 +397,7 @@ describe.skipIf(!browserInstalled)('render properti visual (Chromium, tanpa daem
     const tx2 = beginTransaction(doc, { sessionId: 'tes-render' });
     tx2.update(scrollB, { scrollY: 200 });
     doc = tx2.commit('gulir B').doc;
-    const resolved: ResolvedDocument = resolveTokens(doc);
+    const resolved: ResolvedDocument = resolveDocument(doc);
 
     const shot = async (name: string, boardId: string) => {
       const { result, png } = await render(resolved, boardId, faces);

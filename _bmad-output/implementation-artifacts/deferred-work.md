@@ -154,3 +154,9 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-token-4-token-picker.md`
   summary: Verify ticket story 4 (picker tersaring, canvas berubah sesudah ubah token, Detach) dan jalur DesignPanel → route ops hanya dites di tingkat model/core; UI dan canvas live hanya smoke msedge.
   evidence: Review t4 (intent). Harness komponen/E2E viewer belum ada (pra-ada). Usul: skrip playwright di `scripts/` atau harness DOM yang membuka picker, memasang token, dan membaca gaya computed canvas.
+- source_spec: `_bmad-output/implementation-artifacts/spec-komponen-2-schema.md`
+  summary: Override atau bind yang menjadi tidak sah karena master disunting menolak commit (SCHEMA_INVALID), bukan diabaikan dan dilaporkan.
+  evidence: Review k2 (blind, edge). expandInstances memvalidasi pohon ter-ekspansi dengan skema strict dan commit core memanggil resolveDocument. Keputusan story 2: tetap tolak (AD-1/AD-7); op komponen story 3 menambah reset/buang override yang tidak berlaku atau menjadikannya laporan LC-32.
+- source_spec: `_bmad-output/implementation-artifacts/spec-komponen-2-schema.md`
+  summary: Canvas viewer dengan instance (mount isi terurai, seleksi alamat komposit, ikon/label Layers instance) belum dites otomatis.
+  evidence: Review k2 (intent). Canvas memakai resolveDocument sehingga instance termount; harness DOM/E2E viewer belum ada (pra-ada). Layers memakai ikon cadangan untuk tipe instance; penanda mengikuti desain di story 4.

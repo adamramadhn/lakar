@@ -90,8 +90,8 @@ const issueOf = (input: unknown) => {
 };
 
 describe('katalog v1', () => {
-  it('NODE_TYPES tertutup: 7 tipe', () => {
-    expect([...NODE_TYPES]).toEqual(['board', 'frame', 'text', 'rect', 'ellipse', 'path', 'icon']);
+  it('NODE_TYPES tertutup: 8 tipe (v5 menambah instance)', () => {
+    expect([...NODE_TYPES]).toEqual(['board', 'frame', 'text', 'rect', 'ellipse', 'path', 'icon', 'instance']);
   });
 
   it.each(Object.entries(valid))('contoh valid: %s', (_t, input) => {
@@ -355,7 +355,7 @@ describe('jsonSchemas', () => {
   const { document, node } = jsonSchemas();
   const text = JSON.stringify(node);
 
-  it('memuat ketujuh tipe node', () => {
+  it('memuat kedelapan tipe node', () => {
     for (const t of NODE_TYPES) expect(text).toContain(`"const":"${t}"`);
     const docText = JSON.stringify(document);
     for (const t of NODE_TYPES) expect(docText).toContain(`"const":"${t}"`);
@@ -364,7 +364,7 @@ describe('jsonSchemas', () => {
   it('objek strict → additionalProperties:false', () => {
     expect(document.additionalProperties).toBe(false);
     const variants = (node as { oneOf?: { additionalProperties?: unknown }[]; anyOf?: { additionalProperties?: unknown }[] }).oneOf ?? (node as { anyOf: { additionalProperties?: unknown }[] }).anyOf;
-    expect(variants).toHaveLength(7);
+    expect(variants).toHaveLength(NODE_TYPES.length);
     for (const v of variants) expect(v.additionalProperties).toBe(false);
   });
 

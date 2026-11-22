@@ -45,6 +45,8 @@ export function collectIds(doc: Doc): string[] {
   const walk = (n: AnyNode) => {
     ids.push(n.id);
     if ('children' in n) n.children.forEach(walk);
+    // Isi slot instance (AD-12) adalah node tersimpan dengan ID sendiri.
+    if (n.type === 'instance') for (const list of Object.values(n.slots ?? {})) list.forEach(walk);
   };
   for (const p of doc.pages) {
     ids.push(p.id);

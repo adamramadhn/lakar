@@ -7,11 +7,11 @@ describe('temuan G0 (AD-8)', () => {
   it('aturan G0: error ber-gerbang dan warning tanpa gerbang', () => {
     expect(G0_RULE_IDS).toEqual([
       'LC-01a', 'LC-01b', 'LC-02a', 'LC-02b', 'LC-04', 'LC-05', 'LC-11', 'LC-12', 'LC-18', 'LC-20',
-      'LC-23', 'LC-24', 'LC-25', 'LC-26', 'LC-27', 'LC-28', 'LC-29', 'LC-30', 'LC-31',
+      'LC-23', 'LC-24', 'LC-25', 'LC-26', 'LC-27', 'LC-28', 'LC-29', 'LC-30', 'LC-31', 'LC-32',
     ]);
     for (const id of G0_RULE_IDS) expect(G0_RULES[id].gate, id).toBe(G0_RULES[id].level === 'error');
     const warnings = G0_RULE_IDS.filter((id) => G0_RULES[id].level === 'warning');
-    expect(warnings).toEqual(['LC-12', 'LC-18', 'LC-23', 'LC-24', 'LC-25', 'LC-26', 'LC-27', 'LC-28', 'LC-29', 'LC-30']);
+    expect(warnings).toEqual(['LC-12', 'LC-18', 'LC-23', 'LC-24', 'LC-25', 'LC-26', 'LC-27', 'LC-28', 'LC-29', 'LC-30', 'LC-32']);
   });
 
   it('temuan warning dari aturan ber-gerbang (kontras perkiraan) tidak dihitung gerbang', () => {

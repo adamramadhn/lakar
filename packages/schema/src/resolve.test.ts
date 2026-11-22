@@ -1,5 +1,5 @@
 // `resolveDocument` (spine model-dokumen AD-10): untuk dokumen tanpa instance, hasil dan error identik dengan
-// `resolveTokens`. Korpus dibaca lewat loader bersama; `parseDocument` dari core lewat path relatif (khusus tes).
+// `resolveTokens` (dokumen dengan instance dites di components.test.ts). Korpus dibaca lewat loader bersama; `parseDocument` dari core lewat path relatif (khusus tes).
 import { describe, expect, it } from 'vitest';
 import { parseDocument } from '../../core/src/index.ts';
 import { loadDocCorpus } from '../../../tests/support/doc-corpus.ts';
@@ -25,7 +25,7 @@ describe('resolveDocument setara resolveTokens', () => {
     expect(corpus.length).toBeGreaterThan(0);
   });
 
-  it.each(corpus.map((d) => [`v${d.version}/${d.name}`, d] as const))('%s: hasil deep-equal', (_label, d) => {
+  it.each(corpus.filter((d) => d.version < 5).map((d) => [`v${d.version}/${d.name}`, d] as const))('%s: hasil deep-equal', (_label, d) => {
     const doc = parseDocument(d.raw);
     const before = structuredClone(doc);
     expect(resolveDocument(doc)).toEqual(resolveTokens(doc));
