@@ -14,6 +14,7 @@ Semua PR ada di repo GitHub `fatmuh/lakar` (dulu `adamramadhn/lakar`; alamat lam
 | `g1` | Pekerjaan G1 dari VPS (2026-11-19): aturan `layout_check` sisa, skill per domain, rubrik v2.3, golden A–E di Lakar | #15 → `main` | Terbuka; merge tanpa konflik dengan #6 |
 | `docs/new-initiative` | Inisiatif baru `initiative-lakar-paper`, inisiatif lama ditutup | #16 → `claude/app-design-parity` | Merged |
 | `docs/new-initiative` | Spine arsitektur model dokumen (epic 1) + penyelarasan inisiatif, AGENTS.md | #17 → `claude/app-design-parity` | Terbuka |
+| `feat/model-dokumen` | Build epic 1: korpus, skema v3 token bertipe, `resolveDocument`, pemetaan CSS tunggal | #18 → `docs/new-initiative` | Draft |
 
 **Urutan ke `main`:**
 1. Approve dan merge #5.
@@ -59,7 +60,14 @@ Perubahan sesudah gelombang fitur di atas:
 2. **Epic 1 inisiatif baru: model dokumen.** Arsitekturnya sudah diputuskan dan disetujui Fatmuh pada 2026-11-22. Spine-nya ada di `_bmad-output/initiative-lakar-paper/tickets/epic-model-dokumen/architecture-model-dokumen/architecture-model-dokumen.md`.
    - Model dokumen: JSON Lakar bertipe dengan semantik CSS (AD-1).
    - Route dan tool lama: kompatibilitas mundur menggantikan pembekuan (AD-4).
-   - Berikutnya: minta Sofia (`bmad-agent-po`) memecah epic model dokumen menjadi story. Story pertamanya mengumpulkan korpus dokumen v1/v2 dari data dir lokal dan VPS ke `tests/fixtures/docs/`. Sesudah itu, refine epic 2–7 di atas spine.
+   - **Dibangun (branch `feat/model-dokumen`, PR #18 → `docs/new-initiative`).** Epic 1 dipecah menjadi 4 story (`tickets/epic-model-dokumen/tickets/tickets.toml`), semuanya dijalankan lewat `bmad-build-auto`. Spec ada di `_bmad-output/implementation-artifacts/spec-model-dokumen-{1..4}-*.md`, semuanya `done`.
+     1. Korpus dokumen v1/v2/v3 dan tes migrasi plus render.
+     2. Skema v3: token bertipe, mode tema, migrasi v2→v3, dan op `setTokenModes`.
+     3. `resolveDocument` sebagai satu pintu resolusi.
+     4. `packages/render/src/css.ts` sebagai pemetaan CSS tunggal, dipakai Copy as; viewer → render.
+   - **Sisa epic 1:** dokumen nyata v1/v2 (termasuk dokumen bench lama di VPS) belum masuk korpus. Cara menambahkannya ada di `tests/fixtures/docs/README.md`.
+   - **Berikutnya:** refine epic 2 (editor canvas) di atas spine. Story pembukanya adalah desain di pen (C6).
+   - **Build lokal di Windows:** Node 26 ada di `C:\Users\Fatmuh\AppData\Local\nvm\v26.5.0` (bukan default PATH), dan pnpm dijalankan lewat `npx -y pnpm@12.21.0`.
 3. **Item tertunda.** Lihat `_bmad-output/implementation-artifacts/deferred-work.md`.
 
 ## Merapikan lingkungan lokal
