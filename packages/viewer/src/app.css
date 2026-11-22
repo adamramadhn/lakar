@@ -1638,6 +1638,39 @@ button.panel-tab:hover {
   background: color-mix(in srgb, var(--accent) 10%, transparent);
   outline: 1px solid var(--accent);
 }
+/* Desain "Text Edit Box" (UHOWY): garis 1.5px accent di luar kotak teks yang diedit inline. */
+.edit-text-box {
+  position: absolute;
+  box-sizing: border-box;
+  border: 1.5px solid var(--accent);
+  pointer-events: none;
+}
+/* Menu konteks editor (QvMyG) dan submenu Align/Distribute (S2WUHS). */
+.edit-menu .menu-item:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.edit-menu .menu-item:disabled:hover {
+  background: none;
+}
+.edit-menu .menu-item.open {
+  background: var(--surface-hover);
+}
+.menu-submenu-chevron {
+  margin-left: auto;
+}
+.edit-submenu {
+  z-index: 1;
+}
+/* Desain "Align & distribute" (J8r8Gq): 8 tombol ikon tinggi 28 berbagi lebar, jarak 6. */
+.dp-row.dp-align-row {
+  gap: 6px;
+}
+.dp-row.dp-align-row > .dp-icon-btn {
+  flex: 1 1 0;
+  width: auto;
+  min-width: 0;
+}
 .edit-ghost-slot {
   box-sizing: border-box;
   border: 1.5px dashed var(--accent);

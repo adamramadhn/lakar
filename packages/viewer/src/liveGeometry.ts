@@ -32,6 +32,16 @@ export function measureLiveSize(root: ParentNode, boardId: string, id: string): 
 }
 
 /**
+ * Geometri halaman (editor-canvas story 6): board terukur apa adanya, board yang belum ter-mount menjadi stub tanpa
+ * anak dengan kotak dari dokumen, supaya aksi board (urutan z, align, pilih semua) tetap tahu posisinya.
+ */
+export function pageGeometry(boards: readonly { id: string; name: string; x: number; y: number; width: number; height: number }[], measured: (id: string) => GeoNode | undefined): GeoNode[] {
+  return boards.map(
+    (b) => measured(b.id) ?? { id: b.id, type: 'board', name: b.name, box: { x: b.x, y: b.y, w: b.width, h: b.height }, parentId: undefined, absolute: true, x: b.x, y: b.y, layout: 'column', children: [] },
+  );
+}
+
+/**
  * Pohon geometri board `board` (posisi halaman `at`) dari DOM live di `host`. Skala = lebar layar elemen board /
  * lebar board. Node tanpa elemen (belum di-mount) dilewati bersama turunannya. Board belum di-mount → undefined.
  */

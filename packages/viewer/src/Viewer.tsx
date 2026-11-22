@@ -4,8 +4,11 @@
 // History (aplikasi 3): klik entri → pratinjau versi lama (snapshot) di kanvas baca-saja dengan banner; Restore
 // (dari banner atau entri) meminta konfirmasi lalu meng-commit versi itu sebagai rev baru.
 // Layer manual (aplikasi 4): tool sisip di kanvas dan menu "+" di header Layers menjalankan `execute` dari sesi
-// viewer dengan kode codegen.ts; Delete/Backspace menghapus node terpilih. Sesudahnya dokumen dimuat ulang
-// (event sesi viewer tidak dipancarkan daemon) dan node baru dipilih. Gagal → toast, dokumen tidak berubah.
+// viewer dengan kode codegen.ts. Sesudahnya dokumen dimuat ulang (event sesi viewer tidak dipancarkan daemon) dan
+// node baru dipilih. Gagal → toast, dokumen tidak berubah.
+// Aksi edit (editor-canvas story 6): hapus, group/ungroup, duplikat, urutan z, align/distribute, nudge, dan pilih
+// semua lewat shortcut, menu konteks (canvas + Layers), dan panel Design; satu permintaan route ops per aksi dengan
+// undo/redo dari op invers per jendela (editActions.ts, EditMenu.tsx).
 // Kehadiran agen (aplikasi 5): `agentPresence` (presence.ts) dari stream → kursor + outline di Canvas dan state
 // baris Layers (agent / created / changed); disembunyikan saat pratinjau versi.
 // Kelola halaman (aplikasi 8): section Pages (PagesPanel.tsx) menambah/rename/mengurutkan/menghapus halaman lewat
@@ -21,7 +24,9 @@
 // Dashboard/Archive (`requestCloseTab`), bukan 404 mentah. Rename di jendela lain ditangani App (tab ikut pindah).
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { resolveDocument, type DocOp, type LakarDocument } from '@lakar/schema';
-import { toggleSelection } from './gesture';
+import { toggleSelection, type GeoNode } from './gesture';
+import { actionState, EDIT_ACTIONS, nudgeNodes, nudgeOps, planAction, selectAllIds, selectionAfter, shortcutAction, type EditAction, type EditPlan } from './editActions';
+import { EditMenu } from './EditMenu';
 import { EMPTY_STACKS, recordCommit, settleStep, takeStep, type UndoStacks } from './undoHistory';
 import { activityHub, editChange, goneReason, harnessLabel, revChange, sessionsForSlug, slugAppeared, type StreamEvent } from './activity';
 import { ActivityPanel } from './ActivityPanel';
@@ -29,7 +34,7 @@ import { BottomSheet } from './BottomSheet';
 import { AddLayerButton, IconPicker, Toast, type ToastState } from './AddLayer';
 import { api, ApiError, errorText, OfflineError, type FontFamily, type HistoryEntry, type InspectResult, type LayoutCheck } from './api';
 import { Canvas, type CanvasMarker, type CanvasPreview, type Focus, type Highlight, type InsertPoint } from './Canvas';
-import { failureText, imageFileProblem, insertBoardAt, insertBoardPlaced, insertIntoBoard, canvasInsertTarget, menuInsertTarget, removeNode, type InsertExtra, type InsertKind, type InsertTarget } from './codegen';
+import { failureText, imageFileProblem, insertBoardAt, insertBoardPlaced, insertIntoBoard, canvasInsertTarget, menuInsertTarget, type InsertExtra, type InsertKind, type InsertTarget } from './codegen';
 import { resolvePageIndex } from './pages';
 import { PagesPanel } from './PagesPanel';
 import { indexDocument, relativeTime, type NodeInfo, type TreeNode } from './format';
@@ -76,9 +81,16 @@ const TABS: { id: Tab; label: string }[] = [
 ];
 
 
-/** Fokus di kolom ketik (input, textarea, select, contentEditable): Delete/Backspace milik kolom itu. */
-const typingTarget = (t: EventTarget | null) =>
-  t instanceof HTMLElement && (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || t instanceof HTMLSelectElement || t.isContentEditable);
+/**
+ * Fokus di kolom ketik (input, textarea, select, contentEditable): Delete/Backspace milik kolom itu. Event dari
+ * shadow root (teks yang diedit inline di board live) dicek pada target aslinya (`composedPath()[0]`).
+ */
+const typingTarget = (e: Event) => {
+  const t = e.composedPath()[0] ?? e.target;
+  return t instanceof HTMLElement && (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || t instanceof HTMLSelectElement || t.isContentEditable);
+};
+
+const NO_ACTIONS = Object.fromEntries(EDIT_ACTIONS.map((a) => [a, false])) as Record<EditAction, boolean>;
 
 /** Pesan Restore gagal; CONFLICT = versi usang (ada perubahan lebih baru) atau versi terkini. */
 const restoreErrorText = (e: unknown) =>
@@ -617,26 +629,28 @@ export function Viewer({ slug }: { slug: string }) {
     stacks.current = s;
     setUndoDepth({ undo: s.undo.length, redo: s.redo.length });
   }, []);
-  const commitOps = useCallback(
-    (ops: DocOp[], description: string): Promise<boolean> => {
+  /** Satu permintaan ops (AD-7): sukses → invers ke tumpukan undo, dokumen dimuat ulang; gagal → toast, undefined. */
+  const applyEdit = useCallback(
+    (ops: DocOp[], description: string) => {
       editing.current++;
       return api.applyOps(slug, ops, description).then(
         (r) => {
           editing.current--;
           setStacks(recordCommit(stacks.current, r.inverse, description));
           loadDoc(true);
-          return true;
+          return r;
         },
         (e) => {
           editing.current--;
           setToast(e instanceof ApiError ? failureText(e.message, e.hint) : errorText(e));
           loadDoc(true);
-          return false;
+          return undefined;
         },
       );
     },
     [slug, loadDoc, setToast, setStacks],
   );
+  const commitOps = useCallback((ops: DocOp[], description: string): Promise<boolean> => applyEdit(ops, description).then((r) => r !== undefined), [applyEdit]);
   /** Undo atau redo: kirim op invers teratas; sukses → invers respons masuk tumpukan seberang, gagal → entri dibuang. */
   const stepHistory = useCallback(
     (dir: 'undo' | 'redo') => {
@@ -675,7 +689,7 @@ export function Viewer({ slug }: { slug: string }) {
       const isUndo = k === 'z' && !e.shiftKey;
       const isRedo = (k === 'z' && e.shiftKey) || (k === 'y' && !e.shiftKey && e.ctrlKey);
       if (!isUndo && !isRedo) return;
-      if (typingTarget(e.target) || document.querySelector('.modal-scrim, .menu-layer')) return;
+      if (typingTarget(e) || document.querySelector('.modal-scrim, .menu-layer')) return;
       e.preventDefault();
       if (e.repeat || editing.current > 0) return;
       stepHistory(isUndo ? 'undo' : 'redo');
@@ -747,31 +761,6 @@ export function Viewer({ slug }: { slug: string }) {
     [insert, setToast],
   );
 
-  /** Toast "Deleted <name>" + Undo (Restore rev sebelum hapus, baseRev = rev hapus) bila rev itu bersnapshot. */
-  const offerUndo = useCallback(
-    (name: string, rev: number) => {
-      const message = `Deleted ${name}`;
-      setToastState({ message, kind: 'info' });
-      const prev = rev - 1;
-      api.getHistory(slug).then(
-        (entries) => {
-          if (!entries.find((h) => h.rev === prev)?.snapshot) return;
-          const undo = () => {
-            setToastState(undefined);
-            api.restore(slug, prev, rev).then(
-              () => loadDoc(),
-              (e) => setToast(restoreErrorText(e)),
-            );
-          };
-          // Hanya bila toast ini masih tampil (belum diganti/ditutup).
-          setToastState((t) => (t?.message === message && t.kind === 'info' ? { ...t, action: { label: 'Undo', run: undo } } : t));
-        },
-        () => {},
-      );
-    },
-    [slug, loadDoc, setToast],
-  );
-
   /** Operasi halaman: sukses → muat ulang dokumen; gagal → toast (dokumen dimuat ulang bila sudah usang). */
   const pageWrite = useCallback(
     (op: Promise<{ pageId: string }>, after?: (pageId: string) => void): Promise<void> =>
@@ -799,29 +788,113 @@ export function Viewer({ slug }: { slug: string }) {
   const movePage = useCallback((id: string, to: number) => void pageWrite(api.movePage(slug, id, to)), [slug, pageWrite]);
   const deletePage = useCallback((id: string) => pageWrite(api.deletePage(slug, id)), [slug, pageWrite]);
 
-  // Delete/Backspace: hapus node terpilih (board juga), kecuali saat mengetik atau dialog/menu terbuka.
-  const selectedRef = useRef<{ id: string; name: string; type: string } | undefined>(undefined);
-  const selInfo = selectedId ? index.get(selectedId) : undefined;
-  selectedRef.current = selInfo && !previewDoc ? { id: selInfo.id, name: selInfo.name, type: selInfo.type } : undefined;
+  // ---- Aksi edit (story 6): group, ungroup, duplikat, hapus, urutan z, align, distribute, nudge, pilih semua ----
+  // Plan murni dari editActions.ts atas geometri halaman (Canvas mengisi `sceneRef`), satu permintaan ops per aksi,
+  // invers ke tumpukan undo jendela ini (AD-7, AD-8). Hapus tidak lagi memakai execute + restore rev.
+  const sceneRef = useRef<(() => GeoNode[]) | null>(null);
+  /** Render ulang saat geometri canvas berubah (ketersediaan Align & distribute di panel Design). */
+  const [, setSceneTick] = useState(0);
+  const onSceneChange = useCallback(() => setSceneTick((v) => v + 1), []);
+  const selectionRef = useRef(selection);
+  selectionRef.current = selection;
+  const runPlan = useCallback(
+    (plan: EditPlan, deleted: boolean) =>
+      applyEdit(plan.ops, plan.label).then((r) => {
+        if (!r) return;
+        const next = selectionAfter(plan, r.refs);
+        if (next) setSelection(next);
+        if (!deleted) return;
+        // Toast "Deleted …" + Undo = undo tumpukan, hanya bila entri hapus ini masih teratas.
+        const entry = stacks.current.undo[stacks.current.undo.length - 1];
+        const undoDelete = () => {
+          // Tulisan lain masih berjalan: toast tetap, pengguna bisa mengklik lagi.
+          if (editing.current > 0) return;
+          setToastState(undefined);
+          if (entry && stacks.current.undo[stacks.current.undo.length - 1] === entry) stepHistory('undo');
+          else setToast("Couldn't undo this delete: it was already undone or newer edits were made.");
+        };
+        setToastState({ message: plan.label.replace(/^Delete /, 'Deleted '), kind: 'info', ...(entry ? { action: { label: 'Undo', run: undoDelete } } : {}) });
+      }),
+    [applyEdit, stepHistory, setToast],
+  );
+  /** Jalankan aksi untuk `ids` (default seleksi): aksi tak berlaku → toast/diam; satu permintaan tulis sekaligus. */
+  const runAction = useCallback(
+    (kind: EditAction, ids?: string[]) => {
+      if (!editableRef.current || editing.current > 0) return;
+      const plan = planAction(kind, sceneRef.current?.() ?? [], ids ?? selectionRef.current);
+      if (!plan) return;
+      if ('error' in plan) {
+        setToast(plan.error);
+        return;
+      }
+      void runPlan(plan, kind === 'delete');
+    },
+    [runPlan, setToast],
+  );
+  // Nudge panah: Δ menumpuk selama commit berjalan; dikirim sesudah dokumen termuat pada rev commit sebelumnya, dengan
+  // x/y dari dokumen tersimpan (geometri canvas baru diukur ulang sesudah board di-mount ulang).
+  const nudge = useRef({ dx: 0, dy: 0, waitRev: -1 });
+  const flushNudge = useCallback(() => {
+    const n = nudge.current;
+    const d = docRef.current;
+    if ((n.dx === 0 && n.dy === 0) || editing.current > 0 || !d || d.rev < n.waitRev || !editableRef.current) return;
+    const nodes = nudgeNodes(sceneRef.current?.() ?? [], selectionRef.current, (id) => findNode(d, id));
+    const { dx, dy } = n;
+    n.dx = 0;
+    n.dy = 0;
+    const plan = nudgeOps(nodes, dx, dy);
+    if (!plan) return;
+    void applyEdit(plan.ops, plan.label).then((r) => {
+      if (r) n.waitRev = r.rev;
+      else {
+        // Gagal: Δ yang menumpuk selama permintaan berjalan dibuang (tidak ikut nudge berikutnya).
+        n.dx = 0;
+        n.dy = 0;
+      }
+    });
+  }, [applyEdit]);
+  useEffect(() => flushNudge(), [currentRev, flushNudge]);
+  // Seleksi berganti: Δ yang belum terkirim milik seleksi lama.
+  useEffect(() => {
+    nudge.current.dx = 0;
+    nudge.current.dy = 0;
+  }, [selection]);
+  // Shortcut aksi (bukan saat mengetik, termasuk teks yang diedit inline, atau dialog/menu terbuka).
   useEffect(() => {
     if (!editable) return;
     const onKey = (e: KeyboardEvent) => {
-      if ((e.key !== 'Delete' && e.key !== 'Backspace') || e.metaKey || e.ctrlKey || e.altKey) return;
-      if (typingTarget(e.target) || document.querySelector('.modal-scrim, .menu-layer')) return;
-      const node = selectedRef.current;
-      if (!node) return;
+      if (typingTarget(e) || document.querySelector('.modal-scrim, .menu-layer')) return;
+      const s = shortcutAction(e);
+      if (!s) return;
+      if ('selectAll' in s) {
+        e.preventDefault();
+        setSelection(selectAllIds(sceneRef.current?.() ?? [], selectionRef.current));
+        return;
+      }
+      if (!selectionRef.current.length) return;
+      if ('action' in s) {
+        e.preventDefault();
+        if (!e.repeat) runAction(s.action);
+        return;
+      }
+      // Panah di baris Layers = navigasi pohon, bukan nudge.
+      if (e.target instanceof HTMLElement && e.target.closest('[role="treeitem"]')) return;
       e.preventDefault();
-      if (e.repeat || editing.current > 0) return;
-      const { code, description } = removeNode(node);
-      void runEdit(code, description, (_created, rev) => {
-        // Hanya node terhapus yang keluar dari seleksi (anggota lain seleksi banyak tetap).
-        setSelection((prev) => prev.filter((x) => x !== node.id));
-        offerUndo(node.name, rev);
-      });
+      nudge.current.dx += s.nudge[0];
+      nudge.current.dy += s.nudge[1];
+      flushNudge();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [editable, runEdit, offerUndo]);
+  }, [editable, runAction, flushNudge]);
+  /** Menu konteks aksi (canvas live / baris Layers) dengan seleksi saat dibuka. */
+  const [editMenu, setEditMenu] = useState<{ x: number; y: number; ids: string[] } | undefined>(undefined);
+  const openLayerMenu = useCallback((id: string, x: number, y: number) => {
+    const cur = selectionRef.current;
+    const ids = cur.includes(id) ? [...cur] : [id];
+    if (!cur.includes(id)) setSelection(ids);
+    setEditMenu({ x, y, ids });
+  }, []);
 
   if (gone || (doc.state === 'error' && doc.notFound)) {
     const archived = gone === 'archived' || (!gone && inArchive);
@@ -1058,7 +1131,7 @@ export function Viewer({ slug }: { slug: string }) {
             <span className="section-label">Layers</span>
             <AddLayerButton disabled={!editable} disabledReason={preview ? 'Not available while previewing a version' : 'lakard is offline'} hasBoard={boards.length > 0} onPick={onMenuInsert} />
           </div>
-          {boards.length === 0 ? <div className="muted-note">No layers yet</div> : <LayerTree key={page?.id} nodes={boards} selectedId={selectedId} selectedIds={selection} selectedPath={selectedInfo} index={index} onSelect={select} onToggle={toggleSelect} marks={preview ? undefined : marks} />}
+          {boards.length === 0 ? <div className="muted-note">No layers yet</div> : <LayerTree key={page?.id} nodes={boards} selectedId={selectedId} selectedIds={selection} selectedPath={selectedInfo} index={index} onSelect={select} onToggle={toggleSelect} onMenu={openLayerMenu} marks={preview ? undefined : marks} />}
         </div>
           </>
         )}
@@ -1093,6 +1166,9 @@ export function Viewer({ slug }: { slug: string }) {
         canRedo={editable && undoDepth.redo > 0}
         onUndo={undo}
         onRedo={redo}
+        sceneRef={sceneRef}
+        onSceneChange={onSceneChange}
+        onContextMenu={(x, y, ids) => setEditMenu({ x, y, ids })}
         onOpenChecks={() => openTab('checks')}
         preview={canvasPreview}
         editable={editable}
@@ -1133,6 +1209,7 @@ export function Viewer({ slug }: { slug: string }) {
               inspectNode={inspect?.state === 'ok' ? inspect.value.node : undefined}
               rev={d.rev}
               onCommit={commitOps}
+              align={designTargets.length > 1 ? { enabled: editable ? actionState(sceneRef.current?.() ?? [], selection) : NO_ACTIONS, run: (a) => runAction(a) } : undefined}
             />
           )}
           {tab === 'checks' && <ChecksPanel checks={checks} index={index} selectedId={selectedId} onSelect={select} onRun={runChecks} hasBoards={d.pages.some((p) => p.children.length > 0)} />}
@@ -1163,6 +1240,15 @@ export function Viewer({ slug }: { slug: string }) {
         />
       )}
       {toast && <Toast toast={toast} onClose={closeToast} />}
+      {editMenu && (
+        <EditMenu
+          x={editMenu.x}
+          y={editMenu.y}
+          enabled={editable ? actionState(sceneRef.current?.() ?? [], editMenu.ids) : NO_ACTIONS}
+          onAction={(a) => runAction(a, editMenu.ids)}
+          onClose={() => setEditMenu(undefined)}
+        />
+      )}
       {fileMenu && (
         <FileMenu
           target={{ slug, x: fileMenu.x, y: fileMenu.y }}
@@ -1209,8 +1295,11 @@ function LayerTree({
   index,
   onSelect,
   onToggle,
+  onMenu,
   marks,
 }: {
+  /** Klik kanan baris: menu aksi edit (story 6) di (x, y). */
+  onMenu?: (id: string, x: number, y: number) => void;
   nodes: TreeNode[];
   selectedId: string | undefined;
   /** Semua node terpilih (seleksi banyak dari canvas); tanpa ini hanya `selectedId`. */
@@ -1262,6 +1351,11 @@ function LayerTree({
         className={`layer-row${selected ? ' selected' : ''}${depth === 0 ? ' top' : ''}${markClass}`}
         style={{ paddingLeft: 8 + depth * 16 }}
         onClick={(e) => (e.shiftKey && onToggle ? onToggle(n.id) : onSelect(n.id))}
+        onContextMenu={(e) => {
+          if (!onMenu) return;
+          e.preventDefault();
+          onMenu(n.id, e.clientX, e.clientY);
+        }}
         onKeyDown={(e) => {
           if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault();

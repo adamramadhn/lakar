@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { NODE_ATTR } from '@lakar/render';
 import type { BoardNode } from '@lakar/schema';
-import { measureBoard, measureLiveSize } from './liveGeometry.js';
+import { measureBoard, measureLiveSize, pageGeometry } from './liveGeometry.js';
 
 /** Host palsu: shadow root dengan elemen ber-`data-lakar-id` dan kotak layar (skala 0.5, board di layar (100, 50)). */
 function fakeHost(rects: Record<string, [number, number, number, number]>) {
@@ -79,5 +79,18 @@ describe('measureLiveSize', () => {
   it('board atau node belum di-mount → undefined', () => {
     expect(measureLiveSize(root, 'XXXXXXXX', 'NNNNNNNN')).toBeUndefined();
     expect(measureLiveSize(root, 'BBBBBBBB', 'ZZZZZZZZ')).toBeUndefined();
+  });
+});
+
+describe('pageGeometry', () => {
+  it('board terukur dipakai apa adanya; board belum ter-mount → stub tanpa anak dengan kotak dokumen, urutan halaman', () => {
+    const measured = { id: 'B1', type: 'board', name: 'One', box: { x: 0, y: 0, w: 10, h: 10 }, parentId: undefined, absolute: true, x: 0, y: 0, layout: 'column' as const, children: [] };
+    const boards = [
+      { id: 'B1', name: 'One', x: 0, y: 0, width: 10, height: 10 },
+      { id: 'B2', name: 'Two', x: 50, y: 5, width: 20, height: 30 },
+    ];
+    const geo = pageGeometry(boards, (id) => (id === 'B1' ? measured : undefined));
+    expect(geo[0]).toBe(measured);
+    expect(geo[1]).toEqual({ id: 'B2', type: 'board', name: 'Two', box: { x: 50, y: 5, w: 20, h: 30 }, parentId: undefined, absolute: true, x: 50, y: 5, layout: 'column', children: [] });
   });
 });

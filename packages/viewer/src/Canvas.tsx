@@ -19,7 +19,7 @@
 // "Last synced …"), dan slot `overlay` untuk toast rollback / chip Follow dari Viewer. Jalur PNG (pratinjau versi,
 // atau tanpa `doc`): PNG board lama tetap tampil sampai PNG rev baru selesai dimuat (tanpa kedip skeleton); jalur
 // live: DOM lama tetap tampil sampai mount baru siap.
-import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type MutableRefObject, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
 import { findBoard } from '@lakar/render';
 import { resolveDocument, type DocOp, type FindingLevel, type FindingSummary, type LakarDocument, type ResolvedDocument } from '@lakar/schema';
 import { boardDepKeys, boardSignature, boardSource, ensureFaces, mountLive, RenderDepsCache } from './liveBoard';
@@ -27,6 +27,7 @@ import { api, errorText } from './api';
 import { SelectionBox, useCanvasEdit } from './canvasEdit';
 import { INSERT_KINDS, type InsertKind } from './codegen';
 import { ExportButton } from './ExportPopover';
+import type { GeoNode } from './gesture';
 import { useOffline, useRetry } from './hooks';
 import { Icon, type IconName } from './icons';
 import type { AgentPresence, Rect } from './presence';
@@ -333,7 +334,16 @@ export function Canvas({
   canRedo = false,
   onUndo,
   onRedo,
+  sceneRef,
+  onSceneChange,
+  onContextMenu,
 }: {
+  /** Diisi Canvas: pohon geometri halaman untuk aksi edit (story 6). */
+  sceneRef?: MutableRefObject<(() => GeoNode[]) | null>;
+  /** Geometri `sceneRef` berubah (board di-mount ulang): pemanggil menghitung ulang ketersediaan aksi. */
+  onSceneChange?: () => void;
+  /** Klik kanan di canvas live: target dipilih seperti klik (`ids` = seleksi menu); pemanggil membuka menu di (x, y). */
+  onContextMenu?: (x: number, y: number, ids: string[]) => void;
   /** Node terpilih (urutan pilih; terakhir = primer). Seleksi canvas live dan Layers memakai state yang sama. */
   selection?: readonly string[];
   /** Seleksi baru dari klik/Shift-klik/marquee di canvas live. */
@@ -423,6 +433,13 @@ export function Canvas({
     onCommit,
   });
   const cancelEdit = edit.cancel;
+  if (sceneRef) sceneRef.current = edit.scene;
+  const onSceneChangeRef = useRef(onSceneChange);
+  onSceneChangeRef.current = onSceneChange;
+  useEffect(() => onSceneChangeRef.current?.(), [edit.sceneKey]);
+  /** Enter dengan satu teks terpilih → edit inline (nilai render terakhir untuk listener keyboard). */
+  const enterText = useRef<() => boolean>(() => false);
+  enterText.current = () => selection.length === 1 && edit.startTextEdit(selection[0]!);
   const [panning, setPanning] = useState(false);
   /** Satu pointer: `pan` = gerak menggeser kamera, `tap` = lepas tanpa gerak memilih/menyisip. */
   const drag = useRef<{ id: number; x: number; y: number; cam: Camera; moved: boolean; pan: boolean; tap: boolean; slop: number; target: string | undefined } | null>(null);
@@ -519,7 +536,8 @@ export function Canvas({
 
   useEffect(() => {
     const typing = (e: KeyboardEvent) => {
-      const t = e.target;
+      // Target asli di dalam shadow root (teks yang diedit inline), bukan host hasil retarget.
+      const t = e.composedPath()[0] ?? e.target;
       if (!(t instanceof HTMLElement)) return false;
       return t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || t instanceof HTMLSelectElement || t.isContentEditable || t.closest('[role="treeitem"]') !== null;
     };
@@ -543,7 +561,12 @@ export function Canvas({
       else if (insertKey && !e.shiftKey) {
         if (canInsert) setTool(insertKey);
       }
-      else if (e.key === '!' || (e.shiftKey && e.code === 'Digit1')) fit();
+      else if (e.key === 'Enter' && !e.shiftKey) {
+        // Satu teks terpilih → edit inline; preventDefault supaya Enter tidak masuk ke teks yang baru difokus.
+        // Tombol/tautan yang fokus tetap memakai Enter-nya sendiri.
+        if (e.target instanceof Element && e.target.closest('button, a, [role="menuitem"]')) return;
+        if (enterText.current()) e.preventDefault();
+      } else if (e.key === '!' || (e.shiftKey && e.code === 'Digit1')) fit();
       else if (e.key === '+' || e.key === '=') zoomAt(1.25, size.w / 2, size.h / 2);
       else if (e.key === '-') zoomAt(1 / 1.25, size.w / 2, size.h / 2);
       else if (e.key === 'Escape') {
@@ -567,6 +590,8 @@ export function Canvas({
 
   const onPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
     if ((e.target as HTMLElement).closest('.canvas-overlay-ui')) return;
+    // Di dalam teks yang sedang diedit inline: caret/seleksi bawaan, bukan gestur kanvas.
+    if (e.nativeEvent.composedPath().some((n) => n instanceof HTMLElement && n.isContentEditable)) return;
     const touch = e.pointerType === 'touch';
     if (e.button !== 0 && e.button !== 1) return;
     stopAnim();
@@ -689,6 +714,14 @@ export function Canvas({
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerCancel}
       onPointerLeave={edit.onPointerLeave}
+      onContextMenu={(e) => {
+        if ((e.target as HTMLElement).closest('.canvas-overlay-ui') || e.nativeEvent.composedPath().some((n) => n instanceof HTMLElement && n.isContentEditable)) return;
+        if (!onContextMenu) return;
+        e.preventDefault();
+        // Pratinjau versi (jalur PNG): menu dengan seleksi saat ini, item nonaktif (Viewer: tidak editable).
+        const ids = liveActive ? edit.contextSelect(e.clientX, e.clientY) : [...selection];
+        if (ids.length) onContextMenu(e.clientX, e.clientY, ids);
+      }}
     >
       {boards.length === 0 && !preview && (
         <div className="canvas-waiting">

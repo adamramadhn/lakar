@@ -9,6 +9,8 @@ import { Blend, type DocOp } from '@lakar/schema';
 import type { FontFamily, InspectNode } from './api';
 import { copyText } from './Connections';
 import { copyAs, type CopyFormat } from './copyas';
+import { ALIGN_ACTIONS, DISTRIBUTE_ACTIONS, type EditAction } from './editActions';
+import { ACTION_META, actionTitle } from './EditMenu';
 import {
   addFill,
   addShadow,
@@ -1104,9 +1106,26 @@ export type DesignPanelProps = {
   /** Rev dokumen yang tampil: antrean edit lanjut saat rev berubah. */
   rev: number;
   onCommit: Commit;
+  /** Multi-seleksi (story 6, desain "Align & distribute" J8r8Gq): ketersediaan dan penjalan aksi align/distribute. */
+  align?: { enabled: Record<EditAction, boolean>; run: (a: EditAction) => void } | undefined;
 };
 
-export function DesignPanel({ targets, path, editable, fonts, inspectNode, rev, onCommit }: DesignPanelProps) {
+/** Grup "Align & distribute": 6 align + 2 distribute, satu permintaan ops per klik (dijalankan Viewer). */
+function AlignGroup({ align, disabled }: { align: NonNullable<DesignPanelProps['align']>; disabled: boolean }) {
+  return (
+    <Group title="Align & distribute">
+      <div className="dp-row dp-align-row">
+        {[...ALIGN_ACTIONS, ...DISTRIBUTE_ACTIONS].map((a) => (
+          <button key={a} type="button" className="dp-icon-btn" title={actionTitle(a)} aria-label={ACTION_META[a].label} disabled={disabled || !align.enabled[a]} onClick={() => align.run(a)}>
+            <Icon name={ACTION_META[a].icon} size={15} />
+          </button>
+        ))}
+      </div>
+    </Group>
+  );
+}
+
+export function DesignPanel({ targets, path, editable, fonts, inspectNode, rev, onCommit, align }: DesignPanelProps) {
   const [menu, setMenu] = useState<{ x: number; y: number } | undefined>(undefined);
   const [copied, setCopied] = useState<string | undefined>(undefined);
   // Antrean edit: patch fills/shadows/stroke berupa array/objek utuh, jadi edit berikutnya baru dibangun sesudah commit
@@ -1230,6 +1249,7 @@ export function DesignPanel({ targets, path, editable, fonts, inspectNode, rev, 
         />
       )}
       <Fragment key={targets.map((t) => t.id).join(',')}>
+      {multi && align && <AlignGroup align={align} disabled={!editable} />}
       {groups.includes('position') && <PositionGroup targets={targets} ctx={ctx} bounds={bounds} />}
       {groups.includes('autoLayout') && <AutoLayoutGroup targets={targets} ctx={ctx} />}
       {groups.includes('typography') && <TypographyGroup targets={targets} ctx={ctx} fonts={fonts} />}

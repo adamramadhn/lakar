@@ -101,3 +101,9 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-editor-5-design-panel.md`
   summary: Wiring komponen `DesignPanel` (Field Enter/blur/Escape/scrub, color picker `change`, drag urutan fill) belum punya tes otomatis; logika patch/parse dites murni dan alur dicek dengan smoke Playwright msedge.
   evidence: Vitest viewer tanpa environment DOM. Usul: e2e Playwright `/app/` bersama deferred story 3 dan 4.
+- source_spec: `_bmad-output/implementation-artifacts/spec-editor-6-editing-actions.md`
+  summary: Wiring edit teks inline (`startTextEdit`/`finishText` di canvasEdit.tsx: Enter/blur commit satu op, Escape tanpa request, remount membatalkan) dan dispatch menu konteks/EditMenu belum punya tes otomatis; hanya smoke Playwright msedge.
+  evidence: Vitest viewer tanpa environment DOM/contentEditable; bagian deterministik (`textEditPlan`, `normalizeEditedText`, `shortcutAction`, `nudgeNodes`, `pageGeometry`) dites murni. Usul: e2e Playwright `/app/` bersama deferred story 3-5.
+- source_spec: `_bmad-output/implementation-artifacts/spec-editor-6-editing-actions.md`
+  summary: Sisip layer dari tool kanvas / menu + Layers masih lewat `execute` + codegen sehingga tidak masuk tumpukan undo per jendela; Ctrl+Z sesudah sisip membatalkan edit ops sebelumnya.
+  evidence: Sudah ada sebelum story 6 (aplikasi 4); AD-8 meminta undo untuk commit jendela. Usul: pindahkan sisip ke route ops (`add` + `ref`) agar invers tercatat.

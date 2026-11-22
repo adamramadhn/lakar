@@ -32,8 +32,9 @@ import {
   type Point,
   type ReorderTarget,
 } from './gesture';
+import { normalizeEditedText, textEditPlan } from './editActions';
 import { Icon } from './icons';
-import { liveElement, measureBoard } from './liveGeometry';
+import { liveElement, measureBoard, pageGeometry } from './liveGeometry';
 import { CLICK_SLOP } from './sheet';
 import type { Camera } from './viewState';
 
@@ -118,13 +119,16 @@ export function useCanvasEdit({
   const [held, setHeld] = useState<Held | null>(null);
   const [hover, setHover] = useState<string | undefined>(undefined);
   const lastDown = useRef<{ t: number; x: number; y: number } | undefined>(undefined);
+  /** `startTextEdit` render terakhir (dipanggil tertunda dari dobel-klik). */
+  const startTextRef = useRef<(id: string) => boolean>(() => false);
 
   // Geometri per board di-cache per mount + posisi/ukuran board (pan/zoom tidak mengukur ulang).
   const cache = useRef(new Map<string, { key: string; geo: GeoNode | undefined }>());
   const geometry = (): GeoNode[] => {
     if (!active || !doc) return [];
-    const out: GeoNode[] = [];
-    for (const b of boards) {
+    // Board belum ter-mount: stub tanpa anak (pageGeometry), aksi board tetap tahu posisinya.
+    return pageGeometry(boards, (id) => {
+      const b = boards.find((x) => x.id === id)!;
       const n = mounts[b.id] ?? 0;
       const key = `${n}:${b.x}:${b.y}:${b.width}:${b.height}`;
       let c = cache.current.get(b.id);
@@ -134,9 +138,8 @@ export function useCanvasEdit({
         c = { key, geo: host && rb && n > 0 ? measureBoard(host, rb, { x: b.x, y: b.y }) : undefined };
         cache.current.set(b.id, c);
       }
-      if (c.geo) out.push(c.geo);
-    }
-    return out;
+      return c.geo;
+    });
   };
   const geo = geometry();
   const index = indexGeo(geo);
@@ -317,6 +320,14 @@ export function useCanvasEdit({
     const mode = e.ctrlKey || e.metaKey ? 'deep' : double ? 'enter' : 'scope';
     const picked = labelId ? index.get(labelId) : pickTarget(hitPath(geo, p), selSet, scope, mode);
     setHover(undefined);
+    // Dobel-klik teks → edit inline. Dimulai sesudah event mouse bawaan (fokus mousedown tidak langsung mem-blur-nya).
+    if (double && !labelId && picked?.type === 'text' && canEdit) {
+      e.preventDefault();
+      const id = picked.id;
+      onSelectIds([id]);
+      setTimeout(() => startTextRef.current(id), 0);
+      return true;
+    }
     if (!picked || (picked.type === 'board' && !selSet.has(picked.id) && !labelId)) {
       setGesture({ ...base, kind: 'marquee', p, picked, candidates: picked ? picked.children : geo, base: e.shiftKey ? [...selection] : [], shift: e.shiftKey });
       return true;
@@ -447,13 +458,140 @@ export function useCanvasEdit({
   };
   const onPointerLeave = () => setHover(undefined);
 
+  // ---- Menu konteks (story 6) ----
+  /**
+   * Klik kanan di (clientX, clientY): target dipilih seperti klik biasa (scope seleksi); node yang sudah terpilih
+   * mempertahankan seleksi banyak. Mengembalikan seleksi untuk menu (kosong = tanpa menu).
+   */
+  const contextSelect = (clientX: number, clientY: number): string[] => {
+    if (!active) return [...selection];
+    cancel();
+    const p = toPage(clientX, clientY);
+    const scope = new Set(selection.flatMap((id) => index.get(id)?.parentId ?? []));
+    const picked = pickTarget(hitPath(geo, p), new Set(selection), scope, 'scope');
+    if (!picked) {
+      if (selection.length) onSelectIds([]);
+      return [];
+    }
+    if (selection.includes(picked.id)) return [...selection];
+    onSelectIds([picked.id]);
+    return [picked.id];
+  };
+
+  // ---- Edit teks inline (story 6, desain "Text editing" UHOWY) ----
+  // Elemen teks live di shadow root dijadikan contentEditable: tata letak, wrap, dan font persis sama dengan canvas.
+  // Enter/blur = commit satu op `update {content}`; Shift+Enter = baris baru; Escape = batal (isi asli dipulihkan).
+  const textRef = useRef<{ id: string; name: string; board: string; mount: number; el: HTMLElement; host: HTMLElement; original: string; saver: Saver; style: HTMLStyleElement; abort: AbortController } | null>(null);
+  const [textId, setTextId] = useState<string | undefined>(undefined);
+  const [, setTextTick] = useState(0);
+  const onCommitRef = useRef(onCommit);
+  onCommitRef.current = onCommit;
+  const finishText = useCallback((commitIt: boolean) => {
+    const t = textRef.current;
+    if (!t) return;
+    textRef.current = null;
+    setTextId(undefined);
+    t.abort.abort();
+    const after = normalizeEditedText(t.el.innerText, t.el.lastChild?.nodeName === 'BR');
+    t.el.removeAttribute('contenteditable');
+    t.el.removeAttribute('data-lakar-editing');
+    t.saver.restore();
+    t.style.remove();
+    if (t.el.isConnected) t.el.ownerDocument.getSelection()?.removeAllRanges();
+    // Board di-mount ulang selama edit (agen menulis): elemen sudah diganti → batal tanpa request.
+    const plan = commitIt && t.el.isConnected ? textEditPlan(t.id, t.name, t.original, after) : undefined;
+    const commitFn = onCommitRef.current;
+    if (!plan || !commitFn) {
+      t.el.textContent = t.original;
+      return;
+    }
+    t.el.textContent = after;
+    void commitFn(plan.ops, plan.label).then((ok) => {
+      if (!ok && t.el.isConnected) t.el.textContent = t.original;
+    });
+  }, []);
+  useEffect(() => {
+    const t = textRef.current;
+    if (t && (mounts[t.board] ?? 0) !== t.mount) finishText(false);
+  }, [mounts, finishText]);
+  useEffect(() => () => finishText(false), [finishText]);
+
+  /** Mulai edit teks `id` (teks live di halaman ini); false = tidak bisa (bukan teks, belum ter-mount, tidak editable). */
+  const startTextEdit = (id: string): boolean => {
+    if (!canEdit || textRef.current) return false;
+    const n = index.get(id);
+    const board = boardOf(id);
+    const host = n?.type === 'text' ? hostOf(id) : undefined;
+    const el = host && liveElement(host, id);
+    if (!n || !board || !host || !el) return false;
+    cancel();
+    setHover(undefined);
+    const saver = styleSaver();
+    saver.set(host, 'pointer-events', 'auto');
+    for (const [p, v] of [['pointer-events', 'auto'], ['user-select', 'text'], ['-webkit-user-select', 'text'], ['outline', 'none'], ['cursor', 'text']] as const) saver.set(el, p, v);
+    const style = el.ownerDocument.createElement('style');
+    // Highlight teks terseleksi dan caret sesuai desain (Text Selection #3B82F655, Caret accent).
+    style.textContent = '[data-lakar-editing]::selection{background:#3B82F655}[data-lakar-editing]{caret-color:var(--accent,#3B82F6)}';
+    host.shadowRoot?.appendChild(style);
+    el.setAttribute('data-lakar-editing', '');
+    try {
+      el.contentEditable = 'plaintext-only';
+    } catch {
+      el.contentEditable = 'true';
+    }
+    const abort = new AbortController();
+    const signal = abort.signal;
+    // Tombol tidak diteruskan ke shortcut kanvas/Viewer (Delete, panah, Ctrl+A milik teks).
+    el.addEventListener(
+      'keydown',
+      (e) => {
+        e.stopPropagation();
+        if (e.isComposing) return;
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          finishText(false);
+        } else if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          finishText(true);
+        } else if (e.key === 'Enter') {
+          e.preventDefault();
+          el.ownerDocument.execCommand('insertText', false, '\n');
+        }
+      },
+      { signal },
+    );
+    el.addEventListener('keyup', (e) => e.stopPropagation(), { signal });
+    el.addEventListener('pointerdown', (e) => e.stopPropagation(), { signal });
+    el.addEventListener('input', () => setTextTick((v) => v + 1), { signal });
+    // Jendela kehilangan fokus (alt-tab): edit tetap berjalan; fokus kembali ke teks saat jendela aktif lagi.
+    el.addEventListener('blur', () => el.ownerDocument.hasFocus() && finishText(true), { signal });
+    textRef.current = { id, name: n.name, board, mount: mountsRef.current[board] ?? 0, el, host, original: el.textContent ?? '', saver, style, abort };
+    setTextId(id);
+    el.focus({ preventScroll: true });
+    el.ownerDocument.execCommand('selectAll');
+    return true;
+  };
+  startTextRef.current = startTextEdit;
+  /** Kotak teks yang sedang diedit (ikut tumbuh saat mengetik), koordinat halaman. */
+  const textBox = (): Box | undefined => {
+    const t = textRef.current;
+    if (!t) return undefined;
+    const b = boards.find((x) => x.id === t.board);
+    const boardEl = liveElement(t.host, t.board);
+    if (!b || !boardEl) return index.get(t.id)?.box;
+    const br = boardEl.getBoundingClientRect();
+    const k = b.width > 0 && br.width > 0 ? br.width / b.width : 1;
+    const r = t.el.getBoundingClientRect();
+    return { x: b.x + (r.left - br.left) / k, y: b.y + (r.top - br.top) / k, w: r.width / k, h: r.height / k };
+  };
+
   // ---- Overlay ----
   const scr = (b: Box) => ({ left: cam.x + b.x * cam.z, top: cam.y + b.y * cam.z, width: Math.max(1, b.w * cam.z), height: Math.max(1, b.h * cam.z) });
   const overlay: ReactNode[] = [];
   if (active) {
     const reorder = gesture?.kind === 'reorder' ? gesture : undefined;
     const marquee = gesture?.kind === 'marquee' && gesture.moved ? gesture : undefined;
-    if (hover && hoverable && !gesture) {
+    if (hover && hoverable && !gesture && !textId) {
       const b = boxOf(hover);
       if (b) overlay.push(<div key="hover" className="edit-hover" style={scr(b)} />);
     }
@@ -470,7 +608,11 @@ export function useCanvasEdit({
       return b ? [{ id, b }] : [];
     });
     const bound = unionBox(members.map((m) => m.b));
-    if (reorder) {
+    const tb = textId ? textBox() : undefined;
+    if (tb) {
+      // Desain "Text Edit Box": garis 1.5px accent, 0.75px di luar kotak teks, tanpa handle dan badge.
+      overlay.push(<div key="text-edit" className="edit-text-box" style={scr({ x: tb.x - 0.75 / cam.z, y: tb.y - 0.75 / cam.z, w: tb.w + 1.5 / cam.z, h: tb.h + 1.5 / cam.z })} />);
+    } else if (reorder) {
       overlay.push(<div key="ghost" className="edit-ghost-slot" style={scr(reorder.node.box)} />);
       if (reorder.container && reorder.target) {
         const c = reorder.container.box;
@@ -500,7 +642,25 @@ export function useCanvasEdit({
     }
   }
 
-  return { onMounted, onPointerDown, onPointerMove, onPointerUp, onPointerCancel, onPointerLeave, cancel, overlay, boardBox, dragging: gesture !== null && gesture.moved && gesture.kind !== 'marquee' };
+  return {
+    onMounted,
+    onPointerDown,
+    onPointerMove,
+    onPointerUp,
+    onPointerCancel,
+    onPointerLeave,
+    cancel,
+    overlay,
+    boardBox,
+    dragging: gesture !== null && gesture.moved && gesture.kind !== 'marquee',
+    /** Pohon geometri halaman (aksi edit story 6, editActions.ts). */
+    scene: () => geo,
+    /** Berubah tiap board di-mount ulang (geometri `scene` baru): pemilik ketersediaan aksi menghitung ulang. */
+    sceneKey: boards.map((b) => `${b.id}:${mounts[b.id] ?? 0}`).join(','),
+    contextSelect,
+    startTextEdit,
+    textEditing: textId !== undefined,
+  };
 }
 
 /** Kotak akhir anggota resize sebagaimana di-commit (`committedBox`): tunggal = kotak handle, multi = diskalakan. */
