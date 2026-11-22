@@ -4,7 +4,7 @@ title: "Model dokumen Lakar siap untuk editor, token, komponen, dan kode"
 parent: initiative-lakar-paper
 covers: []
 after: []
-refined: false
+refined: true
 risk: high
 ---
 
@@ -41,4 +41,5 @@ Semua epic sesudahnya membangun di atas satu model dokumen yang sudah diputuskan
 - Decision: 2026-11-22 — spine architecture-model-dokumen disetujui Fatmuh.
   - Model dokumen: JSON Lakar bertipe dengan semantik CSS (AD-1).
   - Route dan tool lama: kompatibilitas mundur menggantikan pembekuan (AD-4). Untuk Done when, "lolos tesnya" berarti tes route dan tool lama tetap hijau, dan asersi teks pesan error boleh diperbarui di PR yang sama.
+- Decision: 2026-11-22 — epic dipecah menjadi 4 story (tickets/tickets.toml) atas delegasi Fatmuh: korpus, skema v3 token bertipe, resolveDocument, dan pemetaan CSS tunggal. Fitur di atas model tetap milik epic 2–7.
 - Open question: korpus dokumen v1/v2, termasuk dokumen bench lama, belum ada di repo (data dir lokal dan VPS). Story migrasi pertama mengumpulkan dan menyamarkannya ke `tests/fixtures/docs/` (AD-3).
