@@ -185,6 +185,9 @@ export const EXECUTE_DESCRIPTION =
   'move(id, parentId|null, index?) pindah ke board/frame (null = urutan board); ' +
   'duplicate(id, patch?) → id salinan subtree tepat setelah asal; ' +
   'remove(id) hapus subtree; ' +
+  "komponen: setComponent(id, {props, slots}?) jadikan master (null melepas), add(parent, {type:'instance', name, componentId, props?}) sisip instance, " +
+  "update('<instanceId>/<idNodeMaster>', patch) override isi instance, resetOverride(alamat, props?) kembali ke master, add('<instanceId>/<idFrameSlot>', node) isi slot, " +
+  'detach(instanceId) → id node biasa, get(alamat) node efektif; hapus master men-detach instancenya; ' +
   "setTokens({'colors.primary':'#0F62FE','spacing.4':16}) merge token, null menghapus (bertipe: {type, value, modes?}); " +
   "setTokenModes(['light','dark']) mode tema, board themeMode; " +
   'getTokens() → {tokens, modes} baca token dan mode; renameToken(from, to) ganti nama token + semua ref; ' +

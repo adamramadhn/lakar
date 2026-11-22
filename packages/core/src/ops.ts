@@ -16,6 +16,9 @@ const OP_KEYS: Record<DocOpKind, { required: readonly string[]; optional: readon
   setTokens: { required: ['tokens'], optional: [] },
   setTokenModes: { required: ['modes'], optional: [] },
   renameToken: { required: ['from', 'to'], optional: [] },
+  setComponent: { required: ['id', 'component'], optional: [] },
+  resetOverride: { required: ['id'], optional: ['props'] },
+  detach: { required: ['id'], optional: ['ref'] },
 };
 
 const OPS_HINT =
@@ -67,16 +70,18 @@ export function applyOps(tx: Transaction, ops: unknown): ApplyOpsResult {
   /** `"@ref"` → ID; selain itu nilai apa adanya (divalidasi op core). */
   const addr = (v: unknown): unknown => {
     if (typeof v !== 'string' || !v.startsWith('@')) return v;
-    const name = v.slice(1);
+    // `"@ref/…"` = alamat komposit di dalam instance yang dibuat op sebelumnya (mis. "@kartu/Tttttt01").
+    const slash = v.indexOf('/');
+    const name = slash < 0 ? v.slice(1) : v.slice(1, slash);
     if (!Object.hasOwn(refs, name)) {
-      throw new LakarError('SCHEMA_INVALID', `ref ${v} tidak dikenal`, { hint: 'ref dipakai sesudah op add/duplicate dengan ref yang sama di daftar ops ini' });
+      throw new LakarError('SCHEMA_INVALID', `ref ${v} tidak dikenal`, { hint: 'ref dipakai sesudah op add/duplicate/detach dengan ref yang sama di daftar ops ini' });
     }
-    return refs[name];
+    return slash < 0 ? refs[name] : `${refs[name]}${v.slice(slash)}`;
   };
   ops.forEach((raw, i) => {
     try {
       const o = checkShape(raw);
-      if ((o.op === 'add' || o.op === 'duplicate') && o.ref !== undefined && Object.hasOwn(refs, o.ref)) {
+      if ((o.op === 'add' || o.op === 'duplicate' || o.op === 'detach') && o.ref !== undefined && Object.hasOwn(refs, o.ref)) {
         throw new LakarError('SCHEMA_INVALID', `${o.op}: ref ${JSON.stringify(o.ref)} sudah dipakai`, { hint: 'pakai ref unik per permintaan' });
       }
       let id: string | undefined;
@@ -111,8 +116,17 @@ export function applyOps(tx: Transaction, ops: unknown): ApplyOpsResult {
         case 'renameToken':
           tx.renameToken(o.from, o.to);
           break;
+        case 'setComponent':
+          tx.setComponent(addr(o.id) as string, o.component);
+          break;
+        case 'resetOverride':
+          tx.resetOverride(addr(o.id) as string, o.props);
+          break;
+        case 'detach':
+          id = tx.detach(addr(o.id) as string) ?? undefined;
+          break;
       }
-      if ((o.op === 'add' || o.op === 'duplicate') && o.ref !== undefined && id !== undefined) refs[o.ref] = id;
+      if ((o.op === 'add' || o.op === 'duplicate' || o.op === 'detach') && o.ref !== undefined && id !== undefined) refs[o.ref] = id;
     } catch (e) {
       throw atOp(i, e);
     }

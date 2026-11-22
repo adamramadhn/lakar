@@ -6,7 +6,7 @@ Pengguna memilih node di canvas viewer Lakar lalu meminta pekerjaan atasnya ("bu
 
 1. `get_selection` tanpa argumen → `{slug, rev, addresses, nodes:[{id, type, name, boardId, bounds}], missing?}`. `nodes` kosong → minta pengguna memilih node di viewer, lalu berhenti. `missing` = node yang sudah dihapus: abaikan.
 2. `open_doc {slug}` bila slug bukan dokumen aktif sesi ini (`get_selection` tidak mengganti dokumen aktif).
-3. Alamati node lewat `nodes[].id` (baris `const SEL = [...]` di contoh, semua node terpilih), bukan nama. `bounds` = `[x,y,w,h]` terukur, relatif board. Execute `NOT_FOUND` pada id seleksi (pengguna menghapusnya) → `get_selection` lagi.
+3. Alamati node lewat `nodes[].id` (baris `const SEL = [...]` di contoh, semua node terpilih), bukan nama. `bounds` = `[x,y,w,h]` terukur, relatif board. Execute `NOT_FOUND` pada id seleksi (pengguna menghapusnya) → `get_selection` lagi. Id ber-`/` = isi instance: `get`/`update` (menjadi override) saja; struktur → master atau `detach`.
 4. Tulis hanya lewat `execute`; node sumber tidak diubah kecuali diminta. Op berlaku di rev terbaru, jadi edit pengguna di antara panggilanmu tetap ada: ubah hanya node yang perlu (`update`), jangan hapus lalu bangun ulang.
 5. Panggil `get_selection` lagi hanya bila pengguna merujuk seleksi baru.
 

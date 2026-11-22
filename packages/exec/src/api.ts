@@ -3,7 +3,20 @@
 // Tanpa IO. Semua op baca bekerja di salinan kerja transaksi dan mengembalikan salinan.
 import { isPlainObject, type Transaction } from '@lakar/core';
 import type { CssVariableSkip, CssVariablesPort, IconCatalogMatch, IconCatalogPort, PhotoInfo, PhotoLibraryPort } from '@lakar/ports';
-import { ICON_SEARCH_DEFAULT_LIMIT, ICON_SEARCH_MAX_LIMIT, ID_PATTERN, LakarError, NODE_TYPES, type AnyNode, type ErrorCode, type LakarDocument as Doc, type NodeInput, type NodeType } from '@lakar/schema';
+import {
+  ICON_SEARCH_DEFAULT_LIMIT,
+  ICON_SEARCH_MAX_LIMIT,
+  ID_PATTERN,
+  LakarError,
+  NODE_ADDRESS_PATTERN,
+  NODE_TYPES,
+  expandedNodeAt,
+  type AnyNode,
+  type ErrorCode,
+  type LakarDocument as Doc,
+  type NodeInput,
+  type NodeType,
+} from '@lakar/schema';
 
 // ---------------------------------------------------------------------------
 // Batas
@@ -116,8 +129,17 @@ export interface LakarApi {
   move(id: string, parentId: string | null, index?: number): void;
   /** Salin node + subtree dengan ID baru tepat setelah asal; `patch` di-merge ke akar salinan. Mengembalikan ID akar baru. */
   duplicate(id: string, patch?: NodePatch): string;
-  /** Hapus node beserta subtree-nya. */
+  /** Hapus node beserta subtree-nya. Master yang terhapus men-detach semua instancenya di commit yang sama. */
   remove(id: string): void;
+  /**
+   * Jadikan node master komponen (`{props, slots}`; tanpa argumen = `{props:[], slots:[]}` bila belum master) atau
+   * lepas status master (`null`, instancenya di-detach). Instance: `add(parent, {type:'instance', name, componentId})`.
+   */
+  setComponent(id: string, component?: Record<string, unknown> | null): void;
+  /** Hapus override pada `address` (ID instance = akar, atau `<instanceId>/<idNodeMaster>`); `props` = hanya properti itu. */
+  resetOverride(address: string, props?: string[]): void;
+  /** Ganti instance dengan node biasa ber-ID baru (props/override/slot diterapkan). `null` bila instance tersembunyi (dihapus). */
+  detach(id: string): string | null;
   /**
    * Merge token ke dokumen; `null` menghapus token. Nilai datar: token ada → ganti `value` (tipe/mode tetap),
    * token baru → tipe diinferensi dari slot yang merujuknya. Objek `{type, value, modes?}` menggantikan token.
@@ -286,10 +308,11 @@ function iconNode(ctx: ApiContext, fn: string, node: unknown): unknown {
 /** update/duplicate: patch yang menyentuh icon/lib/version pada node icon → lib/icon digabung dari node lama. */
 function iconPatch(ctx: ApiContext, fn: string, id: unknown, patch: unknown): unknown {
   if (!isPlainObject(patch) || !ICON_KEYS.some((k) => Object.hasOwn(patch, k))) return patch;
-  if (typeof id !== 'string' || !ID_PATTERN.test(id)) return patch;
-  const hit = walk(ctx.view()).find((e) => e.node.id === id);
-  if (!hit || hit.node.type !== 'icon') return patch;
-  const old = hit.node as { lib: string; icon: string };
+  if (typeof id !== 'string' || !NODE_ADDRESS_PATTERN.test(id)) return patch;
+  // Alamat komposit: node efektif isi instance (patch menjadi override, AD-12).
+  const node = id.includes('/') ? expandedNodeAt(ctx.view() as Doc, id)?.node : walk(ctx.view()).find((e) => e.node.id === id)?.node;
+  if (!node || node.type !== 'icon') return patch;
+  const old = node as { lib: string; icon: string };
   const lib = Object.hasOwn(patch, 'lib') ? patch.lib : old.lib;
   const icon = Object.hasOwn(patch, 'icon') ? patch.icon : old.icon;
   const c = canonicalIcon(ctx, fn, lib, icon, patch.version);
@@ -301,13 +324,14 @@ const ICON_SEARCH_HINT = "contoh: iconSearch('dumbbell') atau iconSearch('arrow 
 
 type Entry = { node: AnyNode; parentId: string | null; path: string[] };
 
-/** Semua node dalam urutan dokumen (pre-order: halaman → board → anak). */
+/** Semua node tersimpan dalam urutan dokumen (pre-order: halaman → board → anak; isi slot instance ber-parent instance). */
 function walk(doc: Readonly<Doc>): Entry[] {
   const out: Entry[] = [];
   const visit = (n: AnyNode, parentId: string | null, prefix: string[]) => {
     const path = [...prefix, n.name];
     out.push({ node: n, parentId, path });
     if ('children' in n) for (const c of n.children) visit(c, n.id, path);
+    if (n.type === 'instance') for (const list of Object.values(n.slots ?? {})) for (const c of list) visit(c, n.id, path);
   };
   for (const p of doc.pages) for (const b of p.children) visit(b, null, []);
   return out;
@@ -361,9 +385,10 @@ const BOARD = "const b = add(null, {type:'board', name:'Beranda', x:0, y:0, widt
 export const API: { readonly [K in keyof LakarApi]: ApiFunction } = {
   add: {
     kind: 'op',
-    signature: "add(parentId: string | null, node: {type: 'board'|'frame'|'text'|'rect'|'ellipse'|'path'|'icon', name, ...}): string",
+    signature: "add(parentId: string | null, node: {type: 'board'|'frame'|'text'|'rect'|'ellipse'|'path'|'icon'|'instance', name, ...}): string",
     doc:
-      'Tambah node ke board/frame parentId (null = halaman, khusus board). Katalog v1 tertutup: board, frame, text, rect, ellipse, path, icon. ' +
+      'Tambah node ke board/frame parentId (null = halaman, khusus board). Katalog tertutup: board, frame, text, rect, ellipse, path, icon, instance (bagian Komponen). ' +
+      "parentId '<instanceId>/<idFrameSlot>' mengisi slot instance. " +
       'Anak ditambahkan satu per satu (tanpa children bersarang). Mengembalikan ID 8 karakter secara sinkron. ' +
       "Icon: {type:'icon', lib:'lucide'|'simple-icons', icon:<nama kanonik>, size, color?, strokeWidth?, filled?}; alias dikonversi ke nama kanonik " +
       "(lucide 'home' → 'house'), name default 'Icon / <lib> / <icon>', version diisi otomatis (jangan dikirim); nama tidak dikenal → ICON_UNKNOWN + 3 saran (cari dengan iconSearch).",
@@ -379,7 +404,9 @@ export const API: { readonly [K in keyof LakarApi]: ApiFunction } = {
   update: {
     kind: 'op',
     signature: 'update(id: string, patch: {...}): void',
-    doc: 'Merge dangkal properti ke node; null menghapus properti opsional. type/id/children tidak bisa diubah (ganti tipe → replace).',
+    doc:
+      'Merge dangkal properti ke node; null menghapus properti opsional. type/id/children tidak bisa diubah (ganti tipe → replace). ' +
+      "id '<instanceId>/<idNodeMaster>' (isi instance) atau properti node pada instance (mis. fills) menjadi override instance itu; master tetap.",
     returns: 'undefined',
     errors: ['SCHEMA_INVALID', 'NOT_FOUND', 'ICON_UNKNOWN'],
     example: `${BOARD}\nconst t = add(b, {type:'text', name:'Judul', content:'Halo', size:32});\nupdate(t, {size: 40, color: '#1A1A1A'});`,
@@ -407,7 +434,7 @@ export const API: { readonly [K in keyof LakarApi]: ApiFunction } = {
   move: {
     kind: 'op',
     signature: 'move(id: string, parentId: string | null, index?: number): void',
-    doc: 'Pindah node ke board/frame parentId pada index (default akhir). parentId null hanya untuk board: mengubah urutan board di halaman.',
+    doc: "Pindah node ke board/frame parentId pada index (default akhir). parentId null hanya untuk board: mengubah urutan board di halaman. parentId '<instanceId>/<idFrameSlot>' = ke slot instance.",
     returns: 'undefined',
     errors: ['SCHEMA_INVALID', 'NOT_FOUND'],
     example: `${BOARD}\nconst f = add(b, {type:'frame', name:'Kartu', layout:'column'});\nconst t = add(b, {type:'text', name:'Judul', content:'Halo', size:16});\nmove(t, f, 0);`,
@@ -432,13 +459,67 @@ export const API: { readonly [K in keyof LakarApi]: ApiFunction } = {
   remove: {
     kind: 'op',
     signature: 'remove(id: string): void',
-    doc: 'Hapus node beserta subtree-nya; ID itu tidak bisa dipakai lagi.',
+    doc: 'Hapus node beserta subtree-nya; ID itu tidak bisa dipakai lagi. Master komponen yang terhapus men-detach semua instancenya (node biasa ber-ID baru) di commit yang sama.',
     returns: 'undefined',
     errors: ['SCHEMA_INVALID', 'NOT_FOUND'],
     example: `${BOARD}\nconst t = add(b, {type:'text', name:'Sementara', content:'x', size:12});\nremove(t);`,
     call(ctx, [id]) {
       mutation(ctx, () => ctx.tx.remove(id as string));
       return undefined;
+    },
+  },
+  setComponent: {
+    kind: 'op',
+    signature: "setComponent(id: string, component?: {props: [{name, type:'text'|'boolean'|'enum', default, options?, binds:[{nodeId, prop}]}], slots: [{name, nodeId}]} | null): void",
+    doc:
+      'Jadikan node anak (frame/text/rect/ellipse/path/icon) master komponen; tanpa component = {props:[], slots:[]} (master yang sudah ada tidak berubah). ' +
+      "props: nama [a-z][A-Za-z0-9]*, binds menulis nilai prop ke properti node di dalam master (prop boolean + prop:'visible' menyembunyikan node). " +
+      'slots: frame turunan master yang isinya diganti per instance. null melepas status master: semua instancenya di-detach di commit yang sama. ' +
+      "Sisipkan instance dengan add(parentId, {type:'instance', name, componentId: id, props?}).",
+    returns: 'undefined',
+    errors: ['SCHEMA_INVALID', 'NOT_FOUND'],
+    example:
+      `${BOARD}\nconst k = add(b, {type:'frame', name:'Kartu', layout:'column', gap:8, padding:16});\nconst t = add(k, {type:'text', name:'Judul', content:'Judul', size:16});\n` +
+      "setComponent(k, {props:[{name:'title', type:'text', default:'Judul', binds:[{nodeId:t, prop:'content'}]}], slots:[]});\n" +
+      "add(b, {type:'instance', name:'Kartu promo', componentId:k, props:{title:'Promo'}});",
+    call(ctx, [id, component]) {
+      if (component === undefined) {
+        const hit = walk(ctx.view()).find((e) => e.node.id === id);
+        if (hit && hit.node.type !== 'board' && hit.node.type !== 'instance' && hit.node.component !== undefined) return undefined;
+      }
+      mutation(ctx, () => ctx.tx.setComponent(id as string, component === undefined ? { props: [], slots: [] } : component));
+      return undefined;
+    },
+  },
+  resetOverride: {
+    kind: 'op',
+    signature: 'resetOverride(address: string, props?: string[]): void',
+    doc:
+      "Hapus override isi instance: address = '<instanceId>/<idNodeMaster>' (atau ID instance untuk override akar, mis. fills); props = hanya properti itu, tanpa props = semua. " +
+      'Properti kembali mengikuti master. Override yatim (LC-32) juga bisa dibersihkan dengan ini.',
+    returns: 'undefined',
+    errors: ['SCHEMA_INVALID', 'NOT_FOUND'],
+    example:
+      `${BOARD}\nconst k = add(b, {type:'frame', name:'Kartu', layout:'column'});\nconst t = add(k, {type:'text', name:'Judul', content:'Judul', size:16});\nsetComponent(k);\n` +
+      "const i = add(b, {type:'instance', name:'Kartu A', componentId:k});\nupdate(i + '/' + t, {content:'Promo', color:'#B42318'});\nresetOverride(i + '/' + t, ['color']);",
+    call(ctx, [address, props]) {
+      mutation(ctx, () => ctx.tx.resetOverride(address as string, props));
+      return undefined;
+    },
+  },
+  detach: {
+    kind: 'op',
+    signature: 'detach(id: string): string | null',
+    doc:
+      'Ganti instance dengan node biasa ber-ID baru di posisi yang sama: props, override, dan isi slot diterapkan (tampilan tetap, instance bersarang ikut menjadi node biasa; isi slot mempertahankan ID). ' +
+      'Ref token tetap ref. null bila akar instance disembunyikan prop boolean-nya sendiri (instance dihapus).',
+    returns: 'ID akar node baru (string 8 karakter) atau null',
+    errors: ['SCHEMA_INVALID', 'NOT_FOUND'],
+    example:
+      `${BOARD}\nconst k = add(b, {type:'frame', name:'Kartu', layout:'column'});\nadd(k, {type:'text', name:'Judul', content:'Judul', size:16});\nsetComponent(k);\n` +
+      "const i = add(b, {type:'instance', name:'Kartu A', componentId:k});\nconst f = detach(i);\nget(f).type;",
+    call(ctx, [id]) {
+      return mutation(ctx, () => ctx.tx.detach(id as string));
     },
   },
   setTokens: {
@@ -531,11 +612,25 @@ export const API: { readonly [K in keyof LakarApi]: ApiFunction } = {
   get: {
     kind: 'read',
     signature: 'get(id: string): NodeView',
-    doc: 'Baca satu node sebagai salinan datar: properti tersimpan (token apa adanya) + parentId, path (nama board→node), childIds (board/frame). Melihat perubahan snippet ini.',
+    doc:
+      'Baca satu node sebagai salinan datar: properti tersimpan (token apa adanya) + parentId, path (nama board→node), childIds (board/frame). Melihat perubahan snippet ini. ' +
+      "Instance dibaca tersimpan (componentId, props, overrides, slots; tanpa childIds, isi slot lewat children(instanceId)); isinya lewat alamat '<instanceId>/<idNodeMaster>' = node efektif (props/override diterapkan, id/parentId/childIds beralamat komposit).",
     returns: 'NodeView',
     errors: ['SCHEMA_INVALID', 'NOT_FOUND'],
     example: `${BOARD}\nconst t = add(b, {type:'text', name:'Judul', content:'Halo', size:32});\nget(t).path;`,
     call(ctx, [id]) {
+      if (typeof id === 'string' && NODE_ADDRESS_PATTERN.test(id) && id.includes('/')) {
+        // Alamat komposit (AD-12): node efektif isi instance (props, override, slot diterapkan; token apa adanya).
+        const doc = ctx.view();
+        const hit = expandedNodeAt(doc as Doc, id);
+        if (!hit) {
+          throw new LakarError('NOT_FOUND', `get: isi instance ${id} tidak ada`, {
+            hint: 'alamat = <instanceId>/<idNodeMaster>[/…]: ID node master dari children(masterId); childIds node efektif sudah berupa alamat; node yang disembunyikan prop boolean tidak ada',
+          });
+        }
+        const owner = mustFind('get', doc, id.split('/')[0]!);
+        return toView({ node: hit.node as unknown as AnyNode, parentId: hit.parentId, path: [...owner.path.slice(0, -1), ...hit.names] });
+      }
       const nid = requireId('get', 'id', id);
       return toView(mustFind('get', ctx.view(), nid));
     },
@@ -543,7 +638,7 @@ export const API: { readonly [K in keyof LakarApi]: ApiFunction } = {
   find: {
     kind: 'read',
     signature: 'find(query?: {type?, name?: string | RegExp, within?: string}): NodeView[]',
-    doc: 'Cari node dalam urutan dokumen. name string = sama persis, RegExp = cocok; within = hanya keturunan board/frame itu.',
+    doc: 'Cari node tersimpan dalam urutan dokumen (termasuk isi slot instance, parentId = instance; isi master di dalam instance tidak). name string = sama persis, RegExp = cocok; within = hanya keturunan board/frame/instance itu.',
     returns: 'NodeView[] (urutan dokumen)',
     errors: ['SCHEMA_INVALID', 'NOT_FOUND'],
     example: `${BOARD}\nadd(b, {type:'text', name:'Judul', content:'Halo', size:32});\nfind({type:'text', name:/^Jud/, within: b}).map((n) => n.id);`,
@@ -576,7 +671,7 @@ export const API: { readonly [K in keyof LakarApi]: ApiFunction } = {
   children: {
     kind: 'read',
     signature: 'children(id: string | null): NodeView[]',
-    doc: 'Anak langsung node dalam urutan dokumen; null = board di halaman. Node daun → [].',
+    doc: 'Anak langsung node dalam urutan dokumen; null = board di halaman. Instance → isi slot tersimpannya (bukan isi master; itu lewat get alamat komposit). Node daun → [].',
     returns: 'NodeView[]',
     errors: ['SCHEMA_INVALID', 'NOT_FOUND'],
     example: `${BOARD}\nadd(b, {type:'text', name:'Judul', content:'Halo', size:32});\nchildren(b).map((n) => n.name);`,
@@ -744,7 +839,7 @@ export const API_REFERENCE: readonly ApiReferenceSection[] = [
   {
     title: 'Katalog node v1',
     items: [
-      "Tertutup: board, frame, text, rect, ellipse, path, icon. Kunci di luar skema → SCHEMA_INVALID. Semua node anak wajib `name`.",
+      "Tertutup: board, frame, text, rect, ellipse, path, icon, instance (bagian Komponen). Kunci di luar skema → SCHEMA_INVALID. Semua node anak wajib `name`.",
       "board (parent null): `{type:'board', name, x, y, width, height, screen:'landing'|'app'|'mobile', expectedSize?:{width,height}, fills?, themeMode?:string}` (themeMode harus ada di tokenModes). Selalu clip; anak disusun kolom dari kiri atas (seperti frame `layout:'column'`, align start).",
       "frame: `layout?:'none'|'row'|'column'|'grid'` (default `'none'` = semua anak absolut di x/y, default 0,0; grid: bagian Grid), `gap?` (boleh negatif), `padding?`, `align?:'start'|'center'|'end'|'stretch'` (sumbu silang), `justify?:'start'|'center'|'end'|'space-between'` (sumbu utama), `clip?`, `scrollY?` (geser isi ke atas), sizing, cat, radius, efek.",
       "text: `content, size, family?` (default Inter), `weight?` (100–900, default 400), `style?:'normal'|'italic'`, `lineHeight?` (px), `letterSpacing?` (em), `align?:'left'|'center'|'right'|'justify'`, `wrap?`, `numeric?:'proportional'|'tabular'`, `color?` (default #000000), sizing, efek.",
@@ -835,6 +930,22 @@ export const API_REFERENCE: readonly ApiReferenceSection[] = [
       "Mode tema: `setTokenModes(['light','dark'])`, token `modes:{dark:'#000000'}`, board `themeMode:'dark'` (default mode pertama).",
       "Baca: `getTokens()` → `{tokens, modes}`. Ganti nama: `renameToken(from, to)` (semua ref ikut). Dari codebase: `importCssVariables(css)` (`:root` + `[data-theme]`; variabel CSS = `--` + nama dengan `.` → `-`).",
     ],
+  },
+  {
+    title: 'Komponen',
+    items: [
+      'Master = node anak biasa ber-`component` (`setComponent(id, def?)`). Instance = `{type:\'instance\', name, componentId, props?, position?, x?, y?}`: isinya tidak disimpan, selalu mengikuti master (ubah master → semua instance berubah, override tetap).',
+      "Isi instance dialamati `'<instanceId>/<idNodeMaster>'` (bersarang: `I/J/x`). `get(alamat)` = node efektif; `update(alamat, patch)` = override di instance terluar; `resetOverride(alamat, props?)` mengembalikan ke master. move/remove/replace pada isi instance → SCHEMA_INVALID.",
+      "Props `{name, type:'text'|'boolean'|'enum', default, options?, binds:[{nodeId, prop}]}`; nilai per instance di `props`. Slot `{name, nodeId:<frame>}`: `add('<instanceId>/<idFrameSlot>', node)` mengisi slot (isi slot = node tersimpan biasa, ID sendiri).",
+      '`detach(instanceId)` → node biasa ber-ID baru. Menghapus master men-detach semua instancenya di commit yang sama. Override/prop yang tidak lagi cocok dengan master diabaikan dan dilaporkan check LC-32.',
+    ],
+    example:
+      `${BOARD}\nconst k = add(b, {type:'frame', name:'Kartu', layout:'column', gap:8, padding:16, fills:[{type:'solid', color:'#F2F4F7'}]});\n` +
+      "const t = add(k, {type:'text', name:'Judul', content:'Judul', size:16, weight:600});\nconst isi = add(k, {type:'frame', name:'Isi', layout:'column'});\n" +
+      "setComponent(k, {props:[{name:'title', type:'text', default:'Judul', binds:[{nodeId:t, prop:'content'}]}], slots:[{name:'body', nodeId:isi}]});\n" +
+      "const a = add(b, {type:'instance', name:'Kartu A', componentId:k, props:{title:'Promo'}});\n" +
+      "update(a + '/' + t, {color:'#B42318'});\nadd(a + '/' + isi, {type:'text', name:'Catatan', content:'Diskon 20%', size:14});\n" +
+      "update(k, {fills:[{type:'solid', color:'#FFFFFF'}]});\nget(a + '/' + t).content;",
   },
   {
     title: 'Respons execute',

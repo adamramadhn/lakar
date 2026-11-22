@@ -8,7 +8,9 @@ import {
   OVERRIDABLE_PROPS,
   SCHEMA_VERSION,
   componentIssues,
+  expandInstanceAt,
   expandInstances,
+  expandedNodeAt,
   instanceIssues,
   jsonSchemas,
   resolveDocument,
@@ -251,11 +253,48 @@ describe('expandInstances', () => {
     expect(instanceIssues(out).map((i) => i.instanceId)).toEqual(['Jjjjjjj1']);
   });
 
-  it('override bernilai tidak sah → SCHEMA_INVALID "instance tidak valid" dengan alamat node', () => {
-    const e = thrown(() => expandInstances(parse(docOf([master(), inst({ overrides: { Tttttt01: { size: -1 } } })]))));
-    expect(e.code).toBe('SCHEMA_INVALID');
-    expect(e.message).toContain('instance tidak valid');
-    expect(e.message).toContain('Iiiiiii1/Tttttt01');
+  it('override bernilai tidak sah: properti itu diabaikan dan dilaporkan, properti sah di patch yang sama tetap (story 3)', () => {
+    const out = expandInstances(parse(docOf([master(), inst({ overrides: { Tttttt01: { size: -1, content: 'Ok' } } })])));
+    expect(nodes(out).get('Iiiiiii1/Tttttt01')).toMatchObject({ size: 14, content: 'Ok' });
+    expect(instanceIssues(out)).toEqual([expect.objectContaining({ instanceId: 'Iiiiiii1', kind: 'override', key: 'Tttttt01', detail: expect.stringContaining('size') })]);
+  });
+
+  it('master berganti tipe: kunci override yang tidak berlaku untuk tipe baru diabaikan dan dilaporkan', () => {
+    const m = master({}, [{ type: 'rect', id: 'Tttttt01', name: 'Garis', width: 10, height: 2 }]);
+    const out = expandInstances(parse(docOf([m, inst({ overrides: { Tttttt01: { content: 'X', name: 'Garis promo' } } })])));
+    const t = nodes(out).get('Iiiiiii1/Tttttt01')!;
+    expect(t).toMatchObject({ type: 'rect', name: 'Garis promo' });
+    expect(t.content).toBeUndefined();
+    expect(instanceIssues(out).map((i) => [i.kind, i.key])).toEqual([['override', 'Tttttt01']]);
+  });
+
+  it('x override tanpa position pada node flow: diabaikan (atribusi refine xy); bersama position absolute: berlaku', () => {
+    const bad = expandInstances(parse(docOf([master(), inst({ overrides: { Tttttt01: { x: 10 } } })])));
+    expect(nodes(bad).get('Iiiiiii1/Tttttt01')!.x).toBeUndefined();
+    expect(instanceIssues(bad)).toHaveLength(1);
+    const ok = expandInstances(parse(docOf([master(), inst({ overrides: { Tttttt01: { x: 10, position: 'absolute' } } })])));
+    expect(nodes(ok).get('Iiiiiii1/Tttttt01')).toMatchObject({ x: 10, position: 'absolute' });
+    expect(instanceIssues(ok)).toEqual([]);
+  });
+
+  it('bind bertipe tidak cocok (prop text ke size): bind diabaikan dan dilaporkan, tanpa menolak dokumen', () => {
+    const def = { props: [{ name: 'title', type: 'text', default: 'Besar', binds: [{ nodeId: 'Tttttt01', prop: 'size' }] }], slots: [] };
+    const out = expandInstances(parse(docOf([master({}, [text('Tttttt01')], def), inst()])));
+    expect(nodes(out).get('Iiiiiii1/Tttttt01')!.size).toBe(14);
+    expect(instanceIssues(out)).toEqual([expect.objectContaining({ kind: 'bind', key: 'title.Tttttt01' })]);
+  });
+
+  it('expandInstanceAt / expandedNodeAt: satu instance di lokasi tersimpannya; parent dan nama', () => {
+    const d = parse(docOf([master(), inst({ overrides: { Tttttt01: { content: 'X' } } })]));
+    expect(expandInstanceAt(d, 'Zzzzzzzz')).toBeUndefined();
+    expect(expandInstanceAt(d, 'Iiiiiii1')).toEqual(nodes(expandInstances(d)).get('Iiiiiii1'));
+    const hit = expandedNodeAt(d, 'Iiiiiii1/Tttttt01')!;
+    expect(hit.node).toMatchObject({ content: 'X' });
+    expect(hit.parentId).toBe('Iiiiiii1');
+    expect(hit.names).toEqual(['Instance Iiiiiii1', 'Teks Tttttt01']);
+    expect(expandedNodeAt(d, 'Iiiiiii1')!.parent).toBeNull();
+    expect(expandedNodeAt(d, 'Iiiiiii1/Zzzzzzzz')).toBeUndefined();
+    expect(expandedNodeAt(d, 'Mmmmmmm1/Tttttt01')).toBeUndefined();
   });
 
   it('token salah slot lewat override → SCHEMA_INVALID token salah tipe (resolveDocument)', () => {

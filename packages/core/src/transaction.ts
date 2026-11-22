@@ -1,16 +1,23 @@
-// Transaksi operasi (AD-4): add | update | replace | move | duplicate | remove | insert | setTokens | setTokenModes di atas
-// salinan copy-on-write. Setiap op atomik sendiri: semua validasi selesai sebelum salinan kerja diubah,
+// Transaksi operasi (AD-4): add | update | replace | move | duplicate | remove | insert | setTokens | setTokenModes |
+// renameToken | setComponent | resetOverride | detach di atas salinan copy-on-write. Komponen (AD-12): update ke alamat
+// komposit menjadi override instance terluar; parent `I/<frameSlot>` mengisi slot; master yang hilang men-detach
+// instancenya di op yang sama. Setiap op atomik sendiri: semua validasi selesai sebelum salinan kerja diubah,
 // sehingga op gagal yang ditangkap snippet tidak meninggalkan jejak. Setiap op sukses mencatat op inversnya (AD-8);
 // commit mengembalikan daftar invers yang, diterapkan sebagai transaksi baru, mengembalikan isi dokumen. Tanpa IO.
 import {
+  ComponentDef,
   ID_PATTERN,
+  INSTANCE_KEYS,
   LakarError,
   NodeInput,
+  OVERRIDABLE_PROPS,
   TokenDef,
   TokenModes,
   TokenName,
   TokenValue,
   XY_HINT,
+  expandInstanceAt,
+  expandedNodeAt,
   isTokenValueOf,
   resolveDocument,
   suggestTokens,
@@ -21,16 +28,31 @@ import {
   type DocOp,
   type CreatedEntry,
   type HistoryEntry,
+  type InstanceNode,
   type LakarDocument as Doc,
   type TokenDef as TokenDefT,
 } from '@lakar/schema';
+import { detachedNode, instancesOf, isComposite, mastersIn, pruneSlots, remapAfterDetach, remapComponentIds, slotList, slotTarget } from './components.js';
 import { host } from './host.js';
 import { isPlainObject } from './object.js';
 import { IdAllocator, collectIds, type RandomSource } from './ids.js';
 import { inferTokens, tokenTypeOfValue } from './tokens-infer.js';
-import { indexNodes, isContainer, locate, subtree, type Container, type Location } from './tree.js';
+import { indexNodes, isContainer, locate, parentAddress, subtree, type Container, type Location } from './tree.js';
 
-export type OpKind = 'add' | 'update' | 'replace' | 'move' | 'duplicate' | 'remove' | 'insert' | 'setTokens' | 'setTokenModes' | 'renameToken';
+export type OpKind =
+  | 'add'
+  | 'update'
+  | 'replace'
+  | 'move'
+  | 'duplicate'
+  | 'remove'
+  | 'insert'
+  | 'setTokens'
+  | 'setTokenModes'
+  | 'renameToken'
+  | 'setComponent'
+  | 'resetOverride'
+  | 'detach';
 
 /**
  * Hasil commit. `entry === null` berarti tidak ada op yang sukses: tidak ada revisi baru, `doc` adalah
@@ -76,6 +98,15 @@ export interface Transaction {
    */
   renameToken(from: unknown, to: unknown): void;
   /**
+   * Jadikan node anak master (`component` = `{props, slots}`) atau lepas status master (`null`): instance master
+   * itu di-detach di op yang sama. Bind/slot harus menunjuk node di dalam master (slot: frame turunan).
+   */
+  setComponent(id: string, component: unknown): void;
+  /** Hapus override pada `address` (ID instance = akar, atau komposit); `props` = hanya properti itu. */
+  resetOverride(address: string, props?: unknown): void;
+  /** Ganti instance dengan node biasa ber-ID baru; `null` bila akarnya disembunyikan prop sendiri (instance dihapus). */
+  detach(id: string): string | null;
+  /**
    * Salinan kerja hidup (melihat op yang sudah sukses di transaksi ini). Hanya-baca menurut kontrak:
    * pemanggil tidak boleh memutasinya. Melempar bila transaksi sudah ditutup.
    */
@@ -94,7 +125,13 @@ const FORBIDDEN_PATCH_KEYS: Record<string, string> = {
   children: 'anak diubah lewat add/move/remove, bukan lewat patch',
 };
 
+const CONTENT_HINT =
+  'isi instance diubah lewat update(alamat, patch) (menjadi override) atau resetOverride(alamat); untuk mengubah strukturnya ubah master atau detach(instanceId); slot diisi lewat parent "<instanceId>/<frameSlot>"';
+
 function requireId(op: OpKind, what: string, v: unknown): string {
+  if (isComposite(v)) {
+    throw new LakarError('SCHEMA_INVALID', `${op}: ${what} ${v} adalah alamat isi instance; ${op} hanya menerima ID node tersimpan`, { hint: CONTENT_HINT });
+  }
   if (typeof v !== 'string' || !ID_PATTERN.test(v)) {
     throw new LakarError('SCHEMA_INVALID', `${op}: ${what} harus ID 8 karakter [A-Za-z0-9], bukan ${JSON.stringify(v) ?? 'undefined'}`, { hint: ADDRESS_HINT });
   }
@@ -197,6 +234,24 @@ function buildNode(input: NodeInput, id: string, children: ChildNode[] | undefin
   return { ...input, id } as AnyNode;
 }
 
+/**
+ * Op yang memulihkan node pada lokasi `loc` sesudah node itu dicabut (invers remove/detach). Isi slot yatim
+ * (nama slot tidak ada lagi di master) tidak punya alamat: dipulihkan dengan peta `slots` instance utuh.
+ */
+function reinsertOp(loc: Location): DocOp {
+  const node = host.structuredClone(loc.node) as unknown as Record<string, unknown>;
+  if (loc.slot) {
+    if (loc.slot.address) return { op: 'insert', parentId: loc.slot.address, node, index: loc.index };
+    return { op: 'update', id: loc.slot.instance.id, patch: { slots: host.structuredClone(loc.slot.instance.slots) } };
+  }
+  return { op: 'insert', parentId: loc.parent ? loc.parent.id : loc.page.id, node, index: loc.index };
+}
+
+const COMPONENT_HINT =
+  "setComponent(id, {props:[{name:'title', type:'text', default:'Judul', binds:[{nodeId, prop:'content'}]}], slots:[{name:'body', nodeId:<frame turunan>}]}); null melepas status master (instancenya di-detach)";
+const RESET_HINT = "resetOverride('<instanceId>/<idNodeMaster>', ['content']) atau resetOverride(instanceId) untuk override akar; tanpa props = semua properti kunci itu";
+const OVERRIDE_HINT = 'override = properti node (mis. content, fills, color); type/id/children/component tidak bisa di-override';
+
 const TOKENS_HINT =
   'setTokens({"colors.text-primary": "#1A1A1A", "spacing.2": 8}) atau bertipe {"colors.bg": {type:"color", value:"#FFFFFF", modes:{dark:"#000000"}}}; nama: segmen [a-z0-9-] dipisah titik; nilai datar: angka atau string tak kosong; null menghapus token';
 const RENAME_HINT = "renameToken('colors.primary', 'colors.brand'): nama lama harus ada, nama baru belum dipakai; nama: segmen [a-z0-9-] dipisah titik";
@@ -292,6 +347,94 @@ export function beginTransaction(doc: Doc, opts: TransactionOptions): Transactio
     inverses.push(inv);
     return result;
   };
+  /** Jalankan `f` yang memutasi lebih dari satu tempat; gagal di tengah → salinan kerja dipulihkan (op atomik). */
+  const withRollback = <T>(f: () => T): T => {
+    const snap = host.structuredClone(live());
+    try {
+      return f();
+    } catch (e) {
+      work = snap;
+      throw e;
+    }
+  };
+
+  /**
+   * Detach instance `iid` (AD-12) di tempat: diganti salinan beku hasil ekspansinya (ID baru, isi slot tetap).
+   * Mengembalikan ID akar baru (`null` = akar tersembunyi, instance dihapus) dan invers urut penerapan undo.
+   */
+  const detachOne = (w: Doc, opName: OpKind, iid: string): { id: string | null; inv: DocOp[] } => {
+    const loc = mustLocate(w, opName, iid, 'instance');
+    if (loc.node.type !== 'instance') {
+      throw new LakarError('SCHEMA_INVALID', `${opName}: node ${loc.node.type} ${iid} bukan instance`, { hint: 'detach hanya untuk node bertipe instance' });
+    }
+    const inst = loc.node;
+    const back = reinsertOp(loc);
+    const expanded = expandInstanceAt(w, iid);
+    if (!expanded) {
+      loc.siblings.splice(loc.index, 1);
+      if (loc.slot) pruneSlots(loc.slot.instance, loc.slot.name);
+      return { id: null, inv: [back] };
+    }
+    const built = detachedNode(expanded, inst, () => ids.next());
+    const parsed = ChildNode.safeParse(built.node);
+    if (!parsed.success) throw zodToLakarError(parsed.error, `${opName} instance ${iid}`);
+    const restore = remapAfterDetach(w, iid, built.map);
+    loc.siblings[loc.index] = parsed.data;
+    createdIds.push(...built.fresh);
+    return { id: parsed.data.id, inv: [{ op: 'remove', id: parsed.data.id }, back, ...restore] };
+  };
+
+  /** Detach semua instance tersimpan dari `masters` di luar `exclude`; invers per langkah (urut penerapan). */
+  const detachAll = (w: Doc, opName: OpKind, masters: ReadonlySet<string>, exclude?: ReadonlySet<string>): DocOp[][] =>
+    instancesOf(w, masters, exclude).map((iid) => detachOne(w, opName, iid).inv);
+
+  /** Catat invers langkah detach (langkah terakhir dibatalkan lebih dulu). */
+  const undoSteps = (steps: DocOp[][], undo: (inv: DocOp) => void) => {
+    for (const s of [...steps].reverse()) s.forEach(undo);
+  };
+
+  /**
+   * Siapkan override `patch` pada `address` (ID instance = akar, atau komposit) milik instance `inst` tanpa
+   * memutasi: validasi node efektif (`NodeInput`), lalu kembalikan penerap (mencari ulang instance) dan inversnya.
+   */
+  const prepareOverride = (w: Doc, opName: OpKind, inst: InstanceNode, address: string, patch: Record<string, unknown>) => {
+    for (const key of Object.keys(patch)) {
+      if (Object.hasOwn(FORBIDDEN_PATCH_KEYS, key) || key === 'component') {
+        throw new LakarError('SCHEMA_INVALID', `${opName}: properti ${key} pada isi instance ${address} tidak bisa di-override`, { hint: OVERRIDE_HINT });
+      }
+      if (!OVERRIDABLE_PROPS.includes(key)) {
+        throw new LakarError('SCHEMA_INVALID', `${opName}: properti ${key} tidak dikenal untuk override`, { hint: OVERRIDE_HINT });
+      }
+    }
+    const hit = expandedNodeAt(w, address);
+    if (!hit) {
+      throw new LakarError('NOT_FOUND', `${opName}: isi instance ${address} tidak ada`, {
+        hint: 'alamat = <instanceId>/<idNodeMaster>[/…] dari get()/find() atau seleksi; node yang disembunyikan prop boolean tidak bisa dialamati',
+      });
+    }
+    const parent = hit.parent ?? (address === inst.id ? (locate(w, inst.id)?.parent ?? null) : null);
+    const norm = implicitAbsolute(parent as AnyNode | null, patch) as Record<string, unknown>;
+    mergePatch(opName, hit.node as unknown as AnyNode, norm);
+    const key = address === inst.id ? inst.componentId : address.slice(inst.id.length + 1);
+    const old = inst.overrides?.[key] ?? {};
+    const restore: Record<string, unknown> = {};
+    const fresh: string[] = [];
+    for (const [p, v] of Object.entries(norm)) {
+      if (v === undefined) continue;
+      if (!Object.hasOwn(old, p)) fresh.push(p);
+      else if (!sameValue(old[p], v)) restore[p] = host.structuredClone(old[p]);
+    }
+    const inv: DocOp[] = [];
+    if (Object.keys(restore).length) inv.push({ op: 'update', id: address, patch: restore });
+    if (fresh.length) inv.push({ op: 'resetOverride', id: address, props: fresh });
+    const apply = () => {
+      const target = locate(live(), inst.id)!.node as InstanceNode;
+      const entry: Record<string, unknown> = { ...(target.overrides?.[key] ?? {}) };
+      for (const [p, v] of Object.entries(norm)) if (v !== undefined) entry[p] = v;
+      target.overrides = { ...(target.overrides ?? {}), [key]: entry };
+    };
+    return { apply, inv };
+  };
 
   return {
     get open() {
@@ -304,6 +447,17 @@ export function beginTransaction(doc: Doc, opts: TransactionOptions): Transactio
 
     add(parentId, raw) {
       return op('add', (w, undo) => {
+        if (isComposite(parentId)) {
+          // Isi slot instance (AD-12): parent = "<instanceId>/<frameSlot>".
+          const t = slotTarget(w, 'add', parentId);
+          const input = parseInput('add', implicitAbsolute(t.frame, raw));
+          if (input.type === 'board') throw new LakarError('SCHEMA_INVALID', 'board hanya boleh menjadi anak halaman', { hint: 'pakai add(null, {type:"board",...})' });
+          const id = ids.next();
+          slotList(t).push(buildNode(input, id, undefined) as ChildNode);
+          createdIds.push(id);
+          undo({ op: 'remove', id });
+          return id;
+        }
         const pid = parentId === null ? null : requireId('add', 'parentId', parentId);
         // Parent dicari tanpa throw dulu (normalisasi x/y); urutan error lama tetap (skema → parent).
         const input = parseInput('add', implicitAbsolute(pid === null ? null : locate(w, pid)?.node, raw));
@@ -346,12 +500,45 @@ export function beginTransaction(doc: Doc, opts: TransactionOptions): Transactio
 
     update(id, patch) {
       op('update', (w, undo) => {
+        if (isComposite(id)) {
+          // Alamat komposit (AD-12) → override pada instance terluar (segmen pertama).
+          const iid = id.split('/')[0]!;
+          const loc = mustLocate(w, 'update', iid, 'instance');
+          if (loc.node.type !== 'instance') throw new LakarError('NOT_FOUND', `update: isi instance ${id} tidak ada (${iid} bukan instance)`, { hint: CONTENT_HINT });
+          if (!isPlainObject(patch)) mergePatch('update', loc.node, patch);
+          const prep = prepareOverride(w, 'update', loc.node, id, patch as Record<string, unknown>);
+          prep.apply();
+          prep.inv.forEach(undo);
+          return;
+        }
         const loc = mustLocate(w, 'update', requireId('update', 'id', id));
-        const input = mergePatch('update', loc.node, implicitAbsolute(loc.parent, patch));
-        const next = buildNode(input, loc.node.id, 'children' in loc.node ? loc.node.children : undefined);
-        const revert = revertPatch(loc.node, next);
-        loc.siblings[loc.index] = next;
-        if (revert) undo({ op: 'update', id: next.id, patch: revert });
+        let own: unknown = patch;
+        let over: ReturnType<typeof prepareOverride> | undefined;
+        if (loc.node.type === 'instance' && isPlainObject(patch)) {
+          // Kunci non-instance pada instance = override akar (kunci componentId), mis. fills dari panel Design.
+          const mine: Record<string, unknown> = {};
+          const rest: Record<string, unknown> = {};
+          for (const [k, v] of Object.entries(patch)) (INSTANCE_KEYS.includes(k) || Object.hasOwn(FORBIDDEN_PATCH_KEYS, k) ? mine : rest)[k] = v;
+          if (Object.keys(rest).length) {
+            over = prepareOverride(w, 'update', loc.node, loc.node.id, rest);
+            own = mine;
+          }
+        }
+        const input = mergePatch('update', loc.node, implicitAbsolute(loc.parent, own));
+        const vanishing = loc.node.type !== 'board' && loc.node.type !== 'instance' && loc.node.component !== undefined && (input as { component?: unknown }).component === undefined;
+        const apply = (steps: DocOp[][]) => {
+          const at = steps.length ? mustLocate(live(), 'update', loc.node.id) : loc;
+          const next = buildNode(input, at.node.id, 'children' in at.node ? at.node.children : undefined);
+          const revert = revertPatch(at.node, next);
+          at.siblings[at.index] = next;
+          over?.apply();
+          over?.inv.forEach(undo);
+          if (revert) undo({ op: 'update', id: next.id, patch: revert });
+          undoSteps(steps, undo);
+        };
+        // Lepas status master lewat patch component:null → instancenya di-detach dulu (AD-12).
+        if (vanishing) withRollback(() => apply(detachAll(live(), 'update', new Set([loc.node.id]))));
+        else apply([]);
       });
     },
 
@@ -381,8 +568,21 @@ export function beginTransaction(doc: Doc, opts: TransactionOptions): Transactio
             hint: 'pindahkan anaknya (move) atau hapus (remove) dulu, atau ganti ke tipe frame agar anak dipertahankan',
           });
         }
-        loc.siblings[loc.index] = buildNode(input, old.id, children);
-        undo({ op: 'replace', id: old.id, node: host.structuredClone(propsOf(old)) });
+        const back: DocOp = { op: 'replace', id: old.id, node: host.structuredClone(propsOf(old)) };
+        const vanishing = old.type !== 'board' && old.type !== 'instance' && old.component !== undefined && (input as { component?: unknown }).component === undefined;
+        if (!vanishing) {
+          loc.siblings[loc.index] = buildNode(input, old.id, children);
+          undo(back);
+          return;
+        }
+        // Pengganti tanpa component = master hilang → instancenya di-detach dulu di op yang sama (AD-12).
+        withRollback(() => {
+          const steps = detachAll(live(), 'replace', new Set([old.id]));
+          const at = mustLocate(live(), 'replace', old.id);
+          at.siblings[at.index] = buildNode(input, old.id, 'children' in at.node ? at.node.children : []);
+          undo(back);
+          undoSteps(steps, undo);
+        });
       });
     },
 
@@ -391,6 +591,7 @@ export function beginTransaction(doc: Doc, opts: TransactionOptions): Transactio
         const loc = mustLocate(w, 'move', requireId('move', 'id', id));
         const node = loc.node;
         let dest: AnyNode[];
+        let slot: ReturnType<typeof slotTarget> | undefined;
         if (parentId === null) {
           if (node.type !== 'board') {
             throw new LakarError('SCHEMA_INVALID', `move(id, null): hanya board yang bisa menjadi anak halaman, bukan ${node.type}`, {
@@ -398,6 +599,14 @@ export function beginTransaction(doc: Doc, opts: TransactionOptions): Transactio
             });
           }
           dest = loc.page.children;
+        } else if (isComposite(parentId)) {
+          // Ke slot instance (AD-12); daftar slot baru dibuat hanya bila op lolos validasi.
+          slot = slotTarget(w, 'move', parentId);
+          if (node.type === 'board') throw new LakarError('SCHEMA_INVALID', 'move: board hanya boleh menjadi anak halaman', { hint: 'untuk mengubah urutan board pakai move(boardId, null, index)' });
+          if (slot.instance.id === node.id || slot.loc.ancestors.some((a) => a.id === node.id)) {
+            throw new LakarError('SCHEMA_INVALID', `move: ${node.id} tidak bisa dipindah ke slot di dalam dirinya sendiri (${parentId})`, { hint: 'pilih slot di luar subtree node yang dipindah' });
+          }
+          dest = slot.instance.slots?.[slot.name] ?? [];
         } else {
           const pid = requireId('move', 'parentId', parentId);
           const target = mustLocate(w, 'move', pid, 'parent');
@@ -424,11 +633,19 @@ export function beginTransaction(doc: Doc, opts: TransactionOptions): Transactio
             hint: 'index = posisi akhir di antara anak parent tujuan; hilangkan index untuk menaruh di akhir',
           });
         }
+        // Asal di slot yatim (tanpa alamat): invers memulihkan peta slots instance utuh.
+        const orphanBack = loc.slot && !loc.slot.address ? reinsertOp(loc) : undefined;
         loc.siblings.splice(loc.index, 1);
+        if (slot && dest.length === 0 && slot.instance.slots?.[slot.name] === undefined) dest = slotList(slot);
         const at = index ?? dest.length;
         dest.splice(at, 0, node);
+        if (loc.slot) pruneSlots(loc.slot.instance, loc.slot.name);
         // Pindah ke posisi yang sama (wadah dan indeks akhir sama) tidak menghasilkan invers.
-        if (dest !== loc.siblings || at !== loc.index) undo({ op: 'move', id: node.id, parentId: loc.parent ? loc.parent.id : null, index: loc.index });
+        if (dest === loc.siblings && at === loc.index) return;
+        if (orphanBack) {
+          undo({ op: 'remove', id: node.id });
+          undo(orphanBack);
+        } else undo({ op: 'move', id: node.id, parentId: parentAddress(loc), index: loc.index });
       });
     },
 
@@ -438,11 +655,20 @@ export function beginTransaction(doc: Doc, opts: TransactionOptions): Transactio
         const rootInput = patch === undefined ? undefined : mergePatch('duplicate', loc.node, implicitAbsolute(loc.parent, patch));
         const copy = host.structuredClone(loc.node);
         const fresh: string[] = [];
+        const renamed = new Map<string, string>();
+        // subtree ikut isi slot instance, jadi salinan isi slot juga mendapat ID baru.
         for (const n of subtree(copy)) {
-          n.id = ids.next();
-          fresh.push(n.id);
+          const nid = ids.next();
+          renamed.set(n.id, nid);
+          n.id = nid;
+          fresh.push(nid);
         }
-        const root = rootInput ? buildNode(rootInput, copy.id, 'children' in copy ? copy.children : undefined) : copy;
+        // Patch dibangun dari properti asal: isi slot instance diambil dari salinan (ID baru), kecuali patch membawa slots sendiri.
+        const keepSlots = copy.type === 'instance' && copy.slots && !(isPlainObject(patch) && Object.hasOwn(patch, 'slots'));
+        const input = rootInput && keepSlots ? ({ ...rootInput, slots: (copy as InstanceNode).slots } as NodeInput) : rootInput;
+        const root = input ? buildNode(input, copy.id, 'children' in copy ? copy.children : undefined) : copy;
+        // Salinan master menjadi master baru: bind/slot menunjuk node salinan, bukan node master asal.
+        for (const n of subtree(root)) remapComponentIds(n, renamed);
         loc.siblings.splice(loc.index + 1, 0, root);
         createdIds.push(...fresh);
         undo({ op: 'remove', id: root.id });
@@ -453,25 +679,44 @@ export function beginTransaction(doc: Doc, opts: TransactionOptions): Transactio
     remove(id) {
       op('remove', (w, undo) => {
         const loc = mustLocate(w, 'remove', requireId('remove', 'id', id));
-        loc.siblings.splice(loc.index, 1);
-        // Board: parent = ID halamannya (bisa bukan halaman pertama).
-        const node = host.structuredClone(loc.node) as unknown as Record<string, unknown>;
-        undo({ op: 'insert', parentId: loc.parent ? loc.parent.id : loc.page.id, node, index: loc.index });
+        const masters = mastersIn(loc.node);
+        const removeAt = (at: Location) => {
+          // Board: parent = ID halamannya (bisa bukan halaman pertama); isi slot: alamat slot.
+          const back = reinsertOp(at);
+          at.siblings.splice(at.index, 1);
+          if (at.slot) pruneSlots(at.slot.instance, at.slot.name);
+          undo(back);
+        };
+        if (!masters.size) return removeAt(loc);
+        // Master ikut terhapus → instancenya di luar subtree ini di-detach dulu, di op yang sama (AD-12).
+        const inside = new Set(subtree(loc.node).map((n) => n.id));
+        withRollback(() => {
+          const steps = detachAll(live(), 'remove', masters, inside);
+          removeAt(mustLocate(live(), 'remove', loc.node.id));
+          undoSteps(steps, undo);
+        });
       });
     },
 
     insert(parentId, raw, index) {
       return op('insert', (w, undo) => {
-        const pid = parentId === null ? null : requireId('insert', 'parentId', parentId);
+        const slot = isComposite(parentId) ? slotTarget(w, 'insert', parentId) : undefined;
+        const pid = parentId === null || slot ? null : requireId('insert', 'parentId', parentId);
         if (!isPlainObject(raw)) {
           throw new LakarError('SCHEMA_INVALID', `insert: node harus objek node tersimpan, bukan ${Array.isArray(raw) ? 'array' : JSON.stringify(raw) ?? 'undefined'}`, {
             hint: 'insert menerima node utuh dengan id dan children (mis. dari op invers remove)',
           });
         }
-        const page = pid === null ? w.pages[0]! : w.pages.find((p) => p.id === pid);
+        const page = slot ? undefined : pid === null ? w.pages[0]! : w.pages.find((p) => p.id === pid);
         let dest: AnyNode[];
         let node: AnyNode;
-        if (page) {
+        if (slot) {
+          if (raw.type === 'board') throw new LakarError('SCHEMA_INVALID', 'board hanya boleh menjadi anak halaman', { hint: 'insert(pageId | null, board)' });
+          const parsed = ChildNode.safeParse(raw);
+          if (!parsed.success) throw zodToLakarError(parsed.error, 'insert');
+          dest = slot.instance.slots?.[slot.name] ?? [];
+          node = parsed.data;
+        } else if (page) {
           if (raw.type !== 'board') {
             throw new LakarError('SCHEMA_INVALID', `insert(pageId, …) hanya untuk board, bukan ${JSON.stringify(raw.type) ?? 'undefined'}`, {
               hint: 'anak halaman hanya board; sisipkan node anak ke board atau frame',
@@ -510,6 +755,7 @@ export function beginTransaction(doc: Doc, opts: TransactionOptions): Transactio
           }
           seen.add(nid);
         }
+        if (slot && dest.length === 0) dest = slotList(slot);
         dest.splice(index ?? dest.length, 0, node);
         for (const nid of fresh) ids.reserve(nid);
         createdIds.push(...fresh);
@@ -584,6 +830,94 @@ export function beginTransaction(doc: Doc, opts: TransactionOptions): Transactio
         renameRefs(w.pages, from, to);
         if (pendingFlat.delete(from)) pendingFlat.add(to);
         undo({ op: 'renameToken', from: to, to: from });
+      });
+    },
+
+    setComponent(id, raw) {
+      op('setComponent', (w, undo) => {
+        const loc = mustLocate(w, 'setComponent', requireId('setComponent', 'id', id));
+        const node = loc.node;
+        if (node.type === 'board' || node.type === 'instance') {
+          throw new LakarError('SCHEMA_INVALID', `setComponent: ${node.type} ${node.id} tidak bisa menjadi master`, {
+            hint: 'master = node anak biasa (frame, text, rect, ellipse, path, icon); instance di-detach dulu bila ingin dijadikan master',
+          });
+        }
+        const old = node.component;
+        if (raw === null) {
+          if (old === undefined) return;
+          // Lepas status master → instancenya di-detach dulu di op yang sama (AD-12).
+          withRollback(() => {
+            const steps = detachAll(live(), 'setComponent', new Set([node.id]));
+            const at = mustLocate(live(), 'setComponent', node.id).node as ChildNode & { component?: unknown };
+            delete at.component;
+            undo({ op: 'setComponent', id: node.id, component: host.structuredClone(old) as unknown as Record<string, unknown> });
+            undoSteps(steps, undo);
+          });
+          return;
+        }
+        // Master tidak boleh bersarang atau berada di isi slot (componentIssues); ditolak di op supaya snippet bisa menangkapnya.
+        const outer = loc.ancestors.find((a) => a.type !== 'board' && a.type !== 'instance' && a.component !== undefined);
+        const innerMaster = [...mastersIn(node)].find((m) => m !== node.id);
+        const where = loc.slot || loc.ancestors.some((a) => a.type === 'instance') ? 'berada di isi slot instance' : outer ? `berada di dalam master ${outer.id}` : innerMaster ? `memuat master ${innerMaster}` : undefined;
+        if (old === undefined && where) {
+          throw new LakarError('SCHEMA_INVALID', `setComponent: ${node.type} ${node.id} ${where}; master tidak boleh bersarang`, {
+            hint: 'pakai instance komponen lain di dalam master (add(parent, {type:"instance", …})), atau pindahkan node keluar dari master/slot dulu',
+          });
+        }
+        const parsed = ComponentDef.safeParse(raw);
+        if (!parsed.success) throw new LakarError('SCHEMA_INVALID', zodToLakarError(parsed.error, 'setComponent').message, { hint: COMPONENT_HINT });
+        const def = parsed.data;
+        const inside = new Map(subtree(node).map((n) => [n.id, n] as const));
+        const problems: string[] = [];
+        for (const p of def.props) for (const b of p.binds) if (!inside.has(b.nodeId)) problems.push(`prop ${p.name}: bind ${b.nodeId} bukan node di dalam master ${node.id}`);
+        for (const s of def.slots) {
+          const target = inside.get(s.nodeId);
+          if (!target || s.nodeId === node.id || target.type !== 'frame') problems.push(`slot ${s.name}: ${s.nodeId} harus frame turunan master ${node.id}`);
+        }
+        if (problems.length) throw new LakarError('SCHEMA_INVALID', `setComponent: ${problems.join('; ')}`, { hint: COMPONENT_HINT });
+        if (sameValue(old, def)) return;
+        (node as ChildNode & { component?: unknown }).component = def;
+        undo({ op: 'setComponent', id: node.id, component: old === undefined ? null : (host.structuredClone(old) as unknown as Record<string, unknown>) });
+      });
+    },
+
+    resetOverride(address, props) {
+      op('resetOverride', (w, undo) => {
+        if (typeof address !== 'string' || !(ID_PATTERN.test(address) || isComposite(address))) {
+          throw new LakarError('SCHEMA_INVALID', `resetOverride: alamat harus ID instance atau alamat komposit "<instanceId>/<idNodeMaster>", bukan ${JSON.stringify(address) ?? 'undefined'}`, { hint: RESET_HINT });
+        }
+        if (props !== undefined && (!Array.isArray(props) || props.length === 0 || props.some((p) => typeof p !== 'string' || !p))) {
+          throw new LakarError('SCHEMA_INVALID', `resetOverride: props harus array nama properti tak kosong, bukan ${JSON.stringify(props) ?? 'undefined'}`, { hint: RESET_HINT });
+        }
+        const iid = address.split('/')[0]!;
+        const loc = mustLocate(w, 'resetOverride', iid, 'instance');
+        if (loc.node.type !== 'instance') {
+          throw new LakarError('SCHEMA_INVALID', `resetOverride: node ${loc.node.type} ${iid} bukan instance`, { hint: RESET_HINT });
+        }
+        const inst = loc.node;
+        const key = address === iid ? inst.componentId : address.slice(iid.length + 1);
+        const old = inst.overrides;
+        const entry = old?.[key];
+        if (!old || !entry) return;
+        const next = { ...entry };
+        for (const p of (props as string[] | undefined) ?? Object.keys(entry)) delete next[p];
+        if (Object.keys(next).length === Object.keys(entry).length) return;
+        const overrides = { ...old };
+        if (Object.keys(next).length) overrides[key] = next;
+        else delete overrides[key];
+        if (Object.keys(overrides).length) inst.overrides = overrides;
+        else delete inst.overrides;
+        // Peta lama utuh: selalu bisa diterapkan, juga untuk kunci yatim atau nilai yang sudah basi.
+        undo({ op: 'update', id: iid, patch: { overrides: host.structuredClone(old) } });
+      });
+    },
+
+    detach(id) {
+      return op('detach', (_w, undo) => {
+        const iid = requireId('detach', 'id', id);
+        const r = withRollback(() => detachOne(live(), 'detach', iid));
+        r.inv.forEach(undo);
+        return r.id;
       });
     },
 

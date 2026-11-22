@@ -97,7 +97,7 @@ async function commitRun(code: string, doc: Doc = createDocument()) {
 describe('@lakar/exec', () => {
   it('mengekspor nama paket dan permukaan API lengkap (AD-7)', () => {
     expect(PACKAGE).toBe('@lakar/exec');
-    expect(Object.keys(API)).toEqual(['add', 'update', 'replace', 'move', 'duplicate', 'remove', 'setTokens', 'setTokenModes', 'renameToken', 'importCssVariables', 'get', 'find', 'children', 'getTokens', 'place', 'iconSearch', 'photo']);
+    expect(Object.keys(API)).toEqual(['add', 'update', 'replace', 'move', 'duplicate', 'remove', 'setComponent', 'resetOverride', 'detach', 'setTokens', 'setTokenModes', 'renameToken', 'importCssVariables', 'get', 'find', 'children', 'getTokens', 'place', 'iconSearch', 'photo']);
     for (const [name, fn] of Object.entries(API)) {
       expect(fn.signature.startsWith(`${name}(`), name).toBe(true);
       expect(fn.doc.length, name).toBeGreaterThan(20);
@@ -315,7 +315,7 @@ describe('@lakar/exec', () => {
       const ts = errRun(await runSnippet('const a = 1;\nconst b: number = 2', txFor()));
       expect(ts.message).toMatch(/^baris 2:\d+: SyntaxError/);
       const ref = errRun(await runSnippet('fetch("x")', txFor()));
-      expect(ref.hint).toContain('add, update, replace, move, duplicate, remove, setTokens, setTokenModes, renameToken, importCssVariables, get, find, children, getTokens, place, iconSearch, photo, keep, console.log');
+      expect(ref.hint).toContain('add, update, replace, move, duplicate, remove, setComponent, resetOverride, detach, setTokens, setTokenModes, renameToken, importCssVariables, get, find, children, getTokens, place, iconSearch, photo, keep, console.log');
     });
 
     it('error host yang ditangkap snippet tidak membatalkan transaksi; e.code tersedia', async () => {
@@ -516,6 +516,63 @@ describe('@lakar/exec', () => {
       expect(errRun(await runSnippet("importCssVariables(':root{--colors-bg:#fff}' + ' '.repeat(300000))", txFor())).code).toBe('SCHEMA_INVALID');
       const noPort = errRun(await runSnippetRaw("importCssVariables(':root{--colors-bg:#fff}')", txFor(), { icons: fakeIcons }));
       expect(noPort.code).toBe('EXEC_ERROR');
+    });
+  });
+
+  describe('komponen: setComponent, instance, override komposit, resetOverride, detach (epic komponen story 3)', () => {
+    const KARTU = `const b = ${BOARD()}; const k = add(b, {type:'frame', name:'Kartu', layout:'column'}); const t = add(k, {type:'text', name:'Judul', content:'Halo', size:16}); const isi = add(k, {type:'frame', name:'Isi', layout:'column'}); setComponent(k, {props:[], slots:[{name:'body', nodeId:isi}]}); const a = add(b, {type:'instance', name:'Kartu A', componentId:k}); const c = add(b, {type:'instance', name:'Kartu B', componentId:k});`;
+
+    it('alur agen: override teks di satu instance, ubah master, get komposit, find/children isi slot', async () => {
+      const { r, c } = await commitRun(
+        `${KARTU} update(a + '/' + t, {content:'Promo'}); update(t, {color:'#B42318'}); const s = add(a + '/' + isi, {type:'text', name:'Catatan', content:'x', size:12});` +
+          ` [get(a + '/' + t), get(c + '/' + t).content, get(a), find({name:'Catatan'}).map((n) => n.parentId), children(a).map((n) => n.name), get(a + '/' + isi).childIds, a]`,
+      );
+      const [eff, other, inst, parents, kids, slotKids, a] = r.value as [Record<string, unknown>, string, Record<string, unknown>, string[], string[], string[], string];
+      expect(eff).toMatchObject({ type: 'text', content: 'Promo', color: '#B42318', parentId: a, path: ['B', 'Kartu A', 'Judul'] });
+      expect(String(eff.id)).toMatch(new RegExp(`^${a}/`));
+      expect(other).toBe('Halo');
+      expect(inst).toMatchObject({ type: 'instance', overrides: expect.any(Object) });
+      expect(inst.childIds).toBeUndefined();
+      expect(parents).toEqual([a]);
+      expect(kids).toEqual(['Catatan']);
+      expect(slotKids).toHaveLength(1);
+      expect(c.inverse.length).toBeGreaterThan(0);
+    });
+
+    it('setComponent tanpa argumen; resetOverride; detach → node biasa; hapus master men-detach', async () => {
+      const { r, c } = await commitRun(
+        `const b = ${BOARD()}; const k = add(b, {type:'frame', name:'Kartu'}); add(k, {type:'text', name:'Judul', content:'Halo', size:16}); setComponent(k); setComponent(k);` +
+          ` const a = add(b, {type:'instance', name:'A', componentId:k}); const z = add(b, {type:'instance', name:'Z', componentId:k}); update(a, {fills:[{type:'solid', color:'#FEF3C7'}]}); resetOverride(a);` +
+          ` const d = detach(a); remove(k); [get(d).type, find({type:'instance'}).length, children(b).map((n) => n.type)]`,
+      );
+      expect(r.value).toEqual(['frame', 0, ['frame', 'frame']]);
+      expect(c.entry!.opsSummary).toContain('detach');
+    });
+
+    it('setComponent tanpa argumen pada master berdefinisi: props dan slots tetap', async () => {
+      const { r } = await commitRun(`${KARTU} setComponent(k, {props:[{name:'title', type:'text', default:'Halo', binds:[{nodeId:t, prop:'content'}]}], slots:[{name:'body', nodeId:isi}]}); setComponent(k); [get(k).component, get(a + '/' + t).content]`);
+      const [def, content] = r.value as [Record<string, unknown[]>, string];
+      expect(def.props).toHaveLength(1);
+      expect(def.slots).toHaveLength(1);
+      expect(content).toBe('Halo');
+    });
+
+    it('update ikon lewat alamat komposit: alias → nama kanonik + version; nama tak dikenal → ICON_UNKNOWN', async () => {
+      const ICON = `const b = ${BOARD()}; const k = add(b, {type:'frame', name:'Tombol', layout:'row'}); const ic = add(k, {type:'icon', lib:'lucide', icon:'search', size:16}); setComponent(k); const a = add(b, {type:'instance', name:'Tombol A', componentId:k});`;
+      const { r } = await commitRun(`${ICON} update(a + '/' + ic, {icon:'home'}); [get(a + '/' + ic), get(a).overrides]`);
+      const [eff, overrides] = r.value as [Record<string, unknown>, Record<string, Record<string, unknown>>];
+      expect(eff).toMatchObject({ icon: 'house', version: '1.74.0' });
+      expect(Object.values(overrides)[0]).toEqual({ icon: 'house', version: '1.74.0' });
+      expect(errRun(await runSnippet(`${ICON} update(a + '/' + ic, {icon:'nope'})`, txFor())).code).toBe('ICON_UNKNOWN');
+    });
+
+    it('error: alamat tak ada → NOT_FOUND, override tidak sah → SCHEMA_INVALID, komposit ke remove → SCHEMA_INVALID', async () => {
+      expect(errRun(await runSnippet(`${KARTU} get(a + '/Zzzzzzzz')`, txFor())).code).toBe('NOT_FOUND');
+      expect(errRun(await runSnippet(`${KARTU} update(a + '/' + t, {size:-1})`, txFor())).code).toBe('SCHEMA_INVALID');
+      const e = errRun(await runSnippet(`${KARTU} remove(a + '/' + t)`, txFor()));
+      expect(e.code).toBe('SCHEMA_INVALID');
+      expect(e.hint).toContain('detach');
+      expect(errRun(await runSnippet(`${KARTU} detach(k)`, txFor())).code).toBe('SCHEMA_INVALID');
     });
   });
 });

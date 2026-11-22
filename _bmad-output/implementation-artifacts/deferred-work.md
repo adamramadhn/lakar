@@ -157,6 +157,7 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-komponen-2-schema.md`
   summary: Override atau bind yang menjadi tidak sah karena master disunting menolak commit (SCHEMA_INVALID), bukan diabaikan dan dilaporkan.
   evidence: Review k2 (blind, edge). expandInstances memvalidasi pohon ter-ekspansi dengan skema strict dan commit core memanggil resolveDocument. Keputusan story 2: tetap tolak (AD-1/AD-7); op komponen story 3 menambah reset/buang override yang tidak berlaku atau menjadikannya laporan LC-32.
+  resolved: 2026-11-22 di `spec-komponen-3-ops.md` (epic komponen story 3). `expandInstances` kini mengabaikan nilai bind/override yang membuat node efektif tidak sah dan melaporkannya sebagai LC-32, jadi suntingan master tidak pernah ditolak karena override lama. Jalur edit komposit (`update`) tetap memvalidasi node efektif, dan `resetOverride` bisa membersihkan kunci basi.
 - source_spec: `_bmad-output/implementation-artifacts/spec-komponen-2-schema.md`
   summary: Canvas viewer dengan instance (mount isi terurai, seleksi alamat komposit, ikon/label Layers instance) belum dites otomatis.
   evidence: Review k2 (intent). Canvas memakai resolveDocument sehingga instance termount; harness DOM/E2E viewer belum ada (pra-ada). Layers memakai ikon cadangan untuk tipe instance; penanda mengikuti desain di story 4.

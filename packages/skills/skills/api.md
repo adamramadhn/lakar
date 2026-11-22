@@ -6,9 +6,9 @@ Referensi lengkap fungsi global di snippet `execute` (sandbox QuickJS sinkron). 
 
 ### add
 
-`add(parentId: string | null, node: {type: 'board'|'frame'|'text'|'rect'|'ellipse'|'path'|'icon', name, ...}): string`
+`add(parentId: string | null, node: {type: 'board'|'frame'|'text'|'rect'|'ellipse'|'path'|'icon'|'instance', name, ...}): string`
 
-Tambah node ke board/frame parentId (null = halaman, khusus board). Katalog v1 tertutup: board, frame, text, rect, ellipse, path, icon. Anak ditambahkan satu per satu (tanpa children bersarang). Mengembalikan ID 8 karakter secara sinkron. Icon: {type:'icon', lib:'lucide'|'simple-icons', icon:<nama kanonik>, size, color?, strokeWidth?, filled?}; alias dikonversi ke nama kanonik (lucide 'home' → 'house'), name default 'Icon / <lib> / <icon>', version diisi otomatis (jangan dikirim); nama tidak dikenal → ICON_UNKNOWN + 3 saran (cari dengan iconSearch).
+Tambah node ke board/frame parentId (null = halaman, khusus board). Katalog tertutup: board, frame, text, rect, ellipse, path, icon, instance (bagian Komponen). parentId '<instanceId>/<idFrameSlot>' mengisi slot instance. Anak ditambahkan satu per satu (tanpa children bersarang). Mengembalikan ID 8 karakter secara sinkron. Icon: {type:'icon', lib:'lucide'|'simple-icons', icon:<nama kanonik>, size, color?, strokeWidth?, filled?}; alias dikonversi ke nama kanonik (lucide 'home' → 'house'), name default 'Icon / <lib> / <icon>', version diisi otomatis (jangan dikirim); nama tidak dikenal → ICON_UNKNOWN + 3 saran (cari dengan iconSearch).
 
 - Mengembalikan: ID node baru (string 8 karakter)
 - Error: SCHEMA_INVALID, NOT_FOUND, ICON_UNKNOWN
@@ -23,7 +23,7 @@ add(b, {type:'icon', lib:'lucide', icon:'home', size:24, color:'#1A1A1A'});
 
 `update(id: string, patch: {...}): void`
 
-Merge dangkal properti ke node; null menghapus properti opsional. type/id/children tidak bisa diubah (ganti tipe → replace).
+Merge dangkal properti ke node; null menghapus properti opsional. type/id/children tidak bisa diubah (ganti tipe → replace). id '<instanceId>/<idNodeMaster>' (isi instance) atau properti node pada instance (mis. fills) menjadi override instance itu; master tetap.
 
 - Mengembalikan: undefined
 - Error: SCHEMA_INVALID, NOT_FOUND, ICON_UNKNOWN
@@ -53,7 +53,7 @@ replace(r, {type:'ellipse', name:'Bulat', width:40, height:40});
 
 `move(id: string, parentId: string | null, index?: number): void`
 
-Pindah node ke board/frame parentId pada index (default akhir). parentId null hanya untuk board: mengubah urutan board di halaman.
+Pindah node ke board/frame parentId pada index (default akhir). parentId null hanya untuk board: mengubah urutan board di halaman. parentId '<instanceId>/<idFrameSlot>' = ke slot instance.
 
 - Mengembalikan: undefined
 - Error: SCHEMA_INVALID, NOT_FOUND
@@ -85,7 +85,7 @@ duplicate(f, {name:'Kartu 2'});
 
 `remove(id: string): void`
 
-Hapus node beserta subtree-nya; ID itu tidak bisa dipakai lagi.
+Hapus node beserta subtree-nya; ID itu tidak bisa dipakai lagi. Master komponen yang terhapus men-detach semua instancenya (node biasa ber-ID baru) di commit yang sama.
 
 - Mengembalikan: undefined
 - Error: SCHEMA_INVALID, NOT_FOUND
@@ -94,6 +94,61 @@ Hapus node beserta subtree-nya; ID itu tidak bisa dipakai lagi.
 const b = add(null, {type:'board', name:'Beranda', x:0, y:0, width:390, height:844, screen:'mobile'});
 const t = add(b, {type:'text', name:'Sementara', content:'x', size:12});
 remove(t);
+```
+
+### setComponent
+
+`setComponent(id: string, component?: {props: [{name, type:'text'|'boolean'|'enum', default, options?, binds:[{nodeId, prop}]}], slots: [{name, nodeId}]} | null): void`
+
+Jadikan node anak (frame/text/rect/ellipse/path/icon) master komponen; tanpa component = {props:[], slots:[]} (master yang sudah ada tidak berubah). props: nama [a-z][A-Za-z0-9]*, binds menulis nilai prop ke properti node di dalam master (prop boolean + prop:'visible' menyembunyikan node). slots: frame turunan master yang isinya diganti per instance. null melepas status master: semua instancenya di-detach di commit yang sama. Sisipkan instance dengan add(parentId, {type:'instance', name, componentId: id, props?}).
+
+- Mengembalikan: undefined
+- Error: SCHEMA_INVALID, NOT_FOUND
+
+```js
+const b = add(null, {type:'board', name:'Beranda', x:0, y:0, width:390, height:844, screen:'mobile'});
+const k = add(b, {type:'frame', name:'Kartu', layout:'column', gap:8, padding:16});
+const t = add(k, {type:'text', name:'Judul', content:'Judul', size:16});
+setComponent(k, {props:[{name:'title', type:'text', default:'Judul', binds:[{nodeId:t, prop:'content'}]}], slots:[]});
+add(b, {type:'instance', name:'Kartu promo', componentId:k, props:{title:'Promo'}});
+```
+
+### resetOverride
+
+`resetOverride(address: string, props?: string[]): void`
+
+Hapus override isi instance: address = '<instanceId>/<idNodeMaster>' (atau ID instance untuk override akar, mis. fills); props = hanya properti itu, tanpa props = semua. Properti kembali mengikuti master. Override yatim (LC-32) juga bisa dibersihkan dengan ini.
+
+- Mengembalikan: undefined
+- Error: SCHEMA_INVALID, NOT_FOUND
+
+```js
+const b = add(null, {type:'board', name:'Beranda', x:0, y:0, width:390, height:844, screen:'mobile'});
+const k = add(b, {type:'frame', name:'Kartu', layout:'column'});
+const t = add(k, {type:'text', name:'Judul', content:'Judul', size:16});
+setComponent(k);
+const i = add(b, {type:'instance', name:'Kartu A', componentId:k});
+update(i + '/' + t, {content:'Promo', color:'#B42318'});
+resetOverride(i + '/' + t, ['color']);
+```
+
+### detach
+
+`detach(id: string): string | null`
+
+Ganti instance dengan node biasa ber-ID baru di posisi yang sama: props, override, dan isi slot diterapkan (tampilan tetap, instance bersarang ikut menjadi node biasa; isi slot mempertahankan ID). Ref token tetap ref. null bila akar instance disembunyikan prop boolean-nya sendiri (instance dihapus).
+
+- Mengembalikan: ID akar node baru (string 8 karakter) atau null
+- Error: SCHEMA_INVALID, NOT_FOUND
+
+```js
+const b = add(null, {type:'board', name:'Beranda', x:0, y:0, width:390, height:844, screen:'mobile'});
+const k = add(b, {type:'frame', name:'Kartu', layout:'column'});
+add(k, {type:'text', name:'Judul', content:'Judul', size:16});
+setComponent(k);
+const i = add(b, {type:'instance', name:'Kartu A', componentId:k});
+const f = detach(i);
+get(f).type;
 ```
 
 ### setTokens
@@ -163,7 +218,7 @@ add(b, {type:'rect', name:'Kartu', width:120, height:80, radius:{$token:'radius.
 
 `get(id: string): NodeView`
 
-Baca satu node sebagai salinan datar: properti tersimpan (token apa adanya) + parentId, path (nama board→node), childIds (board/frame). Melihat perubahan snippet ini.
+Baca satu node sebagai salinan datar: properti tersimpan (token apa adanya) + parentId, path (nama board→node), childIds (board/frame). Melihat perubahan snippet ini. Instance dibaca tersimpan (componentId, props, overrides, slots; tanpa childIds, isi slot lewat children(instanceId)); isinya lewat alamat '<instanceId>/<idNodeMaster>' = node efektif (props/override diterapkan, id/parentId/childIds beralamat komposit).
 
 - Mengembalikan: NodeView
 - Error: SCHEMA_INVALID, NOT_FOUND
@@ -178,7 +233,7 @@ get(t).path;
 
 `find(query?: {type?, name?: string | RegExp, within?: string}): NodeView[]`
 
-Cari node dalam urutan dokumen. name string = sama persis, RegExp = cocok; within = hanya keturunan board/frame itu.
+Cari node tersimpan dalam urutan dokumen (termasuk isi slot instance, parentId = instance; isi master di dalam instance tidak). name string = sama persis, RegExp = cocok; within = hanya keturunan board/frame/instance itu.
 
 - Mengembalikan: NodeView[] (urutan dokumen)
 - Error: SCHEMA_INVALID, NOT_FOUND
@@ -193,7 +248,7 @@ find({type:'text', name:/^Jud/, within: b}).map((n) => n.id);
 
 `children(id: string | null): NodeView[]`
 
-Anak langsung node dalam urutan dokumen; null = board di halaman. Node daun → [].
+Anak langsung node dalam urutan dokumen; null = board di halaman. Instance → isi slot tersimpannya (bukan isi master; itu lewat get alamat komposit). Node daun → [].
 
 - Mengembalikan: NodeView[]
 - Error: SCHEMA_INVALID, NOT_FOUND
@@ -273,7 +328,7 @@ add(k, {type:'text', name:'Judul', content:'Kamar deluks, 2 tamu', size:16, line
 
 ## Katalog node v1
 
-- Tertutup: board, frame, text, rect, ellipse, path, icon. Kunci di luar skema → SCHEMA_INVALID. Semua node anak wajib `name`.
+- Tertutup: board, frame, text, rect, ellipse, path, icon, instance (bagian Komponen). Kunci di luar skema → SCHEMA_INVALID. Semua node anak wajib `name`.
 - board (parent null): `{type:'board', name, x, y, width, height, screen:'landing'|'app'|'mobile', expectedSize?:{width,height}, fills?, themeMode?:string}` (themeMode harus ada di tokenModes). Selalu clip; anak disusun kolom dari kiri atas (seperti frame `layout:'column'`, align start).
 - frame: `layout?:'none'|'row'|'column'|'grid'` (default `'none'` = semua anak absolut di x/y, default 0,0; grid: bagian Grid), `gap?` (boleh negatif), `padding?`, `align?:'start'|'center'|'end'|'stretch'` (sumbu silang), `justify?:'start'|'center'|'end'|'space-between'` (sumbu utama), `clip?`, `scrollY?` (geser isi ke atas), sizing, cat, radius, efek.
 - text: `content, size, family?` (default Inter), `weight?` (100–900, default 400), `style?:'normal'|'italic'`, `lineHeight?` (px), `letterSpacing?` (em), `align?:'left'|'center'|'right'|'justify'`, `wrap?`, `numeric?:'proportional'|'tabular'`, `color?` (default #000000), sizing, efek.
@@ -370,6 +425,26 @@ add(b, {type:'frame', name:'Kartu terangkat', width:200, height:120, radius:12, 
 - Nilai per tipe (value dan modes): color hex #RRGGBB/#RRGGBBAA; fontFamily string tak kosong; fontWeight 100–900 kelipatan 100; lineHeight > 0; letterSpacing angka apa pun; tipe lain angka ≥ 0.
 - Mode tema: `setTokenModes(['light','dark'])`, token `modes:{dark:'#000000'}`, board `themeMode:'dark'` (default mode pertama).
 - Baca: `getTokens()` → `{tokens, modes}`. Ganti nama: `renameToken(from, to)` (semua ref ikut). Dari codebase: `importCssVariables(css)` (`:root` + `[data-theme]`; variabel CSS = `--` + nama dengan `.` → `-`).
+
+## Komponen
+
+- Master = node anak biasa ber-`component` (`setComponent(id, def?)`). Instance = `{type:'instance', name, componentId, props?, position?, x?, y?}`: isinya tidak disimpan, selalu mengikuti master (ubah master → semua instance berubah, override tetap).
+- Isi instance dialamati `'<instanceId>/<idNodeMaster>'` (bersarang: `I/J/x`). `get(alamat)` = node efektif; `update(alamat, patch)` = override di instance terluar; `resetOverride(alamat, props?)` mengembalikan ke master. move/remove/replace pada isi instance → SCHEMA_INVALID.
+- Props `{name, type:'text'|'boolean'|'enum', default, options?, binds:[{nodeId, prop}]}`; nilai per instance di `props`. Slot `{name, nodeId:<frame>}`: `add('<instanceId>/<idFrameSlot>', node)` mengisi slot (isi slot = node tersimpan biasa, ID sendiri).
+- `detach(instanceId)` → node biasa ber-ID baru. Menghapus master men-detach semua instancenya di commit yang sama. Override/prop yang tidak lagi cocok dengan master diabaikan dan dilaporkan check LC-32.
+
+```js
+const b = add(null, {type:'board', name:'Beranda', x:0, y:0, width:390, height:844, screen:'mobile'});
+const k = add(b, {type:'frame', name:'Kartu', layout:'column', gap:8, padding:16, fills:[{type:'solid', color:'#F2F4F7'}]});
+const t = add(k, {type:'text', name:'Judul', content:'Judul', size:16, weight:600});
+const isi = add(k, {type:'frame', name:'Isi', layout:'column'});
+setComponent(k, {props:[{name:'title', type:'text', default:'Judul', binds:[{nodeId:t, prop:'content'}]}], slots:[{name:'body', nodeId:isi}]});
+const a = add(b, {type:'instance', name:'Kartu A', componentId:k, props:{title:'Promo'}});
+update(a + '/' + t, {color:'#B42318'});
+add(a + '/' + isi, {type:'text', name:'Catatan', content:'Diskon 20%', size:14});
+update(k, {fills:[{type:'solid', color:'#FFFFFF'}]});
+get(a + '/' + t).content;
+```
 
 ## Respons execute
 

@@ -679,6 +679,23 @@ const expandedLeaves = [
   z.object({ ...iconShape, id: Address }).strict().superRefine(xyOnlyWhenAbsolute),
 ];
 const expanded = nodeBranch(Address, expandedLeaves, false);
+
+/**
+ * Skema dangkal node hasil ekspansi per tipe (tanpa `children`, id = alamat). Dipakai ekspansi untuk menguji
+ * nilai bind/override per node: nilai yang membuat node tidak sah diabaikan dan dilaporkan (AD-12).
+ */
+export const EXPANDED_NODE_SHALLOW: Readonly<Record<string, z.ZodType>> = Object.freeze({
+  frame: z.object({ ...frameShape, id: Address }).strict().superRefine(xyOnlyWhenAbsolute),
+  text: expandedLeaves[0]!,
+  rect: expandedLeaves[1]!,
+  ellipse: expandedLeaves[2]!,
+  path: expandedLeaves[3]!,
+  icon: expandedLeaves[4]!,
+});
+
+/** Kunci milik node instance sendiri; kunci lain pada `update(instanceId, …)` menjadi override akar. */
+export const INSTANCE_KEYS: readonly string[] = Object.freeze([...Object.keys(instanceShape), 'slots']);
+
 /**
  * Dokumen ter-ekspansi (hasil `expandInstances`): sama dengan `LakarDocument`, tetapi id node boleh alamat
  * komposit dan tipe `instance` tidak ada. Validasi komponen (siklus, master) sudah dijalankan pada dokumen tersimpan.

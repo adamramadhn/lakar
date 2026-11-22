@@ -286,4 +286,37 @@ describe.skipIf(!browserInstalled)('alur agen dari seleksi: get_selection → ex
       await agent.close();
     }
   }, 60_000);
+
+  // epic komponen story 3: agen membuat master + instance lewat tool MCP execute, meng-override teks, mengubah master,
+  // lalu menghapus master (instance di-detach dalam satu rev).
+  it('MCP execute: master, instance, override teks; ubah master tanpa menimpa override; hapus master men-detach', async () => {
+    const agent = new Client({ name: 'agen-komponen', version: '0' });
+    try {
+      const [ct, st] = InMemoryTransport.createLinkedPair();
+      await createLakarMcpServer(d.url).connect(st);
+      await agent.connect(ct);
+      expect((await agent.callTool({ name: 'open_doc', arguments: { slug: 'komponen-mcp' } })).isError).toBeFalsy();
+      const run = async (code: string, description: string) => {
+        const r = await agent.callTool({ name: 'execute', arguments: { code, description } });
+        expect(r.isError, text(r)).toBeFalsy();
+        return JSON.parse(text(r).split('\n')[0]!);
+      };
+      const made = await run(
+        "const b = add(null, {type:'board', name:'Kartu', x:0, y:0, width:390, height:844, screen:'mobile'});" +
+          "const k = add(b, {type:'frame', name:'Kartu', layout:'column', padding:16}); const t = add(k, {type:'text', name:'Judul', content:'Halo', size:16});" +
+          "setComponent(k); const a = add(b, {type:'instance', name:'Kartu A', componentId:k}); const c = add(b, {type:'instance', name:'Kartu B', componentId:k});" +
+          "update(a + '/' + t, {content:'Promo'}); keep.k = k; keep.t = t; keep.a = a; keep.c = c; [a, c]",
+        'buat komponen kartu',
+      );
+      await run("update(keep.t, {color:'#B42318'})", 'warna judul master');
+      const read = await run("[get(keep.a + '/' + keep.t), get(keep.c + '/' + keep.t)].map((n) => [n.content, n.color])", 'baca isi instance');
+      expect(read.value).toEqual([['Promo', '#B42318'], ['Halo', '#B42318']]);
+      const del = await run('remove(keep.k); find({type:\'instance\'}).length', 'hapus master kartu');
+      expect(del.rev).toBe(read.rev + 1);
+      expect(del.value).toBe(0);
+      expect(made.value).toHaveLength(2);
+    } finally {
+      await agent.close();
+    }
+  }, 60_000);
 });

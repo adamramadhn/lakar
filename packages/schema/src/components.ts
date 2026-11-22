@@ -4,11 +4,13 @@
 import { componentIssues, hasComponents, hasInstances, visitStored } from './component-issues.js';
 import { LakarError } from './errors.js';
 import {
+  EXPANDED_NODE_SHALLOW,
   ExpandedLakarDocument,
   VISIBLE_BIND,
   zodToLakarError,
   type ChildNode,
   type ComponentDef,
+  type ExpandedChildNode,
   type ExpandedDocument,
   type InstanceNode,
   type LakarDocument as Doc,
@@ -52,23 +54,63 @@ const ROOT_KEYS = ['name', 'position', 'x', 'y', 'gridColumn', 'gridRow'] as con
 
 type Mut = Record<string, unknown> & { id: string; type: string; children?: Mut[] };
 
-/**
- * Urai setiap instance menjadi salinan master (AD-12). Alamat: akar = id instance, turunan
- * `<alamatInstance>/<idTersimpan>`, bersarang `I/J/x`. Urutan: salin → props → override → slot → buang node
- * `visible:false`. Struktur rusak (siklus, master tak ada, master bersarang, ID ganda) → SCHEMA_INVALID; hasil yang
- * melanggar skema (mis. override bernilai salah) → SCHEMA_INVALID `instance tidak valid` dengan alamat node.
- * Dokumen tanpa instance dikembalikan apa adanya. Laporan basi: `instanceIssues(hasil)`.
- */
-export function expandInstances(doc: Doc): ExpandedDocument {
-  if (!hasComponents(doc)) return doc as unknown as ExpandedDocument;
-  const structural = componentIssues(doc);
-  if (structural.length) {
-    throw new LakarError('SCHEMA_INVALID', `komponen tidak valid: ${structural.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ')}`, {
-      hint: 'instance hanya boleh merujuk master (node dengan component) di dokumen yang sama, tanpa siklus; master tidak boleh bersarang; ID node unik',
-    });
-  }
-  if (!hasInstances(doc)) return doc as unknown as ExpandedDocument;
+const ABSENT = Symbol('absent');
 
+/**
+ * Kunci (dari `candidates`) yang membuat node tidak sah terhadap skema dangkal tipenya; `null` = node sah;
+ * `'all'` = tidak sah tetapi penyebabnya tidak bisa diatribusikan ke kandidat.
+ */
+function invalidKeys(node: Mut, candidates: readonly string[]): string[] | 'all' | null {
+  const schema = EXPANDED_NODE_SHALLOW[node.type];
+  if (!schema) return null;
+  const { children: _c, ...flat } = node;
+  const r = schema.safeParse(flat);
+  if (r.success) return null;
+  const hit = new Set<string>();
+  for (const i of r.error.issues) {
+    const keys = i.code === 'unrecognized_keys' ? i.keys : typeof i.path[0] === 'string' ? [i.path[0]] : [];
+    for (const k of keys) if (candidates.includes(k)) hit.add(k);
+  }
+  return hit.size ? [...hit] : 'all';
+}
+
+/**
+ * Terapkan `patch` (null menghapus) ke `target`. Properti yang membuat node tidak sah dikembalikan ke nilai
+ * sebelumnya dan dikembalikan sebagai daftar; atribusi gagal → seluruh patch dikembalikan (AD-12: diabaikan).
+ */
+function applyLenient(target: Mut, patch: Readonly<Record<string, unknown>>): string[] {
+  const before = new Map<string, unknown>();
+  for (const [prop, value] of Object.entries(patch)) {
+    if (value === undefined) continue;
+    before.set(prop, Object.hasOwn(target, prop) ? target[prop] : ABSENT);
+    if (value === null) delete target[prop];
+    else target[prop] = value;
+  }
+  const keys = [...before.keys()];
+  const revert = (k: string) => {
+    const v = before.get(k);
+    if (v === ABSENT) delete target[k];
+    else target[k] = v;
+  };
+  const bad = invalidKeys(target, keys);
+  if (bad === null) return [];
+  if (bad !== 'all') {
+    bad.forEach(revert);
+    if (invalidKeys(target, keys) === null) return bad;
+  }
+  keys.forEach(revert);
+  return keys;
+}
+
+type Expander = {
+  /** Salin node tersimpan (instance diekspansi). `owner` = alamat instance pemilik salinan (undefined = tersimpan). */
+  copy(node: ChildNode, owner: string | undefined, stack: readonly string[]): Mut | null;
+  issues: InstanceIssue[];
+  setBoard(id: string): void;
+};
+
+/** Pabrik ekspansi untuk satu dokumen yang lolos `componentIssues`. */
+function expander(doc: Doc): Expander {
   const masters = new Map<string, ChildNode & { component: ComponentDef }>();
   visitStored(doc, ({ node }) => {
     if (node.component !== undefined) masters.set(node.id as string, node as unknown as ChildNode & { component: ComponentDef });
@@ -130,7 +172,7 @@ export function expandInstances(doc: Doc): ExpandedDocument {
     const gone = (key: string) => removed.has(full(key));
     const def = master.component;
 
-    // Props: nilai instance yang sah, atau default; ditulis ke setiap bind.
+    // Props: nilai instance yang sah, atau default; ditulis ke setiap bind (nilai yang membuat node tidak sah diabaikan).
     const hidden = new Set<Mut>();
     const given = inst.props ?? {};
     for (const name of Object.keys(given)) {
@@ -151,21 +193,21 @@ export function expandInstances(doc: Doc): ExpandedDocument {
         } else if (b.prop === VISIBLE_BIND) {
           if (p.type !== 'boolean') issue('bind', `${p.name}.${b.nodeId}`, `bind "${VISIBLE_BIND}" hanya untuk prop boolean (bertipe ${p.type})`);
           else if (value === false) hidden.add(target);
-        } else target[b.prop] = value;
+        } else if (applyLenient(target, { [b.prop]: value }).length) {
+          issue('bind', `${p.name}.${b.nodeId}`, `nilai ${JSON.stringify(value)} tidak sah untuk ${b.prop} pada ${target.type} ${b.nodeId}; bind diabaikan`);
+        }
       }
     }
 
-    // Override: merge dangkal per node; null menghapus properti master.
+    // Override: merge dangkal per node; null menghapus properti master. Properti yang tidak lagi sah diabaikan.
     for (const [key, patch] of Object.entries(inst.overrides ?? {})) {
       const target = at(key);
       if (!target) {
         if (!gone(key)) issue('override', key, `node master tidak ada lagi di ${cid}; override diabaikan`);
         continue;
       }
-      for (const [prop, value] of Object.entries(patch)) {
-        if (value === null) delete target[prop];
-        else if (value !== undefined) target[prop] = value;
-      }
+      const bad = applyLenient(target, patch);
+      if (bad.length) issue('override', key, `${bad.join(', ')} tidak sah lagi untuk ${target.type} di master ${cid}; override properti itu diabaikan`);
     }
 
     // Slot: isi tersimpan instance menggantikan anak frame slot (prefiks pemilik instance).
@@ -205,11 +247,41 @@ export function expandInstances(doc: Doc): ExpandedDocument {
     return root;
   };
 
+  return {
+    copy,
+    issues,
+    setBoard(id) {
+      boardId = id;
+    },
+  };
+}
+
+function assertStructure(doc: Doc): void {
+  const structural = componentIssues(doc);
+  if (structural.length) {
+    throw new LakarError('SCHEMA_INVALID', `komponen tidak valid: ${structural.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ')}`, {
+      hint: 'instance hanya boleh merujuk master (node dengan component) di dokumen yang sama, tanpa siklus; master tidak boleh bersarang; ID node unik',
+    });
+  }
+}
+
+/**
+ * Urai setiap instance menjadi salinan master (AD-12). Alamat: akar = id instance, turunan
+ * `<alamatInstance>/<idTersimpan>`, bersarang `I/J/x`. Urutan: salin → props → override → slot → buang node
+ * `visible:false`. Struktur rusak (siklus, master tak ada, master bersarang, ID ganda) → SCHEMA_INVALID. Nilai
+ * bind/override yang membuat node efektif tidak sah diabaikan dan dilaporkan (`instanceIssues`), sehingga suntingan
+ * master tidak pernah gagal karena override lama. Dokumen tanpa instance dikembalikan apa adanya.
+ */
+export function expandInstances(doc: Doc): ExpandedDocument {
+  if (!hasComponents(doc)) return doc as unknown as ExpandedDocument;
+  assertStructure(doc);
+  if (!hasInstances(doc)) return doc as unknown as ExpandedDocument;
+  const x = expander(doc);
   const pages = doc.pages.map((p) => ({
     ...p,
     children: p.children.map((b) => {
-      boardId = b.id;
-      return { ...b, children: b.children.map((c) => copy(c, undefined, [])).filter((c): c is Mut => c !== null) };
+      x.setBoard(b.id);
+      return { ...b, children: b.children.map((c) => x.copy(c, undefined, [])).filter((c): c is Mut => c !== null) };
     }),
   }));
   const out = { ...doc, pages };
@@ -221,7 +293,50 @@ export function expandInstances(doc: Doc): ExpandedDocument {
       hint: 'nilai props/override instance harus sah untuk properti node master (skema sama dengan node biasa); null menghapus properti',
     });
   }
-  return attachInstanceIssues(r.data, issues);
+  return attachInstanceIssues(r.data, x.issues);
+}
+
+/**
+ * Ekspansi satu instance tersimpan `instanceId` di lokasi tersimpannya (alamat akar = `instanceId`), seperti
+ * bagian yang sama dari `expandInstances`. `undefined` = tidak ada instance tersimpan dengan id itu; `null` = akar
+ * disembunyikan prop boolean instance sendiri. Dipakai core (override komposit, detach) dan exec (`get`).
+ */
+export function expandInstanceAt(doc: Doc, instanceId: string): ExpandedChildNode | null | undefined {
+  let inst: InstanceNode | undefined;
+  visitStored(doc, ({ node }) => {
+    if (inst === undefined && node.type === 'instance' && node.id === instanceId) inst = node as unknown as InstanceNode;
+  });
+  if (!inst) return undefined;
+  assertStructure(doc);
+  return expander(doc).copy(inst, undefined, []) as unknown as ExpandedChildNode | null;
+}
+
+/**
+ * Node efektif pada alamat (ID instance atau komposit `I/…`). `parentId`/`parent` = alamat dan node parent di dalam
+ * ekspansi (`null` untuk akar instance); `names` = nama dari akar instance sampai node.
+ */
+export type ExpandedHit = { node: ExpandedChildNode; parentId: string | null; parent: ExpandedChildNode | null; names: string[] };
+
+/**
+ * Cari node hasil ekspansi pada `address` di dalam instance tersimpan terluar (segmen pertama). `undefined` bila
+ * instance tidak ada, akarnya tersembunyi, atau alamat tidak ada di hasil ekspansi.
+ */
+export function expandedNodeAt(doc: Doc, address: string): ExpandedHit | undefined {
+  const root = expandInstanceAt(doc, address.split('/')[0]!);
+  if (!root) return undefined;
+  const find = (n: ExpandedChildNode, parent: ExpandedChildNode | null, names: string[]): ExpandedHit | undefined => {
+    const path = [...names, n.name];
+    if (n.id === address) return { node: n, parentId: parent ? parent.id : null, parent, names: path };
+    // Telusur penuh: isi slot instance tingkat atas memakai id tersimpan polos, jadi prefiks alamat tidak bisa dipakai memangkas.
+    if (n.type === 'frame') {
+      for (const c of n.children) {
+        const hit = find(c, n, path);
+        if (hit) return hit;
+      }
+    }
+    return undefined;
+  };
+  return find(root, null, []);
 }
 
 /** Alamat node terdalam di sepanjang `path` issue (undefined bila path tidak melewati node). */

@@ -5,7 +5,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { DocOp, LakarDocument } from '@lakar/schema';
+import { resolveDocument, type DocOp, type LakarDocument } from '@lakar/schema';
 import { buildServer, loadConfig } from './index.js';
 import type { DocChange } from './events.js';
 
@@ -329,6 +329,107 @@ describe('token: execute getTokens/importCssVariables + route ops renameToken', 
       expect(node(renamed, board).fills).toEqual([{ type: 'solid', color: { $token: 'colors.surface' } }]);
       await t.ops(slug, { ops: ren.inverse });
       expect(content(await t.doc(slug))).toEqual(content(before));
+    } finally {
+      await t.app.close();
+    }
+  });
+});
+
+// epic komponen story 3: agen membuat master + instance lewat execute, viewer memakai op komponen lewat route ops.
+describe('komponen: execute (agen) + route ops (viewer) dengan invers', () => {
+  it('agen: master, dua instance, override teks, ubah master, hapus master men-detach dalam satu rev; LC-32 untuk override basi', async () => {
+    const t = await setup();
+    try {
+      const { slug, board } = await t.create('Ops Komponen');
+      const s = await t.post('/sessions', { client: 'claude-code' });
+      const session = { 'x-lakar-session': s.json().data.sessionId as string };
+      expect((await t.post('/docs/open', { slug }, session)).statusCode).toBe(200);
+      const exec = async (code: string, description: string) => {
+        const r = await t.post('/execute', { code, description }, session);
+        expect(r.statusCode, r.body).toBe(200);
+        return r.json().data;
+      };
+      const made = await exec(
+        `const k = add('${board}', {type:'frame', name:'Kartu', layout:'column'}); const t = add(k, {type:'text', name:'Judul', content:'Halo', size:16});` +
+          ` setComponent(k); const a = add('${board}', {type:'instance', name:'Kartu A', componentId:k}); const c = add('${board}', {type:'instance', name:'Kartu B', componentId:k});` +
+          ` update(a + '/' + t, {content:'Promo'}); keep.k = k; keep.t = t; keep.a = a; keep.c = c; [a, c]`,
+        'buat kartu komponen',
+      );
+      const [a, c] = made.value as [string, string];
+      await exec(`update(keep.t, {color:'#B42318'}); update(keep.k, {gap: 12})`, 'ubah master kartu');
+      const read = await exec(`[get(keep.a + '/' + keep.t), get(keep.c + '/' + keep.t)]`, 'baca isi instance');
+      expect(read.value[0]).toMatchObject({ content: 'Promo', color: '#B42318' });
+      expect(read.value[1]).toMatchObject({ content: 'Halo', color: '#B42318' });
+
+      const stale = await exec(`replace(keep.t, {type:'rect', name:'Garis', width:40, height:2})`, 'ganti judul jadi garis');
+      expect(stale.check.findings.some((f: any) => f.rule === 'LC-32' && f.nodeId === a)).toBe(true);
+      expect(stale.check.summary.gate).toBe(0);
+
+      const before = await t.doc(slug);
+      const removed = await exec(`remove(keep.k)`, 'hapus master kartu');
+      expect(removed.rev).toBe(before.rev + 1);
+      const after = await t.doc(slug);
+      expect(JSON.stringify(after)).not.toContain('"instance"');
+      expect(node(after, a)).toBeUndefined();
+      expect(node(after, c)).toBeUndefined();
+      expect((await t.history(slug)).at(-1).opsSummary).toContain('remove');
+    } finally {
+      await t.app.close();
+    }
+  });
+
+  it('viewer: setComponent, sisip instance, override, slot, reset, detach dalam satu permintaan; undo/redo lewat inverse', async () => {
+    const t = await setup();
+    try {
+      const { slug, board } = await t.create('Ops Komponen Viewer');
+      const base = await t.ops(slug, {
+        ops: [
+          { op: 'add', parentId: board, node: { type: 'frame', name: 'Kartu', layout: 'column' }, ref: 'k' },
+          { op: 'add', parentId: '@k', node: { type: 'text', name: 'Judul', content: 'Halo', size: 16 }, ref: 't' },
+          { op: 'add', parentId: '@k', node: { type: 'frame', name: 'Isi', layout: 'column' }, ref: 'b' },
+        ],
+      });
+      const { k, t: tid, b } = base.refs as Record<string, string>;
+      const before = await t.doc(slug);
+      const done = await t.ops(slug, {
+        ops: [
+          { op: 'setComponent', id: k, component: { props: [], slots: [{ name: 'body', nodeId: b }] } },
+          { op: 'add', parentId: board, node: { type: 'instance', name: 'Kartu A', componentId: k }, ref: 'i' },
+          { op: 'add', parentId: board, node: { type: 'instance', name: 'Kartu B', componentId: k }, ref: 'j' },
+          { op: 'update', id: `@i/${tid}`, patch: { content: 'Promo', color: '#B42318' } },
+          { op: 'resetOverride', id: `@i/${tid}`, props: ['color'] },
+          { op: 'add', parentId: `@i/${b}`, node: { type: 'text', name: 'Catatan', content: 'x', size: 12 }, ref: 's' },
+          { op: 'detach', id: '@j', ref: 'd' },
+        ],
+        description: 'Create component',
+      });
+      expect(done.rev).toBe(before.rev + 1);
+      const mid = await t.doc(slug);
+      const inst = node(mid, done.refs.i!);
+      expect(inst.overrides).toEqual({ [tid!]: { content: 'Promo' } });
+      expect(inst.slots.body[0].id).toBe(done.refs.s);
+      expect(node(mid, done.refs.d!).type).toBe('frame');
+      expect((await t.history(slug)).at(-1).opsSummary).toContain('setComponent');
+
+      const undo = await t.ops(slug, { ops: done.inverse });
+      expect(content(await t.doc(slug))).toEqual(content(before));
+      await t.ops(slug, { ops: undo.inverse });
+      expect(content(await t.doc(slug))).toEqual(content(mid));
+
+      // Hapus master lewat route: satu rev, instance menjadi node biasa yang tampil sama; inverse mengembalikannya.
+      const eff = (d: LakarDocument, id: string): any => node(resolveDocument(d) as unknown as LakarDocument, id);
+      const shape = (n: any): any => n && { ...n, id: undefined, children: n.children?.map(shape) };
+      const at = mid.pages[0]!.children.find((x) => x.id === board)!.children.findIndex((x) => x.id === done.refs.i);
+      const looked = shape(eff(mid, done.refs.i!));
+      const del = await t.ops(slug, { ops: [{ op: 'remove', id: k }] });
+      expect(del.rev).toBe(done.rev + 3);
+      const gone = await t.doc(slug);
+      expect(JSON.stringify(gone)).not.toContain('"instance"');
+      const detached = gone.pages[0]!.children.find((x) => x.id === board)!.children[at - 1]!;
+      expect(detached.type).toBe('frame');
+      expect(shape(eff(gone, detached.id))).toEqual(looked);
+      await t.ops(slug, { ops: del.inverse });
+      expect(content(await t.doc(slug))).toEqual(content(mid));
     } finally {
       await t.app.close();
     }
