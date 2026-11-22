@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type RefObject } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore, type RefObject } from 'react';
 import { connection } from './api';
 
 /** Panggil `fn` saat tombol Retry di banner offline ditekan. */
@@ -43,4 +43,9 @@ export function useNow(intervalMs: number): number {
     return () => clearInterval(t);
   }, [intervalMs]);
   return now;
+}
+
+/** True selama lakard tidak bisa dihubungi (banner offline). */
+export function useOffline(): boolean {
+  return useSyncExternalStore(connection.subscribe, connection.isOffline, connection.isOffline);
 }

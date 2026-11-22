@@ -1,6 +1,9 @@
 // Stream aktivitas dari lakard (`GET /viewer/events`, SSE): klien EventSource dengan reconnect + backoff, dan
 // reducer murni sesi/tool call. Bentuk event disalin dari packages/daemon/src/events.ts (viewer tidak bergantung
 // pada daemon). Sesi viewer sendiri (`lakar-viewer`) tidak pernah ditampilkan.
+// Sinkron antar jendela: event `change` (tulis dari aplikasi di jendela lain: kelola file, folder, layer manual)
+// tidak masuk state Activity; `remoteEffect`/`editChange` memutuskan reaksinya. `activityHub` berbagi satu
+// EventSource per jendela untuk App (daftar, tab) dan Viewer (state Activity, muat ulang dokumen).
 
 export const VIEWER_CLIENT = 'lakar-viewer';
 /** Sesi dianggap Live bila ada call running atau call terakhir lebih baru dari ini. */
@@ -25,11 +28,32 @@ export type ActivityCall = {
   created?: string[];
   boards?: string[];
   nodes?: number;
+  /** Posisi `[x, y, w, h]` relatif board per id node (execute dan inspect selesai). */
+  bounds?: Record<string, [number, number, number, number]>;
   summary?: { error: number; warning: number };
   error?: { code: string; message: string };
+  /** Jendela viewer pengirim (restore, pages). */
+  origin?: string;
 };
 export type ActivityEvent = { seq: number; type: 'call'; call: ActivityCall } | { seq: number; type: 'session'; session: ActivitySession };
 export type Hello = { sessions: ActivitySession[]; recent: ActivityEvent[] };
+
+/** Perubahan dari aplikasi (salinan `DocChange` events.ts). */
+export type DocChange = {
+  kind: 'create' | 'rename' | 'duplicate' | 'archive' | 'unarchive' | 'delete' | 'folders' | 'edit';
+  /** Dokumen hasil (rename: slug baru; duplicate: salinan). */
+  slug?: string;
+  /** Slug lama (rename) atau sumber (duplicate). */
+  from?: string;
+  /** delete: salinan arsip yang dihapus. */
+  archived?: boolean;
+  rev?: number;
+  boards?: string[];
+  origin?: string;
+};
+export type ChangeEvent = { seq: number; type: 'change'; change: DocChange };
+/** Semua event stream `/viewer/events` sesudah `hello`. */
+export type StreamEvent = ActivityEvent | ChangeEvent;
 
 // ---- Reducer ----
 
@@ -43,15 +67,22 @@ export type ActivityState = {
   connected: boolean;
 };
 
-export type ActivityAction = { type: 'hello'; hello: Hello } | { type: 'event'; event: ActivityEvent } | { type: 'connection'; connected: boolean };
+export type ActivityAction = { type: 'hello'; hello: Hello } | { type: 'event'; event: StreamEvent } | { type: 'connection'; connected: boolean };
 
 export const initialActivity: ActivityState = { sessions: {}, calls: [], seq: 0, connected: false };
 
 const isViewer = (client: string | undefined) => client === VIEWER_CLIENT;
+/**
+ * Restore dan kelola halaman dari aplikasi (tool `restore`/`pages`, client `lakar-viewer`) tidak tampil di
+ * Activity, tetapi tetap mengubah dokumen: viewer lain (dan viewer yang sama) memuat ulang karenanya.
+ */
+export const isDocChangeFromViewer = (c: Pick<ActivityCall, 'client' | 'tool'>) => isViewer(c.client) && (c.tool === 'restore' || c.tool === 'pages');
 
-function applyEvent(state: ActivityState, event: ActivityEvent): ActivityState {
+function applyEvent(state: ActivityState, event: StreamEvent): ActivityState {
   if (event.seq <= state.seq) return state;
   const next: ActivityState = { ...state, seq: event.seq };
+  // Perubahan dari aplikasi tidak tampil di Activity.
+  if (event.type === 'change') return next;
   if (event.type === 'session') {
     if (isViewer(event.session.client)) return next;
     next.sessions = { ...state.sessions, [event.session.id]: { ...state.sessions[event.session.id], ...event.session } };
@@ -135,12 +166,89 @@ export function sessionsForSlug(state: ActivityState, slug: string, now: number)
  * Event selesai yang membuat dokumen `slug` yang tampil (rev `shownRev`) usang: rev baru dan board tersentuh.
  * `boards` hanya diketahui dari execute (`check.boards`); tool lain → `undefined` (muat ulang semua board).
  */
-export function revChange(event: ActivityEvent, slug: string, shownRev: number): { rev: number; boards?: string[] } | undefined {
+export function revChange(event: StreamEvent, slug: string, shownRev: number): { rev: number; boards?: string[] } | undefined {
   if (event.type !== 'call') return undefined;
   const c = event.call;
-  if (isViewer(c.client) || c.status === 'running' || c.status === 'error' || c.slug !== slug) return undefined;
+  if ((isViewer(c.client) && !isDocChangeFromViewer(c)) || c.status === 'running' || c.status === 'error' || c.slug !== slug) return undefined;
   if (typeof c.rev !== 'number' || c.rev <= shownRev) return undefined;
   return c.tool === 'execute' ? { rev: c.rev, boards: c.boards ?? [] } : { rev: c.rev };
+}
+
+// ---- Sinkron antar jendela ----
+
+/** Event kelola file untuk tab (bentuk sama dengan `FileEvent` api.ts, plus `remote`). */
+export type RemoteFileEvent = { type: 'rename'; from: string; to: string; remote: true } | { type: 'archive'; slug: string; remote: true } | { type: 'delete'; slug: string; archived: boolean; remote: true };
+
+/** Reaksi jendela ini atas perubahan dari jendela lain. */
+export type RemoteEffect = {
+  /** Slug yang cache dokumen/screenshot-nya dibuang (dokumen pindah/hilang/dibuat ulang). */
+  invalidate: string[];
+  /** Diteruskan ke pendengar tab (rename/archive/delete). */
+  fileEvent?: RemoteFileEvent;
+};
+
+/**
+ * Perubahan `change` dari jendela lain → reaksi jendela ini; gema jendela sendiri (`origin` sama) → undefined
+ * (jendela pengirim sudah memuat ulang sendiri). Semua reaksi memuat ulang daftar (Dashboard, folder, thumbnail).
+ */
+export function remoteEffect(change: DocChange, origin: string): RemoteEffect | undefined {
+  if (change.origin !== undefined && change.origin === origin) return undefined;
+  const slug = change.slug;
+  switch (change.kind) {
+    case 'rename':
+      return slug && change.from ? { invalidate: [change.from, slug], fileEvent: { type: 'rename', from: change.from, to: slug, remote: true } } : { invalidate: [] };
+    case 'archive':
+      return slug ? { invalidate: [slug], fileEvent: { type: 'archive', slug, remote: true } } : { invalidate: [] };
+    case 'delete':
+      if (!slug) return { invalidate: [] };
+      return change.archived ? { invalidate: [], fileEvent: { type: 'delete', slug, archived: true, remote: true } } : { invalidate: [slug], fileEvent: { type: 'delete', slug, archived: false, remote: true } };
+    case 'create':
+    case 'duplicate':
+    case 'unarchive':
+      // Slug bisa dipakai ulang (dokumen lama dihapus lalu dibuat lagi): jangan pakai cache lama.
+      return { invalidate: slug ? [slug] : [] };
+    case 'folders':
+    case 'edit':
+      return { invalidate: [] };
+    default:
+      return undefined;
+  }
+}
+
+/** Restore/kelola halaman (event call aplikasi) dari jendela lain yang selesai → daftar perlu dimuat ulang. */
+export function remoteDocCall(event: StreamEvent, origin: string): boolean {
+  if (event.type !== 'call') return false;
+  const c = event.call;
+  return isDocChangeFromViewer(c) && c.status === 'done' && c.origin !== origin;
+}
+
+/**
+ * Event `change` `edit` (layer manual dari jendela lain) yang membuat dokumen `slug` (rev `shownRev`) usang:
+ * rev baru dan board tersentuh. Gema jendela sendiri diabaikan (sudah dimuat ulang sesudah execute).
+ */
+export function editChange(event: StreamEvent, slug: string, shownRev: number, origin: string): { rev: number; boards: string[] } | undefined {
+  if (event.type !== 'change') return undefined;
+  const c = event.change;
+  if (c.kind !== 'edit' || c.slug !== slug || (c.origin !== undefined && c.origin === origin)) return undefined;
+  if (typeof c.rev !== 'number' || c.rev <= shownRev) return undefined;
+  return { rev: c.rev, boards: c.boards ?? [] };
+}
+
+/** Dokumen `slug` yang sedang dibuka diarsip/dihapus di jendela lain → alasan; selain itu undefined. */
+export function goneReason(event: StreamEvent, slug: string, origin: string): 'archived' | 'deleted' | undefined {
+  if (event.type !== 'change') return undefined;
+  const c = event.change;
+  if (c.slug !== slug || (c.origin !== undefined && c.origin === origin)) return undefined;
+  if (c.kind === 'archive') return 'archived';
+  if (c.kind === 'delete' && !c.archived) return 'deleted';
+  return undefined;
+}
+
+/** Slug `slug` muncul lagi (dibuat, dipulihkan dari arsip, duplikat, atau hasil rename) → muat ulang. */
+export function slugAppeared(event: StreamEvent, slug: string): boolean {
+  if (event.type !== 'change') return false;
+  const c = event.change;
+  return c.slug === slug && (c.kind === 'create' || c.kind === 'unarchive' || c.kind === 'duplicate' || c.kind === 'rename');
 }
 
 // ---- Label ----
@@ -152,6 +260,8 @@ export function harnessLabel(client: string | undefined): string {
   if (c.includes('claude')) return 'Claude Code';
   if (c.includes('codex')) return 'Codex';
   if (c === 'lakar-mcp') return 'MCP agent';
+  // Kelola file dari aplikasi (New file, Duplicate) mencatat riwayat atas nama viewer.
+  if (c === 'lakar-viewer') return 'You';
   return client;
 }
 
@@ -177,6 +287,10 @@ export function callTitle(c: ActivityCall, nameOf: (id: string) => string | unde
       return t ? `Export ${t}` : 'Export first board';
     case 'open_doc':
       return c.slug ? `Open ${c.slug}` : 'Open document';
+    case 'restore':
+      return c.description ?? 'Restore version';
+    case 'pages':
+      return c.description ?? 'Edit pages';
     case 'list_boards':
       return 'List boards';
     case 'read_skill':
@@ -230,7 +344,7 @@ export type EventSourceCtor = new (url: string) => EventSourceLike;
 
 export type StreamHandlers = {
   onHello: (hello: Hello) => void;
-  onEvent: (event: ActivityEvent) => void;
+  onEvent: (event: StreamEvent) => void;
   onConnection: (connected: boolean) => void;
   /** Stream tersambung lagi setelah putus: dokumen perlu dimuat ulang (event yang hilang tidak diputar ulang). */
   onReconnect?: () => void;
@@ -274,13 +388,14 @@ export function connectActivity(handlers: StreamHandlers, opts: { url?: string; 
     });
     const onData = (ev: { data: string }) => {
       try {
-        handlers.onEvent(JSON.parse(ev.data) as ActivityEvent);
+        handlers.onEvent(JSON.parse(ev.data) as StreamEvent);
       } catch {
         // event rusak dilewati
       }
     };
     src.addEventListener('call', onData);
     src.addEventListener('session', onData);
+    src.addEventListener('change', onData);
     src.onerror = () => {
       if (stopped || es !== src) return;
       src.close();
@@ -299,3 +414,85 @@ export function connectActivity(handlers: StreamHandlers, opts: { url?: string; 
     es = undefined;
   };
 }
+
+// ---- Hub: satu stream per jendela ----
+
+export type HubListener = {
+  /** Setiap event sesudah `hello` (call, session, change). */
+  onEvent?: (event: StreamEvent) => void;
+  /** Stream tersambung lagi (event yang hilang tidak diputar ulang): muat ulang. */
+  onReconnect?: () => void;
+};
+
+/**
+ * Satu EventSource `/viewer/events` dibagi App dan Viewer (batas koneksi HTTP/1.1 per host kecil, dan tiap
+ * tab browser sudah memakai satu). State Activity direduksi di sini sehingga Viewer yang baru dipasang langsung
+ * melihat sesi/call terkini tanpa menunggu `hello` baru. Tersambung selama ada pelanggan (state atau event).
+ */
+export class ActivityHub {
+  #state: ActivityState = initialActivity;
+  readonly #stateListeners = new Set<() => void>();
+  readonly #listeners = new Set<HubListener>();
+  #close: (() => void) | undefined;
+  readonly #connect: (handlers: StreamHandlers) => () => void;
+
+  constructor(connect: (handlers: StreamHandlers) => () => void = (h) => connectActivity(h)) {
+    this.#connect = connect;
+  }
+
+  getState = (): ActivityState => this.#state;
+
+  /** Untuk `useSyncExternalStore`. */
+  subscribeState = (l: () => void): (() => void) => {
+    this.#stateListeners.add(l);
+    this.#ensure();
+    return () => {
+      this.#stateListeners.delete(l);
+      this.#release();
+    };
+  };
+
+  listen(l: HubListener): () => void {
+    this.#listeners.add(l);
+    this.#ensure();
+    return () => {
+      this.#listeners.delete(l);
+      this.#release();
+    };
+  }
+
+  get connected(): boolean {
+    return this.#close !== undefined;
+  }
+
+  #dispatch(action: ActivityAction) {
+    const next = activityReducer(this.#state, action);
+    if (next === this.#state) return;
+    this.#state = next;
+    for (const l of [...this.#stateListeners]) l();
+  }
+
+  #ensure() {
+    if (this.#close) return;
+    this.#close = this.#connect({
+      onHello: (hello) => this.#dispatch({ type: 'hello', hello }),
+      onEvent: (event) => {
+        this.#dispatch({ type: 'event', event });
+        for (const l of [...this.#listeners]) l.onEvent?.(event);
+      },
+      onConnection: (connected) => this.#dispatch({ type: 'connection', connected }),
+      onReconnect: () => {
+        for (const l of [...this.#listeners]) l.onReconnect?.();
+      },
+    });
+  }
+
+  #release() {
+    if (this.#stateListeners.size || this.#listeners.size || !this.#close) return;
+    this.#close();
+    this.#close = undefined;
+    this.#state = initialActivity;
+  }
+}
+
+export const activityHub = new ActivityHub();

@@ -4,8 +4,14 @@
 // - commit: riwayat dulu (append + fsync), LALU dokumen; dokumen gagal ditulis → riwayat dipotong balik;
 // - buka: tmp sisa dihapus, riwayat direkonsiliasi (baris parsial/rusak dan entri `rev > doc.rev` dibuang),
 //   dokumen hasil migrasi ditulis balik.
+// Kelola file (aplikasi 1): rename/archive/unarchive memindahkan dokumen lalu riwayat (rename atomik per file);
+// arsip di <data>/docs/archive dengan pola nama yang sama.
+// Snapshot (aplikasi 3): isi dokumen per rev di <dir>/.snapshots/<slug>/r<rev>.lakar.json (dir = docs atau
+// docs/archive), ditulis atomik sesudah commit berhasil; gagal tulis hanya dicatat. Retensi SNAPSHOT_KEEP rev
+// terakhir, dan total byte folder snapshot per dokumen maks SNAPSHOT_MAX_BYTES (snapshot tertua dibuang dulu; snapshot
+// terbaru selalu disimpan). Rename/archive/unarchive memindahkan foldernya, remove menghapusnya.
 import { mkdir, open, readFile, readdir, rename, rm, stat, truncate, type FileHandle } from 'node:fs/promises';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { randomBytes } from 'node:crypto';
 import { migrateDocument, parseDocument, type MigrationRegistry } from '@lakar/core';
 import { LakarError, SLUG_PATTERN, errorMessage, type HistoryEntry, type LakarDocument } from '@lakar/schema';
@@ -15,13 +21,76 @@ export type DocStoreOptions = {
   migrations?: MigrationRegistry;
   /** Pengganti langkah migrasi (khusus tes write-back): mentah → dokumen versi kini. */
   migrate?: (raw: unknown) => unknown;
+  /** Pencatat masalah non-fatal (snapshot gagal ditulis/dipindah). Default `console.warn`. */
+  log?: (message: string) => void;
+  /** Jumlah snapshot yang disimpan per dokumen (default `SNAPSHOT_KEEP`). */
+  snapshotKeep?: number;
+  /** Batas total byte snapshot per dokumen (default `SNAPSHOT_MAX_BYTES`). */
+  snapshotMaxBytes?: number;
 };
 
+/** Retensi snapshot: rev terakhir per dokumen. */
+export const SNAPSHOT_KEEP = 200;
+/** Retensi snapshot: total byte folder snapshot per dokumen (200 MB). */
+export const SNAPSHOT_MAX_BYTES = 200 * 1024 * 1024;
+const SNAPSHOTS_DIR = '.snapshots';
+const SNAPSHOT_FILE = /^r(\d+)\.lakar\.json$/;
+
 const DOC_SUFFIX = '.lakar.json';
+const HISTORY_SUFFIX = '.history.jsonl';
 
 const isEnoent = (e: unknown) => (e as NodeJS.ErrnoException)?.code === 'ENOENT';
 
+const notFoundDoc = (slug: string, archived: boolean) =>
+  new LakarError('NOT_FOUND', `dokumen ${slug} tidak ada${archived ? ' di arsip' : ''}`, {
+    hint: archived ? 'pakai slug dari GET /viewer/archive' : 'pakai slug dari GET /viewer/docs',
+  });
+
+/** `<slug>.lakar.json` dengan slug valid di `dir` beserta mtime; direktori belum ada → `[]`. */
+async function listDocsIn(dir: string): Promise<{ slug: string; mtimeMs: number }[]> {
+  let names: string[];
+  try {
+    names = await readdir(dir);
+  } catch (e) {
+    if (isEnoent(e)) return [];
+    throw e;
+  }
+  const out: { slug: string; mtimeMs: number }[] = [];
+  for (const name of names) {
+    if (!name.endsWith(DOC_SUFFIX)) continue;
+    const slug = name.slice(0, -DOC_SUFFIX.length);
+    if (!SLUG_PATTERN.test(slug)) continue;
+    try {
+      const st = await stat(join(dir, name));
+      if (st.isFile()) out.push({ slug, mtimeMs: st.mtimeMs });
+    } catch (e) {
+      // Terhapus di antara readdir dan stat: lewati.
+      if (!isEnoent(e)) throw e;
+    }
+  }
+  return out;
+}
+
+/** Hapus tmp sisa proses yang dibunuh milik `slug` di `dir`. */
+async function removeTmp(dir: string, slug: string): Promise<void> {
+  let names: string[];
+  try {
+    names = await readdir(dir);
+  } catch (e) {
+    if (isEnoent(e)) return;
+    throw e;
+  }
+  const prefixes = [`${slug}${DOC_SUFFIX}.`, `${slug}${HISTORY_SUFFIX}.`];
+  await Promise.all(names.filter((n) => n.endsWith('.tmp') && prefixes.some((p) => n.startsWith(p))).map((n) => rm(join(dir, n), { force: true })));
+}
+
+/**
+ * fsync direktori agar entri (rename/buat file) tahan crash. Windows tidak mendukung fsync pada handle direktori
+ * (selalu EPERM) dan NTFS sudah menjurnal metadata, jadi di sana no-op; tanpa ini setiap commit pertama dokumen
+ * (New file, aplikasi desktop Windows) gagal. Platform lain tidak berubah.
+ */
 async function syncDir(dir: string): Promise<void> {
+  if (process.platform === 'win32') return;
   const h = await open(dir, 'r');
   try {
     await h.sync();
@@ -50,10 +119,16 @@ const isHistoryEntry = (v: unknown): v is HistoryEntry =>
 export class DocStore {
   readonly docsDir: string;
   readonly #migrate: (raw: unknown) => unknown;
+  readonly #log: (message: string) => void;
+  readonly #keep: number;
+  readonly #maxBytes: number;
 
   constructor(dataDir: string, opts: DocStoreOptions = {}) {
     this.docsDir = join(dataDir, 'docs');
     this.#migrate = opts.migrate ?? ((raw) => migrateDocument(raw, { migrations: opts.migrations }));
+    this.#log = opts.log ?? ((m) => console.warn(m));
+    this.#keep = Math.max(1, opts.snapshotKeep ?? SNAPSHOT_KEEP);
+    this.#maxBytes = Math.max(0, opts.snapshotMaxBytes ?? SNAPSHOT_MAX_BYTES);
   }
 
   docPath(slug: string): string {
@@ -114,6 +189,8 @@ export class DocStore {
     await mkdir(this.docsDir, { recursive: true });
     const hp = this.historyPath(slug);
     const h = await open(hp, 'a+');
+    // Windows menolak ftruncate pada handle mode append (EPERM); potong lewat path (handle dibuka dengan share write).
+    const cut = (n: number) => (process.platform === 'win32' ? truncate(hp, n) : h.truncate(n));
     let before: number;
     let fresh: boolean;
     try {
@@ -125,14 +202,14 @@ export class DocStore {
         await h.read(last, 0, 1, size - 1);
         if (last[0] !== 0x0a) {
           before = await lastLineEnd(h, size);
-          await h.truncate(before);
+          await cut(before);
         }
       }
       try {
         await h.write(`${JSON.stringify(entry)}\n`);
         await h.sync();
       } catch (e) {
-        await h.truncate(before).catch(() => {});
+        await cut(before).catch(() => {});
         throw e;
       }
     } finally {
@@ -145,6 +222,98 @@ export class DocStore {
       await truncate(hp, before).catch(() => {});
       throw e;
     }
+    // Commit sudah berhasil: snapshot hanya pelengkap (History Restore/Compare), gagalnya tidak menggagalkan commit.
+    try {
+      await this.#writeSnapshot(slug, doc);
+    } catch (e) {
+      this.#log(`lakard: snapshot ${slug} r${doc.rev} gagal ditulis: ${errorMessage(e)}`);
+    }
+  }
+
+  /** Folder snapshot `<dir>/.snapshots/<slug>` (dir = docs, atau arsip bila `archived`). */
+  snapshotDir(slug: string, archived = false): string {
+    return join(archived ? this.archiveDir : this.docsDir, SNAPSHOTS_DIR, slug);
+  }
+  snapshotPath(slug: string, rev: number, archived = false): string {
+    return join(this.snapshotDir(slug, archived), `r${rev}${DOC_SUFFIX}`);
+  }
+
+  /** Rev yang punya snapshot (dokumen aktif). Folder belum ada → kosong. */
+  async snapshotRevs(slug: string): Promise<Set<number>> {
+    let names: string[];
+    try {
+      names = await readdir(this.snapshotDir(slug));
+    } catch (e) {
+      if (isEnoent(e) || (e as NodeJS.ErrnoException)?.code === 'ENOTDIR') return new Set();
+      throw e;
+    }
+    const out = new Set<number>();
+    for (const n of names) {
+      const m = SNAPSHOT_FILE.exec(n);
+      if (m) out.add(Number(m[1]));
+    }
+    return out;
+  }
+
+  /** Isi snapshot rev `rev` (dimigrasi ke versi kini, tanpa tulis balik); `undefined` bila tidak ada. */
+  async readSnapshot(slug: string, rev: number): Promise<LakarDocument | undefined> {
+    let text: string;
+    try {
+      text = await readFile(this.snapshotPath(slug, rev), 'utf8');
+    } catch (e) {
+      const code = (e as NodeJS.ErrnoException)?.code;
+      if (code === 'ENOENT' || code === 'ENOTDIR') return undefined;
+      throw e;
+    }
+    let json: unknown;
+    try {
+      json = JSON.parse(text);
+    } catch (e) {
+      throw new LakarError('SCHEMA_INVALID', `snapshot ${slug} r${rev} bukan JSON valid: ${errorMessage(e)}`, { hint: 'pilih versi lain' });
+    }
+    return parseDocument(this.#migrate(json));
+  }
+
+  /**
+   * Tulis `r<rev>.lakar.json` atomik, lalu buang snapshot di luar `#keep` rev terakhir dan snapshot tertua yang
+   * membuat total byte melewati `#maxBytes`. Snapshot terbaru selalu disimpan walau sendirian melebihi batas.
+   */
+  async #writeSnapshot(slug: string, doc: LakarDocument): Promise<void> {
+    const dir = this.snapshotDir(slug);
+    await this.#writeAtomic(this.snapshotPath(slug, doc.rev), JSON.stringify(doc), dir);
+    const revs = [...(await this.snapshotRevs(slug))].sort((a, b) => b - a);
+    const drop = revs.slice(this.#keep);
+    let total = 0;
+    for (const [i, r] of revs.slice(0, this.#keep).entries()) {
+      let size: number;
+      try {
+        size = (await stat(this.snapshotPath(slug, r))).size;
+      } catch (e) {
+        if (isEnoent(e)) continue;
+        throw e;
+      }
+      total += size;
+      if (i > 0 && total > this.#maxBytes) drop.push(r);
+    }
+    await Promise.all(drop.map((r) => rm(this.snapshotPath(slug, r), { force: true })));
+  }
+
+  /** Pindahkan folder snapshot (best-effort): folder target yatim dibuang dulu; gagal hanya dicatat. */
+  async #moveSnapshots(fromDir: string, from: string, toDir: string, to: string): Promise<void> {
+    const src = join(fromDir, SNAPSHOTS_DIR, from);
+    const dst = join(toDir, SNAPSHOTS_DIR, to);
+    try {
+      await rm(dst, { recursive: true, force: true });
+      const exists = await stat(src).then(
+        (s) => s.isDirectory(),
+        () => false,
+      );
+      if (!exists) return;
+      await mkdir(dirname(dst), { recursive: true });
+      await rename(src, dst);
+    } catch (e) {
+      this.#log(`lakard: snapshot ${from} gagal dipindah ke ${to}: ${errorMessage(e)}`);
+    }
   }
 
   /**
@@ -152,27 +321,102 @@ export class DocStore {
    * dengan slug valid; tmp, riwayat, dan file lain diabaikan. Direktori belum ada → `[]`.
    */
   async list(): Promise<{ slug: string; mtimeMs: number }[]> {
-    let names: string[];
+    return listDocsIn(this.docsDir);
+  }
+
+  /** Direktori arsip: `<dataDir>/docs/archive`, pola nama file sama dengan `docsDir`. */
+  get archiveDir(): string {
+    return join(this.docsDir, 'archive');
+  }
+  archivedDocPath(slug: string): string {
+    return join(this.archiveDir, `${slug}${DOC_SUFFIX}`);
+  }
+
+  /** True bila `<slug>.lakar.json` ada (aktif, atau di arsip bila `archived`). */
+  async exists(slug: string, archived = false): Promise<boolean> {
     try {
-      names = await readdir(this.docsDir);
+      return (await stat(archived ? this.archivedDocPath(slug) : this.docPath(slug))).isFile();
     } catch (e) {
-      if (isEnoent(e)) return [];
+      if (isEnoent(e)) return false;
       throw e;
     }
-    const out: { slug: string; mtimeMs: number }[] = [];
-    for (const name of names) {
-      if (!name.endsWith(DOC_SUFFIX)) continue;
-      const slug = name.slice(0, -DOC_SUFFIX.length);
-      if (!SLUG_PATTERN.test(slug)) continue;
-      try {
-        const st = await stat(join(this.docsDir, name));
-        if (st.isFile()) out.push({ slug, mtimeMs: st.mtimeMs });
-      } catch (e) {
-        // Terhapus di antara readdir dan stat: lewati.
-        if (!isEnoent(e)) throw e;
-      }
+  }
+
+  /**
+   * Ganti slug: pindahkan dokumen lalu riwayat. Target sudah ada → CONFLICT; sumber tidak ada → NOT_FOUND.
+   * Riwayat yatim milik target (tanpa dokumen) dibuang dulu supaya tidak tercampur dengan dokumen yang masuk.
+   */
+  async rename(from: string, to: string): Promise<void> {
+    await this.#move(this.docsDir, from, this.docsDir, to, 'dokumen');
+  }
+
+  /** Pindahkan dokumen + riwayat ke arsip. Slug yang sama sudah ada di arsip → CONFLICT. */
+  async archive(slug: string): Promise<void> {
+    await this.#move(this.docsDir, slug, this.archiveDir, slug, 'arsip');
+  }
+
+  /** Kembalikan dokumen + riwayat dari arsip. Slug sudah dipakai dokumen aktif → CONFLICT. */
+  async unarchive(slug: string): Promise<void> {
+    await this.#move(this.archiveDir, slug, this.docsDir, slug, 'dokumen');
+  }
+
+  /**
+   * Hapus dokumen + riwayat (permanen; aktif, atau di arsip bila `archived`). Dokumen dihapus dulu supaya
+   * hilang dari daftar walau penghapusan riwayat gagal. Dokumen tidak ada → NOT_FOUND.
+   */
+  async remove(slug: string, archived = false): Promise<void> {
+    const dir = archived ? this.archiveDir : this.docsDir;
+    if (!(await this.exists(slug, archived))) throw notFoundDoc(slug, archived);
+    await rm(join(dir, `${slug}${DOC_SUFFIX}`));
+    await rm(join(dir, `${slug}${HISTORY_SUFFIX}`), { force: true });
+    await rm(this.snapshotDir(slug, archived), { recursive: true, force: true }).catch((e) => this.#log(`lakard: snapshot ${slug} gagal dihapus: ${errorMessage(e)}`));
+    await removeTmp(dir, slug);
+    await syncDir(dir).catch(() => {});
+  }
+
+  /** Buang riwayat yatim `<slug>.history.jsonl` (dokumen belum ada) sebelum dokumen baru dibuat di slug itu. */
+  async dropOrphanHistory(slug: string): Promise<void> {
+    if (await this.exists(slug)) return;
+    await rm(this.historyPath(slug), { force: true });
+    await rm(this.snapshotDir(slug), { recursive: true, force: true });
+  }
+
+  /** Seperti `list`, untuk direktori arsip. */
+  async listArchive(): Promise<{ slug: string; mtimeMs: number }[]> {
+    return listDocsIn(this.archiveDir);
+  }
+
+  async #move(fromDir: string, from: string, toDir: string, to: string, where: string): Promise<void> {
+    const fromDoc = join(fromDir, `${from}${DOC_SUFFIX}`);
+    const toDoc = join(toDir, `${to}${DOC_SUFFIX}`);
+    const fromHist = join(fromDir, `${from}${HISTORY_SUFFIX}`);
+    const toHist = join(toDir, `${to}${HISTORY_SUFFIX}`);
+    const isFile = (p: string) =>
+      stat(p).then(
+        (s) => s.isFile(),
+        (e) => {
+          if (isEnoent(e)) return false;
+          throw e;
+        },
+      );
+    if (!(await isFile(fromDoc))) throw notFoundDoc(from, fromDir !== this.docsDir);
+    if (await isFile(toDoc)) {
+      throw new LakarError('CONFLICT', `${where} ${to} sudah ada`, {
+        hint: where === 'arsip' ? `hapus ${to} dari arsip dulu, atau ganti nama dokumen` : 'pilih nama lain',
+      });
     }
-    return out;
+    await mkdir(toDir, { recursive: true });
+    await removeTmp(fromDir, from);
+    const hasHistory = await isFile(fromHist);
+    // Riwayat target tanpa dokumen = yatim (sisa penghapusan/kill): jangan sampai tercampur.
+    if (!hasHistory) await rm(toHist, { force: true });
+    // Dokumen dulu, lalu riwayat. Kill di antaranya: dokumen di slug baru tanpa riwayat (riwayat lama yatim di
+    // slug asal dan dibuang saat slug itu dipakai lagi) — dokumen sendiri tidak pernah hilang.
+    await rename(fromDoc, toDoc);
+    if (hasHistory) await rename(fromHist, toHist);
+    await this.#moveSnapshots(fromDir, from, toDir, to);
+    await syncDir(toDir).catch(() => {});
+    if (toDir !== fromDir) await syncDir(fromDir).catch(() => {});
   }
 
   /** Entri riwayat yang terbaca (baris rusak dilewati). */
@@ -197,8 +441,8 @@ export class DocStore {
     return out;
   }
 
-  async #writeAtomic(target: string, content: string): Promise<void> {
-    await mkdir(this.docsDir, { recursive: true });
+  async #writeAtomic(target: string, content: string, dir = this.docsDir): Promise<void> {
+    await mkdir(dir, { recursive: true });
     const tmp = `${target}.${process.pid}.${randomBytes(4).toString('hex')}.tmp`;
     try {
       const h = await open(tmp, 'w');
@@ -214,22 +458,12 @@ export class DocStore {
       throw e;
     }
     // Rename sudah terjadi: fsync direktori best-effort, kegagalannya bukan kegagalan tulis.
-    await syncDir(this.docsDir).catch(() => {});
+    await syncDir(dir).catch(() => {});
   }
 
   /** Hapus `<slug>.lakar.json.*.tmp` / `<slug>.history.jsonl.*.tmp` sisa proses yang dibunuh. */
   async #removeStaleTmp(slug: string): Promise<void> {
-    let names: string[];
-    try {
-      names = await readdir(this.docsDir);
-    } catch (e) {
-      if (isEnoent(e)) return;
-      throw e;
-    }
-    const prefixes = [`${slug}.lakar.json.`, `${slug}.history.jsonl.`];
-    await Promise.all(
-      names.filter((n) => n.endsWith('.tmp') && prefixes.some((p) => n.startsWith(p))).map((n) => rm(join(this.docsDir, n), { force: true })),
-    );
+    await removeTmp(this.docsDir, slug);
   }
 
   /** Buang baris parsial/rusak dan entri `rev > docRev`; tulis ulang atomik bila ada yang dibuang. */

@@ -1,6 +1,6 @@
 // Pengelompokan History per hari dengan `now` tetap (waktu lokal).
 import { describe, expect, it } from 'vitest';
-import { dayLabel, groupByDay } from './history.ts';
+import { canRestore, changedBoards, comparePair, dayLabel, fileMeta, groupByDay, hasVersion, previewLabel } from './history.ts';
 
 /** 1 Maret 2026 10:00 waktu lokal: hari sebelumnya melintasi batas bulan (28 Februari). */
 const NOW = new Date(2026, 2, 1, 10, 0, 0);
@@ -41,5 +41,65 @@ describe('groupByDay', () => {
       ['Yesterday', [3]],
       [dayLabel(local(1, 20), NOW), [2, 1]],
     ]);
+  });
+});
+
+describe('ketersediaan versi (snapshot)', () => {
+  const e = (rev: number, snapshot?: boolean) => ({ rev, at: local(2, 1, 9), description: `rev ${rev}`, ...(snapshot !== undefined ? { snapshot } : {}) });
+  it('pratinjau/Compare: ada snapshot atau rev terkini; Restore: hanya versi lama bersnapshot', () => {
+    expect(hasVersion(e(3, true), 7)).toBe(true);
+    expect(hasVersion(e(3), 7)).toBe(false);
+    expect(hasVersion(e(7), 7)).toBe(true);
+    expect(canRestore(e(3, true), 7)).toBe(true);
+    expect(canRestore(e(3, false), 7)).toBe(false);
+    expect(canRestore(e(7, true), 7)).toBe(false);
+  });
+  it('comparePair: Before = entri tepat sebelumnya bila terbaca', () => {
+    const list = [e(7, true), e(6, true), e(5), e(4, true)];
+    expect(comparePair(list, list[0]!, 7)).toEqual({ before: 6, after: 7 });
+    expect(comparePair(list, list[1]!, 7)).toEqual({ after: 6 });
+    expect(comparePair(list, list[3]!, 7)).toEqual({ after: 4 });
+  });
+  it('previewLabel: jam · deskripsi; tanpa jam → rev', () => {
+    expect(previewLabel(e(3, true), () => '14:29')).toBe('Previewing 14:29 · rev 3');
+    expect(previewLabel({ ...e(3, true), description: 'Tightened headline tracking' }, () => '')).toBe('Previewing r3 · Tightened headline tracking');
+  });
+});
+
+describe('changedBoards', () => {
+  const doc = (boards: { id: string; name: string; w?: number }[]) => ({ pages: [{ children: boards.map((b) => ({ id: b.id, name: b.name, width: b.w ?? 100 })) }] });
+  it('berubah, baru, dan dihapus per board; board sama dilewati', () => {
+    const before = doc([{ id: 'A', name: 'Home' }, { id: 'B', name: 'About' }, { id: 'C', name: 'Old' }]);
+    const after = doc([{ id: 'A', name: 'Home', w: 200 }, { id: 'B', name: 'About' }, { id: 'D', name: 'New' }]);
+    expect(changedBoards(before, after)).toEqual([
+      { id: 'A', name: 'Home', change: 'changed' },
+      { id: 'D', name: 'New', change: 'added' },
+      { id: 'C', name: 'Old', change: 'removed' },
+    ]);
+  });
+  it('tanpa Before → semua board After baru; versi identik → kosong', () => {
+    const a = doc([{ id: 'A', name: 'Home' }]);
+    expect(changedBoards(undefined, a)).toEqual([{ id: 'A', name: 'Home', change: 'added' }]);
+    expect(changedBoards(a, doc([{ id: 'A', name: 'Home' }]))).toEqual([]);
+  });
+});
+
+describe('fileMeta', () => {
+  const ago = (t: string | number) => (t === 1000 ? '10s ago' : 'just now');
+  const label = (c: string | undefined) => (c === 'lakar-viewer' ? 'You' : c === 'claude-code' ? 'Claude Code' : (c ?? 'Agent'));
+  it('riwayat belum termuat → hanya waktu buka', () => {
+    expect(fileMeta(undefined, 0, 1000, ago, label)).toBe('Opened 10s ago');
+  });
+  it('belum ada revisi → no changes yet', () => {
+    expect(fileMeta({ count: 0 }, 0, 1000, ago, label)).toBe('Opened 10s ago · no changes yet');
+  });
+  it('satu revisi dari aplikasi (New file) → Created · jumlah board', () => {
+    expect(fileMeta({ count: 1, top: { at: 'x', client: 'lakar-viewer' } }, 1, 1000, ago, label)).toBe('Created just now · 1 board');
+    expect(fileMeta({ count: 1, top: { at: 'x', client: 'lakar-viewer' } }, 3, 1000, ago, label)).toBe('Created just now · 3 boards');
+  });
+  it('revisi terakhir agen → Updated by harness; aplikasi → by you', () => {
+    expect(fileMeta({ count: 4, top: { at: 'x', client: 'claude-code' } }, 2, 1000, ago, label)).toBe('Updated just now by Claude Code');
+    expect(fileMeta({ count: 4, top: { at: 'x', client: 'lakar-viewer' } }, 2, 1000, ago, label)).toBe('Updated just now by you');
+    expect(fileMeta({ count: 2, top: { at: 'x' } }, 2, 1000, ago, label)).toBe('Updated just now by an agent');
   });
 });

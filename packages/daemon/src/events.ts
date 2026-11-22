@@ -2,9 +2,13 @@
 // disalurkan lewat SSE `GET /viewer/events`. Event dibentuk dari hook fastify (`preHandler`/`onSend`) di luar
 // handler, jadi route lama, body respons, dan pesan error tidak berubah. Event hanya membawa id sesi publik
 // (8 karakter pertama, seperti `/status`): id penuh adalah kredensial header `x-lakar-session`.
+// Sinkron antar jendela: tulis dari aplikasi (kelola file, folder, execute sesi viewer) dipancarkan sebagai event
+// `change` (jenis baru, di luar ring `hello`) dengan `origin` jendela pengirim (header `x-lakar-origin`), supaya
+// jendela/tab viewer lain ikut memuat ulang dan jendela pengirim bisa mengabaikan gemanya sendiri.
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import type { ServerResponse } from 'node:http';
 import { SESSION_HEADER } from '@lakar/schema';
+import type { BoundsTuple } from './inspect.js';
 import type { Session, Sessions } from './sessions.js';
 
 /** Jumlah event terakhir yang diingat untuk snapshot `hello`. */
@@ -13,6 +17,15 @@ export const ACTIVITY_RING_MAX = 100;
 export const ACTIVITY_HEARTBEAT_MS = 15_000;
 /** Klien viewer sendiri: tidak dipancarkan (Activity hanya menampilkan agen, dan buffer tidak dibanjiri). */
 export const VIEWER_CLIENT = 'lakar-viewer';
+/** Header id jendela viewer pengirim (acak per jendela); diteruskan apa adanya di event `change`. */
+export const ORIGIN_HEADER = 'x-lakar-origin';
+const ORIGIN_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
+
+/** Id jendela dari header `x-lakar-origin`; tidak ada/tidak valid → undefined. */
+export function originOf(headers: Record<string, string | string[] | undefined>): string | undefined {
+  const v = headers[ORIGIN_HEADER];
+  return typeof v === 'string' && ORIGIN_PATTERN.test(v) ? v : undefined;
+}
 
 /** Route POST lama → nama tool MCP. */
 export const TOOL_ROUTES: Readonly<Record<string, string>> = {
@@ -66,19 +79,53 @@ export type ActivityCall = {
   boards?: string[];
   /** Jumlah node berubah (execute) atau diperiksa. */
   nodes?: number;
+  /**
+   * Posisi terukur `[x, y, w, h]` relatif board per id node (execute: `data.bounds`, maks 60 entri; inspect: node
+   * target). Dipakai viewer untuk kursor dan outline agen.
+   */
+  bounds?: Record<string, BoundsTuple>;
   summary?: CallSummary;
   error?: { code: string; message: string };
+  /** Jendela viewer pengirim (hanya call dari aplikasi: restore, pages). */
+  origin?: string;
 };
+
+/** Jenis perubahan dari aplikasi untuk sinkron antar jendela. */
+export type ChangeKind = 'create' | 'rename' | 'duplicate' | 'archive' | 'unarchive' | 'delete' | 'folders' | 'edit';
+
+/**
+ * Perubahan dari aplikasi. `slug` = dokumen hasil (rename: slug baru, `from` = slug lama; duplicate: salinan,
+ * `from` = sumber). `archived` (delete) = salinan arsip yang dihapus. `edit` = execute sesi viewer (rev + board
+ * tersentuh). `folders` = metadata folder berubah (`slug` diisi untuk move).
+ */
+export type DocChange = {
+  kind: ChangeKind;
+  slug?: string;
+  from?: string;
+  archived?: boolean;
+  rev?: number;
+  boards?: string[];
+  origin?: string;
+};
+export type ChangeEvent = { seq: number; type: 'change'; change: DocChange };
 
 export type ActivityEvent = { seq: number; type: 'call'; call: ActivityCall } | { seq: number; type: 'session'; session: ActivitySession };
 type ActivityPayload = { type: 'call'; call: ActivityCall } | { type: 'session'; session: ActivitySession };
 
+/** Semua event bus: aktivitas (masuk ring) + perubahan aplikasi (tidak masuk ring). */
+export type BusEvent = ActivityEvent | ChangeEvent;
 export type ActivityListener = (event: ActivityEvent) => void;
+export type BusListener = (event: BusEvent) => void;
 
-/** Bus event dalam proses: ring buffer `ACTIVITY_RING_MAX` + pelanggan. */
+/**
+ * Bus event dalam proses: ring buffer `ACTIVITY_RING_MAX` + pelanggan. Event `change` hanya disiarkan (seq ikut
+ * naik) ke pelanggan `subscribeAll` (stream SSE) dan tidak disimpan di ring: bentuk `hello` dan pelanggan
+ * `subscribe` lama tetap, dan viewer yang tersambung ulang memuat ulang penuh.
+ */
 export class ActivityBus {
   readonly #ring: ActivityEvent[] = [];
-  readonly #listeners = new Set<ActivityListener>();
+  /** Pelanggan; `all` = juga menerima event `change`. */
+  readonly #listeners = new Map<BusListener, { all: boolean }>();
   readonly #max: number;
   #seq = 0;
   constructor(max = ACTIVITY_RING_MAX) {
@@ -88,21 +135,40 @@ export class ActivityBus {
     const event = { seq: ++this.#seq, ...payload } as ActivityEvent;
     this.#ring.push(event);
     if (this.#ring.length > this.#max) this.#ring.splice(0, this.#ring.length - this.#max);
-    for (const l of this.#listeners) {
+    this.#broadcast(event);
+    return event;
+  }
+  /** Siarkan perubahan dari aplikasi (tanpa ring). Field kosong dibuang. */
+  change(change: DocChange): ChangeEvent {
+    const clean = Object.fromEntries(Object.entries(change).filter(([, v]) => v !== undefined)) as DocChange;
+    const event: ChangeEvent = { seq: ++this.#seq, type: 'change', change: clean };
+    this.#broadcast(event);
+    return event;
+  }
+  #broadcast(event: BusEvent): void {
+    for (const [l, { all }] of [...this.#listeners]) {
+      if (event.type === 'change' && !all) continue;
       try {
         l(event);
       } catch {
         // pelanggan rusak tidak boleh memutus pelanggan lain
       }
     }
-    return event;
   }
   /** Event terakhir (maks `ACTIVITY_RING_MAX`), urut lama → baru. */
   recent(): ActivityEvent[] {
     return [...this.#ring];
   }
+  /** Event aktivitas (call, session). */
   subscribe(l: ActivityListener): () => void {
-    this.#listeners.add(l);
+    return this.#add(l as BusListener, false);
+  }
+  /** Event aktivitas + event `change`. */
+  subscribeAll(l: BusListener): () => void {
+    return this.#add(l, true);
+  }
+  #add(l: BusListener, all: boolean): () => void {
+    this.#listeners.set(l, { all });
     return () => {
       this.#listeners.delete(l);
     };
@@ -121,7 +187,7 @@ export const sessionSnapshot = (s: Session): ActivitySession => ({
   executes: s.executes,
 });
 
-type Pending = { call: ActivityCall; t0: number; sessionId: string; emitted: boolean; boardId?: string };
+type Pending = { call: ActivityCall; t0: number; sessionId: string; emitted: boolean; boardId?: string; viewer?: { slug: string; origin?: string } };
 
 /** Respons berisi PNG base64: tidak di-parse saat sukses (hasil cukup dari status HTTP). */
 const BINARY_TOOLS = new Set(['screenshot', 'export']);
@@ -131,6 +197,15 @@ const obj = (v: unknown): Record<string, unknown> | undefined => (v && typeof v 
 const asSummary = (v: unknown): CallSummary | undefined => {
   const o = obj(v);
   return o && typeof o.error === 'number' && typeof o.warning === 'number' ? { error: o.error, warning: o.warning } : undefined;
+};
+const isTuple = (v: unknown): v is BoundsTuple => Array.isArray(v) && v.length === 4 && v.every((n) => typeof n === 'number' && Number.isFinite(n));
+/** Peta id → tuple 4 angka; entri tidak valid dibuang, peta kosong → undefined. */
+const boundsRecord = (v: unknown): Record<string, BoundsTuple> | undefined => {
+  const o = obj(v);
+  if (!o) return undefined;
+  const out: Record<string, BoundsTuple> = {};
+  for (const [id, b] of Object.entries(o)) if (id && isTuple(b)) out[id] = [b[0], b[1], b[2], b[3]];
+  return Object.keys(out).length ? out : undefined;
 };
 const ids = (v: unknown): string[] | undefined => {
   if (!Array.isArray(v)) return undefined;
@@ -186,6 +261,8 @@ function finish(call: ActivityCall, statusCode: number, json: unknown): Activity
       if (boards) out.boards = boards;
       const bounds = obj(data.bounds);
       if (bounds) out.nodes = Object.keys(bounds).length + (typeof data.boundsTruncated === 'number' ? data.boundsTruncated : 0);
+      const rects = boundsRecord(bounds);
+      if (rects) out.bounds = rects;
       const summary = asSummary(check?.summary);
       if (summary) out.summary = summary;
       break;
@@ -197,10 +274,15 @@ function finish(call: ActivityCall, statusCode: number, json: unknown): Activity
       if (summary) out.summary = summary;
       break;
     }
-    case 'inspect':
-      if (str(obj(data.node)?.id)) out.nodes = 1;
+    case 'inspect': {
+      const node = obj(data.node);
+      const id = str(node?.id);
+      if (id) out.nodes = 1;
+      const b = node?.bounds;
+      if (id && isTuple(b)) out.bounds = { [id]: [b[0], b[1], b[2], b[3]] };
       if (str(data.boardId)) out.boards = [str(data.boardId)!];
       break;
+    }
     case 'list_boards':
       if (Array.isArray(data.boards)) out.nodes = data.boards.length;
       break;
@@ -234,7 +316,16 @@ export function registerActivityHooks(app: FastifyInstance, { sessions, bus, hea
     const tool = TOOL_ROUTES[routeUrl(req) ?? ''];
     if (!tool) return;
     const session = sessions.peek(req.headers[SESSION_HEADER]);
-    if (!session || session.client === VIEWER_CLIENT) return;
+    if (!session) return;
+    if (session.client === VIEWER_CLIENT) {
+      // Execute dari aplikasi (layer manual): tidak tampil di Activity, tetapi jendela lain perlu memuat ulang.
+      if (tool === 'execute' && session.activeSlug) {
+        const origin = originOf(req.headers);
+        const call: ActivityCall = { callId: '', session: publicSessionId(session.id), client: VIEWER_CLIENT, tool, status: 'running', startedAt: '' };
+        pending.set(req, { call, t0: now(), sessionId: session.id, emitted: false, viewer: { slug: session.activeSlug, ...(origin ? { origin } : {}) } });
+      }
+      return;
+    }
     const body = obj(req.body);
     let description: string | undefined;
     if (tool === 'execute') {
@@ -280,6 +371,21 @@ export function registerActivityHooks(app: FastifyInstance, { sessions, bus, hea
     const p = pending.get(req);
     if (!p || p.emitted) return payload;
     p.emitted = true;
+    if (p.viewer) {
+      // Sesi viewer: hanya execute sukses yang dipancarkan, sebagai `change` jenis `edit`.
+      if (reply.statusCode !== 200 || typeof payload !== 'string') return payload;
+      try {
+        const body = obj(JSON.parse(payload));
+        const data = obj(body?.data);
+        if (body?.ok === true && data && typeof data.rev === 'number') {
+          const boards = ids(obj(data.check)?.boards);
+          bus.change({ kind: 'edit', slug: p.viewer.slug, rev: data.rev, ...(boards ? { boards } : {}), ...(p.viewer.origin ? { origin: p.viewer.origin } : {}) });
+        }
+      } catch {
+        // payload bukan JSON: abaikan
+      }
+      return payload;
+    }
     const timed = { ...p.call, durationMs: Math.max(0, Math.round(now() - p.t0)) };
     let done: ActivityCall;
     if (BINARY_TOOLS.has(p.call.tool) && reply.statusCode === 200) {
@@ -302,6 +408,7 @@ export function registerActivityHooks(app: FastifyInstance, { sessions, bus, hea
     const p = pending.get(req);
     if (!p || p.emitted) return;
     p.emitted = true;
+    if (p.viewer) return;
     bus.emit({
       type: 'call',
       call: { ...p.call, status: 'error', durationMs: Math.max(0, Math.round(now() - p.t0)), error: { code: 'EXEC_ERROR', message: 'koneksi ditutup sebelum respons terkirim' } },
@@ -336,7 +443,7 @@ export function registerActivityHooks(app: FastifyInstance, { sessions, bus, hea
     };
     write('hello', hello);
     streams.add(res);
-    const unsubscribe = bus.subscribe((e) => write(e.type, e));
+    const unsubscribe = bus.subscribeAll((e) => write(e.type, e));
     const ping = setInterval(() => {
       if (!res.writableEnded) res.write(': ping\n\n');
     }, heartbeatMs);

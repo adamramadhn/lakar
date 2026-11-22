@@ -32,15 +32,23 @@ export { rasterType, readAsset, writeAsset, readAssetMeta, imageSize, type Asset
 export { PhotoService, type PhotoServiceOptions, type PhotoStatus, type SearchResponse } from './photos/service.js';
 export { SafeNet, NetError, isBlockedIp, DEFAULT_ALLOWLIST, type HostAllowlist, type SafeNetOptions } from './photos/net.js';
 export { DocStore } from './store.js';
+export { ASSET_UPLOAD_MAX, BOARD_PRESETS, SLUG_MAX, registerFileRoutes, slugify, withSuffix, type FileRoutesOptions } from './files.js';
+export { FOLDER_ID_PATTERN, FOLDER_NAME_MAX, FOLDERS_FILE, FolderStore, folderName, memberOf, newFolderId, type Folder } from './folders.js';
+export { exportFileName, registerExportRoutes, type ExportRoutesOptions } from './export.js';
 export { VIEWER_DIST_DIR, registerViewerRoutes, type ViewerDocSummary, type ViewerHistoryEntry } from './viewer.js';
 export {
   ACTIVITY_HEARTBEAT_MS,
   ACTIVITY_RING_MAX,
   ActivityBus,
+  ORIGIN_HEADER,
   TOOL_ROUTES,
   registerActivityHooks,
   type ActivityCall,
   type ActivityEvent,
+  type BusEvent,
+  type ChangeEvent,
+  type ChangeKind,
+  type DocChange,
   type ActivitySession,
   type CallStatus,
   type CallSummary,

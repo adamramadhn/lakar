@@ -128,6 +128,20 @@ describe('deteksi rev baru', () => {
     expect(revChange(callEv({ callId: 'd', status: 'error', rev: 9 }), 'a', 4)).toBeUndefined();
     expect(revChange(callEv({ callId: 'e', status: 'done', rev: 9, client: 'lakar-viewer' }), 'a', 4)).toBeUndefined();
   });
+  it('Restore dari aplikasi (lakar-viewer, tool restore) → muat ulang semua board; tetap tidak tampil di Activity', () => {
+    const e = callEv({ callId: 'rs', status: 'done', rev: 8, tool: 'restore', client: 'lakar-viewer', session: 'lakar-vi' });
+    expect(revChange(e, 'a', 7)).toEqual({ rev: 8 });
+    expect(revChange(e, 'a', 8)).toBeUndefined();
+    expect(callTitle({ ...(e as { call: ActivityCall }).call, description: 'Restored r3' })).toBe('Restored r3');
+    const s = activityReducer(initialActivity, { type: 'event', event: e });
+    expect(s.calls).toEqual([]);
+  });
+  it('kelola halaman dari aplikasi (lakar-viewer, tool pages) → muat ulang; tidak tampil di Activity', () => {
+    const e = callEv({ callId: 'pg', status: 'done', rev: 8, tool: 'pages', client: 'lakar-viewer', session: 'lakar-vi', description: 'Added page "Page 2"' });
+    expect(revChange(e, 'a', 7)).toEqual({ rev: 8 });
+    expect(callTitle((e as { call: ActivityCall }).call)).toBe('Added page "Page 2"');
+    expect(activityReducer(initialActivity, { type: 'event', event: e }).calls).toEqual([]);
+  });
   it('tool lain dengan rev lebih baru → muat ulang semua board (boards tidak diketahui)', () => {
     expect(revChange(callEv({ callId: 'f', status: 'done', rev: 6, tool: 'layout_check' }), 'a', 4)).toEqual({ rev: 6 });
   });

@@ -154,3 +154,272 @@ describe('ViewerClient', () => {
     expect(count('/screenshot')).toBe(2);
   });
 });
+
+describe('kolom List view (aplikasi 11)', () => {
+  it('listDocs meneruskan field opsional createdAt/lastClient/check; ringkasan lama tanpa field tetap utuh', async () => {
+    const rich = { slug: 'a', rev: 3, updatedAt: '2026-01-02T00:00:00.000Z', boardCount: 2, firstBoardId: 'Bbbbbbb1', createdAt: '2026-01-01T00:00:00.000Z', lastClient: 'codex-cli', check: { error: 1, warning: 0 } };
+    const plain = { slug: 'b', rev: 1, updatedAt: '2026-01-01T00:00:00.000Z', boardCount: 0, firstBoardId: null };
+    const calls = fakeFetch(() => ok({ docs: [rich, plain] }));
+    const api = await freshApi();
+    const list = await api.listDocs();
+    expect(calls.map((c) => `${c.method} ${c.path}`)).toEqual(['GET /viewer/docs']);
+    expect(list).toEqual([rich, plain]);
+    expect(list[1]).not.toHaveProperty('check');
+  });
+});
+
+describe('kelola file', () => {
+  it('rute + metode tulis; sukses → cache screenshot slug terkait dibuang dan pendengar dipanggil', async () => {
+    let deleted = false;
+    const calls = fakeFetch((c) => {
+      if (c.path === '/viewer/docs' && c.method === 'GET') return docs(deleted ? [] : ['a']);
+      if (c.path === '/viewer/docs/a' && c.method === 'GET') return doc('a');
+      if (c.path === '/sessions') return ok({ sessionId: 's1' });
+      if (c.path === '/docs/open') return ok({ docId: 'Dddddddd', slug: 'a', rev: 1, created: false });
+      if (c.path === '/screenshot') return ok({ boardId: 'A', width: 1, height: 1, mimeType: 'image/png', png: PNG });
+      if (c.path === '/viewer/docs' && c.method === 'POST') return ok({ slug: 'my-landing', rev: 1 });
+      if (c.path === '/viewer/docs/a/rename') return ok({ slug: 'b', from: 'a' });
+      if (c.path === '/viewer/docs/a/duplicate') return ok({ slug: 'a-copy', rev: 0 });
+      if (c.path === '/viewer/docs/a/archive' || c.path === '/viewer/docs/a/unarchive') return ok({ slug: 'a' });
+      if (c.path.startsWith('/viewer/docs/a') && c.method === 'DELETE') {
+        deleted = true;
+        return ok({ slug: 'a', deleted: true });
+      }
+      if (c.path === '/viewer/archive') return docs(['z']);
+      throw new Error(`tak terduga ${c.method} ${c.path}`);
+    });
+    const api = await freshApi();
+    const changed = vi.fn();
+    api.onDocsChanged(changed);
+    const fileEvents = vi.fn();
+    api.onFileEvent(fileEvents);
+    await expect(api.createFile('My Landing', { preset: 'custom', width: 10, height: 20 })).resolves.toEqual({ slug: 'my-landing', rev: 1 });
+    await api.renameFile('a', 'B');
+    await api.duplicateFile('a');
+    await api.archiveFile('a');
+    await api.unarchiveFile('a');
+    await api.deleteFile('a', true);
+    expect((await api.listArchive()).map((d) => d.slug)).toEqual(['z']);
+    expect(changed).toHaveBeenCalledTimes(6);
+    // Hanya rename/archive/delete yang memengaruhi tab; slug rename dari respons daemon.
+    expect(fileEvents.mock.calls.map((c) => c[0])).toEqual([
+      { type: 'rename', from: 'a', to: 'b' },
+      { type: 'archive', slug: 'a' },
+      { type: 'delete', slug: 'a', archived: true },
+    ]);
+    expect(calls.filter((c) => c.method !== 'GET' && c.path.startsWith('/viewer')).map((c) => `${c.method} ${c.path}`)).toEqual([
+      'POST /viewer/docs',
+      'POST /viewer/docs/a/rename',
+      'POST /viewer/docs/a/duplicate',
+      'POST /viewer/docs/a/archive',
+      'POST /viewer/docs/a/unarchive',
+      'DELETE /viewer/docs/a?archived=true',
+    ]);
+    expect(calls[0]!.body).toEqual({ name: 'My Landing', board: { preset: 'custom', width: 10, height: 20 } });
+
+    // Screenshot a di-cache, lalu dihapus: cache dibuang → permintaan berikut tidak memakai PNG lama.
+    deleted = false;
+    await api.screenshot('a', 1, 'A');
+    await api.screenshot('a', 1, 'A');
+    expect(calls.filter((c) => c.path === '/screenshot')).toHaveLength(1);
+    await api.deleteFile('a');
+    await expect(api.screenshot('a', 1, 'A')).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    expect(calls.filter((c) => c.path === '/screenshot')).toHaveLength(1);
+  });
+
+  it('gagal → ApiError, pendengar tidak dipanggil', async () => {
+    fakeFetch(() => ({ status: 409, body: { ok: false, error: { code: 'CONFLICT', message: 'dokumen b sudah ada', hint: 'pilih nama lain', retryable: false } } }));
+    const api = await freshApi();
+    const changed = vi.fn();
+    api.onDocsChanged(changed);
+    api.onFileEvent(changed);
+    await expect(api.renameFile('a', 'b')).rejects.toMatchObject({ code: 'CONFLICT', status: 409 });
+    expect(changed).not.toHaveBeenCalled();
+  });
+});
+
+describe('folder (aplikasi 10)', () => {
+  const folder = { id: 'fabcdefghij', name: 'Client work', createdAt: '2026-01-01T00:00:00.000Z' };
+  it('metode, path, body; pendengar onDocsChanged dipanggil setelah setiap tulis', async () => {
+    const calls = fakeFetch((c) => {
+      if (c.path === '/viewer/folders' && c.method === 'GET') return ok({ folders: [folder], membership: { a: folder.id } });
+      if (c.path === '/viewer/folders' && c.method === 'POST') return ok({ folder });
+      if (c.path === `/viewer/folders/${folder.id}/rename`) return ok({ folder: { ...folder, name: 'Clients' } });
+      if (c.path === `/viewer/folders/${folder.id}` && c.method === 'DELETE') return ok({ id: folder.id, deleted: true, moved: ['a'] });
+      if (c.path === '/viewer/folders/move') return ok({ slug: c.body.slug, folder: c.body.folder });
+      throw new Error(`tak terduga ${c.method} ${c.path}`);
+    });
+    const api = await freshApi();
+    const changed = vi.fn();
+    api.onDocsChanged(changed);
+    await expect(api.listFolders()).resolves.toEqual({ folders: [folder], membership: { a: folder.id } });
+    expect(changed).not.toHaveBeenCalled();
+    await expect(api.createFolder('Client work')).resolves.toEqual(folder);
+    expect(changed).toHaveBeenCalledTimes(1);
+    await expect(api.renameFolder(folder.id, 'Clients')).resolves.toMatchObject({ id: folder.id, name: 'Clients' });
+    expect(changed).toHaveBeenCalledTimes(2);
+    await expect(api.moveToFolder('a', folder.id)).resolves.toEqual({ slug: 'a', folder: folder.id });
+    expect(changed).toHaveBeenCalledTimes(3);
+    await expect(api.moveToFolder('a', null)).resolves.toEqual({ slug: 'a', folder: null });
+    expect(changed).toHaveBeenCalledTimes(4);
+    await expect(api.deleteFolder(folder.id)).resolves.toMatchObject({ id: folder.id, moved: ['a'] });
+    expect(changed).toHaveBeenCalledTimes(5);
+    expect(calls.map((c) => [c.method, c.path, c.body])).toEqual([
+      ['GET', '/viewer/folders', undefined],
+      ['POST', '/viewer/folders', { name: 'Client work' }],
+      ['POST', `/viewer/folders/${folder.id}/rename`, { name: 'Clients' }],
+      ['POST', '/viewer/folders/move', { slug: 'a', folder: folder.id }],
+      ['POST', '/viewer/folders/move', { slug: 'a', folder: null }],
+      ['DELETE', `/viewer/folders/${folder.id}`, undefined],
+    ]);
+  });
+
+  it('409 dari createFolder → ApiError CONFLICT, pendengar tidak dipanggil', async () => {
+    fakeFetch(() => ({ status: 409, body: { ok: false, error: { code: 'CONFLICT', message: 'folder "Client work" sudah ada', hint: 'pilih nama lain', retryable: false } } }));
+    const api = await freshApi();
+    const changed = vi.fn();
+    api.onDocsChanged(changed);
+    const err = await api.createFolder('client work').catch((e: unknown) => e);
+    expect(err).toBeInstanceOf((await import('./api.ts')).ApiError);
+    expect(err).toMatchObject({ code: 'CONFLICT', status: 409 });
+    expect(changed).not.toHaveBeenCalled();
+  });
+});
+
+describe('History (aplikasi 3)', () => {
+  it('versi lama + screenshot snapshot di-cache per slug@rev tanpa sesi; gagal tidak di-cache; restore → POST {rev} + pendengar', async () => {
+    let failShot = true;
+    const calls = fakeFetch((c) => {
+      if (c.path === '/viewer/docs/a/revs/3' && c.method === 'GET') return ok({ doc: { id: 'Dddddddd', rev: 3, pages: [] } });
+      if (c.path === '/viewer/docs/a/revs/2' && c.method === 'GET')
+        return { status: 404, body: { ok: false, error: { code: 'NOT_FOUND', message: 'tidak ada snapshot', hint: 'versi ini dibuat sebelum snapshot tersedia' } } };
+      if (c.path === '/viewer/docs/a/revs/3/screenshot') {
+        if (failShot) {
+          failShot = false;
+          return { status: 500, body: { ok: false, error: { code: 'RENDER_FAILED', message: 'x', hint: '' } } };
+        }
+        return ok({ boardId: c.body.boardId, width: 1, height: 1, mimeType: 'image/png', png: PNG });
+      }
+      if (c.path === '/viewer/docs/a/restore') return ok({ slug: 'a', rev: 8, restoredFrom: 3 });
+      throw new Error(`tak terduga ${c.method} ${c.path}`);
+    });
+    const api = await freshApi();
+    const changed = vi.fn();
+    api.onDocsChanged(changed);
+    expect((await api.getRevision('a', 3)).rev).toBe(3);
+    await api.getRevision('a', 3);
+    await expect(api.getRevision('a', 2)).rejects.toMatchObject({ code: 'NOT_FOUND', hint: 'versi ini dibuat sebelum snapshot tersedia' });
+    await expect(api.getRevision('a', 2)).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    await expect(api.revScreenshot('a', 3, 'B')).rejects.toMatchObject({ code: 'RENDER_FAILED' });
+    expect((await api.revScreenshot('a', 3, 'B')).boardId).toBe('B');
+    await api.revScreenshot('a', 3, 'B');
+    expect(calls.filter((c) => c.path === '/viewer/docs/a/revs/3')).toHaveLength(1);
+    expect(calls.filter((c) => c.path === '/viewer/docs/a/revs/2')).toHaveLength(2);
+    expect(calls.filter((c) => c.path === '/viewer/docs/a/revs/3/screenshot')).toHaveLength(2);
+    expect(calls.every((c) => c.session === undefined)).toBe(true);
+    await expect(api.restore('a', 3)).resolves.toEqual({ slug: 'a', rev: 8, restoredFrom: 3 });
+    expect(calls.at(-1)).toMatchObject({ method: 'POST', path: '/viewer/docs/a/restore', body: { rev: 3 } });
+    expect(changed).toHaveBeenCalledOnce();
+    await api.restore('a', 3, 7);
+    expect(calls.at(-1)).toMatchObject({ path: '/viewer/docs/a/restore', body: { rev: 3, baseRev: 7 } });
+  });
+
+  it('kelola halaman: path, method, dan body; gagal → ApiError', async () => {
+    const calls = fakeFetch((c) => {
+      if (c.path === '/viewer/docs/a/pages/Pg000001' && c.method === 'DELETE') return { status: 409, body: { ok: false, error: { code: 'CONFLICT', message: 'satu-satunya halaman', hint: 'dokumen butuh setidaknya satu halaman' } } };
+      return ok({ slug: 'a', rev: 2, pageId: 'Pg000002' });
+    });
+    const api = await freshApi();
+    await expect(api.addPage('a')).resolves.toEqual({ slug: 'a', rev: 2, pageId: 'Pg000002' });
+    expect(calls.at(-1)).toMatchObject({ method: 'POST', path: '/viewer/docs/a/pages', body: {} });
+    await api.addPage('a', 'Home');
+    expect(calls.at(-1)).toMatchObject({ body: { name: 'Home' } });
+    await api.renamePage('a', 'Pg000002', 'About');
+    expect(calls.at(-1)).toMatchObject({ method: 'POST', path: '/viewer/docs/a/pages/Pg000002/rename', body: { name: 'About' } });
+    await api.movePage('a', 'Pg000002', 0);
+    expect(calls.at(-1)).toMatchObject({ method: 'POST', path: '/viewer/docs/a/pages/Pg000002/move', body: { index: 0 } });
+    await api.deletePage('a', 'Pg000002');
+    expect(calls.at(-1)).toMatchObject({ method: 'DELETE', path: '/viewer/docs/a/pages/Pg000002', body: undefined });
+    await expect(api.deletePage('a', 'Pg000001')).rejects.toMatchObject({ code: 'CONFLICT', status: 409 });
+  });
+
+  it('restore dengan baseRev usang → ApiError CONFLICT 409 dengan hint', async () => {
+    fakeFetch((c) => {
+      if (c.path === '/viewer/docs/a/restore') return { status: 409, body: { ok: false, error: { code: 'CONFLICT', message: 'dokumen a sudah berubah ke r9', hint: 'ada perubahan yang lebih baru', retryable: false } } };
+      throw new Error(`tak terduga ${c.path}`);
+    });
+    const api = await freshApi();
+    await expect(api.restore('a', 3, 8)).rejects.toMatchObject({ code: 'CONFLICT', status: 409, hint: 'ada perubahan yang lebih baru' });
+  });
+});
+
+describe('exportPng (aplikasi 2)', () => {
+  it('PNG → blob + nama dari content-disposition; error AD-11 → ApiError; nama aneh → cadangan', async () => {
+    const mod = await (async () => {
+      vi.resetModules();
+      return import('./api.ts');
+    })();
+    const seen: { path: string; body: unknown }[] = [];
+    vi.stubGlobal('fetch', async (path: string, init: { body: string }) => {
+      seen.push({ path, body: JSON.parse(init.body) });
+      if (JSON.parse(init.body).boardId === 'nope') {
+        return new Response(JSON.stringify({ ok: false, error: { code: 'NOT_FOUND', message: 'board nope tidak ada', hint: 'pilih board lain' } }), { status: 404 });
+      }
+      return new Response(new Uint8Array([137, 80, 78, 71]), {
+        status: 200,
+        headers: { 'content-type': 'image/png', 'content-disposition': 'attachment; filename="my-landing-desktop@2x.png"' },
+      });
+    });
+    const r = await mod.api.exportPng('my-landing', 'Bbbbbbb1', 2);
+    expect(r.filename).toBe('my-landing-desktop@2x.png');
+    expect(r.blob.size).toBe(4);
+    expect(seen[0]).toEqual({ path: '/viewer/docs/my-landing/export', body: { boardId: 'Bbbbbbb1', scale: 2 } });
+    await expect(mod.api.exportPng('my-landing', 'nope', 1)).rejects.toMatchObject({ code: 'NOT_FOUND', status: 404 });
+    expect(mod.exportFileName('attachment; filename="../x.png"', 'f.png')).toBe('f.png');
+    expect(mod.exportFileName(null, 'f.png')).toBe('f.png');
+  });
+});
+
+describe('layer manual (aplikasi 4)', () => {
+  it('execute: /docs/open lalu POST /execute {code, description} dengan sesi viewer; gagal → ApiError berisi hint', async () => {
+    let fail = false;
+    const calls = fakeFetch((c) => {
+      if (c.path === '/viewer/docs') return docs(['a']);
+      if (c.path === '/viewer/docs/a') return doc('a');
+      if (c.path === '/sessions') return ok({ sessionId: 's1' });
+      if (c.path === '/docs/open') return ok({ docId: 'Dddddddd', slug: 'a', rev: 1, created: false });
+      if (c.path === '/execute') {
+        if (fail) return { status: 422, body: { ok: false, error: { code: 'RENDER_FAILED', message: 'render gagal', hint: 'periksa font', retryable: false } } };
+        return ok({ docId: 'Dddddddd', rev: 2, created: [{ id: 'Nnnnnnn1', name: 'Rectangle' }], check: { boards: ['Bbbbbbb1'] } });
+      }
+      throw new Error(`tak terduga ${c.path}`);
+    });
+    const api = await freshApi();
+    const r = await api.execute('a', 'add("B", {})', 'Insert rectangle into Desktop board');
+    expect(r).toMatchObject({ rev: 2, created: [{ id: 'Nnnnnnn1' }] });
+    const ex = calls.find((c) => c.path === '/execute')!;
+    expect(ex).toMatchObject({ method: 'POST', session: 's1', body: { code: 'add("B", {})', description: 'Insert rectangle into Desktop board' } });
+    expect(calls.findIndex((c) => c.path === '/docs/open')).toBeLessThan(calls.indexOf(ex));
+    fail = true;
+    await expect(api.execute('a', 'x', 'Insert rectangle into Desktop board')).rejects.toMatchObject({ code: 'RENDER_FAILED', hint: 'periksa font', status: 422 });
+  });
+
+  it('uploadAsset: byte mentah + content-type file; 413 → ApiError; iconSearch memakai sesi', async () => {
+    const seen: { path: string; type: string | undefined; body: unknown }[] = [];
+    let big = false;
+    vi.stubGlobal('fetch', async (path: string, init: { method: string; headers: Record<string, string>; body?: unknown }) => {
+      seen.push({ path, type: init.headers['content-type'], body: init.body });
+      if (path === '/sessions') return new Response(JSON.stringify({ ok: true, data: { sessionId: 's1' } }));
+      if (path === '/icons/search') return new Response(JSON.stringify({ ok: true, data: { query: 'star', results: [{ lib: 'lucide', icon: 'star' }] } }));
+      if (big) return new Response(JSON.stringify({ ok: false, error: { code: 'SCHEMA_INVALID', message: 'gambar melebihi 20 MB', hint: 'perkecil', retryable: false } }), { status: 413 });
+      return new Response(JSON.stringify({ ok: true, data: { assetId: 'f'.repeat(64), mime: 'image/png', width: 1200, height: 800 } }));
+    });
+    const api = await freshApi();
+    const file = new Blob([new Uint8Array([137, 80, 78, 71])], { type: 'image/png' });
+    expect(await api.uploadAsset(file)).toMatchObject({ width: 1200, height: 800 });
+    expect(seen[0]).toMatchObject({ path: '/viewer/assets', type: 'image/png', body: file });
+    big = true;
+    await expect(api.uploadAsset(file)).rejects.toMatchObject({ status: 413, code: 'SCHEMA_INVALID' });
+    expect(await api.iconSearch('star')).toEqual([{ lib: 'lucide', icon: 'star' }]);
+  });
+});

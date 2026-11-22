@@ -1,4 +1,5 @@
-/* Token desain dari design/lakar-ui.pen (variabel tema `mode: dark | light`). Tema ikut prefers-color-scheme. */
+/* Token desain dari design/lakar-ui.pen (variabel tema `mode: dark | light`). Tema = atribut `data-theme` di <html>
+   (theme.ts: pilihan Settings → Appearance, `system` mengikuti prefers-color-scheme); tanpa atribut → terang. */
 @font-face {
   font-family: 'Inter';
   font-style: normal;
@@ -63,32 +64,30 @@
   --font-mono: 'JetBrains Mono', ui-monospace, 'SFMono-Regular', Consolas, monospace;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    color-scheme: dark;
-    --bg: #232323;
-    --titlebar: #2a2a2a;
-    --sidebar: #262626;
-    --surface: #2a2a2a;
-    --surface-hover: #333333;
-    --thumb: #2f2f2f;
-    --border: #363636;
-    --text-primary: #f2f2f2;
-    --text-secondary: #9a9a9a;
-    --text-muted: #7a7a7a;
-    --btn-bg: #ffffff;
-    --btn-text: #171717;
-    --canvas: #1c1c1c;
-    --input: #303030;
-    --modal: #2a2a2a;
-    --scrim: #00000099;
-    --gallery: #9c9c9c;
-    --accent-soft: #3b82f633;
-    --agent-soft: #f9731626;
-    --codex-soft: #0ea5e926;
-    --danger: #f87171;
-    --danger-soft: #f871711f;
-    --warning: #eab308;
-    --success: #22c55e;
-  }
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --bg: #232323;
+  --titlebar: #2a2a2a;
+  --sidebar: #262626;
+  --surface: #2a2a2a;
+  --surface-hover: #333333;
+  --thumb: #2f2f2f;
+  --border: #363636;
+  --text-primary: #f2f2f2;
+  --text-secondary: #9a9a9a;
+  --text-muted: #7a7a7a;
+  --btn-bg: #ffffff;
+  --btn-text: #171717;
+  --canvas: #1c1c1c;
+  --input: #303030;
+  --modal: #2a2a2a;
+  --scrim: #00000099;
+  --gallery: #9c9c9c;
+  --accent-soft: #3b82f633;
+  --agent-soft: #f9731626;
+  --codex-soft: #0ea5e926;
+  --danger: #f87171;
+  --danger-soft: #f871711f;
+  --warning: #eab308;
+  --success: #22c55e;
 }

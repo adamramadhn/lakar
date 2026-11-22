@@ -101,6 +101,20 @@ export class Sessions {
   all(): Session[] {
     return [...this.#map.values()];
   }
+  /**
+   * Alihkan `activeSlug` setiap sesi yang menunjuk `from` ke `to` (rename), atau kosongkan bila `to`
+   * undefined (archive/delete: agen lalu mendapat NO_ACTIVE_DOC). Mengembalikan jumlah sesi yang diubah.
+   */
+  retarget(from: string, to: string | undefined): number {
+    let n = 0;
+    for (const s of this.#map.values()) {
+      if (s.activeSlug !== from) continue;
+      if (to === undefined) delete s.activeSlug;
+      else s.activeSlug = to;
+      n++;
+    }
+    return n;
+  }
   /** Sesi dengan id penuh, tanpa efek samping. */
   byId(id: string): Session | undefined {
     return this.#map.get(id);

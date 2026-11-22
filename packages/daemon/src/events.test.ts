@@ -103,6 +103,9 @@ describe('event tool call', () => {
       expect(done).toMatchObject({ rev: data.rev, created: data.created.map((c: { id: string }) => c.id), boards: data.check.boards });
       expect(done.durationMs).toBeGreaterThanOrEqual(0);
       expect(done.nodes).toBe(Object.keys(data.bounds).length);
+      expect(Object.keys(data.bounds).length).toBeGreaterThan(0);
+      expect(done.bounds).toEqual(data.bounds);
+      expect(running.bounds).toBeUndefined();
       expect(done.summary).toEqual({ error: data.check.summary.error, warning: data.check.summary.warning });
       expect(done.status).toBe(data.check.summary.error + data.check.summary.warning > 0 ? 'warning' : 'done');
       expect(JSON.stringify(calls())).not.toContain(sid);
@@ -201,6 +204,31 @@ describe('event tool call', () => {
     }
   });
 
+  it('execute sesi lakar-viewer → satu event change `edit` (slug, rev, board, origin) ke subscribeAll; tidak ada call/ring', async () => {
+    const { app, activity, events, post, session } = await setup();
+    try {
+      const changes: unknown[] = [];
+      activity.subscribeAll((e) => e.type === 'change' && changes.push(e.change));
+      const sid = await session('lakar-viewer');
+      await post('/docs/open', { slug: 'a' }, sid);
+      const ex = await app.inject({ method: 'POST', url: '/execute', payload: { code: BOARD, description: 'tambah board home awal' }, headers: { 'x-lakar-session': sid, 'x-lakar-origin': 'win-1' } });
+      expect(ex.statusCode, ex.body).toBe(200);
+      const boardId = ex.json().data.created[0].id as string;
+      // Gagal (description kosong) → tidak ada event.
+      expect((await post('/execute', { code: BOARD, description: '' }, sid)).statusCode).not.toBe(200);
+      // Tanpa header origin → change tanpa origin.
+      await post('/execute', { code: BOARD, description: 'tambah board kedua lagi' }, sid);
+      expect(changes).toEqual([
+        { kind: 'edit', slug: 'a', rev: 1, boards: [boardId], origin: 'win-1' },
+        { kind: 'edit', slug: 'a', rev: 2, boards: [expect.any(String)] },
+      ]);
+      expect(events).toEqual([]);
+      expect(activity.recent()).toEqual([]);
+    } finally {
+      await app.close();
+    }
+  });
+
   it('open_doc, list_boards, inspect, read_skill → nama tool MCP dan target ringkas', async () => {
     const { app, calls, post, session } = await setup();
     try {
@@ -209,7 +237,7 @@ describe('event tool call', () => {
       const ex = await post('/execute', { code: BOARD, description: 'tambah board home awal' }, sid);
       const boardId = ex.json().data.created[0].id as string;
       await post('/boards', {}, sid);
-      await post('/inspect', { id: boardId }, sid);
+      const ins = await post('/inspect', { id: boardId }, sid);
       await post('/skills/read', { name: 'webapp' }, sid);
       expect((await post('/screenshot', { boardId }, sid)).statusCode).toBe(200);
       await post('/screenshot', {}, sid);
@@ -223,6 +251,11 @@ describe('event tool call', () => {
       expect(done[0]).toMatchObject({ slug: 'b', rev: 0 });
       expect(done[2]).toMatchObject({ nodes: 1, slug: 'b' });
       expect(done[3]).toMatchObject({ target: boardId, nodes: 1, boards: [boardId] });
+      // inspect → bounds node target dari respons (relatif board).
+      const insNode = ins.json().data.node;
+      expect(insNode.bounds).toHaveLength(4);
+      expect(done[3]!.bounds).toEqual({ [boardId]: insNode.bounds });
+      expect(done[2]!.bounds).toBeUndefined();
       expect(done[4]).toMatchObject({ target: 'webapp' });
     } finally {
       await app.close();
@@ -322,6 +355,25 @@ describe('GET /viewer/events (SSE)', () => {
 
       sse.close();
       await sse.until(() => activity.listenerCount === 1);
+    } finally {
+      await app.close();
+    }
+  });
+
+  it('event change mengalir sebagai frame `change` dan tidak masuk recent[] hello', async () => {
+    const { app, activity } = await setup();
+    try {
+      activity.change({ kind: 'create', slug: 'early', rev: 1 });
+      await app.listen({ host: '127.0.0.1', port: 0 });
+      const port = (app.server.address() as { port: number }).port;
+      const sse = openSse(port);
+      await sse.until(() => sse.frames().length >= 1);
+      expect(sse.frames()[0]!.data.recent).toEqual([]);
+      activity.change({ kind: 'rename', slug: 'b', from: 'a', origin: 'win-1' });
+      await sse.until(() => sse.frames().some((f) => f.event === 'change'));
+      const frame = sse.frames().find((f) => f.event === 'change')!;
+      expect(frame.data).toEqual({ seq: 2, type: 'change', change: { kind: 'rename', slug: 'b', from: 'a', origin: 'win-1' } });
+      sse.close();
     } finally {
       await app.close();
     }
