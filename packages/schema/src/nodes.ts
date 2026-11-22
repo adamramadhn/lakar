@@ -1,11 +1,13 @@
-// Skema dokumen Lakar v2 (AD-2, AD-15, AD-16): primitif, token, properti visual, katalog node, dokumen.
+// Skema dokumen Lakar v3 (AD-2, AD-11, AD-15, AD-16): primitif, token, properti visual, katalog node, dokumen.
 // v2 (story 22) menambah fill `conic`, `noise`, `mesh`; dokumen v1 dimigrasi identitas (`@lakar/core` MIGRATIONS[1]).
+// v3 (epic model-dokumen story 2) mengganti token datar dengan token bertipe + mode tema; dokumen v2 dimigrasi
+// lewat inferensi tipe (`@lakar/core` MIGRATIONS[2]).
 // Satu sumber: tipe TS diturunkan dari zod di sini. Tanpa IO.
 import { z } from 'zod';
 import { LakarError } from './errors.js';
 import { ICON_LIBS, ICON_NAME_PATTERN } from './icons.js';
 
-export const SCHEMA_VERSION = 2 as const;
+export const SCHEMA_VERSION = 3 as const;
 
 // ---------------------------------------------------------------------------
 // Primitif
@@ -41,9 +43,73 @@ export const TokenName = z
   .regex(TOKEN_NAME_PATTERN, 'nama token: segmen [a-z0-9-] dipisah titik, mis. "colors.text-primary"');
 export const TokenRef = z.object({ $token: TokenName }).strict();
 export type TokenRef = z.infer<typeof TokenRef>;
+/** Nilai token datar (bentuk v2; masih diterima `setTokens` dan migrasi v2 â†’ v3). */
 export const TokenValue = z.union([z.number().finite(), z.string().min(1)]);
 export type TokenValue = z.infer<typeof TokenValue>;
-export const Tokens = z.record(TokenName, TokenValue);
+
+/** Tipe token tertutup (AD-11). Urutan ini juga pemecah seri inferensi tipe (`@lakar/core` inferTokens). */
+export const TOKEN_TYPES = ['color', 'radius', 'spacing', 'container', 'breakpoint', 'fontFamily', 'fontWeight', 'fontSize', 'lineHeight', 'letterSpacing'] as const;
+export type TokenType = (typeof TOKEN_TYPES)[number];
+
+export const MODE_NAME_PATTERN = /^[a-z0-9][a-z0-9-]{0,31}$/;
+export const ModeName = z.string().regex(MODE_NAME_PATTERN, `nama mode harus cocok ${MODE_NAME_PATTERN.source}`);
+/** Daftar mode dokumen: minimal satu, tanpa duplikat; elemen pertama = mode default. */
+export const TokenModes = z
+  .array(ModeName)
+  .min(1)
+  .refine((m) => new Set(m).size === m.length, 'tokenModes tidak boleh berisi nama ganda');
+
+const Weight = z
+  .number()
+  .int()
+  .min(100)
+  .max(900)
+  .refine((w) => w % 100 === 0, 'weight harus kelipatan 100 (100â€“900)');
+
+const FontFamily = z.string().min(1);
+
+/** Skema nilai per tipe token; berlaku untuk `value` dan setiap nilai di `modes`. Tidak menerima string CSS. */
+export const TOKEN_VALUE_SCHEMAS = {
+  color: HexColor,
+  radius: Size,
+  spacing: Size,
+  container: Size,
+  breakpoint: Size,
+  fontFamily: FontFamily,
+  fontWeight: Weight,
+  fontSize: Size,
+  lineHeight: Positive,
+  letterSpacing: Px,
+} as const satisfies Record<TokenType, z.ZodType>;
+
+/** True bila `value` sah untuk tipe token `type`. */
+export const isTokenValueOf = (type: TokenType, value: unknown): boolean => TOKEN_VALUE_SCHEMAS[type].safeParse(value).success;
+
+const tokenDef = <T extends TokenType>(type: T) =>
+  z
+    .object({
+      type: z.literal(type),
+      value: TOKEN_VALUE_SCHEMAS[type],
+      /** Nilai per mode; kunci wajib ada di `tokenModes` dokumen. Mode tanpa nilai memakai `value`. */
+      modes: z.record(ModeName, TOKEN_VALUE_SCHEMAS[type]).optional(),
+    })
+    .strict();
+
+/** Definisi token bertipe (AD-11): `{type, value, modes?}`. */
+export const TokenDef = z.discriminatedUnion('type', [
+  tokenDef('color'),
+  tokenDef('radius'),
+  tokenDef('spacing'),
+  tokenDef('container'),
+  tokenDef('breakpoint'),
+  tokenDef('fontFamily'),
+  tokenDef('fontWeight'),
+  tokenDef('fontSize'),
+  tokenDef('lineHeight'),
+  tokenDef('letterSpacing'),
+]);
+export type TokenDef = z.infer<typeof TokenDef>;
+export const Tokens = z.record(TokenName, TokenDef);
 export type Tokens = z.infer<typeof Tokens>;
 
 /** Slot yang boleh berisi nilai langsung atau referensi token. */
@@ -106,16 +172,16 @@ const MeshFill = z
     type: z.literal('mesh'),
     columns: MeshGrid,
     rows: MeshGrid,
-    /** Warna titik kendali baris demi baris (= columns × rows). */
+    /** Warna titik kendali baris demi baris (= columns Ã— rows). */
     colors: z.array(Color).min(4).max(MESH_GRID_MAX * MESH_GRID_MAX),
-    /** Posisi titik kendali relatif kotak (= columns × rows); default grid rata. */
+    /** Posisi titik kendali relatif kotak (= columns Ã— rows); default grid rata. */
     points: z.array(z.tuple([Unit, Unit])).min(4).max(MESH_GRID_MAX * MESH_GRID_MAX).optional(),
   })
   .strict()
   .superRefine((f, ctx) => {
     const n = f.columns * f.rows;
-    if (f.colors.length !== n) ctx.addIssue({ code: 'custom', path: ['colors'], message: `mesh: colors harus ${n} warna (columns ${f.columns} × rows ${f.rows}, baris demi baris), bukan ${f.colors.length}` });
-    if (f.points && f.points.length !== n) ctx.addIssue({ code: 'custom', path: ['points'], message: `mesh: points harus ${n} titik [x,y] (columns × rows), bukan ${f.points.length}` });
+    if (f.colors.length !== n) ctx.addIssue({ code: 'custom', path: ['colors'], message: `mesh: colors harus ${n} warna (columns ${f.columns} Ã— rows ${f.rows}, baris demi baris), bukan ${f.colors.length}` });
+    if (f.points && f.points.length !== n) ctx.addIssue({ code: 'custom', path: ['points'], message: `mesh: points harus ${n} titik [x,y] (columns Ã— rows), bukan ${f.points.length}` });
   });
 
 export const Fill = z.discriminatedUnion('type', [
@@ -233,6 +299,8 @@ const boardShape = {
   /** Board selalu clip (AD-15); ketiadaan = true. */
   clip: z.literal(true).optional(),
   fills: z.array(Fill).optional(),
+  /** Mode tema board (AD-11); wajib ada di `tokenModes`. Ketiadaan = mode pertama `tokenModes`. */
+  themeMode: ModeName.optional(),
 };
 
 const frameShape = {
@@ -249,18 +317,11 @@ const frameShape = {
   ...visualShape,
 };
 
-const Weight = z
-  .number()
-  .int()
-  .min(100)
-  .max(900)
-  .refine((w) => w % 100 === 0, 'weight harus kelipatan 100 (100–900)');
-
 const textShape = {
   type: z.literal('text'),
   ...childBase,
   content: z.string(),
-  family: tok(z.string().min(1)).optional(),
+  family: tok(FontFamily).optional(),
   weight: tok(Weight).optional(),
   style: z.enum(['normal', 'italic']).optional(),
   size: tok(Positive),
@@ -307,7 +368,7 @@ const iconShape = {
   ...childBase,
   lib: z.enum(ICON_LIBS),
   // `name` (dari childBase) = nama layer (AD-3, mis. "Icon / lucide / arrow-right"); nama ikon kanonik
-  // pustaka disimpan terpisah di `icon` supaya tidak bertabrakan dengan nama layer (AD-9 × AD-3).
+  // pustaka disimpan terpisah di `icon` supaya tidak bertabrakan dengan nama layer (AD-9 Ã— AD-3).
   // `_` ada di beberapa slug simple-icons (mis. "hive_blockchain").
   icon: z.string().regex(ICON_NAME_PATTERN, 'nama ikon kanonik: huruf kecil/angka/tanda hubung/garis bawah, mis. "arrow-right"'),
   version: z.string().min(1).optional(),
@@ -386,12 +447,44 @@ export const LakarDocument = z
     schemaVersion: z.literal(SCHEMA_VERSION),
     id: Id,
     rev: z.number().int().nonnegative(),
-    /** Peta datar nama bertitik → nilai. Opsional: dokumen tracer tanpa tokens tetap valid. */
+    /** Peta nama bertitik â†’ token bertipe. Opsional: dokumen tracer tanpa tokens tetap valid. */
     tokens: Tokens.optional(),
+    /** Mode tema yang dideklarasikan (AD-11); elemen pertama = default. */
+    tokenModes: TokenModes.optional(),
     pages: z.array(Page).min(1),
   })
-  .strict();
+  .strict()
+  .superRefine((d, ctx) => {
+    for (const i of tokenModeIssues(d)) ctx.addIssue({ code: 'custom', path: i.path, message: i.message });
+  });
 export type LakarDocument = z.infer<typeof LakarDocument>;
+
+export type TokenModeIssue = { path: (string | number)[]; message: string };
+
+/**
+ * Konsistensi mode (AD-11): kunci `modes` token dan `themeMode` board wajib ada di `tokenModes`; tanpa
+ * `tokenModes` keduanya dilarang. Dipakai `LakarDocument` dan `resolveTokens`.
+ */
+export function tokenModeIssues(doc: {
+  tokens?: Readonly<Record<string, { modes?: Readonly<Record<string, unknown>> | undefined }>> | undefined;
+  tokenModes?: readonly string[] | undefined;
+  pages: readonly { children: readonly { themeMode?: string | undefined }[] }[];
+}): TokenModeIssue[] {
+  const out: TokenModeIssue[] = [];
+  const declared = doc.tokenModes;
+  const known = new Set(declared ?? []);
+  const why = (m: string) =>
+    declared ? `mode ${JSON.stringify(m)} tidak ada di tokenModes [${declared.join(', ')}]` : `mode ${JSON.stringify(m)} dipakai tetapi dokumen tidak punya tokenModes`;
+  for (const [name, def] of Object.entries(doc.tokens ?? {})) {
+    for (const m of Object.keys(def.modes ?? {})) if (!known.has(m)) out.push({ path: ['tokens', name, 'modes', m], message: why(m) });
+  }
+  doc.pages.forEach((p, pi) =>
+    p.children.forEach((b, bi) => {
+      if (b.themeMode !== undefined && !known.has(b.themeMode)) out.push({ path: ['pages', pi, 'children', bi, 'themeMode'], message: why(b.themeMode) });
+    }),
+  );
+  return out;
+}
 
 /**
  * Board `boardId` di halaman mana pun (generik: dokumen tersimpan maupun ter-resolve), atau undefined.
@@ -416,7 +509,7 @@ export type HistoryEntry = {
 export type CreatedEntry = { id: string; name: string; path: string[] };
 
 // ---------------------------------------------------------------------------
-// Pemetaan issue zod → LakarError SCHEMA_INVALID
+// Pemetaan issue zod â†’ LakarError SCHEMA_INVALID
 // ---------------------------------------------------------------------------
 
 type Issue = z.core.$ZodIssue;

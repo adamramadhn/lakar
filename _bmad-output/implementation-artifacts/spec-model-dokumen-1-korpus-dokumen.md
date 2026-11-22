@@ -1,4 +1,4 @@
-﻿---
+---
 title: 'Korpus dokumen v1/v2 dan tes migrasi korpus (epic model-dokumen story 1)'
 type: 'chore'
 created: '2026-11-22'

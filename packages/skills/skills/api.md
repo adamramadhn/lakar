@@ -98,9 +98,9 @@ remove(t);
 
 ### setTokens
 
-`setTokens(map: {[name: string]: string | number | null}): void`
+`setTokens(map: {[name: string]: string | number | {type, value, modes?} | null}): void`
 
-Merge token datar ke dokumen (nama segmen [a-z0-9-] dipisah titik, mis. 'colors.primary'); null menghapus. Rujuk dengan {$token:'colors.primary'}.
+Merge token ke dokumen (nama segmen [a-z0-9-] dipisah titik, mis. 'colors.primary'); null menghapus. Rujuk dengan {$token:'colors.primary'}. Nilai datar: token ada → ganti value (type/modes tetap); token baru → type diinferensi dari slot yang merujuknya. Bertipe: {type:'color'|'radius'|'spacing'|'container'|'breakpoint'|'fontFamily'|'fontWeight'|'fontSize'|'lineHeight'|'letterSpacing', value, modes?:{dark:...}}.
 
 - Mengembalikan: undefined
 - Error: SCHEMA_INVALID, TOKEN_UNKNOWN
@@ -109,6 +109,22 @@ Merge token datar ke dokumen (nama segmen [a-z0-9-] dipisah titik, mis. 'colors.
 setTokens({'colors.primary': '#0F62FE', 'spacing.4': 16});
 const b = add(null, {type:'board', name:'Beranda', x:0, y:0, width:390, height:844, screen:'mobile'});
 add(b, {type:'rect', name:'Aksen', width:40, height:40, fills:[{type:'solid', color:{$token:'colors.primary'}}]});
+```
+
+### setTokenModes
+
+`setTokenModes(modes: string[] | null): void`
+
+Ganti daftar mode tema dokumen: minimal satu, tanpa duplikat, elemen pertama = default; nama diawali huruf kecil/angka lalu [a-z0-9-], maks 32 karakter. null menghapus. Kunci token.modes dan board themeMode wajib ada di daftar ini (dicek saat commit).
+
+- Mengembalikan: undefined
+- Error: SCHEMA_INVALID
+
+```js
+setTokenModes(['light', 'dark']);
+setTokens({'colors.bg': {type:'color', value:'#FFFFFF', modes:{dark:'#0B0C0F'}}});
+const b = add(null, {type:'board', name:'Beranda', x:0, y:0, width:390, height:844, screen:'mobile'});
+update(b, {themeMode:'dark', fills:[{type:'solid', color:{$token:'colors.bg'}}]});
 ```
 
 ### get
@@ -210,7 +226,7 @@ add(k, {type:'text', name:'Judul', content:'Kamar deluks, 2 tamu', size:16, line
 ## Katalog node v1
 
 - Tertutup: board, frame, text, rect, ellipse, path, icon. Kunci di luar skema → SCHEMA_INVALID. Semua node anak wajib `name`.
-- board (parent null): `{type:'board', name, x, y, width, height, screen:'landing'|'app'|'mobile', expectedSize?:{width,height}, fills?}`. Selalu clip; anak disusun kolom dari kiri atas (seperti frame `layout:'column'`, align start).
+- board (parent null): `{type:'board', name, x, y, width, height, screen:'landing'|'app'|'mobile', expectedSize?:{width,height}, fills?, themeMode?:string}` (themeMode harus ada di tokenModes). Selalu clip; anak disusun kolom dari kiri atas (seperti frame `layout:'column'`, align start).
 - frame: `layout?:'none'|'row'|'column'` (default `'none'` = semua anak absolut di x/y, default 0,0), `gap?` (boleh negatif), `padding?`, `align?:'start'|'center'|'end'|'stretch'` (sumbu silang), `justify?:'start'|'center'|'end'|'space-between'` (sumbu utama), `clip?`, `scrollY?` (geser isi ke atas), sizing, cat, radius, efek.
 - text: `content, size, family?` (default Inter), `weight?` (100–900, default 400), `style?:'normal'|'italic'`, `lineHeight?` (px), `letterSpacing?` (em), `align?:'left'|'center'|'right'|'justify'`, `wrap?`, `numeric?:'proportional'|'tabular'`, `color?` (default #000000), sizing, efek.
 - rect: sizing, cat, radius, efek. ellipse: sizing, cat, efek + `startDeg?` (0 = jam 12, searah jarum jam), `sweepDeg?` (-360..360), `inner?` (rasio lubang [0,1)) untuk busur/ring.
@@ -289,6 +305,9 @@ add(b, {type:'frame', name:'Kartu terangkat', width:200, height:120, radius:12, 
 ## Token
 
 - `setTokens({'colors.primary':'#0F62FE', 'spacing.4':16})`; nilai properti boleh `{$token:'colors.primary'}` (token harus ada → selain itu TOKEN_UNKNOWN). get/find mengembalikan referensi apa adanya.
+- Token bertipe `{type, value, modes?}`: warna → color; radius/gap/padding/ukuran/stroke.width/size icon → radius|spacing|container|breakpoint; text size → fontSize; family/weight/lineHeight/letterSpacing → tipe senama. Salah slot → SCHEMA_INVALID.
+- Nilai per tipe (value dan modes): color hex #RRGGBB/#RRGGBBAA; fontFamily string tak kosong; fontWeight 100–900 kelipatan 100; lineHeight > 0; letterSpacing angka apa pun; tipe lain angka ≥ 0.
+- Mode tema: `setTokenModes(['light','dark'])`, token `modes:{dark:'#000000'}`, board `themeMode:'dark'` (default mode pertama).
 
 ## Respons execute
 

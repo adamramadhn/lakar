@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { parseDocument } from '../packages/core/src/index.ts';
-import { NODE_TYPES, resolveTokens, SCHEMA_VERSION } from '../packages/schema/src/index.ts';
+import { NODE_TYPES, resolveTokens, SCHEMA_VERSION, TOKEN_TYPES } from '../packages/schema/src/index.ts';
 import { boardsOf, loadDocCorpus, missingVersions, type CorpusDoc } from './support/doc-corpus.ts';
 
 const corpus = loadDocCorpus();
@@ -105,6 +105,52 @@ describe('korpus dokumen: migrasi, validasi, resolve token', () => {
     const before = JSON.stringify(v1.raw);
     parseDocument(v1.raw);
     expect(JSON.stringify(v1.raw)).toBe(before);
+  });
+});
+
+/** Substitusi ref `{$token}` di `raw.pages` dengan nilai token datar lama (v1/v2), tanpa skema. */
+function substituteFlat(raw: Record<string, unknown>): unknown {
+  const tokens = (raw.tokens ?? {}) as Record<string, unknown>;
+  const sub = (v: unknown): unknown => {
+    if (typeof v === 'object' && v !== null && !Array.isArray(v) && Object.keys(v).length === 1 && typeof (v as { $token?: unknown }).$token === 'string') {
+      return tokens[(v as { $token: string }).$token];
+    }
+    if (Array.isArray(v)) return v.map(sub);
+    if (typeof v === 'object' && v !== null) return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, sub(x)]));
+    return v;
+  };
+  return sub(raw.pages);
+}
+
+describe('korpus dokumen: migrasi token v2 → v3 (AD-11)', () => {
+  it.each(corpus.filter((d) => d.version < 3).map((d): [string, CorpusDoc] => [`v${d.version}/${d.name}`, d]))('tampilan tetap: %s', (_label, d) => {
+    expect(resolveTokens(parseDocument(d.raw)).pages, d.path).toEqual(substituteFlat(d.raw));
+  });
+
+  it('fixture v3 memakai semua tipe token, dua mode, board dengan dan tanpa themeMode', () => {
+    const v3 = corpus.filter((d) => d.version === 3).map((d) => parseDocument(d.raw));
+    const types = new Set(v3.flatMap((doc) => Object.values(doc.tokens ?? {}).map((t) => t.type)));
+    expect(TOKEN_TYPES.filter((t) => !types.has(t)), 'tipe token tanpa fixture v3').toEqual([]);
+    expect(v3.some((doc) => doc.tokenModes?.join() === 'light,dark' && Object.values(doc.tokens ?? {}).some((t) => t.modes))).toBe(true);
+    const boards = v3.flatMap((doc) => doc.pages.flatMap((p) => p.children));
+    expect(boards.some((b) => b.themeMode === 'dark')).toBe(true);
+    expect(boards.some((b) => b.themeMode === undefined)).toBe(true);
+  });
+
+  it('fixture v3 tema-mode: board gelap memakai nilai mode dark, board terang memakai value/modes.light', () => {
+    const d = corpus.find((x) => x.version === 3 && x.name === 'tema-mode')!;
+    const r = resolveTokens(parseDocument(d.raw));
+    const [light, dark] = r.pages[0]!.children;
+    expect(light!.fills).toEqual([{ type: 'solid', color: '#FFFFFF' }]);
+    expect(dark!.fills).toEqual([{ type: 'solid', color: '#0B0C0F' }]);
+    expect(light!.children[0]).toMatchObject({ gap: 16, padding: 16, maxWidth: 350, radius: 16 });
+    expect(dark!.children[0]).toMatchObject({ gap: 20, padding: 20 });
+    const icon = (b: typeof light) => (b!.children[0] as { children: { color?: string; weight?: number }[] }).children;
+    expect(icon(light)[0]!.color).toBe('#1D4ED8');
+    expect(icon(dark)[0]!.color).toBe('#60A5FA');
+    expect([icon(light)[1]!.weight, icon(dark)[1]!.weight]).toEqual([600, 700]);
+    const forced = resolveTokens(parseDocument(d.raw), { mode: 'dark' });
+    expect(forced.pages[0]!.children[0]!.fills).toEqual([{ type: 'solid', color: '#0B0C0F' }]);
   });
 });
 

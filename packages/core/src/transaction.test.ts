@@ -369,7 +369,7 @@ describe('setTokens', () => {
     tx.setTokens({ 'colors.a': '#111111', 'spacing.2': 8 });
     tx.setTokens({ 'spacing.2': null, 'colors.b': '#222222' });
     const r = tx.commit('tokens');
-    expect(r.doc.tokens).toEqual({ 'colors.a': '#111111', 'colors.b': '#222222' });
+    expect(r.doc.tokens).toEqual({ 'colors.a': { type: 'color', value: '#111111' }, 'colors.b': { type: 'color', value: '#222222' } });
     expect(r.entry!.opsSummary).toBe('setTokens×2');
   });
 
@@ -380,12 +380,12 @@ describe('setTokens', () => {
     ['bukan objek', ['colors.a']],
     ['satu salah dari banyak', { 'colors.ok': '#111111', 'bad name': 1 }],
   ])('%s → SCHEMA_INVALID, seluruh map ditolak', (_l, map) => {
-    const doc = { ...createDocument(), tokens: { 'colors.x': '#000000' } };
+    const doc = { ...createDocument(), tokens: { 'colors.x': { type: 'color' as const, value: '#000000' } } };
     expectAtomic(doc, (tx) => tx.setTokens({ 'colors.y': '#FFFFFF' }), (tx) => tx.setTokens(map), 'SCHEMA_INVALID');
   });
 
   it('token terhapus masih dirujuk → TOKEN_UNKNOWN saat commit, transaksi tertutup, dokumen utuh', () => {
-    const doc0 = { ...createDocument(), tokens: { 'colors.a': '#111111' } };
+    const doc0 = { ...createDocument(), tokens: { 'colors.a': { type: 'color' as const, value: '#111111' } } };
     const t0 = beginTransaction(doc0, { sessionId: 's' });
     const b = t0.add(null, boardIn());
     t0.add(b, { type: 'text', name: 'T', content: 'a', size: 12, color: { $token: 'colors.a' } });
@@ -547,5 +547,136 @@ describe('view', () => {
     expect(doc.pages[0]!.children).toHaveLength(0);
     tx.rollback();
     expect(() => tx.view()).toThrow(/ditutup/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Token bertipe v3 (AD-11): setTokens gaya baru + setTokenModes
+// ---------------------------------------------------------------------------
+
+describe('setTokens bertipe (v3)', () => {
+  const base = () => createDocument(seeded(3));
+  const colorDark = { 'colors.a': { type: 'color' as const, value: '#FFFFFF', modes: { dark: '#000000' } } };
+
+  it('datar baru + ref di snippet yang sama → tipe diinferensi saat commit (radius)', () => {
+    const tx = beginTransaction(base(), { sessionId: 's' });
+    tx.setTokens({ 'radius.md': 8 });
+    const b = tx.add(null, boardIn());
+    tx.add(b, { type: 'rect', name: 'R', width: 10, height: 10, radius: { $token: 'radius.md' } });
+    const r = tx.commit('radius');
+    expect(r.doc.tokens!['radius.md']).toEqual({ type: 'radius', value: 8 });
+  });
+
+  it('datar baru dirujuk 2× size text + 1× gap → fontSize, gap di-detach saat commit', () => {
+    const tx = beginTransaction(base(), { sessionId: 's' });
+    tx.setTokens({ 'n.16': 16 });
+    const b = tx.add(null, boardIn());
+    const f = tx.add(b, { type: 'frame', name: 'F', layout: 'column', gap: { $token: 'n.16' } });
+    tx.add(f, { type: 'text', name: 'A', content: 'a', size: { $token: 'n.16' } });
+    tx.add(f, { type: 'text', name: 'B', content: 'b', size: { $token: 'n.16' } });
+    const r = tx.commit('detach');
+    expect(r.doc.tokens!['n.16']).toEqual({ type: 'fontSize', value: 16 });
+    expect(find(r.doc, f)!.gap).toBe(16);
+  });
+
+  it('datar baru tanpa ref → tipe dari nilai', () => {
+    const tx = beginTransaction(base(), { sessionId: 's' });
+    tx.setTokens({ 'a.hex': '#FFF000', 'a.font': 'Inter', 'a.num': 8, 'a.neg': -0.5 });
+    expect(tx.commit('x').doc.tokens).toEqual({
+      'a.hex': { type: 'color', value: '#FFF000' },
+      'a.font': { type: 'fontFamily', value: 'Inter' },
+      'a.num': { type: 'spacing', value: 8 },
+      'a.neg': { type: 'letterSpacing', value: -0.5 },
+    });
+  });
+
+  it('datar ke token yang ada → value diganti, type/modes tetap', () => {
+    const doc = { ...base(), tokenModes: ['light', 'dark'], tokens: colorDark };
+    const tx = beginTransaction(doc, { sessionId: 's' });
+    tx.setTokens({ 'colors.a': '#222222' });
+    expect(tx.commit('x').doc.tokens).toEqual({ 'colors.a': { type: 'color', value: '#222222', modes: { dark: '#000000' } } });
+  });
+
+  it('datar ke token yang ada tetapi salah tipe → SCHEMA_INVALID, atomik', () => {
+    const doc = { ...base(), tokenModes: ['light', 'dark'], tokens: colorDark };
+    expectAtomic(doc, (tx) => tx.setTokens({ 'colors.y': '#FFFFFF' }), (tx) => tx.setTokens({ 'colors.a': 16 }), 'SCHEMA_INVALID');
+  });
+
+  it('bertipe → tersimpan apa adanya (menggantikan token sepenuhnya)', () => {
+    const doc = { ...base(), tokenModes: ['light', 'dark'], tokens: colorDark };
+    const tx = beginTransaction(doc, { sessionId: 's' });
+    tx.setTokens({ 'colors.b': { type: 'color', value: '#FFFFFF' }, 'colors.a': { type: 'color', value: '#333333' } });
+    expect(tx.commit('x').doc.tokens).toEqual({ 'colors.a': { type: 'color', value: '#333333' }, 'colors.b': { type: 'color', value: '#FFFFFF' } });
+  });
+
+  it.each([
+    ['nilai salah tipe', { 'colors.b': { type: 'color', value: 16 } }],
+    ['tipe tak dikenal', { 'colors.b': { type: 'shadow', value: '#000000' } }],
+    ['string CSS', { 'colors.b': { type: 'color', value: 'rgba(0,0,0,1)' } }],
+    ['kunci asing', { 'colors.b': { type: 'color', value: '#000000', extra: 1 } }],
+    ['nilai mode salah tipe', { 'colors.b': { type: 'color', value: '#000000', modes: { dark: 4 } } }],
+    ['fontWeight bukan kelipatan 100', { 'w.x': { type: 'fontWeight', value: 450 } }],
+    ['lineHeight 0', { 'lh.x': { type: 'lineHeight', value: 0 } }],
+    ['satu salah dari banyak', { 'colors.ok': '#111111', 'colors.b': { type: 'color', value: 16 } }],
+  ])('%s → SCHEMA_INVALID, seluruh map ditolak, dokumen tak berubah', (_l, map) => {
+    const doc = { ...base(), tokens: { 'colors.x': { type: 'color' as const, value: '#000000' } } };
+    expectAtomic(doc, (tx) => tx.setTokens({ 'colors.y': '#FFFFFF' }), (tx) => tx.setTokens(map), 'SCHEMA_INVALID');
+  });
+
+  it('token color dirujuk di padding → commit gagal SCHEMA_INVALID menyebut path, token, tipe', () => {
+    const doc = { ...base(), tokens: { 'colors.a': { type: 'color' as const, value: '#111111' } } };
+    const tx = beginTransaction(doc, { sessionId: 's' });
+    const b = tx.add(null, boardIn());
+    tx.add(b, { type: 'frame', name: 'F', padding: { $token: 'colors.a' } });
+    const e = caught(() => tx.commit('salah slot'));
+    expect(e.code).toBe('SCHEMA_INVALID');
+    expect(e.message).toContain('pages.0.children.0.children.0.padding');
+    expect(e.message).toContain('colors.a');
+    expect(e.message).toContain('color');
+    expect(tx.open).toBe(false);
+  });
+});
+
+describe('setTokenModes', () => {
+  it('setTokenModes lalu update board themeMode → commit sukses', () => {
+    const tx = beginTransaction(createDocument(seeded(4)), { sessionId: 's' });
+    const b = tx.add(null, boardIn());
+    tx.setTokenModes(['light', 'dark']);
+    tx.update(b, { themeMode: 'dark' });
+    const r = tx.commit('mode');
+    expect(r.doc.tokenModes).toEqual(['light', 'dark']);
+    expect(find(r.doc, b)!.themeMode).toBe('dark');
+    expect(r.entry!.opsSummary).toBe('add×1, setTokenModes×1, update×1');
+  });
+
+  it('setTokenModes(null) saat mode masih dipakai → SCHEMA_INVALID saat commit; tidak dipakai → kunci dihapus', () => {
+    const tx0 = beginTransaction(createDocument(seeded(5)), { sessionId: 's' });
+    const b = tx0.add(null, boardIn());
+    tx0.setTokenModes(['light', 'dark']);
+    tx0.update(b, { themeMode: 'dark' });
+    const doc = tx0.commit('x').doc;
+    const tx = beginTransaction(doc, { sessionId: 's' });
+    tx.setTokenModes(null);
+    expect(code(() => tx.commit('hapus mode'))).toBe('SCHEMA_INVALID');
+    const ok = beginTransaction(doc, { sessionId: 's' });
+    ok.update(b, { themeMode: null });
+    ok.setTokenModes(null);
+    expect('tokenModes' in ok.commit('hapus').doc).toBe(false);
+  });
+
+  it('mode token tak terdaftar → SCHEMA_INVALID saat commit', () => {
+    const tx = beginTransaction(createDocument(seeded(6)), { sessionId: 's' });
+    tx.setTokenModes(['light', 'dark']);
+    tx.setTokens({ 'colors.a': { type: 'color', value: '#FFFFFF', modes: { sepia: '#704214' } } });
+    expect(code(() => tx.commit('sepia'))).toBe('SCHEMA_INVALID');
+  });
+
+  it.each([
+    ['kosong', []],
+    ['duplikat', ['light', 'light']],
+    ['nama tidak valid', ['Light']],
+    ['bukan array', 'light'],
+  ])('%s → SCHEMA_INVALID langsung, atomik', (_l, modes) => {
+    expectAtomic(createDocument(seeded(8)), (tx) => tx.setTokens({ 'colors.y': '#FFFFFF' }), (tx) => tx.setTokenModes(modes), 'SCHEMA_INVALID');
   });
 });

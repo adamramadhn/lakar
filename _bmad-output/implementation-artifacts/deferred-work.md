@@ -77,3 +77,6 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-app-12-splash-theme.md`
   summary: Belum terverifikasi di build release bahwa tema native jendela (Light/Dark dari Settings) diteruskan ke `prefers-color-scheme` layar mulai, terutama di Linux (WebKitGTK mengikuti preferensi gelap GTK).
   evidence: maybe-false. Windows dan macOS didukung lewat jalur Tauri yang terdokumentasi (`window.theme()` saat membuat WebView2, NSAppearance). Bila Linux tidak ikut, tambahkan atribut `data-theme` di layar mulai dari nilai tema yang disuntikkan Rust.
+- source_spec: `_bmad-output/implementation-artifacts/spec-model-dokumen-2-token-bertipe-v3.md`
+  summary: Agen tidak punya API baca untuk `tokens` dan `tokenModes` dokumen, jadi tidak bisa melihat definisi token atau daftar mode sebelum memanggil `setTokenModes`.
+  evidence: `get`/`find` di API `execute` hanya mengembalikan node. Celah sudah ada sejak token v2. Usul: fungsi baca kepala dokumen di epic token (aditif, AD-4).

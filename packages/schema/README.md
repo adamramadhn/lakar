@@ -1,6 +1,6 @@
 # @lakar/schema
 
-Satu sumber kebenaran untuk bentuk data Lakar: skema dokumen v1 (zod, tipe TS diturunkan dari sini),
+Satu sumber kebenaran untuk bentuk data Lakar: skema dokumen v3 (zod, tipe TS diturunkan dari sini),
 token, kontrak error, temuan check, dan konstanta yang dipakai lebih dari satu paket. Tanpa IO.
 
 - **AD terkait:** AD-2 (skema + JSON Schema hasil zod), AD-11 (bentuk `{ok, data|error}`, enum `ErrorCode`),

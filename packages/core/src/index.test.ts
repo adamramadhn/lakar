@@ -146,7 +146,7 @@ describe('@lakar/core', () => {
   });
 
   it('commit dengan token salah tipe → SCHEMA_INVALID, transaksi tertutup, dokumen asli utuh', () => {
-    const doc = { ...createDocument(), tokens: { 'spacing.2': 16 } };
+    const doc = { ...createDocument(), tokens: { 'spacing.2': { type: 'spacing' as const, value: 16 } } };
     const before = structuredClone(doc);
     const tx = beginTransaction(doc, { sessionId: 's' });
     const b = tx.add(null, boardIn);
@@ -164,7 +164,7 @@ describe('@lakar/core', () => {
   });
 
   it('commit dengan token yang terdefinisi: ref disimpan apa adanya', () => {
-    const doc = { ...createDocument(), tokens: { 'colors.text-primary': '#1A1A1A' } };
+    const doc = { ...createDocument(), tokens: { 'colors.text-primary': { type: 'color' as const, value: '#1A1A1A' } } };
     const tx = beginTransaction(doc, { sessionId: 's' });
     const b = tx.add(null, boardIn);
     tx.add(b, { type: 'text', name: 'T', content: 'a', size: 12, color: { $token: 'colors.text-primary' } });

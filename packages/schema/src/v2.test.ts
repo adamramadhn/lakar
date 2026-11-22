@@ -15,8 +15,8 @@ const codeOf = (input: unknown) => {
 const mesh6 = ['#0B1020', '#123B2A', '#0B1020', '#22C55E', '#0EA5E9', '#0B1020'];
 
 describe('skema v2: fill efek', () => {
-  it('SCHEMA_VERSION 2', () => {
-    expect(SCHEMA_VERSION).toBe(2);
+  it('SCHEMA_VERSION 3 (v2 dimigrasi lewat @lakar/core)', () => {
+    expect(SCHEMA_VERSION).toBe(3);
   });
 
   it.each([
@@ -65,7 +65,7 @@ describe('skema v2: fill efek', () => {
       schemaVersion: SCHEMA_VERSION,
       id: 'Dddddddd',
       rev: 0,
-      tokens: { 'colors.acc': '#22C55E' },
+      tokens: { 'colors.acc': { type: 'color', value: '#22C55E' } },
       pages: [
         {
           id: 'Pppppppp',

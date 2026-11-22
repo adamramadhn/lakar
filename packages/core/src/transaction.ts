@@ -1,13 +1,16 @@
-// Transaksi operasi (AD-4): add | update | replace | move | duplicate | remove | setTokens di atas
+// Transaksi operasi (AD-4): add | update | replace | move | duplicate | remove | setTokens | setTokenModes di atas
 // salinan copy-on-write. Setiap op atomik sendiri: semua validasi selesai sebelum salinan kerja diubah,
 // sehingga op gagal yang ditangkap snippet tidak meninggalkan jejak. Tanpa IO.
 import {
   ID_PATTERN,
   LakarError,
   NodeInput,
+  TokenDef,
+  TokenModes,
   TokenName,
   TokenValue,
   XY_HINT,
+  isTokenValueOf,
   resolveTokens,
   zodToLakarError,
   type AnyNode,
@@ -16,13 +19,15 @@ import {
   type CreatedEntry,
   type HistoryEntry,
   type LakarDocument as Doc,
+  type TokenDef as TokenDefT,
 } from '@lakar/schema';
 import { host } from './host.js';
 import { isPlainObject } from './object.js';
 import { IdAllocator, type RandomSource } from './ids.js';
+import { inferTokens, tokenTypeOfValue } from './tokens-infer.js';
 import { indexNodes, isContainer, locate, subtree, type Container, type Location } from './tree.js';
 
-export type OpKind = 'add' | 'update' | 'replace' | 'move' | 'duplicate' | 'remove' | 'setTokens';
+export type OpKind = 'add' | 'update' | 'replace' | 'move' | 'duplicate' | 'remove' | 'setTokens' | 'setTokenModes';
 
 /**
  * Hasil commit. `entry === null` berarti tidak ada op yang sukses: tidak ada revisi baru, `doc` adalah
@@ -46,8 +51,14 @@ export interface Transaction {
   duplicate(id: string, patch?: unknown): string;
   /** Hapus node beserta subtree-nya. */
   remove(id: string): void;
-  /** Merge peta token datar ke `doc.tokens`; `null` menghapus token. */
+  /**
+   * Merge peta token ke `doc.tokens` (AD-11). Nilai: `null` menghapus; string/angka datar mengganti `value` token
+   * yang ada (`type`/`modes` tetap) atau membuat token baru yang tipenya diinferensi saat commit; objek
+   * `{type, value, modes?}` menggantikan token sepenuhnya.
+   */
   setTokens(map: unknown): void;
+  /** Ganti daftar mode tema dokumen (elemen pertama = default); `null` menghapus `tokenModes`. Konsistensi dicek saat commit. */
+  setTokenModes(modes: unknown): void;
   /**
    * Salinan kerja hidup (melihat op yang sudah sukses di transaksi ini). Hanya-baca menurut kontrak:
    * pemanggil tidak boleh memutasinya. Melempar bila transaksi sudah ditutup.
@@ -144,22 +155,38 @@ function buildNode(input: NodeInput, id: string, children: ChildNode[] | undefin
 }
 
 const TOKENS_HINT =
-  'setTokens({"colors.text-primary": "#1A1A1A", "spacing.2": 8}); nama: segmen [a-z0-9-] dipisah titik; nilai: angka atau string tak kosong; null menghapus token';
+  'setTokens({"colors.text-primary": "#1A1A1A", "spacing.2": 8}) atau bertipe {"colors.bg": {type:"color", value:"#FFFFFF", modes:{dark:"#000000"}}}; nama: segmen [a-z0-9-] dipisah titik; nilai datar: angka atau string tak kosong; null menghapus token';
+const TOKEN_MODES_HINT = 'setTokenModes(["light","dark"]): nama mode [a-z0-9-] (maks 32), minimal satu, tanpa duplikat, elemen pertama = default; null menghapus tokenModes';
 
-/** Validasi seluruh peta token sebelum apa pun diubah; satu entri salah → seluruh peta ditolak. */
-function parseTokenPatch(map: unknown): [string, string | number | null][] {
+/** Satu entri `setTokens` tervalidasi: hapus, nilai datar, atau definisi bertipe lengkap. */
+type TokenPatchEntry = { name: string } & ({ kind: 'delete' } | { kind: 'flat'; value: string | number } | { kind: 'def'; def: TokenDefT });
+
+/**
+ * Validasi seluruh peta token sebelum apa pun diubah; satu entri salah → seluruh peta ditolak. Nilai datar untuk
+ * token yang sudah ada (dan bukan token baru di transaksi ini, `pending`) wajib sah untuk tipe token itu.
+ */
+function parseTokenPatch(map: unknown, existing: Readonly<Record<string, TokenDefT>>, pending: ReadonlySet<string>): TokenPatchEntry[] {
   if (!isPlainObject(map)) {
     throw new LakarError('SCHEMA_INVALID', `setTokens: argumen harus objek {nama: nilai}, bukan ${Array.isArray(map) ? 'array' : JSON.stringify(map) ?? 'undefined'}`, { hint: TOKENS_HINT });
   }
   const problems: string[] = [];
-  const out: [string, string | number | null][] = [];
+  const out: TokenPatchEntry[] = [];
   for (const [name, value] of Object.entries(map)) {
     if (!TokenName.safeParse(name).success) problems.push(`nama token tidak valid: ${JSON.stringify(name)}`);
-    if (value === null) out.push([name, null]);
-    else {
+    if (value === null) out.push({ name, kind: 'delete' });
+    else if (isPlainObject(value)) {
+      const d = TokenDef.safeParse(value);
+      if (d.success) out.push({ name, kind: 'def', def: d.data });
+      else problems.push(zodToLakarError(d.error, name).message);
+    } else {
       const v = TokenValue.safeParse(value);
-      if (v.success) out.push([name, v.data]);
-      else problems.push(`${name}: nilai harus angka atau string tak kosong, bukan ${JSON.stringify(value) ?? 'undefined'}`);
+      if (!v.success) {
+        problems.push(`${name}: nilai harus angka, string tak kosong, atau {type, value, modes?}, bukan ${JSON.stringify(value) ?? 'undefined'}`);
+        continue;
+      }
+      const old = Object.hasOwn(existing, name) && !pending.has(name) ? existing[name] : undefined;
+      if (old && !isTokenValueOf(old.type, v.data)) problems.push(`${name}: nilai ${JSON.stringify(v.data)} tidak sah untuk token bertipe ${old.type}`);
+      else out.push({ name, kind: 'flat', value: v.data });
     }
   }
   if (problems.length) throw new LakarError('SCHEMA_INVALID', `setTokens: ${problems.join('; ')}`, { hint: TOKENS_HINT });
@@ -177,6 +204,8 @@ export function beginTransaction(doc: Doc, opts: TransactionOptions): Transactio
   /** ID node baru dalam urutan pembuatan; difilter ke yang masih ada saat commit. */
   const createdIds: string[] = [];
   const ops = new Map<OpKind, number>();
+  /** Token baru dari nilai datar di transaksi ini: tipenya diinferensi saat commit (AD-11, seperti migrasi). */
+  const pendingFlat = new Set<string>();
   const now = opts.now ?? (() => new Date());
 
   const live = (): Doc => {
@@ -347,13 +376,36 @@ export function beginTransaction(doc: Doc, opts: TransactionOptions): Transactio
 
     setTokens(map) {
       op('setTokens', (w) => {
-        const entries = parseTokenPatch(map);
         const tokens = { ...(w.tokens ?? {}) };
-        for (const [name, value] of entries) {
-          if (value === null) delete tokens[name];
-          else tokens[name] = value;
+        const entries = parseTokenPatch(map, tokens, pendingFlat);
+        for (const e of entries) {
+          if (e.kind === 'delete') {
+            delete tokens[e.name];
+            pendingFlat.delete(e.name);
+          } else if (e.kind === 'def') {
+            tokens[e.name] = e.def;
+            pendingFlat.delete(e.name);
+          } else if (Object.hasOwn(tokens, e.name) && !pendingFlat.has(e.name)) {
+            tokens[e.name] = { ...tokens[e.name]!, value: e.value } as TokenDefT;
+          } else {
+            // Tipe sementara dari nilai; diganti hasil inferensi pemakaian saat commit.
+            tokens[e.name] = { type: tokenTypeOfValue(e.value), value: e.value } as TokenDefT;
+            pendingFlat.add(e.name);
+          }
         }
         w.tokens = tokens;
+      });
+    },
+
+    setTokenModes(modes) {
+      op('setTokenModes', (w) => {
+        if (modes === null) {
+          delete w.tokenModes;
+          return;
+        }
+        const r = TokenModes.safeParse(modes);
+        if (!r.success) throw new LakarError('SCHEMA_INVALID', zodToLakarError(r.error, 'setTokenModes').message, { hint: TOKEN_MODES_HINT });
+        w.tokenModes = r.data;
       });
     },
 
@@ -361,6 +413,14 @@ export function beginTransaction(doc: Doc, opts: TransactionOptions): Transactio
       const w = live();
       work = undefined;
       if (ops.size === 0) return { doc, entry: null, created: [] };
+      // AD-11: token baru dari nilai datar mendapat tipe dari pemakaiannya (ref slot lain di-detach), seperti migrasi.
+      const fresh = [...pendingFlat].filter((n) => Object.hasOwn(w.tokens ?? {}, n));
+      if (fresh.length) {
+        const flat = Object.fromEntries(fresh.map((n) => [n, w.tokens![n]!.value]));
+        const inferred = inferTokens(flat, w.pages);
+        w.tokens = { ...w.tokens, ...(inferred.tokens as Record<string, TokenDefT>) };
+        w.pages = inferred.pages as Doc['pages'];
+      }
       // AD-16: ref token tak dikenal → TOKEN_UNKNOWN, token salah tipe → SCHEMA_INVALID, keduanya saat
       // commit. Transaksi sudah tertutup; dokumen asli tidak tersentuh (salinan kerja dibuang).
       resolveTokens(w);

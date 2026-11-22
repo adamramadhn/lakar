@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { LakarError } from '@lakar/schema';
-import { MIGRATIONS, createDocument, migrateDocument, parseDocument, type MigrationRegistry } from './index.js';
+import { MIGRATIONS, createDocument, inferTokenType, inferTokens, migrateDocument, parseDocument, tokenTypeOfValue, type MigrationRegistry } from './index.js';
 
 const codeOf = (fn: () => unknown): string => {
   try {
@@ -24,21 +24,21 @@ const chain: MigrationRegistry = {
 };
 
 describe('migrateDocument', () => {
-  it('registri resmi: 1→2 identitas; versi kini → apa adanya (objek yang sama)', () => {
-    expect(Object.keys(MIGRATIONS)).toEqual(['1']);
+  it('registri resmi: 1→2 identitas, 2→3 token bertipe; versi kini → apa adanya (objek yang sama)', () => {
+    expect(Object.keys(MIGRATIONS)).toEqual(['1', '2']);
     const doc = JSON.parse(JSON.stringify(createDocument()));
-    expect(doc.schemaVersion).toBe(2);
+    expect(doc.schemaVersion).toBe(3);
     expect(migrateDocument(doc)).toBe(doc);
   });
 
-  it('migrasi resmi 1→2: dokumen v1 lama dibuka sebagai v2 tanpa perubahan lain, input tidak dimutasi', () => {
-    const v2 = JSON.parse(JSON.stringify(createDocument()));
-    const v1 = { ...v2, schemaVersion: 1 };
+  it('migrasi resmi 1→2→3: dokumen v1 lama (tokens kosong) dibuka sebagai v3 tanpa perubahan lain, input tidak dimutasi', () => {
+    const v3 = JSON.parse(JSON.stringify(createDocument()));
+    const v1 = { ...v3, schemaVersion: 1 };
     const snapshot = structuredClone(v1);
     const out = migrateDocument(v1) as Record<string, unknown>;
-    expect(out).toEqual(v2);
+    expect(out).toEqual(v3);
     expect(v1).toEqual(snapshot);
-    expect(parseDocument(v1)).toEqual(v2);
+    expect(parseDocument(v1)).toEqual(v3);
   });
 
   it('rantai 1→2→3 dijalankan berurutan, input tidak dimutasi', () => {
@@ -50,7 +50,7 @@ describe('migrateDocument', () => {
   });
 
   it('lebih baru dari target → VERSION_MISMATCH', () => {
-    expect(codeOf(() => migrateDocument({ schemaVersion: 3 }))).toBe('VERSION_MISMATCH');
+    expect(codeOf(() => migrateDocument({ schemaVersion: 4 }))).toBe('VERSION_MISMATCH');
     expect(codeOf(() => parseDocument({ ...createDocument(), schemaVersion: 99 }))).toBe('VERSION_MISMATCH');
   });
 
@@ -89,5 +89,115 @@ describe('migrateDocument', () => {
     const doc = createDocument();
     expect(parseDocument(JSON.parse(JSON.stringify(doc)))).toEqual(doc);
     expect(codeOf(() => parseDocument({ schemaVersion: 1, id: 'x' }))).toBe('SCHEMA_INVALID');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Migrasi 2 → 3 (AD-11): token datar → token bertipe lewat inferensi
+// ---------------------------------------------------------------------------
+
+type Raw = Record<string, unknown>;
+const v2Doc = (tokens: Raw | undefined, children: Raw[]): Raw => ({
+  schemaVersion: 2,
+  id: 'Dddddddd',
+  rev: 4,
+  ...(tokens ? { tokens } : {}),
+  pages: [{ id: 'Pppppppp', name: 'P', children: [{ type: 'board', id: 'Bbbbbbbb', name: 'B', x: 0, y: 0, width: 390, height: 844, screen: 'mobile', children }] }],
+});
+const nodes = (d: { pages: { children: { children: unknown[] }[] }[] }) => d.pages[0]!.children[0]!.children as Raw[];
+
+describe('migrasi 2 → 3', () => {
+  it('warna dirujuk fill → color, ref tetap', () => {
+    const raw = v2Doc({ 'colors.a': '#111111' }, [{ type: 'rect', id: 'Rrrrrrr1', name: 'R', fills: [{ type: 'solid', color: { $token: 'colors.a' } }] }]);
+    const doc = parseDocument(raw);
+    expect(doc.schemaVersion).toBe(3);
+    expect(doc.tokens).toEqual({ 'colors.a': { type: 'color', value: '#111111' } });
+    expect(doc.tokenModes).toBeUndefined();
+    expect(nodes(doc)[0]).toMatchObject({ fills: [{ color: { $token: 'colors.a' } }] });
+  });
+
+  it('grup panjang: 1× padding + 1× radius → seri → radius (urutan TOKEN_TYPES), kedua ref tetap', () => {
+    const raw = v2Doc({ 'size.x': 12 }, [{ type: 'frame', id: 'Fffffff1', name: 'F', padding: { $token: 'size.x' }, radius: { $token: 'size.x' }, children: [] }]);
+    const doc = parseDocument(raw);
+    expect(doc.tokens).toEqual({ 'size.x': { type: 'radius', value: 12 } });
+    expect(nodes(doc)[0]).toMatchObject({ padding: { $token: 'size.x' }, radius: { $token: 'size.x' } });
+  });
+
+  it('lintas grup: 16 dirujuk 2× size text + 1× gap → fontSize; ref gap di-detach jadi 16', () => {
+    const raw = v2Doc({ 'n.16': 16 }, [
+      {
+        type: 'frame',
+        id: 'Fffffff1',
+        name: 'F',
+        layout: 'column',
+        gap: { $token: 'n.16' },
+        children: [
+          { type: 'text', id: 'Tttttt01', name: 'A', content: 'a', size: { $token: 'n.16' } },
+          { type: 'text', id: 'Tttttt02', name: 'B', content: 'b', size: { $token: 'n.16' } },
+        ],
+      },
+    ]);
+    const snapshot = structuredClone(raw);
+    const doc = parseDocument(raw);
+    expect(raw).toEqual(snapshot);
+    expect(doc.tokens).toEqual({ 'n.16': { type: 'fontSize', value: 16 } });
+    const frame = nodes(doc)[0] as { gap: unknown; children: Raw[] };
+    expect(frame.gap).toBe(16);
+    expect(frame.children.map((c) => c.size)).toEqual([{ $token: 'n.16' }, { $token: 'n.16' }]);
+  });
+
+  it('token tak dirujuk: hex → color, string → fontFamily, angka ≥ 0 → spacing, < 0 → letterSpacing', () => {
+    const doc = parseDocument(v2Doc({ 'a.hex': '#FFF000', 'a.font': 'Inter', 'a.num': 8, 'a.neg': -0.5, 'a.nol': 0 }, []));
+    expect(doc.tokens).toEqual({
+      'a.hex': { type: 'color', value: '#FFF000' },
+      'a.font': { type: 'fontFamily', value: 'Inter' },
+      'a.num': { type: 'spacing', value: 8 },
+      'a.neg': { type: 'letterSpacing', value: -0.5 },
+      'a.nol': { type: 'spacing', value: 0 },
+    });
+  });
+
+  it('nilai tak sah untuk tipe kandidat (gap negatif) → tipe dari nilai, ref di-detach; tampilan tetap', () => {
+    const raw = v2Doc({ 'gap.neg': -8 }, [{ type: 'frame', id: 'Fffffff1', name: 'F', layout: 'row', gap: { $token: 'gap.neg' }, children: [] }]);
+    const doc = parseDocument(raw);
+    expect(doc.tokens).toEqual({ 'gap.neg': { type: 'letterSpacing', value: -8 } });
+    expect(nodes(doc)[0]).toMatchObject({ gap: -8 });
+  });
+
+  it('dokumen tanpa tokens hanya naik versi', () => {
+    const raw = v2Doc(undefined, [{ type: 'rect', id: 'Rrrrrrr1', name: 'R' }]);
+    expect(migrateDocument(raw)).toEqual({ ...raw, schemaVersion: 3 });
+  });
+
+  it('langkah 2 murni: input tidak dimutasi', () => {
+    const raw = v2Doc({ 'n.16': 16 }, [{ type: 'frame', id: 'Fffffff1', name: 'F', gap: { $token: 'n.16' }, children: [{ type: 'text', id: 'Tttttt01', name: 'A', content: 'a', size: { $token: 'n.16' } }, { type: 'text', id: 'Tttttt02', name: 'B', content: 'b', size: { $token: 'n.16' } }] }]);
+    const snapshot = structuredClone(raw);
+    MIGRATIONS[2]!(raw);
+    expect(raw).toEqual(snapshot);
+  });
+});
+
+describe('inferensi tipe token', () => {
+  it('tokenTypeOfValue', () => {
+    expect(['#FFF000', '#11223344', 'Inter', 'fff000', 8, 0, -1].map(tokenTypeOfValue)).toEqual(['color', 'color', 'fontFamily', 'fontFamily', 'spacing', 'spacing', 'letterSpacing']);
+  });
+
+  it('inferTokenType: frekuensi tipe utama, seri → urutan TOKEN_TYPES, tanpa ref → dari nilai', () => {
+    const s = (primary: string) => ({ slot: { slot: 'x', accepts: [primary] as never, primary: primary as never } });
+    expect(inferTokenType(8, [s('spacing'), s('spacing'), s('radius')])).toBe('spacing');
+    expect(inferTokenType(8, [s('spacing'), s('radius')])).toBe('radius');
+    expect(inferTokenType(8, [])).toBe('spacing');
+    expect(inferTokenType(500, [s('fontWeight')])).toBe('fontWeight');
+    expect(inferTokenType(450, [s('fontWeight')])).toBe('spacing');
+  });
+
+  it('inferTokens hanya menyentuh nama yang diminta; pages mentah tidak dimutasi', () => {
+    const pages = [{ id: 'P', name: 'P', children: [{ type: 'board', children: [{ type: 'text', size: { $token: 'a' }, color: { $token: 'b' } }] }] }];
+    const snapshot = structuredClone(pages);
+    const r = inferTokens({ a: 14 }, pages);
+    expect(r.tokens).toEqual({ a: { type: 'fontSize', value: 14 } });
+    expect(r.detached).toBe(0);
+    expect(r.pages).toBe(pages);
+    expect(pages).toEqual(snapshot);
   });
 });

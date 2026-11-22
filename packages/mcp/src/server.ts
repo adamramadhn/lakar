@@ -185,7 +185,8 @@ export const EXECUTE_DESCRIPTION =
   'move(id, parentId|null, index?) pindah ke board/frame (null = urutan board); ' +
   'duplicate(id, patch?) → id salinan subtree tepat setelah asal; ' +
   'remove(id) hapus subtree; ' +
-  "setTokens({'colors.primary':'#0F62FE','spacing.4':16}) merge token, null menghapus; " +
+  "setTokens({'colors.primary':'#0F62FE','spacing.4':16}) merge token, null menghapus (bertipe: {type, value, modes?}); " +
+  "setTokenModes(['light','dark']) mode tema, board themeMode; " +
   'get(id) → NodeView; find({type?, name?: string|RegExp, within?}) → NodeView[] urutan dokumen; children(id|null) → NodeView[] anak langsung (null = board); ' +
   'NodeView = properti tersimpan (token apa adanya) + parentId, path, childIds (hanya-baca: jangan kirim balik ke update/add); ' +
   'place(w, h, {near?, gap?}) → {x,y} posisi board baru yang tidak tumpang tindih (gap default 80); ' +

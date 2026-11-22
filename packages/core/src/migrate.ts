@@ -3,6 +3,7 @@
 import { LakarDocument, LakarError, SCHEMA_VERSION, zodToLakarError, type LakarDocument as Doc } from '@lakar/schema';
 import { host } from './host.js';
 import { isPlainObject } from './object.js';
+import { inferTokens } from './tokens-infer.js';
 
 export type RawDocument = Record<string, unknown>;
 /** Satu langkah: dokumen versi n → dokumen versi n+1. Boleh memutasi argumennya (sudah salinan). */
@@ -14,9 +15,17 @@ export type MigrationRegistry = Readonly<Record<number, Migration>>;
  * Registri migrasi resmi.
  * - 1 → 2 (story 22): v2 hanya menambah jenis fill (`conic`, `noise`, `mesh`); dokumen v1 valid apa adanya, jadi langkahnya
  *   identitas yang hanya menaikkan `schemaVersion`. Pembaca v1 tidak bisa membuka v2 (fill baru), maka versinya naik.
+ * - 2 → 3 (epic model-dokumen story 2, AD-11): token datar menjadi `{type, value}` lewat `inferTokens` (tipe dari
+ *   slot yang paling sering merujuk; ref dari slot lain di-detach ke nilai literal, jadi tampilan tetap). Tanpa
+ *   `tokenModes`/`modes`. Dokumen tanpa `tokens` hanya naik versi. Murni: input tidak dimutasi.
  */
 export const MIGRATIONS: MigrationRegistry = Object.freeze({
   1: (d: RawDocument): RawDocument => ({ ...d, schemaVersion: 2 }),
+  2: (d: RawDocument): RawDocument => {
+    if (!isPlainObject(d.tokens)) return { ...d, schemaVersion: 3 };
+    const { tokens, pages } = inferTokens(d.tokens, d.pages);
+    return { ...d, schemaVersion: 3, tokens, pages };
+  },
 });
 
 export type MigrateOptions = { migrations?: MigrationRegistry; target?: number };

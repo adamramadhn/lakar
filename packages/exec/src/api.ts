@@ -80,6 +80,11 @@ export type NodeProps = NodeInput;
 /** Patch dangkal untuk `update`/`duplicate`; `null` menghapus properti opsional. */
 export type NodePatch = Record<string, unknown>;
 
+/** Tipe token (AD-11). */
+export type TokenTypeName = 'color' | 'radius' | 'spacing' | 'container' | 'breakpoint' | 'fontFamily' | 'fontWeight' | 'fontSize' | 'lineHeight' | 'letterSpacing';
+/** Token bertipe; `modes` = nilai per mode tema (kunci dari `setTokenModes`). */
+export type TokenDefinition = { type: TokenTypeName; value: string | number; modes?: Record<string, string | number> };
+
 /** Fungsi global yang tersedia di snippet `execute`. */
 export interface LakarApi {
   /**
@@ -104,8 +109,13 @@ export interface LakarApi {
   duplicate(id: string, patch?: NodePatch): string;
   /** Hapus node beserta subtree-nya. */
   remove(id: string): void;
-  /** Merge token datar ke dokumen; `null` menghapus token. */
-  setTokens(map: Record<string, string | number | null>): void;
+  /**
+   * Merge token ke dokumen; `null` menghapus token. Nilai datar: token ada → ganti `value` (tipe/mode tetap),
+   * token baru → tipe diinferensi dari slot yang merujuknya. Objek `{type, value, modes?}` menggantikan token.
+   */
+  setTokens(map: Record<string, string | number | TokenDefinition | null>): void;
+  /** Daftar mode tema dokumen (elemen pertama = default); `null` menghapus. Board memilih mode lewat `themeMode`. */
+  setTokenModes(modes: string[] | null): void;
   /** Baca satu node (salinan datar). */
   get(id: string): NodeView;
   /** Cari node dalam urutan dokumen. */
@@ -408,8 +418,11 @@ export const API: { readonly [K in keyof LakarApi]: ApiFunction } = {
   },
   setTokens: {
     kind: 'op',
-    signature: 'setTokens(map: {[name: string]: string | number | null}): void',
-    doc: "Merge token datar ke dokumen (nama segmen [a-z0-9-] dipisah titik, mis. 'colors.primary'); null menghapus. Rujuk dengan {$token:'colors.primary'}.",
+    signature: 'setTokens(map: {[name: string]: string | number | {type, value, modes?} | null}): void',
+    doc:
+      "Merge token ke dokumen (nama segmen [a-z0-9-] dipisah titik, mis. 'colors.primary'); null menghapus. Rujuk dengan {$token:'colors.primary'}. " +
+      'Nilai datar: token ada → ganti value (type/modes tetap); token baru → type diinferensi dari slot yang merujuknya. ' +
+      "Bertipe: {type:'color'|'radius'|'spacing'|'container'|'breakpoint'|'fontFamily'|'fontWeight'|'fontSize'|'lineHeight'|'letterSpacing', value, modes?:{dark:...}}.",
     returns: 'undefined',
     errors: ['SCHEMA_INVALID', 'TOKEN_UNKNOWN'],
     example:
@@ -417,6 +430,21 @@ export const API: { readonly [K in keyof LakarApi]: ApiFunction } = {
       `${BOARD}\nadd(b, {type:'rect', name:'Aksen', width:40, height:40, fills:[{type:'solid', color:{$token:'colors.primary'}}]});`,
     call(ctx, [map]) {
       mutation(ctx, () => ctx.tx.setTokens(map));
+      return undefined;
+    },
+  },
+  setTokenModes: {
+    kind: 'op',
+    signature: 'setTokenModes(modes: string[] | null): void',
+    doc: "Ganti daftar mode tema dokumen: minimal satu, tanpa duplikat, elemen pertama = default; nama diawali huruf kecil/angka lalu [a-z0-9-], maks 32 karakter. null menghapus. Kunci token.modes dan board themeMode wajib ada di daftar ini (dicek saat commit).",
+    returns: 'undefined',
+    errors: ['SCHEMA_INVALID'],
+    example:
+      "setTokenModes(['light', 'dark']);\n" +
+      "setTokens({'colors.bg': {type:'color', value:'#FFFFFF', modes:{dark:'#0B0C0F'}}});\n" +
+      `${BOARD}\nupdate(b, {themeMode:'dark', fills:[{type:'solid', color:{$token:'colors.bg'}}]});`,
+    call(ctx, [modes]) {
+      mutation(ctx, () => ctx.tx.setTokenModes(modes));
       return undefined;
     },
   },
@@ -616,7 +644,7 @@ export const API_REFERENCE: readonly ApiReferenceSection[] = [
     title: 'Katalog node v1',
     items: [
       "Tertutup: board, frame, text, rect, ellipse, path, icon. Kunci di luar skema → SCHEMA_INVALID. Semua node anak wajib `name`.",
-      "board (parent null): `{type:'board', name, x, y, width, height, screen:'landing'|'app'|'mobile', expectedSize?:{width,height}, fills?}`. Selalu clip; anak disusun kolom dari kiri atas (seperti frame `layout:'column'`, align start).",
+      "board (parent null): `{type:'board', name, x, y, width, height, screen:'landing'|'app'|'mobile', expectedSize?:{width,height}, fills?, themeMode?:string}` (themeMode harus ada di tokenModes). Selalu clip; anak disusun kolom dari kiri atas (seperti frame `layout:'column'`, align start).",
       "frame: `layout?:'none'|'row'|'column'` (default `'none'` = semua anak absolut di x/y, default 0,0), `gap?` (boleh negatif), `padding?`, `align?:'start'|'center'|'end'|'stretch'` (sumbu silang), `justify?:'start'|'center'|'end'|'space-between'` (sumbu utama), `clip?`, `scrollY?` (geser isi ke atas), sizing, cat, radius, efek.",
       "text: `content, size, family?` (default Inter), `weight?` (100–900, default 400), `style?:'normal'|'italic'`, `lineHeight?` (px), `letterSpacing?` (em), `align?:'left'|'center'|'right'|'justify'`, `wrap?`, `numeric?:'proportional'|'tabular'`, `color?` (default #000000), sizing, efek.",
       'rect: sizing, cat, radius, efek. ellipse: sizing, cat, efek + `startDeg?` (0 = jam 12, searah jarum jam), `sweepDeg?` (-360..360), `inner?` (rasio lubang [0,1)) untuk busur/ring.',
@@ -689,6 +717,9 @@ export const API_REFERENCE: readonly ApiReferenceSection[] = [
     title: 'Token',
     items: [
       "`setTokens({'colors.primary':'#0F62FE', 'spacing.4':16})`; nilai properti boleh `{$token:'colors.primary'}` (token harus ada → selain itu TOKEN_UNKNOWN). get/find mengembalikan referensi apa adanya.",
+      "Token bertipe `{type, value, modes?}`: warna → color; radius/gap/padding/ukuran/stroke.width/size icon → radius|spacing|container|breakpoint; text size → fontSize; family/weight/lineHeight/letterSpacing → tipe senama. Salah slot → SCHEMA_INVALID.",
+      'Nilai per tipe (value dan modes): color hex #RRGGBB/#RRGGBBAA; fontFamily string tak kosong; fontWeight 100–900 kelipatan 100; lineHeight > 0; letterSpacing angka apa pun; tipe lain angka ≥ 0.',
+      "Mode tema: `setTokenModes(['light','dark'])`, token `modes:{dark:'#000000'}`, board `themeMode:'dark'` (default mode pertama).",
     ],
   },
   {
