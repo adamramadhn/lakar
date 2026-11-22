@@ -192,3 +192,12 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-vektor-5-pen-tool.md`
   summary: Wiring Pen tool dan mode edit titik di canvas (routing pointer, keyboard capture, pratinjau DOM, seleksi path baru, grup Point panel Design) tanpa tes otomatis; satu rev per gestur dan Ctrl+Z lewat tumpukan undo jendela hanya diverifikasi smoke msedge.
   evidence: Review v5 (vgap, blind, intent). Viewer belum punya harness tes komponen/DOM (pra-ada, sama dengan story 3–4 dan kode-5). Keputusan op (update/remove/no-op), `pathEditable`, dan koordinat panel sudah murni dan dites (`pathEdit.test.ts`); kontrak route dites `tests/vector-edit.test.ts`. Usul: harness jsdom/RTL untuk `usePathTools` (Esc mempertahankan seleksi, Delete tidak menghapus node, Enter < 2 titik tanpa request, pratinjau dipulihkan saat commit gagal) dan `Canvas` (tap Pen tidak ke `onInsert`, seleksi node baru).
+- source_plan: none
+  summary: Tinggi board landing mengikuti isi: aturan cek baru untuk ruang kosong di bawah isi board, dan skill `landing` mengambil tinggi akhir dari `bounds` execute alih-alih menebak angka.
+  evidence: Dipisah dari `spec-agent-open-doc.md` (2026-11-23, pilihan Fatmuh: kerjakan sesudahnya). Landing `landing-kopi-lereng` menyisakan 24 px kosong di bawah footer (board 4074, isi 4050) karena tinggi board hanya angka tetap dan `landing.md` menyuruh `update(keep.board, {height:…})` dengan angka tebakan.
+- source_plan: none
+  summary: Skill desain dari Emil Kowalski untuk agen MCP Lakar: adaptasi `break-ui` (skill opsional review), ringkasan non-animasi `emil-design-eng` ke `ui`/`review`, dan `prototype` untuk alur varian; skill animasi (`animate`, `choreograph`, `review-animations`, `animation-performance`, `learn-taste`) dipasang sebagai skill pengembangan. Atribusi MIT wajib.
+  evidence: Diminta Fatmuh 2026-11-23 (aiforui.dev/skills). Rincian dan kendala anggaran skill ada di `research-agent-canvas-references.md` bagian 3. Urutan kerja kedua, sesudah `spec-agent-open-doc.md`.
+- source_plan: none
+  summary: Efek canvas saat agen bekerja: node baru fade-in (blur + translateY, stagger), label "Generating" dan border warna agen pada board, outline node yang sedang ditulis, cursor per agen dengan nama model, dan baris Activity ala `terminal-chunk-in`; opsional sapuan shimmer ala `g-scan` pen.dev.
+  evidence: Diminta Fatmuh 2026-11-23 dengan acuan Paper, pen.dev, dan open-pencil. Angka dan easing ada di `research-agent-canvas-references.md` bagian 2. Wajib desain dulu di `lakar-ui.pen` section 04. Urutan kerja ketiga.
