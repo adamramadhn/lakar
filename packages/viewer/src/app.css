@@ -1573,33 +1573,142 @@ button.panel-tab:hover {
 .board-error svg {
   color: #dc2626;
 }
+/* Seleksi (desain bagian 05 "Selection"): garis 1.5px accent, 8 handle 7px putih bergaris 1.5px, badge ukuran. */
 .selection {
   position: absolute;
-  border: 1px solid var(--accent);
+  outline: 1.5px solid var(--accent);
   pointer-events: none;
 }
 .handle {
   position: absolute;
   width: 7px;
   height: 7px;
+  margin: -3.5px 0 0 -3.5px;
+  box-sizing: border-box;
   background: #fff;
-  border: 1px solid var(--accent);
+  border: 1.5px solid var(--accent);
 }
-.handle.tl {
-  left: -4px;
-  top: -4px;
+.handle.active {
+  pointer-events: auto;
 }
-.handle.tr {
-  right: -4px;
-  top: -4px;
+.handle.nw,
+.handle.w,
+.handle.sw {
+  left: 0;
 }
-.handle.bl {
-  left: -4px;
-  bottom: -4px;
+.handle.n,
+.handle.s {
+  left: 50%;
 }
-.handle.br {
-  right: -4px;
-  bottom: -4px;
+.handle.ne,
+.handle.e,
+.handle.se {
+  left: 100%;
+}
+.handle.nw,
+.handle.n,
+.handle.ne {
+  top: 0;
+}
+.handle.w,
+.handle.e {
+  top: 50%;
+}
+.handle.sw,
+.handle.s,
+.handle.se {
+  top: 100%;
+}
+/* Overlay editor (story 4): hover/anggota multi-seleksi 1px, marquee, slot asal + target + bar drop reorder. */
+.edit-hover,
+.edit-member,
+.edit-marquee,
+.edit-ghost-slot,
+.edit-drop-target,
+.edit-drop-bar,
+.edit-drop-hint {
+  position: absolute;
+  pointer-events: none;
+}
+.edit-hover,
+.edit-member {
+  outline: 1px solid var(--accent);
+}
+.edit-marquee {
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  outline: 1px solid var(--accent);
+}
+.edit-ghost-slot {
+  box-sizing: border-box;
+  border: 1.5px dashed var(--accent);
+  border-radius: 8px;
+}
+.edit-drop-target {
+  box-sizing: border-box;
+  border: 1px dashed var(--accent);
+  border-radius: 10px;
+}
+.edit-drop-bar {
+  background: var(--accent);
+  border-radius: 1.5px;
+}
+.edit-drop-bar i {
+  position: absolute;
+  width: 7px;
+  height: 7px;
+  box-sizing: border-box;
+  border: 2px solid var(--accent);
+  border-radius: 50%;
+  background: #fff;
+}
+.edit-drop-bar.row i {
+  left: 50%;
+  margin-left: -3.5px;
+}
+.edit-drop-bar.row i:first-child {
+  top: -3.5px;
+}
+.edit-drop-bar.row i:last-child {
+  bottom: -3.5px;
+}
+.edit-drop-bar.column i {
+  top: 50%;
+  margin-top: -3.5px;
+}
+.edit-drop-bar.column i:first-child {
+  left: -3.5px;
+}
+.edit-drop-bar.column i:last-child {
+  right: -3.5px;
+}
+.edit-drop-hint {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 500;
+  white-space: nowrap;
+  transform: translateX(-50%);
+}
+.edit-drag-preview {
+  position: absolute;
+  overflow: hidden;
+  opacity: 0.92;
+  box-shadow: 0 14px 28px #00000059;
+  pointer-events: none;
+}
+.canvas.live-edit .board-label {
+  pointer-events: auto;
+}
+.canvas.live-edit:not(.hand) .board:hover {
+  outline: none;
+}
+.canvas.dragging {
+  cursor: grabbing;
 }
 .size-badge {
   position: absolute;

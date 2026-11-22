@@ -1,7 +1,8 @@
 // Canvas viewer: board di posisi x/y dokumen. Versi terkini = DOM hidup (editor-canvas story 3, AD-6): dokumen
 // di-resolve sekali per objek dokumen (`resolveDocument`, AD-10), tiap board di-mount `mountBoard` ke shadow root
 // (liveBoard.ts) dan diskalakan transform kamera; tanpa POST /screenshot. Pratinjau versi tetap PNG snapshot.
-// Pan, zoom, Fit, seleksi, Export PNG (ExportPopover), dan tool sisip layer (aplikasi 4, di bawah); tanpa drag/resize.
+// Pan, zoom, Fit, seleksi, Export PNG (ExportPopover), dan tool sisip layer (aplikasi 4, di bawah). Di canvas live,
+// seleksi banyak, marquee, geser, reorder, resize, dan Undo/Redo toolbar ada di canvasEdit.tsx (editor-canvas story 4).
 // Mode pratinjau versi (History, aplikasi 3): board dari snapshot (POST revs/:rev/screenshot), banner
 // "Previewing …" dengan Back to latest / Restore this version; Export, Checks, dan outline agen disembunyikan.
 // Tool edit (batch 4) wajib nonaktif selama `preview` ada.
@@ -20,9 +21,10 @@
 // live: DOM lama tetap tampil sampai mount baru siap.
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
 import { findBoard } from '@lakar/render';
-import { resolveDocument, type FindingLevel, type FindingSummary, type LakarDocument, type ResolvedDocument } from '@lakar/schema';
+import { resolveDocument, type DocOp, type FindingLevel, type FindingSummary, type LakarDocument, type ResolvedDocument } from '@lakar/schema';
 import { boardDepKeys, boardSignature, boardSource, ensureFaces, mountLive, RenderDepsCache } from './liveBoard';
 import { api, errorText } from './api';
+import { SelectionBox, useCanvasEdit } from './canvasEdit';
 import { INSERT_KINDS, type InsertKind } from './codegen';
 import { ExportButton } from './ExportPopover';
 import { useOffline, useRetry } from './hooks';
@@ -236,7 +238,18 @@ type LiveDoc = { ok: true; doc: ResolvedDocument } | { ok: false; error: string 
  * Deps gagal diambil (offline) → board tetap di-mount, lalu dicoba lagi saat koneksi pulih (otomatis
  * atau tombol Retry, `useRetry`).
  */
-const BoardLive = memo(function BoardLive({ live, board, zoom }: { live: LiveDoc; board: CanvasBoard; zoom: number }) {
+const BoardLive = memo(function BoardLive({
+  live,
+  board,
+  zoom,
+  onMounted,
+}: {
+  live: LiveDoc;
+  board: CanvasBoard;
+  zoom: number;
+  /** Mount selesai (geometri seleksi/gestur diukur ulang). */
+  onMounted?: ((boardId: string, host: HTMLDivElement) => void) | undefined;
+}) {
   const host = useRef<HTMLDivElement>(null);
   const [state, setState] = useState<{ mounted?: boolean; error?: string; partial?: boolean }>({});
   const [attempt, setAttempt] = useState(0);
@@ -251,6 +264,8 @@ const BoardLive = memo(function BoardLive({ live, board, zoom }: { live: LiveDoc
   const signature = useMemo(() => (live.ok ? boardSignature(resolved) : `error:${live.error}`), [live, resolved]);
   const liveRef = useRef(live);
   liveRef.current = live;
+  const onMountedRef = useRef(onMounted);
+  onMountedRef.current = onMounted;
   useEffect(() => {
     const cur = liveRef.current;
     if (!cur.ok) {
@@ -267,6 +282,7 @@ const BoardLive = memo(function BoardLive({ live, board, zoom }: { live: LiveDoc
       if (!current) return;
       mountLive(el, cur.doc, board.id, deps);
       setState({ mounted: true, ...(deps.complete ? {} : { partial: true }) });
+      onMountedRef.current?.(board.id, el);
     })().catch((e) => current && setState({ error: errorText(e) }));
     return () => {
       current = false;
@@ -310,7 +326,24 @@ export function Canvas({
   onMarker,
   overlay,
   doc,
+  selection = [],
+  onSelectIds,
+  onCommit,
+  canUndo = false,
+  canRedo = false,
+  onUndo,
+  onRedo,
 }: {
+  /** Node terpilih (urutan pilih; terakhir = primer). Seleksi canvas live dan Layers memakai state yang sama. */
+  selection?: readonly string[];
+  /** Seleksi baru dari klik/Shift-klik/marquee di canvas live. */
+  onSelectIds?: (ids: string[]) => void;
+  /** Commit satu gestur (geser/reorder/resize) lewat route ops; false = gagal (pratinjau dipulihkan). */
+  onCommit?: (ops: DocOp[], description: string) => Promise<boolean>;
+  canUndo?: boolean;
+  canRedo?: boolean;
+  onUndo?: () => void;
+  onRedo?: () => void;
   /** Dokumen tersimpan terkini: board versi terkini di-mount sebagai DOM hidup dari `resolveDocument(doc)`. */
   doc?: LakarDocument | undefined;
   /** Dokumen belum punya board sama sekali (state Waiting desain); false = hanya halaman ini yang kosong. */
@@ -374,6 +407,22 @@ export function Canvas({
     if (!canInsert) setTool((t) => (isInsertTool(t) ? 'select' : t));
   }, [canInsert]);
   const [spaceHeld, setSpaceHeld] = useState(false);
+  // Seleksi + gestur editor di canvas live (canvasEdit.tsx); jalur PNG (pratinjau versi) memakai klik board lama.
+  const liveActive = live?.ok === true && !preview;
+  const selectIds = useCallback((ids: string[]) => (onSelectIds ? onSelectIds(ids) : onSelect(ids[ids.length - 1])), [onSelectIds, onSelect]);
+  const edit = useCanvasEdit({
+    section: ref,
+    cam,
+    boards,
+    doc: live?.ok ? live.doc : undefined,
+    active: liveActive,
+    hoverable: tool === 'select' && !spaceHeld,
+    canEdit: editable && !preview && tool === 'select' && !spaceHeld && onCommit !== undefined,
+    selection,
+    onSelectIds: selectIds,
+    onCommit,
+  });
+  const cancelEdit = edit.cancel;
   const [panning, setPanning] = useState(false);
   /** Satu pointer: `pan` = gerak menggeser kamera, `tap` = lepas tanpa gerak memilih/menyisip. */
   const drag = useRef<{ id: number; x: number; y: number; cam: Camera; moved: boolean; pan: boolean; tap: boolean; slop: number; target: string | undefined } | null>(null);
@@ -498,6 +547,8 @@ export function Canvas({
       else if (e.key === '+' || e.key === '=') zoomAt(1.25, size.w / 2, size.h / 2);
       else if (e.key === '-') zoomAt(1 / 1.25, size.w / 2, size.h / 2);
       else if (e.key === 'Escape') {
+        // Gestur berjalan: hanya dibatalkan (seleksi tetap).
+        if (cancelEdit()) return;
         setTool((t) => (isInsertTool(t) ? 'select' : t));
         onSelect(undefined);
       }
@@ -512,7 +563,7 @@ export function Canvas({
       window.removeEventListener('keyup', up);
       window.removeEventListener('blur', blur);
     };
-  }, [fit, zoomAt, size, onSelect, canInsert]);
+  }, [fit, zoomAt, size, onSelect, canInsert, cancelEdit]);
 
   const onPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
     if ((e.target as HTMLElement).closest('.canvas-overlay-ui')) return;
@@ -535,6 +586,8 @@ export function Canvas({
     }
     // Sentuh: satu jari menggeser di Select/Hand; tap tetap memilih (Select) atau menyisip (tool sisip).
     const { pan, tap, slop } = pointerIntent({ touch, tool, spaceHeld, button: e.button });
+    // Mouse/pen dengan tool Select di canvas live: seleksi, marquee, dan gestur edit (sentuh tidak pernah ke sini).
+    if (!touch && tool === 'select' && !pan && e.button === 0 && edit.onPointerDown(e)) return;
     const boardEl = (e.target as HTMLElement).closest<HTMLElement>('[data-board]');
     drag.current = { id: e.pointerId, x: e.clientX, y: e.clientY, cam: camRef.current, moved: false, pan, tap, slop, target: boardEl?.dataset.board };
     if (pan && !touch) setPanning(true);
@@ -553,6 +606,7 @@ export function Canvas({
       setCam(next);
       return;
     }
+    if (edit.onPointerMove(e)) return;
     const d = drag.current;
     if (!d || d.id !== e.pointerId) return;
     const dx = e.clientX - d.x;
@@ -578,6 +632,7 @@ export function Canvas({
   };
   const onPointerUp = (e: ReactPointerEvent<HTMLDivElement>) => {
     if (releaseTouch(e.pointerId)) return;
+    if (edit.onPointerUp(e)) return;
     const d = drag.current;
     if (d && d.id !== e.pointerId) return;
     drag.current = null;
@@ -605,6 +660,7 @@ export function Canvas({
   /** Gestur dibatalkan (mis. sistem mengambil alih pointer): jari pinch → jari tersisa lanjut menggeser; selain itu bersihkan tanpa memilih. */
   const onPointerCancel = (e: ReactPointerEvent<HTMLDivElement>) => {
     if (releaseTouch(e.pointerId)) return;
+    if (edit.onPointerCancel(e)) return;
     if (drag.current && drag.current.id !== e.pointerId) return;
     drag.current = null;
     setPanning(false);
@@ -626,12 +682,13 @@ export function Canvas({
   return (
     <section
       ref={ref}
-      className={`canvas${handMode ? ' hand' : isInsertTool(tool) ? ' inserting' : ''}${panning ? ' panning' : ''}${preview ? ' previewing' : ''}${stale !== undefined ? ' stale' : ''}`}
+      className={`canvas${handMode ? ' hand' : isInsertTool(tool) ? ' inserting' : ''}${panning ? ' panning' : ''}${preview ? ' previewing' : ''}${stale !== undefined ? ' stale' : ''}${liveActive ? ' live-edit' : ''}${edit.dragging ? ' dragging' : ''}`}
       aria-label="Canvas"
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerCancel}
+      onPointerLeave={edit.onPointerLeave}
     >
       {boards.length === 0 && !preview && (
         <div className="canvas-waiting">
@@ -648,17 +705,21 @@ export function Canvas({
         </div>
       )}
       {boards.map((b) => {
-        const left = cam.x + b.x * cam.z;
-        const top = cam.y + b.y * cam.z;
+        // Board yang sedang digeser/di-resize (atau menunggu mount rev baru): kotak pratinjau.
+        const ob = edit.boardBox(b.id);
+        const bw = ob?.w ?? b.width;
+        const bh = ob?.h ?? b.height;
+        const left = cam.x + (ob?.x ?? b.x) * cam.z;
+        const top = cam.y + (ob?.y ?? b.y) * cam.z;
         const selected = highlight?.boardId === b.id && !highlight.bounds;
         return (
           <div key={b.id}>
-            <div className={`board-label${highlight?.boardId === b.id ? ' active' : ''}`} style={{ left, top: top - 18, maxWidth: Math.max(40, b.width * cam.z) }}>
+            <div className={`board-label${highlight?.boardId === b.id ? ' active' : ''}`} data-board-label={b.id} style={{ left, top: top - 18, maxWidth: Math.max(40, bw * cam.z) }}>
               {b.name}
             </div>
-            <div className={`board${selected ? ' selected' : ''}`} data-board={b.id} style={{ left, top, width: b.width * cam.z, height: b.height * cam.z }}>
+            <div className={`board${selected ? ' selected' : ''}`} data-board={b.id} style={{ left, top, width: bw * cam.z, height: bh * cam.z }}>
               {live && boardSource(live !== undefined, preview !== undefined) === 'live' ? (
-                <BoardLive live={live} board={b} zoom={cam.z} />
+                <BoardLive live={live} board={b} zoom={cam.z} onMounted={edit.onMounted} />
               ) : (
                 <BoardImage slug={slug} rev={Math.min(rev, boardRevs?.[b.id] ?? rev)} board={b} previewRev={previewRev} />
               )}
@@ -666,20 +727,15 @@ export function Canvas({
           </div>
         );
       })}
-      {hRect && (
-        <div
-          className="selection"
-          style={{ left: cam.x + hRect.x * cam.z, top: cam.y + hRect.y * cam.z, width: Math.max(1, hRect.w * cam.z), height: Math.max(1, hRect.h * cam.z) }}
-        >
-          <i className="handle tl" />
-          <i className="handle tr" />
-          <i className="handle bl" />
-          <i className="handle br" />
-          <span className="size-badge">
-            {Math.round(hRect.w)} × {Math.round(hRect.h)}
-          </span>
-        </div>
-      )}
+      {liveActive
+        ? edit.overlay
+        : hRect && (
+            <SelectionBox
+              style={{ left: cam.x + hRect.x * cam.z, top: cam.y + hRect.y * cam.z, width: Math.max(1, hRect.w * cam.z), height: Math.max(1, hRect.h * cam.z) }}
+              handles={false}
+              label={`${Math.round(hRect.w)} × ${Math.round(hRect.h)}`}
+            />
+          )}
 
       {markers && markers.length > 0 && (
         <div className="marker-layer">
@@ -779,6 +835,17 @@ export function Canvas({
         <button type="button" className="tool" aria-label="Fit" title="Fit (Shift+1)" onClick={fit}>
           <Icon name="fit" />
         </button>
+        {(onUndo || onRedo) && (
+          <>
+            <span className="divider" />
+            <button type="button" className="tool" aria-label="Undo" title={isMac ? 'Undo (⌘Z)' : 'Undo (Ctrl+Z)'} disabled={!canUndo} onClick={onUndo}>
+              <Icon name="undo2" />
+            </button>
+            <button type="button" className="tool" aria-label="Redo" title={isMac ? 'Redo (⇧⌘Z)' : 'Redo (Ctrl+Shift+Z)'} disabled={!canRedo} onClick={onRedo}>
+              <Icon name="redo2" />
+            </button>
+          </>
+        )}
       </div>
     </section>
   );

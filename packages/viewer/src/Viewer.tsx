@@ -20,7 +20,9 @@
 // ulang dokumen, dan dokumen yang diarsip/dihapus di jendela lain menampilkan pesan dengan jalan kembali ke
 // Dashboard/Archive (`requestCloseTab`), bukan 404 mentah. Rename di jendela lain ditangani App (tab ikut pindah).
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
-import type { LakarDocument } from '@lakar/schema';
+import type { DocOp, LakarDocument } from '@lakar/schema';
+import { toggleSelection } from './gesture';
+import { EMPTY_STACKS, recordCommit, settleStep, takeStep, type UndoStacks } from './undoHistory';
 import { activityHub, editChange, goneReason, harnessLabel, revChange, sessionsForSlug, slugAppeared, type StreamEvent } from './activity';
 import { ActivityPanel } from './ActivityPanel';
 import { BottomSheet } from './BottomSheet';
@@ -136,7 +138,18 @@ export function Viewer({ slug }: { slug: string }) {
   const lastPageIndex = useRef(saved?.pageIndex ?? 0);
   /** Halaman baru dari "+" yang belum ada di dokumen termuat (jangan dianggap terhapus). */
   const pendingPage = useRef<string | undefined>(undefined);
-  const [selectedId, setSelectedId] = useState<string | undefined>(saved?.selectedId);
+  /** Seleksi (urutan pilih; terakhir = primer untuk Inspect/viewState). Canvas live dan Layers berbagi state ini. */
+  const [selection, setSelection] = useState<string[]>(() => (saved?.selectedId ? [saved.selectedId] : []));
+  const selectedId = selection[selection.length - 1];
+  /** Ganti seleksi dengan satu node (atau kosong); bentuk fungsi menerima primer saat ini, hasil sama = tidak berubah. */
+  const setSelectedId = useCallback((v: string | undefined | ((cur: string | undefined) => string | undefined)) => {
+    setSelection((prev) => {
+      const cur = prev[prev.length - 1];
+      const next = typeof v === 'function' ? v(cur) : v;
+      if (typeof v === 'function' && next === cur) return prev;
+      return next ? [next] : [];
+    });
+  }, []);
   const [inspect, setInspect] = useState<Loaded<InspectResult> | undefined>(undefined);
   const [checks, setChecks] = useState<Loaded<LayoutCheck> | undefined>(undefined);
   const [tab, setTab] = useState<Tab>(saved?.panel ?? 'activity');
@@ -329,6 +342,8 @@ export function Viewer({ slug }: { slug: string }) {
           setRestoring(false);
           setRestoreAsk(undefined);
           setPreview(undefined);
+          // Versi lama dipulihkan: invers gestur sebelumnya tidak lagi bermakna terhadap dokumen ini.
+          setStacks(EMPTY_STACKS);
           loadDoc();
         },
         (e) => {
@@ -564,6 +579,85 @@ export function Viewer({ slug }: { slug: string }) {
     [slug, loadDoc],
   );
 
+  // Gestur canvas (story 4): satu gestur = satu permintaan ops (AD-7). Tumpukan undo/redo per jendela berisi op
+  // invers dari respons route (AD-8); undo/redo dijalankan sebagai commit baru. Invers gagal (mis. node sudah dihapus
+  // agen) → entri dibuang + toast, tanpa undo sebagian. Undo hapus (Delete + toast) tetap memakai restore (story 6).
+  // Transisi tumpukan murni di undoHistory.ts; ref = nilai terkini untuk callback async, state = render tombol.
+  const stacks = useRef<UndoStacks>(EMPTY_STACKS);
+  const [undoDepth, setUndoDepth] = useState({ undo: 0, redo: 0 });
+  const setStacks = useCallback((s: UndoStacks) => {
+    stacks.current = s;
+    setUndoDepth({ undo: s.undo.length, redo: s.redo.length });
+  }, []);
+  const commitOps = useCallback(
+    (ops: DocOp[], description: string): Promise<boolean> => {
+      editing.current++;
+      return api.applyOps(slug, ops, description).then(
+        (r) => {
+          editing.current--;
+          setStacks(recordCommit(stacks.current, r.inverse, description));
+          loadDoc(true);
+          return true;
+        },
+        (e) => {
+          editing.current--;
+          setToast(e instanceof ApiError ? failureText(e.message, e.hint) : errorText(e));
+          loadDoc(true);
+          return false;
+        },
+      );
+    },
+    [slug, loadDoc, setToast, setStacks],
+  );
+  /** Undo atau redo: kirim op invers teratas; sukses → invers respons masuk tumpukan seberang, gagal → entri dibuang. */
+  const stepHistory = useCallback(
+    (dir: 'undo' | 'redo') => {
+      // Satu permintaan tulis viewer sekaligus (klik toolbar beruntun, gestur yang masih dikirim).
+      if (editing.current > 0) return;
+      const { entry, stacks: rest } = takeStep(stacks.current, dir);
+      if (!entry) return;
+      setStacks(rest);
+      editing.current++;
+      api.applyOps(slug, entry.ops, `${dir === 'undo' ? 'Undo' : 'Redo'} ${entry.label}`).then(
+        (r) => {
+          editing.current--;
+          setStacks(settleStep(stacks.current, dir, entry, { ok: true, inverse: r.inverse }));
+          loadDoc(true);
+        },
+        (e) => {
+          editing.current--;
+          // Invers ditolak daemon (4xx, mis. NOT_FOUND) → entri dibuang; offline/5xx → entri dikembalikan.
+          const transient = !(e instanceof ApiError) || e.status >= 500;
+          setStacks(settleStep(stacks.current, dir, entry, { ok: false, transient }));
+          setToast(`Couldn't ${dir}: ${errorText(e)}`);
+          loadDoc(true);
+        },
+      );
+    },
+    [slug, loadDoc, setToast, setStacks],
+  );
+  const undo = useCallback(() => stepHistory('undo'), [stepHistory]);
+  const redo = useCallback(() => stepHistory('redo'), [stepHistory]);
+  // Ctrl/⌘+Z = undo, Ctrl/⌘+Shift+Z atau Ctrl+Y = redo; bukan saat mengetik atau dialog/menu terbuka.
+  useEffect(() => {
+    if (!editable) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
+      const k = e.key.toLowerCase();
+      const isUndo = k === 'z' && !e.shiftKey;
+      const isRedo = (k === 'z' && e.shiftKey) || (k === 'y' && !e.shiftKey && e.ctrlKey);
+      if (!isUndo && !isRedo) return;
+      if (typingTarget(e.target) || document.querySelector('.modal-scrim, .menu-layer')) return;
+      e.preventDefault();
+      if (e.repeat || editing.current > 0) return;
+      stepHistory(isUndo ? 'undo' : 'redo');
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [editable, stepHistory]);
+  const selectIds = useCallback((ids: string[]) => setSelection(ids), []);
+  const toggleSelect = useCallback((id: string) => setSelection((prev) => toggleSelection(prev, id)), []);
+
   const insert = useCallback(
     (t: InsertTarget, extra: InsertExtra = {}) => {
       const { code, description } = t.board
@@ -692,7 +786,8 @@ export function Viewer({ slug }: { slug: string }) {
       if (e.repeat || editing.current > 0) return;
       const { code, description } = removeNode(node);
       void runEdit(code, description, (_created, rev) => {
-        setSelectedId((s) => (s === node.id ? undefined : s));
+        // Hanya node terhapus yang keluar dari seleksi (anggota lain seleksi banyak tetap).
+        setSelection((prev) => prev.filter((x) => x !== node.id));
         offerUndo(node.name, rev);
       });
     };
@@ -922,7 +1017,7 @@ export function Viewer({ slug }: { slug: string }) {
             <span className="section-label">Layers</span>
             <AddLayerButton disabled={!editable} disabledReason={preview ? 'Not available while previewing a version' : 'lakard is offline'} hasBoard={boards.length > 0} onPick={onMenuInsert} />
           </div>
-          {boards.length === 0 ? <div className="muted-note">No layers yet</div> : <LayerTree key={page?.id} nodes={boards} selectedId={selectedId} selectedPath={selectedInfo} index={index} onSelect={select} marks={preview ? undefined : marks} />}
+          {boards.length === 0 ? <div className="muted-note">No layers yet</div> : <LayerTree key={page?.id} nodes={boards} selectedId={selectedId} selectedIds={selection} selectedPath={selectedInfo} index={index} onSelect={select} onToggle={toggleSelect} marks={preview ? undefined : marks} />}
         </div>
           </>
         )}
@@ -950,6 +1045,13 @@ export function Viewer({ slug }: { slug: string }) {
         summary={summary}
         checksLoading={checks?.state === 'loading'}
         onSelect={select}
+        selection={selection}
+        onSelectIds={selectIds}
+        onCommit={commitOps}
+        canUndo={editable && undoDepth.undo > 0}
+        canRedo={editable && undoDepth.redo > 0}
+        onUndo={undo}
+        onRedo={redo}
         onOpenChecks={() => openTab('checks')}
         preview={canvasPreview}
         editable={editable}
@@ -1051,13 +1153,19 @@ function RestoreDialog({ entry, busy, error, onCancel, onConfirm }: { entry: His
 function LayerTree({
   nodes,
   selectedId,
+  selectedIds,
   selectedPath,
   index,
   onSelect,
+  onToggle,
   marks,
 }: {
   nodes: TreeNode[];
   selectedId: string | undefined;
+  /** Semua node terpilih (seleksi banyak dari canvas); tanpa ini hanya `selectedId`. */
+  selectedIds?: readonly string[];
+  /** Shift-klik baris: tambah/kurangi seleksi. */
+  onToggle?: (id: string) => void;
   selectedPath: NodeInfo | undefined;
   index: Map<string, NodeInfo>;
   onSelect: (id: string) => void;
@@ -1088,7 +1196,7 @@ function LayerTree({
   const walk = (n: TreeNode, depth: number) => {
     const kids = n.children ?? [];
     const isOpen = open.has(n.id);
-    const selected = n.id === selectedId;
+    const selected = selectedIds ? selectedIds.includes(n.id) : n.id === selectedId;
     const m = marks?.get(n.id);
     const mark = m?.mark;
     const markClass = m ? ` ${m.mark}${m.color === 'codex' ? ' codex' : ''}` : '';
@@ -1102,7 +1210,7 @@ function LayerTree({
         tabIndex={0}
         className={`layer-row${selected ? ' selected' : ''}${depth === 0 ? ' top' : ''}${markClass}`}
         style={{ paddingLeft: 8 + depth * 16 }}
-        onClick={() => onSelect(n.id)}
+        onClick={(e) => (e.shiftKey && onToggle ? onToggle(n.id) : onSelect(n.id))}
         onKeyDown={(e) => {
           if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault();
