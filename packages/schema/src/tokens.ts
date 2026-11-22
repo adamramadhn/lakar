@@ -120,7 +120,7 @@ const slot = (name: string, accepts: readonly TokenType[], primary: TokenType = 
 const colorSlot = (name: string) => slot(name, COLOR_ACCEPTS);
 const lengthSlot = (name: string, primary: TokenType = 'spacing') => slot(name, LENGTH_TOKEN_TYPES, primary);
 
-const LENGTH_KEYS = new Set(['gap', 'padding', 'width', 'height', 'minWidth', 'maxWidth', 'minHeight', 'maxHeight']);
+const LENGTH_KEYS = new Set(['gap', 'columnGap', 'rowGap', 'padding', 'width', 'height', 'minWidth', 'maxWidth', 'minHeight', 'maxHeight']);
 
 /**
  * Slot sebuah ref token: `nodeType` = tipe node pemilik, `propPath` = path ref di dalam node

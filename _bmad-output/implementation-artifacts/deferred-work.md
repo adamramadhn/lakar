@@ -107,3 +107,12 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-editor-6-editing-actions.md`
   summary: Sisip layer dari tool kanvas / menu + Layers masih lewat `execute` + codegen sehingga tidak masuk tumpukan undo per jendela; Ctrl+Z sesudah sisip membatalkan edit ops sebelumnya.
   evidence: Sudah ada sebelum story 6 (aplikasi 4); AD-8 meminta undo untuk commit jendela. Usul: pindahkan sisip ke route ops (`add` + `ref`) agar invers tercatat.
+- source_spec: `_bmad-output/implementation-artifacts/spec-editor-7-grid-layout.md`
+  summary: Panel Design belum punya kontrol penempatan anak grid (`gridColumn`/`gridRow`: span, start/end); hanya lewat agen (`execute`).
+  evidence: Desain 05 Editor (Xxi0M) hanya memuat Columns/Rows/Column gap/Row gap/Padding/Align. Usul: baris Placement di grup Position & size untuk anak parent grid setelah desainnya ada.
+- source_spec: `_bmad-output/implementation-artifacts/spec-editor-7-grid-layout.md`
+  summary: Drag reorder di canvas tidak mengenal kontainer grid: anak grid tidak bisa diurutkan ulang dengan drag di dalam grid (dropContainer hanya row/column).
+  evidence: Urutan sel grid mengikuti urutan anak; perlu indeks drop 2D dari kotak sel (gesture.ts reorderTarget). Usul: story editor lanjutan.
+- source_spec: `_bmad-output/implementation-artifacts/spec-editor-7-grid-layout.md`
+  summary: Panel grid tidak menyunting jenis track (px/fr/auto/minmax) per kolom; jumlah kolom/baris saja, track baru `{fr:1}`/`auto`.
+  evidence: Desain tidak memuat editor track. Usul: popover track per kolom bila desain menambahkannya.

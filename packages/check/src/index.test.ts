@@ -89,6 +89,37 @@ describe('@lakar/check', () => {
   });
 });
 
+describe('frame grid (v4): anak diperlakukan flow, tidak crash', () => {
+  const card = (name: string, r: R, kids: Loose[] = []) => frame(name, r, kids, { layout: 'column', padding: 12, radius: 12, fills: [{ type: 'solid', color: '#F2F4F7' }] });
+  const gridSpec = () => {
+    const a = card('Kartu A', [16, 16, 173, 80], [text('Satu', [28, 28, 149, 20], { color: '#101828' })]);
+    const b = card('Kartu B', [201, 16, 173, 80], [text('Dua', [213, 28, 149, 20], { color: '#101828' })]);
+    const c = card('Kartu lebar', [16, 108, 358, 80], [text('Tiga', [28, 120, 334, 20], { color: '#101828' })]);
+    c.gridColumn = { span: 2 };
+    const g = frame('Grid kartu', [0, 0, 390, 204], [a, b, c, rect('Overlay / Lencana', [360, 0, 24, 24], { position: 'absolute', x: 360, y: 0 })], {
+      layout: 'grid',
+      gridTemplateColumns: [{ fr: 1 }, { fr: 1 }],
+      gridTemplateRows: [80, 'auto'],
+      columnGap: 12,
+      rowGap: 12,
+      padding: 16,
+    });
+    return clean([g]);
+  };
+
+  it('grid bersih: tanpa temuan (termasuk aturan khusus row/column)', () => {
+    expect(run(gridSpec())).toEqual([]);
+  });
+
+  it('anak grid meluber dari induk tetap dilaporkan (dihitung sebagai flow)', () => {
+    const t = text('Judul yang sangat panjang meluber', [16, 16, 420, 20], { color: '#101828' });
+    const g = frame('Grid', [0, 0, 390, 52], [t], { layout: 'grid', gridTemplateColumns: [{ fr: 1 }], padding: 16, clip: true });
+    let f: Finding[] = [];
+    expect(() => (f = run(clean([g])))).not.toThrow();
+    expect(rules(f)).toContain('LC-02a');
+  });
+});
+
 describe('LC-01a emoji', () => {
   it.each(['Halo 👋', '✅ Lunas', '⭐ 4,9', '❤️', '1️⃣ Pilih', '🇮🇩', '👩‍💻', '👋🏽', '▶️ Putar', '#️⃣', '1️'])('positif %s', (s) => {
     expect(emojiIn(s).length).toBeGreaterThan(0);

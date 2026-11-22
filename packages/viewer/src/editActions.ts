@@ -101,7 +101,7 @@ function planUngroup(scene: readonly GeoNode[], index: ReadonlyMap<string, GeoNo
   for (const f of ordered) {
     const parent = index.get(f.parentId!)!;
     const i = at(f);
-    const parentFlow = parent.layout === 'row' || parent.layout === 'column';
+    const parentFlow = parent.layout === 'row' || parent.layout === 'column' || parent.layout === 'grid';
     const o = f.absolute ? originOf(f) : { x: parent.box.x, y: parent.box.y };
     f.children.forEach((c, k) => {
       ops.push({ op: 'move', id: c.id, parentId: parent.id, index: i + k });

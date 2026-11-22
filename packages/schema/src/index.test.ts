@@ -38,7 +38,7 @@ describe('@lakar/schema', () => {
     ['frame flow', { type: 'frame', name: 'F', layout: 'row', gap: -4, padding: 8, align: 'center', justify: 'space-between' }, true],
     ['frame flow dengan x ditolak', { type: 'frame', name: 'F', x: 1 }, false],
     ['frame absolute dengan x/y', { type: 'frame', name: 'F', position: 'absolute', x: 1, y: 2 }, true],
-    ['frame layout asing', { type: 'frame', name: 'F', layout: 'grid' }, false],
+    ['frame layout asing', { type: 'frame', name: 'F', layout: 'wrap' }, false],
     ['rect kini dalam katalog', { type: 'rect', name: 'R' }, true],
     ['tipe asing', { type: 'image', name: 'I' }, false],
   ])('NodeInput: %s', (_label, input, ok) => {
@@ -66,11 +66,12 @@ describe('@lakar/schema', () => {
     expect(BoardNode.safeParse({ ...node, id: 'short' }).success).toBe(false);
   });
 
-  it('LakarDocument: schemaVersion = SCHEMA_VERSION (3) dan minimal 1 halaman; v1/v2 hanya lewat migrasi (@lakar/core)', () => {
-    expect(SCHEMA_VERSION).toBe(3);
+  it('LakarDocument: schemaVersion = SCHEMA_VERSION (4) dan minimal 1 halaman; v1/v2/v3 hanya lewat migrasi (@lakar/core)', () => {
+    expect(SCHEMA_VERSION).toBe(4);
     const doc = { schemaVersion: SCHEMA_VERSION, id: 'Dddddddd', rev: 0, pages: [{ id: 'Pppppppp', name: 'Page 1', children: [] }] };
     expect(LakarDocument.safeParse(doc).success).toBe(true);
-    expect(LakarDocument.safeParse({ ...doc, schemaVersion: 4 }).success).toBe(false);
+    expect(LakarDocument.safeParse({ ...doc, schemaVersion: 5 }).success).toBe(false);
+    expect(LakarDocument.safeParse({ ...doc, schemaVersion: 3 }).success).toBe(false);
     expect(LakarDocument.safeParse({ ...doc, schemaVersion: 2 }).success).toBe(false);
     expect(LakarDocument.safeParse({ ...doc, schemaVersion: 1 }).success).toBe(false);
     expect(LakarDocument.safeParse({ ...doc, pages: [] }).success).toBe(false);

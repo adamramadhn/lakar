@@ -2,11 +2,11 @@
 // pembangun op `update` untuk route ops viewer (AD-7). Murni: masukan = node tersimpan (ref token utuh) + pasangan
 // ter-resolve (AD-10); keluaran = DocOp[] tanpa op untuk node yang nilainya tidak berubah. Patch hanya memakai
 // properti skema v3 (AD-1, AD-13); `null` menghapus properti opsional (core `update`).
-import type { DocOp } from '@lakar/schema';
-import { isTokenRef, joinHex, round2, sameValue, splitHex, withHex } from './designValues.js';
+import { GRID_TRACKS_MAX, type DocOp } from '@lakar/schema';
+import { isTokenRef, joinHex, parseNumber, round2, sameValue, splitHex, withHex } from './designValues.js';
 
 export type Raw = Record<string, unknown>;
-export type ParentLayout = 'row' | 'column' | 'none';
+export type ParentLayout = 'row' | 'column' | 'grid' | 'none';
 
 /** Satu node terpilih untuk panel Design. */
 export type DesignTarget = {
@@ -126,7 +126,7 @@ export function setSizing(targets: readonly DesignTarget[], axis: Axis, mode: Si
 export function parentLayoutOf(type: string, parent: Raw | undefined): ParentLayout | undefined {
   if (type === 'board') return undefined;
   if (parent?.type === 'board') return 'column';
-  return parent?.layout === 'row' || parent?.layout === 'column' ? parent.layout : 'none';
+  return parent?.layout === 'row' || parent?.layout === 'column' || parent?.layout === 'grid' ? parent.layout : 'none';
 }
 
 /** X/Y bisa diedit: board, node absolute, atau anak frame `none` (core menambah `position` lewat implicitAbsolute). */
@@ -137,9 +137,60 @@ export const canEditXY = (t: DesignTarget) => t.type === 'board' || t.stored.pos
 // ---------------------------------------------------------------------------
 
 /** Arah layout tersimpan (ketiadaan = none). */
-export const layoutOf = (n: Raw) => (n.layout === 'row' || n.layout === 'column' ? n.layout : 'none');
+export const layoutOf = (n: Raw) => (n.layout === 'row' || n.layout === 'column' || n.layout === 'grid' ? n.layout : 'none');
 
-export const setLayout = (targets: readonly DesignTarget[], layout: ParentLayout | null) => setProp(targets, 'layout', layout);
+/**
+ * Ganti arah layout. Keluar dari grid menghapus `columnGap`/`rowGap`: di flex keduanya tetap berlaku (CSS) tetapi
+ * panel flex hanya menampilkan Gap, jadi tanpa ini Gap tertimpa nilai yang tidak terlihat. Template track dipertahankan.
+ */
+export const setLayout = (targets: readonly DesignTarget[], layout: ParentLayout | null) =>
+  opsFor(targets, (t) => (t.stored.layout === 'grid' && layout !== 'grid' ? { layout, columnGap: null, rowGap: null } : { layout }));
+
+export { GRID_TRACKS_MAX };
+
+/** Teks kolom Columns → jumlah 1..GRID_TRACKS_MAX (dibulatkan); 0/teks tak valid → undefined (batal). */
+export const parseColumnCount = (text: string) => parseNumber(text, { int: true, min: 1, max: GRID_TRACKS_MAX });
+/** Teks kolom Rows → jumlah 0..GRID_TRACKS_MAX; kosong = 0 (hapus template, "Auto"). */
+export const parseRowCount = (text: string) => (text.trim() === '' ? 0 : parseNumber(text, { int: true, min: 0, max: GRID_TRACKS_MAX }));
+/** Nilai Rows → teks kolom: 0 (tanpa template) ditampilkan kosong dengan placeholder "Auto". */
+export const formatRowCount = (v: unknown) => (typeof v === 'number' && v > 0 ? String(v) : '');
+
+/**
+ * Gap sumbu yang tampil di panel grid: `columnGap`/`rowGap`, lalu `gap` bila ≥ 0 (gap negatif diabaikan render grid).
+ */
+export const axisGapOf = (n: Raw, key: 'columnGap' | 'rowGap') => n[key] ?? (typeof n.gap === 'number' && n.gap < 0 ? 0 : n.gap) ?? 0;
+
+export type TrackAxis = 'gridTemplateColumns' | 'gridTemplateRows';
+/** Track tambahan saat jumlah dinaikkan: kolom `1fr`, baris `auto`. */
+const TRACK_DEFAULT: Record<TrackAxis, unknown> = { gridTemplateColumns: { fr: 1 }, gridTemplateRows: 'auto' };
+
+const tracksOf = (n: Raw, axis: TrackAxis): unknown[] => (Array.isArray(n[axis]) ? (n[axis] as unknown[]) : []);
+
+/** Jumlah track tersimpan (0 = tanpa template). */
+export const trackCount = (n: Raw, axis: TrackAxis) => tracksOf(n, axis).length;
+
+/**
+ * Ubah jumlah track: track awal dipertahankan, sisanya ditambah default (kolom `{fr:1}`, baris `'auto'`); 0 menghapus
+ * template (`null`). Di luar 0..GRID_TRACKS_MAX atau bukan integer → tanpa op.
+ */
+export function setTrackCount(targets: readonly DesignTarget[], axis: TrackAxis, count: number): DocOp[] {
+  if (!Number.isInteger(count) || count < 0 || count > GRID_TRACKS_MAX) return [];
+  return opsFor(targets, (t) => {
+    if (count === 0) return { [axis]: null };
+    const cur = tracksOf(t.stored, axis);
+    const next = Array.from({ length: count }, (_, i) => (i < cur.length ? cur[i] : structuredClone(TRACK_DEFAULT[axis])));
+    return { [axis]: next };
+  });
+}
+
+/** Masuk mode grid: `layout:'grid'` + kolom `{fr:1}` sebanyak min(max(anak, 1), 3) bila template kolom belum ada. */
+export function enterGrid(targets: readonly DesignTarget[]): DocOp[] {
+  return opsFor(targets, (t) => {
+    if (tracksOf(t.stored, 'gridTemplateColumns').length) return { layout: 'grid' };
+    const kids = Array.isArray(t.stored.children) ? t.stored.children.length : 0;
+    return { layout: 'grid', gridTemplateColumns: Array.from({ length: Math.min(Math.max(kids, 1), 3) }, () => ({ fr: 1 })) };
+  });
+}
 
 // ---------------------------------------------------------------------------
 // Fill

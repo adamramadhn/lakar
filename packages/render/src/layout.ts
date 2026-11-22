@@ -15,7 +15,7 @@ import type {
 } from '@lakar/schema';
 import { cssFamily, textFont } from './fonts.js';
 // Nilai bersama render/Copy as/codegen (radius, padding, teks, bayangan teks, align/justify) dari css.ts (AD-5).
-import { ALIGN, JUSTIFY, letterSpacingCss, lineHeightCss, paddingCss, radiusCss, textShadowCss } from './css.js';
+import { ALIGN, gridLineCss, gridTemplateCss, JUSTIFY, letterSpacingCss, lineHeightCss, paddingCss, radiusCss, textShadowCss } from './css.js';
 import { applyEffects, boxShadowCss, DEFAULT_ASSET_BASE, dropShadowFilters, applyFills, strokeOverlay } from './paint.js';
 import { ellipseShape, fillLayer, pathShape, strokeSvg, type Shape } from './shape.js';
 import { iconKey, renderIconElement } from './icon.js';
@@ -35,7 +35,7 @@ type Sized = {
 type Positioned = { position?: 'absolute' | undefined; x?: number | undefined; y?: number | undefined };
 
 /** Konteks parent: arah flow (`none` = semua anak absolute) dan geser `scrollY` anak-anaknya. */
-type Parent = { layout: 'row' | 'column' | 'none'; scrollY: number };
+type Parent = { layout: 'row' | 'column' | 'grid' | 'none'; scrollY: number };
 
 /** Konteks render: prefiks URL aset gambar dan glyph ikon (kunci `lib/icon`). */
 export type RenderContext = { assetBase: string; icons: ReadonlyMap<string, IconGlyph> };
@@ -78,7 +78,8 @@ function appendChildren(
   for (const c of children) {
     const child = renderChild(d, c, parent, ctx);
     // Gap negatif: CSS `gap` menolak nilai < 0 → margin pada anak flow ke-2 dst. Anak absolute dilewati.
-    if (gap !== undefined && gap < 0 && parent.layout !== 'none' && c.position !== 'absolute') {
+    // Hanya flex row/column; grid mengabaikan gap negatif (CSS grid tidak punya padanan margin per sumbu).
+    if (gap !== undefined && gap < 0 && (parent.layout === 'row' || parent.layout === 'column') && c.position !== 'absolute') {
       if (flowIndex > 0) {
         if (parent.layout === 'row') child.style.marginLeft = px(gap);
         else child.style.marginTop = px(gap);
@@ -127,6 +128,7 @@ function renderChild(d: Document, n: ChildNode, parent: Parent, ctx: RenderConte
   s.margin = '0';
   const sizing = sizingOf(n);
   if (parent.layout === 'none' || n.position === 'absolute') applyAbsolute(s, n, sizing);
+  else if (parent.layout === 'grid') applyGridItem(s, n, sizing);
   else applyFlowSizing(s, sizing, parent.layout);
   applyMinMax(s, sizing);
   // Efek bersama (termasuk text/icon) + geser scrollY parent di depan rotasi.
@@ -172,6 +174,30 @@ function applyFlowSizing(s: CSSStyleDeclaration, z: Sized, layout: 'row' | 'colu
     s[crossKey] = 'auto';
   } else if (cross === 'hug') s[crossKey] = 'fit-content';
   // tidak diisi → auto (ikut align parent)
+}
+
+/**
+ * Anak flow di sel grid (v4): angka → px; `fill` → regang di sel (justify/align-self stretch, min 0); `hug` →
+ * fit-content (tidak diregang); tidak diisi → default CSS grid (regang, tinggi ikut `align` parent). Penempatan
+ * `gridColumn`/`gridRow` hanya di sini (anak absolute tidak memakai area grid sebagai containing block).
+ */
+function applyGridItem(s: CSSStyleDeclaration, n: { gridColumn?: unknown; gridRow?: unknown }, z: Sized): void {
+  for (const [key, self, min] of [
+    ['width', 'justifySelf', 'minWidth'],
+    ['height', 'alignSelf', 'minHeight'],
+  ] as const) {
+    const v = z[key];
+    if (typeof v === 'number') s[key] = px(v);
+    else if (v === 'fill') {
+      s[self] = 'stretch';
+      s[key] = 'auto';
+      s[min] = '0';
+    } else if (v === 'hug') s[key] = 'fit-content';
+  }
+  const col = gridLineCss(n.gridColumn);
+  const row = gridLineCss(n.gridRow);
+  if (col) s.gridColumn = col;
+  if (row) s.gridRow = row;
 }
 
 /** Anak absolute (atau anak frame `none`): left/top relatif border-box parent, keluar dari flow. */
@@ -256,9 +282,21 @@ function renderFrame(d: Document, n: FrameNode, ctx: RenderContext): HTMLElement
   if (layout === 'none') {
     s.display = 'block';
   } else {
-    s.display = 'flex';
-    s.flexDirection = layout;
+    if (layout === 'grid') {
+      s.display = 'grid';
+      const cols = gridTemplateCss(n.gridTemplateColumns);
+      const rows = gridTemplateCss(n.gridTemplateRows);
+      if (cols) s.gridTemplateColumns = cols;
+      if (rows) s.gridTemplateRows = rows;
+    } else {
+      s.display = 'flex';
+      s.flexDirection = layout;
+    }
     if (n.gap !== undefined && n.gap >= 0) s.gap = px(n.gap);
+    // Gap per sumbu menimpa `gap` (CSS column-gap/row-gap; berlaku juga di flex).
+    if (n.columnGap !== undefined) s.columnGap = px(n.columnGap);
+    if (n.rowGap !== undefined) s.rowGap = px(n.rowGap);
+    // Grid: align → align-items (posisi item di sel), justify → justify-content (distribusi track); peta sama.
     if (n.align) s.alignItems = ALIGN[n.align]!;
     if (n.justify) s.justifyContent = JUSTIFY[n.justify]!;
   }

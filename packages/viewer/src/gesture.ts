@@ -22,7 +22,7 @@ export type GeoNode = {
   /** x/y tersimpan (board: posisi di halaman; anak absolute: relatif parent; flow: 0). */
   x: number;
   y: number;
-  layout: FlowLayout | 'none' | undefined;
+  layout: FlowLayout | 'grid' | 'none' | undefined;
   children: GeoNode[];
 };
 

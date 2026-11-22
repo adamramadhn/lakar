@@ -3,13 +3,19 @@ import {
   addFill,
   addShadow,
   addStroke,
+  axisGapOf,
   canEditXY,
+  formatRowCount,
+  GRID_TRACKS_MAX,
+  parseColumnCount,
+  parseRowCount,
   convertFill,
   designGroups,
   describeEdit,
   editFill,
   editShadow,
   editStop,
+  enterGrid,
   fillRows,
   keepsToken,
   layoutOf,
@@ -29,11 +35,13 @@ import {
   setRadiusCorner,
   setSizing,
   setStroke,
+  setTrackCount,
   solidAlpha,
   solidColor,
   strokeColor,
   strokeSides,
   toggleSide,
+  trackCount,
   type DesignTarget,
   type Raw,
 } from './designModel.js';
@@ -211,5 +219,72 @@ describe('designModel', () => {
     expect(setProp([a, b], 'weight', 700)).toEqual([{ op: 'update', id: 'a', patch: { weight: 700 } }]);
     expect(setProp([a, b], 'size', 34)).toHaveLength(2);
     expect(setProp([a], 'align', 'center')[0]).toMatchObject({ patch: { align: 'center' } });
+  });
+});
+
+describe('designModel: grid (v4)', () => {
+  const fr = { fr: 1 };
+  it('layoutOf / parentLayoutOf / canEditXY mengenal grid', () => {
+    expect(layoutOf({ layout: 'grid' })).toBe('grid');
+    expect(parentLayoutOf('rect', { type: 'frame', layout: 'grid' })).toBe('grid');
+    expect(canEditXY(t('a', 'rect', {}, { parentLayout: 'grid' }))).toBe(false);
+    expect(canEditXY(t('a', 'rect', { position: 'absolute' }, { parentLayout: 'grid' }))).toBe(true);
+  });
+
+  it('enterGrid: kolom fr = min(max(anak,1),3) bila template belum ada; template ada → hanya layout', () => {
+    expect(enterGrid([t('a', 'frame', { layout: 'row', children: [{}, {}] })])).toEqual([{ op: 'update', id: 'a', patch: { layout: 'grid', gridTemplateColumns: [fr, fr] } }]);
+    expect(enterGrid([t('a', 'frame', { children: [] })])[0]!).toMatchObject({ patch: { gridTemplateColumns: [fr] } });
+    expect(enterGrid([t('a', 'frame', { children: [{}, {}, {}, {}, {}] })])[0]!).toMatchObject({ patch: { gridTemplateColumns: [fr, fr, fr] } });
+    expect(enterGrid([t('a', 'frame', { gridTemplateColumns: [80, fr] })])).toEqual([{ op: 'update', id: 'a', patch: { layout: 'grid' } }]);
+    expect(enterGrid([t('a', 'frame', { layout: 'grid', gridTemplateColumns: [fr] })])).toEqual([]);
+  });
+
+  it('setTrackCount: naik menambah default, turun memangkas, 0 menghapus, di luar batas tanpa op', () => {
+    const g = t('g', 'frame', { layout: 'grid', gridTemplateColumns: [80, fr, fr] });
+    expect(trackCount(g.stored, 'gridTemplateColumns')).toBe(3);
+    expect(setTrackCount([g], 'gridTemplateColumns', 4)).toEqual([{ op: 'update', id: 'g', patch: { gridTemplateColumns: [80, fr, fr, fr] } }]);
+    expect(setTrackCount([g], 'gridTemplateColumns', 2)).toEqual([{ op: 'update', id: 'g', patch: { gridTemplateColumns: [80, fr] } }]);
+    expect(setTrackCount([g], 'gridTemplateColumns', 3)).toEqual([]);
+    expect(setTrackCount([g], 'gridTemplateRows', 2)).toEqual([{ op: 'update', id: 'g', patch: { gridTemplateRows: ['auto', 'auto'] } }]);
+    expect(setTrackCount([g], 'gridTemplateRows', 0)).toEqual([]);
+    const r = t('r', 'frame', { layout: 'grid', gridTemplateRows: ['auto', 40] });
+    expect(setTrackCount([r], 'gridTemplateRows', 0)).toEqual([{ op: 'update', id: 'r', patch: { gridTemplateRows: null } }]);
+    expect(setTrackCount([g], 'gridTemplateColumns', 25)).toEqual([]);
+    expect(setTrackCount([g], 'gridTemplateColumns', 1.5)).toEqual([]);
+    expect(setTrackCount([g], 'gridTemplateColumns', -1)).toEqual([]);
+  });
+
+  it('setLayout keluar dari grid menghapus columnGap/rowGap (template tetap); ke grid / dari flex hanya layout', () => {
+    const g = t('g', 'frame', { layout: 'grid', gridTemplateColumns: [fr], columnGap: 8, rowGap: 4 });
+    expect(setLayout([g], 'row')).toEqual([{ op: 'update', id: 'g', patch: { layout: 'row', columnGap: null, rowGap: null } }]);
+    expect(setLayout([g], null)).toEqual([{ op: 'update', id: 'g', patch: { layout: null, columnGap: null, rowGap: null } }]);
+    expect(setLayout([t('h', 'frame', { layout: 'grid' })], 'column')).toEqual([{ op: 'update', id: 'h', patch: { layout: 'column' } }]);
+    expect(setLayout([t('r', 'frame', { layout: 'row', columnGap: 8 })], 'column')).toEqual([{ op: 'update', id: 'r', patch: { layout: 'column' } }]);
+  });
+
+  it('parse Columns/Rows panel: Columns 0/abc/25 batal; Rows kosong = 0 (hapus), format 0 = kosong', () => {
+    expect(parseColumnCount('4')).toBe(4);
+    for (const s of ['0', 'abc', '25', '-1', '']) expect(parseColumnCount(s)).toBeUndefined();
+    expect(parseRowCount('')).toBe(0);
+    expect(parseRowCount('  ')).toBe(0);
+    expect(parseRowCount('3')).toBe(3);
+    for (const s of ['abc', '25', '-1']) expect(parseRowCount(s)).toBeUndefined();
+    expect(formatRowCount(0)).toBe('');
+    expect(formatRowCount(2)).toBe('2');
+    expect(GRID_TRACKS_MAX).toBe(24);
+  });
+
+  it('axisGapOf: gap sumbu, lalu gap ≥ 0; gap negatif tampil 0 (diabaikan render grid)', () => {
+    expect(axisGapOf({ columnGap: 6, gap: 12 }, 'columnGap')).toBe(6);
+    expect(axisGapOf({ gap: 12 }, 'rowGap')).toBe(12);
+    expect(axisGapOf({ gap: -4 }, 'rowGap')).toBe(0);
+    expect(axisGapOf({ gap: { $token: 'space.4' } }, 'rowGap')).toEqual({ $token: 'space.4' });
+    expect(axisGapOf({}, 'columnGap')).toBe(0);
+  });
+
+  it('gap sumbu: setProp columnGap tidak menyentuh gap', () => {
+    const g = t('g', 'frame', { layout: 'grid', gap: 12 });
+    expect(setProp([g], 'columnGap', 20)).toEqual([{ op: 'update', id: 'g', patch: { columnGap: 20 } }]);
+    expect(readField([g], (n) => n.columnGap ?? n.gap ?? 0)).toMatchObject({ value: 12 });
   });
 });

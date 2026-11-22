@@ -4,7 +4,7 @@ import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { parseDocument } from '../packages/core/src/index.ts';
+import { migrateDocument, parseDocument } from '../packages/core/src/index.ts';
 import { NODE_TYPES, resolveTokens, SCHEMA_VERSION, TOKEN_TYPES } from '../packages/schema/src/index.ts';
 import { boardsOf, loadDocCorpus, missingVersions, type CorpusDoc } from './support/doc-corpus.ts';
 
@@ -151,6 +151,30 @@ describe('korpus dokumen: migrasi token v2 → v3 (AD-11)', () => {
     expect([icon(light)[1]!.weight, icon(dark)[1]!.weight]).toEqual([600, 700]);
     const forced = resolveTokens(parseDocument(d.raw), { mode: 'dark' });
     expect(forced.pages[0]!.children[0]!.fills).toEqual([{ type: 'solid', color: '#0B0C0F' }]);
+  });
+});
+
+describe('korpus dokumen: migrasi v3 → v4 (grid, AD-13)', () => {
+  it.each(corpus.filter((d) => d.version === 3).map((d): [string, CorpusDoc] => [`v${d.version}/${d.name}`, d]))('identitas: %s', (_label, d) => {
+    expect(migrateDocument(d.raw), d.path).toEqual({ ...d.raw, schemaVersion: 4 });
+  });
+
+  it.each(corpus.filter((d) => d.version < 4).map((d): [string, CorpusDoc] => [`v${d.version}/${d.name}`, d]))('%s: hasil v3 = hasil v4 kecuali versi', (_label, d) => {
+    const v3 = migrateDocument(d.raw, { target: 3 }) as Record<string, unknown>;
+    expect(parseDocument(d.raw), d.path).toEqual({ ...v3, schemaVersion: 4 });
+  });
+
+  it('fixture v4 memakai grid: semua jenis track, rows, gap sumbu, penempatan span dan start/end', () => {
+    const v4 = corpus.filter((d) => d.version === 4).map((d) => parseDocument(d.raw));
+    const nodes = v4.flatMap((doc) => allNodes(doc)) as Record<string, unknown>[];
+    const grids = nodes.filter((n) => n.type === 'frame' && n.layout === 'grid');
+    const tracks = grids.flatMap((g) => [...((g.gridTemplateColumns as unknown[]) ?? []), ...((g.gridTemplateRows as unknown[]) ?? [])]);
+    const kind = (t: unknown) => (typeof t === 'number' ? 'px' : t === 'auto' ? 'auto' : Object.keys(t as object)[0]);
+    expect(new Set(tracks.map(kind))).toEqual(new Set(['px', 'fr', 'auto', 'minmax']));
+    expect(grids.some((g) => g.gridTemplateRows !== undefined && g.columnGap !== undefined && g.rowGap !== undefined)).toBe(true);
+    const places = nodes.flatMap((n) => [n.gridColumn, n.gridRow]).filter(Boolean) as Record<string, number>[];
+    expect(places.some((p) => p.span !== undefined)).toBe(true);
+    expect(places.some((p) => p.start !== undefined && p.end !== undefined)).toBe(true);
   });
 });
 

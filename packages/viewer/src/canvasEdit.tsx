@@ -223,6 +223,11 @@ export function useCanvasEdit({
     const base = { pointer: g.pointer, c0: g.c0, p0: g.p0, moved: true };
     const single = nodes.length === 1 ? nodes[0]! : undefined;
     if (single && !single.absolute && single.parentId) {
+      // Reorder di dalam grid belum didukung (ditunda): jangan sampai drop memindahkan anak grid ke leluhur flex.
+      if (index.get(single.parentId)?.layout === 'grid') {
+        setGesture(null);
+        return;
+      }
       const saver = styleSaver();
       const el = hostOf(single.id) && liveElement(hostOf(single.id)!, single.id);
       let ghost: HTMLElement | undefined;

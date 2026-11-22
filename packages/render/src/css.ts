@@ -181,6 +181,50 @@ export const ALIGN: Readonly<Record<string, string>> = { start: 'flex-start', ce
 /** justify flex (skema) → `justify-content`. */
 export const JUSTIFY: Readonly<Record<string, string>> = { start: 'flex-start', center: 'center', end: 'flex-end', 'space-between': 'space-between' };
 
+// ---------------------------------------------------------------------------
+// Grid (v4, AD-13): track bertipe → `grid-template-*`, penempatan → `grid-column`/`grid-row`.
+// ---------------------------------------------------------------------------
+
+const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
+
+/** Satu ukuran track (tanpa minmax): angka → px, `{fr}` → `Nfr`, `'auto'`. */
+function trackSizeCss(t: unknown): string | undefined {
+  if (isNum(t)) return `${t}px`;
+  if (t === 'auto') return 'auto';
+  if (isObj(t) && isNum(t.fr)) return `${t.fr}fr`;
+  return undefined;
+}
+
+/** Satu track: px | fr | auto | `{minmax:[min,max]}` → `minmax(min, max)`; tak terpetakan → undefined. */
+export function gridTrackCss(t: unknown): string | undefined {
+  if (isObj(t) && Array.isArray(t.minmax)) {
+    const [lo, hi] = t.minmax.map(trackSizeCss);
+    return t.minmax.length === 2 && lo && hi ? `minmax(${lo}, ${hi})` : undefined;
+  }
+  return trackSizeCss(t);
+}
+
+/** Template track → `grid-template-columns|rows` berspasi; kosong atau satu entri tak valid → undefined. */
+export function gridTemplateCss(list: unknown): string | undefined {
+  if (!Array.isArray(list) || !list.length) return undefined;
+  const v = list.map(gridTrackCss);
+  return v.every((x) => x !== undefined) ? v.join(' ') : undefined;
+}
+
+/**
+ * Penempatan `{start?, end?, span?}` → nilai `grid-column`/`grid-row`: `2`, `1 / 3`, `span 2`, `2 / span 2`,
+ * `auto / 3`. Tanpa kunci yang terpetakan → undefined.
+ */
+export function gridLineCss(p: unknown): string | undefined {
+  if (!isObj(p)) return undefined;
+  const start = isNum(p.start) ? String(p.start) : undefined;
+  const end = isNum(p.end) ? String(p.end) : isNum(p.span) ? `span ${p.span}` : undefined;
+  if (start && end) return `${start} / ${end}`;
+  if (start) return start;
+  if (end) return isNum(p.end) ? `auto / ${end}` : end;
+  return undefined;
+}
+
 /**
  * Stroke sebagai CSS `border` untuk kode (Copy as, codegen): `w solid c` di semua sisi atau per `sides`.
  * Render TIDAK memakai ini (overlay/box-shadow karena semantik `align`, lihat paint.ts).

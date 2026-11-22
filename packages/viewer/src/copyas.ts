@@ -10,6 +10,8 @@ import {
   colorCss,
   fontFamilyCss,
   fontWeightCss,
+  gridLineCss,
+  gridTemplateCss,
   JUSTIFY,
   lengthCss,
   letterSpacingCss,
@@ -76,10 +78,23 @@ export function cssDeclarations(node: Node): CssDecl[] {
   if (type === 'icon') push('color', colorCss(node.color));
   // Satu entri padding tidak valid → padding dilewati (bukan "16px  8px").
   const pad = paddingCss(node.padding);
-  if (type === 'frame' && (node.layout === 'row' || node.layout === 'column')) {
-    push('display', 'flex');
-    push('flex-direction', node.layout);
-    push('gap', lengthCss(node.gap));
+  // Penempatan sel grid (v4) milik anak; ditulis apa adanya (parent tidak diketahui di sini).
+  push('grid-column', gridLineCss(node.gridColumn));
+  push('grid-row', gridLineCss(node.gridRow));
+  const flex = node.layout === 'row' || node.layout === 'column';
+  if (type === 'frame' && (flex || node.layout === 'grid')) {
+    if (flex) {
+      push('display', 'flex');
+      push('flex-direction', node.layout as string);
+    } else {
+      push('display', 'grid');
+      push('grid-template-columns', gridTemplateCss(node.gridTemplateColumns));
+      push('grid-template-rows', gridTemplateCss(node.gridTemplateRows));
+    }
+    // Grid mengabaikan gap negatif (render layout.ts); flex tetap menyalin nilai tersimpan apa adanya.
+    if (flex || !(isNum(node.gap) && node.gap < 0)) push('gap', lengthCss(node.gap));
+    push('column-gap', lengthCss(node.columnGap));
+    push('row-gap', lengthCss(node.rowGap));
     push('padding', pad);
     if (typeof node.align === 'string') push('align-items', ALIGN[node.align]);
     if (typeof node.justify === 'string') push('justify-content', JUSTIFY[node.justify]);
@@ -144,7 +159,14 @@ export function toTailwind(node: Node): string {
   const ta = get('text-align');
   if (ta !== undefined) cls.push(`text-${ta}`);
   if (get('display') === 'flex') cls.push('flex', get('flex-direction') === 'column' ? 'flex-col' : 'flex-row');
+  if (get('display') === 'grid') cls.push('grid');
+  add('grid-cols', 'grid-template-columns');
+  add('grid-rows', 'grid-template-rows');
+  add('col', 'grid-column');
+  add('row', 'grid-row');
   add('gap', 'gap');
+  add('gap-x', 'column-gap');
+  add('gap-y', 'row-gap');
   const pad = get('padding');
   if (pad !== undefined) {
     const p = pad.split(' ');

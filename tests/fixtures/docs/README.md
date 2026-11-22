@@ -27,6 +27,7 @@ Loader bersama ada di `tests/support/doc-corpus.ts`.
 | `v2/fill-efek` | fill `conic`, `noise`, `mesh` (satu warna token), `image` (`cover` + `tile`) |
 | `v2/mobile-gulir` | board `mobile` dengan frame `scrollY`, efek `opacity`/`blend`/`blur`/`backdropBlur`/`rotation`, teks italic, token tipografi (`family`, `weight`, `size`, `lineHeight`, `letterSpacing`) |
 | `v3/tema-mode` | token bertipe semua tipe (`color` … `letterSpacing`), `tokenModes: [light, dark]`, token dengan `modes` (warna, spacing, fontWeight), board `themeMode: dark` dan board tanpa `themeMode`, token di gap/padding/maxWidth/radius/size icon |
+| `v4/grid-galeri` | frame `layout:'grid'` dengan track px/`fr`/`auto`/`minmax`, `gridTemplateRows`, `columnGap`/`rowGap` token dan `gap`, `align`/`justify`, anak `gridColumn`/`gridRow` (`span`, `start`+`span`, `start`/`end` negatif), anak `hug`/`fill`/fixed/tanpa ukuran, anak absolute di grid |
 
 Gabungan korpus wajib tetap mencakup semua tipe node, semua jenis fill, dan properti di atas. Bila skema bertambah properti, tambahkan pemakaiannya ke fixture versi baru.
 

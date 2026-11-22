@@ -18,6 +18,8 @@ export type MigrationRegistry = Readonly<Record<number, Migration>>;
  * - 2 → 3 (epic model-dokumen story 2, AD-11): token datar menjadi `{type, value}` lewat `inferTokens` (tipe dari
  *   slot yang paling sering merujuk; ref dari slot lain di-detach ke nilai literal, jadi tampilan tetap). Tanpa
  *   `tokenModes`/`modes`. Dokumen tanpa `tokens` hanya naik versi. Murni: input tidak dimutasi.
+ * - 3 → 4 (epic editor-canvas story 7, AD-13): v4 hanya menambah `layout:'grid'`, track grid, `columnGap`/`rowGap`,
+ *   dan `gridColumn`/`gridRow`; dokumen v3 valid apa adanya, jadi langkahnya identitas yang menaikkan versi.
  */
 export const MIGRATIONS: MigrationRegistry = Object.freeze({
   1: (d: RawDocument): RawDocument => ({ ...d, schemaVersion: 2 }),
@@ -26,6 +28,7 @@ export const MIGRATIONS: MigrationRegistry = Object.freeze({
     const { tokens, pages } = inferTokens(d.tokens, d.pages);
     return { ...d, schemaVersion: 3, tokens, pages };
   },
+  3: (d: RawDocument): RawDocument => ({ ...d, schemaVersion: 4 }),
 });
 
 export type MigrateOptions = { migrations?: MigrationRegistry; target?: number };

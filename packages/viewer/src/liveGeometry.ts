@@ -59,7 +59,7 @@ export function measureBoard(host: HTMLElement, board: BoardNode, at: { x: numbe
     const r = el.getBoundingClientRect();
     return { x: at.x + (r.left - br.left) / k, y: at.y + (r.top - br.top) / k, w: r.width / k, h: r.height / k };
   };
-  const child = (n: ChildNode, parentId: string, parentLayout: 'row' | 'column' | 'none'): GeoNode | undefined => {
+  const child = (n: ChildNode, parentId: string, parentLayout: 'row' | 'column' | 'grid' | 'none'): GeoNode | undefined => {
     const el = els.get(n.id);
     if (!el) return undefined;
     const absolute = parentLayout === 'none' || n.position === 'absolute';

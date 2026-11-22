@@ -227,7 +227,7 @@ add(k, {type:'text', name:'Judul', content:'Kamar deluks, 2 tamu', size:16, line
 
 - Tertutup: board, frame, text, rect, ellipse, path, icon. Kunci di luar skema → SCHEMA_INVALID. Semua node anak wajib `name`.
 - board (parent null): `{type:'board', name, x, y, width, height, screen:'landing'|'app'|'mobile', expectedSize?:{width,height}, fills?, themeMode?:string}` (themeMode harus ada di tokenModes). Selalu clip; anak disusun kolom dari kiri atas (seperti frame `layout:'column'`, align start).
-- frame: `layout?:'none'|'row'|'column'` (default `'none'` = semua anak absolut di x/y, default 0,0), `gap?` (boleh negatif), `padding?`, `align?:'start'|'center'|'end'|'stretch'` (sumbu silang), `justify?:'start'|'center'|'end'|'space-between'` (sumbu utama), `clip?`, `scrollY?` (geser isi ke atas), sizing, cat, radius, efek.
+- frame: `layout?:'none'|'row'|'column'|'grid'` (default `'none'` = semua anak absolut di x/y, default 0,0; grid: bagian Grid), `gap?` (boleh negatif), `padding?`, `align?:'start'|'center'|'end'|'stretch'` (sumbu silang), `justify?:'start'|'center'|'end'|'space-between'` (sumbu utama), `clip?`, `scrollY?` (geser isi ke atas), sizing, cat, radius, efek.
 - text: `content, size, family?` (default Inter), `weight?` (100–900, default 400), `style?:'normal'|'italic'`, `lineHeight?` (px), `letterSpacing?` (em), `align?:'left'|'center'|'right'|'justify'`, `wrap?`, `numeric?:'proportional'|'tabular'`, `color?` (default #000000), sizing, efek.
 - rect: sizing, cat, radius, efek. ellipse: sizing, cat, efek + `startDeg?` (0 = jam 12, searah jarum jam), `sweepDeg?` (-360..360), `inner?` (rasio lubang [0,1)) untuk busur/ring.
 - path: `d` (SVG path), `viewBox:[x,y,w,h]`, sizing, cat, efek. icon: `lib, icon, size, color?, strokeWidth?, filled?`, efek (lihat add).
@@ -263,6 +263,19 @@ add(row, {type:'rect', name:'Penanda', width:24, height:24, radius:6, fills:[{ty
 const b = add(null, {type:'board', name:'Beranda', x:0, y:0, width:390, height:844, screen:'mobile'});
 const bar = add(b, {type:'frame', name:'Overlay / Tab bar', position:'absolute', x:20, y:746, width:350, height:64, layout:'row', padding:[0,8], align:'center', radius:24, fills:[{type:'solid', color:'#FFFFFF'}], stroke:{color:'#E4E7EC', width:1, align:'inside'}});
 add(bar, {type:'icon', lib:'lucide', icon:'house', size:24, color:'#2563EB'});
+```
+
+## Grid
+
+- Frame `layout:'grid'` + `gridTemplateColumns?`/`gridTemplateRows?`: array 1-24 track; track = angka (px) | `{fr:1}` | `'auto'` | `{minmax:[min, max]}` (min px|'auto', max px|fr|'auto'). Tanpa string CSS dan tanpa repeat(): tulis tiap track. Tanpa template = satu kolom.
+- `columnGap?`/`rowGap?` (≥ 0, boleh token) menimpa `gap` per sumbu; `gap` negatif diabaikan di grid. `align` = posisi item di sel (sumbu vertikal), `justify` = distribusi track.
+- Anak: `gridColumn?`/`gridRow?` `{start?, end?, span?}` (garis mulai 1, negatif dari ujung; end dan span tidak bersamaan), mis. `{span:2}`. Anak tanpa width meregang selebar sel; tanpa height meregang setinggi sel hanya bila `align` kosong/'stretch' (selain itu ikut isi: beri height). `'fill'` = regang, `'hug'` = ikut isi.
+
+```js
+const b = add(null, {type:'board', name:'Beranda', x:0, y:0, width:390, height:844, screen:'mobile'});
+const g = add(b, {type:'frame', name:'Grid kartu', layout:'grid', gridTemplateColumns:[{fr:1}, {fr:1}], columnGap:12, rowGap:12, padding:16, width:'fill'});
+for (const n of ['Satu', 'Dua']) add(g, {type:'rect', name:'Kartu ' + n, height:80, radius:12, fills:[{type:'solid', color:'#F2F4F7'}]});
+add(g, {type:'rect', name:'Kartu lebar', height:80, radius:12, gridColumn:{span:2}, fills:[{type:'solid', color:'#E0E7FF'}]});
 ```
 
 ## Cat, stroke, radius
@@ -305,7 +318,7 @@ add(b, {type:'frame', name:'Kartu terangkat', width:200, height:120, radius:12, 
 ## Token
 
 - `setTokens({'colors.primary':'#0F62FE', 'spacing.4':16})`; nilai properti boleh `{$token:'colors.primary'}` (token harus ada → selain itu TOKEN_UNKNOWN). get/find mengembalikan referensi apa adanya.
-- Token bertipe `{type, value, modes?}`: warna → color; radius/gap/padding/ukuran/stroke.width/size icon → radius|spacing|container|breakpoint; text size → fontSize; family/weight/lineHeight/letterSpacing → tipe senama. Salah slot → SCHEMA_INVALID.
+- Token bertipe `{type, value, modes?}`: warna → color; radius/gap/columnGap/rowGap/padding/ukuran/stroke.width/size icon → radius|spacing|container|breakpoint; text size → fontSize; family/weight/lineHeight/letterSpacing → tipe senama. Salah slot → SCHEMA_INVALID.
 - Nilai per tipe (value dan modes): color hex #RRGGBB/#RRGGBBAA; fontFamily string tak kosong; fontWeight 100–900 kelipatan 100; lineHeight > 0; letterSpacing angka apa pun; tipe lain angka ≥ 0.
 - Mode tema: `setTokenModes(['light','dark'])`, token `modes:{dark:'#000000'}`, board `themeMode:'dark'` (default mode pertama).
 

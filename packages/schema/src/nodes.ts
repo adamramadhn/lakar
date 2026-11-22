@@ -1,4 +1,4 @@
-// Skema dokumen Lakar v3 (AD-2, AD-11, AD-15, AD-16): primitif, token, properti visual, katalog node, dokumen.
+// Skema dokumen Lakar v4 (AD-2, AD-11, AD-13, AD-15, AD-16): primitif, token, properti visual, katalog node, dokumen.
 // v2 (story 22) menambah fill `conic`, `noise`, `mesh`; dokumen v1 dimigrasi identitas (`@lakar/core` MIGRATIONS[1]).
 // v3 (epic model-dokumen story 2) mengganti token datar dengan token bertipe + mode tema; dokumen v2 dimigrasi
 // lewat inferensi tipe (`@lakar/core` MIGRATIONS[2]).
@@ -7,7 +7,9 @@ import { z } from 'zod';
 import { LakarError } from './errors.js';
 import { ICON_LIBS, ICON_NAME_PATTERN } from './icons.js';
 
-export const SCHEMA_VERSION = 3 as const;
+// v4 (epic editor-canvas story 7, AD-13) menambah `layout:'grid'` + track bertipe, `columnGap`/`rowGap`, dan
+// penempatan anak `gridColumn`/`gridRow`; dokumen v3 dimigrasi identitas (`@lakar/core` MIGRATIONS[3]).
+export const SCHEMA_VERSION = 4 as const;
 
 // ---------------------------------------------------------------------------
 // Primitif
@@ -123,7 +125,7 @@ export type Color = z.infer<typeof Color>;
 // ---------------------------------------------------------------------------
 
 export const Screen = z.enum(['landing', 'app', 'mobile']);
-export const Layout = z.enum(['none', 'row', 'column']);
+export const Layout = z.enum(['none', 'row', 'column', 'grid']);
 export const Align = z.enum(['start', 'center', 'end', 'stretch']);
 export const Justify = z.enum(['start', 'center', 'end', 'space-between']);
 export const Blend = z.enum([
@@ -278,7 +280,49 @@ const positionShape = {
   y: Px.optional(),
 };
 
-const childBase = { name: Name, ...positionShape };
+// ---------------------------------------------------------------------------
+// Grid (v4, AD-13): track bertipe (tanpa string CSS) dan penempatan anak. Pemetaan CSS di render css.ts.
+// ---------------------------------------------------------------------------
+
+/** Batas jumlah track per sumbu, nilai `span`, dan garis grid (±). */
+export const GRID_TRACKS_MAX = 24;
+export const GRID_SPAN_MAX = 24;
+export const GRID_LINE_MAX = 25;
+
+/** Track `fr`: `{fr: 1}` → `1fr`. */
+export const GridFr = z.object({ fr: Positive }).strict();
+/** Batas bawah minmax: px | 'auto' (CSS melarang fr sebagai min). */
+const GridTrackMin = z.union([Size, z.literal('auto')]);
+/** Batas atas minmax: px | fr | 'auto'. */
+const GridTrackMax = z.union([Size, GridFr, z.literal('auto')]);
+/** Satu track: angka (px) | `{fr}` | `'auto'` | `{minmax:[min, max]}`. */
+export const GridTrack = z.union([Size, GridFr, z.literal('auto'), z.object({ minmax: z.tuple([GridTrackMin, GridTrackMax]) }).strict()]);
+export type GridTrack = z.infer<typeof GridTrack>;
+/** Template satu sumbu: 1..GRID_TRACKS_MAX track, ditulis apa adanya (tanpa repeat()). */
+export const GridTemplate = z.array(GridTrack).min(1).max(GRID_TRACKS_MAX);
+export type GridTemplate = z.infer<typeof GridTemplate>;
+
+const GridLine = z
+  .number()
+  .int()
+  .min(-GRID_LINE_MAX)
+  .max(GRID_LINE_MAX)
+  .refine((n) => n !== 0, 'garis grid tidak boleh 0 (mulai dari 1; negatif dihitung dari ujung)');
+/** Penempatan anak di parent grid: `{start?, end?, span?}`; minimal satu kunci, `end` dan `span` tidak bersamaan. */
+export const GridPlacement = z
+  .object({ start: GridLine.optional(), end: GridLine.optional(), span: z.number().int().min(1).max(GRID_SPAN_MAX).optional() })
+  .strict()
+  .refine((p) => p.start !== undefined || p.end !== undefined || p.span !== undefined, 'penempatan grid butuh start, end, atau span')
+  .refine((p) => !(p.end !== undefined && p.span !== undefined), 'penempatan grid: pakai end atau span, tidak keduanya');
+export type GridPlacement = z.infer<typeof GridPlacement>;
+
+/** Penempatan sel: hanya berlaku di parent `layout:'grid'` untuk anak flow (selain itu diabaikan render). */
+const gridItemShape = {
+  gridColumn: GridPlacement.optional(),
+  gridRow: GridPlacement.optional(),
+};
+
+const childBase = { name: Name, ...positionShape, ...gridItemShape };
 
 const PadValue = tok(Size);
 export const Padding = z.union([PadValue, z.tuple([PadValue, PadValue]), z.tuple([PadValue, PadValue, PadValue, PadValue])]);
@@ -311,6 +355,12 @@ const frameShape = {
   padding: Padding.optional(),
   align: Align.optional(),
   justify: Justify.optional(),
+  /** Track kolom/baris untuk `layout:'grid'` (diabaikan di layout lain). */
+  gridTemplateColumns: GridTemplate.optional(),
+  gridTemplateRows: GridTemplate.optional(),
+  /** Gap per sumbu (CSS column-gap/row-gap); menimpa `gap` di sumbu itu. */
+  columnGap: tok(Size).optional(),
+  rowGap: tok(Size).optional(),
   ...sizingShape,
   clip: z.boolean().optional(),
   scrollY: Size.optional(),

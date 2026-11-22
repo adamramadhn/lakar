@@ -15,6 +15,7 @@ import {
   addFill,
   addShadow,
   addStroke,
+  axisGapOf,
   canEditXY,
   convertFill,
   CORNERS,
@@ -23,10 +24,15 @@ import {
   editFill,
   editShadow,
   editStop,
+  enterGrid,
   fillRows,
+  formatRowCount,
+  GRID_TRACKS_MAX,
   keepsToken,
   layoutOf,
   moveFill,
+  parseColumnCount,
+  parseRowCount,
   radiusAll,
   readField,
   readSizing,
@@ -40,12 +46,14 @@ import {
   setRadiusCorner,
   setSizing,
   setStroke,
+  setTrackCount,
   SIDES,
   solidAlpha,
   solidColor,
   strokeColor,
   strokeSides,
   toggleSide,
+  trackCount,
   type Axis,
   type DesignTarget,
   type FieldState,
@@ -583,8 +591,33 @@ function PositionGroup({ targets, ctx, bounds }: { targets: DesignTarget[]; ctx:
 
 function AutoLayoutGroup({ targets, ctx }: { targets: DesignTarget[]; ctx: Ctx }) {
   const dir = readField(targets, layoutOf);
-  const layout = dir.mixed ? undefined : (dir.value as 'none' | 'row' | 'column');
-  const on = layout === 'row' || layout === 'column';
+  const layout = dir.mixed ? undefined : (dir.value as 'none' | 'row' | 'column' | 'grid');
+  const grid = layout === 'grid';
+  const on = layout === 'row' || layout === 'column' || grid;
+  const padding = (
+    <Field
+      label="Padding"
+      state={readField(targets, (n) => n.padding ?? 0)}
+      format={(v) => formatPadding(v)}
+      parse={parsePadding}
+      scrub={{ step: 1, min: 0 }}
+      disabled={ctx.disabled}
+      onCommit={(v) => ctx.run((ts) => setProp(ts, 'padding', v), 'Change padding')}
+    />
+  );
+  const align = <SelectField label="Align" state={readField(targets, (n) => n.align ?? 'start')} options={ALIGN_OPTIONS} disabled={ctx.disabled} onPick={(v) => ctx.run((ts) => setProp(ts, 'align', v), 'Change align')} />;
+  // Grid (desain Xxi0M): Columns | Rows, Column gap | Row gap, Padding | Align. Gap sumbu mewarisi `gap` bila kosong.
+  const axisGap = (key: 'columnGap' | 'rowGap', label: string) => (
+    <Field
+      label={label}
+      state={readField(targets, (n) => axisGapOf(n, key))}
+      format={num}
+      parse={parseSize}
+      scrub={{ step: 1, min: 0 }}
+      disabled={ctx.disabled}
+      onCommit={(v) => ctx.run((ts) => setProp(ts, key, v), `Change ${label.toLowerCase()}`)}
+    />
+  );
   return (
     <Group
       title="Auto layout"
@@ -604,29 +637,53 @@ function AutoLayoutGroup({ targets, ctx }: { targets: DesignTarget[]; ctx: Ctx }
             { value: 'none', icon: 'squareDashed', title: 'No auto layout' },
             { value: 'row', icon: 'arrowRight', title: 'Horizontal' },
             { value: 'column', icon: 'arrowDown', title: 'Vertical' },
-            { value: 'grid', icon: 'layoutGrid', title: 'Grid layout comes in a later update', disabled: true },
+            { value: 'grid', icon: 'layoutGrid', title: 'Grid' },
           ]}
           value={layout}
           disabled={ctx.disabled}
-          onPick={(v) => v !== 'grid' && ctx.run((ts) => setLayout(ts, v === 'none' ? null : v), 'Change layout direction')}
+          onPick={(v) => ctx.run((ts) => (v === 'grid' ? enterGrid(ts) : setLayout(ts, v === 'none' ? null : v)), 'Change layout direction')}
         />
       </div>
-      {(on || dir.mixed) && (
+      {grid && (
         <>
           <div className="dp-row">
-            <Field label="Gap" state={readField(targets, (n) => n.gap ?? 0)} format={num} parse={(t) => parseNumber(t)} scrub={{ step: 1 }} disabled={ctx.disabled} onCommit={(v) => ctx.run((ts) => setProp(ts, 'gap', v), 'Change gap')} />
             <Field
-              label="Padding"
-              state={readField(targets, (n) => n.padding ?? 0)}
-              format={(v) => formatPadding(v)}
-              parse={parsePadding}
-              scrub={{ step: 1, min: 0 }}
+              label="Columns"
+              state={readField(targets, (n) => Math.max(1, trackCount(n, 'gridTemplateColumns')))}
+              format={num}
+              parse={parseColumnCount}
+              scrub={{ step: 0.1, min: 1, max: GRID_TRACKS_MAX, toValue: Math.round }}
               disabled={ctx.disabled}
-              onCommit={(v) => ctx.run((ts) => setProp(ts, 'padding', v), 'Change padding')}
+              onCommit={(v) => ctx.run((ts) => setTrackCount(ts, 'gridTemplateColumns', v as number), 'Change grid columns')}
+            />
+            <Field
+              label="Rows"
+              state={readField(targets, (n) => trackCount(n, 'gridTemplateRows'))}
+              format={formatRowCount}
+              parse={parseRowCount}
+              placeholder="Auto"
+              disabled={ctx.disabled}
+              onCommit={(v) => ctx.run((ts) => setTrackCount(ts, 'gridTemplateRows', v as number), 'Change grid rows')}
             />
           </div>
           <div className="dp-row">
-            <SelectField label="Align" state={readField(targets, (n) => n.align ?? 'start')} options={ALIGN_OPTIONS} disabled={ctx.disabled} onPick={(v) => ctx.run((ts) => setProp(ts, 'align', v), 'Change align')} />
+            {axisGap('columnGap', 'Column gap')}
+            {axisGap('rowGap', 'Row gap')}
+          </div>
+          <div className="dp-row">
+            {padding}
+            {align}
+          </div>
+        </>
+      )}
+      {!grid && (on || dir.mixed) && (
+        <>
+          <div className="dp-row">
+            <Field label="Gap" state={readField(targets, (n) => n.gap ?? 0)} format={num} parse={(t) => parseNumber(t)} scrub={{ step: 1 }} disabled={ctx.disabled} onCommit={(v) => ctx.run((ts) => setProp(ts, 'gap', v), 'Change gap')} />
+            {padding}
+          </div>
+          <div className="dp-row">
+            {align}
             <SelectField label="Justify" state={readField(targets, (n) => n.justify ?? 'start')} options={JUSTIFY_OPTIONS} disabled={ctx.disabled} onPick={(v) => ctx.run((ts) => setProp(ts, 'justify', v), 'Change justify')} />
           </div>
         </>

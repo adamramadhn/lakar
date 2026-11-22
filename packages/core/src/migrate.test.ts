@@ -24,14 +24,14 @@ const chain: MigrationRegistry = {
 };
 
 describe('migrateDocument', () => {
-  it('registri resmi: 1→2 identitas, 2→3 token bertipe; versi kini → apa adanya (objek yang sama)', () => {
-    expect(Object.keys(MIGRATIONS)).toEqual(['1', '2']);
+  it('registri resmi: 1→2 identitas, 2→3 token bertipe, 3→4 identitas (grid); versi kini → apa adanya (objek yang sama)', () => {
+    expect(Object.keys(MIGRATIONS)).toEqual(['1', '2', '3']);
     const doc = JSON.parse(JSON.stringify(createDocument()));
-    expect(doc.schemaVersion).toBe(3);
+    expect(doc.schemaVersion).toBe(4);
     expect(migrateDocument(doc)).toBe(doc);
   });
 
-  it('migrasi resmi 1→2→3: dokumen v1 lama (tokens kosong) dibuka sebagai v3 tanpa perubahan lain, input tidak dimutasi', () => {
+  it('migrasi resmi 1→2→3→4: dokumen v1 lama (tokens kosong) dibuka sebagai versi kini tanpa perubahan lain, input tidak dimutasi', () => {
     const v3 = JSON.parse(JSON.stringify(createDocument()));
     const v1 = { ...v3, schemaVersion: 1 };
     const snapshot = structuredClone(v1);
@@ -50,7 +50,7 @@ describe('migrateDocument', () => {
   });
 
   it('lebih baru dari target → VERSION_MISMATCH', () => {
-    expect(codeOf(() => migrateDocument({ schemaVersion: 4 }))).toBe('VERSION_MISMATCH');
+    expect(codeOf(() => migrateDocument({ schemaVersion: 5 }))).toBe('VERSION_MISMATCH');
     expect(codeOf(() => parseDocument({ ...createDocument(), schemaVersion: 99 }))).toBe('VERSION_MISMATCH');
   });
 
@@ -110,7 +110,7 @@ describe('migrasi 2 → 3', () => {
   it('warna dirujuk fill → color, ref tetap', () => {
     const raw = v2Doc({ 'colors.a': '#111111' }, [{ type: 'rect', id: 'Rrrrrrr1', name: 'R', fills: [{ type: 'solid', color: { $token: 'colors.a' } }] }]);
     const doc = parseDocument(raw);
-    expect(doc.schemaVersion).toBe(3);
+    expect(doc.schemaVersion).toBe(4);
     expect(doc.tokens).toEqual({ 'colors.a': { type: 'color', value: '#111111' } });
     expect(doc.tokenModes).toBeUndefined();
     expect(nodes(doc)[0]).toMatchObject({ fills: [{ color: { $token: 'colors.a' } }] });
@@ -166,7 +166,15 @@ describe('migrasi 2 → 3', () => {
 
   it('dokumen tanpa tokens hanya naik versi', () => {
     const raw = v2Doc(undefined, [{ type: 'rect', id: 'Rrrrrrr1', name: 'R' }]);
-    expect(migrateDocument(raw)).toEqual({ ...raw, schemaVersion: 3 });
+    expect(migrateDocument(raw, { target: 3 })).toEqual({ ...raw, schemaVersion: 3 });
+  });
+
+  it('langkah 3 → 4 (grid): identitas yang hanya menaikkan versi, input tidak dimutasi', () => {
+    const v3 = { ...JSON.parse(JSON.stringify(createDocument())), schemaVersion: 3 };
+    const snapshot = structuredClone(v3);
+    expect(MIGRATIONS[3]!(v3)).toEqual({ ...snapshot, schemaVersion: 4 });
+    expect(v3).toEqual(snapshot);
+    expect(parseDocument(v3).schemaVersion).toBe(4);
   });
 
   it('langkah 2 murni: input tidak dimutasi', () => {

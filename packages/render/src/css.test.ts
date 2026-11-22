@@ -9,6 +9,9 @@ import {
   fontFamilyCss,
   fontWeightCss,
   gradientLayerCss,
+  gridLineCss,
+  gridTemplateCss,
+  gridTrackCss,
   JUSTIFY,
   lengthCss,
   letterSpacingCss,
@@ -152,5 +155,33 @@ describe('teks', () => {
     expect(fontFamilyCss('Inter')).toBe('Inter');
     expect(fontFamilyCss('JetBrains Mono')).toBe('"JetBrains Mono"');
     expect(fontFamilyCss({ $token: 'type.family' })).toBe('var(--type-family)');
+  });
+});
+
+describe('grid (v4, AD-13)', () => {
+  it('track: px, fr, auto, minmax', () => {
+    expect(gridTemplateCss([80, { fr: 1 }, 'auto', { minmax: [120, { fr: 2 }] }])).toBe('80px 1fr auto minmax(120px, 2fr)');
+    expect(gridTrackCss({ minmax: ['auto', 'auto'] })).toBe('minmax(auto, auto)');
+    expect(gridTrackCss({ fr: 0.5 })).toBe('0.5fr');
+  });
+
+  it('track tak terpetakan → undefined; template dengan satu entri salah atau kosong → undefined', () => {
+    expect(gridTrackCss('1fr')).toBeUndefined();
+    expect(gridTrackCss({ minmax: [10] })).toBeUndefined();
+    expect(gridTrackCss({ $token: 'space.4' })).toBeUndefined();
+    expect(gridTemplateCss([80, '1fr'])).toBeUndefined();
+    expect(gridTemplateCss([])).toBeUndefined();
+    expect(gridTemplateCss(undefined)).toBeUndefined();
+  });
+
+  it('penempatan: start, start/end, span, start/span, end saja', () => {
+    expect(gridLineCss({ start: 2 })).toBe('2');
+    expect(gridLineCss({ start: 1, end: 3 })).toBe('1 / 3');
+    expect(gridLineCss({ start: 1, end: -1 })).toBe('1 / -1');
+    expect(gridLineCss({ span: 2 })).toBe('span 2');
+    expect(gridLineCss({ start: 2, span: 2 })).toBe('2 / span 2');
+    expect(gridLineCss({ end: 3 })).toBe('auto / 3');
+    expect(gridLineCss({})).toBeUndefined();
+    expect(gridLineCss(undefined)).toBeUndefined();
   });
 });
