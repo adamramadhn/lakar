@@ -49,6 +49,7 @@ import { Icon, NODE_ICON } from './icons';
 import { Modal } from './NewFileDialog';
 import { ChecksPanel } from './panels';
 import { DesignPanel } from './DesignPanel';
+import { ThemeButton, ThemePanel } from './ThemePanel';
 import { parentLayoutOf, type DesignTarget } from './designModel';
 import { measureLiveSize } from './liveGeometry';
 import { agentPresence, layerMarks, type LayerMarkInfo } from './presence';
@@ -188,6 +189,12 @@ export function Viewer({ slug }: { slug: string }) {
   const [restoreAsk, setRestoreAsk] = useState<HistoryEntry | undefined>(undefined);
   const [restoring, setRestoring] = useState(false);
   const [restoreError, setRestoreError] = useState<string | undefined>(undefined);
+  /** Panel Theme (epic token-tema story 3); ditutup saat pratinjau versi (tombol Theme tidak tampil). */
+  const [themeOpen, setThemeOpen] = useState(false);
+  const closeTheme = useCallback(() => setThemeOpen(false), []);
+  useEffect(() => {
+    if (preview) setThemeOpen(false);
+  }, [preview]);
   const offline = useOffline();
   /** Toast sisip/hapus/unggah: gagal, "Deleted …" + Undo, atau "Uploading image…". */
   const [toast, setToastState] = useState<ToastState | undefined>(undefined);
@@ -1232,6 +1239,7 @@ export function Viewer({ slug }: { slug: string }) {
         onSelectIds={selectIds}
         onCommit={commitGesture}
         shareBadge={shareBadge}
+        actions={<ThemeButton open={themeOpen} onToggle={() => setThemeOpen((o) => !o)} />}
         canUndo={editable && undoDepth.undo > 0}
         canRedo={editable && undoDepth.redo > 0}
         onUndo={undo}
@@ -1252,6 +1260,7 @@ export function Viewer({ slug }: { slug: string }) {
         }}
         overlay={
           <>
+            {themeOpen && !preview && <ThemePanel doc={latestDoc} rev={latestDoc.rev} editable={editable} onCommit={commitOps} onClose={closeTheme} />}
             {undoSkipped && <UndoSkippedToast key={undoSkipped.key} toast={undoSkipped} onHistory={() => openTab('history')} onClose={closeUndoSkipped} />}
             {rollback && (
               <div key={rollback.key} className="rollback-toast canvas-overlay-ui" role="alert">
@@ -1280,6 +1289,7 @@ export function Viewer({ slug }: { slug: string }) {
               inspectNode={inspect?.state === 'ok' ? inspect.value.node : undefined}
               rev={d.rev}
               onCommit={commitOps}
+              tokenModes={d.tokenModes}
               align={designTargets.length > 1 ? { enabled: editable ? actionState(sceneRef.current?.() ?? [], selection) : NO_ACTIONS, run: (a) => runAction(a) } : undefined}
             />
           )}

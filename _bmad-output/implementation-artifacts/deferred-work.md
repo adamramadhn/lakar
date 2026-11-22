@@ -136,3 +136,12 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-token-2-read-api.md`
   summary: Dua token berbeda nama tetapi sama variabel CSS (mis. `a.b` dan `a-b`) bisa ada berdampingan dan bertabrakan saat ekspor/impor.
   evidence: `cssVarName` tidak injektif; `setTokens` sudah bisa membuat pasangan seperti itu sebelum story ini, `renameToken` juga tidak menolaknya, dan impor memilih token pertama. Usul: tolak saat commit (CONFLICT) atau tangani di codegen (epic kode).
+- source_spec: `_bmad-output/implementation-artifacts/spec-token-3-theme-panel.md`
+  summary: Tombol "Import CSS variables" dan "Copy tokens as CSS" di header panel Theme belum ada.
+  evidence: Desain dialog impor dan Copy tokens as CSS ada di bagian 09 Code (wvCMu/ngHGS, w6iQk/SpvBC) dan ticket epic kode story 5 memuatnya ("Copy tokens as CSS di panel Theme; impor CSS variables memakai parser epic token"). Usul: epic kode story 5 menambah kedua tombol di `.theme-header` ThemePanel.tsx (parser `parseCssVariables` @lakar/render + setTokenModes/setTokens lewat route ops).
+- source_spec: `_bmad-output/implementation-artifacts/spec-token-3-theme-panel.md`
+  summary: Panel Theme tidak bisa menghapus mode, mengubah urutan mode, atau mengganti mode default.
+  evidence: Ticket story 3 hanya meminta tambah dan ubah nama mode; desain 07 tidak memuat aksi itu. Usul: menu konteks di header mode (Delete mode / Make default) dengan op setTokenModes + setTokens yang membuang/menggeser `modes` dan update themeMode board.
+- source_spec: `_bmad-output/implementation-artifacts/spec-token-3-theme-panel.md`
+  summary: Wiring komponen ThemePanel (antrean commit, input sel, popover hapus) tanpa tes otomatis.
+  evidence: Viewer belum punya harness tes komponen/DOM (pra-ada); pembangun op dites murni di `themeModel.test.ts` dan alur diverifikasi smoke msedge.

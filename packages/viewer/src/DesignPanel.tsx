@@ -80,6 +80,7 @@ import {
   WEIGHT_NAMES,
 } from './designValues';
 import { Menu } from './FileMenu';
+import { modeIcon, modeLabel, readThemeMode, themeModeOps } from './themeModel';
 import { Icon, NODE_ICON, type IconName } from './icons';
 
 type Commit = (ops: DocOp[], description: string) => Promise<boolean>;
@@ -1165,7 +1166,25 @@ export type DesignPanelProps = {
   onCommit: Commit;
   /** Multi-seleksi (story 6, desain "Align & distribute" J8r8Gq): ketersediaan dan penjalan aksi align/distribute. */
   align?: { enabled: Record<EditAction, boolean>; run: (a: EditAction) => void } | undefined;
+  /** `tokenModes` dokumen tampil (epic token-tema story 3): grup Theme mode untuk board. */
+  tokenModes?: readonly string[] | undefined;
 };
+
+/** Grup "Theme mode" board (desain tuEOt/mjY37): ≤ 3 mode = segmented, lebih = select; mode pertama = default. */
+function ThemeModeGroup({ targets, ctx, modes }: { targets: DesignTarget[]; ctx: Ctx; modes: readonly string[] }) {
+  const current = readThemeMode(targets, modes);
+  const pick = (m: string) => ctx.run((ts) => themeModeOps(ts, m, modes), 'Change theme mode');
+  return (
+    <Group title="Theme mode" action={<Icon name="palette" size={13} className="dp-group-icon" />}>
+      {modes.length <= 3 ? (
+        <Segmented label="Theme mode" options={modes.map((m) => ({ value: m, label: modeLabel(m), icon: modeIcon(m) }))} value={current} onPick={pick} disabled={ctx.disabled} />
+      ) : (
+        <SelectField state={current === undefined ? { mixed: true } : { mixed: false, value: current, resolved: current }} options={modes.map((m) => [m, modeLabel(m)] as const)} onPick={pick} disabled={ctx.disabled} />
+      )}
+      <span className="dp-helper">Applies to every layer on this board, including instances.</span>
+    </Group>
+  );
+}
 
 /** Grup "Align & distribute": 6 align + 2 distribute, satu permintaan ops per klik (dijalankan Viewer). */
 function AlignGroup({ align, disabled }: { align: NonNullable<DesignPanelProps['align']>; disabled: boolean }) {
@@ -1182,7 +1201,7 @@ function AlignGroup({ align, disabled }: { align: NonNullable<DesignPanelProps['
   );
 }
 
-export function DesignPanel({ targets, path, editable, fonts, inspectNode, rev, onCommit, align }: DesignPanelProps) {
+export function DesignPanel({ targets, path, editable, fonts, inspectNode, rev, onCommit, align, tokenModes }: DesignPanelProps) {
   const [menu, setMenu] = useState<{ x: number; y: number } | undefined>(undefined);
   const [copied, setCopied] = useState<string | undefined>(undefined);
   // Antrean edit: patch fills/shadows/stroke berupa array/objek utuh, jadi edit berikutnya baru dibangun sesudah commit
@@ -1307,6 +1326,7 @@ export function DesignPanel({ targets, path, editable, fonts, inspectNode, rev, 
       )}
       <Fragment key={targets.map((t) => t.id).join(',')}>
       {multi && align && <AlignGroup align={align} disabled={!editable} />}
+      {tokenModes && tokenModes.length > 0 && targets.every((t) => t.type === 'board') && <ThemeModeGroup targets={targets} ctx={ctx} modes={tokenModes} />}
       {groups.includes('position') && <PositionGroup targets={targets} ctx={ctx} bounds={bounds} />}
       {groups.includes('autoLayout') && <AutoLayoutGroup targets={targets} ctx={ctx} />}
       {groups.includes('typography') && <TypographyGroup targets={targets} ctx={ctx} fonts={fonts} />}

@@ -344,6 +344,7 @@ export function Canvas({
   onSceneChange,
   onContextMenu,
   shareBadge,
+  actions,
 }: {
   /** Diisi Canvas: pohon geometri halaman untuk aksi edit (story 6). */
   sceneRef?: MutableRefObject<(() => GeoNode[]) | null>;
@@ -359,6 +360,8 @@ export function Canvas({
   onCommit?: (ops: DocOp[], description: string) => Promise<number | undefined>;
   /** Label badge "Selection shared with agents" di kiri atas (story 3); undefined = tidak tampil. */
   shareBadge?: string | undefined;
+  /** Tombol tambahan di kiri Export (kanan atas kanvas), mis. Theme (epic token-tema story 3). */
+  actions?: ReactNode;
   canUndo?: boolean;
   canRedo?: boolean;
   onUndo?: () => void;
@@ -529,6 +532,12 @@ export function Canvas({
     const el = ref.current;
     if (!el) return;
     const onWheel = (e: WheelEvent) => {
+      // Panel melayang yang bisa di-scroll (Theme): wheel men-scroll panel, bukan kamera.
+      // Ctrl/⌘ + wheel (pinch) tetap ditahan agar halaman tidak ikut zoom.
+      if (e.target instanceof Element && e.target.closest('.canvas-scroll-ui')) {
+        if (e.ctrlKey || e.metaKey) e.preventDefault();
+        return;
+      }
       e.preventDefault();
       stopAnim();
       const r = el.getBoundingClientRect();
@@ -859,7 +868,12 @@ export function Canvas({
         </button>
       )}
 
-      {!preview && <ExportButton slug={slug} boards={boards} selectedBoardId={highlight?.boardId} />}
+      {!preview && (
+        <div className="canvas-actions">
+          {actions}
+          <ExportButton slug={slug} boards={boards} selectedBoardId={highlight?.boardId} />
+        </div>
+      )}
 
       <div className="view-controls canvas-overlay-ui" role="toolbar" aria-label="View controls">
         <button type="button" className={`tool${tool === 'select' ? ' active' : ''}`} aria-label="Select (V)" title="Select (V)" aria-pressed={tool === 'select'} onClick={() => setTool('select')}>
