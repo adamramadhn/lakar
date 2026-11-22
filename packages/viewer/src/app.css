@@ -755,11 +755,11 @@ code {
   flex-direction: column;
   gap: 6px;
 }
-/* Desain "List Row": Name 360 · Edited 160 · Boards 160 · Revision 200 · "…"; baris 82 (thumb 120×66). */
+/* Desain "List Row": Name 360 · Edited 160 · Created 160 · Last agent 200 · Checks (sisa) · "…"; baris 82 (thumb 120×66). */
 .list-head,
 .list-row {
   display: grid;
-  grid-template-columns: minmax(0, 360fr) minmax(0, 160fr) minmax(0, 160fr) minmax(0, 200fr) 28px;
+  grid-template-columns: minmax(0, 360fr) minmax(0, 160fr) minmax(0, 160fr) minmax(0, 200fr) minmax(0, 104fr) 28px;
   align-items: center;
   gap: 0;
 }
@@ -815,6 +815,72 @@ code {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+/* Kolom Last agent dan Checks (aplikasi 11, desain `List Row`): avatar 24 + nama gap 10; titik 7 + label 13px. */
+.list-agent,
+.list-check {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  padding-right: 12px;
+}
+.list-agent {
+  gap: 10px;
+}
+.list-check {
+  gap: 6px;
+  font-size: 13px;
+}
+.list-agent-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.list-avatar {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  background: var(--agent);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+}
+.list-avatar.codex {
+  background: var(--codex);
+}
+.list-avatar.user {
+  border-radius: 12px;
+  background: var(--avatar);
+  font-weight: 600;
+}
+.check-dot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--success);
+}
+.check-dot.warning {
+  background: var(--warning);
+}
+.check-dot.danger {
+  background: var(--danger);
+}
+.list-unknown {
+  color: var(--text-muted);
+}
+/* Desktop sempit (769–1100px, sidebar masih tampil): Created disembunyikan agar kolom Name tetap terbaca. */
+@media (min-width: 769px) and (max-width: 1100px) {
+  .list-head,
+  .list-row {
+    grid-template-columns: minmax(0, 360fr) minmax(0, 150fr) minmax(0, 190fr) minmax(0, 120fr) 28px;
+  }
+  .list-head span:nth-child(3),
+  .list-row > span:nth-child(3) {
+    display: none;
+  }
 }
 .live-badge {
   flex: none;
@@ -2649,13 +2715,15 @@ button.panel-tab:hover {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 20px;
   }
-  /* List tablet: Name · Edited · Boards (Revision disembunyikan). */
+  /* List tablet (desain "Tablet — List"): Name · Edited · Last agent (Created dan Checks disembunyikan). */
   .list-head,
   .list-row {
     grid-template-columns: minmax(0, 344fr) minmax(0, 170fr) minmax(0, 190fr) 28px;
   }
-  .list-head span:nth-child(4),
-  .list-row > span:nth-child(4) {
+  .list-head span:nth-child(3),
+  .list-head span:nth-child(5),
+  .list-row > span:nth-child(3),
+  .list-row > span:nth-child(5) {
     display: none;
   }
   .steps {

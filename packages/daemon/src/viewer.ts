@@ -6,7 +6,8 @@ import { readFile, stat } from 'node:fs/promises';
 import { extname, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { migrateDocument, parseDocument } from '@lakar/core';
-import { LakarError, SLUG_PATTERN, errorMessage, type LakarDocument } from '@lakar/schema';
+import { LakarError, SLUG_PATTERN, errorMessage, type HistoryEntry, type LakarDocument } from '@lakar/schema';
+import type { CheckCounts, CheckLedger } from './checks.js';
 import { notFound } from './errors.js';
 import { VIEWER_CLIENT } from './events.js';
 import type { Sessions } from './sessions.js';
@@ -21,7 +22,15 @@ export type ViewerDocSummary = {
   updatedAt: string;
   boardCount: number;
   firstBoardId: string | null;
+  /** Waktu entri riwayat pertama (opsional; dokumen tanpa riwayat tidak punya). */
+  createdAt?: string;
+  /** Klien penulis entri riwayat terakhir (opsional; tidak diketahui untuk sesi lama yang sudah hilang). */
+  lastClient?: string;
+  /** Hasil check terakhir yang mencakup semua board pada rev terkini (opsional; hanya memori daemon). */
+  check?: CheckCounts;
 };
+
+type DocMeta = Pick<ViewerDocSummary, 'createdAt' | 'lastClient'>;
 
 /** Entri riwayat untuk viewer: id sesi hanya versi publik (8 karakter), bukan kredensial penuh. */
 export type ViewerHistoryEntry = {
@@ -44,6 +53,8 @@ export type ViewerRoutesOptions = {
   store: DocStore;
   /** Sesi daemon (untuk nama klien di riwayat); dibaca saja. */
   sessions?: Sessions;
+  /** Hasil check terakhir per dokumen (kolom Checks Dashboard); dibaca saja. */
+  checks?: CheckLedger;
   /** Direktori hasil build viewer (berisi `index.html`). */
   distDir: string;
   /** Pencatat masalah non-fatal (file rusak dilewati). Default `console.warn`. */
@@ -122,10 +133,52 @@ export const summarize = (slug: string, doc: LakarDocument, mtimeMs: number): Vi
   firstBoardId: doc.pages.find((p) => p.children.length > 0)?.children[0]?.id ?? null,
 });
 
-export function registerViewerRoutes(app: FastifyInstance, { docs, store, sessions, distDir, log = (m) => console.warn(m) }: ViewerRoutesOptions): void {
+const boardIdsOf = (doc: LakarDocument) => doc.pages.flatMap((p) => p.children.map((b) => b.id));
+
+/**
+ * Klien penulis entri riwayat: `client` yang tercatat di entri (execute sejak aplikasi 11), lalu sesi yang masih
+ * dikenal, lalu id sesi tetap `lakar-viewer` (kelola file dari aplikasi).
+ */
+export function historyClient(h: Pick<HistoryEntry, 'sessionId' | 'client'>, sessions?: Sessions): string | undefined {
+  if (typeof h.client === 'string' && h.client) return h.client;
+  return sessions?.byId(h.sessionId)?.client ?? (h.sessionId === VIEWER_CLIENT ? VIEWER_CLIENT : undefined);
+}
+
+/** Created (entri pertama) dan Last agent (entri terakhir) dari riwayat; entri tanpa `sessionId`/`at` dilewati. */
+export function historyMeta(history: readonly HistoryEntry[], sessions?: Sessions): DocMeta {
+  const valid = history.filter((h) => typeof h.sessionId === 'string' && typeof h.at === 'string');
+  const first = valid[0];
+  const last = valid.at(-1);
+  const client = last ? historyClient(last, sessions) : undefined;
+  return { ...(first ? { createdAt: first.at } : {}), ...(client ? { lastClient: client } : {}) };
+}
+
+export function registerViewerRoutes(app: FastifyInstance, { docs, store, sessions, checks, distDir, log = (m) => console.warn(m) }: ViewerRoutesOptions): void {
   const root = resolve(distDir);
   /** Ringkasan dokumen dari file per `slug@mtime`: file yang tidak berubah tidak di-parse ulang. */
-  const cache = new Map<string, { mtimeMs: number; summary: ViewerDocSummary }>();
+  const cache = new Map<string, { mtimeMs: number; summary: ViewerDocSummary; docId: string; boardIds: string[] }>();
+  /**
+   * Meta riwayat per `slug@mtime` (juga untuk dokumen di memori): setiap commit menulis riwayat lalu dokumen,
+   * jadi mtime dokumen berubah setiap riwayat bertambah.
+   */
+  const metaCache = new Map<string, { mtimeMs: number; meta: DocMeta }>();
+  const metaOf = async (slug: string, mtimeMs: number): Promise<DocMeta> => {
+    const hit = metaCache.get(slug);
+    if (hit && hit.mtimeMs === mtimeMs) return hit.meta;
+    try {
+      const meta = historyMeta(await store.readHistory(slug), sessions);
+      metaCache.set(slug, { mtimeMs, meta });
+      return meta;
+    } catch (e) {
+      log(`lakard: viewer tidak bisa membaca riwayat ${slug}: ${errorMessage(e)}`);
+      return {};
+    }
+  };
+  // Check dihitung per permintaan: layout_check tidak menulis file, jadi tidak tertangkap mtime.
+  const withCheck = (summary: ViewerDocSummary, doc: { id: string; rev: number }, boardIds: readonly string[]): ViewerDocSummary => {
+    const check = checks?.forDoc(doc, boardIds);
+    return check ? { ...summary, check } : summary;
+  };
 
   app.get('/viewer/docs', async (_req, reply) => {
     const entries = await store.list();
@@ -133,20 +186,21 @@ export function registerViewerRoutes(app: FastifyInstance, { docs, store, sessio
     for (const { slug, mtimeMs } of entries) {
       const mem = docs.get(slug);
       if (mem) {
-        out.push(summarize(slug, mem, mtimeMs));
+        out.push(withCheck({ ...summarize(slug, mem, mtimeMs), ...(await metaOf(slug, mtimeMs)) }, mem, boardIdsOf(mem)));
         continue;
       }
       const hit = cache.get(slug);
       if (hit && hit.mtimeMs === mtimeMs) {
-        out.push(hit.summary);
+        out.push(withCheck(hit.summary, { id: hit.docId, rev: hit.summary.rev }, hit.boardIds));
         continue;
       }
       try {
         const doc = await peekDocument(store, slug);
         if (!doc) continue; // terhapus di antara list dan baca
-        const summary = summarize(slug, doc, mtimeMs);
-        cache.set(slug, { mtimeMs, summary });
-        out.push(summary);
+        const summary = { ...summarize(slug, doc, mtimeMs), ...(await metaOf(slug, mtimeMs)) };
+        const boardIds = boardIdsOf(doc);
+        cache.set(slug, { mtimeMs, summary, docId: doc.id, boardIds });
+        out.push(withCheck(summary, doc, boardIds));
       } catch (e) {
         cache.delete(slug);
         log(`lakard: viewer melewati ${slug}.lakar.json: ${errorMessage(e)}`);
@@ -182,7 +236,7 @@ export function registerViewerRoutes(app: FastifyInstance, { docs, store, sessio
       .filter((h) => typeof h.sessionId === 'string' && typeof h.at === 'string' && typeof h.description === 'string')
       .map((h) => {
         // Entri dari aplikasi (kelola file) memakai id sesi tetap `lakar-viewer`.
-        const client = sessions?.byId(h.sessionId)?.client ?? (h.sessionId === VIEWER_CLIENT ? VIEWER_CLIENT : undefined);
+        const client = historyClient(h, sessions);
         return {
           rev: h.rev,
           description: h.description,

@@ -34,6 +34,7 @@ import { readAsset } from './assets.js';
 import { PhotoService, SEARCH_LIMIT_MAX } from './photos/service.js';
 import { notFound } from './errors.js';
 import { runCheck } from './check.js';
+import { CheckLedger } from './checks.js';
 import { readRenderModule, RENDER_PAGE_HTML } from './chromium.js';
 import type { DaemonConfig } from './config.js';
 import { FontRegistry } from './fonts.js';
@@ -208,6 +209,7 @@ export function buildServer({
   const store = new DocStore(config.dataDir);
   const sessions = new Sessions();
   const activity = new ActivityBus();
+  const checks = new CheckLedger();
   const docLocks = new DocumentLocks();
   /** Daemon pemilik tunggal (AD-1): salinan terkini per slug. */
   const docs = new Map<string, LakarDocument>();
@@ -467,8 +469,10 @@ export function buildServer({
           checkMs: Math.round((performance.now() - t0) * 10) / 10,
           summary,
         };
-        await store.commit(slug, committed.doc, committed.entry);
+        // Klien sesi ikut dicatat (opsional) supaya "Last agent" Dashboard tetap terbaca setelah restart.
+        await store.commit(slug, committed.doc, session.client ? { ...committed.entry, client: session.client } : committed.entry);
         docs.set(slug, committed.doc);
+        checks.record(committed.doc.id, doc.rev, committed.doc.rev, ran.boards);
         result = { docId: committed.doc.id, rev: committed.doc.rev, created: committed.created };
       }
       session.keep = run.keep;
@@ -627,6 +631,7 @@ export function buildServer({
     } else boardIds = doc.pages.flatMap((p) => p.children.map((b) => b.id));
     for (const id of boardIds) assertIcons(findBoard(doc, id)!);
     const ran = await runCheck(render, doc, boardIds);
+    checks.record(stored.id, stored.rev, stored.rev, ran.boards);
     return ok(reply, { docId: stored.id, rev: stored.rev, boards: ran.boards, summary: summarizeFindings(ran.findings), findings: ran.findings });
   });
 
@@ -666,7 +671,7 @@ export function buildServer({
   });
 
   // Viewer baca-saja (Viewer B slice 1): `/viewer/*` dan `/app/*`. Route lama tidak berubah.
-  registerViewerRoutes(app, { docs, store, sessions, distDir: config.viewerDir ?? VIEWER_DIST_DIR });
+  registerViewerRoutes(app, { docs, store, sessions, checks, distDir: config.viewerDir ?? VIEWER_DIST_DIR });
   registerFileRoutes(app, { docs, store, sessions, docLocks, activity, dataDir: config.dataDir });
   registerPageRoutes(app, { docs, store, docLocks, activity });
   registerExportRoutes(app, { docs, store, render, icons });
