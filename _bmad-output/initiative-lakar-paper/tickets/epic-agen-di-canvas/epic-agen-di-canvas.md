@@ -4,7 +4,7 @@ title: "Agen dan manusia bekerja di canvas yang sama"
 parent: initiative-lakar-paper
 covers: [R2]
 after: [epic-editor-canvas]
-refined: false
+refined: true
 risk: medium
 ---
 
@@ -40,3 +40,4 @@ Fatmuh bisa memilih bagian desain lalu meminta agen mengerjakan pekerjaan berula
 - Waits on epic-editor-canvas because: seleksi, edit manual, dan History editor.
 - Waits on initiative-lakar story 3.1 because: tool `get_selection` dasar dibangun di sana.
 - Decision: 2026-11-22 — story pertama epic ini adalah desain UI/UX/motion yang belum ada di `design/lakar-ui.pen` (hitl, disetujui Fatmuh). Story kode mengikuti desain itu lewat MCP pencil (C6).
+- Decision: 2026-11-22 — epic dipecah menjadi 4 story (tickets/tickets.toml) atas delegasi Fatmuh.

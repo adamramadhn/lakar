@@ -21,7 +21,7 @@ const pkg = (name: string, code: string, deps: Record<string, string> = {}): Pac
 describe('arah dependensi: repo nyata', () => {
   const packages = loadWorkspace(root);
 
-  it('menemukan 11 paket', () => {
+  it('menemukan 12 paket', () => {
     expect(packages.map((p) => p.name).sort()).toEqual(Object.keys(EDGES).sort());
     for (const p of packages) expect(Object.keys(p.files).length).toBeGreaterThan(0);
   });
@@ -49,7 +49,7 @@ describe('arah dependensi: fixture pelanggaran', () => {
     ]);
   });
 
-  it.each(['schema', 'ports', 'render'])('%s juga dilarang IO', (name) => {
+  it.each(['schema', 'ports', 'render', 'codegen'])('%s juga dilarang IO', (name) => {
     expect(checkPackage(pkg(name, "import 'node:path';"))).toMatchObject([{ pkg: name, kind: 'io' }]);
   });
 
@@ -119,10 +119,33 @@ describe('arah dependensi: fixture pelanggaran', () => {
 
   it('closure transitif diizinkan', () => {
     expect([...allowedDeps('daemon')].sort()).toEqual(
-      ['check', 'core', 'exec', 'icons', 'ports', 'render', 'schema', 'skills'],
+      ['check', 'codegen', 'core', 'exec', 'icons', 'ports', 'render', 'schema', 'skills'],
     );
     expect(checkPackage(pkg('exec', "import '@lakar/schema';"))).toEqual([]);
     expect(checkPackage(pkg('daemon', "import '@lakar/schema';"))).toEqual([]);
+  });
+
+  it('viewer boleh @lakar/render (pemetaan CSS tunggal AD-5), tetap dilarang core/exec/icons', () => {
+    expect([...allowedDeps('viewer')].sort()).toEqual(['codegen', 'ports', 'render', 'schema']);
+    expect(checkPackage(pkg('viewer', "import { colorCss } from '@lakar/render';"))).toEqual([]);
+    for (const target of ['core', 'exec', 'icons']) {
+      expect(checkPackage(pkg('viewer', `import { x } from '@lakar/${target}';`))).toMatchObject([
+        { pkg: 'viewer', kind: 'direction', specifier: `@lakar/${target}` },
+      ]);
+    }
+  });
+
+  it('codegen hanya schema + render (AD-16/AD-17); viewer dan daemon boleh codegen', () => {
+    expect([...allowedDeps('codegen')].sort()).toEqual(['ports', 'render', 'schema']);
+    expect(checkPackage(pkg('codegen', "import { childLayoutDecls } from '@lakar/render';"))).toEqual([]);
+    for (const target of ['core', 'exec', 'icons', 'check']) {
+      expect(checkPackage(pkg('codegen', `import { x } from '@lakar/${target}';`))).toMatchObject([
+        { pkg: 'codegen', kind: 'direction', specifier: `@lakar/${target}` },
+      ]);
+    }
+    expect(checkPackage(pkg('viewer', "import { generateCode } from '@lakar/codegen';"))).toEqual([]);
+    expect(checkPackage(pkg('daemon', "import { generateCode } from '@lakar/codegen';"))).toEqual([]);
+    expect(checkPackage(pkg('render', "import { generateCode } from '@lakar/codegen';"))).toMatchObject([{ pkg: 'render', kind: 'direction' }]);
   });
 
   it('impor relatif dan pustaka non-IO tidak dilaporkan', () => {

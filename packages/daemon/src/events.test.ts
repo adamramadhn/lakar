@@ -65,6 +65,22 @@ describe('ActivityBus', () => {
     expect(bus.listenerCount).toBe(0);
   });
 
+  it('selection: hanya ke subscribeAll, tanpa ring, field kosong dibuang, seq berbagi dengan change', () => {
+    const bus = new ActivityBus();
+    const plain: string[] = [];
+    const all: unknown[] = [];
+    bus.subscribe((e) => plain.push(e.type));
+    bus.subscribeAll((e) => all.push(e));
+    bus.change({ kind: 'edit', slug: 'a', rev: 2 });
+    bus.selection({ slug: 'a', addresses: ['Aaaaaaa1'], rev: 2, origin: undefined });
+    expect(plain).toEqual([]);
+    expect(all).toEqual([
+      { seq: 1, type: 'change', change: { kind: 'edit', slug: 'a', rev: 2 } },
+      { seq: 2, type: 'selection', selection: { slug: 'a', addresses: ['Aaaaaaa1'], rev: 2 } },
+    ]);
+    expect(bus.recent()).toEqual([]);
+  });
+
   it('default ring 100', () => {
     const bus = new ActivityBus();
     for (let i = 0; i < 130; i++) bus.emit({ type: 'session', session: { id: 'x', createdAt: '', executes: 0 } });

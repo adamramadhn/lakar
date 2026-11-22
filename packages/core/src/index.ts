@@ -7,7 +7,9 @@ export const PACKAGE = '@lakar/core';
 export { IdAllocator, collectIds, type RandomSource } from './ids.js';
 export { DocumentLocks } from './locks.js';
 export { isPlainObject } from './object.js';
+export { applyOps, type ApplyOpsResult } from './ops.js';
 export { MIGRATIONS, migrateDocument, parseDocument, type MigrateOptions, type Migration, type MigrationRegistry, type RawDocument } from './migrate.js';
+export { inferTokenType, inferTokens, tokenTypeOfValue, type InferredTokens } from './tokens-infer.js';
 export {
   beginTransaction,
   transact,

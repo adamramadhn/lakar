@@ -8,6 +8,8 @@ dihasilkan dari `@lakar/exec`.
 - **Domain (story 2.16):** `layout`, `typography`, `color`, `accessibility`, `ui` (berisi contoh teruji), `interface`,
   `writing`, `review`. Menggantikan `polish` (dihapus; `read_skill('polish')` → NOT_FOUND dengan pesan pemecahannya).
 - **Rujukan:** `icons`, `api`.
+- **Alur seleksi:** `selection` (kerja dari node yang dipilih pengguna di viewer: varian responsif, cek konsistensi); dibaca
+  hanya bila permintaan merujuk seleksi, di luar muat per jenis layar.
 
 Aturan muat (instruksi MCP + deskripsi `read_skill`): core + 8 domain + 1 jenis layar dibaca paralel di satu giliran; total per
 jenis layar ≤ 9.600 token (iterasi 6; dulu 11.500; lewat batas → padatkan, jangan naikkan). Setiap aturan diajarkan di tepat

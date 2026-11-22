@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 
 export const PACKAGE = '@lakar/skills';
 
-/** Nama skill yang dikenal (tertutup): inti, jenis layar, delapan domain desain, lalu rujukan. */
+/** Nama skill yang dikenal (tertutup): inti, jenis layar, delapan domain desain, lalu rujukan dan alur seleksi. */
 export const SKILL_NAMES = [
   'core',
   'landing',
@@ -23,6 +23,7 @@ export const SKILL_NAMES = [
   'review',
   'icons',
   'api',
+  'selection',
 ] as const;
 export type SkillName = (typeof SKILL_NAMES)[number];
 

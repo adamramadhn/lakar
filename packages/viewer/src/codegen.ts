@@ -142,16 +142,6 @@ export function menuInsertTarget(kind: InsertKind, menuBoard: BoardBox | undefin
   return undefined;
 }
 
-/** Hapus node `id` (board juga boleh). */
-export function removeNode(node: { id: string; name: string; type: string }): { code: string; description: string } {
-  const isBoard = node.type === 'board';
-  const words = nameWords(node.name, 5);
-  return {
-    code: `remove(${JSON.stringify(node.id)});`,
-    description: words.length ? sentence('Delete', words, isBoard ? 'board' : 'layer') : isBoard ? 'Delete selected board' : 'Delete selected layer',
-  };
-}
-
 /** Jumlah kata deskripsi (sama dengan aturan daemon). */
 export const wordCount = (s: string) => s.trim().split(/\s+/).filter(Boolean).length;
 

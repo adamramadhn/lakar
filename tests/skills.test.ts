@@ -15,6 +15,7 @@ const REGEN = 'regenerasi: /opt/node-26/bin/pnpm build && /opt/node-26/bin/node 
 /**
  * Batas token (DESIGN.md §Turunan): core total; delapan domain total (ui juga prosa: memuat contoh); landing/mobile/webapp
  * prosa + total. Total muat per jenis layar (core + 8 domain + 1 jenis layar) ≤ LOAD_LIMIT; lewat batas → padatkan.
+ * selection (dibaca hanya saat kerja dari seleksi, di luar muat per layar): spec-agen-4-variant-flow.
  */
 const LIMITS = {
   core: { total: 2600 },
@@ -29,6 +30,7 @@ const LIMITS = {
   landing: { prose: 1100, total: 3200 },
   mobile: { prose: 1100, total: 3000 },
   webapp: { prose: 1000, total: 3000 },
+  selection: { prose: 1200, total: 2600 },
 } as const;
 /** Iterasi 6 story 2.16: 11.500 → 9.600 (biaya berpikir agen); turun saja, jangan naik. */
 const LOAD_LIMIT = 9_600;
@@ -43,8 +45,8 @@ describe('skill: batas token (estimateTokens = karakter / 3.2)', () => {
     if ('prose' in lim) expect(prose, `${name}.md prosa ${prose} > ${lim.prose}`).toBeLessThanOrEqual(lim.prose);
   });
 
-  it('setiap skill domain dan jenis layar punya batas', () => {
-    expect(Object.keys(LIMITS).sort()).toEqual(['core', ...DOMAIN_SKILLS, ...SCREEN_SKILLS].sort());
+  it('setiap skill domain, jenis layar, dan selection punya batas', () => {
+    expect(Object.keys(LIMITS).sort()).toEqual(['core', ...DOMAIN_SKILLS, ...SCREEN_SKILLS, 'selection'].sort());
   });
 
   it.each(SCREEN_SKILLS)(`muat %s: core + 8 domain + skill jenis layar ≤ ${LOAD_LIMIT}`, (screen) => {
@@ -54,8 +56,8 @@ describe('skill: batas token (estimateTokens = karakter / 3.2)', () => {
     expect(total, `muat ${screen} ${total} > ${LOAD_LIMIT}`).toBeLessThanOrEqual(LOAD_LIMIT);
   });
 
-  it('daftar skill: 14 nama, tanpa polish; domain berjudul "# Lakar: <nama>"', () => {
-    expect(SKILL_NAMES).toHaveLength(14);
+  it('daftar skill: 15 nama, tanpa polish; domain berjudul "# Lakar: <nama>"', () => {
+    expect(SKILL_NAMES).toHaveLength(15);
     expect(SKILL_NAMES).not.toContain('polish');
     for (const n of DOMAIN_SKILLS) expect(read(n).split('\n')[0], n).toBe(`# Lakar: ${n}`);
   });

@@ -11,7 +11,8 @@
 // - Kotak node = size×size; viewBox glyph dipetakan penuh; overflow terlihat (stroke tepi tidak terpotong).
 import type { IconGlyph, ResolvedBoardNode as BoardNode, ResolvedChildNode as ChildNode, ResolvedIconNode as IconNode } from '@lakar/schema';
 
-const SVG_NS = 'http://www.w3.org/2000/svg';
+import type { CssDecl, SvgSpec } from './css.js';
+import { buildSvg, svgPaint } from './shape.js';
 
 /** Default stroke lucide (sama dengan `strokeWidth` default lucide). */
 export const DEFAULT_ICON_STROKE_WIDTH = 2;
@@ -48,39 +49,48 @@ export function glyphMap(glyphs: readonly IconGlyph[] | undefined): Map<string, 
   return new Map((glyphs ?? []).map((g) => [iconKey(g.lib, g.icon), g]));
 }
 
+/**
+ * Spesifikasi `<svg>` glyph ikon (render dan codegen, AD-5): kotak penuh, viewBox glyph, overflow terlihat. Warna
+ * ref token → `currentColor` + `color: var(--…)` di style svg (lihat `svgPaint`).
+ */
+export function iconSvgSpec(
+  n: { readonly color?: unknown; readonly filled?: unknown; readonly strokeWidth?: unknown },
+  glyph: IconGlyph,
+): SvgSpec {
+  const style: CssDecl[] = [
+    ['overflow', 'visible'],
+    ['display', 'block'],
+  ];
+  const attrs: [string, string][] = [
+    ['viewBox', glyph.viewBox.join(' ')],
+    ['width', '100%'],
+    ['height', '100%'],
+    ['aria-hidden', 'true'],
+  ];
+  let color: string;
+  if (glyph.kind === 'stroke') {
+    color = svgPaint(n.color ?? DEFAULT_ICON_COLOR, style);
+    const sw = typeof n.strokeWidth === 'number' ? n.strokeWidth : DEFAULT_ICON_STROKE_WIDTH;
+    attrs.push(['fill', n.filled === true ? color : 'none'], ['stroke', color], ['stroke-width', String(sw)], ['stroke-linecap', 'round'], ['stroke-linejoin', 'round']);
+  } else {
+    color = svgPaint(n.color ?? glyph.brandColor ?? DEFAULT_ICON_COLOR, style);
+    attrs.push(['fill', color]);
+  }
+  const children: SvgSpec[] = [];
+  for (const [tag, a] of glyph.nodes) {
+    if (!TAGS.has(tag)) continue;
+    const ca: [string, string][] = [];
+    for (const [k, v] of Object.entries(a)) if (ATTR.test(k)) ca.push([k, v === 'currentColor' ? color : v]);
+    children.push({ tag, attrs: ca, style: [], children: [] });
+  }
+  return { tag: 'svg', attrs, style, children };
+}
+
 /** Div berukuran (diatur layout) berisi SVG glyph; glyph tidak ada → div kosong. */
 export function renderIconElement(d: Document, n: IconNode, glyph: IconGlyph | undefined, nodeAttr: string): HTMLElement {
   const el = d.createElement('div');
   el.setAttribute(nodeAttr, n.id);
-  if (!glyph) return el;
-  const svg = d.createElementNS(SVG_NS, 'svg');
-  svg.setAttribute('viewBox', glyph.viewBox.join(' '));
-  svg.setAttribute('width', '100%');
-  svg.setAttribute('height', '100%');
-  svg.setAttribute('aria-hidden', 'true');
-  svg.style.overflow = 'visible';
-  svg.style.display = 'block';
-  let color: string;
-  if (glyph.kind === 'stroke') {
-    color = n.color ?? DEFAULT_ICON_COLOR;
-    svg.setAttribute('fill', n.filled ? color : 'none');
-    svg.setAttribute('stroke', color);
-    svg.setAttribute('stroke-width', String(n.strokeWidth ?? DEFAULT_ICON_STROKE_WIDTH));
-    svg.setAttribute('stroke-linecap', 'round');
-    svg.setAttribute('stroke-linejoin', 'round');
-  } else {
-    color = n.color ?? glyph.brandColor ?? DEFAULT_ICON_COLOR;
-    svg.setAttribute('fill', color);
-  }
-  for (const [tag, attrs] of glyph.nodes) {
-    if (!TAGS.has(tag)) continue;
-    const child = d.createElementNS(SVG_NS, tag);
-    for (const [k, v] of Object.entries(attrs)) {
-      if (!ATTR.test(k)) continue;
-      child.setAttribute(k, v === 'currentColor' ? color : v);
-    }
-    svg.appendChild(child);
-  }
-  el.appendChild(svg);
+  if (glyph) el.appendChild(buildSvg(d, iconSvgSpec(n, glyph)));
   return el;
 }
+

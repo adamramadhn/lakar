@@ -66,6 +66,14 @@ describe('activityReducer', () => {
     expect(sessionsForSlug(s, 'a', T0)).toEqual([]);
   });
 
+  it('event selection hanya memajukan seq (tidak tampil di Activity)', () => {
+    const s1 = run(initialActivity, callEv({ callId: 's', status: 'running' }));
+    const s2 = activityReducer(s1, { type: 'event', event: { seq: s1.seq + 1, type: 'selection', selection: { slug: 'a', addresses: ['Nnnnnnn1'], rev: 1 } } });
+    expect(s2.seq).toBe(s1.seq + 1);
+    expect(s2.calls).toBe(s1.calls);
+    expect(s2.sessions).toBe(s1.sessions);
+  });
+
   it('event lama / duplikat (seq ≤ terakhir) diabaikan', () => {
     const e = callEv({ callId: 'd', status: 'running' });
     const s1 = run(initialActivity, e);
@@ -144,6 +152,7 @@ describe('deteksi rev baru', () => {
   });
   it('tool lain dengan rev lebih baru → muat ulang semua board (boards tidak diketahui)', () => {
     expect(revChange(callEv({ callId: 'f', status: 'done', rev: 6, tool: 'layout_check' }), 'a', 4)).toEqual({ rev: 6 });
+    expect(revChange(callEv({ callId: 'g', status: 'done', rev: 7, tool: 'paste', boards: ['B1'] }), 'a', 4)).toEqual({ rev: 7, boards: ['B1'] });
   });
 });
 
@@ -161,6 +170,10 @@ describe('label', () => {
     expect(callTitle({ ...base, tool: 'inspect', target: 'N1' }, (id) => (id === 'N1' ? 'Headline' : undefined))).toBe('Inspect Headline');
     expect(callTitle({ ...base, tool: 'layout_check' })).toBe('Check all boards');
     expect(callTitle({ ...base, tool: 'read_skill', target: 'webapp' })).toBe('Load webapp skill');
+    expect(callTitle({ ...base, tool: 'get_selection' })).toBe('Read selection');
+    expect(callTitle({ ...base, tool: 'paste', target: 'B1' })).toBe('Paste layers');
+    expect(callTitle({ ...base, tool: 'export_code', target: 'N1' }, (id) => (id === 'N1' ? 'Headline' : undefined))).toBe('Export code for Headline');
+    expect(callTitle({ ...base, tool: 'export_code' })).toBe('Export code for first board');
     expect(callMeta({ ...base, tool: 'execute', durationMs: 800, nodes: 3 }, T0)).toBe('0.8s · 3 nodes');
   });
 });
@@ -210,6 +223,7 @@ describe('connectActivity', () => {
     expect(instances[0]!.url).toBe('/viewer/events');
     instances[0]!.emit('hello', { sessions: [], recent: [] });
     instances[0]!.emit('call', { seq: 1, type: 'call', call: {} });
+    instances[0]!.emit('selection', { seq: 2, type: 'selection', selection: { slug: 'a', addresses: [] } });
     instances[0]!.fail();
     expect(instances[0]!.closed).toBe(true);
     expect(timers.map((t) => t.ms)).toEqual([BACKOFF_MS[0]]);
@@ -218,7 +232,7 @@ describe('connectActivity', () => {
     expect(timers.map((t) => t.ms)).toEqual([BACKOFF_MS[0], BACKOFF_MS[1]]);
     timers[1]!.fn();
     instances[2]!.emit('hello', { sessions: [{}], recent: [] });
-    expect(log).toEqual(['conn:true', 'hello:0', 'event:1', 'conn:false', 'conn:false', 'conn:true', 'hello:1', 'reconnect']);
+    expect(log).toEqual(['conn:true', 'hello:0', 'event:1', 'event:2', 'conn:false', 'conn:false', 'conn:true', 'hello:1', 'reconnect']);
     // Setelah sukses, backoff mulai lagi dari awal.
     instances[2]!.fail();
     expect(timers.at(-1)!.ms).toBe(BACKOFF_MS[0]);

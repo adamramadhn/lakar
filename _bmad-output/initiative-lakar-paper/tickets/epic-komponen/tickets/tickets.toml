@@ -1,0 +1,58 @@
+# Story epic komponen, urut build (dipecah 2026-11-22 atas delegasi Fatmuh: "terima jadi").
+# Acuan: architecture-model-dokumen (AD-2, AD-3, AD-4, AD-7, AD-8, AD-10, AD-12). UI mengikuti design/lakar-ui.pen (C6).
+
+[[entry]]
+id = 1
+type = "story"
+title = "Desain komponen, instance, props, dan slot di lakar-ui.pen"
+description = "Menambah bagian Komponen di design/lakar-ui.pen (dark dan light): aksi Create component, daftar komponen di panel Assets untuk menyisipkan instance, penanda master dan instance di canvas dan Layers, seleksi isi instance (dobel-klik), penanda properti ter-override dan aksi Reset, panel definisi props (text, boolean, enum) dan slot pada master, kontrol props dan isi slot pada instance, serta aksi Detach instance."
+verify = "Bagian Komponen ada di lakar-ui.pen dengan versi dark dan light, memakai komponen dan token yang sudah ada, dan memuat semua state di atas."
+covers = ["R4"]
+after = []
+hitl = true
+risk = "medium"
+notes = ["Persetujuan desain didelegasikan Fatmuh (terima jadi, 2026-11-22)."]
+
+[[entry]]
+id = 2
+type = "story"
+title = "Skema komponen dan instance dengan tahap ekspansi di resolveDocument"
+description = "Skema naik satu versi dari SCHEMA_VERSION saat merge (sekarang 4; AD-3): kunci `component { props, slots }` pada node non-board dan tipe node `instance { componentId, props?, overrides?, slots? }` (AD-12). `expandInstances` di @lakar/schema mengurai instance menjadi node dengan alamat komposit `<instanceId>/<masterNodeId>…`, menerapkan props, override (kunci masterNodeId + properti), dan isi slot; siklus ditolak; override yatim dilaporkan sebagai finding. `resolveDocument` menjalankan ekspansi lalu token (AD-10), sehingga render, check, dan canvas langsung mendukung instance. Langkah migrasi n → n+1 dan fixture korpus v<n+1> dengan master, instance ber-override, dan slot."
+verify = "Korpus semua versi bermigrasi, valid, dan dirender di CI Linux; mengubah master di fixture mengubah semua instance hasil resolveDocument tanpa menimpa override; siklus komponen ditolak validasi; override yatim muncul sebagai finding check; data-lakar-id node ekspansi memakai alamat komposit."
+covers = ["R4"]
+after = []
+hitl = false
+risk = "high"
+
+[[entry]]
+id = 3
+type = "story"
+title = "Op komponen di core, execute, dan route ops"
+description = "Op core baru (AD-2): jadikan node master (definisi props/slots), sisipkan instance, update ke alamat komposit yang diterjemahkan menjadi override instance terluar, reset override, isi slot, detach instance (node biasa ber-id baru dengan props dan override diterapkan), dan hapus master yang men-detach semua instance dalam commit yang sama; semuanya dengan op invers (AD-8). Diekspos di API execute (get dengan alamat komposit, find mengembalikan node tersimpan) dan route ops viewer; skill api.md diperbarui (aditif, AD-4)."
+verify = "Agen membuat master dan instance lewat MCP execute lalu meng-override teks di instance; mengubah master memperbarui instance tanpa menimpa override; hapus master men-detach instance dalam satu rev; setiap op punya invers yang mengembalikan dokumen; tes matriks op core dan route ops hijau."
+covers = ["R4"]
+after = [2]
+hitl = false
+risk = "high"
+
+[[entry]]
+id = 4
+type = "story"
+title = "Buat, sisipkan, dan override instance di viewer"
+description = "Viewer sesuai desain story 1: Create component dari seleksi (menu konteks dan shortcut), daftar komponen di Assets untuk menyisipkan instance, penanda master/instance di canvas dan Layers, dobel-klik masuk ke isi instance dengan seleksi beralamat komposit, edit di panel Design menjadi override dengan penanda dan Reset, serta Detach instance. Semua lewat route ops sehingga masuk undo per jendela."
+verify = "Membuat komponen, menyisipkan dua instance, meng-override fill salah satunya, lalu mengubah master: kedua instance berubah di canvas live dan override tetap; Reset mengembalikan nilai master; Detach menghasilkan layer biasa; setiap aksi bisa di-undo."
+covers = ["R4"]
+after = [1, 3]
+hitl = false
+risk = "high"
+
+[[entry]]
+id = 5
+type = "story"
+title = "Props dan slot di panel komponen"
+description = "Panel definisi komponen pada master: tambah/ubah/hapus prop text, boolean, enum dengan default dan binds ke properti node master; tandai frame sebagai slot. Pada instance: kontrol nilai props dan isi slot dengan layer (sisip atau pindah ke slot). Semua lewat op komponen story 3 dan route ops."
+verify = "Prop text yang di-bind ke teks master bisa diubah per instance; prop boolean menyembunyikan node terikat; prop enum mengganti nilai terikat; slot instance menerima layer dan tetap terisi saat master berubah; perubahan tampil di canvas dan bisa di-undo."
+covers = ["R4"]
+after = [4]
+hitl = false
+risk = "medium"

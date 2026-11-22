@@ -2,7 +2,7 @@
 // Frame diberi fill tint (story 8) agar golden bermakna; bounds tidak berubah.
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { BoardMeasure, NodeBounds } from '../src/index.js';
-import { boardDoc, browserInstalled, compareGolden, frame, interFaces, render, start, stop, text } from './harness.js';
+import { boardDoc, browserInstalled, compareGolden, frame, interFaces, rect, render, start, stop, text } from './harness.js';
 
 const faces = interFaces(400);
 // Tint fill (story 8) supaya golden memperlihatkan box frame, bukan hanya teks.
@@ -162,5 +162,68 @@ describe.skipIf(!browserInstalled)('render layout (Chromium, tanpa daemon)', () 
     near(fw, 20);
     expect(tw).toBeGreaterThan(fw);
     expect(result.measure.texts.find((t) => t.id === long.id)!.lines).toBe(1);
+  });
+
+  // Grid v4 (editor-canvas story 7): hanya rect (tanpa teks) supaya golden tidak bergantung rasterisasi font.
+  it('grid: track px/fr, rows, gap sumbu, span, start/end, align center, anak absolute', async () => {
+    const solid = (color: string) => [{ type: 'solid', color }];
+    const a = rect({ width: 'fill', height: 'fill', fills: solid('#1E88E5') });
+    const b = rect({ width: 'fill', height: 20, gridColumn: { span: 2 }, fills: solid('#43A047') });
+    const c = rect({ width: 'fill', height: 30, gridColumn: { start: 1, end: 3 }, fills: solid('#FB8C00') });
+    const d = rect({ width: 50, height: 30, fills: solid('#8E24AA') });
+    const e = rect({ position: 'absolute', x: 370, y: 0, width: 20, height: 20, fills: solid('#E53935') });
+    const g = frame(
+      { fills: TINT, layout: 'grid', width: 400, padding: 10, gridTemplateColumns: [80, { fr: 1 }, { fr: 2 }], gridTemplateRows: [40, 'auto'], columnGap: 10, rowGap: 8, align: 'center' },
+      [a, b, c, d, e],
+    );
+    const at = await run('grid', [g], { width: 420, height: 120 });
+    near(at(g.id).width, 400);
+    near(at(g.id).height, 10 + 40 + 8 + 30 + 10);
+    // Kolom: 80 | (380 - 80 - 20) / 3 = 93.33 | 186.67.
+    near(at(a.id).x, 10);
+    near(at(a.id).y, 10);
+    near(at(a.id).width, 80);
+    near(at(a.id).height, 40);
+    near(at(b.id).x, 100);
+    near(at(b.id).width, 93.333 + 10 + 186.667);
+    near(at(b.id).y, 20); // align center di baris 40
+    near(at(c.id).x, 10);
+    near(at(c.id).y, 58);
+    near(at(c.id).width, 80 + 10 + 93.333);
+    near(at(d.id).x, 10 + 80 + 10 + 93.333 + 10);
+    near(at(d.id).y, 58);
+    near(at(d.id).width, 50);
+    near(at(e.id).x, 370);
+    near(at(e.id).y, 0);
+  });
+
+  // Cabang sizing/penempatan grid lain (tanpa golden baru: bounds saja).
+  it('grid: hug, tanpa ukuran, gridRow span/start, gap negatif diabaikan; gap sumbu di flex', async () => {
+    const solid = (color: string) => [{ type: 'solid', color }];
+    const tall = rect({ width: 'fill', gridRow: { span: 2 }, fills: solid('#1E88E5') });
+    const plain = rect({ height: 30, fills: solid('#43A047') });
+    const hug = frame({ layout: 'row', width: 'hug', height: 'hug', padding: 5, fills: solid('#FB8C00') }, [rect({ width: 20, height: 20 })]);
+    const low = rect({ height: 10, gridColumn: { start: 3 }, gridRow: { start: 2 }, fills: solid('#8E24AA') });
+    const g = frame({ fills: TINT, layout: 'grid', width: 330, gap: -8, gridTemplateColumns: [100, 100, 100], gridTemplateRows: [30, 30] }, [tall, plain, hug, low]);
+    const r1 = rect({ width: 20, height: 20 });
+    const r2 = rect({ width: 20, height: 20 });
+    const row = frame({ fills: TINT, layout: 'row', gap: 4, columnGap: 12 }, [r1, r2]);
+    const { doc, boardId } = boardDoc([g, row], { width: 400, height: 140 });
+    const { result } = await render(doc, boardId, faces);
+    if (!result.ok) throw new Error(JSON.stringify(result));
+    const at = (id: unknown) => result.measure.nodes.find((n) => n.id === id)!;
+    // gap -8 diabaikan (tanpa margin): kolom 0 / 100 / 200, baris 0 / 30.
+    near(at(tall.id).x, 0);
+    near(at(tall.id).height, 60);
+    near(at(plain.id).x, 100);
+    near(at(plain.id).width, 100); // tanpa width → regang selebar sel
+    near(at(plain.id).y, 0);
+    near(at(hug.id).x, 200);
+    near(at(hug.id).width, 30); // hug = isi, tidak diregang
+    near(at(hug.id).height, 30);
+    near(at(low.id).x, 200);
+    near(at(low.id).y, 30);
+    near(at(g.id).height, 60);
+    near(at(r2.id).x - at(r1.id).x, 20 + 12); // columnGap menimpa gap di flex row
   });
 });

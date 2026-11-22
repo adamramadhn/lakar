@@ -34,7 +34,8 @@ export const SHORTCUT = {
 } as const;
 
 /** `icon` kosong → ruang kosong selebar ikon; `checked` → ikon centang + `menuitemradio`. `keys` = `aria-keyshortcuts`. */
-export type Item = { label: string; icon?: IconName; shortcut?: string; keys?: string; checked?: boolean; danger?: boolean; separator?: boolean; disabled?: boolean; title?: string; run: () => void };
+/** `heading` = judul bagian di atas item; `key` = kunci React bila label bisa kembar (mis. nama layer). */
+export type Item = { label: string; key?: string; heading?: string; icon?: IconName; shortcut?: string; keys?: string; checked?: boolean; danger?: boolean; separator?: boolean; disabled?: boolean; title?: string; run: () => void };
 
 export function Menu({ x, y, items, onClose }: { x: number; y: number; items: Item[]; onClose: () => void }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -90,8 +91,9 @@ export function Menu({ x, y, items, onClose }: { x: number; y: number; items: It
         }}
       >
         {items.map((it) => (
-          <div key={it.label} className="menu-group" role="none">
+          <div key={it.key ?? it.label} className="menu-group" role="none">
             {it.separator && <div className="menu-separator" role="separator" />}
+            {it.heading && <div className="menu-heading">{it.heading}</div>}
             <button
               type="button"
               role={it.checked === undefined ? 'menuitem' : 'menuitemradio'}

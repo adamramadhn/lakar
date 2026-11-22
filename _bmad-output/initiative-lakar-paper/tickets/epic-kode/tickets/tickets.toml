@@ -1,0 +1,59 @@
+# Story epic kode, urut build (dipecah 2026-11-22 atas delegasi Fatmuh: "terima jadi").
+# Acuan: architecture-model-dokumen (AD-4, AD-5, AD-6, AD-10, AD-11, AD-12, AD-16, AD-17). UI mengikuti design/lakar-ui.pen (C6).
+
+[[entry]]
+id = 1
+type = "story"
+title = "Desain dialog ekspor kode dan impor token di lakar-ui.pen"
+description = "Menambah bagian Kode di design/lakar-ui.pen (dark dan light): dialog Export code untuk frame/board terpilih (target React + Tailwind atau React + CSS, daftar file keluaran, pratinjau kode, Copy dan Download), aksi Copy tokens as CSS di panel Theme, dan pintu masuk impor CSS variables dari codebase; menggantikan menu Copy as CSS/Tailwind per node."
+verify = "Bagian Kode ada di lakar-ui.pen dengan versi dark dan light, memakai komponen dan token yang sudah ada, dan memuat dialog ekspor, Copy tokens as CSS, dan impor."
+covers = ["R5"]
+after = []
+hitl = true
+risk = "low"
+notes = ["Persetujuan desain didelegasikan Fatmuh (terima jadi, 2026-11-22)."]
+
+[[entry]]
+id = 2
+type = "story"
+title = "Paket @lakar/codegen: frame ke React + Tailwind atau React + CSS"
+description = "Paket murni baru @lakar/codegen (deps schema dan render; masuk EDGES dan IO_FORBIDDEN, AD-17) menerima dokumen tersimpan (AD-10) dan menghasilkan komponen React (TSX) dari satu frame/board dengan Tailwind atau modul CSS, memakai pemetaan css.ts (AD-5) dan tag semantik node; ref token menjadi var(--…) (AD-11). Juga menghasilkan file token: CSS variables :root plus selektor per mode, dan tema Tailwind (warna, spacing, radius, font, screens dari token breakpoint)."
+verify = "Tes golden atas korpus terbaru: keluaran deterministik, TSX lolos typecheck, nilai CSS per properti sama dengan deklarasi css.ts, token tampil sebagai var(--nama) yang sama dengan Copy as; dependency-direction hijau dengan EDGES baru."
+covers = ["R3", "R5"]
+after = []
+hitl = false
+risk = "high"
+
+[[entry]]
+id = 3
+type = "story"
+title = "Komponen dan instance di codegen"
+description = "Codegen mengekspor master sebagai komponen React tersendiri (props bertipe dari text/boolean/enum, slot sebagai props ReactNode) dan instance sebagai pemakaian komponen beserta props, override, dan isi slot (AD-12, AD-16); ekspansi hanya lewat expandInstances bila override tidak bisa dinyatakan sebagai prop. Keluaran berupa beberapa file dengan impor antar-file."
+verify = "Fixture dengan master, instance ber-override, dan slot menghasilkan satu file per komponen dan file pemakai yang mengimpornya; mengubah master di dokumen mengubah komponen hasil ekspor tanpa mengubah pemanggilan instance; TSX lolos typecheck."
+covers = ["R4", "R5"]
+after = [2]
+hitl = false
+risk = "high"
+
+[[entry]]
+id = 4
+type = "story"
+title = "Uji paritas piksel ekspor terhadap render Chromium"
+description = "Harness tes merender keluaran codegen (React + CSS dan React + Tailwind yang dikompilasi) di Chromium daemon dan membandingkannya dengan render acuan board yang sama (AD-6). Ambang R5 ditetapkan di sini: selisih piksel di bawah 1% luas board dengan toleransi warna per piksel, diukur pada korpus dan fixture landing page berisi token dan komponen; tooling build tes yang dibutuhkan hanya devDependency tes dan dicatat di spec."
+verify = "Tes paritas berjalan di CI Linux untuk kedua target dan lulus di bawah ambang; mengganti nilai token di fixture lalu mengekspor ulang tetap lulus; regresi sengaja di pemetaan codegen membuat tes gagal."
+covers = ["R5"]
+after = [3]
+hitl = false
+risk = "high"
+notes = ["Ambang selisih piksel R5 (Deferred spine) diputuskan di story ini; angka final dicatat di Design Notes spec."]
+
+[[entry]]
+id = 5
+type = "story"
+title = "Ekspor kode dan impor token di viewer dan MCP"
+description = "Viewer sesuai desain story 1: dialog Export code memanggil @lakar/codegen langsung (viewer → codegen diizinkan AD-17) dan menggantikan Copy as per node; Copy tokens as CSS di panel Theme; impor CSS variables memakai parser epic token. Tool MCP baru `export_code` (daemon memanggil codegen yang sama) untuk agen; tool lama tidak berubah (AD-4)."
+verify = "Mengekspor board yang sama lewat viewer dan lewat export_code menghasilkan berkas identik; token hasil ekspor sama dengan token di panel Theme dan mengimpornya ulang membuat token yang sama; mengubah satu token atau master lalu mengekspor ulang memperbarui semua pemakai di kode."
+covers = ["R3", "R5"]
+after = [1, 3]
+hitl = false
+risk = "medium"

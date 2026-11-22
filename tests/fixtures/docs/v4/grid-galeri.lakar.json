@@ -1,0 +1,142 @@
+{
+  "schemaVersion": 4,
+  "id": "CorpV4Gr",
+  "rev": 5,
+  "tokens": {
+    "space.4": { "type": "spacing", "value": 16 },
+    "space.3": { "type": "spacing", "value": 12 },
+    "colors.kartu": { "type": "color", "value": "#FFFFFF" },
+    "colors.teks": { "type": "color", "value": "#101828" }
+  },
+  "pages": [
+    {
+      "id": "PageGr01",
+      "name": "Galeri",
+      "children": [
+        {
+          "type": "board",
+          "id": "BrdGr001",
+          "name": "Dasbor",
+          "x": 0,
+          "y": 0,
+          "width": 960,
+          "height": 600,
+          "screen": "app",
+          "fills": [{ "type": "solid", "color": "#F3F6F5" }],
+          "children": [
+            {
+              "type": "frame",
+              "id": "FrmGr001",
+              "name": "Grid KPI",
+              "layout": "grid",
+              "gridTemplateColumns": [200, { "fr": 1 }, { "minmax": [120, { "fr": 2 }] }, "auto"],
+              "gridTemplateRows": [96, "auto", { "minmax": ["auto", 160] }],
+              "columnGap": { "$token": "space.4" },
+              "rowGap": { "$token": "space.3" },
+              "padding": 24,
+              "align": "center",
+              "justify": "start",
+              "width": "fill",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "FrmGr002",
+                  "name": "Kartu utama",
+                  "layout": "column",
+                  "gap": 4,
+                  "padding": 16,
+                  "radius": 12,
+                  "width": "fill",
+                  "height": "fill",
+                  "gridRow": { "span": 2 },
+                  "fills": [{ "type": "solid", "color": "#0E7490" }],
+                  "children": [
+                    { "type": "text", "id": "TxtGr001", "name": "Label", "content": "Pendapatan", "size": 13, "lineHeight": 18, "color": "#E0F2FE" },
+                    { "type": "text", "id": "TxtGr002", "name": "Nilai", "content": "Rp 48,2 jt", "weight": 700, "size": 24, "lineHeight": 32, "numeric": "tabular", "color": "#FFFFFF" }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "FrmGr003",
+                  "name": "Kartu lebar",
+                  "layout": "row",
+                  "align": "center",
+                  "padding": [0, 16],
+                  "radius": 12,
+                  "height": 64,
+                  "gridColumn": { "start": 2, "span": 2 },
+                  "fills": [{ "type": "solid", "color": { "$token": "colors.kartu" } }],
+                  "children": [
+                    { "type": "text", "id": "TxtGr003", "name": "Judul", "content": "Pesanan hari ini", "weight": 600, "size": 14, "lineHeight": 20, "color": { "$token": "colors.teks" } }
+                  ]
+                },
+                {
+                  "type": "rect",
+                  "id": "RctGr001",
+                  "name": "Penanda",
+                  "width": 24,
+                  "height": 24,
+                  "radius": 6,
+                  "fills": [{ "type": "solid", "color": "#F97316" }]
+                },
+                {
+                  "type": "frame",
+                  "id": "FrmGr004",
+                  "name": "Kartu sisa",
+                  "layout": "column",
+                  "padding": 16,
+                  "radius": 12,
+                  "width": "hug",
+                  "gridColumn": { "start": 2, "end": -1 },
+                  "fills": [{ "type": "solid", "color": "#FFFFFF" }],
+                  "children": [
+                    { "type": "text", "id": "TxtGr004", "name": "Isi", "content": "Pelanggan baru: 128", "size": 14, "lineHeight": 20, "color": "#344054" }
+                  ]
+                },
+                {
+                  "type": "rect",
+                  "id": "RctGr002",
+                  "name": "Baris bawah",
+                  "height": 40,
+                  "radius": 8,
+                  "gridColumn": { "start": 1, "end": 5 },
+                  "gridRow": { "start": 3 },
+                  "fills": [{ "type": "solid", "color": "#E4E7EC" }]
+                },
+                {
+                  "type": "frame",
+                  "id": "FrmGr005",
+                  "name": "Overlay / Lencana",
+                  "position": "absolute",
+                  "x": 900,
+                  "y": 8,
+                  "width": 24,
+                  "height": 24,
+                  "radius": 12,
+                  "fills": [{ "type": "solid", "color": "#DC2626" }],
+                  "children": []
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "FrmGr006",
+              "name": "Galeri",
+              "layout": "grid",
+              "gridTemplateColumns": [{ "fr": 1 }, { "fr": 1 }, { "fr": 1 }],
+              "gap": 8,
+              "padding": [0, 24],
+              "width": "fill",
+              "children": [
+                { "type": "rect", "id": "RctGr003", "name": "Foto 1", "height": 80, "radius": 8, "fills": [{ "type": "linear", "angle": 135, "stops": [{ "offset": 0, "color": "#C7D2FE" }, { "offset": 1, "color": "#818CF8" }] }] },
+                { "type": "rect", "id": "RctGr004", "name": "Foto 2", "height": 80, "radius": 8, "fills": [{ "type": "solid", "color": "#BBF7D0" }] },
+                { "type": "ellipse", "id": "ElpGr001", "name": "Avatar", "width": 48, "height": 48, "fills": [{ "type": "solid", "color": "#FDE68A" }] },
+                { "type": "icon", "id": "IcnGr001", "name": "Icon / lucide / star", "lib": "lucide", "icon": "star", "size": 24, "color": "#CA8A04", "gridColumn": { "span": 3 } }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

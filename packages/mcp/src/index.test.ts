@@ -8,13 +8,13 @@ import { fileURLToPath } from 'node:url';
 import { Client, InMemoryTransport } from '@modelcontextprotocol/client';
 import { StdioClientTransport } from '@modelcontextprotocol/client/stdio';
 import { LAKAR_VERSION, SCHEMA_VERSION } from '@lakar/schema';
-import { PACKAGE, PHOTO_SEARCH_DESCRIPTION, READ_SKILL_DESCRIPTION, SERVER_INSTRUCTIONS, SERVER_VERSION, createLakarMcpServer, formatStatus } from './index.js';
+import { EXPORT_CODE_DESCRIPTION, GET_SELECTION_DESCRIPTION, PACKAGE, PASTE_DESCRIPTION, PHOTO_SEARCH_DESCRIPTION, READ_SKILL_DESCRIPTION, SERVER_INSTRUCTIONS, SERVER_VERSION, createLakarMcpServer, formatStatus } from './index.js';
 import { readFile } from 'node:fs/promises';
 import { chromiumInstalled, DEFAULT_BROWSERS_PATH } from '../../../tests/support/browser.ts';
 import { testLog } from '../../../tests/support/log.ts';
 
 /** Skill v1 (packages/skills; mcp tidak bergantung pada paket itu, hanya membaca file untuk perbandingan). */
-const SKILL_NAMES = ['core', 'landing', 'mobile', 'webapp', 'layout', 'typography', 'color', 'accessibility', 'ui', 'interface', 'writing', 'review', 'icons', 'api'] as const;
+const SKILL_NAMES = ['core', 'landing', 'mobile', 'webapp', 'layout', 'typography', 'color', 'accessibility', 'ui', 'interface', 'writing', 'review', 'icons', 'api', 'selection'] as const;
 const readSkill = (name: string) => readFile(fileURLToPath(new URL(`../../skills/skills/${name}.md`, import.meta.url)), 'utf8');
 
 const PNG_B64 = Buffer.from('fake-png').toString('base64');
@@ -107,6 +107,25 @@ function fakeDaemon() {
       const results = Array.from({ length: 8 }, (_, i) => ({ ref: `openverse:${i}`, width: 40, height: 30, alt: 'kamar', creator: 'Budi', license: 'CC BY 2.0', sourcePageUrl: 'https://x', credit: 'kredit' }));
       return send(200, { ok: true, data: { provider: 'openverse', fallbackReason: 'no-key', query: body.query, results, thumbnails: results.map((r) => ({ ref: r.ref, mimeType: 'image/png', data: PNG_B64 })) } });
     }
+    if (req.url === '/viewer/selection') {
+      if (body.slug === 'hilang') return send(404, { ok: false, error: { code: 'NOT_FOUND', message: 'dokumen hilang tidak ada', hint: 'pakai slug dari GET /viewer/docs', retryable: false } });
+      return send(200, {
+        ok: true,
+        data: { slug: body.slug ?? 'landing-kopi', rev: 4, addresses: ['Ffffffff'], nodes: [{ address: 'Ffffffff', id: 'Ffffffff', type: 'frame', name: 'Hero', boardId: 'Bbbbbbbb', bounds: [0, 0, 390, 200] }] },
+      });
+    }
+    if (req.url === '/viewer/export-code') {
+      if (body.id === 'Zzzzzzzz') return send(404, { ok: false, error: { code: 'NOT_FOUND', message: 'node Zzzzzzzz tidak ada di dokumen a', hint: 'pakai ID', retryable: false } });
+      const files = [
+        { path: 'Home.tsx', contents: 'export function Home() {}\n', bytes: 26 },
+        { path: 'tokens.css', contents: ':root {\n}\n', bytes: 10 },
+      ];
+      return send(200, { ok: true, data: { docId: 'Dddddddd', slug: 'a', rev: 3, id: body.id ?? 'Bbbbbbbb', name: 'Home', target: body.target ?? 'react-tailwind', files, warnings: [] } });
+    }
+    if (req.url === '/viewer/paste') {
+      if (body.parentId === 'Zzzzzzzz') return send(404, { ok: false, error: { code: 'NOT_FOUND', message: 'paste: node Zzzzzzzz tidak ada di dokumen a', hint: 'pakai ID', retryable: false } });
+      return send(200, { ok: true, data: { docId: 'Dddddddd', slug: 'a', rev: 5, created: [{ id: 'Pppppppp', name: 'SVG', path: ['Home', 'SVG'] }], nodeId: 'Pppppppp', boards: ['Bbbbbbbb'], report: { kind: 'svg', paths: 1, kept: [], dropped: [] } } });
+    }
     if (req.url === '/boards') return send(200, { ok: true, data: { docId: 'Dddddddd', slug: 'a', rev: 1, boards: [{ id: 'Bbbbbbbb', name: '[WIP] Home', wip: true }] } });
     if (req.url === '/inspect') {
       if (body.id === 'Zzzzzzzz') return send(404, { ok: false, error: { code: 'NOT_FOUND', message: 'node Zzzzzzzz tidak ada', hint: 'pakai ID', retryable: false } });
@@ -159,14 +178,76 @@ describe('@lakar/mcp', () => {
     expect(PACKAGE).toBe('@lakar/mcp');
   });
 
-  it('daftar tool lengkap (10 AD-11 + photo_search); SERVER_VERSION = LAKAR_VERSION', async () => {
+  it('daftar tool lengkap (10 AD-11 + photo_search + get_selection + export_code + paste); SERVER_VERSION = LAKAR_VERSION', async () => {
     const c = await connect(url);
     const { tools } = await c.listTools();
     expect(tools.map((t) => t.name).sort()).toEqual(
-      ['execute', 'export', 'icon_search', 'inspect', 'layout_check', 'list_boards', 'open_doc', 'photo_search', 'read_skill', 'screenshot', 'status'].sort(),
+      ['execute', 'export', 'export_code', 'get_selection', 'icon_search', 'inspect', 'layout_check', 'list_boards', 'open_doc', 'paste', 'photo_search', 'read_skill', 'screenshot', 'status'].sort(),
     );
     expect(SERVER_VERSION).toBe(LAKAR_VERSION);
     expect(c.getServerVersion()?.version).toBe(LAKAR_VERSION);
+  });
+
+  it('get_selection → POST /viewer/selection dalam sesi; slug opsional diteruskan; teks JSON; error terformat', async () => {
+    fake.seen.length = 0;
+    const c = await connect(url);
+    const r = await c.callTool({ name: 'get_selection', arguments: {} });
+    expect(r.isError).toBeFalsy();
+    const data = JSON.parse((r.content as any[])[0].text);
+    expect(data).toMatchObject({ slug: 'landing-kopi', rev: 4, addresses: ['Ffffffff'], nodes: [{ id: 'Ffffffff', type: 'frame', name: 'Hero', bounds: [0, 0, 390, 200] }] });
+    const call = fake.seen.find((s) => s.path === '/viewer/selection')!;
+    expect(call.body).toEqual({});
+    expect(call.session).toMatch(/^s\d+$/);
+    const other = await c.callTool({ name: 'get_selection', arguments: { slug: 'lain' } });
+    expect(JSON.parse((other.content as any[])[0].text).slug).toBe('lain');
+    const gone = await c.callTool({ name: 'get_selection', arguments: { slug: 'hilang' } });
+    expect(gone.isError).toBe(true);
+    expect((gone.content as any[])[0].text).toContain('NOT_FOUND: dokumen hilang tidak ada');
+    expect(GET_SELECTION_DESCRIPTION).toContain('NO_ACTIVE_DOC');
+    expect(GET_SELECTION_DESCRIPTION).toContain('read_skill selection');
+    expect(READ_SKILL_DESCRIPTION).toMatch(/selection bila permintaan merujuk node yang dipilih pengguna/);
+  });
+
+  it('export_code → POST /viewer/export-code dalam sesi; argumen diteruskan; ringkasan JSON + satu blok per berkas; error terformat', async () => {
+    fake.seen.length = 0;
+    const c = await connect(url);
+    const r = await c.callTool({ name: 'export_code', arguments: { target: 'react-css', components: false, typescript: false } });
+    expect(r.isError).toBeFalsy();
+    const content = r.content as { type: string; text: string }[];
+    expect(content).toHaveLength(3);
+    expect(JSON.parse(content[0]!.text)).toEqual({ docId: 'Dddddddd', slug: 'a', rev: 3, id: 'Bbbbbbbb', name: 'Home', target: 'react-css', files: [{ path: 'Home.tsx', bytes: 26 }, { path: 'tokens.css', bytes: 10 }], warnings: [] });
+    expect(content[1]!.text).toBe('----- Home.tsx -----\nexport function Home() {}\n');
+    expect(content[2]!.text).toBe('----- tokens.css -----\n:root {\n}\n');
+    const call = fake.seen.find((s) => s.path === '/viewer/export-code')!;
+    expect(call.body).toEqual({ target: 'react-css', components: false, typescript: false });
+    expect(call.session).toMatch(/^s\d+$/);
+    const bad = await c.callTool({ name: 'export_code', arguments: { id: 'Zzzzzzzz' } });
+    expect(bad.isError).toBe(true);
+    expect((bad.content as any[])[0].text).toContain('NOT_FOUND: node Zzzzzzzz tidak ada');
+    const wrong = await c.callTool({ name: 'export_code', arguments: { target: 'vue' } });
+    expect(wrong.isError).toBe(true);
+    expect(EXPORT_CODE_DESCRIPTION).toContain('react-tailwind');
+  });
+
+  it('paste → POST /viewer/paste dalam sesi; argumen diteruskan; teks JSON; error terformat', async () => {
+    fake.seen.length = 0;
+    const c = await connect(url);
+    const svg = '<svg viewBox="0 0 24 24"><path d="M0 0h24v24z"/></svg>';
+    const r = await c.callTool({ name: 'paste', arguments: { content: svg, parentId: 'Bbbbbbbb', x: 10 } });
+    expect(r.isError).toBeFalsy();
+    expect(JSON.parse((r.content as any[])[0].text)).toMatchObject({ rev: 5, nodeId: 'Pppppppp', report: { kind: 'svg', paths: 1 } });
+    const call = fake.seen.find((s) => s.path === '/viewer/paste')!;
+    expect(call.body).toEqual({ content: svg, parentId: 'Bbbbbbbb', x: 10 });
+    expect(call.session).toMatch(/^s\d+$/);
+    const bad = await c.callTool({ name: 'paste', arguments: { content: svg, parentId: 'Zzzzzzzz' } });
+    expect(bad.isError).toBe(true);
+    expect((bad.content as any[])[0].text).toContain('NOT_FOUND: paste: node Zzzzzzzz tidak ada');
+    expect(PASTE_DESCRIPTION).toContain('NO_ACTIVE_DOC');
+    // kind html + width diteruskan apa adanya (story 4).
+    fake.seen.length = 0;
+    await c.callTool({ name: 'paste', arguments: { content: '<nav>x</nav>', parentId: 'Bbbbbbbb', kind: 'html', width: 640 } });
+    expect(fake.seen.find((s) => s.path === '/viewer/paste')!.body).toEqual({ content: '<nav>x</nav>', parentId: 'Bbbbbbbb', kind: 'html', width: 640 });
+    expect(PASTE_DESCRIPTION).toContain('kind "html"');
   });
 
   it('photo_search → teks JSON (tanpa data thumbnail) + maks 6 image content; argumen diteruskan; error terformat', async () => {
@@ -511,7 +592,7 @@ describe('@lakar/mcp', () => {
       const r = await c2.callTool({ name: 'execute', arguments: { code: '1' } });
       expect(r.isError).toBe(true);
       expect((r.content as any)[0].text).toContain('http://127.0.0.1:1');
-      expect((await c2.listTools()).tools).toHaveLength(11);
+      expect((await c2.listTools()).tools).toHaveLength(14);
     } finally {
       await c2.close();
       await deadTransport.close();
@@ -616,7 +697,7 @@ describe.skipIf(!browserInstalled)('layout_check dengan respons lakard asli', ()
     testLog(`[mcp] layout_check:\n${text}`);
   }, 60_000);
 
-  it('read_skill terhadap lakard asli: keempat belas skill (8 domain) tersedia, isi sama dengan file skill; polish NOT_FOUND', async () => {
+  it('read_skill terhadap lakard asli: kelima belas skill (8 domain + selection) tersedia, isi sama dengan file skill; polish NOT_FOUND', async () => {
     const c = await connect(proxyUrl);
     const list = await c.callTool({ name: 'read_skill', arguments: {} });
     expect(list.isError).toBeFalsy();
@@ -631,6 +712,7 @@ describe.skipIf(!browserInstalled)('layout_check dengan respons lakard asli', ()
     const none = await c.callTool({ name: 'read_skill', arguments: { name: 'dashboard' } });
     expect(none.isError).toBe(true);
     expect((none.content as any)[0].text).toContain('NOT_FOUND');
+    expect((none.content as any)[0].text).toContain('selection');
     const old = await c.callTool({ name: 'read_skill', arguments: { name: 'polish' } });
     expect(old.isError).toBe(true);
     expect((old.content as any)[0].text).toContain('NOT_FOUND: skill "polish" tidak ada: skill polish dipecah menjadi layout, typography, color, accessibility, ui, interface, writing, review');

@@ -1,0 +1,99 @@
+{
+  "schemaVersion": 2,
+  "id": "CorpV2Fx",
+  "rev": 7,
+  "tokens": {
+    "colors.mesh-a": "#FF7A59",
+    "colors.ink": "#1A1A1A",
+    "spacing.gap": 24
+  },
+  "pages": [
+    {
+      "id": "PageFx01",
+      "name": "Fill efek",
+      "children": [
+        {
+          "type": "board",
+          "id": "BrdFx001",
+          "name": "Galeri fill",
+          "x": 0,
+          "y": 0,
+          "width": 800,
+          "height": 480,
+          "screen": "landing",
+          "fills": [
+            { "type": "solid", "color": "#FFFFFF" },
+            { "type": "noise", "opacity": 0.12, "size": 1.5, "seed": 42, "blend": "overlay", "mono": true }
+          ],
+          "children": [
+            {
+              "type": "frame",
+              "id": "FrmFx001",
+              "name": "Grid",
+              "layout": "row",
+              "gap": { "$token": "spacing.gap" },
+              "padding": 32,
+              "width": "fill",
+              "height": "fill",
+              "align": "stretch",
+              "children": [
+                {
+                  "type": "rect",
+                  "id": "RctCon01",
+                  "name": "Conic",
+                  "width": "fill",
+                  "height": "fill",
+                  "radius": 16,
+                  "fills": [{ "type": "conic", "angle": 45, "center": [0.5, 0.5], "stops": [{ "offset": 0, "color": "#FF7A59" }, { "offset": 0.5, "color": "#2F6FEB" }, { "offset": 1, "color": "#FF7A59" }] }]
+                },
+                {
+                  "type": "rect",
+                  "id": "RctMsh01",
+                  "name": "Mesh",
+                  "width": "fill",
+                  "height": "fill",
+                  "radius": 16,
+                  "fills": [
+                    {
+                      "type": "mesh",
+                      "columns": 3,
+                      "rows": 2,
+                      "colors": [{ "$token": "colors.mesh-a" }, "#FFD166", "#06D6A0", "#118AB2", "#073B4C", "#EF476F"],
+                      "points": [[0, 0], [0.5, 0], [1, 0], [0, 1], [0.45, 1], [1, 1]]
+                    },
+                    { "type": "noise", "opacity": 0.2 }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "FrmImg01",
+                  "name": "Gambar",
+                  "layout": "column",
+                  "gap": 8,
+                  "padding": 16,
+                  "justify": "end",
+                  "width": "fill",
+                  "height": "fill",
+                  "radius": 16,
+                  "clip": true,
+                  "fills": [{ "type": "image", "assetId": "e14414c7fc0f20c2a299aed9471ccf3f5056d94248f7a5948d8a067917faa153", "fit": "cover" }],
+                  "children": [
+                    { "type": "text", "id": "TxtImg01", "name": "Keterangan", "content": "Foto contoh", "weight": 600, "size": 16, "lineHeight": 20, "color": { "$token": "colors.ink" } }
+                  ]
+                },
+                {
+                  "type": "ellipse",
+                  "id": "ElpImg01",
+                  "name": "Ubin",
+                  "width": 120,
+                  "height": 120,
+                  "fills": [{ "type": "image", "assetId": "e14414c7fc0f20c2a299aed9471ccf3f5056d94248f7a5948d8a067917faa153", "fit": "tile" }]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

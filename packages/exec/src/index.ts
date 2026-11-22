@@ -10,7 +10,7 @@ import {
   type QuickJSWASMModule,
 } from 'quickjs-emscripten';
 import type { Transaction } from '@lakar/core';
-import type { IconCatalogPort, PhotoLibraryPort } from '@lakar/ports';
+import type { CssVariablesPort, IconCatalogPort, PhotoLibraryPort } from '@lakar/ports';
 import { LakarError, errorMessage } from '@lakar/schema';
 import { API, DEFAULT_TIMEOUT_MS, KEEP_MAX_BYTES, LOG_MAX_BYTES, LOG_MAX_LINES, MAX_OPS, SNIPPET_GLOBALS, VALUE_MAX_BYTES, type ApiContext } from './api.js';
 
@@ -28,6 +28,8 @@ export type RunOptions = {
   icons: IconCatalogPort;
   /** Foto terimpor untuk `photo(ref)` (daemon mengimpor ref literal sebelum snippet). Tidak ada → `photo()` NOT_FOUND. */
   photos?: PhotoLibraryPort;
+  /** Parser CSS variables untuk `importCssVariables` (daemon: @lakar/render). Tidak ada → EXEC_ERROR. */
+  cssVariables?: CssVariablesPort;
 };
 export type RunSuccess = {
   ok: true;
@@ -241,6 +243,7 @@ export async function runSnippet(code: string, tx: Transaction, opts: RunOptions
     view: () => tx.view(),
     icons: opts.icons,
     ...(opts.photos ? { photos: opts.photos } : {}),
+    ...(opts.cssVariables ? { cssVariables: opts.cssVariables } : {}),
     countOp() {
       ops++;
       if (ops > MAX_OPS) {

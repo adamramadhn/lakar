@@ -16,7 +16,6 @@ import {
   menuInsertTarget,
   nextBoardPosition,
   nodeProps,
-  removeNode,
   wordCount,
   type InsertKind,
 } from '../packages/viewer/src/codegen.ts';
@@ -109,21 +108,6 @@ describe('board baru dan hapus', () => {
     expect(next.doc.pages[1]!.children[1]).toMatchObject({ x: 100 + 400 + 80, y: 50 });
     expect(nextBoardPosition([])).toEqual({ x: 0, y: 0 });
     expect(insertBoardAt(0, 0).code.startsWith('add(null, ')).toBe(true);
-  });
-
-  it('remove node dan board; deskripsi 3–8 kata', async () => {
-    const { doc, board } = await baseDoc();
-    const added = await run(doc, insertIntoBoard('rect', board, 0, 0).code);
-    const id = added.created[0]!.id;
-    const del = removeNode({ id, name: 'Rectangle', type: 'rect' });
-    expect(del.description).toBe('Delete Rectangle layer');
-    const r = await run(added.doc, del.code);
-    expect(childOf(r.doc, id)).toBeUndefined();
-    const delBoard = removeNode({ id: board.id, name: 'Desktop', type: 'board' });
-    expect(delBoard.description).toBe('Delete Desktop board');
-    expect((await run(r.doc, delBoard.code)).doc.pages[0]!.children).toHaveLength(0);
-    expect(removeNode({ id: 'x', name: '', type: 'rect' }).description).toBe('Delete selected layer');
-    expect(wordCount(removeNode({ id: 'x', name: 'one two three four five six seven', type: 'rect' }).description)).toBe(7);
   });
 
   it('semua deskripsi 3–8 kata', () => {

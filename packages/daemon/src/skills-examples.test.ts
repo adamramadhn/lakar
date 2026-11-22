@@ -1,6 +1,8 @@
 // Setiap blok ```js di skill dijalankan terhadap daemon nyata (render + check Chromium): wajib sukses dengan
 // check 0 error / 0 gerbang / 0 warning. Satu dokumen + sesi per file (blok berurutan, `keep` terbawa);
 // blok `// pakai prelude` didahului blok prelude core.md; blok api.md masing-masing di dokumen kosong baru.
+// selection.md: dokumen berisi fixture seleksi (tests/support/selection-fixture.ts) dan baris `const SEL = [...]`
+// diganti id board fixture; blok `// baca saja` wajib sukses tanpa op mutasi (tanpa check, rev tetap).
 // LAKAR_SKILL_PNG_DIR=<dir> → PNG setiap board contoh ditulis ke sana untuk pemeriksaan visual.
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
@@ -11,6 +13,7 @@ import { PhotoService, SafeNet, loadConfig, startDaemon, type RunningDaemon } fr
 import { chromiumInstalled } from '../../../tests/support/browser.ts';
 import { postJson } from '../../../tests/support/http.ts';
 import { startFakeProviders, type FakeProviders } from '../../../tests/support/photos.ts';
+import { READ_ONLY_MARK, SELECTION_FIXTURE, withSelection } from '../../../tests/support/selection-fixture.ts';
 
 // Tes tidak pernah memakai key Unsplash nyata: file key default dialihkan ke path yang tidak ada.
 const baseConfig = { ...loadConfig({}), unsplashKeyFile: '/nonexistent/lakar-test/unsplash-access-key' };
@@ -52,8 +55,10 @@ async function runBlock(label: string, code: string, sid: string, prelude: strin
   const check = r.data.check as { summary: { error: number; warning: number; gate: number }; findings: { level: string; rule: string; nodeName: string; detail: string }[] } | undefined;
   // Blok prelude hanya mendefinisikan helper: sukses tanpa op mutasi (tanpa check). Blok lain wajib dicek.
   if (isPrelude) return check ? [`${label}: blok prelude tidak boleh memutasi dokumen`] : [];
+  if (code.startsWith(READ_ONLY_MARK)) return check ? [`${label}: blok baca saja tidak boleh memutasi dokumen`] : [];
   if (!check) return [`${label}: tidak ada check (blok tanpa op mutasi)`];
-  const pending = PENDING_2_10[label.split(' ')[0]!] ?? [];
+  const file = label.split(' ')[0]!;
+  const pending = PENDING_2_10[file] ?? FIXTURE_FINDINGS[file] ?? [];
   const findings = check.findings.filter((f) => !pending.some((p) => f.rule === p.rule && p.node.test(f.nodeName) && f.detail.startsWith(p.detail)));
   if (findings.length === check.findings.length) {
     const { error, warning, gate } = check.summary;
@@ -75,6 +80,14 @@ const PENDING_2_10: Record<string, { rule: string; node: RegExp; detail: string 
     { rule: 'LC-08', node: /^Judul$/, detail: '16/20 (token 16/24)' },
     { rule: 'LC-04', node: /^Judul$/, detail: 'scrim: teks di atas efek tanpa scrim (fill solid ≥ 0,5) "Malam yang tenang' },
   ],
+};
+
+/**
+ * Temuan yang sengaja dibawa fixture (bukan dari contoh skill): kartu kedua fixture seleksi ber-`gap` 10 (di luar skala,
+ * bahan cek konsistensi) → LC-07 ikut tersalin ke varian. Temuan lain tetap gagal.
+ */
+const FIXTURE_FINDINGS: Record<string, { rule: string; node: RegExp; detail: string }[]> = {
+  'selection.md': [{ rule: 'LC-07', node: /^Kartu \/ Profil rasa$/, detail: 'gap 10' }],
 };
 
 /** Skill tanpa contoh teruji (domain berisi aturan saja); skill lain selain api wajib punya ≥ 1 blok js. */
@@ -135,13 +148,23 @@ describe.skipIf(!browserInstalled)('contoh skill dijalankan terhadap daemon nyat
       if (name === 'api') expect(blocks.length).toBeGreaterThanOrEqual(12);
       const problems: string[] = [];
       let sid = name === 'api' ? '' : await freshDoc(`skill-${name}`);
+      // selection.md bekerja atas seleksi pengguna: board fixture dipilih (id menggantikan baris `const SEL`).
+      let sel: string[] | undefined;
+      if (name === 'selection') {
+        const f = await call('/execute', { code: SELECTION_FIXTURE, description: 'fixture seleksi pengguna' }, sid);
+        expect(f.ok, JSON.stringify(f.error)).toBe(true);
+        // Satu-satunya temuan fixture: gap 10 yang disengaja (FIXTURE_FINDINGS).
+        expect(f.data.check.summary, JSON.stringify(f.data.check.findings)).toMatchObject({ error: 0, warning: 1, gate: 0 });
+        expect(f.data.check.findings.map((x: { rule: string; nodeName: string; detail: string }) => `${x.rule} ${x.nodeName}: ${x.detail}`)).toEqual(['LC-07 Kartu / Profil rasa: gap 10']);
+        sel = [f.data.value.board as string];
+      }
       for (const [i, code] of blocks.entries()) {
         const label = `${name}.md blok ${i + 1}`;
         if (name === 'api') {
           sid = await freshDoc(`skill-api-${i + 1}`);
           problems.push(...(await runBlock(label, code, sid, prelude)));
           await savePngs(`skill-api-${i + 1}`, sid);
-        } else problems.push(...(await runBlock(label, code, sid, prelude)));
+        } else problems.push(...(await runBlock(label, sel ? withSelection(code, sel) : code, sid, prelude)));
       }
       if (name !== 'api') await savePngs(`skill-${name}`, sid);
       expect(problems).toEqual([]);

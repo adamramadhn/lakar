@@ -904,8 +904,9 @@ describe('screenshot menerima dokumen ter-resolve', () => {
     try {
       const { mkdir } = await import('node:fs/promises');
       await mkdir(join(tmp, 'docs'), { recursive: true });
+      // Dokumen v2 (token datar): dibuka lewat migrasi v2 → v3 lalu ditulis balik.
       const stored = {
-        schemaVersion: SCHEMA_VERSION,
+        schemaVersion: 2,
         id: 'Dddddddd',
         rev: 2,
         tokens: { 'colors.surface': '#101010', 'colors.text-primary': '#FAFAFA', 'type.body.size': 18 },
@@ -934,8 +935,13 @@ describe('screenshot menerima dokumen ter-resolve', () => {
       const doc = seen[0] as typeof stored;
       expect(doc.pages[0]!.children[0]!.fills).toEqual([{ type: 'solid', color: '#101010' }]);
       expect(doc.pages[0]!.children[0]!.children[0]).toMatchObject({ size: 18, color: '#FAFAFA' });
-      // file tetap menyimpan referensi
-      expect(await readFile(join(tmp, 'docs', 'tok.lakar.json'), 'utf8')).toContain('"$token"');
+      // file tetap menyimpan referensi, kini sebagai v3 bertipe
+      const file = await readFile(join(tmp, 'docs', 'tok.lakar.json'), 'utf8');
+      expect(file).toContain('"$token"');
+      expect(JSON.parse(file)).toMatchObject({
+        schemaVersion: SCHEMA_VERSION,
+        tokens: { 'colors.surface': { type: 'color', value: '#101010' }, 'type.body.size': { type: 'fontSize', value: 18 } },
+      });
     } finally {
       await app.close();
       await rm(tmp, { recursive: true, force: true });

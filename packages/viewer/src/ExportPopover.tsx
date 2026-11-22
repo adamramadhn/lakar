@@ -1,5 +1,5 @@
 // Tombol Export di kanan atas kanvas + popover (desain `Viewer — Desktop — Export`): pilih board, skala 1x/2x,
-// info ukuran, lalu "Export PNG". Byte PNG dari POST /viewer/docs/:slug/export diunduh lewat `<a download>`;
+// info ukuran, lalu "Export PNG". "Export code…" membuka dialog Export code (epic kode story 5) untuk board itu. Byte PNG dari POST /viewer/docs/:slug/export diunduh lewat `<a download>`;
 // di aplikasi desktop unduhan itu ditangkap handler `on_download` Tauri dan disimpan ke folder Downloads OS.
 import { useEffect, useRef, useState } from 'react';
 import { api, errorText } from './api';
@@ -9,7 +9,7 @@ import { Icon } from './icons';
 type Status = { state: 'idle' } | { state: 'busy' } | { state: 'saved'; filename: string } | { state: 'error'; message: string };
 
 /** Picu unduhan blob dengan nama `filename` (browser: folder unduhan; desktop: handler on_download). */
-function download(blob: Blob, filename: string) {
+export function download(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
@@ -23,7 +23,17 @@ function download(blob: Blob, filename: string) {
   setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
 
-export function ExportButton({ slug, boards, selectedBoardId }: { slug: string; boards: readonly CanvasBoard[]; selectedBoardId: string | undefined }) {
+export function ExportButton({
+  slug,
+  boards,
+  selectedBoardId,
+  onExportCode,
+}: {
+  slug: string;
+  boards: readonly CanvasBoard[];
+  selectedBoardId: string | undefined;
+  onExportCode?: ((boardId: string) => void) | undefined;
+}) {
   const [open, setOpen] = useState(false);
   const [boardId, setBoardId] = useState<string | undefined>(undefined);
   // Default 2x seperti desain (`Viewer — Desktop — Export`).
@@ -121,6 +131,21 @@ export function ExportButton({ slug, boards, selectedBoardId }: { slug: string; 
             {status.state === 'busy' ? <div className="spinner small" /> : <Icon name="download" size={14} />}
             {status.state === 'busy' ? 'Exporting…' : 'Export PNG'}
           </button>
+          {onExportCode && (
+            <button
+              type="button"
+              className="btn export-run"
+              disabled={!board}
+              onClick={() => {
+                if (!board) return;
+                setOpen(false);
+                onExportCode(board.id);
+              }}
+            >
+              <Icon name="codeXml" size={14} />
+              Export code…
+            </button>
+          )}
           {status.state === 'saved' && (
             <div className="export-note" role="status">
               <Icon name="circleCheck" size={13} />

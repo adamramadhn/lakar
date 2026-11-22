@@ -102,19 +102,20 @@ describe('DocStore', () => {
     await plain.write('d', doc);
     const raw = await readFile(plain.docPath('d'), 'utf8');
     // Tiruan langkah migrasi: menambah token.
-    const migrating = new DocStore(dir, { migrate: (r) => ({ ...(r as object), tokens: { 'colors.baru': '#000000' } }) });
+    const baru = { 'colors.baru': { type: 'color', value: '#000000' } };
+    const migrating = new DocStore(dir, { migrate: (r) => ({ ...(r as object), tokens: baru }) });
     const read = await migrating.read('d');
-    expect(read!.tokens).toEqual({ 'colors.baru': '#000000' });
+    expect(read!.tokens).toEqual(baru);
     const after = await readFile(plain.docPath('d'), 'utf8');
     expect(after).not.toBe(raw);
-    expect(JSON.parse(after).tokens).toEqual({ 'colors.baru': '#000000' });
+    expect(JSON.parse(after).tokens).toEqual(baru);
     expect(tmpFiles(plain.docsDir)).toEqual([]);
     // Tanpa migrasi: file tidak ditulis ulang.
     await plain.read('d');
     expect(await readFile(plain.docPath('d'), 'utf8')).toBe(after);
   });
 
-  it('read: dokumen v1 lama dimigrasi resmi ke v2 (identitas) dan ditulis balik', async () => {
+  it('read: dokumen v1 lama dimigrasi resmi ke versi kini (v7) dan ditulis balik', async () => {
     const dir = join(root, 'v1');
     const plain = new DocStore(dir);
     const doc = createDocument();
@@ -123,7 +124,7 @@ describe('DocStore', () => {
     await writeFile(plain.docPath('lama'), `${JSON.stringify(v1, null, 2)}\n`, 'utf8');
     const read = await new DocStore(dir).read('lama');
     expect(read).toEqual(doc);
-    expect(read!.schemaVersion).toBe(2);
+    expect(read!.schemaVersion).toBe(7);
     expect(JSON.parse(await readFile(plain.docPath('lama'), 'utf8'))).toEqual(doc);
     expect(tmpFiles(plain.docsDir)).toEqual([]);
   });

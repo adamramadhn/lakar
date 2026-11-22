@@ -3,6 +3,7 @@
 import { LakarDocument, LakarError, SCHEMA_VERSION, zodToLakarError, type LakarDocument as Doc } from '@lakar/schema';
 import { host } from './host.js';
 import { isPlainObject } from './object.js';
+import { inferTokens } from './tokens-infer.js';
 
 export type RawDocument = Record<string, unknown>;
 /** Satu langkah: dokumen versi n → dokumen versi n+1. Boleh memutasi argumennya (sudah salinan). */
@@ -14,9 +15,29 @@ export type MigrationRegistry = Readonly<Record<number, Migration>>;
  * Registri migrasi resmi.
  * - 1 → 2 (story 22): v2 hanya menambah jenis fill (`conic`, `noise`, `mesh`); dokumen v1 valid apa adanya, jadi langkahnya
  *   identitas yang hanya menaikkan `schemaVersion`. Pembaca v1 tidak bisa membuka v2 (fill baru), maka versinya naik.
+ * - 2 → 3 (epic model-dokumen story 2, AD-11): token datar menjadi `{type, value}` lewat `inferTokens` (tipe dari
+ *   slot yang paling sering merujuk; ref dari slot lain di-detach ke nilai literal, jadi tampilan tetap). Tanpa
+ *   `tokenModes`/`modes`. Dokumen tanpa `tokens` hanya naik versi. Murni: input tidak dimutasi.
+ * - 3 → 4 (epic editor-canvas story 7, AD-13): v4 hanya menambah `layout:'grid'`, track grid, `columnGap`/`rowGap`,
+ *   dan `gridColumn`/`gridRow`; dokumen v3 valid apa adanya, jadi langkahnya identitas yang menaikkan versi.
+ * - 4 → 5 (epic komponen story 2, AD-12): v5 hanya menambah master `component` dan tipe node `instance`; dokumen v4
+ *   valid apa adanya, jadi langkahnya identitas yang menaikkan versi.
+ * - 5 → 6 (epic paste-vektor story 2, AD-14): v6 hanya menambah atribut vektor bertipe dan `svg` pada node `path`;
+ *   dokumen v5 valid apa adanya, jadi langkahnya identitas yang menaikkan versi.
+ * - 6 → 7 (epic paste-vektor story 4, AD-1): v7 hanya menambah `tag` semantik opsional pada frame dan text;
+ *   dokumen v6 valid apa adanya, jadi langkahnya identitas yang menaikkan versi.
  */
 export const MIGRATIONS: MigrationRegistry = Object.freeze({
   1: (d: RawDocument): RawDocument => ({ ...d, schemaVersion: 2 }),
+  2: (d: RawDocument): RawDocument => {
+    if (!isPlainObject(d.tokens)) return { ...d, schemaVersion: 3 };
+    const { tokens, pages } = inferTokens(d.tokens, d.pages);
+    return { ...d, schemaVersion: 3, tokens, pages };
+  },
+  3: (d: RawDocument): RawDocument => ({ ...d, schemaVersion: 4 }),
+  4: (d: RawDocument): RawDocument => ({ ...d, schemaVersion: 5 }),
+  5: (d: RawDocument): RawDocument => ({ ...d, schemaVersion: 6 }),
+  6: (d: RawDocument): RawDocument => ({ ...d, schemaVersion: 7 }),
 });
 
 export type MigrateOptions = { migrations?: MigrationRegistry; target?: number };

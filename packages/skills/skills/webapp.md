@@ -11,7 +11,7 @@ Board persis ukuran permintaan (default `1440 × 900`, `screen:'app'`), isi muat
 - **Grafik bervariasi,** bentuk mengikuti data: batang bertumpuk/berkelompok untuk komposisi (`rect`, sudut atas 4), area bergradasi untuk tren (aksen ke transparan di bawah garis), sparkline di KPI. Garis tipis tunggal hanya pelengkap. Label sumbu caption t3; nilai kini/puncak ditandai (batang hari ini penuh, lainnya lebih muda).
 - **Tabel** (struktur sel: `ui`): angka dengan satuan kecil; status = `Badge` bertitik (`dot`); baris bermasalah ber-tint warning/danger; waktu relatif ("2 jam lalu").
 - **Panel keadaan** (bila ada ruang): yang perlu tindakan (lewat tenggat, hampir habis, menunggu persetujuan) dengan ikon status dan waktu.
-- Grid kartu gap 24, padding kartu 20–24, radius 12. Baris bawah dan grafik `height:'fill'` (isi seluruh tinggi).
+- Grid kartu: frame `layout:'grid'` + `gridTemplateColumns:[{fr:1},{fr:1},{fr:1}]` (kartu lebar `gridColumn:{span:2}`), gap 24, padding kartu 20–24, radius 12. Baris bawah dan grafik `height:'fill'` (isi seluruh tinggi).
 
 ## Tanda slop dashboard
 

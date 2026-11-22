@@ -4,8 +4,15 @@
 // History (aplikasi 3): klik entri → pratinjau versi lama (snapshot) di kanvas baca-saja dengan banner; Restore
 // (dari banner atau entri) meminta konfirmasi lalu meng-commit versi itu sebagai rev baru.
 // Layer manual (aplikasi 4): tool sisip di kanvas dan menu "+" di header Layers menjalankan `execute` dari sesi
-// viewer dengan kode codegen.ts; Delete/Backspace menghapus node terpilih. Sesudahnya dokumen dimuat ulang
-// (event sesi viewer tidak dipancarkan daemon) dan node baru dipilih. Gagal → toast, dokumen tidak berubah.
+// viewer dengan kode codegen.ts. Sesudahnya dokumen dimuat ulang (event sesi viewer tidak dipancarkan daemon) dan
+// node baru dipilih. Gagal → toast, dokumen tidak berubah.
+// Aksi edit (editor-canvas story 6): hapus, group/ungroup, duplikat, urutan z, align/distribute, nudge, dan pilih
+// semua lewat shortcut, menu konteks (canvas + Layers), dan panel Design; satu permintaan route ops per aksi dengan
+// undo/redo dari op invers per jendela (editActions.ts, EditMenu.tsx).
+// Komponen (epic komponen story 4, desain bagian 08): Create component/Detach (menu konteks + shortcut), daftar komponen
+// di Assets (+ sisip, drag ke canvas), ikon master/instance di Layers (pohon dari dokumen ter-resolve sehingga isi
+// instance beralamat komposit bisa dipilih), dan panel Design untuk instance/isi instance (override + Reset), semuanya
+// lewat route ops dengan undo per jendela (componentModel.ts).
 // Kehadiran agen (aplikasi 5): `agentPresence` (presence.ts) dari stream → kursor + outline di Canvas dan state
 // baris Layers (agent / created / changed); disembunyikan saat pratinjau versi.
 // Kelola halaman (aplikasi 8): section Pages (PagesPanel.tsx) menambah/rename/mengurutkan/menghapus halaman lewat
@@ -20,14 +27,45 @@
 // ulang dokumen, dan dokumen yang diarsip/dihapus di jendela lain menampilkan pesan dengan jalan kembali ke
 // Dashboard/Archive (`requestCloseTab`), bukan 404 mentah. Rename di jendela lain ditangani App (tab ikut pindah).
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
-import type { LakarDocument } from '@lakar/schema';
+import { resolveDocument, type DocOp, type LakarDocument } from '@lakar/schema';
+import {
+  COMPONENT_DRAG_TYPE,
+  componentInfo,
+  componentTarget,
+  dropTarget,
+  effectiveNode,
+  instanceNode,
+  instanceRootOf,
+  instancesText,
+  instanceTarget,
+  inSlotContent,
+  isComposite,
+  overrideSummary,
+  resetAllOps,
+  type ComponentInfo,
+  type InsertTargetResult,
+} from './componentModel';
+import type { ComponentPanel } from './DesignPanel';
+import { instanceModel, masterModel, slotFrameInfo } from './componentProps';
+import type { ComponentEdit } from './ComponentPropsPanel';
+import { createActionQueue } from './componentQueue';
+import { indexGeo, toggleSelection, type GeoNode } from './gesture';
+import { actionState, EDIT_ACTIONS, nudgeNodes, nudgeOps, planAction, selectAllIds, selectionAfter, shortcutAction, type EditAction, type EditPlan } from './editActions';
+import { EditMenu } from './EditMenu';
+import { EMPTY_STACKS, recordCommit, settleStep, takeStep, type UndoStacks } from './undoHistory';
+import { attachSelectionReporter } from './selectionSync';
+import { lastAgentLabel, pruneSelection, shareBadgeText, undoSkippedFor } from './liveChanges';
+import { UndoSkippedToast, type UndoSkipped } from './UndoSkippedToast';
+import { PasteToast, type PasteToastState } from './PasteToast';
+import { canUndoPaste, clipboardPaste, pasteTarget } from './paste';
 import { activityHub, editChange, goneReason, harnessLabel, revChange, sessionsForSlug, slugAppeared, type StreamEvent } from './activity';
 import { ActivityPanel } from './ActivityPanel';
 import { BottomSheet } from './BottomSheet';
 import { AddLayerButton, IconPicker, Toast, type ToastState } from './AddLayer';
-import { api, ApiError, errorText, OfflineError, type HistoryEntry, type InspectResult, type LayoutCheck } from './api';
+import { api, ApiError, errorText, OfflineError, type FontFamily, type HistoryEntry, type InspectResult, type LayoutCheck } from './api';
 import { Canvas, type CanvasMarker, type CanvasPreview, type Focus, type Highlight, type InsertPoint } from './Canvas';
-import { failureText, imageFileProblem, insertBoardAt, insertBoardPlaced, insertIntoBoard, canvasInsertTarget, menuInsertTarget, removeNode, type InsertExtra, type InsertKind, type InsertTarget } from './codegen';
+import type { PathEditPanel } from './pathTools';
+import { failureText, imageFileProblem, insertBoardAt, insertBoardPlaced, insertIntoBoard, canvasInsertTarget, menuInsertTarget, type InsertExtra, type InsertKind, type InsertTarget } from './codegen';
 import { resolvePageIndex } from './pages';
 import { PagesPanel } from './PagesPanel';
 import { indexDocument, relativeTime, type NodeInfo, type TreeNode } from './format';
@@ -37,7 +75,14 @@ import { FileMenu } from './FileMenu';
 import { useNow, useOffline, useRetry } from './hooks';
 import { Icon, NODE_ICON } from './icons';
 import { Modal } from './NewFileDialog';
-import { ChecksPanel, InspectPanel } from './panels';
+import { ChecksPanel } from './panels';
+import { DesignPanel } from './DesignPanel';
+import { ThemeButton, ThemePanel } from './ThemePanel';
+import { CodeExportDialog } from './CodeExportDialog';
+import { ImportCssDialog } from './TokensCss';
+import { effectiveMode } from './themeModel';
+import { parentLayoutOf, type DesignTarget } from './designModel';
+import { measureLiveSize } from './liveGeometry';
 import { agentPresence, layerMarks, type LayerMarkInfo } from './presence';
 import { sheetForTab, type SheetState } from './sheet';
 import { requestCloseTab } from './tabs';
@@ -65,15 +110,22 @@ const DRAWER_QUERY = '(max-width: 1100px)';
 type Tab = PanelTab;
 const TABS: { id: Tab; label: string }[] = [
   { id: 'activity', label: 'Activity' },
-  { id: 'inspect', label: 'Inspect' },
+  { id: 'design', label: 'Design' },
   { id: 'checks', label: 'Checks' },
   { id: 'history', label: 'History' },
 ];
 
 
-/** Fokus di kolom ketik (input, textarea, select, contentEditable): Delete/Backspace milik kolom itu. */
-const typingTarget = (t: EventTarget | null) =>
-  t instanceof HTMLElement && (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || t instanceof HTMLSelectElement || t.isContentEditable);
+/**
+ * Fokus di kolom ketik (input, textarea, select, contentEditable): Delete/Backspace milik kolom itu. Event dari
+ * shadow root (teks yang diedit inline di board live) dicek pada target aslinya (`composedPath()[0]`).
+ */
+const typingTarget = (e: Event) => {
+  const t = e.composedPath()[0] ?? e.target;
+  return t instanceof HTMLElement && (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || t instanceof HTMLSelectElement || t.isContentEditable);
+};
+
+const NO_ACTIONS = Object.fromEntries(EDIT_ACTIONS.map((a) => [a, false])) as Record<EditAction, boolean>;
 
 /** Pesan Restore gagal; CONFLICT = versi usang (ada perubahan lebih baru) atau versi terkini. */
 const restoreErrorText = (e: unknown) =>
@@ -83,13 +135,19 @@ type Loaded<T> = { state: 'loading' } | { state: 'ok'; value: T } | { state: 'er
 
 type RawNode = Record<string, unknown> & { id: string; name: string; type: string; children?: RawNode[] };
 
-/** Node mentah dokumen berdasarkan id (untuk properti induk di Inspect). */
+/** Node mentah dokumen berdasarkan id (untuk properti induk di Inspect), termasuk isi slot instance (AD-12). */
 function findNode(doc: LakarDocument, id: string): RawNode | undefined {
   const walk = (nodes: readonly RawNode[]): RawNode | undefined => {
     for (const n of nodes) {
       if (n.id === id) return n;
       const hit = walk(n.children ?? []);
       if (hit) return hit;
+      if (n.type === 'instance' && n.slots) {
+        for (const list of Object.values(n.slots as Record<string, RawNode[]>)) {
+          const s = walk(list ?? []);
+          if (s) return s;
+        }
+      }
     }
     return undefined;
   };
@@ -98,6 +156,63 @@ function findNode(doc: LakarDocument, id: string): RawNode | undefined {
     if (hit) return hit;
   }
   return undefined;
+}
+
+/** `resolveDocument` (AD-10) sebagai dokumen mentah; gagal → undefined (pemanggil memakai dokumen tersimpan). */
+function tryResolve(doc: LakarDocument): LakarDocument | undefined {
+  try {
+    return resolveDocument(doc) as unknown as LakarDocument;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Kotak node relatif board dari geometri canvas live (isi instance tidak bisa diukur lewat /inspect): highlight node,
+ * bukan board, sehingga board tidak tampil terpilih.
+ */
+function sceneBounds(scene: readonly GeoNode[], id: string, boards: readonly { id: string; x: number; y: number }[]): [number, number, number, number] | undefined {
+  const idx = indexGeo(scene);
+  const n = idx.get(id);
+  if (!n) return undefined;
+  let root: GeoNode | undefined = n;
+  while (root?.parentId) root = idx.get(root.parentId);
+  const b = boards.find((x) => x.id === root?.id);
+  return b ? [n.box.x - b.x, n.box.y - b.y, n.box.w, n.box.h] : undefined;
+}
+
+/** Info komponen node primer untuk header/grup Instance panel Design. */
+function panelInfo(
+  info: ComponentInfo,
+  id: string,
+  index: ReadonlyMap<string, NodeInfo>,
+  doc: LakarDocument,
+  act: { goTo: (id: string) => void; detach: (id: string, name: string) => void; resetAll: (id: string, name: string) => void; select: (address: string) => void },
+): ComponentPanel | undefined {
+  const masterOf = (instanceId: string) => info.masterById.get(info.instances.get(instanceId)?.componentId as string);
+  if (isComposite(id)) {
+    const root = instanceRootOf(id);
+    return { kind: 'inside', instanceName: index.get(root)?.name ?? info.stored.get(root)?.name ?? root, masterName: masterOf(root)?.name ?? 'Component' };
+  }
+  const kind = info.kinds.get(id);
+  if (kind === 'master') return { kind: 'master', instances: info.masterById.get(id)?.instances.length ?? 0, model: masterModel(doc, id) };
+  if (kind !== 'instance') {
+    // Frame di dalam master (story 5): grup Slot.
+    const sf = slotFrameInfo(doc, info, id);
+    return sf ? { kind: 'slotFrame', frameId: id, ...sf } : undefined;
+  }
+  const inst = info.instances.get(id)!;
+  const master = masterOf(id);
+  const model = instanceModel(doc, info, id);
+  return {
+    props: model ? { model, masters: info.masters, doc, info, onSelect: act.select } : undefined,
+    kind: 'instance',
+    masterName: master?.name ?? 'Missing component',
+    overrides: overrideSummary(inst, (key) => effectiveNode(doc, `${id}/${key}`)?.name),
+    onGoToMaster: () => master && act.goTo(master.id),
+    onDetach: () => act.detach(id, inst.name),
+    onResetAll: () => act.resetAll(id, inst.name),
+  };
 }
 
 /** Node rect dengan fill gambar: ikon Image di Layers/Assets (desain "Visual"). */
@@ -136,7 +251,18 @@ export function Viewer({ slug }: { slug: string }) {
   const lastPageIndex = useRef(saved?.pageIndex ?? 0);
   /** Halaman baru dari "+" yang belum ada di dokumen termuat (jangan dianggap terhapus). */
   const pendingPage = useRef<string | undefined>(undefined);
-  const [selectedId, setSelectedId] = useState<string | undefined>(saved?.selectedId);
+  /** Seleksi (urutan pilih; terakhir = primer untuk Inspect/viewState). Canvas live dan Layers berbagi state ini. */
+  const [selection, setSelection] = useState<string[]>(() => (saved?.selectedId ? [saved.selectedId] : []));
+  const selectedId = selection[selection.length - 1];
+  /** Ganti seleksi dengan satu node (atau kosong); bentuk fungsi menerima primer saat ini, hasil sama = tidak berubah. */
+  const setSelectedId = useCallback((v: string | undefined | ((cur: string | undefined) => string | undefined)) => {
+    setSelection((prev) => {
+      const cur = prev[prev.length - 1];
+      const next = typeof v === 'function' ? v(cur) : v;
+      if (typeof v === 'function' && next === cur) return prev;
+      return next ? [next] : [];
+    });
+  }, []);
   const [inspect, setInspect] = useState<Loaded<InspectResult> | undefined>(undefined);
   const [checks, setChecks] = useState<Loaded<LayoutCheck> | undefined>(undefined);
   const [tab, setTab] = useState<Tab>(saved?.panel ?? 'activity');
@@ -157,6 +283,22 @@ export function Viewer({ slug }: { slug: string }) {
   const [restoreAsk, setRestoreAsk] = useState<HistoryEntry | undefined>(undefined);
   const [restoring, setRestoring] = useState(false);
   const [restoreError, setRestoreError] = useState<string | undefined>(undefined);
+  /** Panel Theme (epic token-tema story 3); ditutup saat pratinjau versi (tombol Theme tidak tampil). */
+  const [themeOpen, setThemeOpen] = useState(false);
+  const closeTheme = useCallback(() => setThemeOpen(false), []);
+  /** Dialog Export code (epic kode story 5): id node sumber; ditutup saat pratinjau versi. */
+  const [codeExport, setCodeExport] = useState<string | undefined>(undefined);
+  /** Dialog Import CSS variables (panel Theme, epic kode story 5). */
+  const [cssImportOpen, setCssImportOpen] = useState(false);
+  // Pratinjau versi menutup kedua dialog (bukan hanya menyembunyikan), supaya tidak muncul lagi sesudah pratinjau.
+  useEffect(() => {
+    if (!preview) return;
+    setCodeExport(undefined);
+    setCssImportOpen(false);
+  }, [preview]);
+  useEffect(() => {
+    if (preview) setThemeOpen(false);
+  }, [preview]);
   const offline = useOffline();
   /** Toast sisip/hapus/unggah: gagal, "Deleted …" + Undo, atau "Uploading image…". */
   const [toast, setToastState] = useState<ToastState | undefined>(undefined);
@@ -176,6 +318,8 @@ export function Viewer({ slug }: { slug: string }) {
   const [sheet, setSheet] = useState<SheetState>('half');
   /** Tab panel kiri (desain "Panel Tabs": Layers | Assets). */
   const [leftTab, setLeftTab] = useState<'layers' | 'assets'>('layers');
+  /** Pencarian komponen di tab Assets (desain C2xbUQ "Search components"). */
+  const [assetQuery, setAssetQuery] = useState('');
   /** Menu file dari chevron di header file. */
   const [fileMenu, setFileMenu] = useState<{ x: number; y: number } | undefined>(undefined);
   /** Ringkasan History untuk keterangan header file. */
@@ -204,6 +348,8 @@ export function Viewer({ slug }: { slug: string }) {
   }, [layersOpen]);
 
   const docRef = useRef<LakarDocument | undefined>(undefined);
+  /** Penunggu rev dokumen termuat (antrean aksi komponen story 5). */
+  const revWaiters = useRef<{ rev: number; resolve: () => void }[]>([]);
   /**
    * Muat dokumen. `onlyIfChanged`: abaikan hasil bila id dan rev sama (refresh diam). `full`: semua board
    * dianggap berubah (PNG dimuat ulang); event execute memakai `full=false` sehingga hanya board tersentuh dirender.
@@ -226,6 +372,8 @@ export function Viewer({ slug }: { slug: string }) {
           }
           setDoc({ state: 'ok', value: { doc: d, loadedAt: Date.now() } });
           if (prev && changed) setAttempt((a) => a + 1);
+          // Aksi komponen berikutnya menunggu rev aksi sebelumnya dimuat (componentEdit).
+          revWaiters.current = revWaiters.current.filter((w) => (w.rev <= d.rev ? (w.resolve(), false) : true));
         },
         (e) => {
           if (e instanceof OfflineError || onlyIfChanged) {
@@ -268,7 +416,47 @@ export function Viewer({ slug }: { slug: string }) {
   /** Dokumen yang tampil: versi pratinjau bila sudah termuat, selain itu terkini. */
   const previewDoc = preview?.doc.state === 'ok' ? preview.doc.value : undefined;
   const shown = previewDoc ?? current;
-  const index = useMemo(() => (shown ? indexDocument(shown) : new Map<string, NodeInfo>()), [shown]);
+  /** Dokumen tampil ter-resolve (AD-10): nilai token untuk panel Design (swatch, detach). Resolve gagal → nilai tersimpan. */
+  const resolvedShown = useMemo(() => (shown ? tryResolve(shown) : undefined), [shown]);
+  const resolvedCurrent = useMemo(() => (current ? (current === shown ? resolvedShown : tryResolve(current)) : undefined), [current, shown, resolvedShown]);
+  // Indeks dari dokumen ter-resolve (epic komponen story 4): isi instance (alamat komposit) dan isi slot dikenal
+  // seleksi, Layers, dan halaman. Resolve gagal → dokumen tersimpan.
+  const index = useMemo(() => (shown ? indexDocument(resolvedShown ?? shown) : new Map<string, NodeInfo>()), [shown, resolvedShown]);
+  /** Indeks dokumen terkini (bukan pratinjau): pembersihan seleksi dan target undo (story 3). */
+  const latestIndex = useMemo(() => (current ? (shown === current ? index : indexDocument(resolvedCurrent ?? current)) : undefined), [current, shown, index, resolvedCurrent]);
+  /** Master/instance dokumen tampil (Layers, Assets, panel Design) dan terkini (penanda canvas live). */
+  const components = useMemo(() => (shown ? componentInfo(shown) : undefined), [shown]);
+  const latestComponents = useMemo(() => (current ? (current === shown ? components : componentInfo(current)) : undefined), [current, shown, components]);
+  const latestIndexRef = useRef(latestIndex);
+  latestIndexRef.current = latestIndex;
+  /** Nama node yang pernah terlihat jendela ini (nama node yang sudah dihapus agen untuk toast Undo skipped). */
+  const knownNames = useRef(new Map<string, string>());
+  const prevLatest = useRef<Map<string, NodeInfo> | undefined>(undefined);
+  // Dokumen terkini berganti: node yang hilang (dihapus agen/jendela lain) keluar dari seleksi (dan laporan get_selection).
+  useEffect(() => {
+    if (!latestIndex) return;
+    for (const [id, n] of latestIndex) knownNames.current.set(id, n.name);
+    // Pratinjau versi: tidak dipangkas; dokumen pembanding tetap, jadi node yang dihapus selama pratinjau dibuang sesudahnya.
+    if (previewDoc) return;
+    const prev = prevLatest.current;
+    prevLatest.current = latestIndex;
+    if (!prev || prev === latestIndex) return;
+    setSelection((sel) => pruneSelection(sel, (id) => prev.has(id), (id) => latestIndex.has(id)) as string[]);
+  }, [latestIndex, previewDoc]);
+  /** Font terpasang di lakard untuk Typography (GET /viewer/fonts); dimuat saat tab Design dibuka, dicoba lagi saat Retry/koneksi pulih (`attempt`). */
+  const [fonts, setFonts] = useState<FontFamily[]>([]);
+  const needFonts = tab === 'design' && fonts.length === 0;
+  useEffect(() => {
+    if (!needFonts) return;
+    let live = true;
+    api.fonts().then(
+      (f) => live && setFonts(f),
+      () => {},
+    );
+    return () => {
+      live = false;
+    };
+  }, [needFonts, attempt]);
   // Halaman aktif per ID. Tidak ada di dokumen: pratinjau versi lama atau halaman baru yang belum termuat → indeks
   // terakhir; selain itu halaman sudah dihapus → tetangga (resolvePageIndex).
   const pageFound = pageId !== undefined && !!shown?.pages.some((p) => p.id === pageId);
@@ -329,6 +517,8 @@ export function Viewer({ slug }: { slug: string }) {
           setRestoring(false);
           setRestoreAsk(undefined);
           setPreview(undefined);
+          // Versi lama dipulihkan: invers gestur sebelumnya tidak lagi bermakna terhadap dokumen ini.
+          setStacks(EMPTY_STACKS);
           loadDoc();
         },
         (e) => {
@@ -406,6 +596,20 @@ export function Viewer({ slug }: { slug: string }) {
       }),
     [],
   );
+  // Seleksi canvas dilaporkan ke daemon (AD-9, debounce) supaya agen membacanya lewat get_selection; dikirim ulang
+  // saat stream tersambung lagi (daemon mungkin restart) dan dikosongkan saat Viewer ditutup.
+  const reporter = useRef<ReturnType<typeof attachSelectionReporter> | undefined>(undefined);
+  useEffect(() => {
+    const r = attachSelectionReporter(slug, selectionRef.current, (s, addresses) => api.putSelection(s, addresses), (l) => activityHub.listen(l));
+    reporter.current = r;
+    return () => {
+      r.dispose();
+      if (reporter.current === r) reporter.current = undefined;
+    };
+  }, [slug]);
+  useEffect(() => {
+    reporter.current?.update(selection);
+  }, [selection]);
   // Tidak ditemukan: cek arsip supaya pesan bisa menunjuk ke Archive.
   const notFound = doc.state === 'error' && doc.notFound === true;
   useEffect(() => {
@@ -447,6 +651,8 @@ export function Viewer({ slug }: { slug: string }) {
 
   const now = useNow(5000);
   const views = useMemo(() => sessionsForSlug(activity, slug, now), [activity, slug, now]);
+  const viewsRef = useRef(views);
+  viewsRef.current = views;
   /**
    * Kehadiran agen (kursor, outline, baris Layers) tiap sesi Live pada dokumen ini. `now` (5 dtk) cukup untuk
    * jendela sorotan 10 dtk: pudarnya sendiri berjalan di CSS (`forwards`).
@@ -493,15 +699,19 @@ export function Viewer({ slug }: { slug: string }) {
     };
   }, [slug, checkFindings]);
 
+  // Isi slot instance (story 5): POST /inspect (route lama) tidak menelusuri slot.
+  const selectedInSlot = !!selectedId && !!components && inSlotContent(components, selectedId);
   // Inspect node terpilih: properti tersimpan + bounds terukur (POST /inspect).
   useEffect(() => {
     // Pratinjau: properti terukur hanya ada untuk versi terkini, jadi Inspect menampilkan data JSON versi itu saja.
-    if (!selectedId || preview) {
+    // Isi instance (alamat komposit): POST /inspect hanya menerima ID tersimpan (route lama, AD-4).
+    if (!selectedId || preview || isComposite(selectedId) || selectedInSlot) {
       setInspect(undefined);
       return;
     }
     let live = true;
-    setInspect({ state: 'loading' });
+    // Node sama (rev baru): data lama tetap tampil sampai hasil baru tiba (tanpa kedip highlight).
+    setInspect((p) => (p?.state === 'ok' && p.value.node.id === selectedId ? p : { state: 'loading' }));
     api.inspect(slug, selectedId, 0).then(
       (r) => live && setInspect({ state: 'ok', value: r }),
       (e) => live && setInspect({ state: 'error', message: errorText(e) }),
@@ -509,7 +719,8 @@ export function Viewer({ slug }: { slug: string }) {
     return () => {
       live = false;
     };
-  }, [slug, selectedId, attempt, preview]);
+    // Panel Design: diukur ulang tiap rev (Copy as dan posisi terukur mengikuti edit); tab lain hanya saat seleksi berubah.
+  }, [slug, selectedId, selectedInSlot, attempt, preview, tab === 'design' ? currentRev : undefined]);
 
   useRetry(() => {
     loadDoc();
@@ -564,6 +775,114 @@ export function Viewer({ slug }: { slug: string }) {
     [slug, loadDoc],
   );
 
+  // Gestur canvas (story 4): satu gestur = satu permintaan ops (AD-7). Tumpukan undo/redo per jendela berisi op
+  // invers dari respons route (AD-8); undo/redo dijalankan sebagai commit baru. Invers gagal (mis. node sudah dihapus
+  // agen) → entri dibuang + toast, tanpa undo sebagian. Undo hapus (Delete + toast) tetap memakai restore (story 6).
+  // Transisi tumpukan murni di undoHistory.ts; ref = nilai terkini untuk callback async, state = render tombol.
+  const stacks = useRef<UndoStacks>(EMPTY_STACKS);
+  const [undoDepth, setUndoDepth] = useState({ undo: 0, redo: 0 });
+  const setStacks = useCallback((s: UndoStacks) => {
+    stacks.current = s;
+    setUndoDepth({ undo: s.undo.length, redo: s.redo.length });
+  }, []);
+  /** Satu permintaan ops (AD-7): sukses → invers ke tumpukan undo, dokumen dimuat ulang; gagal → toast, undefined. */
+  const applyEdit = useCallback(
+    (ops: DocOp[], description: string) => {
+      editing.current++;
+      return api.applyOps(slug, ops, description).then(
+        (r) => {
+          editing.current--;
+          setStacks(recordCommit(stacks.current, r.inverse, description, Date.now()));
+          loadDoc(true);
+          return r;
+        },
+        (e) => {
+          editing.current--;
+          setToast(e instanceof ApiError ? failureText(e.message, e.hint) : errorText(e));
+          loadDoc(true);
+          return undefined;
+        },
+      );
+    },
+    [slug, loadDoc, setToast, setStacks],
+  );
+  const commitOps = useCallback((ops: DocOp[], description: string): Promise<boolean> => applyEdit(ops, description).then((r) => r !== undefined), [applyEdit]);
+  /** Commit gestur canvas: rev commit (pratinjau ditahan sampai board di-mount dari rev itu), undefined bila gagal. */
+  const commitGesture = useCallback((ops: DocOp[], description: string): Promise<number | undefined> => applyEdit(ops, description).then((r) => r?.rev), [applyEdit]);
+  /** Commit yang membuat node (Pen tool, paste-vektor story 5): node baru terpilih begitu ada di dokumen. */
+  const commitCreate = useCallback(
+    (ops: DocOp[], description: string): Promise<string | undefined> =>
+      applyEdit(ops, description).then((r) => {
+        const id = r?.created[0]?.id;
+        if (id) pendingSelect.current = id;
+        return id;
+      }),
+    [applyEdit],
+  );
+  /** Mode edit titik path di canvas (grup Point panel Design, desain J7AmQi). */
+  const [pathEdit, setPathEdit] = useState<PathEditPanel | undefined>(undefined);
+  /** Toast "Undo skipped" (desain r69qO): entri undo/redo dibuang karena target sudah diubah/dihapus perubahan lain. */
+  const [undoSkipped, setUndoSkipped] = useState<UndoSkipped | undefined>(undefined);
+  const closeUndoSkipped = useCallback(() => setUndoSkipped(undefined), []);
+  /** Undo atau redo: kirim op invers teratas; sukses → invers respons masuk tumpukan seberang, gagal → entri dibuang. */
+  const stepHistory = useCallback(
+    (dir: 'undo' | 'redo') => {
+      // Satu permintaan tulis viewer sekaligus (klik toolbar beruntun, gestur yang masih dikirim).
+      if (editing.current > 0) return;
+      const { entry, stacks: rest } = takeStep(stacks.current, dir);
+      if (!entry) return;
+      setStacks(rest);
+      editing.current++;
+      api.applyOps(slug, entry.ops, `${dir === 'undo' ? 'Undo' : 'Redo'} ${entry.label}`).then(
+        (r) => {
+          editing.current--;
+          setStacks(settleStep(stacks.current, dir, entry, { ok: true, inverse: r.inverse, at: Date.now() }));
+          loadDoc(true);
+        },
+        (e) => {
+          editing.current--;
+          // Invers ditolak daemon (4xx, mis. NOT_FOUND) → entri dibuang; offline/5xx → entri dikembalikan.
+          const transient = !(e instanceof ApiError) || e.status >= 500;
+          setStacks(settleStep(stacks.current, dir, entry, { ok: false, transient }));
+          // Ditolak permanen (4xx, mis. agen menghapus target, AD-8): toast desain "Undo skipped" (liveChanges.ts).
+          const skipped = undoSkippedFor(
+            dir,
+            entry.ops,
+            { transient, message: e instanceof ApiError ? e.message : undefined },
+            (id) => latestIndexRef.current?.has(id) ?? true,
+            (id) => knownNames.current.get(id),
+            lastAgentLabel(viewsRef.current, entry.at),
+          );
+          if (skipped) setUndoSkipped({ key: Date.now(), ...skipped });
+          else setToast(`Couldn't ${dir}: ${errorText(e)}`);
+          loadDoc(true);
+        },
+      );
+    },
+    [slug, loadDoc, setToast, setStacks],
+  );
+  const undo = useCallback(() => stepHistory('undo'), [stepHistory]);
+  const redo = useCallback(() => stepHistory('redo'), [stepHistory]);
+  // Ctrl/⌘+Z = undo, Ctrl/⌘+Shift+Z atau Ctrl+Y = redo; bukan saat mengetik atau dialog/menu terbuka.
+  useEffect(() => {
+    if (!editable) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
+      const k = e.key.toLowerCase();
+      const isUndo = k === 'z' && !e.shiftKey;
+      const isRedo = (k === 'z' && e.shiftKey) || (k === 'y' && !e.shiftKey && e.ctrlKey);
+      if (!isUndo && !isRedo) return;
+      if (typingTarget(e) || document.querySelector('.modal-scrim, .menu-layer')) return;
+      e.preventDefault();
+      if (e.repeat || editing.current > 0) return;
+      stepHistory(isUndo ? 'undo' : 'redo');
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [editable, stepHistory]);
+  const selectIds = useCallback((ids: string[]) => setSelection(ids), []);
+  const toggleSelect = useCallback((id: string) => setSelection((prev) => toggleSelection(prev, id)), []);
+
   const insert = useCallback(
     (t: InsertTarget, extra: InsertExtra = {}) => {
       const { code, description } = t.board
@@ -579,6 +898,73 @@ export function Viewer({ slug }: { slug: string }) {
     },
     [runEdit],
   );
+
+  // ---- Paste SVG/HTML (epic paste-vektor story 3–4; desain G0vf1/nE6dL, rkIyP/GXHxW) ----
+  // Ctrl+V dengan teks/file SVG atau text/html → importer daemon (AD-15) lewat route paste: satu commit, invers ke
+  // tumpukan undo jendela ini (AD-8), node baru dipilih, toast r69qO (SVG) atau Paste Report w2am0 + Pasted Tag (HTML).
+  const [pasteToast, setPasteToast] = useState<PasteToastState | undefined>(undefined);
+  const closePasteToast = useCallback(() => setPasteToast(undefined), []);
+  /** Entri undo milik paste yang toast-nya tampil ("Undo paste" hanya bila entri ini masih teratas). */
+  const pasteEntry = useRef<unknown>(undefined);
+  const pasteContent = useCallback(
+    (content: string, kind: 'svg' | 'html', name?: string) => {
+      const d = docRef.current;
+      if (!editableRef.current || !d) return;
+      // Satu tulis viewer sekaligus: paste tidak dibuang diam-diam (preventDefault sudah dipanggil).
+      if (editing.current > 0) {
+        setToast('Another edit is still saving. Paste again in a moment.');
+        return;
+      }
+      const target = pasteTarget(d, selectionRef.current);
+      if ('error' in target) {
+        setToast(target.error);
+        return;
+      }
+      editing.current++;
+      api.paste(slug, { content, parentId: target.parentId, ...(kind === 'html' ? { kind } : {}), ...(name ? { name } : {}) }).then(
+        (r) => {
+          editing.current--;
+          setStacks(recordCommit(stacks.current, r.inverse, kind === 'html' ? 'Paste HTML' : 'Paste SVG', Date.now()));
+          pasteEntry.current = stacks.current.undo[stacks.current.undo.length - 1];
+          pendingSelect.current = r.nodeId;
+          setSelectedId(r.nodeId);
+          loadDoc(true);
+          setPasteToast({ key: Date.now(), report: r.report, layer: r.created.find((c) => c.id === r.nodeId)?.name ?? name ?? (kind === 'html' ? 'HTML' : 'SVG'), nodeId: r.nodeId });
+        },
+        (e) => {
+          editing.current--;
+          setToast(e instanceof ApiError ? failureText(e.message, e.hint) : errorText(e));
+        },
+      );
+    },
+    [slug, loadDoc, setToast, setStacks, setSelectedId],
+  );
+  const undoPaste = useCallback(() => {
+    if (editing.current > 0) setToast("Couldn't undo the paste while another edit is saving. Try again in a moment.");
+    else if (canUndoPaste(stacks.current.undo, pasteEntry.current)) stepHistory('undo');
+    else setToast("Couldn't undo this paste: it was already undone or newer edits were made.");
+  }, [stepHistory, setToast]);
+  // Event `paste` (Ctrl/⌘+V): file SVG, teks yang diawali <svg/<?xml, lalu text/html; bukan saat mengetik atau dialog terbuka.
+  useEffect(() => {
+    if (!editable) return;
+    const onPaste = (e: ClipboardEvent) => {
+      if (typingTarget(e) || document.querySelector('.modal-scrim, .menu-layer')) return;
+      const dt = e.clipboardData;
+      if (!dt) return;
+      const pick = clipboardPaste({ files: [...dt.files], text: dt.getData('text/plain'), html: dt.getData('text/html') });
+      if (!pick) return;
+      e.preventDefault();
+      if ('html' in pick) pasteContent(pick.html, 'html');
+      else if ('text' in pick) pasteContent(pick.text, 'svg');
+      else
+        void pick.file.text().then(
+          (text) => pasteContent(text, 'svg', pick.name),
+          () => setToast("Couldn't read the pasted file."),
+        );
+    };
+    window.addEventListener('paste', onPaste);
+    return () => window.removeEventListener('paste', onPaste);
+  }, [editable, pasteContent, setToast]);
 
   /** Tujuan sudah diketahui: Image → pemilih file, Icon → pemilih ikon, lainnya langsung disisipkan. */
   const beginInsert = useCallback(
@@ -625,31 +1011,6 @@ export function Viewer({ slug }: { slug: string }) {
     [insert, setToast],
   );
 
-  /** Toast "Deleted <name>" + Undo (Restore rev sebelum hapus, baseRev = rev hapus) bila rev itu bersnapshot. */
-  const offerUndo = useCallback(
-    (name: string, rev: number) => {
-      const message = `Deleted ${name}`;
-      setToastState({ message, kind: 'info' });
-      const prev = rev - 1;
-      api.getHistory(slug).then(
-        (entries) => {
-          if (!entries.find((h) => h.rev === prev)?.snapshot) return;
-          const undo = () => {
-            setToastState(undefined);
-            api.restore(slug, prev, rev).then(
-              () => loadDoc(),
-              (e) => setToast(restoreErrorText(e)),
-            );
-          };
-          // Hanya bila toast ini masih tampil (belum diganti/ditutup).
-          setToastState((t) => (t?.message === message && t.kind === 'info' ? { ...t, action: { label: 'Undo', run: undo } } : t));
-        },
-        () => {},
-      );
-    },
-    [slug, loadDoc, setToast],
-  );
-
   /** Operasi halaman: sukses → muat ulang dokumen; gagal → toast (dokumen dimuat ulang bila sudah usang). */
   const pageWrite = useCallback(
     (op: Promise<{ pageId: string }>, after?: (pageId: string) => void): Promise<void> =>
@@ -677,28 +1038,194 @@ export function Viewer({ slug }: { slug: string }) {
   const movePage = useCallback((id: string, to: number) => void pageWrite(api.movePage(slug, id, to)), [slug, pageWrite]);
   const deletePage = useCallback((id: string) => pageWrite(api.deletePage(slug, id)), [slug, pageWrite]);
 
-  // Delete/Backspace: hapus node terpilih (board juga), kecuali saat mengetik atau dialog/menu terbuka.
-  const selectedRef = useRef<{ id: string; name: string; type: string } | undefined>(undefined);
-  const selInfo = selectedId ? index.get(selectedId) : undefined;
-  selectedRef.current = selInfo && !previewDoc ? { id: selInfo.id, name: selInfo.name, type: selInfo.type } : undefined;
+  // ---- Aksi edit (story 6): group, ungroup, duplikat, hapus, urutan z, align, distribute, nudge, pilih semua ----
+  // Plan murni dari editActions.ts atas geometri halaman (Canvas mengisi `sceneRef`), satu permintaan ops per aksi,
+  // invers ke tumpukan undo jendela ini (AD-7, AD-8). Hapus tidak lagi memakai execute + restore rev.
+  const sceneRef = useRef<(() => GeoNode[]) | null>(null);
+  /** Render ulang saat geometri canvas berubah (ketersediaan Align & distribute di panel Design). */
+  const [, setSceneTick] = useState(0);
+  const onSceneChange = useCallback(() => setSceneTick((v) => v + 1), []);
+  const selectionRef = useRef(selection);
+  selectionRef.current = selection;
+  const runPlan = useCallback(
+    (plan: EditPlan, deleted: boolean) =>
+      applyEdit(plan.ops, plan.label).then((r) => {
+        if (!r) return;
+        const next = selectionAfter(plan, r.refs);
+        if (next) setSelection(next);
+        if (!deleted) return;
+        // Toast "Deleted …" + Undo = undo tumpukan, hanya bila entri hapus ini masih teratas.
+        const entry = stacks.current.undo[stacks.current.undo.length - 1];
+        const undoDelete = () => {
+          // Tulisan lain masih berjalan: toast tetap, pengguna bisa mengklik lagi.
+          if (editing.current > 0) return;
+          setToastState(undefined);
+          if (entry && stacks.current.undo[stacks.current.undo.length - 1] === entry) stepHistory('undo');
+          else setToast("Couldn't undo this delete: it was already undone or newer edits were made.");
+        };
+        setToastState({ message: plan.label.replace(/^Delete /, 'Deleted '), kind: 'info', ...(entry ? { action: { label: 'Undo', run: undoDelete } } : {}) });
+      }),
+    [applyEdit, stepHistory, setToast],
+  );
+  /** Jalankan aksi untuk `ids` (default seleksi): aksi tak berlaku → toast/diam; satu permintaan tulis sekaligus. */
+  const runAction = useCallback(
+    (kind: EditAction, ids?: string[]) => {
+      if (!editableRef.current || editing.current > 0) return;
+      const plan = planAction(kind, sceneRef.current?.() ?? [], ids ?? selectionRef.current);
+      if (!plan) return;
+      if ('error' in plan) {
+        setToast(plan.error);
+        return;
+      }
+      void runPlan(plan, kind === 'delete');
+    },
+    [runPlan, setToast],
+  );
+  // Nudge panah: Δ menumpuk selama commit berjalan; dikirim sesudah dokumen termuat pada rev commit sebelumnya, dengan
+  // x/y dari dokumen tersimpan (geometri canvas baru diukur ulang sesudah board di-mount ulang).
+  const nudge = useRef({ dx: 0, dy: 0, waitRev: -1 });
+  const flushNudge = useCallback(() => {
+    const n = nudge.current;
+    const d = docRef.current;
+    if ((n.dx === 0 && n.dy === 0) || editing.current > 0 || !d || d.rev < n.waitRev || !editableRef.current) return;
+    const nodes = nudgeNodes(sceneRef.current?.() ?? [], selectionRef.current, (id) => findNode(d, id));
+    const { dx, dy } = n;
+    n.dx = 0;
+    n.dy = 0;
+    const plan = nudgeOps(nodes, dx, dy);
+    if (!plan) return;
+    void applyEdit(plan.ops, plan.label).then((r) => {
+      if (r) n.waitRev = r.rev;
+      else {
+        // Gagal: Δ yang menumpuk selama permintaan berjalan dibuang (tidak ikut nudge berikutnya).
+        n.dx = 0;
+        n.dy = 0;
+      }
+    });
+  }, [applyEdit]);
+  useEffect(() => flushNudge(), [currentRev, flushNudge]);
+  // Seleksi berganti: Δ yang belum terkirim milik seleksi lama.
+  useEffect(() => {
+    nudge.current.dx = 0;
+    nudge.current.dy = 0;
+  }, [selection]);
+  // Shortcut aksi (bukan saat mengetik, termasuk teks yang diedit inline, atau dialog/menu terbuka).
   useEffect(() => {
     if (!editable) return;
     const onKey = (e: KeyboardEvent) => {
-      if ((e.key !== 'Delete' && e.key !== 'Backspace') || e.metaKey || e.ctrlKey || e.altKey) return;
-      if (typingTarget(e.target) || document.querySelector('.modal-scrim, .menu-layer')) return;
-      const node = selectedRef.current;
-      if (!node) return;
+      if (typingTarget(e) || document.querySelector('.modal-scrim, .menu-layer')) return;
+      const s = shortcutAction(e);
+      if (!s) return;
+      if ('selectAll' in s) {
+        e.preventDefault();
+        setSelection(selectAllIds(sceneRef.current?.() ?? [], selectionRef.current));
+        return;
+      }
+      if (!selectionRef.current.length) return;
+      if ('action' in s) {
+        e.preventDefault();
+        if (!e.repeat) runAction(s.action);
+        return;
+      }
+      // Panah di baris Layers = navigasi pohon, bukan nudge.
+      if (e.target instanceof HTMLElement && e.target.closest('[role="treeitem"]')) return;
       e.preventDefault();
-      if (e.repeat || editing.current > 0) return;
-      const { code, description } = removeNode(node);
-      void runEdit(code, description, (_created, rev) => {
-        setSelectedId((s) => (s === node.id ? undefined : s));
-        offerUndo(node.name, rev);
-      });
+      nudge.current.dx += s.nudge[0];
+      nudge.current.dy += s.nudge[1];
+      flushNudge();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [editable, runEdit, offerUndo]);
+  }, [editable, runAction, flushNudge]);
+  /** Menu konteks aksi (canvas live / baris Layers) dengan seleksi saat dibuka. */
+  const [editMenu, setEditMenu] = useState<{ x: number; y: number; ids: string[] } | undefined>(undefined);
+  const openLayerMenu = useCallback((id: string, x: number, y: number) => {
+    const cur = selectionRef.current;
+    const ids = cur.includes(id) ? [...cur] : [id];
+    if (!cur.includes(id)) setSelection(ids);
+    setEditMenu({ x, y, ids });
+  }, []);
+
+  // ---- Komponen (epic komponen story 4): sisip instance dari Assets, Reset all, Detach dari panel Design ----
+  const latestComponentsRef = useRef(latestComponents);
+  latestComponentsRef.current = latestComponents;
+  /** Sisip instance master `masterId` (Assets `+` atau drop): satu permintaan `add`, seleksi = instance baru. */
+  const insertInstance = useCallback(
+    (masterId: string, target: InsertTargetResult) => {
+      if (!editableRef.current || editing.current > 0) return;
+      if ('error' in target) {
+        setToast(target.error);
+        return;
+      }
+      const m = latestComponentsRef.current?.masterById.get(masterId);
+      if (!m) return;
+      void applyEdit([{ op: 'add', parentId: target.parentId, node: instanceNode(m, target.at), ref: 'instance' }], `Insert ${m.name}`).then((r) => {
+        const id = r?.refs.instance;
+        if (!id) return;
+        pendingSelect.current = id;
+        setSelection([id]);
+      });
+    },
+    [applyEdit, setToast],
+  );
+  /**
+   * Detach dari tombol grup Instance: op dibangun dari id tersimpan (bukan geometri canvas, yang bisa belum terukur),
+   * seleksi = node hasil detach.
+   */
+  const detachInstance = useCallback(
+    (instanceId: string, name: string) => {
+      if (!editableRef.current || editing.current > 0) return;
+      void applyEdit([{ op: 'detach', id: instanceId, ref: 'det0' }], `Detach ${name}`).then((r) => {
+        const id = r?.refs.det0;
+        if (id) setSelection([id]);
+      });
+    },
+    [applyEdit],
+  );
+  /** Reset all (grup Instance): buang seluruh override instance dalam satu permintaan. */
+  const resetAllOverrides = useCallback(
+    (instanceId: string, name: string) => {
+      if (!editableRef.current || editing.current > 0) return;
+      void applyEdit(resetAllOps(instanceId), `Reset overrides on ${name}`);
+    },
+    [applyEdit],
+  );
+  /**
+   * Aksi props/slot (story 5): antrean berurutan; op dibangun dari dokumen tersimpan terbaru sesudah rev aksi
+   * sebelumnya dimuat (maks. 3 detik), satu permintaan ops per aksi. Error pembangun → toast tanpa request.
+   */
+  const applyEditRef = useRef(applyEdit);
+  applyEditRef.current = applyEdit;
+  const [enqueueComponent] = useState(() =>
+    createActionQueue<LakarDocument, ComponentInfo>({
+      latest: () => docRef.current,
+      editable: () => editableRef.current,
+      info: componentInfo,
+      apply: (ops, label) => applyEditRef.current(ops, label),
+      waitRev: (rev) =>
+        new Promise<void>((resolve) => {
+          if ((docRef.current?.rev ?? -1) >= rev) return resolve();
+          const timer = setTimeout(() => {
+            revWaiters.current = revWaiters.current.filter((x) => x !== w);
+            resolve();
+          }, 3000);
+          const w = {
+            rev,
+            resolve: () => {
+              clearTimeout(timer);
+              resolve();
+            },
+          };
+          revWaiters.current.push(w);
+        }),
+      toast: (m) => setToast(m),
+      select: (id) => {
+        pendingSelect.current = id;
+        setSelection([id]);
+      },
+    }),
+  );
+  const componentEdit = useCallback<ComponentEdit>((label, build, select) => void enqueueComponent(label, build, select), [enqueueComponent]);
 
   if (gone || (doc.state === 'error' && doc.notFound)) {
     const archived = gone === 'archived' || (!gone && inArchive);
@@ -775,9 +1302,11 @@ export function Viewer({ slug }: { slug: string }) {
   const highlight: Highlight | undefined =
     selectedInfo && inspect?.state === 'ok' && inspect.value.node.id === selectedId && inspect.value.node.bounds
       ? { boardId: inspect.value.boardId, bounds: inspect.value.node.bounds }
-      : selectedInfo
-        ? { boardId: selectedInfo.boardId }
-        : undefined;
+      : selectedInfo && selectedId && (isComposite(selectedId) || selectedInSlot)
+        ? { boardId: selectedInfo.boardId, bounds: sceneBounds(sceneRef.current?.() ?? [], selectedId, boards) ?? [0, 0, 0, 0] }
+        : selectedInfo
+          ? { boardId: selectedInfo.boardId }
+          : undefined;
   const summary = checks?.state === 'ok' ? checks.value.summary : undefined;
   /** Marker temuan per node (level terberat menang); disembunyikan saat pratinjau versi. */
   const markers: CanvasMarker[] = [];
@@ -794,13 +1323,45 @@ export function Viewer({ slug }: { slug: string }) {
     }
     markers.push(...byNode.values());
   }
-  /** Induk node terpilih (frame/board berlayout) untuk "Parent layout" di Inspect. */
-  const parentNode = selectedInfo?.parentId ? findNode(d, selectedInfo.parentId) : undefined;
+  /**
+   * Target panel Design (story 5): node tersimpan + pasangan ter-resolve + layout induk + ukuran terukur DOM live, urut
+   * seleksi (terakhir = primer). Hanya dihitung saat tab Design terbuka.
+   */
+  const designTargets: DesignTarget[] =
+    tab === 'design'
+      ? selection.flatMap((id) => {
+          const info = index.get(id);
+          // Instance dan isi instance (epic komponen story 4): node efektif hasil ekspansi dengan ref token utuh
+          // (`expandedNodeAt`), jadi edit panel menjadi override di core (AD-12).
+          const inInstance = isComposite(id) || components?.kinds.get(id) === 'instance';
+          const ct = inInstance && components ? componentTarget(d, components, id) : undefined;
+          const n = inInstance ? ct?.stored : findNode(d, id);
+          if (!info || !n) return [];
+          // Parent dari dokumen ter-resolve: parent isi instance/slot adalah alamat komposit (layout tidak bertoken).
+          const parentRaw = info.parentId ? ((resolvedShown && findNode(resolvedShown, info.parentId)) ?? findNode(d, info.parentId)) : undefined;
+          const parentLayout = parentLayoutOf(n.type, parentRaw);
+          const r = resolvedShown ? findNode(resolvedShown, id) : undefined;
+          const mode = effectiveMode(findNode(d, info.boardId), d.tokenModes);
+          return [{ id, type: n.type, name: n.name, stored: n, resolved: r ?? n, parentLayout, measured: measureLiveSize(document, info.boardId, id), mode, overrides: ct?.overrides }];
+        })
+      : [];
+  /** Header dan grup Instance panel Design untuk seleksi tunggal master/instance/isi instance. */
+  const componentPanel: ComponentPanel | undefined =
+    tab === 'design' && selection.length === 1 && selectedId && components ? panelInfo(components, selectedId, index, d, {
+      goTo: (id) => locate(id),
+      detach: detachInstance,
+      resetAll: resetAllOverrides,
+      select: (address) => setSelection([address]),
+    }) : undefined;
   const docHasBoards = d.pages.some((p) => p.children.length > 0);
   const meta = previewDoc
     ? `Previewing rev ${d.rev} · latest ${latestDoc.rev}`
     : fileMeta(histInfo, latestDoc.pages.reduce((n, p) => n + p.children.length, 0), loadedAt, (t) => relativeTime(t, now), harnessLabel);
   const assets = leftTab === 'assets' ? collectAssets(d) : [];
+  const q = assetQuery.trim().toLowerCase();
+  const masters = leftTab === 'assets' ? (components?.masters ?? []).filter((m) => !q || m.name.toLowerCase().includes(q)) : [];
+  /** Pohon Layers dari dokumen ter-resolve (isi instance bisa dibuka); resolve gagal → board tersimpan. */
+  const treeBoards = ((resolvedShown?.pages.find((p) => p.id === page?.id)?.children ?? page?.children ?? []) as unknown as TreeNode[]);
   /** Pilih halaman dari Pages: seleksi di halaman lain dilepas (Inspect tidak menampilkan node yang tidak terlihat). */
   const choosePage = (id: string) => {
     setPageId(id);
@@ -808,6 +1369,15 @@ export function Viewer({ slug }: { slug: string }) {
     setSelectedId((sel) => (sel && index.get(sel)?.pageIndex !== i ? undefined : sel));
   };
   const hasLive = views.some((v) => v.live);
+  /** Locate di Agent Commit Row: pilih node lalu geser kamera ke board-nya bila belum terlihat (mekanisme Focus). */
+  const locate = (id: string) => {
+    const info = index.get(id);
+    if (!info || preview) return;
+    select(id);
+    setFocus({ boardId: info.boardId, nonce: Date.now() });
+  };
+  /** Badge "Selection shared with agents" (desain RIpNN): seleksi tidak kosong dan ada agen Live pada dokumen ini. */
+  const shareBadge = selection.length > 0 && !preview && !offline && hasLive ? shareBadgeText(selectedId ? index.get(selectedId)?.name : undefined, selection.length) : undefined;
   /** Rev terakhir tiap board berubah (≤ rev dokumen): PNG board lain dipakai ulang dari cache. */
   const onCanvasInsert = (kind: InsertKind, at: InsertPoint) => {
     beginInsert(canvasInsertTarget(kind, at, boards, page));
@@ -875,8 +1445,71 @@ export function Viewer({ slug }: { slug: string }) {
         </div>
         {leftTab === 'assets' ? (
           <div className="layer-tree assets">
+            {/* Komponen lokal (epic komponen story 4, desain C2xbUQ): klik = pilih master, + = sisip instance, drag = drop ke canvas. */}
+            <div className="assets-components">
+              <label className="assets-search">
+                <Icon name="search" size={13} />
+                <input type="search" placeholder="Search components" aria-label="Search components" value={assetQuery} onChange={(e) => setAssetQuery(e.currentTarget.value)} />
+              </label>
+              <div className="assets-group-header">
+                <span className="label">Local components</span>
+                <span>{components?.masters.length ?? 0}</span>
+              </div>
+              {masters.length === 0 ? (
+                <div className="muted-note">{components?.masters.length ? 'No components match your search.' : 'No components yet. Select layers and choose Create component.'}</div>
+              ) : (
+                masters.map((m) => (
+                  <div
+                    key={m.id}
+                    role="button"
+                    tabIndex={0}
+                    className={`component-card${m.id === selectedId ? ' selected' : ''}`}
+                    draggable={editable && !preview}
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData(COMPONENT_DRAG_TYPE, m.id);
+                      e.dataTransfer.effectAllowed = 'copy';
+                    }}
+                    onClick={() => select(m.id)}
+                    onKeyDown={(e) => {
+                      if (e.target !== e.currentTarget) return;
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        select(m.id);
+                      }
+                    }}
+                  >
+                    <span className="component-card-thumb">
+                      <Icon name="component" size={13} />
+                    </span>
+                    <span className="component-card-info">
+                      <strong>{m.name}</strong>
+                      <span>
+                        {instancesText(m.instances.length)} · {m.boardName}
+                      </span>
+                    </span>
+                    <button
+                      type="button"
+                      className="component-card-insert"
+                      title={editable ? `Insert ${m.name}` : preview ? 'Not available while previewing a version' : 'lakard is offline'}
+                      aria-label={`Insert ${m.name}`}
+                      disabled={!editable}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (latestComponents) insertInstance(m.id, instanceTarget(latestComponents, m.id, selectedId, boards[0]?.id));
+                      }}
+                    >
+                      <Icon name="plus" size={12} />
+                    </button>
+                  </div>
+                ))
+              )}
+              <div className="assets-hint">
+                <Icon name="mousePointerClick" size={13} />
+                <span>Drag a component onto the canvas, or click + to insert an instance into the selected frame.</span>
+              </div>
+            </div>
             <div className="section-header">
-              <span className="section-label">Assets</span>
+              <span className="section-label">Images &amp; icons</span>
             </div>
             {assets.length === 0 ? (
               <div className="muted-note">No assets yet. Images and icons added to this file show up here.</div>
@@ -919,10 +1552,18 @@ export function Viewer({ slug }: { slug: string }) {
         />
         <div className="layer-tree">
           <div className="section-header">
-            <span className="section-label">Layers</span>
+            <span className="section-header-left">
+              <span className="section-label">Layers</span>
+              {shareBadge && (
+                <span className="share-badge compact" title={shareBadge}>
+                  <Icon name="radio" size={10} />
+                  Shared
+                </span>
+              )}
+            </span>
             <AddLayerButton disabled={!editable} disabledReason={preview ? 'Not available while previewing a version' : 'lakard is offline'} hasBoard={boards.length > 0} onPick={onMenuInsert} />
           </div>
-          {boards.length === 0 ? <div className="muted-note">No layers yet</div> : <LayerTree key={page?.id} nodes={boards} selectedId={selectedId} selectedPath={selectedInfo} index={index} onSelect={select} marks={preview ? undefined : marks} />}
+          {boards.length === 0 ? <div className="muted-note">No layers yet</div> : <LayerTree key={page?.id} nodes={treeBoards} kinds={components?.kinds} selectedId={selectedId} selectedIds={selection} selectedPath={selectedInfo} index={index} onSelect={select} onToggle={toggleSelect} onMenu={openLayerMenu} marks={preview ? undefined : marks} />}
         </div>
           </>
         )}
@@ -939,6 +1580,7 @@ export function Viewer({ slug }: { slug: string }) {
         camera={page ? getCamera(slug, page.id) : undefined}
         onCamera={(c) => page && saveCamera(slug, page.id, c)}
         slug={slug}
+        doc={latestDoc}
         rev={d.rev}
         boardRevs={boardRevs}
         boards={boards}
@@ -949,7 +1591,25 @@ export function Viewer({ slug }: { slug: string }) {
         summary={summary}
         checksLoading={checks?.state === 'loading'}
         onSelect={select}
+        selection={selection}
+        onSelectIds={selectIds}
+        onCommit={commitGesture}
+        onCommitCreate={commitCreate}
+        onPathEdit={setPathEdit}
+        shareBadge={shareBadge}
+        actions={<ThemeButton open={themeOpen} onToggle={() => setThemeOpen((o) => !o)} />}
+        canUndo={editable && undoDepth.undo > 0}
+        canRedo={editable && undoDepth.redo > 0}
+        onUndo={undo}
+        onRedo={redo}
+        sceneRef={sceneRef}
+        onSceneChange={onSceneChange}
+        onContextMenu={(x, y, ids) => setEditMenu({ x, y, ids })}
+        components={latestComponents}
+        pastedTag={pasteToast?.report.kind === 'html' && pasteToast.nodeId ? { id: pasteToast.nodeId, label: pasteToast.layer } : undefined}
+        onDropComponent={(id, at) => latestComponents && insertInstance(id, dropTarget(latestComponents, id, sceneRef.current?.() ?? [], at))}
         onOpenChecks={() => openTab('checks')}
+        onExportCode={setCodeExport}
         preview={canvasPreview}
         editable={editable}
         onInsert={onCanvasInsert}
@@ -962,6 +1622,11 @@ export function Viewer({ slug }: { slug: string }) {
         }}
         overlay={
           <>
+            {themeOpen && !preview && (
+              <ThemePanel doc={latestDoc} rev={latestDoc.rev} editable={editable} onCommit={commitOps} onClose={closeTheme} onImportCss={() => setCssImportOpen(true)} importOpen={cssImportOpen} />
+            )}
+            {undoSkipped && <UndoSkippedToast key={undoSkipped.key} toast={undoSkipped} onHistory={() => openTab('history')} onClose={closeUndoSkipped} />}
+            {pasteToast && !undoSkipped && <PasteToast key={pasteToast.key} toast={pasteToast} onUndo={undoPaste} onClose={closePasteToast} />}
             {rollback && (
               <div key={rollback.key} className="rollback-toast canvas-overlay-ui" role="alert">
                 <Icon name="undo2" size={14} />
@@ -980,9 +1645,26 @@ export function Viewer({ slug }: { slug: string }) {
 
       <BottomSheet state={sheet} onState={setSheet} tabs={TABS} tab={tab} onTab={openTab} summary={summary} onChecks={() => openTab('checks')}>
         <div className="panel-body">
-          {tab === 'inspect' && <InspectPanel info={selectedInfo} inspect={inspect} parent={parentNode} />}
+          {tab === 'design' && (
+            <DesignPanel
+              targets={designTargets}
+              path={selectedInfo?.path ?? []}
+              editable={editable}
+              fonts={fonts}
+              inspectNode={inspect?.state === 'ok' ? inspect.value.node : undefined}
+              rev={d.rev}
+              onCommit={commitOps}
+              tokenModes={d.tokenModes}
+              tokens={d.tokens}
+              component={componentPanel}
+              componentEdit={componentEdit}
+              pathEdit={pathEdit}
+              onExportCode={preview ? undefined : setCodeExport}
+              align={designTargets.length > 1 ? { enabled: editable ? actionState(sceneRef.current?.() ?? [], selection) : NO_ACTIONS, run: (a) => runAction(a) } : undefined}
+            />
+          )}
           {tab === 'checks' && <ChecksPanel checks={checks} index={index} selectedId={selectedId} onSelect={select} onRun={runChecks} hasBoards={d.pages.some((p) => p.children.length > 0)} />}
-          {tab === 'activity' && <ActivityPanel views={views} connected={activity.connected} offline={offline} follow={follow} onFollow={setFollow} nameOf={nameOf} />}
+          {tab === 'activity' && <ActivityPanel views={views} connected={activity.connected} offline={offline} follow={follow} onFollow={setFollow} nameOf={nameOf} onLocate={locate} />}
           {tab === 'history' && (
             <HistoryPanel
               slug={slug}
@@ -1009,6 +1691,29 @@ export function Viewer({ slug }: { slug: string }) {
         />
       )}
       {toast && <Toast toast={toast} onClose={closeToast} />}
+      {codeExport && !preview && <CodeExportDialog doc={latestDoc} nodeId={codeExport} onClose={() => setCodeExport(undefined)} />}
+      {cssImportOpen && !preview && (
+        <ImportCssDialog
+          doc={latestDoc}
+          editable={editable}
+          onImport={async (build) => {
+            const b = build(latestDoc);
+            if ('error' in b) return b.error;
+            return (await commitOps(b.ops, b.label)) ? undefined : 'Import failed. Your tokens were not changed.';
+          }}
+          onClose={() => setCssImportOpen(false)}
+        />
+      )}
+      {editMenu && (
+        <EditMenu
+          x={editMenu.x}
+          y={editMenu.y}
+          enabled={editable ? actionState(sceneRef.current?.() ?? [], editMenu.ids) : NO_ACTIONS}
+          onAction={(a) => runAction(a, editMenu.ids)}
+          onClose={() => setEditMenu(undefined)}
+          onExportCode={preview ? undefined : editMenu.ids.length === 1 ? () => setCodeExport(editMenu.ids[0]) : null}
+        />
+      )}
       {fileMenu && (
         <FileMenu
           target={{ slug, x: fileMenu.x, y: fileMenu.y }}
@@ -1050,13 +1755,25 @@ function RestoreDialog({ entry, busy, error, onCancel, onConfirm }: { entry: His
 function LayerTree({
   nodes,
   selectedId,
+  selectedIds,
   selectedPath,
   index,
   onSelect,
+  onToggle,
+  onMenu,
   marks,
+  kinds,
 }: {
+  /** Master/instance tersimpan (epic komponen story 4): ikon component/diamond ungu. */
+  kinds?: ReadonlyMap<string, 'master' | 'instance'> | undefined;
+  /** Klik kanan baris: menu aksi edit (story 6) di (x, y). */
+  onMenu?: (id: string, x: number, y: number) => void;
   nodes: TreeNode[];
   selectedId: string | undefined;
+  /** Semua node terpilih (seleksi banyak dari canvas); tanpa ini hanya `selectedId`. */
+  selectedIds?: readonly string[];
+  /** Shift-klik baris: tambah/kurangi seleksi. */
+  onToggle?: (id: string) => void;
   selectedPath: NodeInfo | undefined;
   index: Map<string, NodeInfo>;
   onSelect: (id: string) => void;
@@ -1087,10 +1804,11 @@ function LayerTree({
   const walk = (n: TreeNode, depth: number) => {
     const kids = n.children ?? [];
     const isOpen = open.has(n.id);
-    const selected = n.id === selectedId;
+    const selected = selectedIds ? selectedIds.includes(n.id) : n.id === selectedId;
     const m = marks?.get(n.id);
     const mark = m?.mark;
     const markClass = m ? ` ${m.mark}${m.color === 'codex' ? ' codex' : ''}` : '';
+    const kind = kinds?.get(n.id.slice(n.id.lastIndexOf('/') + 1));
     rows.push(
       <div
         key={n.id}
@@ -1101,7 +1819,12 @@ function LayerTree({
         tabIndex={0}
         className={`layer-row${selected ? ' selected' : ''}${depth === 0 ? ' top' : ''}${markClass}`}
         style={{ paddingLeft: 8 + depth * 16 }}
-        onClick={() => onSelect(n.id)}
+        onClick={(e) => (e.shiftKey && onToggle ? onToggle(n.id) : onSelect(n.id))}
+        onContextMenu={(e) => {
+          if (!onMenu) return;
+          e.preventDefault();
+          onMenu(n.id, e.clientX, e.clientY);
+        }}
         onKeyDown={(e) => {
           if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault();
@@ -1119,7 +1842,12 @@ function LayerTree({
         >
           {kids.length > 0 && <Icon name={isOpen ? 'chevronDown' : 'chevronRight'} size={12} />}
         </span>
-        <Icon name={isImageNode(n) ? 'image' : (NODE_ICON[n.type] ?? 'square')} size={13} className="type-icon" />
+        {/* Instance bersarang di dalam instance tampil beralamat komposit `I/J`: segmen terakhir = id tersimpan J. */}
+        {kind ? (
+          <Icon name={kind === 'master' ? 'component' : 'diamond'} size={13} className="type-icon component" />
+        ) : (
+          <Icon name={isImageNode(n) ? 'image' : (NODE_ICON[n.type] ?? 'square')} size={13} className="type-icon" />
+        )}
         <span className="layer-label">{n.name}</span>
         {/* Kunci per execute: execute berikutnya pada node yang sama memutar ulang pudar titik. */}
         {(mark === 'agent' || mark === 'changed') && <i key={m?.key ?? mark} className="layer-agent-dot" aria-hidden="true" />}

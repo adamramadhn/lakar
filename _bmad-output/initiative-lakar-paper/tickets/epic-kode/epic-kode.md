@@ -4,7 +4,7 @@ title: "Desain dibawa ke kode dan token dibawa dari kode"
 parent: initiative-lakar-paper
 covers: [R5]
 after: [epic-token-tema, epic-komponen]
-refined: false
+refined: true
 risk: high
 ---
 
@@ -39,3 +39,4 @@ Fatmuh membawa desain ke codebase tanpa menerjemahkan ulang secara manual.
 - Waits on epic-token-tema because: token untuk diekspor.
 - Waits on epic-komponen because: komponen untuk diekspor.
 - Decision: 2026-11-22 — story pertama epic ini adalah desain UI/UX/motion yang belum ada di `design/lakar-ui.pen` (hitl, disetujui Fatmuh). Story kode mengikuti desain itu lewat MCP pencil (C6).
+- Decision: 2026-11-22 — epic dipecah menjadi 5 story (tickets/tickets.toml) atas delegasi Fatmuh.

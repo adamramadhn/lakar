@@ -87,6 +87,7 @@ Font terpasang (weight): Inter 100–900, DM Sans 100–900, Plus Jakarta Sans 2
 - Board `[WIP] Produk / Layar · <landing|app|mobile> · <Arketipe>`, posisi `place()`. Revisi: ubah hanya yang diminta (`update`).
 - Flex di mana-mana; absolut hanya `Overlay / …`. Satu wrapper konten per board.
 - Prefiks: `Seksi /`, `Overlay /` (sengaja menumpuk), `Crop /` (sengaja memotong), `Scroll /` (area gulir), `Ekstra /`, `Image /`, `Button /`, `IconButton /`, `Input /`, `Tab /`, `Link /`, `Badge /`, `KPI / Nilai`, `Display /`.
+- Kerja dari seleksi pengguna (varian, cek konsistensi): `selection`.
 - Teks rata kiri (tengah hanya hero/header seksi landing).
 
 ## Fakta teknis

@@ -47,6 +47,8 @@ pnpm lakard         # jalankan daemon (viewer: http://127.0.0.1:7466/app/)
 - **Windows.**
   - `fsync` direktori dan `ftruncate` pada handle append ditolak `EPERM`. `store.ts` sudah menanganinya (commit `1b6b60c`).
   - Sisa kegagalan tes yang khas Windows: SIGTERM/SIGKILL, izin file key foto, ukuran skill akibat CRLF, dan URL ESM `d:`. **CI Linux adalah acuan.**
+  - Node 26 mungkin tidak ada di PATH. nvm memasangnya di `C:\Users\Fatmuh\AppData\Local\nvm\v26.5.0`. pnpm bisa dijalankan lewat `npx -y pnpm@12.21.0`.
+  - `design/lakar-ui.pen` berupa teks JSON, jadi git menormalkan CRLF-nya di Windows. Perubahan ini tidak berbahaya.
 - **Sumber C7 dan juri.** Tidak ada di repo. CI memakai `LAKAR_C7_ALLOW_MISSING_SOURCES=1`.
 - **Release.**
   - `.github/workflows/release.yml`: tag `v*` membangun installer dan menerbitkannya. `workflow_dispatch` membangun saja, tetapi baru bisa dipicu setelah file workflow ada di `main`.

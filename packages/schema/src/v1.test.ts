@@ -90,8 +90,8 @@ const issueOf = (input: unknown) => {
 };
 
 describe('katalog v1', () => {
-  it('NODE_TYPES tertutup: 7 tipe', () => {
-    expect([...NODE_TYPES]).toEqual(['board', 'frame', 'text', 'rect', 'ellipse', 'path', 'icon']);
+  it('NODE_TYPES tertutup: 8 tipe (v5 menambah instance)', () => {
+    expect([...NODE_TYPES]).toEqual(['board', 'frame', 'text', 'rect', 'ellipse', 'path', 'icon', 'instance']);
   });
 
   it.each(Object.entries(valid))('contoh valid: %s', (_t, input) => {
@@ -191,7 +191,7 @@ describe('katalog v1', () => {
   });
 });
 
-const doc = (pages: unknown[], tokens?: Record<string, number | string>): Doc =>
+const doc = (pages: unknown[], tokens?: Record<string, unknown>): Doc =>
   LakarDocument.parse({ schemaVersion: SCHEMA_VERSION, id: 'Dddddddd', rev: 3, ...(tokens ? { tokens } : {}), pages });
 
 const fullDoc = () =>
@@ -223,12 +223,12 @@ const fullDoc = () =>
       },
     ],
     {
-      'colors.surface': '#FFFFFF',
-      'colors.accent': '#2F6BFF',
-      'colors.text-primary': '#1A1A1A',
-      'type.h1.size': 40,
-      'rounded.md': 8,
-      'size.content': 1200,
+      'colors.surface': { type: 'color', value: '#FFFFFF' },
+      'colors.accent': { type: 'color', value: '#2F6BFF' },
+      'colors.text-primary': { type: 'color', value: '#1A1A1A' },
+      'type.h1.size': { type: 'fontSize', value: 40 },
+      'rounded.md': { type: 'radius', value: 8 },
+      'size.content': { type: 'container', value: 1200 },
     },
   );
 
@@ -275,8 +275,8 @@ describe('dokumen dan token', () => {
   });
 
   it('nama token tidak valid di peta tokens ditolak', () => {
-    expect(() => doc([{ id: 'Pppppppp', name: 'P', children: [] }], { 'Bukan Nama': 1 })).toThrow();
-    expect(() => doc([{ id: 'Pppppppp', name: 'P', children: [] }], { 'a.b': '' })).toThrow();
+    expect(() => doc([{ id: 'Pppppppp', name: 'P', children: [] }], { 'Bukan Nama': { type: 'spacing', value: 1 } })).toThrow();
+    expect(() => doc([{ id: 'Pppppppp', name: 'P', children: [] }], { 'a.b': { type: 'fontFamily', value: '' } })).toThrow();
   });
 
   it('referensi token tersimpan apa adanya; resolveTokens mengganti dengan nilai tanpa memutasi input', () => {
@@ -332,7 +332,7 @@ describe('dokumen dan token', () => {
 
   it('token salah tipe (angka di slot warna) → SCHEMA_INVALID menyebut path dan token', () => {
     const d = fullDoc();
-    d.tokens!['colors.text-primary'] = 16;
+    d.tokens!['colors.text-primary'] = { type: 'spacing', value: 16 };
     try {
       resolveTokens(d);
       expect.unreachable();
@@ -346,7 +346,7 @@ describe('dokumen dan token', () => {
 
   it('token string di slot angka → SCHEMA_INVALID', () => {
     const d = fullDoc();
-    d.tokens!['type.h1.size'] = 'besar';
+    d.tokens!['type.h1.size'] = { type: 'fontFamily', value: 'besar' };
     expect(() => resolveTokens(d)).toThrow(expect.objectContaining({ code: 'SCHEMA_INVALID' }));
   });
 });
@@ -355,7 +355,7 @@ describe('jsonSchemas', () => {
   const { document, node } = jsonSchemas();
   const text = JSON.stringify(node);
 
-  it('memuat ketujuh tipe node', () => {
+  it('memuat kedelapan tipe node', () => {
     for (const t of NODE_TYPES) expect(text).toContain(`"const":"${t}"`);
     const docText = JSON.stringify(document);
     for (const t of NODE_TYPES) expect(docText).toContain(`"const":"${t}"`);
@@ -364,7 +364,7 @@ describe('jsonSchemas', () => {
   it('objek strict → additionalProperties:false', () => {
     expect(document.additionalProperties).toBe(false);
     const variants = (node as { oneOf?: { additionalProperties?: unknown }[]; anyOf?: { additionalProperties?: unknown }[] }).oneOf ?? (node as { anyOf: { additionalProperties?: unknown }[] }).anyOf;
-    expect(variants).toHaveLength(7);
+    expect(variants).toHaveLength(NODE_TYPES.length);
     for (const v of variants) expect(v.additionalProperties).toBe(false);
   });
 

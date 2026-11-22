@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { SCHEMA_VERSION, summarizeFindings, type Finding } from '@lakar/schema';
+import { LakarDocument, SCHEMA_VERSION, resolveDocument, summarizeFindings, type Finding } from '@lakar/schema';
 import { testLog } from '../../../tests/support/log.ts';
 import {
   PACKAGE,
@@ -94,6 +94,37 @@ const clean = (children: BoardSpec['children'], extra: Partial<BoardSpec> = {}):
 describe('@lakar/check', () => {
   it('mengekspor nama paket', () => {
     expect(PACKAGE).toBe('@lakar/check');
+  });
+});
+
+describe('frame grid (v4): anak diperlakukan flow, tidak crash', () => {
+  const card = (name: string, r: R, kids: Loose[] = []) => frame(name, r, kids, { layout: 'column', padding: 12, radius: 12, fills: [{ type: 'solid', color: '#F2F4F7' }] });
+  const gridSpec = () => {
+    const a = card('Kartu A', [16, 16, 173, 80], [text('Satu', [28, 28, 149, 20], { color: '#101828' })]);
+    const b = card('Kartu B', [201, 16, 173, 80], [text('Dua', [213, 28, 149, 20], { color: '#101828' })]);
+    const c = card('Kartu lebar', [16, 108, 358, 80], [text('Tiga', [28, 120, 334, 20], { color: '#101828' })]);
+    c.gridColumn = { span: 2 };
+    const g = frame('Grid kartu', [0, 0, 390, 204], [a, b, c, rect('Overlay / Lencana', [360, 0, 24, 24], { position: 'absolute', x: 360, y: 0 })], {
+      layout: 'grid',
+      gridTemplateColumns: [{ fr: 1 }, { fr: 1 }],
+      gridTemplateRows: [80, 'auto'],
+      columnGap: 12,
+      rowGap: 12,
+      padding: 16,
+    });
+    return clean([g]);
+  };
+
+  it('grid bersih: tanpa temuan (termasuk aturan khusus row/column)', () => {
+    expect(run(gridSpec())).toEqual([]);
+  });
+
+  it('anak grid meluber dari induk tetap dilaporkan (dihitung sebagai flow)', () => {
+    const t = text('Judul yang sangat panjang meluber', [16, 16, 420, 20], { color: '#101828' });
+    const g = frame('Grid', [0, 0, 390, 52], [t], { layout: 'grid', gridTemplateColumns: [{ fr: 1 }], padding: 16, clip: true });
+    let f: Finding[] = [];
+    expect(() => (f = run(clean([g])))).not.toThrow();
+    expect(rules(f)).toContain('LC-02a');
   });
 });
 
@@ -1302,6 +1333,102 @@ describe('batas warning per aturan per board', () => {
   it('error tidak dibatasi', () => {
     const kids = Array.from({ length: 5 }, (_, i) => text(`Abu ${i}`, [0, i * 24, 100, 20], { color: '#D0D5DD' }));
     expect(only(run(clean(kids)), 'LC-04')).toHaveLength(5);
+  });
+});
+
+describe('LC-32 referensi instance basi (AD-12)', () => {
+  const stored = (overrides?: Loose) =>
+    LakarDocument.parse({
+      schemaVersion: SCHEMA_VERSION,
+      id: 'Docu0001',
+      rev: 1,
+      pages: [
+        {
+          id: 'Page0001',
+          name: 'Page 1',
+          children: [
+            {
+              type: 'board',
+              id: 'Brd00001',
+              name: 'Home',
+              x: 0,
+              y: 0,
+              width: 390,
+              height: 844,
+              screen: 'mobile',
+              children: [
+                {
+                  type: 'frame',
+                  id: 'Mst00001',
+                  name: 'Kartu',
+                  layout: 'column',
+                  padding: 12,
+                  component: { props: [], slots: [] },
+                  children: [{ type: 'text', id: 'Txt00001', name: 'Teks', content: 'Halo', size: 14, color: '#101828' }],
+                },
+                { type: 'instance', id: 'Ins00001', name: 'Kartu / A', componentId: 'Mst00001', ...(overrides ? { overrides } : {}) },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+  const measure: BoardMeasure = {
+    width: 390,
+    height: 844,
+    nodes: [
+      { id: 'Mst00001', x: 0, y: 0, width: 390, height: 44 },
+      { id: 'Txt00001', x: 12, y: 12, width: 100, height: 20 },
+      { id: 'Ins00001', x: 0, y: 60, width: 390, height: 44 },
+      { id: 'Ins00001/Txt00001', x: 12, y: 72, width: 100, height: 20 },
+    ],
+    texts: [],
+  };
+  const check = (overrides?: Loose) => checkBoard({ doc: resolveDocument(stored(overrides)), boardId: 'Brd00001', measure });
+
+  it('instance tanpa referensi basi: tanpa LC-32', () => {
+    expect(only(check({ Txt00001: { content: 'Hai' } }), 'LC-32')).toEqual([]);
+  });
+
+  it('override yatim → satu warning LC-32 pada instance, gerbang tetap 0', () => {
+    const f = check({ Gone0001: { content: 'x' }, Txt00001: { content: 'Hai' } });
+    const lc32 = only(f, 'LC-32');
+    expect(lc32).toEqual([expect.objectContaining({ level: 'warning', nodeId: 'Ins00001', nodeName: 'Kartu / A' })]);
+    expect(lc32[0]!.detail).toContain('override Gone0001');
+    expect(summarizeFindings(f).gate).toBe(0);
+  });
+
+  it('dokumen sintetis tanpa resolveDocument: LC-32 tidak muncul (tanpa laporan ekspansi)', () => {
+    expect(rules(run(clean([text('Halo', [0, 0, 100, 20], { color: '#101828' })])))).not.toContain('LC-32');
+  });
+});
+
+describe('LC-32 per board (AD-12)', () => {
+  it('dua board: setiap board hanya mendapat LC-32 instance miliknya', () => {
+    const board = (id: string, x: number, children: Loose[]) => ({ type: 'board', id, name: id, x, y: 0, width: 390, height: 844, screen: 'mobile', children });
+    const m = { type: 'frame', id: 'Mst00001', name: 'Kartu', layout: 'column', component: { props: [], slots: [] }, children: [{ type: 'text', id: 'Txt00001', name: 'Teks', content: 'Halo', size: 14, color: '#101828' }] };
+    const doc = resolveDocument(
+      LakarDocument.parse({
+        schemaVersion: SCHEMA_VERSION,
+        id: 'Docu0001',
+        rev: 1,
+        pages: [
+          {
+            id: 'Page0001',
+            name: 'Page 1',
+            children: [
+              board('Brd00001', 0, [m, { type: 'instance', id: 'Ins00001', name: 'A', componentId: 'Mst00001', overrides: { Gone0001: { content: 'x' } } }]),
+              board('Brd00002', 500, [{ type: 'instance', id: 'Ins00002', name: 'B', componentId: 'Mst00001' }]),
+            ],
+          },
+        ],
+      }),
+    );
+    const measure = (ids: string[]): BoardMeasure => ({ width: 390, height: 844, nodes: ids.map((id, i) => ({ id, x: 0, y: i * 50, width: 390, height: 44 })), texts: [] });
+    const a = only(checkBoard({ doc, boardId: 'Brd00001', measure: measure(['Mst00001', 'Txt00001', 'Ins00001', 'Ins00001/Txt00001']) }), 'LC-32');
+    const b = only(checkBoard({ doc, boardId: 'Brd00002', measure: measure(['Ins00002', 'Ins00002/Txt00001']) }), 'LC-32');
+    expect(a.map((f) => f.nodeId)).toEqual(['Ins00001']);
+    expect(b).toEqual([]);
   });
 });
 

@@ -1,0 +1,224 @@
+{
+  "schemaVersion": 1,
+  "id": "CorpV1La",
+  "rev": 12,
+  "tokens": {
+    "colors.bg": "#FAFAF7",
+    "colors.text-primary": "#1A1A1A",
+    "colors.text-muted": "#6B6B6BFF",
+    "colors.accent": "#2F6FEB",
+    "colors.border": "#E4E4E0",
+    "spacing.sm": 8,
+    "spacing.md": 16,
+    "spacing.lg": 32,
+    "radius.md": 12,
+    "size.body": 16,
+    "size.heading": 40,
+    "stroke.thin": 1,
+    "layout.content": 1120
+  },
+  "pages": [
+    {
+      "id": "PageLnd1",
+      "name": "Landing",
+      "children": [
+        {
+          "type": "board",
+          "id": "BrdLand1",
+          "name": "Landing / Desktop",
+          "x": 0,
+          "y": 0,
+          "width": 1280,
+          "height": 900,
+          "screen": "landing",
+          "expectedSize": { "width": 1280, "height": 900 },
+          "clip": true,
+          "fills": [{ "type": "solid", "color": { "$token": "colors.bg" } }],
+          "children": [
+            {
+              "type": "frame",
+              "id": "FrmHead1",
+              "name": "Header",
+              "layout": "row",
+              "gap": { "$token": "spacing.md" },
+              "padding": [{ "$token": "spacing.md" }, { "$token": "spacing.lg" }],
+              "align": "center",
+              "justify": "space-between",
+              "width": "fill",
+              "height": "hug",
+              "stroke": { "color": { "$token": "colors.border" }, "width": { "$token": "stroke.thin" }, "align": "inside", "sides": ["bottom"] },
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "FrmLogo1",
+                  "name": "Logo",
+                  "layout": "row",
+                  "gap": 8,
+                  "align": "center",
+                  "width": "hug",
+                  "height": "hug",
+                  "children": [
+                    { "type": "icon", "id": "IcoHous1", "name": "Icon / lucide / house", "lib": "lucide", "icon": "house", "size": 24, "color": { "$token": "colors.accent" }, "strokeWidth": 2 },
+                    { "type": "text", "id": "TxtBrnd1", "name": "Brand", "content": "Kedai Contoh", "family": "Inter", "weight": 700, "size": 20, "lineHeight": 24, "color": { "$token": "colors.text-primary" } }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "FrmNav01",
+                  "name": "Nav",
+                  "layout": "row",
+                  "gap": 24,
+                  "align": "center",
+                  "children": [
+                    { "type": "text", "id": "TxtNav01", "name": "Nav / Menu", "content": "Menu", "weight": 500, "size": { "$token": "size.body" }, "lineHeight": 20, "color": { "$token": "colors.text-muted" } },
+                    { "type": "text", "id": "TxtNav02", "name": "Nav / Lokasi", "content": "Lokasi", "weight": 500, "size": { "$token": "size.body" }, "lineHeight": 20, "color": { "$token": "colors.text-muted" } },
+                    { "type": "icon", "id": "IcoSrch1", "name": "Icon / lucide / search", "lib": "lucide", "icon": "search", "size": 20, "color": "#1A1A1A" }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "FrmHero1",
+              "name": "Hero",
+              "layout": "column",
+              "gap": { "$token": "spacing.md" },
+              "padding": [64, { "$token": "spacing.lg" }, 48, { "$token": "spacing.lg" }],
+              "align": "start",
+              "width": "fill",
+              "maxWidth": { "$token": "layout.content" },
+              "children": [
+                { "type": "text", "id": "TxtHero1", "name": "Hero / Judul", "content": "Kopi enak, harga bersahabat", "family": "Inter", "weight": 700, "size": { "$token": "size.heading" }, "lineHeight": 48, "letterSpacing": -0.8, "color": { "$token": "colors.text-primary" }, "width": "fill", "wrap": "wrap" },
+                { "type": "text", "id": "TxtHero2", "name": "Hero / Sub", "content": "Biji pilihan dari kebun lokal, disangrai setiap pekan.", "weight": 400, "size": 18, "lineHeight": 28, "color": { "$token": "colors.text-muted" }, "width": 560, "wrap": "wrap" },
+                {
+                  "type": "frame",
+                  "id": "FrmCta01",
+                  "name": "CTA",
+                  "layout": "row",
+                  "gap": 8,
+                  "padding": [12, 20],
+                  "align": "center",
+                  "radius": { "$token": "radius.md" },
+                  "fills": [{ "type": "solid", "color": { "$token": "colors.accent" } }],
+                  "shadows": [{ "type": "drop", "x": 0, "y": 4, "blur": 12, "spread": 0, "color": "#2F6FEB40" }],
+                  "children": [
+                    { "type": "text", "id": "TxtCta01", "name": "CTA / Label", "content": "Pesan sekarang", "weight": 600, "size": 16, "lineHeight": 20, "color": "#FFFFFF" },
+                    { "type": "icon", "id": "IcoChk01", "name": "Icon / lucide / check", "lib": "lucide", "icon": "check", "size": 18, "color": "#FFFFFF" }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "FrmCard1",
+              "name": "Kartu",
+              "layout": "row",
+              "gap": 24,
+              "padding": [0, 32],
+              "width": "fill",
+              "height": 320,
+              "align": "stretch",
+              "children": [
+                {
+                  "type": "rect",
+                  "id": "RctLin01",
+                  "name": "Kartu / Gradien",
+                  "width": "fill",
+                  "height": "fill",
+                  "minWidth": 200,
+                  "radius": [16, { "$token": "radius.md" }, 4, 0],
+                  "fills": [{ "type": "linear", "angle": 135, "stops": [{ "offset": 0, "color": "#FFE8C7" }, { "offset": 0.5, "color": { "$token": "colors.accent" } }, { "offset": 1, "color": "#1A1A1A" }] }],
+                  "stroke": { "color": "#1A1A1A", "width": 2, "align": "inside", "sides": ["top", "left"] },
+                  "shadows": [
+                    { "type": "drop", "x": 0, "y": 8, "blur": 24, "spread": -4, "color": "#0000002E" },
+                    { "type": "inner", "x": 0, "y": 1, "blur": 0, "color": "#FFFFFF80" }
+                  ]
+                },
+                {
+                  "type": "rect",
+                  "id": "RctRad01",
+                  "name": "Kartu / Radial",
+                  "width": 280,
+                  "height": "fill",
+                  "radius": 24,
+                  "opacity": 0.9,
+                  "fills": [{ "type": "radial", "center": [0.3, 0.3], "radius": 0.8, "stops": [{ "offset": 0, "color": "#FFFFFF" }, { "offset": 1, "color": "#9BC1FF" }] }],
+                  "stroke": { "color": { "$token": "colors.border" }, "width": 1, "align": "outside" }
+                },
+                {
+                  "type": "frame",
+                  "id": "FrmFree1",
+                  "name": "Komposisi bebas",
+                  "layout": "none",
+                  "width": 320,
+                  "height": "fill",
+                  "clip": true,
+                  "radius": 16,
+                  "fills": [{ "type": "solid", "color": "#FFFFFF" }],
+                  "stroke": { "color": "#E4E4E0", "width": 1, "align": "center" },
+                  "children": [
+                    { "type": "ellipse", "id": "ElpArc01", "name": "Busur", "position": "absolute", "x": 24, "y": 24, "width": 120, "height": 120, "startDeg": 0, "sweepDeg": 270, "inner": 0.6, "fills": [{ "type": "solid", "color": { "$token": "colors.accent" } }] },
+                    { "type": "ellipse", "id": "ElpDot01", "name": "Titik", "position": "absolute", "x": 200, "y": 40, "width": 48, "height": 48, "fills": [{ "type": "solid", "color": "#FFB020" }], "stroke": { "color": "#1A1A1A", "width": 2, "align": "inside" } },
+                    { "type": "path", "id": "PthWave1", "name": "Gelombang", "position": "absolute", "x": 16, "y": 180, "width": 288, "height": 80, "d": "M0 40 C 48 0, 96 80, 144 40 S 240 0, 288 40 L 288 80 L 0 80 Z", "viewBox": [0, 0, 288, 80], "fills": [{ "type": "solid", "color": "#9BC1FF" }], "stroke": { "color": "#2F6FEB", "width": 2, "align": "center" } },
+                    { "type": "icon", "id": "IcoStar1", "name": "Icon / lucide / star", "lib": "lucide", "icon": "star", "position": "absolute", "x": 260, "y": 120, "size": 32, "color": "#FFB020", "filled": true },
+                    { "type": "icon", "id": "IcoChrt1", "name": "Icon / lucide / chart-scatter", "lib": "lucide", "icon": "chart-scatter", "position": "absolute", "x": 200, "y": 120, "size": 32, "color": "#1A1A1A" }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "FrmFoot1",
+              "name": "Footer",
+              "layout": "row",
+              "gap": 12,
+              "padding": 32,
+              "align": "center",
+              "width": "fill",
+              "children": [
+                { "type": "icon", "id": "IcoGh001", "name": "Icon / simple-icons / github", "lib": "simple-icons", "icon": "github", "size": 24 },
+                { "type": "icon", "id": "IcoWa001", "name": "Icon / simple-icons / whatsapp", "lib": "simple-icons", "icon": "whatsapp", "size": 24, "color": "#25D366" },
+                { "type": "text", "id": "TxtFoot1", "name": "Footer / Hak cipta", "content": "© 2026 Kedai Contoh", "size": 14, "lineHeight": 20, "align": "right", "numeric": "tabular", "width": "fill", "color": { "$token": "colors.text-muted" } }
+              ]
+            },
+            { "type": "text", "id": "TxtBadg1", "name": "Lencana", "position": "absolute", "x": 1120, "y": 96, "content": "Baru", "weight": 600, "size": 12, "lineHeight": 16, "color": "#FFFFFF" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "PageApp1",
+      "name": "Dasbor",
+      "children": [
+        {
+          "type": "board",
+          "id": "BrdDash1",
+          "name": "Dasbor / Ringkasan",
+          "x": 0,
+          "y": 0,
+          "width": 960,
+          "height": 600,
+          "screen": "app",
+          "fills": [{ "type": "solid", "color": "#FFFFFF" }],
+          "children": [
+            {
+              "type": "frame",
+              "id": "FrmDsh01",
+              "name": "Isi",
+              "layout": "column",
+              "gap": { "$token": "spacing.sm" },
+              "padding": { "$token": "spacing.lg" },
+              "width": "fill",
+              "height": "fill",
+              "children": [
+                { "type": "text", "id": "TxtDsh01", "name": "Judul", "content": "Penjualan pekan ini", "weight": 600, "size": 24, "lineHeight": 32, "color": { "$token": "colors.text-primary" } },
+                { "type": "text", "id": "TxtDsh02", "name": "Angka", "content": "Rp 12.480.000", "weight": 700, "size": 32, "lineHeight": 40, "numeric": "tabular", "color": { "$token": "colors.accent" } },
+                { "type": "rect", "id": "RctDsh01", "name": "Pemisah", "width": "fill", "height": 1, "fills": [{ "type": "solid", "color": { "$token": "colors.border" } }] }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

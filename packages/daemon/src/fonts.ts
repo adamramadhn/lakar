@@ -86,6 +86,11 @@ export class FontRegistry {
     return [...this.#byId.values()].map((e) => e.family);
   }
 
+  /** Keluarga terdaftar beserta bobot dan gaya (pemilih font panel Design viewer). */
+  entries(): { family: string; weights: number[]; styles: FontStyle[] }[] {
+    return [...this.#byId.values()].map((e) => ({ family: e.family, weights: [...e.weights], styles: [...e.styles] }));
+  }
+
   entry(family: string): FontFamilyEntry | undefined {
     return this.#byFamily.get(family.toLowerCase());
   }

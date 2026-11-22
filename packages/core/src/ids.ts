@@ -31,6 +31,10 @@ export class IdAllocator {
     }
     throw new Error('IdAllocator: gagal mendapat ID unik setelah 1000 percobaan');
   }
+  /** Tandai `id` terpakai (ID yang disisip ulang `insert`); `next()` tidak akan mengembalikannya. */
+  reserve(id: string): void {
+    this.#used.add(id);
+  }
   static forDocument(doc: Doc, random?: RandomSource): IdAllocator {
     return new IdAllocator(collectIds(doc), random);
   }
@@ -41,6 +45,8 @@ export function collectIds(doc: Doc): string[] {
   const walk = (n: AnyNode) => {
     ids.push(n.id);
     if ('children' in n) n.children.forEach(walk);
+    // Isi slot instance (AD-12) adalah node tersimpan dengan ID sendiri.
+    if (n.type === 'instance') for (const list of Object.values(n.slots ?? {})) list.forEach(walk);
   };
   for (const p of doc.pages) {
     ids.push(p.id);

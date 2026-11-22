@@ -222,6 +222,24 @@ export async function pixelDiffRatio(a: Buffer, b: Buffer, tol = GOLDEN_TOLERANC
 }
 
 /**
+ * Bandingkan dua PNG di halaman: rasio piksel yang selisih kanal maksimumnya > `tol`, `ok` bila rasio ≤ `maxRatio`.
+ * Gagal → `diff` (PNG base64: merah = piksel berbeda) dan `reason`. Dimensi berbeda → `ok: false` tanpa rasio.
+ */
+export async function comparePngs(
+  a: Buffer,
+  b: Buffer,
+  tol: number,
+  maxRatio: number,
+): Promise<{ ok: boolean; ratio?: number; reason?: string; diff?: string }> {
+  return (await currentPage().evaluate(`(${COMPARE_IN_PAGE})(${JSON.stringify([a.toString('base64'), b.toString('base64'), tol, maxRatio])})`)) as {
+    ok: boolean;
+    ratio?: number;
+    reason?: string;
+    diff?: string;
+  };
+}
+
+/**
  * Tulis `test/out/<name>.png`, bandingkan dengan `test/golden/<name>.png` di halaman.
  * Golden tidak ada → gagal (kecuali LAKAR_UPDATE_GOLDEN=1, yang menulis golden).
  */

@@ -4,7 +4,7 @@ title: "Paste HTML/SVG dan edit vektor"
 parent: initiative-lakar-paper
 covers: [R6, R7]
 after: [epic-editor-canvas]
-refined: false
+refined: true
 risk: medium
 ---
 
@@ -38,3 +38,4 @@ Fatmuh membawa potongan desain yang sudah ada dan menggambar bentuk sendiri di c
 
 - Waits on epic-editor-canvas because: editor canvas dan panel properti.
 - Decision: 2026-11-22 — story pertama epic ini adalah desain UI/UX/motion yang belum ada di `design/lakar-ui.pen` (hitl, disetujui Fatmuh). Story kode mengikuti desain itu lewat MCP pencil (C6).
+- Decision: 2026-11-22 — epic dipecah menjadi 5 story (tickets/tickets.toml) atas delegasi Fatmuh.

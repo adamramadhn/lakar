@@ -1,0 +1,91 @@
+{
+  "schemaVersion": 3,
+  "id": "CorpV3Tm",
+  "rev": 9,
+  "tokenModes": ["light", "dark"],
+  "tokens": {
+    "colors.surface": { "type": "color", "value": "#FFFFFF", "modes": { "dark": "#0B0C0F" } },
+    "colors.ink": { "type": "color", "value": "#111111", "modes": { "dark": "#F5F5F7" } },
+    "colors.accent": { "type": "color", "value": "#2563EB", "modes": { "light": "#1D4ED8", "dark": "#60A5FA" } },
+    "colors.line": { "type": "color", "value": "#E4E7EC" },
+    "radius.card": { "type": "radius", "value": 16 },
+    "spacing.4": { "type": "spacing", "value": 16, "modes": { "dark": 20 } },
+    "spacing.icon": { "type": "spacing", "value": 24 },
+    "container.content": { "type": "container", "value": 350 },
+    "breakpoint.mobile": { "type": "breakpoint", "value": 390 },
+    "font.family": { "type": "fontFamily", "value": "Inter" },
+    "font.weight-strong": { "type": "fontWeight", "value": 600, "modes": { "dark": 700 } },
+    "font.size-title": { "type": "fontSize", "value": 24 },
+    "font.line-title": { "type": "lineHeight", "value": 32 },
+    "font.tracking-title": { "type": "letterSpacing", "value": -0.3 }
+  },
+  "pages": [
+    {
+      "id": "PageTm01",
+      "name": "Tema",
+      "children": [
+        {
+          "type": "board",
+          "id": "BrdTmLgt",
+          "name": "Kartu / Terang",
+          "x": 0,
+          "y": 0,
+          "width": 390,
+          "height": 400,
+          "screen": "mobile",
+          "fills": [{ "type": "solid", "color": { "$token": "colors.surface" } }],
+          "children": [
+            {
+              "type": "frame",
+              "id": "FrmTmLg1",
+              "name": "Kartu",
+              "layout": "column",
+              "gap": { "$token": "spacing.4" },
+              "padding": { "$token": "spacing.4" },
+              "width": "fill",
+              "maxWidth": { "$token": "container.content" },
+              "radius": { "$token": "radius.card" },
+              "stroke": { "color": { "$token": "colors.line" }, "width": 1, "align": "inside" },
+              "children": [
+                { "type": "icon", "id": "IcoTmLg1", "name": "Icon / lucide / star", "lib": "lucide", "icon": "star", "size": { "$token": "spacing.icon" }, "color": { "$token": "colors.accent" } },
+                { "type": "text", "id": "TxtTmLg1", "name": "Judul", "content": "Mode terang", "family": { "$token": "font.family" }, "weight": { "$token": "font.weight-strong" }, "size": { "$token": "font.size-title" }, "lineHeight": { "$token": "font.line-title" }, "letterSpacing": { "$token": "font.tracking-title" }, "color": { "$token": "colors.ink" } },
+                { "type": "rect", "id": "RctTmLg1", "name": "Aksen", "width": "fill", "height": 8, "radius": { "$token": "radius.card" }, "fills": [{ "type": "linear", "angle": 90, "stops": [{ "offset": 0, "color": { "$token": "colors.accent" } }, { "offset": 1, "color": { "$token": "colors.surface" } }] }] }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "board",
+          "id": "BrdTmDrk",
+          "name": "Kartu / Gelap",
+          "x": 470,
+          "y": 0,
+          "width": 390,
+          "height": 400,
+          "screen": "mobile",
+          "themeMode": "dark",
+          "fills": [{ "type": "solid", "color": { "$token": "colors.surface" } }],
+          "children": [
+            {
+              "type": "frame",
+              "id": "FrmTmDk1",
+              "name": "Kartu",
+              "layout": "column",
+              "gap": { "$token": "spacing.4" },
+              "padding": { "$token": "spacing.4" },
+              "width": "fill",
+              "maxWidth": { "$token": "container.content" },
+              "radius": { "$token": "radius.card" },
+              "stroke": { "color": { "$token": "colors.line" }, "width": 1, "align": "inside" },
+              "children": [
+                { "type": "icon", "id": "IcoTmDk1", "name": "Icon / lucide / star", "lib": "lucide", "icon": "star", "size": { "$token": "spacing.icon" }, "color": { "$token": "colors.accent" } },
+                { "type": "text", "id": "TxtTmDk1", "name": "Judul", "content": "Mode gelap", "family": { "$token": "font.family" }, "weight": { "$token": "font.weight-strong" }, "size": { "$token": "font.size-title" }, "lineHeight": { "$token": "font.line-title" }, "letterSpacing": { "$token": "font.tracking-title" }, "color": { "$token": "colors.ink" } },
+                { "type": "rect", "id": "RctTmDk1", "name": "Aksen", "width": "fill", "height": 8, "radius": { "$token": "radius.card" }, "fills": [{ "type": "linear", "angle": 90, "stops": [{ "offset": 0, "color": { "$token": "colors.accent" } }, { "offset": 1, "color": { "$token": "colors.surface" } }] }] }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

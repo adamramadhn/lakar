@@ -39,6 +39,9 @@ export const TOOL_ROUTES: Readonly<Record<string, string>> = {
   '/layout-check': 'layout_check',
   '/icons/search': 'icon_search',
   '/photos/search': 'photo_search',
+  '/viewer/selection': 'get_selection',
+  '/viewer/export-code': 'export_code',
+  '/viewer/paste': 'paste',
 };
 
 export const publicSessionId = (id: string) => id.slice(0, 8);
@@ -109,11 +112,15 @@ export type DocChange = {
 };
 export type ChangeEvent = { seq: number; type: 'change'; change: DocChange };
 
+/** Seleksi canvas dokumen `slug` berubah (AD-9): alamat node terbaru, rev dokumen saat itu, jendela pengirim. */
+export type DocSelection = { slug: string; addresses: string[]; rev?: number; origin?: string };
+export type SelectionEvent = { seq: number; type: 'selection'; selection: DocSelection };
+
 export type ActivityEvent = { seq: number; type: 'call'; call: ActivityCall } | { seq: number; type: 'session'; session: ActivitySession };
 type ActivityPayload = { type: 'call'; call: ActivityCall } | { type: 'session'; session: ActivitySession };
 
-/** Semua event bus: aktivitas (masuk ring) + perubahan aplikasi (tidak masuk ring). */
-export type BusEvent = ActivityEvent | ChangeEvent;
+/** Semua event bus: aktivitas (masuk ring) + perubahan aplikasi dan seleksi (tidak masuk ring). */
+export type BusEvent = ActivityEvent | ChangeEvent | SelectionEvent;
 export type ActivityListener = (event: ActivityEvent) => void;
 export type BusListener = (event: BusEvent) => void;
 
@@ -145,9 +152,16 @@ export class ActivityBus {
     this.#broadcast(event);
     return event;
   }
+  /** Siarkan perubahan seleksi (AD-9; tanpa ring, hanya pelanggan `subscribeAll`). Field kosong dibuang. */
+  selection(selection: DocSelection): SelectionEvent {
+    const clean = Object.fromEntries(Object.entries(selection).filter(([, v]) => v !== undefined)) as DocSelection;
+    const event: SelectionEvent = { seq: ++this.#seq, type: 'selection', selection: clean };
+    this.#broadcast(event);
+    return event;
+  }
   #broadcast(event: BusEvent): void {
     for (const [l, { all }] of [...this.#listeners]) {
-      if (event.type === 'change' && !all) continue;
+      if ((event.type === 'change' || event.type === 'selection') && !all) continue;
       try {
         l(event);
       } catch {
@@ -163,7 +177,7 @@ export class ActivityBus {
   subscribe(l: ActivityListener): () => void {
     return this.#add(l as BusListener, false);
   }
-  /** Event aktivitas + event `change`. */
+  /** Event aktivitas + event `change` dan `selection`. */
   subscribeAll(l: BusListener): () => void {
     return this.#add(l, true);
   }
@@ -222,7 +236,10 @@ function targetOf(tool: string, body: Record<string, unknown> | undefined): stri
     case 'screenshot':
       return str(body.boardId) ?? str(body.nodeId);
     case 'export':
+    case 'export_code':
       return str(body.id);
+    case 'paste':
+      return str(body.parentId);
     case 'layout_check':
       return str(body.boardId);
     case 'read_skill':
@@ -286,6 +303,26 @@ function finish(call: ActivityCall, statusCode: number, json: unknown): Activity
     case 'list_boards':
       if (Array.isArray(data.boards)) out.nodes = data.boards.length;
       break;
+    case 'paste': {
+      // Paste agen (epic paste-vektor story 3): node baru dan board tersentuh, seperti execute.
+      const created = ids(data.created);
+      if (created) {
+        out.created = created;
+        out.nodes = created.length;
+      }
+      const boards = ids(data.boards);
+      if (boards) out.boards = boards;
+      break;
+    }
+    case 'get_selection': {
+      // Viewer menampilkan "… read your selection: {nama}" (agen-di-canvas story 3): dokumen yang benar-benar dibaca
+      // (fallback bisa berbeda dari dokumen aktif sesi), alamat primer (terakhir dipilih), dan jumlah alamat.
+      if (str(data.slug)) out.slug = str(data.slug);
+      const addresses = Array.isArray(data.addresses) ? data.addresses.filter((a): a is string => typeof a === 'string') : undefined;
+      if (addresses?.length) out.target = addresses[addresses.length - 1]!;
+      if (addresses) out.nodes = addresses.length;
+      break;
+    }
   }
   if (out.summary && out.summary.error + out.summary.warning > 0) out.status = 'warning';
   return out;

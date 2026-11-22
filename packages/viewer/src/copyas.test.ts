@@ -201,3 +201,54 @@ describe('copyAs', () => {
     expect(copyAs('tailwind', node)).toBe('w-[10px]');
   });
 });
+
+describe('grid (v4)', () => {
+  const grid = {
+    ...id,
+    type: 'frame',
+    layout: 'grid',
+    width: 400,
+    gridTemplateColumns: [80, { fr: 1 }, { minmax: [120, { fr: 2 }] }],
+    gridTemplateRows: [40, 'auto'],
+    gap: 8,
+    columnGap: { $token: 'space.4' },
+    rowGap: 12,
+    padding: 10,
+    align: 'center',
+    justify: 'start',
+  };
+
+  it('frame grid → display grid, template, gap, column-gap, row-gap, padding, align', () => {
+    expect(toCss(grid)).toBe(
+      [
+        'width: 400px;',
+        'display: grid;',
+        'grid-template-columns: 80px 1fr minmax(120px, 2fr);',
+        'grid-template-rows: 40px auto;',
+        'gap: 8px;',
+        'column-gap: var(--space-4);',
+        'row-gap: 12px;',
+        'padding: 10px;',
+        'align-items: center;',
+        'justify-content: flex-start;',
+      ].join('\n'),
+    );
+    expect(toTailwind(grid)).toBe('w-[400px] grid grid-cols-[80px_1fr_minmax(120px,_2fr)] grid-rows-[40px_auto] gap-[8px] gap-x-[var(--space-4)] gap-y-[12px] p-[10px] items-center justify-start');
+  });
+
+  it('anak dengan penempatan → grid-column/grid-row (col-/row-)', () => {
+    const child = { ...id, type: 'rect', height: 20, gridColumn: { start: 2, span: 2 }, gridRow: { start: 1, end: -1 } };
+    expect(toCss(child)).toBe('height: 20px;\ngrid-column: 2 / span 2;\ngrid-row: 1 / -1;');
+    expect(toTailwind(child)).toBe('h-[20px] col-[2_/_span_2] row-[1_/_-1]');
+  });
+
+  it('gap negatif di grid tidak disalin (render mengabaikannya); di flex tetap', () => {
+    expect(toCss({ ...id, type: 'frame', layout: 'grid', gap: -4 })).toBe('display: grid;');
+    expect(toCss({ ...id, type: 'frame', layout: 'row', gap: -4 })).toBe('display: flex;\nflex-direction: row;\ngap: -4px;');
+  });
+
+  it('frame row tetap flex; track di frame non-grid diabaikan', () => {
+    const row = { ...id, type: 'frame', layout: 'row', gridTemplateColumns: [{ fr: 1 }], gap: 4 };
+    expect(toCss(row)).toBe('display: flex;\nflex-direction: row;\ngap: 4px;');
+  });
+});

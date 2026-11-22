@@ -18,8 +18,10 @@ export const MCP_TOOLS = [
   'layout_check',
   'screenshot',
   'export',
+  'export_code',
   'icon_search',
   'photo_search',
+  'get_selection',
 ] as const;
 
 export type Harness = { id: string; label: string; file: string; snippet: (mcp: McpServerConfig) => string };

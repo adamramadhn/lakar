@@ -1,0 +1,104 @@
+{
+  "schemaVersion": 2,
+  "id": "CorpV2Mb",
+  "rev": 21,
+  "tokens": {
+    "font.family": "Inter",
+    "font.weight-strong": 600,
+    "font.size-title": 28,
+    "font.line-title": 34,
+    "font.tracking-title": -0.4,
+    "colors.surface": "#FFFFFF",
+    "colors.ink": "#111111"
+  },
+  "pages": [
+    {
+      "id": "PageMb01",
+      "name": "Mobile",
+      "children": [
+        {
+          "type": "board",
+          "id": "BrdMb001",
+          "name": "Beranda / Mobile",
+          "x": 0,
+          "y": 0,
+          "width": 390,
+          "height": 844,
+          "screen": "mobile",
+          "fills": [{ "type": "linear", "angle": 180, "stops": [{ "offset": 0, "color": "#EAF1FF" }, { "offset": 1, "color": "#FFFFFF" }] }],
+          "children": [
+            {
+              "type": "frame",
+              "id": "FrmMbScr",
+              "name": "Konten gulir",
+              "layout": "column",
+              "gap": 16,
+              "padding": [72, 20, 24, 20],
+              "width": "fill",
+              "height": "fill",
+              "clip": true,
+              "scrollY": 120,
+              "children": [
+                { "type": "text", "id": "TxtMb001", "name": "Judul", "content": "Halo, Rani", "family": { "$token": "font.family" }, "weight": { "$token": "font.weight-strong" }, "size": { "$token": "font.size-title" }, "lineHeight": { "$token": "font.line-title" }, "letterSpacing": { "$token": "font.tracking-title" }, "color": { "$token": "colors.ink" } },
+                { "type": "text", "id": "TxtMb002", "name": "Kutipan", "content": "Hari yang baik untuk mulai.", "family": "Inter", "weight": 400, "style": "italic", "size": 16, "lineHeight": 24, "color": "#444444", "width": "fill", "wrap": "wrap" },
+                {
+                  "type": "frame",
+                  "id": "FrmMbCd1",
+                  "name": "Kartu kaca",
+                  "layout": "column",
+                  "gap": 8,
+                  "padding": 16,
+                  "width": "fill",
+                  "height": 200,
+                  "radius": 20,
+                  "backdropBlur": 12,
+                  "fills": [{ "type": "solid", "color": "#FFFFFF99" }],
+                  "stroke": { "color": "#FFFFFFCC", "width": 1, "align": "inside" },
+                  "shadows": [{ "type": "drop", "x": 0, "y": 12, "blur": 32, "color": "#1A1A1A1F" }],
+                  "children": [
+                    { "type": "text", "id": "TxtMb003", "name": "Label", "content": "Saldo", "weight": 500, "size": 14, "lineHeight": 20, "color": "#555555", "opacity": 0.8 },
+                    { "type": "text", "id": "TxtMb004", "name": "Nilai", "content": "Rp 2.450.000", "weight": 700, "size": 32, "lineHeight": 40, "numeric": "tabular", "color": { "$token": "colors.ink" } }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "FrmMbRow",
+                  "name": "Aksi",
+                  "layout": "row",
+                  "gap": 12,
+                  "width": "fill",
+                  "children": [
+                    { "type": "rect", "id": "RctMbBl1", "name": "Blur", "width": "fill", "height": 96, "radius": 16, "blur": 4, "fills": [{ "type": "solid", "color": "#2F6FEB" }] },
+                    { "type": "rect", "id": "RctMbBd1", "name": "Blend", "width": "fill", "height": 96, "radius": 16, "blend": "multiply", "fills": [{ "type": "solid", "color": "#FFB020" }] },
+                    { "type": "rect", "id": "RctMbRt1", "name": "Rotasi", "width": "fill", "height": 96, "radius": 16, "rotation": 12, "fills": [{ "type": "solid", "color": "#06D6A0" }] }
+                  ]
+                },
+                { "type": "rect", "id": "RctMbLng", "name": "Isi panjang", "width": "fill", "height": 640, "radius": 16, "fills": [{ "type": "solid", "color": { "$token": "colors.surface" } }] }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "FrmMbBar",
+              "name": "Bilah atas",
+              "position": "absolute",
+              "x": 0,
+              "y": 0,
+              "layout": "row",
+              "padding": [16, 20],
+              "align": "center",
+              "justify": "space-between",
+              "width": 390,
+              "height": 56,
+              "backdropBlur": 20,
+              "fills": [{ "type": "solid", "color": "#FFFFFFB3" }],
+              "children": [
+                { "type": "text", "id": "TxtMbBar", "name": "Judul bilah", "content": "Beranda", "weight": 600, "size": 17, "lineHeight": 22, "color": { "$token": "colors.ink" } },
+                { "type": "icon", "id": "IcoMbSr1", "name": "Icon / lucide / search", "lib": "lucide", "icon": "search", "size": 22, "color": "#111111", "rotation": 0 }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

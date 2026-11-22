@@ -1,9 +1,11 @@
-// Skema dokumen Lakar v1 (AD-2, AD-11, AD-15, AD-16). Satu sumber kebenaran; tanpa IO.
+// Skema dokumen Lakar v7 (AD-2, AD-11, AD-12, AD-13, AD-14, AD-15, AD-16). Satu sumber kebenaran; tanpa IO.
 import { z } from 'zod';
 import { LakarDocument, NodeInput } from './nodes.js';
 
 export const PACKAGE = '@lakar/schema';
 
+export * from './component-issues.js';
+export * from './components.js';
 export * from './content-rules.js';
 export * from './contrast-rules.js';
 export * from './design-tokens.js';
@@ -12,6 +14,9 @@ export * from './findings.js';
 export * from './glyphs.js';
 export * from './icons.js';
 export * from './nodes.js';
+export * from './ops.js';
+export * from './resolve.js';
+export * from './selection.js';
 export * from './tokens.js';
 export * from './version.js';
 

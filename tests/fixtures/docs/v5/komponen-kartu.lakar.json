@@ -1,0 +1,151 @@
+{
+  "schemaVersion": 5,
+  "id": "CorpV5Km",
+  "rev": 7,
+  "tokens": {
+    "colors.brand": { "type": "color", "value": "#0E7490" },
+    "colors.surface": { "type": "color", "value": "#FFFFFF" },
+    "colors.teks": { "type": "color", "value": "#101828" },
+    "space.3": { "type": "spacing", "value": 12 }
+  },
+  "pages": [
+    {
+      "id": "PageKm01",
+      "name": "Komponen",
+      "children": [
+        {
+          "type": "board",
+          "id": "BrdKm001",
+          "name": "Pustaka",
+          "x": 0,
+          "y": 0,
+          "width": 960,
+          "height": 640,
+          "screen": "app",
+          "fills": [{ "type": "solid", "color": "#F3F6F5" }],
+          "children": [
+            {
+              "type": "frame",
+              "id": "FrmKm001",
+              "name": "Isi",
+              "layout": "row",
+              "gap": 32,
+              "padding": 24,
+              "align": "start",
+              "width": "fill",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "FrmKm002",
+                  "name": "Master",
+                  "layout": "column",
+                  "gap": { "$token": "space.3" },
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "MstBadg1",
+                      "name": "Badge",
+                      "layout": "row",
+                      "width": "hug",
+                      "align": "center",
+                      "padding": [2, 8],
+                      "radius": 10,
+                      "fills": [{ "type": "solid", "color": { "$token": "colors.brand" } }],
+                      "component": {
+                        "props": [{ "name": "label", "type": "text", "default": "Baru", "binds": [{ "nodeId": "TxtBadg1", "prop": "content" }] }],
+                        "slots": []
+                      },
+                      "children": [
+                        { "type": "text", "id": "TxtBadg1", "name": "Label", "content": "Baru", "weight": 600, "size": 12, "lineHeight": 16, "color": "#FFFFFF" }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "MstCard1",
+                      "name": "Card",
+                      "layout": "column",
+                      "gap": 8,
+                      "padding": 16,
+                      "radius": 12,
+                      "width": 280,
+                      "fills": [{ "type": "solid", "color": { "$token": "colors.surface" } }],
+                      "component": {
+                        "props": [
+                          { "name": "title", "type": "text", "default": "Judul kartu", "binds": [{ "nodeId": "TxtCard1", "prop": "content" }] },
+                          { "name": "showBadge", "type": "boolean", "default": true, "binds": [{ "nodeId": "InsBadg0", "prop": "visible" }] },
+                          { "name": "tone", "type": "enum", "options": ["star", "check"], "default": "star", "binds": [{ "nodeId": "IcnCard1", "prop": "icon" }] }
+                        ],
+                        "slots": [{ "name": "body", "nodeId": "BdyCard1" }]
+                      },
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "HdrCard1",
+                          "name": "Kepala",
+                          "layout": "row",
+                          "gap": 8,
+                          "align": "center",
+                          "width": "fill",
+                          "children": [
+                            { "type": "icon", "id": "IcnCard1", "name": "Icon / lucide / star", "lib": "lucide", "icon": "star", "size": 20, "color": { "$token": "colors.brand" } },
+                            { "type": "text", "id": "TxtCard1", "name": "Judul", "content": "Judul kartu", "weight": 600, "size": 16, "lineHeight": 24, "color": { "$token": "colors.teks" }, "width": "fill" },
+                            { "type": "instance", "id": "InsBadg0", "name": "Badge", "componentId": "MstBadg1" }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "BdyCard1",
+                          "name": "Isi",
+                          "layout": "column",
+                          "gap": 4,
+                          "width": "fill",
+                          "children": [
+                            { "type": "text", "id": "TxtCard2", "name": "Deskripsi", "content": "Isi bawaan kartu", "size": 14, "lineHeight": 20, "color": "#344054", "width": "fill" }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "FrmKm003",
+                  "name": "Instance",
+                  "layout": "column",
+                  "gap": 16,
+                  "children": [
+                    {
+                      "type": "instance",
+                      "id": "InsCard1",
+                      "name": "Card / promo",
+                      "componentId": "MstCard1",
+                      "props": { "title": "Promo minggu ini" },
+                      "overrides": {
+                        "MstCard1": { "fills": [{ "type": "solid", "color": "#FEF3C7" }] },
+                        "InsBadg0/TxtBadg1": { "content": "Hemat" },
+                        "TxtCard2": { "color": "#7C2D12" }
+                      }
+                    },
+                    {
+                      "type": "instance",
+                      "id": "InsCard2",
+                      "name": "Card / ringkas",
+                      "componentId": "MstCard1",
+                      "props": { "showBadge": false, "tone": "check" },
+                      "slots": {
+                        "body": [
+                          { "type": "text", "id": "TxtSlot1", "name": "Isi slot", "content": "Tiga tugas selesai hari ini", "size": 14, "lineHeight": 20, "color": { "$token": "colors.teks" }, "width": "fill" }
+                        ]
+                      }
+                    },
+                    { "type": "instance", "id": "InsBadg2", "name": "Badge / draf", "componentId": "MstBadg1", "props": { "label": "Draf" } }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

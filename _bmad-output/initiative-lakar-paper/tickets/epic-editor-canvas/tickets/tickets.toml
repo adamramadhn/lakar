@@ -1,0 +1,80 @@
+# Story epic editor-canvas, urut build (dipecah 2026-11-22 atas delegasi Fatmuh: "gas semuanya sampai selesai").
+# Acuan: architecture-model-dokumen (AD-2, AD-5, AD-6, AD-7, AD-8, AD-13). UI mengikuti design/lakar-ui.pen (C6).
+
+[[entry]]
+id = 1
+type = "story"
+title = "Desain editor canvas di lakar-ui.pen"
+description = "Menambah bagian 05 · Editor di design/lakar-ui.pen (dark dan light): panel Design yang bisa diedit (posisi/ukuran, auto layout flex/grid, fill, stroke, radius, efek, tipografi), handle seleksi dan multi-select, edit teks inline, menu konteks (group, duplicate, delete, align), undo/redo di toolbar, dan state hover/drag."
+verify = "Bagian 05 · Editor ada di lakar-ui.pen dengan versi dark dan light, memakai komponen dan token yang sudah ada."
+covers = ["R1"]
+after = []
+hitl = true
+risk = "medium"
+notes = ["Persetujuan desain didelegasikan Fatmuh (terima jadi, 2026-11-22)."]
+
+[[entry]]
+id = 2
+type = "story"
+title = "Route ops viewer dan undo dengan op invers"
+description = "POST /viewer/docs/:slug/ops menerima daftar op JSON (bentuk op Transaction) sebagai satu commit semua-atau-tidak (AD-7); core mengembalikan op invers per commit (AD-8) agar viewer bisa undo/redo sebagai commit baru tanpa restore rev."
+verify = "Satu permintaan ops = satu rev + satu entri riwayat; op gagal me-rollback seluruh permintaan; op invers yang diterapkan mengembalikan dokumen ke keadaan sebelumnya; guard Origin berlaku."
+covers = ["R1"]
+after = []
+hitl = false
+risk = "medium"
+
+[[entry]]
+id = 3
+type = "story"
+title = "Canvas viewer merender board sebagai DOM hidup"
+description = "Viewer me-mount board dengan @lakar/render di atas dokumen hasil resolveDocument (AD-6, AD-10), menggantikan gambar PNG untuk tampilan edit; font dan aset dilayani daemon lewat route /viewer/*; PNG tetap untuk export, thumbnail, dan pratinjau riwayat."
+verify = "Board di canvas viewer adalah DOM dengan atribut data-lakar-id; perubahan dokumen me-render ulang tanpa screenshot; tes viewer dan daemon tetap hijau."
+covers = ["R1"]
+after = [2]
+hitl = false
+risk = "high"
+
+[[entry]]
+id = 4
+type = "story"
+title = "Seleksi, geser, dan ubah ukuran di canvas"
+description = "Klik memilih node, Shift menambah/mengurangi seleksi, drag kotak memilih banyak; handle seleksi sesuai desain; drag memindah node absolute atau mengurutkan ulang anak flow; handle mengubah ukuran; pratinjau lokal selama gestur dan satu commit ops di akhir (AD-7)."
+verify = "Memilih, menggeser, dan mengubah ukuran node di viewer menghasilkan satu rev per gestur dan bisa di-undo."
+covers = ["R1"]
+after = [1, 3]
+hitl = false
+risk = "high"
+
+[[entry]]
+id = 5
+type = "story"
+title = "Panel Design yang bisa diedit"
+description = "Tab Inspect menjadi panel Design sesuai desain: posisi/ukuran (fixed/hug/fill), auto layout (arah, gap, padding, align, justify), fill (solid dan gradien), stroke, radius, efek (opacity, blur, shadow), dan tipografi; setiap perubahan menjadi op update lewat route ops."
+verify = "Mengubah setiap kelompok properti di panel memperbarui canvas dan tercatat di History."
+covers = ["R1"]
+after = [4]
+hitl = false
+risk = "high"
+
+[[entry]]
+id = 6
+type = "story"
+title = "Teks inline, group, duplikat, hapus, align, shortcut, undo/redo"
+description = "Dobel-klik teks untuk edit inline; group/ungroup ke frame; duplikat; hapus; align dan distribusi seleksi; shortcut keyboard standar; undo/redo memakai op invers per jendela (AD-8) menggantikan undo berbasis restore."
+verify = "Setiap aksi tersedia lewat menu konteks dan shortcut, menghasilkan satu rev, dan bisa di-undo/redo tanpa menghapus perubahan agen."
+covers = ["R1"]
+after = [4]
+hitl = false
+risk = "medium"
+
+[[entry]]
+id = 7
+type = "story"
+title = "Layout grid di skema, render, dan panel"
+description = "Skema v4 menambah layout 'grid' dengan gridTemplateColumns/gridTemplateRows bertipe (px | fr | auto | minmax), columnGap/rowGap, dan penempatan anak (AD-13); render memetakannya lewat css.ts; panel Design punya kontrol grid."
+verify = "Frame grid dirender sesuai CSS grid di canvas dan render daemon; korpus v1-v3 bermigrasi ke v4; panel bisa mengubah kolom dan gap."
+covers = ["R1"]
+after = [5]
+hitl = false
+risk = "medium"

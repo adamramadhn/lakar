@@ -4,6 +4,7 @@
 // History (aplikasi 3): versi lama dari snapshot (GET revs/:rev, POST revs/:rev/screenshot, di-cache per
 // `slug@rev`, isinya tidak pernah berubah) dan Restore (tulis, lewat antrean yang sama).
 // Kelola halaman (aplikasi 8): tambah/rename/pindah/hapus halaman (tulis, lewat antrean yang sama).
+// Ops (editor canvas, AD-7/AD-8): POST /viewer/docs/:slug/ops = satu commit semua-atau-tidak; respons membawa op invers (undo).
 // Layer manual (aplikasi 4): `execute` (POST /execute dari sesi viewer sendiri, kode dari codegen.ts), unggah
 // gambar (POST /viewer/assets, byte mentah), dan cari ikon (POST /icons/search).
 // Folder (aplikasi 10): GET/POST /viewer/folders*, tulis lewat antrean yang sama (memanggil pendengar `onDocsChanged`).
@@ -12,7 +13,12 @@
 // Memori: blob URL PNG di-revoke saat entri cache dibuang (dengan jeda, supaya <img> yang masih memakainya sempat
 // diganti); cache versi lama (`#revDocs`, `#revShots`) dibatasi LRU.
 // Bentuk respons AD-11: {ok:true,data} | {ok:false,error}.
-import type { Finding, FindingSummary, LakarDocument } from '@lakar/schema';
+import type { FontFaceSource } from '@lakar/render';
+import type { DocOp, Finding, FindingSummary, IconGlyph, LakarDocument } from '@lakar/schema';
+import type { PasteReport } from './paste.js';
+
+/** Respons GET /viewer/render-deps (dipakai liveBoard.ts; tanpa impor relatif agar api.ts bisa dites di Node). */
+export type RenderDepsResult = { fonts: FontFaceSource[]; icons: IconGlyph[]; missing: { fonts: string[]; icons: string[] } };
 
 /** Header sesi (sama dengan SESSION_HEADER @lakar/schema; disalin agar bundle tidak menarik zod). */
 const SESSION_HEADER = 'x-lakar-session';
@@ -74,6 +80,18 @@ export type UploadedAsset = { assetId: string; mime: string; width: number; heig
 export type IconResult = { lib: string; icon: string; title?: string; aliasOf?: string };
 /** Hasil operasi halaman (`/viewer/docs/:slug/pages…`). */
 export type PageResult = { slug: string; rev: number; pageId: string };
+/**
+ * Hasil `POST /viewer/docs/:slug/ops`: `inverse` = op yang membatalkan commit ini (kosong bila tanpa efek). ID node baru
+ * per op diketahui lewat `refs` (ref lokal → ID; kirim `ref` pada add/duplicate). `created` = semua node yang muncul
+ * di commit ini, termasuk subtree yang disisip ulang `insert` (undo hapus) dengan ID lamanya, jadi bukan hanya node baru.
+ */
+export type OpsResult = { slug: string; rev: number; created: { id: string; name: string; path: string[] }[]; inverse: DocOp[]; refs: Record<string, string> };
+/** Body paste (route `POST /viewer/docs/:slug/paste`, epic paste-vektor story 3–4; `kind` default `svg`). */
+export type PasteBody = { content: string; parentId: string; kind?: 'svg' | 'html'; x?: number; y?: number; name?: string; description?: string; width?: number };
+/** Hasil paste: seperti ops (`inverse` untuk undo) + node akar baru dan laporan importer. */
+export type PasteResult = OpsResult & { nodeId: string; report: PasteReport };
+/** Font terpasang (GET /viewer/fonts). */
+export type FontFamily = { family: string; weights: number[]; styles: string[] };
 export type LayoutCheck = { docId: string; rev: number; boards: unknown; summary: FindingSummary; findings: Finding[]; ranAt: number };
 
 /** lakard tidak bisa dihubungi (jaringan). */
@@ -123,7 +141,7 @@ export const connection = {
   },
 };
 
-async function request<T>(method: 'GET' | 'POST' | 'DELETE', path: string, body?: unknown, session?: string): Promise<T> {
+async function request<T>(method: 'GET' | 'POST' | 'PUT' | 'DELETE', path: string, body?: unknown, session?: string): Promise<T> {
   let res: Response;
   try {
     res = await fetch(path, {
@@ -257,6 +275,24 @@ class ViewerClient {
     const { doc } = await request<{ doc: LakarDocument }>('GET', `/viewer/docs/${encodeURIComponent(slug)}`);
     this.#known.add(slug);
     return doc;
+  }
+
+  /**
+   * Deps render canvas live (GET /viewer/render-deps): face font (`family:weight:style`) dan glyph ikon (`lib/nama`).
+   * Kunci yang tidak dikenal daemon kembali di `missing`, bukan error.
+   */
+  async renderDeps(keys: { fonts: readonly string[]; icons: readonly string[] }): Promise<RenderDepsResult> {
+    const qs = new URLSearchParams();
+    for (const f of keys.fonts) qs.append('font', f);
+    for (const i of keys.icons) qs.append('icon', i);
+    const s = qs.toString();
+    return request<RenderDepsResult>('GET', `/viewer/render-deps${s ? `?${s}` : ''}`);
+  }
+
+  /** Font terpasang di lakard (GET /viewer/fonts): keluarga + bobot + gaya, urut nama (panel Design). */
+  async fonts(): Promise<FontFamily[]> {
+    const { families } = await request<{ families: FontFamily[] }>('GET', '/viewer/fonts');
+    return families;
   }
 
   /** Riwayat revisi dokumen (GET /viewer/docs/:slug/history), urut rev turun. */
@@ -470,6 +506,36 @@ class ViewerClient {
       () => request<PageResult>('POST', `${pagesPath(slug, pageId)}/move`, { index }),
       () => [slug],
     );
+  }
+
+  /**
+   * Terapkan `ops` sebagai satu commit semua-atau-tidak (lewat antrean tulis). Op gagal → ApiError (error op
+   * pertama, prefiks `ops[i]`), dokumen tidak berubah. Undo/redo = kirim `inverse` hasil sebelumnya.
+   */
+  applyOps(slug: string, ops: DocOp[], description?: string): Promise<OpsResult> {
+    return this.#write(
+      () => request<OpsResult>('POST', `/viewer/docs/${encodeURIComponent(slug)}/ops`, { ops, ...(description !== undefined ? { description } : {}) }),
+      () => [slug],
+    );
+  }
+
+  /**
+   * Tempel SVG (importer daemon, AD-15) ke board/frame `parentId` sebagai satu commit (lewat antrean tulis).
+   * Respons membawa `inverse` seperti `applyOps` (undo paste) dan laporan atribut yang dibuang.
+   */
+  paste(slug: string, body: PasteBody): Promise<PasteResult> {
+    return this.#write(
+      () => request<PasteResult>('POST', `/viewer/docs/${encodeURIComponent(slug)}/paste`, body),
+      () => [slug],
+    );
+  }
+
+  /**
+   * Laporkan seleksi canvas ke daemon (PUT /viewer/docs/:slug/selection, AD-9). Hanya di memori daemon: bukan tulis
+   * dokumen, jadi tidak lewat antrean tulis dan tidak membuang cache.
+   */
+  putSelection(slug: string, addresses: readonly string[]): Promise<{ slug: string; rev: number; addresses: string[] }> {
+    return request('PUT', `/viewer/docs/${encodeURIComponent(slug)}/selection`, { addresses });
   }
 
   /** Hapus halaman beserta board-nya; halaman terakhir → ApiError CONFLICT. */

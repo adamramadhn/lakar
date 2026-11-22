@@ -1,5 +1,6 @@
-// Server MCP Lakar: 11 tool (AD-11 + photo_search) → HTTP lakard: status, read_skill, open_doc, list_boards, execute,
-// inspect, layout_check, screenshot, export, icon_search, photo_search.
+// Server MCP Lakar: 14 tool (AD-11 + photo_search + get_selection + export_code + paste) → HTTP lakard: status,
+// read_skill, open_doc, list_boards, execute, inspect, layout_check, screenshot, export, export_code, icon_search,
+// photo_search, get_selection, paste.
 import { McpServer, type CallToolResult } from '@modelcontextprotocol/server';
 import { z } from 'zod';
 import {
@@ -145,9 +146,10 @@ export const STATUS_DESCRIPTION =
 export const READ_SKILL_DESCRIPTION =
   'Baca panduan skill Lakar (Markdown). Baca core (alur kerja, prelude helper, token, konvensi) + delapan skill domain ' +
   '(layout, typography, color, accessibility, ui, interface, writing, review) + skill jenis layar (landing, mobile, atau webapp; ' +
-  'aplikasi desktop/dashboard → webapp; berisi contoh teruji) di giliran yang sama (10 panggilan paralel); icons bila ragu nama ikon; api hanya untuk referensi lengkap. ' +
+  'aplikasi desktop/dashboard → webapp; berisi contoh teruji) di giliran yang sama (10 panggilan paralel); icons bila ragu nama ikon; api hanya untuk referensi lengkap; ' +
+  'selection bila permintaan merujuk node yang dipilih pengguna di viewer (varian responsif, cek konsistensi). ' +
   'Tanpa name → daftar {skills:[{name, available}]}; dengan name → isi skill. ' +
-  'Nama: core, landing, mobile, webapp, layout, typography, color, accessibility, ui, interface, writing, review, icons, api. ' +
+  'Nama: core, landing, mobile, webapp, layout, typography, color, accessibility, ui, interface, writing, review, icons, api, selection. ' +
   'Nama lain atau skill yang belum tersedia → NOT_FOUND dengan daftar yang tersedia (polish sudah dipecah ke delapan skill domain).';
 
 /** Instruksi server MCP (dikirim saat initialize): urutan kerja singkat. */
@@ -174,6 +176,35 @@ export const EXPORT_DESCRIPTION =
   'Ekspor board/node dokumen aktif ke file PNG di disk daemon: <dataDir>/exports/<slug>/<id>-r<rev>@<scale>x.png. ' +
   'id = board atau node (default board pertama); scale 1 atau 2 (default 1; 2 = render asli 2× piksel). ' +
   'Mengembalikan {path, id, name, rev, scale, width, height, bytes} (width/height = piksel PNG). Gagal menulis → EXPORT_FAILED.';
+
+/** Deskripsi tool `export_code` (epic kode story 5). */
+export const EXPORT_CODE_DESCRIPTION =
+  'Ekspor board/node dokumen aktif menjadi kode React (generator yang sama dengan dialog Export code di viewer; berkas identik). ' +
+  "target 'react-tailwind' (default: <Nama>.tsx, components/*.tsx, tokens.css, theme.css Tailwind v4) atau 'react-css' (+ *.module.css). " +
+  'Token menjadi var(--nama) dan master komponen menjadi components/<Nama>.tsx dengan props bertipe; instance menjadi pemakaiannya. ' +
+  'components:false = semua di-inline; tokens:false = tanpa tokens.css; typescript:false = .jsx tanpa tipe. ' +
+  'Mengembalikan blok JSON {docId, slug, rev, id, name, target, files:[{path, bytes}], warnings} lalu satu blok teks per berkas.';
+
+/** Teks `export_code`: ringkasan JSON (tanpa isi berkas) lalu satu blok per berkas `----- path -----`. */
+export type ExportCodeData = { files: { path: string; contents: string; bytes: number }[] } & Record<string, unknown>;
+export function formatExportCode(data: ExportCodeData): CallToolResult['content'] {
+  const { files, ...rest } = data;
+  const head = { ...rest, files: files.map((f) => ({ path: f.path, bytes: f.bytes })) };
+  return [{ type: 'text', text: JSON.stringify(head) }, ...files.map((f) => ({ type: 'text' as const, text: `----- ${f.path} -----\n${f.contents}` }))];
+}
+
+/** Deskripsi tool `paste` (epic paste-vektor story 3–4, AD-15). */
+export const PASTE_DESCRIPTION =
+  'Tempel SVG atau HTML ke board/frame dokumen aktif sebagai layer yang bisa diedit (importer yang sama dengan Ctrl+V di viewer; hasil identik). ' +
+  'content = dokumen SVG utuh berakar <svg> (kind "svg", default) atau potongan HTML (kind "html"); parentId = ID board atau frame tujuan; x/y opsional (default: tengah parent; parent auto layout → ditambahkan di akhir tanpa x/y); ' +
+  'name opsional (nama layer akar); description opsional (label riwayat, default "Paste SVG"/"Paste HTML"); width opsional (lebar viewport HTML, default lebar tujuan). ' +
+  'HTML dirender di Chromium terisolasi (JavaScript mati, jaringan diblokir; gambar hanya data URI): flex/grid → auto layout, teks → text, <img> data → rect gambar, <svg> → path, tag semantik (nav, h1, p, button, …) → tag; ' +
+  'computed style dipetakan ke properti Lakar; HTML/CSS mentah tidak disimpan. Report HTML: {kind:"html", layers, autoLayout, texts, images, vectors, dropped:[{kind: element|attribute|request|property|value|font|layout, name, count}]}. ' +
+  'Satu bentuk → node path; beberapa bentuk → frame berisi path (path, rect, circle, ellipse, line, polyline, polygon; <g> diratakan, transform dipanggang ke d). ' +
+  'fill/stroke solid, stroke-width, fill-rule, stroke-linecap/linejoin/miterlimit/dasharray/dashoffset, fill/stroke-opacity, paint-order, shape-rendering, opacity dipetakan ke properti path; ' +
+  'yang lain (filter, mask, clip-path, gradien url(), <text>, <image>, <use>, <style>, <script>, …) dibuang dan dilaporkan. Satu paste = satu rev. ' +
+  'Mengembalikan {docId, slug, rev, created, nodeId, boards, report:{kind, paths, kept:[atribut], dropped:[{kind: element|attribute|value, name, count}]}}. ' +
+  'SVG rusak/tanpa bentuk, HTML tanpa isi terlihat, atau parent bukan board/frame → SCHEMA_INVALID; ID tidak ada → NOT_FOUND; belum open_doc → NO_ACTIVE_DOC; daemon tanpa Chromium (HTML) → RENDER_FAILED.';
 
 /** Deskripsi tool `layout_check` (aturan gerbang G0). */
 export const LAYOUT_CHECK_DESCRIPTION =
@@ -219,7 +250,13 @@ export const EXECUTE_DESCRIPTION =
   'move(id, parentId|null, index?) pindah ke board/frame (null = urutan board); ' +
   'duplicate(id, patch?) → id salinan subtree tepat setelah asal; ' +
   'remove(id) hapus subtree; ' +
-  "setTokens({'colors.primary':'#0F62FE','spacing.4':16}) merge token, null menghapus; " +
+  "komponen: setComponent(id, {props, slots}?) jadikan master (null melepas), add(parent, {type:'instance', name, componentId, props?}) sisip instance, " +
+  "update('<instanceId>/<idNodeMaster>', patch) override isi instance, resetOverride(alamat, props?) kembali ke master, add('<instanceId>/<idFrameSlot>', node) isi slot, " +
+  'detach(instanceId) → id node biasa, get(alamat) node efektif; hapus master men-detach instancenya; ' +
+  "setTokens({'colors.primary':'#0F62FE','spacing.4':16}) merge token, null menghapus (bertipe: {type, value, modes?}); " +
+  "setTokenModes(['light','dark']) mode tema, board themeMode; " +
+  'getTokens() → {tokens, modes} baca token dan mode; renameToken(from, to) ganti nama token + semua ref; ' +
+  'importCssVariables(css) → {tokens, modes, skipped} token bertipe dari isi file CSS variables (:root + [data-theme="dark"]); ' +
   'get(id) → NodeView; find({type?, name?: string|RegExp, within?}) → NodeView[] urutan dokumen; children(id|null) → NodeView[] anak langsung (null = board); ' +
   'NodeView = properti tersimpan (token apa adanya) + parentId, path, childIds (hanya-baca: jangan kirim balik ke update/add); ' +
   'place(w, h, {near?, gap?}) → {x,y} posisi board baru yang tidak tumpang tindih (gap default 80); ' +
@@ -276,6 +313,16 @@ export const PHOTO_SEARCH_DESCRIPTION =
   'Bila kosong, daemon menyederhanakan kata kunci sendiri (query = yang dipakai, tried = yang dicoba): jangan mengulang pencarian. ' +
   'Cari di awal (maks 2 pencarian per desain, paralel, sebelum execute pertama). Tidak ada hasil → NOT_FOUND; penyedia sibuk/gagal → EXEC_ERROR (retryable): satu percobaan saja, lalu pakai blok gambar pengganti.';
 
+/** Deskripsi tool `get_selection` (AD-9). */
+export const GET_SELECTION_DESCRIPTION =
+  'Baca node yang sedang dipilih pengguna di canvas viewer Lakar (seleksi hidup, hanya di memori daemon; tidak ada di dokumen maupun riwayat). ' +
+  'Tanpa slug → dokumen aktif sesi; belum open_doc → dokumen yang seleksinya terakhir berubah. ' +
+  'Mengembalikan {slug, rev, addresses, nodes:[{address, id, type, name, boardId, bounds?}], missing?, unmeasured?, updatedAt?}: ' +
+  'addresses = urutan pilihan pengguna (ID atau alamat komposit id/id); bounds [x,y,w,h] hasil render, dibulatkan, relatif board (board = [0,0,w,h]); ' +
+  'missing = alamat yang tidak ada lagi di dokumen; unmeasured = board yang gagal dirender (node tetap tercantum tanpa bounds). ' +
+  'addresses kosong = pengguna belum memilih apa pun. Pakai id untuk inspect, execute (get/update), atau open_doc {slug} dulu bila slug bukan dokumen aktif. ' +
+  'Tanpa dokumen aktif dan tanpa seleksi → NO_ACTIVE_DOC. Alur varian responsif dan cek konsistensi atas seleksi: read_skill selection.';
+
 export function createLakarMcpServer(daemonUrl: string): McpServer {
   const client = new DaemonClient(daemonUrl);
   const server = new McpServer({ name: SERVER_NAME, version: SERVER_VERSION }, { instructions: SERVER_INSTRUCTIONS });
@@ -291,7 +338,7 @@ export function createLakarMcpServer(daemonUrl: string): McpServer {
     'read_skill',
     {
       description: READ_SKILL_DESCRIPTION,
-      inputSchema: z.object({ name: z.string().optional().describe('core | landing | mobile | webapp | layout | typography | color | accessibility | ui | interface | writing | review | icons | api; kosongkan untuk daftar') }),
+      inputSchema: z.object({ name: z.string().optional().describe('core | landing | mobile | webapp | layout | typography | color | accessibility | ui | interface | writing | review | icons | api | selection; kosongkan untuk daftar') }),
     },
     ({ name }) =>
       guarded(async () => {
@@ -333,6 +380,47 @@ export function createLakarMcpServer(daemonUrl: string): McpServer {
         if (id !== undefined) body.id = id;
         if (scale !== undefined) body.scale = scale;
         return asText(await client.call('/export', body));
+      }),
+  );
+
+  server.registerTool(
+    'export_code',
+    {
+      description: EXPORT_CODE_DESCRIPTION,
+      inputSchema: z.object({
+        id: z.string().optional().describe('ID board/node; kosongkan untuk board pertama'),
+        target: z.enum(['react-tailwind', 'react-css']).optional().describe("'react-tailwind' (default) atau 'react-css'"),
+        components: z.boolean().optional().describe('master sebagai berkas komponen terpisah (default true)'),
+        tokens: z.boolean().optional().describe('sertakan tokens.css (default true)'),
+        typescript: z.boolean().optional().describe('TSX bertipe (default true); false = JSX'),
+      }),
+    },
+    (args) =>
+      guarded(async () => {
+        const body = Object.fromEntries(Object.entries(args).filter(([, v]) => v !== undefined));
+        return asResult(await client.call<ExportCodeData>('/viewer/export-code', body), formatExportCode);
+      }),
+  );
+
+  server.registerTool(
+    'paste',
+    {
+      description: PASTE_DESCRIPTION,
+      inputSchema: z.object({
+        content: z.string().describe('dokumen SVG utuh (<svg …>…</svg>) atau potongan HTML (kind html)'),
+        parentId: z.string().describe('ID board atau frame tujuan'),
+        x: z.number().optional().describe('posisi x di parent (default tengah)'),
+        y: z.number().optional().describe('posisi y di parent (default tengah)'),
+        name: z.string().optional().describe('nama layer akar (default <title> SVG atau "SVG"; HTML: aria-label/id/kelas/tag akar)'),
+        description: z.string().optional().describe('label riwayat (default "Paste SVG"/"Paste HTML")'),
+        kind: z.enum(['svg', 'html']).optional().describe("jenis isi: 'svg' (default) atau 'html'"),
+        width: z.number().optional().describe('HTML: lebar viewport px (default lebar board/frame tujuan)'),
+      }),
+    },
+    (args) =>
+      guarded(async () => {
+        const body = Object.fromEntries(Object.entries(args).filter(([, v]) => v !== undefined));
+        return asText(await client.call('/viewer/paste', body));
       }),
   );
 
@@ -449,6 +537,15 @@ export function createLakarMcpServer(daemonUrl: string): McpServer {
           ];
         });
       }),
+  );
+
+  server.registerTool(
+    'get_selection',
+    {
+      description: GET_SELECTION_DESCRIPTION,
+      inputSchema: z.object({ slug: z.string().optional().describe('slug dokumen; kosongkan untuk dokumen aktif sesi (atau dokumen dengan seleksi terakhir)') }),
+    },
+    ({ slug }) => guarded(async () => asText(await client.call('/viewer/selection', slug !== undefined ? { slug } : {}))),
   );
 
   server.registerTool(

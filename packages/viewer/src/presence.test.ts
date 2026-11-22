@@ -60,6 +60,9 @@ describe('agentPresence', () => {
       { id: 'c1', boardId: 'B1', rect: [16, 40, 120, 80], created: true },
       { id: 'f1', boardId: 'B1', rect: [0, 0, 390, 200], created: false },
     ]);
+    // Story 3: board tersentuh (tag "Just changed") dan node baru pertama (tag "Added · nama").
+    expect(p!.changedBoards).toEqual(['B1']);
+    expect(p!.added).toEqual({ id: 'c1', name: 'N c1' });
   });
 
   it('execute baru mulai → kursor tetap di c1, working dengan aksi "execute · …"', () => {
@@ -79,8 +82,14 @@ describe('agentPresence', () => {
       ev({ callId: 'x1', status: 'error', startedAt: iso(T0 + 1000), durationMs: 100, error: { code: 'EXEC_ERROR', message: 'x' } }),
     );
     const [p] = presence(s, now);
-    expect(p).toMatchObject({ boardId: 'B1', nodeId: 't1', rect: [1, 2, 3, 4], changed: [] });
+    expect(p).toMatchObject({ boardId: 'B1', nodeId: 't1', rect: [1, 2, 3, 4], changed: [], changedBoards: [] });
     expect(p!.changedKey).toBeUndefined();
+    expect(p!.added).toBeUndefined();
+  });
+
+  it('execute yang hanya menghapus node (tanpa bounds node) → tag board tetap menyala', () => {
+    const [p] = presence(run(ev({ callId: 'x9', status: 'done', durationMs: 100, rev: 2, boards: ['B2'], bounds: { B2: [0, 0, 390, 844] } })), T0 + 1000);
+    expect(p).toMatchObject({ changedKey: 'x9', changedBoards: ['B2'], changed: [] });
   });
 
   it('execute > 10 dtk lalu (mis. hello sesudah reconnect) → tanpa sorotan; sesi tidak Live → tanpa kursor', () => {

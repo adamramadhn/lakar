@@ -35,8 +35,12 @@ export type AgentPresence = {
   createdBoards: string[];
   /** Kunci sorotan (callId execute): berubah → animasi diputar ulang. */
   changedKey?: string;
-  /** Node utama sorotan (badge "Just changed"). */
+  /** Node utama sorotan. */
   primary?: string;
+  /** Board yang disentuh execute sorotan (label board berganti tag "Just changed · {label}", story 3). */
+  changedBoards: string[];
+  /** Node baru pertama execute sorotan (tag "Added · {nama}", story 3). */
+  added?: { id: string; name: string };
 };
 
 type Index = ReadonlyMap<string, NodeInfo>;
@@ -101,6 +105,7 @@ export function agentPresence(views: readonly SessionView[], index: Index, now: 
       ...loc,
       changed: [],
       createdBoards: [],
+      changedBoards: [],
     };
     // Sorotan: execute selesai terbaru, bila sukses dan masih dalam jendela 10 dtk (gagal → tanpa sorotan).
     const exec = v.calls.find((c) => c.tool === 'execute' && c.status !== 'running');
@@ -115,9 +120,14 @@ export function agentPresence(views: readonly SessionView[], index: Index, now: 
       p.changed = ids.slice(0, CHANGED_MAX).map((id) => ({ id, boardId: index.get(id)!.boardId, rect: bounds[id]!, created: created.has(id) }));
       // Board baru: hanya umpan balik baris Layers (tanpa outline node).
       p.createdBoards = [...created].filter((id) => isBoard(index, id));
-      if (p.changed.length || p.createdBoards.length) p.changedKey = exec.callId;
+      // Board tersentuh juga menyalakan sorotan (execute yang hanya menghapus node tetap memberi tag "Just changed").
+      const touched = (exec.boards ?? []).filter((id) => isBoard(index, id));
+      if (p.changed.length || p.createdBoards.length || touched.length) p.changedKey = exec.callId;
       const primary = p.changed.length ? (lead && ids.includes(lead) ? lead : p.changed[0]!.id) : undefined;
       if (primary) p.primary = primary;
+      if (p.changedKey) p.changedBoards = [...new Set([...touched, ...p.changed.map((c) => c.boardId)])].filter((id) => isBoard(index, id));
+      const added = p.changed.find((c) => c.created);
+      if (added) p.added = { id: added.id, name: nameOf(added.id) ?? added.id };
     }
     out.push(p);
   }

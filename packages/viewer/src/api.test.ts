@@ -343,6 +343,49 @@ describe('History (aplikasi 3)', () => {
     await expect(api.deletePage('a', 'Pg000001')).rejects.toMatchObject({ code: 'CONFLICT', status: 409 });
   });
 
+  it('applyOps: POST /viewer/docs/:slug/ops tanpa sesi, description opsional, invalidasi slug; gagal → ApiError', async () => {
+    const result = { slug: 'a', rev: 4, created: [], inverse: [{ op: 'update', id: 'Nnnnnnn1', patch: { gap: 8 } }], refs: {} };
+    const calls = fakeFetch((c) => {
+      if (c.body?.ops?.[0]?.op === 'remove') return { status: 404, body: { ok: false, error: { code: 'NOT_FOUND', message: 'ops[0] remove: node Zzzzzzzz tidak ada', hint: 'muat ulang' } } };
+      return ok(result);
+    });
+    const api = await freshApi();
+    const changed = vi.fn();
+    api.onDocsChanged(changed);
+    await expect(api.applyOps('a', [{ op: 'update', id: 'Nnnnnnn1', patch: { gap: 12 } }])).resolves.toEqual(result);
+    expect(calls.at(-1)).toMatchObject({ method: 'POST', path: '/viewer/docs/a/ops', body: { ops: [{ op: 'update', id: 'Nnnnnnn1', patch: { gap: 12 } }] }, session: undefined });
+    expect(calls.at(-1)!.body).not.toHaveProperty('description');
+    expect(changed).toHaveBeenCalledOnce();
+    await api.applyOps('a', result.inverse as never, 'Undo');
+    expect(calls.at(-1)).toMatchObject({ body: { ops: result.inverse, description: 'Undo' } });
+    await expect(api.applyOps('a', [{ op: 'remove', id: 'Zzzzzzzz' }])).rejects.toMatchObject({ code: 'NOT_FOUND', status: 404 });
+  });
+
+  it('paste: POST /viewer/docs/:slug/paste tanpa sesi, body apa adanya, invalidasi slug; gagal → ApiError', async () => {
+    const result = { slug: 'a', rev: 5, created: [], inverse: [{ op: 'remove', id: 'Pppppppp' }], refs: { paste: 'Pppppppp' }, nodeId: 'Pppppppp', report: { kind: 'svg', paths: 1, kept: [], dropped: [] } };
+    const calls = fakeFetch((c) =>
+      c.body?.parentId === 'Zzzzzzzz' ? { status: 404, body: { ok: false, error: { code: 'NOT_FOUND', message: 'paste: node Zzzzzzzz tidak ada', hint: '' } } } : ok(result),
+    );
+    const api = await freshApi();
+    const changed = vi.fn();
+    api.onDocsChanged(changed);
+    await expect(api.paste('a', { content: '<svg/>', parentId: 'Bbbbbbbb', name: 'Logo' })).resolves.toEqual(result);
+    expect(calls.at(-1)).toMatchObject({ method: 'POST', path: '/viewer/docs/a/paste', body: { content: '<svg/>', parentId: 'Bbbbbbbb', name: 'Logo' }, session: undefined });
+    expect(changed).toHaveBeenCalledOnce();
+    await expect(api.paste('a', { content: '<svg/>', parentId: 'Zzzzzzzz' })).rejects.toMatchObject({ code: 'NOT_FOUND', status: 404 });
+  });
+
+  it('putSelection: PUT /viewer/docs/:slug/selection tanpa sesi, tanpa invalidasi; gagal → ApiError', async () => {
+    const calls = fakeFetch((c) => (c.path === '/viewer/docs/hilang/selection' ? { status: 404, body: { ok: false, error: { code: 'NOT_FOUND', message: 'dokumen hilang tidak ada', hint: '' } } } : ok({ slug: 'a', rev: 2, addresses: c.body.addresses })));
+    const api = await freshApi();
+    const changed = vi.fn();
+    api.onDocsChanged(changed);
+    await expect(api.putSelection('a', ['Nnnnnnn1'])).resolves.toEqual({ slug: 'a', rev: 2, addresses: ['Nnnnnnn1'] });
+    expect(calls.at(-1)).toMatchObject({ method: 'PUT', path: '/viewer/docs/a/selection', body: { addresses: ['Nnnnnnn1'] }, session: undefined });
+    expect(changed).not.toHaveBeenCalled();
+    await expect(api.putSelection('hilang', [])).rejects.toMatchObject({ code: 'NOT_FOUND', status: 404 });
+  });
+
   it('restore dengan baseRev usang → ApiError CONFLICT 409 dengan hint', async () => {
     fakeFetch((c) => {
       if (c.path === '/viewer/docs/a/restore') return { status: 409, body: { ok: false, error: { code: 'CONFLICT', message: 'dokumen a sudah berubah ke r9', hint: 'ada perubahan yang lebih baru', retryable: false } } };
@@ -421,5 +464,17 @@ describe('layer manual (aplikasi 4)', () => {
     big = true;
     await expect(api.uploadAsset(file)).rejects.toMatchObject({ status: 413, code: 'SCHEMA_INVALID' });
     expect(await api.iconSearch('star')).toEqual([{ lib: 'lucide', icon: 'star' }]);
+  });
+});
+
+describe('renderDeps (canvas live)', () => {
+  it('GET /viewer/render-deps dengan font/icon berulang ter-encode; tanpa kunci tanpa query', async () => {
+    const data = { fonts: [], icons: [], missing: { fonts: [], icons: [] } };
+    const calls = fakeFetch(() => ok(data));
+    const api = await freshApi();
+    expect(await api.renderDeps({ fonts: ['Space Grotesk:700:normal', 'Inter:400:normal'], icons: ['lucide/star'] })).toEqual(data);
+    expect(calls[0]).toMatchObject({ method: 'GET', path: '/viewer/render-deps?font=Space+Grotesk%3A700%3Anormal&font=Inter%3A400%3Anormal&icon=lucide%2Fstar' });
+    await api.renderDeps({ fonts: [], icons: [] });
+    expect(calls[1]!.path).toBe('/viewer/render-deps');
   });
 });

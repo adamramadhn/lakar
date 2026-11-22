@@ -9,6 +9,7 @@ import {
   forbiddenPhrasesIn,
   G0_RULES,
   HOME_INDICATOR_INSET,
+  instanceIssues,
   KPI_LINE_HEIGHT_RATIO,
   KPI_SIZES,
   PARAGRAPH_MIN,
@@ -2105,6 +2106,27 @@ export function lc31(ctx: BoardContext, skip: ReadonlySet<string> = new Set()): 
   // Leluhur Scroll / dilewati seluruhnya (dok lama dengan posisi gulir).
   walk(ctx.board.children);
   return out;
+}
+
+// ---------------------------------------------------------------------------
+// LC-32 · referensi instance yang basi (AD-12)
+// ---------------------------------------------------------------------------
+
+const LC32_EXPECTED: Record<string, string> = {
+  override: 'reset override itu, atau sunting master supaya node-nya ada lagi',
+  prop: 'pakai prop yang ada di master dengan tipe yang cocok, atau hapus nilainya',
+  slot: 'isi slot yang ada di master (frame), atau hapus isi slot itu',
+  bind: 'perbaiki bind/slot di definisi master supaya menunjuk node master yang ada',
+};
+
+/**
+ * Laporan ekspansi `instanceIssues` (dari `resolveDocument`) untuk board ini: override yatim, prop/slot tak dikenal
+ * atau salah tipe, serta bind/slot master ke node yang hilang. Warning tanpa gerbang; satu temuan per laporan.
+ */
+export function lc32(doc: ResolvedDocument, boardId: string): Finding[] {
+  return instanceIssues(doc)
+    .filter((i) => i.boardId === boardId)
+    .map((i) => finding('LC-32', 'warning', { id: i.instanceId, name: i.instanceName }, `${i.kind} ${i.key}: ${i.detail}`, LC32_EXPECTED[i.kind]!));
 }
 
 // ===========================================================================

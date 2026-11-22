@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { beginTransaction, createDocument } from '@lakar/core';
-import type { IconCatalogPort, PhotoInfo, PhotoLibraryPort } from '@lakar/ports';
+import type { CssVariablesParseOptions, CssVariablesPort, IconCatalogPort, PhotoInfo, PhotoLibraryPort } from '@lakar/ports';
 import { LakarDocument, LakarError, resolveTokens, type LakarDocument as Doc } from '@lakar/schema';
 import { API, API_GLOBALS, MAX_OPS, PACKAGE, photoRefsInCode, runSnippet as runSnippetRaw, type RunOptions, type RunResult } from './index.js';
 
@@ -53,8 +53,27 @@ const fakePhotos: PhotoLibraryPort & { asked: string[] } = {
     return ref === 'pexels:2014422' || ref === 'unsplash:Kq3wLm8xT0a' ? { ...FAKE_PHOTO } : undefined;
   },
 };
+/**
+ * Parser CSS variables palsu (struktural): hasil tetap untuk stylesheet berisi `--colors-bg`, kosong untuk lainnya.
+ * Parser asli (@lakar/render) dites di render dan lewat `runSnippet` di tests/css-variables-import.test.ts.
+ */
+const fakeCss: CssVariablesPort & { calls: { css: string; opts: CssVariablesParseOptions | undefined }[] } = {
+  calls: [],
+  parse(css, opts) {
+    this.calls.push({ css, opts });
+    if (!css.includes('--colors-bg')) return { entries: [], tokenModes: null, skipped: [{ source: 'body', reason: 'unsupported-selector', detail: 'Only :root and [data-theme="…"] blocks are imported.' }] };
+    return {
+      entries: [
+        { variable: '--colors-bg', token: 'colors.bg', type: 'color', value: '#FFFFFF', modes: { dark: '#0F0F0F' }, status: opts?.tokens?.['colors.bg'] ? 'update' : 'new' },
+        { variable: '--radius-md', token: 'radius.md', type: 'radius', value: 12, status: 'new' },
+      ],
+      tokenModes: opts?.modes?.includes('dark') ? null : ['light', 'dark'],
+      skipped: [{ source: '--shadow-card', reason: 'unsupported-value', detail: 'x' }],
+    };
+  },
+};
 const runSnippet = (code: string, tx: Parameters<typeof runSnippetRaw>[1], opts: Partial<RunOptions> = {}) =>
-  runSnippetRaw(code, tx, { icons: fakeIcons, photos: fakePhotos, ...opts });
+  runSnippetRaw(code, tx, { icons: fakeIcons, photos: fakePhotos, cssVariables: fakeCss, ...opts });
 
 const tracer = `const b=add(null,{type:'board',name:'Tracer',x:0,y:0,width:390,height:844,screen:'mobile'}); add(b,{type:'text',name:'Judul',content:'Halo dari Lakar',size:32})`;
 const BOARD = (name = 'B', x = 0, w = 390, h = 844) => `add(null,{type:'board',name:'${name}',x:${x},y:0,width:${w},height:${h},screen:'mobile'})`;
@@ -78,7 +97,7 @@ async function commitRun(code: string, doc: Doc = createDocument()) {
 describe('@lakar/exec', () => {
   it('mengekspor nama paket dan permukaan API lengkap (AD-7)', () => {
     expect(PACKAGE).toBe('@lakar/exec');
-    expect(Object.keys(API)).toEqual(['add', 'update', 'replace', 'move', 'duplicate', 'remove', 'setTokens', 'get', 'find', 'children', 'place', 'iconSearch', 'photo']);
+    expect(Object.keys(API)).toEqual(['add', 'update', 'replace', 'move', 'duplicate', 'remove', 'setComponent', 'resetOverride', 'detach', 'setTokens', 'setTokenModes', 'renameToken', 'importCssVariables', 'get', 'find', 'children', 'getTokens', 'place', 'iconSearch', 'photo']);
     for (const [name, fn] of Object.entries(API)) {
       expect(fn.signature.startsWith(`${name}(`), name).toBe(true);
       expect(fn.doc.length, name).toBeGreaterThan(20);
@@ -296,7 +315,7 @@ describe('@lakar/exec', () => {
       const ts = errRun(await runSnippet('const a = 1;\nconst b: number = 2', txFor()));
       expect(ts.message).toMatch(/^baris 2:\d+: SyntaxError/);
       const ref = errRun(await runSnippet('fetch("x")', txFor()));
-      expect(ref.hint).toContain('add, update, replace, move, duplicate, remove, setTokens, get, find, children, place, iconSearch, photo, keep, console.log');
+      expect(ref.hint).toContain('add, update, replace, move, duplicate, remove, setComponent, resetOverride, detach, setTokens, setTokenModes, renameToken, importCssVariables, get, find, children, getTokens, place, iconSearch, photo, keep, console.log');
     });
 
     it('error host yang ditangkap snippet tidak membatalkan transaksi; e.code tersedia', async () => {
@@ -447,6 +466,113 @@ describe('@lakar/exec', () => {
       const code = `const a = photo('pexels:2014422');\nconst b = photo( "openverse:${uuid}" );\nconst c = photo('wikimedia:98688894');\nconst d = photo('unsplash:Zp9_rT2uVb1');\nphoto('pexels:2014422'); photo(x); photo('foo'); photo(\`pexels:1\`); photo('pexels:12")`;
       expect(photoRefsInCode(code)).toEqual(['pexels:2014422', `openverse:${uuid}`, 'wikimedia:98688894', 'unsplash:Zp9_rT2uVb1']);
       expect(photoRefsInCode('add(b, {})')).toEqual([]);
+    });
+  });
+
+  describe('token: getTokens, renameToken, importCssVariables (epic token-tema story 2)', () => {
+    it('getTokens: dokumen baru → {tokens:{}, modes:[]}; melihat op snippet yang sama; tanpa op → rev tetap', async () => {
+      const tx = txFor();
+      expect(okRun(await runSnippet('getTokens()', tx)).value).toEqual({ tokens: {}, modes: [] });
+      const r = okRun(await runSnippet("setTokenModes(['light','dark']); setTokens({'colors.bg': {type:'color', value:'#FFFFFF', modes:{dark:'#000000'}}, 's.2': 8}); getTokens()", txFor()));
+      expect(r.value).toEqual({ tokens: { 'colors.bg': { type: 'color', value: '#FFFFFF', modes: { dark: '#000000' } }, 's.2': { type: 'spacing', value: 8 } }, modes: ['light', 'dark'] });
+      const ro = txFor();
+      okRun(await runSnippet('const t = getTokens(); t.tokens.x = 1; getTokens()', ro));
+      expect(ro.commit('baca').entry).toBeNull();
+      expect(errRun(await runSnippet('getTokens(1)', txFor())).code).toBe('SCHEMA_INVALID');
+    });
+
+    it('renameToken lewat execute: ref ikut, error core diteruskan', async () => {
+      const { c } = await commitRun(`setTokens({'colors.a': '#111111'}); const b = ${BOARD()}; add(b, {type:'rect', name:'R', width:10, height:10, fills:[{type:'solid', color:{$token:'colors.a'}}]}); renameToken('colors.a', 'colors.b');`);
+      expect(Object.keys(c.doc.tokens!)).toEqual(['colors.b']);
+      expect(JSON.stringify(c.doc.pages)).toContain('{"$token":"colors.b"}');
+      expect(c.inverse[0]).toEqual({ op: 'renameToken', from: 'colors.b', to: 'colors.a' });
+      expect(errRun(await runSnippet("renameToken('colors.x', 'colors.y')", txFor())).code).toBe('TOKEN_UNKNOWN');
+      expect(errRun(await runSnippet("setTokens({'a': '#111111', 'b': '#222222'}); renameToken('a', 'b')", txFor())).code).toBe('CONFLICT');
+    });
+
+    it('importCssVariables: commit setTokenModes + setTokens dari port, hasil ringkas, opsi keadaan dokumen', async () => {
+      fakeCss.calls.length = 0;
+      const { r, c } = await commitRun("setTokens({'colors.bg': '#000000'}); importCssVariables(':root{--colors-bg:#fff}')");
+      expect(r.value).toEqual({
+        tokens: [
+          { variable: '--colors-bg', token: 'colors.bg', type: 'color', status: 'update' },
+          { variable: '--radius-md', token: 'radius.md', type: 'radius', status: 'new' },
+        ],
+        modes: ['light', 'dark'],
+        skipped: [{ source: '--shadow-card', reason: 'unsupported-value', detail: 'x' }],
+      });
+      expect(fakeCss.calls[0]!.opts).toEqual({ tokens: { 'colors.bg': { type: 'color', value: '#000000' } } });
+      expect(c.doc.tokens).toEqual({ 'colors.bg': { type: 'color', value: '#FFFFFF', modes: { dark: '#0F0F0F' } }, 'radius.md': { type: 'radius', value: 12 } });
+      expect(c.doc.tokenModes).toEqual(['light', 'dark']);
+      expect(c.entry!.opsSummary).toBe('setTokens×2, setTokenModes×1');
+    });
+
+    it('importCssVariables: argumen salah, tanpa token, besar, dan tanpa port', async () => {
+      expect(errRun(await runSnippet('importCssVariables(42)', txFor())).code).toBe('SCHEMA_INVALID');
+      expect(errRun(await runSnippet("importCssVariables('  ')", txFor())).code).toBe('SCHEMA_INVALID');
+      const none = errRun(await runSnippet("importCssVariables('body{color:red}')", txFor()));
+      expect(none.code).toBe('SCHEMA_INVALID');
+      expect(none.message).toContain('body: unsupported-selector');
+      expect(errRun(await runSnippet("importCssVariables(':root{--colors-bg:#fff}' + ' '.repeat(300000))", txFor())).code).toBe('SCHEMA_INVALID');
+      const noPort = errRun(await runSnippetRaw("importCssVariables(':root{--colors-bg:#fff}')", txFor(), { icons: fakeIcons }));
+      expect(noPort.code).toBe('EXEC_ERROR');
+    });
+  });
+
+  describe('komponen: setComponent, instance, override komposit, resetOverride, detach (epic komponen story 3)', () => {
+    const KARTU = `const b = ${BOARD()}; const k = add(b, {type:'frame', name:'Kartu', layout:'column'}); const t = add(k, {type:'text', name:'Judul', content:'Halo', size:16}); const isi = add(k, {type:'frame', name:'Isi', layout:'column'}); setComponent(k, {props:[], slots:[{name:'body', nodeId:isi}]}); const a = add(b, {type:'instance', name:'Kartu A', componentId:k}); const c = add(b, {type:'instance', name:'Kartu B', componentId:k});`;
+
+    it('alur agen: override teks di satu instance, ubah master, get komposit, find/children isi slot', async () => {
+      const { r, c } = await commitRun(
+        `${KARTU} update(a + '/' + t, {content:'Promo'}); update(t, {color:'#B42318'}); const s = add(a + '/' + isi, {type:'text', name:'Catatan', content:'x', size:12});` +
+          ` [get(a + '/' + t), get(c + '/' + t).content, get(a), find({name:'Catatan'}).map((n) => n.parentId), children(a).map((n) => n.name), get(a + '/' + isi).childIds, a]`,
+      );
+      const [eff, other, inst, parents, kids, slotKids, a] = r.value as [Record<string, unknown>, string, Record<string, unknown>, string[], string[], string[], string];
+      expect(eff).toMatchObject({ type: 'text', content: 'Promo', color: '#B42318', parentId: a, path: ['B', 'Kartu A', 'Judul'] });
+      expect(String(eff.id)).toMatch(new RegExp(`^${a}/`));
+      expect(other).toBe('Halo');
+      expect(inst).toMatchObject({ type: 'instance', overrides: expect.any(Object) });
+      expect(inst.childIds).toBeUndefined();
+      expect(parents).toEqual([a]);
+      expect(kids).toEqual(['Catatan']);
+      expect(slotKids).toHaveLength(1);
+      expect(c.inverse.length).toBeGreaterThan(0);
+    });
+
+    it('setComponent tanpa argumen; resetOverride; detach → node biasa; hapus master men-detach', async () => {
+      const { r, c } = await commitRun(
+        `const b = ${BOARD()}; const k = add(b, {type:'frame', name:'Kartu'}); add(k, {type:'text', name:'Judul', content:'Halo', size:16}); setComponent(k); setComponent(k);` +
+          ` const a = add(b, {type:'instance', name:'A', componentId:k}); const z = add(b, {type:'instance', name:'Z', componentId:k}); update(a, {fills:[{type:'solid', color:'#FEF3C7'}]}); resetOverride(a);` +
+          ` const d = detach(a); remove(k); [get(d).type, find({type:'instance'}).length, children(b).map((n) => n.type)]`,
+      );
+      expect(r.value).toEqual(['frame', 0, ['frame', 'frame']]);
+      expect(c.entry!.opsSummary).toContain('detach');
+    });
+
+    it('setComponent tanpa argumen pada master berdefinisi: props dan slots tetap', async () => {
+      const { r } = await commitRun(`${KARTU} setComponent(k, {props:[{name:'title', type:'text', default:'Halo', binds:[{nodeId:t, prop:'content'}]}], slots:[{name:'body', nodeId:isi}]}); setComponent(k); [get(k).component, get(a + '/' + t).content]`);
+      const [def, content] = r.value as [Record<string, unknown[]>, string];
+      expect(def.props).toHaveLength(1);
+      expect(def.slots).toHaveLength(1);
+      expect(content).toBe('Halo');
+    });
+
+    it('update ikon lewat alamat komposit: alias → nama kanonik + version; nama tak dikenal → ICON_UNKNOWN', async () => {
+      const ICON = `const b = ${BOARD()}; const k = add(b, {type:'frame', name:'Tombol', layout:'row'}); const ic = add(k, {type:'icon', lib:'lucide', icon:'search', size:16}); setComponent(k); const a = add(b, {type:'instance', name:'Tombol A', componentId:k});`;
+      const { r } = await commitRun(`${ICON} update(a + '/' + ic, {icon:'home'}); [get(a + '/' + ic), get(a).overrides]`);
+      const [eff, overrides] = r.value as [Record<string, unknown>, Record<string, Record<string, unknown>>];
+      expect(eff).toMatchObject({ icon: 'house', version: '1.74.0' });
+      expect(Object.values(overrides)[0]).toEqual({ icon: 'house', version: '1.74.0' });
+      expect(errRun(await runSnippet(`${ICON} update(a + '/' + ic, {icon:'nope'})`, txFor())).code).toBe('ICON_UNKNOWN');
+    });
+
+    it('error: alamat tak ada → NOT_FOUND, override tidak sah → SCHEMA_INVALID, komposit ke remove → SCHEMA_INVALID', async () => {
+      expect(errRun(await runSnippet(`${KARTU} get(a + '/Zzzzzzzz')`, txFor())).code).toBe('NOT_FOUND');
+      expect(errRun(await runSnippet(`${KARTU} update(a + '/' + t, {size:-1})`, txFor())).code).toBe('SCHEMA_INVALID');
+      const e = errRun(await runSnippet(`${KARTU} remove(a + '/' + t)`, txFor()));
+      expect(e.code).toBe('SCHEMA_INVALID');
+      expect(e.hint).toContain('detach');
+      expect(errRun(await runSnippet(`${KARTU} detach(k)`, txFor())).code).toBe('SCHEMA_INVALID');
     });
   });
 });

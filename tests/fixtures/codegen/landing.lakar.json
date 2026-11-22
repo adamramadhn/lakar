@@ -1,0 +1,1547 @@
+{
+  "schemaVersion": 5,
+  "id": "CgFixLnd",
+  "rev": 1,
+  "tokenModes": [
+    "light",
+    "dark"
+  ],
+  "tokens": {
+    "colors.brand": {
+      "type": "color",
+      "value": "#4F46E5",
+      "modes": {
+        "dark": "#818CF8"
+      }
+    },
+    "colors.ink": {
+      "type": "color",
+      "value": "#0F172A",
+      "modes": {
+        "dark": "#F8FAFC"
+      }
+    },
+    "colors.muted": {
+      "type": "color",
+      "value": "#475569",
+      "modes": {
+        "dark": "#94A3B8"
+      }
+    },
+    "colors.surface": {
+      "type": "color",
+      "value": "#FFFFFF",
+      "modes": {
+        "dark": "#0B1120"
+      }
+    },
+    "colors.card": {
+      "type": "color",
+      "value": "#F8FAFC",
+      "modes": {
+        "dark": "#111827"
+      }
+    },
+    "colors.line": {
+      "type": "color",
+      "value": "#E2E8F0",
+      "modes": {
+        "dark": "#1F2937"
+      }
+    },
+    "space.section": {
+      "type": "spacing",
+      "value": 72,
+      "modes": {
+        "dark": 56
+      }
+    },
+    "space.gap": {
+      "type": "spacing",
+      "value": 24
+    },
+    "radius.card": {
+      "type": "radius",
+      "value": 16
+    },
+    "radius.pill": {
+      "type": "radius",
+      "value": 999
+    },
+    "font.body": {
+      "type": "fontFamily",
+      "value": "Inter"
+    },
+    "font.size-hero": {
+      "type": "fontSize",
+      "value": 52,
+      "modes": {
+        "dark": 36
+      }
+    },
+    "font.line-hero": {
+      "type": "lineHeight",
+      "value": 60,
+      "modes": {
+        "dark": 44
+      }
+    },
+    "font.weight-bold": {
+      "type": "fontWeight",
+      "value": 700
+    },
+    "font.tracking-hero": {
+      "type": "letterSpacing",
+      "value": -0.02
+    }
+  },
+  "pages": [
+    {
+      "id": "PgCgLnd1",
+      "name": "Landing",
+      "children": [
+        {
+          "type": "board",
+          "id": "BrdLnd01",
+          "name": "Landing / Desktop",
+          "x": 0,
+          "y": 0,
+          "width": 1280,
+          "height": 1640,
+          "screen": "landing",
+          "fills": [
+            {
+              "type": "solid",
+              "color": {
+                "$token": "colors.surface"
+              }
+            }
+          ],
+          "children": [
+            {
+              "type": "frame",
+              "id": "FrmLDxHd",
+              "name": "Header",
+              "layout": "row",
+              "justify": "space-between",
+              "align": "center",
+              "padding": [
+                20,
+                64
+              ],
+              "width": "fill",
+              "stroke": {
+                "color": {
+                  "$token": "colors.line"
+                },
+                "width": 1,
+                "align": "inside",
+                "sides": [
+                  "bottom"
+                ]
+              },
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "FrmLDxLg",
+                  "name": "Logo",
+                  "layout": "row",
+                  "gap": 10,
+                  "align": "center",
+                  "children": [
+                    {
+                      "type": "ellipse",
+                      "id": "ElpLDxLg",
+                      "name": "Tanda",
+                      "width": 28,
+                      "height": 28,
+                      "fills": [
+                        {
+                          "type": "linear",
+                          "angle": 45,
+                          "stops": [
+                            {
+                              "offset": 0,
+                              "color": {
+                                "$token": "colors.brand"
+                              }
+                            },
+                            {
+                              "offset": 1,
+                              "color": "#EC4899"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "text",
+                      "id": "TxtLDxLg",
+                      "name": "Merek",
+                      "content": "Lakar",
+                      "size": 20,
+                      "lineHeight": 28,
+                      "weight": 700,
+                      "color": {
+                        "$token": "colors.ink"
+                      },
+                      "letterSpacing": -0.01
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "FrmLDxNv",
+                  "name": "Navigasi",
+                  "layout": "row",
+                  "gap": 32,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "TxtLDxN0",
+                      "name": "Product",
+                      "content": "Product",
+                      "size": 15,
+                      "lineHeight": 24,
+                      "weight": 500,
+                      "color": {
+                        "$token": "colors.muted"
+                      }
+                    },
+                    {
+                      "type": "text",
+                      "id": "TxtLDxN1",
+                      "name": "Pricing",
+                      "content": "Pricing",
+                      "size": 15,
+                      "lineHeight": 24,
+                      "weight": 500,
+                      "color": {
+                        "$token": "colors.muted"
+                      }
+                    },
+                    {
+                      "type": "text",
+                      "id": "TxtLDxN2",
+                      "name": "Docs",
+                      "content": "Docs",
+                      "size": 15,
+                      "lineHeight": 24,
+                      "weight": 500,
+                      "color": {
+                        "$token": "colors.muted"
+                      }
+                    },
+                    {
+                      "type": "text",
+                      "id": "TxtLDxN3",
+                      "name": "Blog",
+                      "content": "Blog",
+                      "size": 15,
+                      "lineHeight": 24,
+                      "weight": 500,
+                      "color": {
+                        "$token": "colors.muted"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "instance",
+                  "id": "InsLDxHd",
+                  "name": "Tombol / daftar",
+                  "componentId": "MstLBtn1",
+                  "props": {
+                    "label": "Sign up",
+                    "showIcon": false
+                  }
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "FrmLDxHe",
+              "name": "Hero",
+              "layout": "column",
+              "align": "center",
+              "gap": {
+                "$token": "space.gap"
+              },
+              "padding": [
+                {
+                  "$token": "space.section"
+                },
+                64
+              ],
+              "width": "fill",
+              "fills": [
+                {
+                  "type": "linear",
+                  "angle": 180,
+                  "stops": [
+                    {
+                      "offset": 0,
+                      "color": {
+                        "$token": "colors.surface"
+                      }
+                    },
+                    {
+                      "offset": 1,
+                      "color": {
+                        "$token": "colors.card"
+                      }
+                    }
+                  ]
+                }
+              ],
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "FrmLDxPl",
+                  "name": "Pil",
+                  "layout": "row",
+                  "gap": 6,
+                  "align": "center",
+                  "padding": [
+                    6,
+                    12
+                  ],
+                  "radius": {
+                    "$token": "radius.pill"
+                  },
+                  "fills": [
+                    {
+                      "type": "solid",
+                      "color": "#EEF2FF"
+                    }
+                  ],
+                  "children": [
+                    {
+                      "type": "icon",
+                      "id": "IcnLDxPl",
+                      "name": "Icon / lucide / sparkles",
+                      "lib": "lucide",
+                      "icon": "sparkles",
+                      "size": 14,
+                      "color": "#4F46E5"
+                    },
+                    {
+                      "type": "text",
+                      "id": "TxtLDxPl",
+                      "name": "Pil",
+                      "content": "New: export to React",
+                      "size": 13,
+                      "lineHeight": 18,
+                      "weight": 600,
+                      "color": "#4F46E5"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "id": "TxtLDxH1",
+                  "name": "Judul",
+                  "content": "Design on a canvas, ship real components",
+                  "size": {
+                    "$token": "font.size-hero"
+                  },
+                  "lineHeight": {
+                    "$token": "font.line-hero"
+                  },
+                  "weight": {
+                    "$token": "font.weight-bold"
+                  },
+                  "letterSpacing": {
+                    "$token": "font.tracking-hero"
+                  },
+                  "color": {
+                    "$token": "colors.ink"
+                  },
+                  "align": "center",
+                  "width": 760,
+                  "family": {
+                    "$token": "font.body"
+                  }
+                },
+                {
+                  "type": "text",
+                  "id": "TxtLDxH2",
+                  "name": "Sub",
+                  "content": "Lakar turns boards into React with Tailwind or CSS modules, using your tokens and components.",
+                  "size": 18,
+                  "lineHeight": 28,
+                  "color": {
+                    "$token": "colors.muted"
+                  },
+                  "align": "center",
+                  "width": 640
+                },
+                {
+                  "type": "frame",
+                  "id": "FrmLDxBt",
+                  "name": "Tombol",
+                  "layout": "row",
+                  "gap": 12,
+                  "align": "center",
+                  "children": [
+                    {
+                      "type": "instance",
+                      "id": "InsLDxB1",
+                      "name": "Tombol / mulai",
+                      "componentId": "MstLBtn1",
+                      "props": {
+                        "label": "Get started"
+                      }
+                    },
+                    {
+                      "type": "instance",
+                      "id": "InsLDxB2",
+                      "name": "Tombol / demo",
+                      "componentId": "MstLBtn1",
+                      "props": {
+                        "label": "Watch demo",
+                        "icon": "play"
+                      },
+                      "overrides": {
+                        "MstLBtn1": {
+                          "fills": [
+                            {
+                              "type": "solid",
+                              "color": "#FFFFFF"
+                            }
+                          ],
+                          "stroke": {
+                            "color": "#CBD5E1",
+                            "width": 1,
+                            "align": "inside"
+                          }
+                        },
+                        "TxtLBtn1": {
+                          "color": "#0F172A"
+                        },
+                        "IcnLBtn1": {
+                          "color": "#0F172A"
+                        }
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "FrmLDxIm",
+                  "name": "Gambar",
+                  "width": 1152,
+                  "height": 400,
+                  "radius": 24,
+                  "fills": [
+                    {
+                      "type": "image",
+                      "assetId": "e14414c7fc0f20c2a299aed9471ccf3f5056d94248f7a5948d8a067917faa153",
+                      "fit": "cover"
+                    }
+                  ],
+                  "shadows": [
+                    {
+                      "x": 0,
+                      "y": 24,
+                      "blur": 48,
+                      "spread": -16,
+                      "color": "#0F172A40"
+                    }
+                  ],
+                  "children": []
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "FrmLDxFt",
+              "name": "Fitur",
+              "layout": "column",
+              "gap": 32,
+              "padding": [
+                64,
+                64
+              ],
+              "width": "fill",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "TxtLDxFt",
+                  "name": "Judul bagian",
+                  "content": "Everything you need to hand off",
+                  "size": 32,
+                  "lineHeight": 40,
+                  "weight": 700,
+                  "color": {
+                    "$token": "colors.ink"
+                  },
+                  "align": "center",
+                  "width": "fill"
+                },
+                {
+                  "type": "frame",
+                  "id": "FrmLDxFr",
+                  "name": "Baris fitur",
+                  "layout": "row",
+                  "gap": {
+                    "$token": "space.gap"
+                  },
+                  "width": "fill",
+                  "children": [
+                    {
+                      "type": "instance",
+                      "id": "InsLDxF1",
+                      "name": "Fitur / cepat",
+                      "componentId": "MstLFea1",
+                      "props": {
+                        "title": "Fast by default",
+                        "desc": "Every board renders with the same engine you export to."
+                      }
+                    },
+                    {
+                      "type": "instance",
+                      "id": "InsLDxF2",
+                      "name": "Fitur / aman",
+                      "componentId": "MstLFea1",
+                      "props": {
+                        "title": "Tokens stay tokens",
+                        "desc": "Colors and spacing export as CSS variables.",
+                        "icon": "shield",
+                        "highlight": true
+                      }
+                    },
+                    {
+                      "type": "instance",
+                      "id": "InsLDxF3",
+                      "name": "Fitur / komponen",
+                      "componentId": "MstLFea1",
+                      "props": {
+                        "title": "Real components",
+                        "icon": "sparkles"
+                      },
+                      "slots": {
+                        "aksi": [
+                          {
+                            "type": "instance",
+                            "id": "InsLDxFB",
+                            "name": "Tombol / coba",
+                            "componentId": "MstLBtn1",
+                            "props": {
+                              "label": "Try it",
+                              "icon": "download"
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "FrmLDxCt",
+              "name": "Ajakan",
+              "layout": "column",
+              "padding": [
+                0,
+                64,
+                64,
+                64
+              ],
+              "width": "fill",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "FrmLDxCb",
+                  "name": "Pita",
+                  "layout": "row",
+                  "justify": "space-between",
+                  "align": "center",
+                  "gap": 16,
+                  "padding": 48,
+                  "radius": 24,
+                  "width": "fill",
+                  "fills": [
+                    {
+                      "type": "linear",
+                      "angle": 90,
+                      "stops": [
+                        {
+                          "offset": 0,
+                          "color": {
+                            "$token": "colors.brand"
+                          }
+                        },
+                        {
+                          "offset": 1,
+                          "color": "#7C3AED"
+                        }
+                      ]
+                    }
+                  ],
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "FrmLDxCx",
+                      "name": "Teks",
+                      "layout": "column",
+                      "gap": 8,
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "TxtLDxC1",
+                          "name": "Judul",
+                          "content": "Start designing today",
+                          "size": 28,
+                          "lineHeight": 36,
+                          "weight": 700,
+                          "color": "#FFFFFF"
+                        },
+                        {
+                          "type": "text",
+                          "id": "TxtLDxC2",
+                          "name": "Sub",
+                          "content": "Free while in beta.",
+                          "size": 16,
+                          "lineHeight": 24,
+                          "color": "#E0E7FF",
+                          "opacity": 0.9
+                        }
+                      ]
+                    },
+                    {
+                      "type": "instance",
+                      "id": "InsLDxCt",
+                      "name": "Tombol / ajakan",
+                      "componentId": "MstLBtn1",
+                      "props": {
+                        "label": "Download",
+                        "icon": "download"
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "FrmLDxFo",
+              "name": "Kaki",
+              "layout": "row",
+              "justify": "space-between",
+              "padding": [
+                24,
+                64
+              ],
+              "width": "fill",
+              "stroke": {
+                "color": {
+                  "$token": "colors.line"
+                },
+                "width": 1,
+                "align": "inside",
+                "sides": [
+                  "top"
+                ]
+              },
+              "children": [
+                {
+                  "type": "text",
+                  "id": "TxtLDxF1",
+                  "name": "Hak cipta",
+                  "content": "© 2026 Lakar",
+                  "size": 14,
+                  "lineHeight": 20,
+                  "color": {
+                    "$token": "colors.muted"
+                  }
+                },
+                {
+                  "type": "text",
+                  "id": "TxtLDxF2",
+                  "name": "Tautan",
+                  "content": "Privacy · Terms",
+                  "size": 14,
+                  "lineHeight": 20,
+                  "color": {
+                    "$token": "colors.muted"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "board",
+          "id": "BrdLnd02",
+          "name": "Landing / Mobile gelap",
+          "x": 1400,
+          "y": 0,
+          "width": 390,
+          "height": 2000,
+          "screen": "mobile",
+          "themeMode": "dark",
+          "fills": [
+            {
+              "type": "solid",
+              "color": {
+                "$token": "colors.surface"
+              }
+            }
+          ],
+          "children": [
+            {
+              "type": "frame",
+              "id": "FrmLMxHd",
+              "name": "Header",
+              "layout": "row",
+              "justify": "space-between",
+              "align": "center",
+              "padding": [
+                20,
+                20
+              ],
+              "width": "fill",
+              "stroke": {
+                "color": {
+                  "$token": "colors.line"
+                },
+                "width": 1,
+                "align": "inside",
+                "sides": [
+                  "bottom"
+                ]
+              },
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "FrmLMxLg",
+                  "name": "Logo",
+                  "layout": "row",
+                  "gap": 10,
+                  "align": "center",
+                  "children": [
+                    {
+                      "type": "ellipse",
+                      "id": "ElpLMxLg",
+                      "name": "Tanda",
+                      "width": 28,
+                      "height": 28,
+                      "fills": [
+                        {
+                          "type": "linear",
+                          "angle": 45,
+                          "stops": [
+                            {
+                              "offset": 0,
+                              "color": {
+                                "$token": "colors.brand"
+                              }
+                            },
+                            {
+                              "offset": 1,
+                              "color": "#EC4899"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "text",
+                      "id": "TxtLMxLg",
+                      "name": "Merek",
+                      "content": "Lakar",
+                      "size": 20,
+                      "lineHeight": 28,
+                      "weight": 700,
+                      "color": {
+                        "$token": "colors.ink"
+                      },
+                      "letterSpacing": -0.01
+                    }
+                  ]
+                },
+                {
+                  "type": "instance",
+                  "id": "InsLMxHd",
+                  "name": "Tombol / daftar",
+                  "componentId": "MstLBtn1",
+                  "props": {
+                    "label": "Sign up",
+                    "showIcon": false
+                  }
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "FrmLMxHe",
+              "name": "Hero",
+              "layout": "column",
+              "align": "center",
+              "gap": {
+                "$token": "space.gap"
+              },
+              "padding": [
+                {
+                  "$token": "space.section"
+                },
+                20
+              ],
+              "width": "fill",
+              "fills": [
+                {
+                  "type": "linear",
+                  "angle": 180,
+                  "stops": [
+                    {
+                      "offset": 0,
+                      "color": {
+                        "$token": "colors.surface"
+                      }
+                    },
+                    {
+                      "offset": 1,
+                      "color": {
+                        "$token": "colors.card"
+                      }
+                    }
+                  ]
+                }
+              ],
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "FrmLMxPl",
+                  "name": "Pil",
+                  "layout": "row",
+                  "gap": 6,
+                  "align": "center",
+                  "padding": [
+                    6,
+                    12
+                  ],
+                  "radius": {
+                    "$token": "radius.pill"
+                  },
+                  "fills": [
+                    {
+                      "type": "solid",
+                      "color": "#EEF2FF"
+                    }
+                  ],
+                  "children": [
+                    {
+                      "type": "icon",
+                      "id": "IcnLMxPl",
+                      "name": "Icon / lucide / sparkles",
+                      "lib": "lucide",
+                      "icon": "sparkles",
+                      "size": 14,
+                      "color": "#4F46E5"
+                    },
+                    {
+                      "type": "text",
+                      "id": "TxtLMxPl",
+                      "name": "Pil",
+                      "content": "New: export to React",
+                      "size": 13,
+                      "lineHeight": 18,
+                      "weight": 600,
+                      "color": "#4F46E5"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "id": "TxtLMxH1",
+                  "name": "Judul",
+                  "content": "Design on a canvas, ship real components",
+                  "size": {
+                    "$token": "font.size-hero"
+                  },
+                  "lineHeight": {
+                    "$token": "font.line-hero"
+                  },
+                  "weight": {
+                    "$token": "font.weight-bold"
+                  },
+                  "letterSpacing": {
+                    "$token": "font.tracking-hero"
+                  },
+                  "color": {
+                    "$token": "colors.ink"
+                  },
+                  "align": "center",
+                  "width": "fill",
+                  "family": {
+                    "$token": "font.body"
+                  }
+                },
+                {
+                  "type": "text",
+                  "id": "TxtLMxH2",
+                  "name": "Sub",
+                  "content": "Lakar turns boards into React with Tailwind or CSS modules, using your tokens and components.",
+                  "size": 18,
+                  "lineHeight": 28,
+                  "color": {
+                    "$token": "colors.muted"
+                  },
+                  "align": "center",
+                  "width": "fill"
+                },
+                {
+                  "type": "frame",
+                  "id": "FrmLMxBt",
+                  "name": "Tombol",
+                  "layout": "column",
+                  "gap": 12,
+                  "align": "center",
+                  "children": [
+                    {
+                      "type": "instance",
+                      "id": "InsLMxB1",
+                      "name": "Tombol / mulai",
+                      "componentId": "MstLBtn1",
+                      "props": {
+                        "label": "Get started"
+                      }
+                    },
+                    {
+                      "type": "instance",
+                      "id": "InsLMxB2",
+                      "name": "Tombol / demo",
+                      "componentId": "MstLBtn1",
+                      "props": {
+                        "label": "Watch demo",
+                        "icon": "play"
+                      },
+                      "overrides": {
+                        "MstLBtn1": {
+                          "fills": [
+                            {
+                              "type": "solid",
+                              "color": "#FFFFFF"
+                            }
+                          ],
+                          "stroke": {
+                            "color": "#CBD5E1",
+                            "width": 1,
+                            "align": "inside"
+                          }
+                        },
+                        "TxtLBtn1": {
+                          "color": "#0F172A"
+                        },
+                        "IcnLBtn1": {
+                          "color": "#0F172A"
+                        }
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "FrmLMxIm",
+                  "name": "Gambar",
+                  "width": "fill",
+                  "height": 220,
+                  "radius": 24,
+                  "fills": [
+                    {
+                      "type": "image",
+                      "assetId": "e14414c7fc0f20c2a299aed9471ccf3f5056d94248f7a5948d8a067917faa153",
+                      "fit": "cover"
+                    }
+                  ],
+                  "shadows": [
+                    {
+                      "x": 0,
+                      "y": 24,
+                      "blur": 48,
+                      "spread": -16,
+                      "color": "#0F172A40"
+                    }
+                  ],
+                  "children": []
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "FrmLMxFt",
+              "name": "Fitur",
+              "layout": "column",
+              "gap": 32,
+              "padding": [
+                64,
+                20
+              ],
+              "width": "fill",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "TxtLMxFt",
+                  "name": "Judul bagian",
+                  "content": "Everything you need to hand off",
+                  "size": 32,
+                  "lineHeight": 40,
+                  "weight": 700,
+                  "color": {
+                    "$token": "colors.ink"
+                  },
+                  "align": "center",
+                  "width": "fill"
+                },
+                {
+                  "type": "frame",
+                  "id": "FrmLMxFr",
+                  "name": "Baris fitur",
+                  "layout": "column",
+                  "gap": {
+                    "$token": "space.gap"
+                  },
+                  "width": "fill",
+                  "children": [
+                    {
+                      "type": "instance",
+                      "id": "InsLMxF1",
+                      "name": "Fitur / cepat",
+                      "componentId": "MstLFea1",
+                      "props": {
+                        "title": "Fast by default",
+                        "desc": "Every board renders with the same engine you export to."
+                      }
+                    },
+                    {
+                      "type": "instance",
+                      "id": "InsLMxF2",
+                      "name": "Fitur / aman",
+                      "componentId": "MstLFea1",
+                      "props": {
+                        "title": "Tokens stay tokens",
+                        "desc": "Colors and spacing export as CSS variables.",
+                        "icon": "shield",
+                        "highlight": true
+                      }
+                    },
+                    {
+                      "type": "instance",
+                      "id": "InsLMxF3",
+                      "name": "Fitur / komponen",
+                      "componentId": "MstLFea1",
+                      "props": {
+                        "title": "Real components",
+                        "icon": "sparkles"
+                      },
+                      "slots": {
+                        "aksi": [
+                          {
+                            "type": "instance",
+                            "id": "InsLMxFB",
+                            "name": "Tombol / coba",
+                            "componentId": "MstLBtn1",
+                            "props": {
+                              "label": "Try it",
+                              "icon": "download"
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "FrmLMxCt",
+              "name": "Ajakan",
+              "layout": "column",
+              "padding": [
+                0,
+                20,
+                64,
+                20
+              ],
+              "width": "fill",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "FrmLMxCb",
+                  "name": "Pita",
+                  "layout": "column",
+                  "justify": "space-between",
+                  "align": "start",
+                  "gap": 16,
+                  "padding": 48,
+                  "radius": 24,
+                  "width": "fill",
+                  "fills": [
+                    {
+                      "type": "linear",
+                      "angle": 90,
+                      "stops": [
+                        {
+                          "offset": 0,
+                          "color": {
+                            "$token": "colors.brand"
+                          }
+                        },
+                        {
+                          "offset": 1,
+                          "color": "#7C3AED"
+                        }
+                      ]
+                    }
+                  ],
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "FrmLMxCx",
+                      "name": "Teks",
+                      "layout": "column",
+                      "gap": 8,
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "TxtLMxC1",
+                          "name": "Judul",
+                          "content": "Start designing today",
+                          "size": 28,
+                          "lineHeight": 36,
+                          "weight": 700,
+                          "color": "#FFFFFF"
+                        },
+                        {
+                          "type": "text",
+                          "id": "TxtLMxC2",
+                          "name": "Sub",
+                          "content": "Free while in beta.",
+                          "size": 16,
+                          "lineHeight": 24,
+                          "color": "#E0E7FF",
+                          "opacity": 0.9
+                        }
+                      ]
+                    },
+                    {
+                      "type": "instance",
+                      "id": "InsLMxCt",
+                      "name": "Tombol / ajakan",
+                      "componentId": "MstLBtn1",
+                      "props": {
+                        "label": "Download",
+                        "icon": "download"
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "FrmLMxFo",
+              "name": "Kaki",
+              "layout": "row",
+              "justify": "space-between",
+              "padding": [
+                24,
+                20
+              ],
+              "width": "fill",
+              "stroke": {
+                "color": {
+                  "$token": "colors.line"
+                },
+                "width": 1,
+                "align": "inside",
+                "sides": [
+                  "top"
+                ]
+              },
+              "children": [
+                {
+                  "type": "text",
+                  "id": "TxtLMxF1",
+                  "name": "Hak cipta",
+                  "content": "© 2026 Lakar",
+                  "size": 14,
+                  "lineHeight": 20,
+                  "color": {
+                    "$token": "colors.muted"
+                  }
+                },
+                {
+                  "type": "text",
+                  "id": "TxtLMxF2",
+                  "name": "Tautan",
+                  "content": "Privacy · Terms",
+                  "size": 14,
+                  "lineHeight": 20,
+                  "color": {
+                    "$token": "colors.muted"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "board",
+          "id": "BrdLnd03",
+          "name": "Komponen",
+          "x": 0,
+          "y": 1800,
+          "width": 720,
+          "height": 720,
+          "screen": "app",
+          "fills": [
+            {
+              "type": "solid",
+              "color": "#FFFFFF"
+            }
+          ],
+          "children": [
+            {
+              "type": "frame",
+              "id": "FrmLPst1",
+              "name": "Pustaka",
+              "layout": "column",
+              "gap": 24,
+              "padding": 24,
+              "width": 368,
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "MstLBtn1",
+                  "name": "Tombol",
+                  "layout": "row",
+                  "gap": 8,
+                  "align": "center",
+                  "padding": [
+                    12,
+                    20
+                  ],
+                  "radius": {
+                    "$token": "radius.pill"
+                  },
+                  "width": "hug",
+                  "fills": [
+                    {
+                      "type": "solid",
+                      "color": {
+                        "$token": "colors.brand"
+                      }
+                    }
+                  ],
+                  "component": {
+                    "props": [
+                      {
+                        "name": "label",
+                        "type": "text",
+                        "default": "Button",
+                        "binds": [
+                          {
+                            "nodeId": "TxtLBtn1",
+                            "prop": "content"
+                          }
+                        ]
+                      },
+                      {
+                        "name": "showIcon",
+                        "type": "boolean",
+                        "default": true,
+                        "binds": [
+                          {
+                            "nodeId": "IcnLBtn1",
+                            "prop": "visible"
+                          }
+                        ]
+                      },
+                      {
+                        "name": "icon",
+                        "type": "enum",
+                        "options": [
+                          "arrow-right",
+                          "download",
+                          "play"
+                        ],
+                        "default": "arrow-right",
+                        "binds": [
+                          {
+                            "nodeId": "IcnLBtn1",
+                            "prop": "icon"
+                          }
+                        ]
+                      }
+                    ],
+                    "slots": []
+                  },
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "TxtLBtn1",
+                      "name": "Label",
+                      "content": "Button",
+                      "size": 15,
+                      "lineHeight": 20,
+                      "weight": 600,
+                      "color": "#FFFFFF",
+                      "family": {
+                        "$token": "font.body"
+                      }
+                    },
+                    {
+                      "type": "icon",
+                      "id": "IcnLBtn1",
+                      "name": "Icon / lucide / arrow-right",
+                      "lib": "lucide",
+                      "icon": "arrow-right",
+                      "size": 18,
+                      "color": "#FFFFFF"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "MstLFea1",
+                  "name": "Fitur",
+                  "layout": "column",
+                  "gap": 12,
+                  "padding": 24,
+                  "radius": {
+                    "$token": "radius.card"
+                  },
+                  "width": "fill",
+                  "fills": [
+                    {
+                      "type": "solid",
+                      "color": {
+                        "$token": "colors.card"
+                      }
+                    }
+                  ],
+                  "stroke": {
+                    "color": {
+                      "$token": "colors.line"
+                    },
+                    "width": 1,
+                    "align": "inside"
+                  },
+                  "shadows": [
+                    {
+                      "x": 0,
+                      "y": 8,
+                      "blur": 24,
+                      "spread": -12,
+                      "color": "#0F172A29"
+                    }
+                  ],
+                  "component": {
+                    "props": [
+                      {
+                        "name": "title",
+                        "type": "text",
+                        "default": "Feature",
+                        "binds": [
+                          {
+                            "nodeId": "TxtLFea1",
+                            "prop": "content"
+                          }
+                        ]
+                      },
+                      {
+                        "name": "desc",
+                        "type": "text",
+                        "default": "Describe the feature in one or two short lines.",
+                        "binds": [
+                          {
+                            "nodeId": "TxtLFea2",
+                            "prop": "content"
+                          }
+                        ]
+                      },
+                      {
+                        "name": "icon",
+                        "type": "enum",
+                        "options": [
+                          "zap",
+                          "shield",
+                          "sparkles"
+                        ],
+                        "default": "zap",
+                        "binds": [
+                          {
+                            "nodeId": "IcnLFea1",
+                            "prop": "icon"
+                          }
+                        ]
+                      },
+                      {
+                        "name": "highlight",
+                        "type": "boolean",
+                        "default": false,
+                        "binds": [
+                          {
+                            "nodeId": "FrmLFea4",
+                            "prop": "visible"
+                          }
+                        ]
+                      }
+                    ],
+                    "slots": [
+                      {
+                        "name": "aksi",
+                        "nodeId": "FrmLFea3"
+                      }
+                    ]
+                  },
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "FrmLFea2",
+                      "name": "Ikon",
+                      "layout": "row",
+                      "align": "center",
+                      "justify": "center",
+                      "width": 44,
+                      "height": 44,
+                      "radius": 12,
+                      "fills": [
+                        {
+                          "type": "linear",
+                          "angle": 135,
+                          "stops": [
+                            {
+                              "offset": 0,
+                              "color": {
+                                "$token": "colors.brand"
+                              }
+                            },
+                            {
+                              "offset": 1,
+                              "color": "#7C3AED"
+                            }
+                          ]
+                        }
+                      ],
+                      "children": [
+                        {
+                          "type": "icon",
+                          "id": "IcnLFea1",
+                          "name": "Icon / lucide / zap",
+                          "lib": "lucide",
+                          "icon": "zap",
+                          "size": 22,
+                          "color": "#FFFFFF"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "text",
+                      "id": "TxtLFea1",
+                      "name": "Judul",
+                      "content": "Feature",
+                      "size": 18,
+                      "lineHeight": 26,
+                      "weight": 600,
+                      "color": {
+                        "$token": "colors.ink"
+                      },
+                      "family": {
+                        "$token": "font.body"
+                      }
+                    },
+                    {
+                      "type": "text",
+                      "id": "TxtLFea2",
+                      "name": "Deskripsi",
+                      "content": "Describe the feature in one or two short lines.",
+                      "size": 15,
+                      "lineHeight": 22,
+                      "color": {
+                        "$token": "colors.muted"
+                      },
+                      "width": "fill"
+                    },
+                    {
+                      "type": "frame",
+                      "id": "FrmLFea3",
+                      "name": "Aksi",
+                      "layout": "row",
+                      "gap": 6,
+                      "align": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "TxtLFea3",
+                          "name": "Tautan",
+                          "content": "Learn more",
+                          "size": 14,
+                          "lineHeight": 20,
+                          "weight": 600,
+                          "color": {
+                            "$token": "colors.brand"
+                          }
+                        },
+                        {
+                          "type": "icon",
+                          "id": "IcnLFea2",
+                          "name": "Icon / lucide / arrow-right",
+                          "lib": "lucide",
+                          "icon": "arrow-right",
+                          "size": 16,
+                          "color": {
+                            "$token": "colors.brand"
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "FrmLFea4",
+                      "name": "Lencana",
+                      "position": "absolute",
+                      "x": 196,
+                      "y": 20,
+                      "layout": "row",
+                      "padding": [
+                        2,
+                        8
+                      ],
+                      "radius": {
+                        "$token": "radius.pill"
+                      },
+                      "fills": [
+                        {
+                          "type": "solid",
+                          "color": "#FEF3C7"
+                        }
+                      ],
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "TxtLFea4",
+                          "name": "Lencana",
+                          "content": "New",
+                          "size": 12,
+                          "lineHeight": 16,
+                          "weight": 600,
+                          "color": "#92400E"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

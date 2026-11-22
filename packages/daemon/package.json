@@ -29,6 +29,7 @@
     "@fontsource/manrope": "5.3.0",
     "@fontsource/plus-jakarta-sans": "5.3.0",
     "@lakar/check": "workspace:*",
+    "@lakar/codegen": "workspace:*",
     "@lakar/core": "workspace:*",
     "@lakar/exec": "workspace:*",
     "@lakar/icons": "workspace:*",

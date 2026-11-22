@@ -77,3 +77,118 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-app-12-splash-theme.md`
   summary: Belum terverifikasi di build release bahwa tema native jendela (Light/Dark dari Settings) diteruskan ke `prefers-color-scheme` layar mulai, terutama di Linux (WebKitGTK mengikuti preferensi gelap GTK).
   evidence: maybe-false. Windows dan macOS didukung lewat jalur Tauri yang terdokumentasi (`window.theme()` saat membuat WebView2, NSAppearance). Bila Linux tidak ikut, tambahkan atribut `data-theme` di layar mulai dari nilai tema yang disuntikkan Rust.
+- source_spec: `_bmad-output/implementation-artifacts/spec-model-dokumen-2-token-bertipe-v3.md`
+  summary: Agen tidak punya API baca untuk `tokens` dan `tokenModes` dokumen, jadi tidak bisa melihat definisi token atau daftar mode sebelum memanggil `setTokenModes`.
+  evidence: `get`/`find` di API `execute` hanya mengembalikan node. Celah sudah ada sejak token v2. Usul: fungsi baca kepala dokumen di epic token (aditif, AD-4).
+  resolved: 2026-11-22 di `spec-token-2-read-api.md` (epic token-tema story 2). `execute` mendapat `getTokens()` yang mengembalikan `{tokens, modes}`.
+- source_spec: `_bmad-output/implementation-artifacts/spec-editor-2-ops-route.md`
+  summary: Op core `insert` (sisip ulang subtree dengan ID asli, dipakai invers `remove`) belum diekspos di sandbox `execute`, padahal AD-2 meminta kemampuan tulis baru diekspos di `execute` dan route ops.
+  evidence: Agen tidak memakai tumpukan undo (AD-8), jadi belum ada kebutuhan. Mengekspos berarti menambah entri `api.ts`/`api.md` exec dan tes ukuran skill (aditif, AD-4).
+- source_spec: `_bmad-output/implementation-artifacts/spec-editor-3-live-canvas.md`
+  summary: Siklus mount board live (`mountLive`, `ensureFaces`, efek `BoardLive` di Canvas.tsx, tanpa `/screenshot`, remount hanya board berubah) hanya diverifikasi lewat smoke Playwright manual; belum ada tes otomatis di permukaan canvas.
+  evidence: Tes viewer berjalan di Node tanpa DOM. Usul: tes halaman Chromium untuk `mountLive` seperti `packages/render/test/text.test.ts`, atau e2e Playwright `/app/` (cek `[data-lakar-id]` di shadow root, remount sesudah ops, tanpa POST /screenshot).
+- source_spec: `_bmad-output/implementation-artifacts/spec-editor-3-live-canvas.md`
+  summary: Bundle viewer naik 397 kB → 523 kB (gzip 161 kB) karena `resolveDocument` menarik zod lewat `tokens.ts` @lakar/schema.
+  evidence: Diukur dari `vite build`. Usul: entry schema tanpa zod (resolve + tipe) atau pisahkan validasi zod dari logika resolve token.
+- source_spec: `_bmad-output/implementation-artifacts/spec-editor-4-select-move-resize.md`
+  summary: Wiring gestur `useCanvasEdit` (pointer → satu `onCommit` per gestur, Escape tanpa request, reorder noop, pratinjau tertahan) dan alur integrasi viewer + daemon (rev per gestur, undo round trip) belum punya tes otomatis; hanya smoke Playwright manual.
+  evidence: Vitest tanpa environment DOM; helper murni (`gesture.ts`, `liveGeometry.ts`, `undoHistory.ts`) sudah dites. Usul: ekstrak mesin state gestur murni atau e2e Playwright `/app/` (bersama deferred story 3).
+- source_spec: `_bmad-output/implementation-artifacts/spec-editor-5-design-panel.md`
+  summary: Ikon mata (visibilitas) pada baris fill dan shadow di desain bagian 05 tidak ditampilkan karena skema v3 tidak punya `visible` pada Fill/Shadow.
+  evidence: AD-1 melarang properti tanpa padanan render; menambah `visible` butuh kenaikan schemaVersion (AD-3), pemetaan render/codegen, dan korpus. Usul: gabungkan dengan story skema berikutnya (mis. story 7 grid v4).
+- source_spec: `_bmad-output/implementation-artifacts/spec-editor-5-design-panel.md`
+  summary: Scrub nilai di panel Design hanya mempratinjau angka di kolom; canvas live baru berubah sesudah commit saat lepas.
+  evidence: AD-7 hanya mewajibkan pratinjau lokal; pratinjau canvas butuh pemetaan properti → gaya DOM sementara per node (css.ts). Usul: pakai deklarasi `@lakar/render` css.ts pada elemen live selama scrub.
+- source_spec: `_bmad-output/implementation-artifacts/spec-editor-5-design-panel.md`
+  summary: Wiring komponen `DesignPanel` (Field Enter/blur/Escape/scrub, color picker `change`, drag urutan fill) belum punya tes otomatis; logika patch/parse dites murni dan alur dicek dengan smoke Playwright msedge.
+  evidence: Vitest viewer tanpa environment DOM. Usul: e2e Playwright `/app/` bersama deferred story 3 dan 4.
+- source_spec: `_bmad-output/implementation-artifacts/spec-editor-6-editing-actions.md`
+  summary: Wiring edit teks inline (`startTextEdit`/`finishText` di canvasEdit.tsx: Enter/blur commit satu op, Escape tanpa request, remount membatalkan) dan dispatch menu konteks/EditMenu belum punya tes otomatis; hanya smoke Playwright msedge.
+  evidence: Vitest viewer tanpa environment DOM/contentEditable; bagian deterministik (`textEditPlan`, `normalizeEditedText`, `shortcutAction`, `nudgeNodes`, `pageGeometry`) dites murni. Usul: e2e Playwright `/app/` bersama deferred story 3-5.
+- source_spec: `_bmad-output/implementation-artifacts/spec-editor-6-editing-actions.md`
+  summary: Sisip layer dari tool kanvas / menu + Layers masih lewat `execute` + codegen sehingga tidak masuk tumpukan undo per jendela; Ctrl+Z sesudah sisip membatalkan edit ops sebelumnya.
+  evidence: Sudah ada sebelum story 6 (aplikasi 4); AD-8 meminta undo untuk commit jendela. Usul: pindahkan sisip ke route ops (`add` + `ref`) agar invers tercatat.
+- source_spec: `_bmad-output/implementation-artifacts/spec-editor-7-grid-layout.md`
+  summary: Panel Design belum punya kontrol penempatan anak grid (`gridColumn`/`gridRow`: span, start/end); hanya lewat agen (`execute`).
+  evidence: Desain 05 Editor (Xxi0M) hanya memuat Columns/Rows/Column gap/Row gap/Padding/Align. Usul: baris Placement di grup Position & size untuk anak parent grid setelah desainnya ada.
+- source_spec: `_bmad-output/implementation-artifacts/spec-editor-7-grid-layout.md`
+  summary: Drag reorder di canvas tidak mengenal kontainer grid: anak grid tidak bisa diurutkan ulang dengan drag di dalam grid (dropContainer hanya row/column).
+  evidence: Urutan sel grid mengikuti urutan anak; perlu indeks drop 2D dari kotak sel (gesture.ts reorderTarget). Usul: story editor lanjutan.
+- source_spec: `_bmad-output/implementation-artifacts/spec-editor-7-grid-layout.md`
+  summary: Panel grid tidak menyunting jenis track (px/fr/auto/minmax) per kolom; jumlah kolom/baris saja, track baru `{fr:1}`/`auto`.
+  evidence: Desain tidak memuat editor track. Usul: popover track per kolom bila desain menambahkannya.
+- source_spec: `_bmad-output/implementation-artifacts/spec-agen-3-live-changes.md`
+  summary: Wiring `useCanvasEdit` (rebase gestur saat board di-mount ulang oleh agen, pelepasan/penerapan ulang pratinjau tertahan per rev) tidak dieksekusi tes otomatis.
+  evidence: Viewer belum punya harness tes komponen/DOM; hanya helper murni (`liveChanges.test.ts`) dan smoke msedge. Usul: harness komponen atau skrip playwright di `scripts/` yang menggeser node selama execute agen.
+- source_spec: `_bmad-output/implementation-artifacts/spec-agen-3-live-changes.md`
+  summary: Efek pembersihan seleksi di `Viewer.tsx` (latestIndex/prevLatest) tidak dites di tingkat komponen.
+  evidence: Hanya `pruneSelection` murni yang dites; tanpa harness komponen (pra-ada).
+- source_spec: `_bmad-output/implementation-artifacts/spec-agen-3-live-changes.md`
+  summary: Gerbang render baru (badge Shared, commit row baris 0, tag board saat pratinjau) tidak punya tes render.
+  evidence: Helper turunannya dites; komponen viewer tanpa harness (pra-ada). Usul: pindahkan gerbang badge ke helper murni bila perlu dipin.
+- source_spec: `_bmad-output/implementation-artifacts/spec-agen-3-live-changes.md`
+  summary: Pratinjau tertahan sesudah commit yang tidak mengubah isi board (tanpa mount ulang) bertahan sampai mount berikutnya.
+  evidence: Pra-ada sejak editor story 4; gaya sementara bernilai sama dengan hasil commit. Usul: lepas juga saat dokumen ber-rev ≥ commit termuat dan tanda tangan board tidak berubah.
+- source_spec: `_bmad-output/implementation-artifacts/spec-agen-4-variant-flow.md`
+  summary: Cek konsistensi `literal` di skill `selection` hanya membandingkan dengan node sejawat bertoken, bukan dengan nilai token dokumen.
+  evidence: Sandbox execute belum bisa membaca nilai token (API baca token = epic token-tema story 2), jadi literal yang nilainya sama dengan token tanpa sejawat bertoken tidak terlapor. Usul: sesudah API baca token ada, bandingkan nilai literal dengan nilai token (mode aktif) di contoh skill dan tes selection-flow.
+  resolved: 2026-11-22 di `spec-token-2-read-api.md` (epic token-tema story 2). Contoh `literal` di skill `selection` kini juga membandingkan literal dengan nilai token dokumen (`getTokens()`, mode efektif board, tipe sesuai slot).
+- source_spec: `_bmad-output/implementation-artifacts/spec-token-2-read-api.md`
+  summary: Dua token berbeda nama tetapi sama variabel CSS (mis. `a.b` dan `a-b`) bisa ada berdampingan dan bertabrakan saat ekspor/impor.
+  evidence: `cssVarName` tidak injektif; `setTokens` sudah bisa membuat pasangan seperti itu sebelum story ini, `renameToken` juga tidak menolaknya, dan impor memilih token pertama. Usul: tolak saat commit (CONFLICT) atau tangani di codegen (epic kode).
+- source_spec: `_bmad-output/implementation-artifacts/spec-token-3-theme-panel.md`
+  summary: Tombol "Import CSS variables" dan "Copy tokens as CSS" di header panel Theme belum ada.
+  evidence: Desain dialog impor dan Copy tokens as CSS ada di bagian 09 Code (wvCMu/ngHGS, w6iQk/SpvBC) dan ticket epic kode story 5 memuatnya ("Copy tokens as CSS di panel Theme; impor CSS variables memakai parser epic token"). Usul: epic kode story 5 menambah kedua tombol di `.theme-header` ThemePanel.tsx (parser `parseCssVariables` @lakar/render + setTokenModes/setTokens lewat route ops).
+- source_spec: `_bmad-output/implementation-artifacts/spec-token-3-theme-panel.md`
+  summary: Panel Theme tidak bisa menghapus mode, mengubah urutan mode, atau mengganti mode default.
+  evidence: Ticket story 3 hanya meminta tambah dan ubah nama mode; desain 07 tidak memuat aksi itu. Usul: menu konteks di header mode (Delete mode / Make default) dengan op setTokenModes + setTokens yang membuang/menggeser `modes` dan update themeMode board.
+- source_spec: `_bmad-output/implementation-artifacts/spec-token-3-theme-panel.md`
+  summary: Wiring komponen ThemePanel (antrean commit, input sel, popover hapus) tanpa tes otomatis.
+  evidence: Viewer belum punya harness tes komponen/DOM (pra-ada); pembangun op dites murni di `themeModel.test.ts` dan alur diverifikasi smoke msedge.
+- source_spec: `_bmad-output/implementation-artifacts/spec-token-4-token-picker.md`
+  summary: Warna shadow tidak punya Token Picker (slot `shadows.color` ada di tabel slot).
+  evidence: Ticket story 4 tidak menyebut efek; baris shadow berupa teks sintaks `drop x y blur` tanpa kotak warna terpisah. Usul: tombol token di swatch shadow dengan `TokenSpec` `['shadows', i, 'color']` (editShadow).
+- source_spec: `_bmad-output/implementation-artifacts/spec-token-4-token-picker.md`
+  summary: Wiring komponen Token Picker/Token Field (posisi popover, keyboard, status open) tanpa tes otomatis.
+  evidence: Viewer belum punya harness tes komponen/DOM (pra-ada); logika saring/pasang/detach/buat dites murni (`tokenPicker.test.ts`) dan lewat core (`tests/token-picker-ops.test.ts`), UI diverifikasi smoke msedge.
+- source_spec: `_bmad-output/implementation-artifacts/spec-token-4-token-picker.md`
+  summary: Verify ticket story 4 (picker tersaring, canvas berubah sesudah ubah token, Detach) dan jalur DesignPanel → route ops hanya dites di tingkat model/core; UI dan canvas live hanya smoke msedge.
+  evidence: Review t4 (intent). Harness komponen/E2E viewer belum ada (pra-ada). Usul: skrip playwright di `scripts/` atau harness DOM yang membuka picker, memasang token, dan membaca gaya computed canvas.
+- source_spec: `_bmad-output/implementation-artifacts/spec-komponen-2-schema.md`
+  summary: Override atau bind yang menjadi tidak sah karena master disunting menolak commit (SCHEMA_INVALID), bukan diabaikan dan dilaporkan.
+  evidence: Review k2 (blind, edge). expandInstances memvalidasi pohon ter-ekspansi dengan skema strict dan commit core memanggil resolveDocument. Keputusan story 2: tetap tolak (AD-1/AD-7); op komponen story 3 menambah reset/buang override yang tidak berlaku atau menjadikannya laporan LC-32.
+  resolved: 2026-11-22 di `spec-komponen-3-ops.md` (epic komponen story 3). `expandInstances` kini mengabaikan nilai bind/override yang membuat node efektif tidak sah dan melaporkannya sebagai LC-32, jadi suntingan master tidak pernah ditolak karena override lama. Jalur edit komposit (`update`) tetap memvalidasi node efektif, dan `resetOverride` bisa membersihkan kunci basi.
+- source_spec: `_bmad-output/implementation-artifacts/spec-komponen-2-schema.md`
+  summary: Canvas viewer dengan instance (mount isi terurai, seleksi alamat komposit, ikon/label Layers instance) belum dites otomatis.
+  evidence: Review k2 (intent). Canvas memakai resolveDocument sehingga instance termount; harness DOM/E2E viewer belum ada (pra-ada). Layers memakai ikon cadangan untuk tipe instance; penanda mengikuti desain di story 4.
+- source_spec: `_bmad-output/implementation-artifacts/spec-komponen-5-props-slots.md`
+  summary: Penanda temuan Checks pada node di dalam isi slot instance tidak tampil karena POST /inspect (route lama) membalas 404 untuk node itu.
+  evidence: Review k5 (vgap). Efek penanda temuan di Viewer.tsx memanggil api.inspect untuk setiap node temuan dan menelan error; locateNode di route /inspect hanya menelusuri children (pra-ada sejak isi slot story 3). Usul: kotak penanda dari geometri canvas live (sceneBounds) untuk node inSlotContent, seperti highlight seleksi.
+- source_spec: `_bmad-output/implementation-artifacts/spec-kode-2-codegen.md`
+  summary: Codegen menulis semua elemen sebagai `div` karena skema v5 belum punya `tag` semantik (AD-1); allowlist tag HTML untuk ekspor belum ada.
+  evidence: AD-1 mengizinkan `tag` opsional dari allowlist, tetapi menambah kunci butuh kenaikan schemaVersion (AD-3), pemetaan render/codegen, korpus, dan UI. Usul: story skema berikutnya menambah `tag` (mis. `section|header|nav|main|footer|h1..h6|p|button|a|ul|li`) dan codegen memakainya sebagai nama elemen.
+  resolved: 2026-11-23 di `spec-vektor-4-html-import.md` (epic paste-vektor story 4). Skema v7 menambah `tag` (allowlist `HTML_TAGS`) pada frame dan text; codegen menulisnya sebagai nama elemen dengan reset UA (`tagResetDecls`). Kontrol `tag` di panel Design belum ada.
+- source_spec: `_bmad-output/implementation-artifacts/spec-kode-4-pixel-parity.md`
+  summary: Penemuan driver komponen (probe satu-flip + pewarisan driver kehadiran) belum terbukti lengkap untuk state anak yang hanya berubah oleh kombinasi dua prop gaya parent sekaligus (unverified, medium bila benar).
+  evidence: Review c4 (edge, vgap). Tidak ada dokumen konkret yang memicunya; state anak bergantung pada parent hanya lewat layout/gap negatif/scrollY, yang biasanya berubah oleh satu flip. Pemakaian di dokumen tetap benar karena dicek terhadap ekspansi (fallback inline). Penentu: fuzz master acak (≤ 64 kombinasi) yang membandingkan `evalComponent` dengan `expandInstances` untuk semua kombinasi.
+- source_spec: `_bmad-output/implementation-artifacts/spec-kode-4-pixel-parity.md`
+  summary: Fill `mesh` tidak diekspor codegen (dilewati dengan warning `mesh-fill`), sehingga board ber-mesh di canvas berbeda dari kode; uji paritas membuang mesh dari acuan.
+  evidence: Review c4 (intent). Keterbatasan sejak story 2 (README codegen). Usul: ekspor mesh sebagai lapisan gambar data URL (PNG mesh yang sama dengan render) atau `background-image` beraset, lalu hapus `withoutMeshFills` dari tes paritas.
+- source_spec: `_bmad-output/implementation-artifacts/spec-kode-5-export-ui.md`
+  summary: Impor `tokens.css` ke dokumen yang belum punya token itu tidak selalu mengembalikan nama dan tipe token yang sama (nama bertanda `-` di segmen, mis. `font.line-hero` → `font.line.hero`; px tanpa petunjuk nama, mis. lineHeight → fontSize).
+  evidence: `cssVarName` tidak injektif (titik dan `-` sama-sama menjadi `-`), dan CSS variables tidak membawa tipe. Impor ulang ke dokumen asal (atau dokumen yang punya token bernama sama) identik (tests/code-export.test.ts); ke dokumen kosong, mode, variabel, dan nilai per mode sama, dan `tokens.css` hasil ekspor ulang identik byte. Usul: komentar petunjuk `/* lakar: name type */` per variabel di `tokens.css` yang dibaca `parseCssVariables` (mengubah golden codegen).
+- source_spec: `_bmad-output/implementation-artifacts/spec-kode-5-export-ui.md`
+  summary: Dialog Import CSS variables menampilkan pemetaan selektor → mode sebagai label baca-saja, bukan Select seperti desain wvCMu.
+  evidence: Pemetaan mode ditentukan parser spec-token-2 secara deterministik (root = mode default, `[data-theme=x]` = mode x); remap butuh aturan gabung baru di `parseCssVariables` (opsi `modeMap`). Usul: opsi `modeMap` di parser + Select per selektor.
+- source_spec: `_bmad-output/implementation-artifacts/spec-kode-5-export-ui.md`
+  summary: Wiring komponen dialog Export code, popover Copy tokens, dan dialog Import CSS variables tanpa tes otomatis.
+  evidence: Viewer belum punya harness tes komponen/DOM (pra-ada). Logika murni dites (`codeExport.test.ts`, `cssImport.test.ts`, `zip.test.ts`, `tests/code-export.test.ts`); UI diverifikasi smoke msedge.
+- source_spec: `_bmad-output/implementation-artifacts/spec-kode-5-export-ui.md`
+  summary: Instance yang override-nya tidak bisa dinyatakan sebagai prop diekspor sebagai salinan inline (statis) master, bertentangan dengan AD-16 "master bukan salinan statis".
+  evidence: Review c5 (intent). Fallback inline story 3 (warning `instance-inlined`); di fixture landing InsLDxB2 (override fill + stroke inside pada akar) di-inline sehingga ubah padding master juga mengubah berkas utama (tests/code-export.test.ts). Usul: override akar seperti stroke `::after` sebagai kelas pemakai, atau props className/style per elemen dalam.
+- source_spec: `_bmad-output/implementation-artifacts/spec-vektor-4-html-import.md`
+  summary: Wiring viewer paste HTML (Ctrl+V text/html → body `kind:'html'`, report langsung terbuka, Pasted Tag) tanpa tes otomatis.
+  evidence: Review v4 (vgap). Hanya `clipboardPaste` dan teks report yang dites murni; `Viewer.tsx` `pasteContent`, `PasteToast`, dan `pastedTag` diverifikasi smoke msedge (pola sama dengan wiring SVG story 3; viewer belum punya harness DOM). Usul: helper murni `pasteBody(pick, parentId)` di `paste.ts` dengan kasus di `paste.test.ts`.
+- source_spec: `_bmad-output/implementation-artifacts/spec-vektor-5-pen-tool.md`
+  summary: Wiring Pen tool dan mode edit titik di canvas (routing pointer, keyboard capture, pratinjau DOM, seleksi path baru, grup Point panel Design) tanpa tes otomatis; satu rev per gestur dan Ctrl+Z lewat tumpukan undo jendela hanya diverifikasi smoke msedge.
+  evidence: Review v5 (vgap, blind, intent). Viewer belum punya harness tes komponen/DOM (pra-ada, sama dengan story 3–4 dan kode-5). Keputusan op (update/remove/no-op), `pathEditable`, dan koordinat panel sudah murni dan dites (`pathEdit.test.ts`); kontrak route dites `tests/vector-edit.test.ts`. Usul: harness jsdom/RTL untuk `usePathTools` (Esc mempertahankan seleksi, Delete tidak menghapus node, Enter < 2 titik tanpa request, pratinjau dipulihkan saat commit gagal) dan `Canvas` (tap Pen tidak ke `onInsert`, seleksi node baru).

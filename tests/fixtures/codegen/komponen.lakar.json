@@ -1,0 +1,149 @@
+{
+  "schemaVersion": 5,
+  "id": "CgFixKmp",
+  "rev": 1,
+  "tokens": {
+    "colors.brand": { "type": "color", "value": "#0E7490" },
+    "colors.teks": { "type": "color", "value": "#101828" }
+  },
+  "pages": [
+    {
+      "id": "PgCgKmp1",
+      "name": "Komponen",
+      "children": [
+        {
+          "type": "board",
+          "id": "BrdCgK01",
+          "name": "Halaman",
+          "x": 0,
+          "y": 0,
+          "width": 960,
+          "height": 900,
+          "screen": "landing",
+          "children": [
+            {
+              "type": "frame",
+              "id": "FrmPstk1",
+              "name": "Pustaka",
+              "layout": "column",
+              "gap": 16,
+              "padding": 16,
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "MstTmb01",
+                  "name": "Tombol",
+                  "layout": "row",
+                  "gap": 6,
+                  "align": "center",
+                  "padding": [8, 16],
+                  "radius": 8,
+                  "width": "hug",
+                  "fills": [{ "type": "solid", "color": { "$token": "colors.brand" } }],
+                  "component": {
+                    "props": [
+                      { "name": "label", "type": "text", "default": "Tombol", "binds": [{ "nodeId": "TxtTmb01", "prop": "content" }] },
+                      { "name": "showIcon", "type": "boolean", "default": true, "binds": [{ "nodeId": "IcnTmb01", "prop": "visible" }] },
+                      { "name": "arah", "type": "enum", "options": ["row", "column"], "default": "row", "binds": [{ "nodeId": "MstTmb01", "prop": "layout" }] }
+                    ],
+                    "slots": []
+                  },
+                  "children": [
+                    { "type": "text", "id": "TxtTmb01", "name": "Label", "content": "Tombol", "weight": 600, "size": 14, "lineHeight": 20, "color": "#FFFFFF" },
+                    { "type": "icon", "id": "IcnTmb01", "name": "Icon / lucide / arrow-right", "lib": "lucide", "icon": "arrow-right", "size": 16, "color": "#FFFFFF" }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "MstKrt01",
+                  "name": "Kartu",
+                  "layout": "column",
+                  "gap": 8,
+                  "padding": 16,
+                  "radius": 12,
+                  "width": 240,
+                  "fills": [{ "type": "solid", "color": "#FFFFFF" }],
+                  "stroke": { "color": "#E4E7EC", "width": 1, "align": "inside" },
+                  "component": {
+                    "props": [{ "name": "title", "type": "text", "default": "Judul", "binds": [{ "nodeId": "TxtJdl01", "prop": "content" }] }],
+                    "slots": [{ "name": "body", "nodeId": "FrmIsi01" }]
+                  },
+                  "children": [
+                    { "type": "text", "id": "TxtJdl01", "name": "Judul", "content": "Judul", "weight": 600, "size": 16, "lineHeight": 24, "color": { "$token": "colors.teks" }, "width": "fill" },
+                    {
+                      "type": "frame",
+                      "id": "FrmIsi01",
+                      "name": "Isi",
+                      "layout": "column",
+                      "gap": 4,
+                      "width": "fill",
+                      "children": [
+                        { "type": "text", "id": "TxtIsi01", "name": "Deskripsi", "content": "Isi bawaan", "size": 14, "lineHeight": 20, "color": "#344054", "width": "fill" }
+                      ]
+                    },
+                    { "type": "instance", "id": "InsTmb01", "name": "Tombol", "componentId": "MstTmb01", "props": { "label": "Buka" } }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "FrmDftr1",
+              "name": "Daftar",
+              "layout": "column",
+              "gap": 12,
+              "padding": 16,
+              "children": [
+                { "type": "instance", "id": "InsKrt01", "name": "Kartu / default", "componentId": "MstKrt01" },
+                {
+                  "type": "instance",
+                  "id": "InsKrt02",
+                  "name": "Kartu / promo",
+                  "componentId": "MstKrt01",
+                  "props": { "title": "Promo" },
+                  "overrides": { "MstKrt01": { "fills": [{ "type": "solid", "color": "#FEF3C7" }] } }
+                },
+                { "type": "instance", "id": "InsKrt03", "name": "Kartu / judul override", "componentId": "MstKrt01", "overrides": { "TxtJdl01": { "content": "Diganti" } } },
+                {
+                  "type": "instance",
+                  "id": "InsKrt04",
+                  "name": "Kartu / slot",
+                  "componentId": "MstKrt01",
+                  "slots": {
+                    "body": [
+                      { "type": "text", "id": "TxtSlt01", "name": "Isi slot", "content": "Isi dari slot", "size": 14, "lineHeight": 20, "color": { "$token": "colors.teks" }, "width": "fill" },
+                      { "type": "instance", "id": "InsTmb02", "name": "Tombol / slot", "componentId": "MstTmb01", "props": { "label": "Lanjut", "showIcon": false } }
+                    ]
+                  }
+                },
+                { "type": "instance", "id": "InsKrt05", "name": "Kartu / isi warna", "componentId": "MstKrt01", "overrides": { "TxtIsi01": { "color": "#7C2D12" } } },
+                { "type": "instance", "id": "InsKrt06", "name": "Kartu / tombol bersarang", "componentId": "MstKrt01", "overrides": { "InsTmb01/TxtTmb01": { "color": "#FDE68A" } } }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "FrmBrs01",
+              "name": "Baris",
+              "layout": "row",
+              "gap": 8,
+              "padding": 16,
+              "children": [
+                { "type": "instance", "id": "InsKrt07", "name": "Kartu / baris", "componentId": "MstKrt01", "props": { "title": "Di baris" } },
+                { "type": "instance", "id": "InsTmb03", "name": "Tombol / kolom", "componentId": "MstTmb01", "props": { "arah": "column", "showIcon": false, "label": "Kolom" } }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "FrmBbs01",
+              "name": "Bebas",
+              "layout": "none",
+              "width": "fill",
+              "height": 80,
+              "children": [{ "type": "instance", "id": "InsTmb04", "name": "Tombol / absolut", "componentId": "MstTmb01", "position": "absolute", "x": 24, "y": 16 }]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

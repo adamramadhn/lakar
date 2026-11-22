@@ -2,7 +2,7 @@
 // Render murni: dokumen (sudah di-resolve) → DOM (AD-5, AD-6).
 // HANYA `import type` dari luar paket dan impor relatif `./x.js`: dist/*.js dimuat apa adanya sebagai
 // module di halaman Chromium (dan nanti browser B), tanpa bundler, tanpa API Node.
-// Dokumen yang diterima sudah di-resolve token-nya oleh daemon (`resolveTokens`), jadi tipe `Resolved*`.
+// Dokumen yang diterima sudah di-resolve token-nya oleh daemon lewat pipa `resolveDocument` (AD-10), jadi tipe `Resolved*`.
 import type { IconGlyph, ResolvedBoardNode as BoardNode, ResolvedDocument as LakarDocument } from '@lakar/schema';
 import { codePointLabel, fontKey, fontRequests, loadFaces, missingFaces, uncoveredGlyphs, type FontFaceSource, type FontRequest } from './fonts.js';
 import { assetIds, decodeAssets, decodeDataUrls, inlineDataUrls } from './assets.js';
@@ -26,7 +26,107 @@ export {
 export { assetIds } from './assets.js';
 export { DEFAULT_ICON_COLOR, DEFAULT_ICON_STROKE_WIDTH, iconKey, iconRefs, type IconRef } from './icon.js';
 export { DEFAULT_ASSET_BASE, DROP_SHADOW_BLUR_FACTOR } from './paint.js';
-export { ellipseShape, type Shape } from './shape.js';
+export { ellipseShape, pathShape, shapeFillLayerDecls, strokeSvgSpec, svgPaint, type Shape, type ViewBox } from './shape.js';
+export { iconSvgSpec } from './icon.js';
+export { vectorToSvg, type SvgDropped, type SvgExport } from './svg.js';
+export { IDENTITY, PathDataError, arcToCubics, flattenArcs, isIdentity, multiply, parsePath, pathBounds, serializePath, transformPath, type Matrix, type PathSeg } from './path-data.js';
+// Pemetaan CSS tunggal (AD-5): dipakai render, Copy as viewer, dan codegen.
+export {
+  BOARD_DEFAULT_BACKGROUND,
+  boardDecls,
+  boxPaintDecls,
+  boxShadowWithStrokeCss,
+  childLayoutDecls,
+  codeBackgroundDecls,
+  DEFAULT_TEXT_COLOR,
+  dropShadowFilterList,
+  effectDecls,
+  effectiveSizing,
+  fillLayerCss,
+  fillsBlendModeCss,
+  frameDecls,
+  frameLayout,
+  strokeOverlayDecls,
+  textDecls,
+  textWrapMode,
+  strokeBeforeFill,
+  vectorSvgAttrs,
+  type SvgAttr,
+  type VectorLike,
+  type VectorSvgAttrs,
+  tokenValueCss,
+  type ChildLike,
+  type EffectsLike,
+  type FillLike,
+  type FrameLike,
+  type ParentLayout,
+  type SizingLike,
+  type StrokeLike,
+  type SvgSpec,
+  type TextLike,
+  ALIGN,
+  backgroundCss,
+  boxShadowsCss,
+  colorCss,
+  cssVarName,
+  fontFamilyCss,
+  fontWeightCss,
+  gradientLayerCss,
+  gridLineCss,
+  gridTemplateCss,
+  gridTrackCss,
+  isTokenRef,
+  JUSTIFY,
+  lengthCss,
+  letterSpacingCss,
+  lineHeightCss,
+  paddingCss,
+  percentCss,
+  radiusCss,
+  shadowCss,
+  stopsCss,
+  strokeBorderDecls,
+  textShadowCss,
+  textShadowItemCss,
+  tagResetDecls,
+  tokenVar,
+  type CssDecl,
+  type PaintLike,
+  type ShadowLike,
+  type StopLike,
+  type TokenRef,
+} from './css.js';
+// Impor CSS variables (epic token-tema story 2): kebalikan cssVarName, dipakai execute (lewat daemon) dan viewer.
+export { CSS_IMPORT_MODE_NAME, CSS_IMPORT_TOKEN_NAME, parseCssColor, parseCssVariables } from './css-vars.js';
+// Tabel kebalikan AD-5 (epic paste-vektor story 4): computed style → nilai skema, dipakai importer HTML daemon.
+export {
+  BLEND_MODES,
+  alignFromCss,
+  blendFromCss,
+  blurFromFilterCss,
+  boxShadowsFromCss,
+  cssColorHex,
+  cssPx,
+  fontWeightFromCss,
+  gradientFromCss,
+  gridPlacementFromCss,
+  gridTemplateFromCss,
+  gridTracksFromPx,
+  isClearHex,
+  justifyFromCss,
+  letterSpacingFromCss,
+  lineHeightFromCss,
+  radiusFromCss,
+  rotationFromTransformCss,
+  splitTopLevel,
+  textAlignFromCss,
+  textShadowsFromCss,
+  type GradientFill,
+  type PlacementValue,
+  type ShadowValue,
+  type StopValue,
+  type TrackValue,
+} from './css-reverse.js';
 export { measureBoard, type BoardMeasure, type NodeBounds, type TextMeasure } from './measure.js';
 
 /** Argumen Chromium bersama daemon dan harness tes (stabilitas golden). */

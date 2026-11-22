@@ -5,7 +5,7 @@ import { DocumentLocks, createDocument, transact } from '@lakar/core';
 import { photoRefsInCode, runSnippet } from '@lakar/exec';
 import { IconCatalog } from '@lakar/icons';
 import type { IconCatalogPort, RenderPort } from '@lakar/ports';
-import { iconRefs } from '@lakar/render';
+import { iconRefs, parseCssVariables } from '@lakar/render';
 import { RETIRED_SKILLS, SKILL_NAMES, SKILLS_DIR, listSkills, readSkill } from '@lakar/skills';
 import {
   ICON_LIBS,
@@ -18,7 +18,7 @@ import {
   errorMessage,
   VERSION_HINT,
   findBoard,
-  resolveTokens,
+  resolveDocument,
   summarizeFindings,
   type ApiErrorBody,
   type ErrorCode,
@@ -46,7 +46,12 @@ import { ActivityBus, registerActivityHooks } from './events.js';
 import { registerConnectionRoutes } from './connections.js';
 import { registerFileRoutes } from './files.js';
 import { registerPageRoutes } from './pages.js';
+import { registerOpsRoutes } from './ops.js';
+import { registerPasteRoutes, type HtmlSnapshotter } from './paste.js';
+import { SelectionStore, registerSelectionRoutes } from './selection.js';
+import { registerRenderDepsRoutes } from './render-deps.js';
 import { registerExportRoutes } from './export.js';
+import { registerCodeExportRoutes } from './code-export.js';
 import { VIEWER_DIST_DIR, registerViewerRoutes } from './viewer.js';
 
 const STATUS: Record<ErrorCode, number> = {
@@ -63,6 +68,9 @@ const STATUS: Record<ErrorCode, number> = {
   EXPORT_FAILED: 500,
   VERSION_MISMATCH: 409,
 };
+
+/** Parser impor CSS variables (@lakar/render) untuk `importCssVariables` di execute (exec tidak bergantung pada render, AD-17). */
+const CSS_VARIABLES = { parse: parseCssVariables };
 
 const SVG_TAGS = new Set(['path', 'circle', 'ellipse', 'rect', 'line', 'polyline', 'polygon']);
 const xmlAttr = (v: string) => v.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
@@ -195,6 +203,8 @@ export type Daemon = {
   photos: PhotoService;
   /** Bus event aktivitas viewer (`GET /viewer/events`). */
   activity: ActivityBus;
+  /** Seleksi canvas efemeral per dokumen (AD-9). */
+  selections: SelectionStore;
   startedAt: string;
 };
 
@@ -216,6 +226,8 @@ export function buildServer({
   const docLocks = new DocumentLocks();
   /** Daemon pemilik tunggal (AD-1): salinan terkini per slug. */
   const docs = new Map<string, LakarDocument>();
+  /** Seleksi canvas per slug, hanya di memori (AD-9). */
+  const selections = new SelectionStore();
 
   const ok = (reply: FastifyReply, data: unknown) => reply.code(200).send({ ok: true, data });
   /** Catatan aditif: foto jarak jauh yang tampil sebagai placeholder (cache dingin + jaringan gagal). */
@@ -433,7 +445,7 @@ export function buildServer({
       try {
         // AD-4: error tak tertangkap di snippet → lempar di dalam body → rollback penuh oleh `transact`.
         committed = await transact(doc, { sessionId: session.id, description: label }, async (tx) => {
-          const run = await runSnippet(code, tx, { timeoutMs: config.execTimeoutMs, memoryBytes: config.execMemoryBytes, keep: session.keep, icons, photos });
+          const run = await runSnippet(code, tx, { timeoutMs: config.execTimeoutMs, memoryBytes: config.execMemoryBytes, keep: session.keep, icons, photos, cssVariables: CSS_VARIABLES });
           if (!run.ok) throw run.error;
           return run;
         });
@@ -449,8 +461,8 @@ export function buildServer({
         // AD-8: render board tersentuh pada salinan kerja + check sekali, LALU commit. Temuan tidak
         // menolak commit; error render (dokumen tidak bisa dirender) → rollback (belum ditulis).
         const t0 = performance.now();
-        const before = resolveTokens(doc);
-        const after = resolveTokens(committed.doc);
+        const before = resolveDocument(doc);
+        const after = resolveDocument(committed.doc);
         const touched = touchedBoards(before, after);
         let ran;
         try {
@@ -508,7 +520,7 @@ export function buildServer({
       throw new LakarError('SCHEMA_INVALID', 'kirim boardId ATAU nodeId, bukan keduanya', { hint: SCREENSHOT_HINT });
     }
     // AD-6/AD-16: render hanya menerima dokumen ter-resolve; token diselesaikan di daemon.
-    const doc = resolveTokens(docs.get(slug)!);
+    const doc = resolveDocument(docs.get(slug)!);
     // scale 2 = zoom review (piksel 2× bounds); default 1 = perilaku lama.
     const scaleOpt = body?.scale === 2 ? { scale: 2 as const } : {};
     if (body?.nodeId !== undefined) {
@@ -538,7 +550,7 @@ export function buildServer({
     const { slug } = activeDoc(req.headers[SESSION_HEADER]);
     parse(BoardsBody, req.body ?? undefined, 'kirim {} (tanpa argumen)');
     const stored = docs.get(slug)!;
-    const resolved = resolveTokens(stored);
+    const resolved = resolveDocument(stored);
     const boards = resolved.pages.flatMap((p) =>
       p.children.map((b) => ({
         id: b.id,
@@ -562,7 +574,7 @@ export function buildServer({
     const { slug } = activeDoc(req.headers[SESSION_HEADER]);
     const body = parse(InspectBody, req.body, `kirim {id, depth?} (depth 0–${INSPECT_DEPTH_MAX}, default ${INSPECT_DEPTH_DEFAULT})`);
     const stored = docs.get(slug)!;
-    const resolved = resolveTokens(stored);
+    const resolved = resolveDocument(stored);
     const hit = locateNode(stored, body.id);
     const rBoard = hit ? findBoard(resolved, hit.board.id) : undefined;
     if (!hit || !rBoard) throw nodeNotFound(body.id, slug);
@@ -578,7 +590,7 @@ export function buildServer({
     const { slug } = activeDoc(req.headers[SESSION_HEADER]);
     const body = parse(ExportBody, req.body ?? undefined, 'kirim {id?, scale?}: id board/node (default board pertama), scale 1 atau 2 (default 1)');
     const stored = docs.get(slug)!;
-    const doc = resolveTokens(stored);
+    const doc = resolveDocument(stored);
     const id = body?.id ?? firstBoardId(doc);
     if (!id) throw notFound(`dokumen ${slug} belum punya board`, 'buat board dulu lewat execute');
     const hit = locateNode(doc, id);
@@ -627,7 +639,7 @@ export function buildServer({
     const { slug } = activeDoc(req.headers[SESSION_HEADER]);
     const body = parse(LayoutCheckBody, req.body ?? undefined, 'kirim {boardId?} (tanpa boardId = semua board dokumen aktif)');
     const stored = docs.get(slug)!;
-    const doc = resolveTokens(stored);
+    const doc = resolveDocument(stored);
     let boardIds: string[];
     if (body?.boardId !== undefined) {
       if (!findBoard(doc, body.boardId)) {
@@ -681,9 +693,25 @@ export function buildServer({
 
   // Viewer baca-saja (Viewer B slice 1): `/viewer/*` dan `/app/*`. Route lama tidak berubah.
   registerViewerRoutes(app, { docs, store, sessions, checks, distDir: config.viewerDir ?? VIEWER_DIST_DIR });
-  registerFileRoutes(app, { docs, store, sessions, docLocks, activity, dataDir: config.dataDir });
+  registerFileRoutes(app, { docs, store, sessions, docLocks, activity, dataDir: config.dataDir, onChange: (c) => selections.onFileChange(c) });
   registerPageRoutes(app, { docs, store, docLocks, activity });
+  registerOpsRoutes(app, { docs, store, docLocks, activity, icons });
+  // Paste HTML (story 4): render terisolasi lewat renderer Chromium bila ada (renderer palsu tes → RENDER_FAILED).
+  const snapshotter = typeof (render as Partial<HtmlSnapshotter>).snapshotHtml === 'function' ? (render as unknown as HtmlSnapshotter) : undefined;
+  registerPasteRoutes(app, {
+    docs,
+    store,
+    docLocks,
+    sessions,
+    activity,
+    ...(snapshotter ? { html: snapshotter } : {}),
+    fonts: (family) => fonts.entry(family),
+    dataDir: config.dataDir,
+  });
+  registerSelectionRoutes(app, { docs, store, sessions, selections, activity, render, assertIcons });
+  registerRenderDepsRoutes(app, { fonts, icons });
   registerExportRoutes(app, { docs, store, render, icons });
+  registerCodeExportRoutes(app, { docs, sessions, icons });
   registerConnectionRoutes(app, { host: config.host, port: config.port, ...(config.mcpEntry ? { mcpEntry: config.mcpEntry } : {}) });
 
   // Pratinjau ikon untuk pemilih Icon… di viewer (aplikasi 4): glyph katalog sebagai SVG statis. Pencarian tetap lewat
@@ -710,5 +738,5 @@ export function buildServer({
     return reply.type(remote.type).header('cache-control', remote.placeholder ? 'no-store' : 'no-cache').send(remote.body);
   });
 
-  return { app, store, sessions, fonts, icons, photos, activity, startedAt: startedAt.toISOString() };
+  return { app, store, sessions, fonts, icons, photos, activity, selections, startedAt: startedAt.toISOString() };
 }

@@ -4,7 +4,7 @@ title: "Komponen dengan instance, override, props, dan slot"
 parent: initiative-lakar-paper
 covers: [R4]
 after: [epic-token-tema]
-refined: false
+refined: true
 risk: medium
 ---
 
@@ -38,3 +38,4 @@ Fatmuh membangun sistem desain yang bisa dipakai ulang, dan agen memakainya.
 
 - Waits on epic-token-tema because: token yang dipakai komponen.
 - Decision: 2026-11-22 — story pertama epic ini adalah desain UI/UX/motion yang belum ada di `design/lakar-ui.pen` (hitl, disetujui Fatmuh). Story kode mengikuti desain itu lewat MCP pencil (C6).
+- Decision: 2026-11-22 — epic dipecah menjadi 5 story (tickets/tickets.toml) atas delegasi Fatmuh.

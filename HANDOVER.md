@@ -1,4 +1,4 @@
-# HANDOVER — posisi pekerjaan Lakar (2026-11-22, sore)
+# HANDOVER — posisi pekerjaan Lakar (build lakar-paper selesai)
 
 Catatan serah-terima untuk melanjutkan di ADE atau IDE lain. Aturan dan jebakan repo ada di [AGENTS.md](AGENTS.md).
 
@@ -14,6 +14,7 @@ Semua PR ada di repo GitHub `fatmuh/lakar` (dulu `adamramadhn/lakar`; alamat lam
 | `g1` | Pekerjaan G1 dari VPS (2026-11-19): aturan `layout_check` sisa, skill per domain, rubrik v2.3, golden A–E di Lakar | #15 → `main` | Terbuka; merge tanpa konflik dengan #6 |
 | `docs/new-initiative` | Inisiatif baru `initiative-lakar-paper`, inisiatif lama ditutup | #16 → `claude/app-design-parity` | Merged |
 | `docs/new-initiative` | Spine arsitektur model dokumen (epic 1) + penyelarasan inisiatif, AGENTS.md | #17 → `claude/app-design-parity` | Terbuka |
+| `feat/model-dokumen` | Build ketujuh epic `initiative-lakar-paper` (model dokumen, editor canvas, agen di canvas, token dan tema, komponen, kode, paste dan vektor), skema v7 | #18 → `docs/new-initiative` | Draft |
 
 **Urutan ke `main`:**
 1. Approve dan merge #5.
@@ -56,10 +57,16 @@ Perubahan sesudah gelombang fitur di atas:
 ## Langkah berikutnya
 
 1. **Bawa ke `main`.** Ikuti urutan di bagian "Branch dan PR".
-2. **Epic 1 inisiatif baru: model dokumen.** Arsitekturnya sudah diputuskan dan disetujui Fatmuh pada 2026-11-22. Spine-nya ada di `_bmad-output/initiative-lakar-paper/tickets/epic-model-dokumen/architecture-model-dokumen/architecture-model-dokumen.md`.
-   - Model dokumen: JSON Lakar bertipe dengan semantik CSS (AD-1).
-   - Route dan tool lama: kompatibilitas mundur menggantikan pembekuan (AD-4).
-   - Berikutnya: minta Sofia (`bmad-agent-po`) memecah epic model dokumen menjadi story. Story pertamanya mengumpulkan korpus dokumen v1/v2 dari data dir lokal dan VPS ke `tests/fixtures/docs/`. Sesudah itu, refine epic 2–7 di atas spine.
+2. **Build `initiative-lakar-paper` selesai (branch `feat/model-dokumen`, PR #18 → `docs/new-initiative`, draft).** Semua story dijalankan lewat `bmad-build-auto`. Spec ada di `_bmad-output/implementation-artifacts/spec-{model-dokumen,editor,agen,token,komponen,kode,vektor}-*.md`. Spine arsitektur ada di `_bmad-output/initiative-lakar-paper/tickets/epic-model-dokumen/architecture-model-dokumen/architecture-model-dokumen.md`. Skema kini v7.
+   - **Model dokumen.** Korpus v1/v2, token bertipe dengan mode tema (v3), `resolveDocument` sebagai satu pintu resolusi, dan `css.ts` sebagai pemetaan CSS tunggal.
+   - **Editor canvas.** Route `/viewer/docs/:slug/ops` dengan op invers untuk undo/redo, board sebagai DOM hidup, select/move/resize, panel Design, aksi edit, dan grid (v4).
+   - **Agen di canvas.** Seleksi bersama lewat `get_selection`, perubahan agen tampil live tanpa menimpa edit manual, dan skill `selection`.
+   - **Token dan tema.** API baca token untuk agen, panel Theme, dan Token Picker di panel Design.
+   - **Komponen.** Master dan instance (v5), op komponen, UI komponen di viewer, serta props dan slot.
+   - **Kode.** Paket `@lakar/codegen` (React + Tailwind atau CSS), komponen sebagai file React, uji paritas piksel, dialog Export code, tool `export_code`, dan impor CSS variables.
+   - **Paste dan vektor.** Atribut SVG bertipe pada path (v6), importer SVG dan HTML dengan tool `paste` (tag v7), Pen tool, dan edit titik.
+   - **Sisa sebelum rilis.** Butir Done-when yang butuh installer release desktop dan demo manual Fatmuh: membuat landing page dari nol dan alur varian lewat agen.
+   - **Tema tertunda utama.** Viewer belum punya harness tes DOM/komponen, jadi wiring UI hanya dites lewat logika murni. Dokumen nyata v1/v2 pengguna dan bench (termasuk di VPS) belum masuk korpus; caranya ada di `tests/fixtures/docs/README.md`. Item lain ada di `deferred-work.md`.
 3. **Item tertunda.** Lihat `_bmad-output/implementation-artifacts/deferred-work.md`.
 
 ## Merapikan lingkungan lokal

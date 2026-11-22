@@ -52,8 +52,11 @@ export type DocChange = {
   origin?: string;
 };
 export type ChangeEvent = { seq: number; type: 'change'; change: DocChange };
+/** Seleksi canvas dokumen berubah (AD-9; salinan `DocSelection` events.ts). */
+export type DocSelection = { slug: string; addresses: string[]; rev?: number; origin?: string };
+export type SelectionEvent = { seq: number; type: 'selection'; selection: DocSelection };
 /** Semua event stream `/viewer/events` sesudah `hello`. */
-export type StreamEvent = ActivityEvent | ChangeEvent;
+export type StreamEvent = ActivityEvent | ChangeEvent | SelectionEvent;
 
 // ---- Reducer ----
 
@@ -81,8 +84,8 @@ export const isDocChangeFromViewer = (c: Pick<ActivityCall, 'client' | 'tool'>) 
 function applyEvent(state: ActivityState, event: StreamEvent): ActivityState {
   if (event.seq <= state.seq) return state;
   const next: ActivityState = { ...state, seq: event.seq };
-  // Perubahan dari aplikasi tidak tampil di Activity.
-  if (event.type === 'change') return next;
+  // Perubahan dari aplikasi dan seleksi tidak tampil di Activity.
+  if (event.type === 'change' || event.type === 'selection') return next;
   if (event.type === 'session') {
     if (isViewer(event.session.client)) return next;
     next.sessions = { ...state.sessions, [event.session.id]: { ...state.sessions[event.session.id], ...event.session } };
@@ -164,14 +167,14 @@ export function sessionsForSlug(state: ActivityState, slug: string, now: number)
 
 /**
  * Event selesai yang membuat dokumen `slug` yang tampil (rev `shownRev`) usang: rev baru dan board tersentuh.
- * `boards` hanya diketahui dari execute (`check.boards`); tool lain → `undefined` (muat ulang semua board).
+ * `boards` hanya diketahui dari execute (`check.boards`) dan paste; tool lain → `undefined` (muat ulang semua board).
  */
 export function revChange(event: StreamEvent, slug: string, shownRev: number): { rev: number; boards?: string[] } | undefined {
   if (event.type !== 'call') return undefined;
   const c = event.call;
   if ((isViewer(c.client) && !isDocChangeFromViewer(c)) || c.status === 'running' || c.status === 'error' || c.slug !== slug) return undefined;
   if (typeof c.rev !== 'number' || c.rev <= shownRev) return undefined;
-  return c.tool === 'execute' ? { rev: c.rev, boards: c.boards ?? [] } : { rev: c.rev };
+  return c.tool === 'execute' || c.tool === 'paste' ? { rev: c.rev, boards: c.boards ?? [] } : { rev: c.rev };
 }
 
 // ---- Sinkron antar jendela ----
@@ -285,6 +288,8 @@ export function callTitle(c: ActivityCall, nameOf: (id: string) => string | unde
       return t ? `Screenshot ${t}` : 'Screenshot first board';
     case 'export':
       return t ? `Export ${t}` : 'Export first board';
+    case 'export_code':
+      return t ? `Export code for ${t}` : 'Export code for first board';
     case 'open_doc':
       return c.slug ? `Open ${c.slug}` : 'Open document';
     case 'restore':
@@ -293,6 +298,10 @@ export function callTitle(c: ActivityCall, nameOf: (id: string) => string | unde
       return c.description ?? 'Edit pages';
     case 'list_boards':
       return 'List boards';
+    case 'get_selection':
+      return 'Read selection';
+    case 'paste':
+      return 'Paste layers';
     case 'read_skill':
       return t ? `Load ${t} skill` : 'List skills';
     case 'icon_search':
@@ -396,6 +405,7 @@ export function connectActivity(handlers: StreamHandlers, opts: { url?: string; 
     src.addEventListener('call', onData);
     src.addEventListener('session', onData);
     src.addEventListener('change', onData);
+    src.addEventListener('selection', onData);
     src.onerror = () => {
       if (stopped || es !== src) return;
       src.close();
@@ -418,7 +428,7 @@ export function connectActivity(handlers: StreamHandlers, opts: { url?: string; 
 // ---- Hub: satu stream per jendela ----
 
 export type HubListener = {
-  /** Setiap event sesudah `hello` (call, session, change). */
+  /** Setiap event sesudah `hello` (call, session, change, selection). */
   onEvent?: (event: StreamEvent) => void;
   /** Stream tersambung lagi (event yang hilang tidak diputar ulang): muat ulang. */
   onReconnect?: () => void;
