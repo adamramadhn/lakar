@@ -1,0 +1,664 @@
+{
+  "schemaVersion": 5,
+  "id": "CgFixInt",
+  "rev": 1,
+  "pages": [
+    {
+      "id": "PgCgInt1",
+      "name": "Interaksi",
+      "children": [
+        {
+          "type": "board",
+          "id": "BrdInt01",
+          "name": "Kombinasi",
+          "x": 0,
+          "y": 0,
+          "width": 960,
+          "height": 760,
+          "screen": "app",
+          "fills": [
+            {
+              "type": "solid",
+              "color": "#F8FAFC"
+            }
+          ],
+          "children": [
+            {
+              "type": "frame",
+              "id": "FrmIntM1",
+              "name": "Master",
+              "layout": "row",
+              "gap": 24,
+              "padding": 24,
+              "align": "start",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "MstIntC1",
+                  "name": "Chip",
+                  "layout": "row",
+                  "gap": 6,
+                  "align": "center",
+                  "padding": [
+                    6,
+                    10
+                  ],
+                  "radius": 8,
+                  "width": "hug",
+                  "fills": [
+                    {
+                      "type": "solid",
+                      "color": "#F1F5F9"
+                    }
+                  ],
+                  "stroke": {
+                    "color": "#CBD5E1",
+                    "width": 1,
+                    "align": "inside"
+                  },
+                  "component": {
+                    "props": [
+                      {
+                        "name": "label",
+                        "type": "text",
+                        "default": "Chip",
+                        "binds": [
+                          {
+                            "nodeId": "TxtIntL1",
+                            "prop": "content"
+                          }
+                        ]
+                      },
+                      {
+                        "name": "open",
+                        "type": "boolean",
+                        "default": false,
+                        "binds": [
+                          {
+                            "nodeId": "FrmIntD1",
+                            "prop": "visible"
+                          }
+                        ]
+                      },
+                      {
+                        "name": "detail",
+                        "type": "boolean",
+                        "default": true,
+                        "binds": [
+                          {
+                            "nodeId": "TxtIntD2",
+                            "prop": "visible"
+                          }
+                        ]
+                      },
+                      {
+                        "name": "tone",
+                        "type": "enum",
+                        "options": [
+                          "info",
+                          "triangle-alert",
+                          "circle-check"
+                        ],
+                        "default": "info",
+                        "binds": [
+                          {
+                            "nodeId": "IcnIntT1",
+                            "prop": "icon"
+                          },
+                          {
+                            "nodeId": "IcnIntT2",
+                            "prop": "icon"
+                          }
+                        ]
+                      },
+                      {
+                        "name": "arah",
+                        "type": "enum",
+                        "options": [
+                          "row",
+                          "column"
+                        ],
+                        "default": "row",
+                        "binds": [
+                          {
+                            "nodeId": "MstIntC1",
+                            "prop": "layout"
+                          },
+                          {
+                            "nodeId": "FrmIntD1",
+                            "prop": "layout"
+                          }
+                        ]
+                      },
+                      {
+                        "name": "rata",
+                        "type": "enum",
+                        "options": [
+                          "start",
+                          "center",
+                          "end"
+                        ],
+                        "default": "center",
+                        "binds": [
+                          {
+                            "nodeId": "MstIntC1",
+                            "prop": "align"
+                          }
+                        ]
+                      }
+                    ],
+                    "slots": []
+                  },
+                  "children": [
+                    {
+                      "type": "icon",
+                      "id": "IcnIntT1",
+                      "name": "Icon / lucide / info",
+                      "lib": "lucide",
+                      "icon": "info",
+                      "size": 16,
+                      "color": "#0369A1"
+                    },
+                    {
+                      "type": "text",
+                      "id": "TxtIntL1",
+                      "name": "Label",
+                      "content": "Chip",
+                      "size": 13,
+                      "lineHeight": 18,
+                      "weight": 600,
+                      "color": "#0F172A"
+                    },
+                    {
+                      "type": "frame",
+                      "id": "FrmIntD1",
+                      "name": "Detail",
+                      "layout": "row",
+                      "gap": 4,
+                      "align": "center",
+                      "padding": [
+                        2,
+                        6
+                      ],
+                      "radius": 6,
+                      "fills": [
+                        {
+                          "type": "solid",
+                          "color": "#E0F2FE"
+                        }
+                      ],
+                      "children": [
+                        {
+                          "type": "icon",
+                          "id": "IcnIntT2",
+                          "name": "Icon / lucide / info",
+                          "lib": "lucide",
+                          "icon": "info",
+                          "size": 12,
+                          "color": "#0369A1"
+                        },
+                        {
+                          "type": "text",
+                          "id": "TxtIntD2",
+                          "name": "Keterangan",
+                          "content": "more",
+                          "size": 11,
+                          "lineHeight": 14,
+                          "color": "#0369A1"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "MstIntR1",
+                  "name": "Baris",
+                  "layout": "row",
+                  "gap": 8,
+                  "align": "center",
+                  "padding": 8,
+                  "radius": 10,
+                  "width": "hug",
+                  "fills": [
+                    {
+                      "type": "solid",
+                      "color": "#FFFFFF"
+                    }
+                  ],
+                  "component": {
+                    "props": [
+                      {
+                        "name": "judul",
+                        "type": "text",
+                        "default": "Row",
+                        "binds": [
+                          {
+                            "nodeId": "TxtIntR1",
+                            "prop": "content"
+                          }
+                        ]
+                      },
+                      {
+                        "name": "showChip",
+                        "type": "boolean",
+                        "default": true,
+                        "binds": [
+                          {
+                            "nodeId": "InsIntN1",
+                            "prop": "visible"
+                          }
+                        ]
+                      },
+                      {
+                        "name": "showIcon",
+                        "type": "boolean",
+                        "default": false,
+                        "binds": [
+                          {
+                            "nodeId": "IcnIntR1",
+                            "prop": "visible"
+                          }
+                        ]
+                      }
+                    ],
+                    "slots": []
+                  },
+                  "children": [
+                    {
+                      "type": "icon",
+                      "id": "IcnIntR1",
+                      "name": "Icon / lucide / star",
+                      "lib": "lucide",
+                      "icon": "star",
+                      "size": 16,
+                      "color": "#CA8A04"
+                    },
+                    {
+                      "type": "text",
+                      "id": "TxtIntR1",
+                      "name": "Judul",
+                      "content": "Row",
+                      "size": 14,
+                      "lineHeight": 20,
+                      "weight": 500,
+                      "color": "#334155"
+                    },
+                    {
+                      "type": "instance",
+                      "id": "InsIntN1",
+                      "name": "Chip / di baris",
+                      "componentId": "MstIntC1",
+                      "props": {
+                        "open": true,
+                        "label": "nested"
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "FrmIntG1",
+              "name": "Grid",
+              "layout": "grid",
+              "gridTemplateColumns": [
+                {
+                  "fr": 1
+                },
+                {
+                  "fr": 1
+                },
+                {
+                  "fr": 1
+                },
+                {
+                  "fr": 1
+                }
+              ],
+              "columnGap": 16,
+              "rowGap": 16,
+              "padding": 24,
+              "width": "fill",
+              "children": [
+                {
+                  "type": "instance",
+                  "id": "InsIntKA",
+                  "name": "Chip / 0",
+                  "componentId": "MstIntC1",
+                  "props": {
+                    "label": "C0"
+                  }
+                },
+                {
+                  "type": "instance",
+                  "id": "InsIntKB",
+                  "name": "Chip / 1",
+                  "componentId": "MstIntC1",
+                  "props": {
+                    "label": "C1",
+                    "arah": "column",
+                    "rata": "start"
+                  }
+                },
+                {
+                  "type": "instance",
+                  "id": "InsIntKC",
+                  "name": "Chip / 2",
+                  "componentId": "MstIntC1",
+                  "props": {
+                    "label": "C2",
+                    "tone": "triangle-alert",
+                    "rata": "end"
+                  }
+                },
+                {
+                  "type": "instance",
+                  "id": "InsIntKD",
+                  "name": "Chip / 3",
+                  "componentId": "MstIntC1",
+                  "props": {
+                    "label": "C3",
+                    "tone": "triangle-alert",
+                    "arah": "column"
+                  }
+                },
+                {
+                  "type": "instance",
+                  "id": "InsIntKE",
+                  "name": "Chip / 4",
+                  "componentId": "MstIntC1",
+                  "props": {
+                    "label": "C4",
+                    "tone": "circle-check",
+                    "rata": "start"
+                  }
+                },
+                {
+                  "type": "instance",
+                  "id": "InsIntKF",
+                  "name": "Chip / 5",
+                  "componentId": "MstIntC1",
+                  "props": {
+                    "label": "C5",
+                    "tone": "circle-check",
+                    "arah": "column",
+                    "rata": "end"
+                  }
+                },
+                {
+                  "type": "instance",
+                  "id": "InsIntKG",
+                  "name": "Chip / 6",
+                  "componentId": "MstIntC1",
+                  "props": {
+                    "label": "C6",
+                    "detail": false
+                  }
+                },
+                {
+                  "type": "instance",
+                  "id": "InsIntKH",
+                  "name": "Chip / 7",
+                  "componentId": "MstIntC1",
+                  "props": {
+                    "label": "C7",
+                    "detail": false,
+                    "arah": "column",
+                    "rata": "start"
+                  }
+                },
+                {
+                  "type": "instance",
+                  "id": "InsIntKI",
+                  "name": "Chip / 8",
+                  "componentId": "MstIntC1",
+                  "props": {
+                    "label": "C8",
+                    "detail": false,
+                    "tone": "triangle-alert",
+                    "rata": "end"
+                  }
+                },
+                {
+                  "type": "instance",
+                  "id": "InsIntKJ",
+                  "name": "Chip / 9",
+                  "componentId": "MstIntC1",
+                  "props": {
+                    "label": "C9",
+                    "detail": false,
+                    "tone": "triangle-alert",
+                    "arah": "column"
+                  }
+                },
+                {
+                  "type": "instance",
+                  "id": "InsIntKK",
+                  "name": "Chip / 10",
+                  "componentId": "MstIntC1",
+                  "props": {
+                    "label": "C10",
+                    "detail": false,
+                    "tone": "circle-check",
+                    "rata": "start"
+                  }
+                },
+                {
+                  "type": "instance",
+                  "id": "InsIntKL",
+                  "name": "Chip / 11",
+                  "componentId": "MstIntC1",
+                  "props": {
+                    "label": "C11",
+                    "detail": false,
+                    "tone": "circle-check",
+                    "arah": "column",
+                    "rata": "end"
+                  }
+                },
+                {
+                  "type": "instance",
+                  "id": "InsIntKM",
+                  "name": "Chip / 12",
+                  "componentId": "MstIntC1",
+                  "props": {
+                    "label": "C12",
+                    "open": true
+                  }
+                },
+                {
+                  "type": "instance",
+                  "id": "InsIntKN",
+                  "name": "Chip / 13",
+                  "componentId": "MstIntC1",
+                  "props": {
+                    "label": "C13",
+                    "open": true,
+                    "arah": "column",
+                    "rata": "start"
+                  }
+                },
+                {
+                  "type": "instance",
+                  "id": "InsIntKO",
+                  "name": "Chip / 14",
+                  "componentId": "MstIntC1",
+                  "props": {
+                    "label": "C14",
+                    "open": true,
+                    "tone": "triangle-alert",
+                    "rata": "end"
+                  }
+                },
+                {
+                  "type": "instance",
+                  "id": "InsIntKP",
+                  "name": "Chip / 15",
+                  "componentId": "MstIntC1",
+                  "props": {
+                    "label": "C15",
+                    "open": true,
+                    "tone": "triangle-alert",
+                    "arah": "column"
+                  }
+                },
+                {
+                  "type": "instance",
+                  "id": "InsIntKQ",
+                  "name": "Chip / 16",
+                  "componentId": "MstIntC1",
+                  "props": {
+                    "label": "C16",
+                    "open": true,
+                    "tone": "circle-check",
+                    "rata": "start"
+                  }
+                },
+                {
+                  "type": "instance",
+                  "id": "InsIntKR",
+                  "name": "Chip / 17",
+                  "componentId": "MstIntC1",
+                  "props": {
+                    "label": "C17",
+                    "open": true,
+                    "tone": "circle-check",
+                    "arah": "column",
+                    "rata": "end"
+                  }
+                },
+                {
+                  "type": "instance",
+                  "id": "InsIntKS",
+                  "name": "Chip / 18",
+                  "componentId": "MstIntC1",
+                  "props": {
+                    "label": "C18",
+                    "open": true,
+                    "detail": false
+                  }
+                },
+                {
+                  "type": "instance",
+                  "id": "InsIntKT",
+                  "name": "Chip / 19",
+                  "componentId": "MstIntC1",
+                  "props": {
+                    "label": "C19",
+                    "open": true,
+                    "detail": false,
+                    "arah": "column",
+                    "rata": "start"
+                  }
+                },
+                {
+                  "type": "instance",
+                  "id": "InsIntKU",
+                  "name": "Chip / 20",
+                  "componentId": "MstIntC1",
+                  "props": {
+                    "label": "C20",
+                    "open": true,
+                    "detail": false,
+                    "tone": "triangle-alert",
+                    "rata": "end"
+                  }
+                },
+                {
+                  "type": "instance",
+                  "id": "InsIntKV",
+                  "name": "Chip / 21",
+                  "componentId": "MstIntC1",
+                  "props": {
+                    "label": "C21",
+                    "open": true,
+                    "detail": false,
+                    "tone": "triangle-alert",
+                    "arah": "column"
+                  }
+                },
+                {
+                  "type": "instance",
+                  "id": "InsIntKW",
+                  "name": "Chip / 22",
+                  "componentId": "MstIntC1",
+                  "props": {
+                    "label": "C22",
+                    "open": true,
+                    "detail": false,
+                    "tone": "circle-check",
+                    "rata": "start"
+                  }
+                },
+                {
+                  "type": "instance",
+                  "id": "InsIntKX",
+                  "name": "Chip / 23",
+                  "componentId": "MstIntC1",
+                  "props": {
+                    "label": "C23",
+                    "open": true,
+                    "detail": false,
+                    "tone": "circle-check",
+                    "arah": "column",
+                    "rata": "end"
+                  }
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "FrmIntB1",
+              "name": "Baris",
+              "layout": "column",
+              "gap": 12,
+              "padding": 24,
+              "align": "start",
+              "children": [
+                {
+                  "type": "instance",
+                  "id": "InsIntB1",
+                  "name": "Baris / bawaan",
+                  "componentId": "MstIntR1"
+                },
+                {
+                  "type": "instance",
+                  "id": "InsIntB2",
+                  "name": "Baris / tanpa chip",
+                  "componentId": "MstIntR1",
+                  "props": {
+                    "judul": "No chip",
+                    "showChip": false
+                  }
+                },
+                {
+                  "type": "instance",
+                  "id": "InsIntB3",
+                  "name": "Baris / ikon",
+                  "componentId": "MstIntR1",
+                  "props": {
+                    "judul": "With icon",
+                    "showIcon": true
+                  }
+                },
+                {
+                  "type": "instance",
+                  "id": "InsIntB4",
+                  "name": "Baris / ikon tanpa chip",
+                  "componentId": "MstIntR1",
+                  "props": {
+                    "judul": "Icon only",
+                    "showIcon": true,
+                    "showChip": false
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

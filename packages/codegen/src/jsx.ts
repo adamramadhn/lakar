@@ -408,10 +408,12 @@ class FileWriter {
     const { cls, style } = this.elStyle(n);
     const props: string[] = [];
     if (n.root) {
-      // Kelas akar + kelas pemanggil dalam satu template (String.raw bila kelas Tailwind memuat `\`).
+      // Kelas akar + kelas pemanggil dalam satu template (String.raw bila kelas Tailwind memuat `\`). Kelas statis
+      // terakhir harus diikuti spasi: pemindai kandidat Tailwind tidak mengenali kelas yang menempel ke `${`
+      // (`w-[fit-content]${…}` tidak ikut dikompilasi; ditemukan uji paritas spec kode-4).
       const extra = "${className ? ` ${className}` : ''}";
       if (cls === undefined) props.push('className={className}');
-      else if ('str' in cls) props.push(`className={${cls.str.includes('\\') ? 'String.raw' : ''}\`${cls.str}${extra}\`}`);
+      else if ('str' in cls) props.push(`className={${cls.str.includes('\\') ? 'String.raw' : ''}\`${cls.str} \${className ?? ''}\`.trimEnd()}`);
       else props.push(`className={\`\${${cls.expr}}${extra}\`}`);
     } else if (cls) props.push(this.attr('className', cls));
     for (const [k, v] of n.attrs) props.push(jsxAttr(reactAttr(k), v));

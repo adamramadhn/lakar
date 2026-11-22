@@ -288,15 +288,24 @@ export class Exporter {
     const dsOf = (k: string) => finite.filter((p) => driverSets.get(k)?.has(p.name)).map((p) => driverOf.get(p.name)!);
     const stateAt = (props: Record<string, PropValue>, k: string) => cache.get(fullKey(props))?.get(k) ?? null;
     const sameState = (a: NodeState | null, b: NodeState | null) => stateEq(a, b) && (!a || !b || JSON.stringify(a.childKeys) === JSON.stringify(b.childKeys));
+    // Driver parent yang diwariskan hanya yang mengubah KEHADIRAN parent (anak tidak bisa hadir tanpa parent, jadi
+    // anak yang baru muncul pada kombinasi dua prop tetap tertangkap). Driver gaya parent (mis. `align` akar) tidak
+    // diwariskan: pengaruhnya ke anak (bila ada) tertangkap probe. Mewariskan semua driver membuat kombinasi daun
+    // meledak melewati COMBOS_MAX untuk komponen dengan beberapa enum (ditemukan uji paritas spec kode-4).
+    const presenceDrivers = (k: string): string[] => {
+      const ds = dsOf(k);
+      return ds
+        .filter((d) =>
+          combos(ds).some((c) => {
+            const at = full(ds, c);
+            return d.values.some((v) => v !== at[d.name] && (stateAt(at, k) === null) !== (stateAt({ ...at, [d.name]: v }, k) === null));
+          }),
+        )
+        .map((d) => d.name);
+    };
     for (let changed = true; changed; ) {
       changed = false;
-      const parentOf = new Map<string, string>();
-      for (const m of cache.values()) for (const [k, s] of m) for (const c of s.childKeys) parentOf.set(c, k);
       const keys = mergeOrder([...[...cache.values()].map((m) => [...m.keys()]), [...driverSets.keys()]]);
-      for (const k of keys) {
-        const parent = parentOf.get(k);
-        if (parent) for (const d of driverSets.get(parent) ?? []) changed = addDriver(k, d) || changed;
-      }
       for (const k of keys) if (combos(dsOf(k)).length > COMBOS_MAX) return null;
       const probes = (k: string) =>
         combos(dsOf(k)).flatMap((c) => {
@@ -307,6 +316,19 @@ export class Exporter {
       for (const k of keys) {
         for (const p of probes(k)) if (!sameState(stateAt(p.at, k), stateAt(p.flip, k))) changed = addDriver(k, p.q) || changed;
       }
+      const parentOf = new Map<string, string>();
+      for (const m of cache.values()) for (const [k, s] of m) for (const c of s.childKeys) parentOf.set(c, k);
+      const keysNow = mergeOrder([...[...cache.values()].map((m) => [...m.keys()]), [...driverSets.keys()]]);
+      for (const k of keysNow) {
+        const parent = parentOf.get(k);
+        if (!parent) continue;
+        // Kehadiran parent dinilai pada semua kombinasi drivernya (driver bisa bertambah oleh probe di putaran ini).
+        const pds = dsOf(parent);
+        if (combos(pds).length > COMBOS_MAX) return null;
+        expand(combos(pds).map((c) => full(pds, c)));
+        for (const d of presenceDrivers(parent)) changed = addDriver(k, d) || changed;
+      }
+      for (const k of keysNow) if (combos(dsOf(k)).length > COMBOS_MAX) return null;
     }
     const drivers = new Map([...driverSets.keys()].map((k): [string, Driver[]] => [k, dsOf(k)]));
 

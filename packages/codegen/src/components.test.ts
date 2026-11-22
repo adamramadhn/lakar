@@ -303,6 +303,78 @@ describe('generateCode dengan komponen', () => {
     expect(comp).not.toContain('[font-family:');
   });
 
+  it('akar komponen Tailwind: kelas statis terakhir diikuti spasi agar terbaca pemindai kandidat (spec kode-4)', () => {
+    const comp = file(doc([button({}, { width: 'hug' }), inst('Inst0001')]), 'components/Button.tsx', 'react-tailwind');
+    expect(comp).toContain("w-[fit-content] ${className ?? ''}`.trimEnd()}");
+    expect(comp).not.toMatch(/[^\s`]\$\{className/);
+  });
+
+  it('driver gaya parent tidak diwariskan: enum gaya di akar × enum/boolean di anak tetap di bawah batas kombinasi (spec kode-4)', () => {
+    // Akar bervariasi menurut arah (2) × rata (3); anak dalam detail bervariasi menurut open × detail × tone (2×2×3).
+    // Mewariskan semua driver akar ke daun memberi 72 kombinasi (> 64) → dulu jatuh ke inline.
+    const master = frame(
+      'Mast0001',
+      {
+        name: 'Chip',
+        layout: 'row',
+        component: {
+          props: [
+            { name: 'open', type: 'boolean', default: false, binds: [{ nodeId: 'Detl0001', prop: 'visible' }] },
+            { name: 'detail', type: 'boolean', default: true, binds: [{ nodeId: 'More0001', prop: 'visible' }] },
+            { name: 'tone', type: 'enum', options: ['#111111', '#EE0000', '#00AA00'], default: '#111111', binds: [{ nodeId: 'More0001', prop: 'color' }] },
+            { name: 'arah', type: 'enum', options: ['row', 'column'], default: 'row', binds: [{ nodeId: 'Mast0001', prop: 'layout' }, { nodeId: 'Detl0001', prop: 'layout' }] },
+            { name: 'rata', type: 'enum', options: ['start', 'center', 'end'], default: 'center', binds: [{ nodeId: 'Mast0001', prop: 'align' }] },
+          ],
+          slots: [],
+        },
+      },
+      [text('Labl0001', 'Chip'), frame('Detl0001', { layout: 'row' }, [text('More0001', 'More', { color: '#111111' })])],
+    );
+    const d = doc([master, inst('Inst0001', { name: 'Open', props: { open: true, tone: '#EE0000', arah: 'column', rata: 'end' } })]);
+    const r = generateCode(d, { nodeId: BOARD, target: 'react-css' });
+    expect(r.warnings.map((w) => w.code)).not.toContain('component-too-complex');
+    expect(file(d, 'Page.tsx')).toContain('<Chip open={true} tone="#EE0000" arah="column" rata="end" />');
+    expect(equivalent(d)).toBe(true);
+    // Semua 72 kombinasi: komponen = ekspansi instance dengan props itu, dan setiap instance menjadi pemakaian.
+    const all: Record<string, string | boolean>[] = [];
+    for (const open of [false, true])
+      for (const detail of [true, false])
+        for (const tone of ['#111111', '#EE0000', '#00AA00'])
+          for (const arah of ['row', 'column']) for (const rata of ['start', 'center', 'end']) all.push({ open, detail, tone, arah, rata });
+    const probe = doc([master, ...all.map((props, i) => inst(`Prob${String(i).padStart(4, '0')}`, { name: `Probe ${i}`, props }))]);
+    expect(equivalent(probe)).toBe(true);
+    const r2 = generateCode(probe, { nodeId: BOARD, target: 'react-css' });
+    expect(r2.warnings.map((w) => `${w.code} ${w.nodeId ?? ''}`)).toEqual(['instance-inlined Mast0001']);
+    expect(r2.files[0]!.contents.match(/<Chip\b/g)).toHaveLength(72);
+  });
+
+  it('node tanpa bind di bawah dua frame visible bersarang (open → luar, extra → dalam) ikut dua driver kehadiran (spec kode-4)', () => {
+    const master = frame(
+      'Mast0001',
+      {
+        name: 'Panel',
+        layout: 'column',
+        component: {
+          props: [
+            { name: 'open', type: 'boolean', default: false, binds: [{ nodeId: 'Body0001', prop: 'visible' }] },
+            { name: 'extra', type: 'boolean', default: false, binds: [{ nodeId: 'More0001', prop: 'visible' }] },
+          ],
+          slots: [],
+        },
+      },
+      [frame('Body0001', { layout: 'column' }, [text('Head0001', 'Head'), frame('More0001', { layout: 'column' }, [text('Deep0001', 'Deep')])])],
+    );
+    for (const props of [{ open: true, extra: true }, { open: true, extra: false }, { open: false, extra: true }]) {
+      const d = doc([master, inst('Inst0001', { name: 'Probe', props })]);
+      expect(equivalent(d), JSON.stringify(props)).toBe(true);
+      expect(file(d, 'Page.tsx')).toContain('<Panel ');
+    }
+    const comp = file(doc([master, inst('Inst0001')]), 'components/Panel.tsx');
+    expect(comp).toContain('{open && (');
+    expect(comp).toContain('{extra && (');
+    expect(comp).toContain('Deep');
+  });
+
   it('deterministik dan components:false tetap story 2', () => {
     const d = doc([button(), inst('Inst0001', { props: { label: 'Buy' } })]);
     expect(generateCode(d, { nodeId: BOARD, target: 'react-tailwind' })).toEqual(generateCode(structuredClone(d), { nodeId: BOARD, target: 'react-tailwind' }));

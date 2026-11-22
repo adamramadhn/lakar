@@ -61,7 +61,7 @@ export type BadgeProps = {
 
 export function Badge({ label = "Baru", className, style }: BadgeProps) {
   return (
-    <div className={`relative flex flex-row items-center p-[2px_8px] bg-[color:var(--colors-brand)] rounded-[10px] box-border m-[0] flex-[0_0_auto] w-[fit-content]${className ? ` ${className}` : ''}`} style={style}>
+    <div className={`relative flex flex-row items-center p-[2px_8px] bg-[color:var(--colors-brand)] rounded-[10px] box-border m-[0] flex-[0_0_auto] w-[fit-content] ${className ?? ''}`.trimEnd()} style={style}>
       <div className="[font-family:Inter] font-[600] not-italic text-[12px] leading-[16px] text-[#FFFFFF] whitespace-pre box-border m-[0] flex-[0_0_auto]">
         {label}
       </div>
@@ -87,7 +87,7 @@ export type CardProps = {
 
 export function Card({ title = "Judul kartu", showBadge = true, tone = "star", body, className, style }: CardProps) {
   return (
-    <div className={`relative flex flex-col gap-[8px] p-[16px] bg-[color:var(--colors-surface)] rounded-[12px] box-border m-[0] flex-[0_0_auto] w-[280px]${className ? ` ${className}` : ''}`} style={style}>
+    <div className={`relative flex flex-col gap-[8px] p-[16px] bg-[color:var(--colors-surface)] rounded-[12px] box-border m-[0] flex-[0_0_auto] w-[280px] ${className ?? ''}`.trimEnd()} style={style}>
       <div className="relative flex flex-row gap-[8px] items-center box-border m-[0] flex-[0_0_auto] self-stretch w-[auto]">
         <div className="box-border m-[0] flex-[0_0_20px] w-[20px] h-[20px]">
           {tone === "star" && (

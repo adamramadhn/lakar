@@ -52,3 +52,12 @@ jobs:
       # GitHub runners are slower than the VPS; render latency tests need more than vitest's 5 s default.
       - name: Test
         run: pnpm test --testTimeout=30000
+
+      # Render golden and export parity diffs (acuan/ekspor/diff PNG) for failed cases.
+      - name: Upload render diffs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: render-diffs
+          path: packages/render/test/out/
+          if-no-files-found: ignore

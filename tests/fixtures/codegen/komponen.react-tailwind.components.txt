@@ -113,7 +113,7 @@ export type KartuProps = {
 
 export function Kartu({ title = "Judul", body, className, style }: KartuProps) {
   return (
-    <div className={`relative flex flex-col gap-[8px] p-[16px] bg-[#FFFFFF] rounded-[12px] box-border m-[0] flex-[0_0_auto] w-[240px] after:content-[''] after:absolute after:inset-[0] after:box-border after:pointer-events-none after:m-[0] after:z-auto after:rounded-[12px] after:[border-top:1px_solid_#E4E7EC] after:[border-right:1px_solid_#E4E7EC] after:[border-bottom:1px_solid_#E4E7EC] after:[border-left:1px_solid_#E4E7EC]${className ? ` ${className}` : ''}`} style={style}>
+    <div className={`relative flex flex-col gap-[8px] p-[16px] bg-[#FFFFFF] rounded-[12px] box-border m-[0] flex-[0_0_auto] w-[240px] after:content-[''] after:absolute after:inset-[0] after:box-border after:pointer-events-none after:m-[0] after:z-auto after:rounded-[12px] after:[border-top:1px_solid_#E4E7EC] after:[border-right:1px_solid_#E4E7EC] after:[border-bottom:1px_solid_#E4E7EC] after:[border-left:1px_solid_#E4E7EC] ${className ?? ''}`.trimEnd()} style={style}>
       <div className="[font-family:Inter] font-[600] not-italic text-[16px] leading-[24px] text-[color:var(--colors-teks)] whitespace-pre-wrap [overflow-wrap:break-word] box-border m-[0] flex-[0_0_auto] self-stretch w-[auto]">
         {title}
       </div>

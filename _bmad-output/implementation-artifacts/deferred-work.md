@@ -167,3 +167,9 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-kode-2-codegen.md`
   summary: Codegen menulis semua elemen sebagai `div` karena skema v5 belum punya `tag` semantik (AD-1); allowlist tag HTML untuk ekspor belum ada.
   evidence: AD-1 mengizinkan `tag` opsional dari allowlist, tetapi menambah kunci butuh kenaikan schemaVersion (AD-3), pemetaan render/codegen, korpus, dan UI. Usul: story skema berikutnya menambah `tag` (mis. `section|header|nav|main|footer|h1..h6|p|button|a|ul|li`) dan codegen memakainya sebagai nama elemen.
+- source_spec: `_bmad-output/implementation-artifacts/spec-kode-4-pixel-parity.md`
+  summary: Penemuan driver komponen (probe satu-flip + pewarisan driver kehadiran) belum terbukti lengkap untuk state anak yang hanya berubah oleh kombinasi dua prop gaya parent sekaligus (unverified, medium bila benar).
+  evidence: Review c4 (edge, vgap). Tidak ada dokumen konkret yang memicunya; state anak bergantung pada parent hanya lewat layout/gap negatif/scrollY, yang biasanya berubah oleh satu flip. Pemakaian di dokumen tetap benar karena dicek terhadap ekspansi (fallback inline). Penentu: fuzz master acak (≤ 64 kombinasi) yang membandingkan `evalComponent` dengan `expandInstances` untuk semua kombinasi.
+- source_spec: `_bmad-output/implementation-artifacts/spec-kode-4-pixel-parity.md`
+  summary: Fill `mesh` tidak diekspor codegen (dilewati dengan warning `mesh-fill`), sehingga board ber-mesh di canvas berbeda dari kode; uji paritas membuang mesh dari acuan.
+  evidence: Review c4 (intent). Keterbatasan sejak story 2 (README codegen). Usul: ekspor mesh sebagai lapisan gambar data URL (PNG mesh yang sama dengan render) atau `background-image` beraset, lalu hapus `withoutMeshFills` dari tes paritas.

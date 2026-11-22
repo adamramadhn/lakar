@@ -46,6 +46,7 @@ import {
 } from '../packages/codegen/src/index.ts';
 import { copyAs } from '../packages/viewer/src/copyas.ts';
 import { loadDocCorpus } from './support/doc-corpus.ts';
+import { DEFAULT_INSTANCE_ID, withDefaultInstance } from './support/parity.ts';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const TARGETS: readonly CodegenTarget[] = ['react-css', 'react-tailwind'];
@@ -90,7 +91,9 @@ const boards = (doc: LakarDocument) => doc.pages.flatMap((p) => p.children);
 
 /** Fixture komponen (master, instance ber-override, slot, row/absolute) khusus tes codegen. */
 const fixture = parseDocument(JSON.parse(readFileSync(join(root, 'tests', 'fixtures', 'codegen', 'komponen.lakar.json'), 'utf8'))) as LakarDocument;
-const docs = [...corpus, { label: 'komponen', doc: fixture }];
+/** Fixture paritas (spec kode-4): landing page bertoken + komponen, dan interaksi prop komponen. */
+const fixtureOf = (name: string) => parseDocument(JSON.parse(readFileSync(join(root, 'tests', 'fixtures', 'codegen', name), 'utf8'))) as LakarDocument;
+const docs = [...corpus, { label: 'komponen', doc: fixture }, { label: 'landing', doc: fixtureOf('landing.lakar.json') }, { label: 'interaksi', doc: fixtureOf('interaksi.lakar.json') }];
 
 /** Semua keluaran satu dokumen untuk satu target, digabung per board dengan pemisah berkas. `components:false` = story 2. */
 function bundle(doc: LakarDocument, target: CodegenTarget, components: boolean): string {
@@ -152,12 +155,18 @@ describe('codegen: komponen setara dengan inline (story 2)', () => {
       }
     };
     for (const p of doc.pages) for (const b of p.children) walk(b.children);
+    const masters = new Set(nodes.filter((id) => !boards(doc).some((b) => b.id === id)));
     for (const id of [...nodes, ...stored]) {
       const icons = glyphsFor(doc, id);
-      const inline = buildTree(doc, { nodeId: id, icons }, []).root;
+      // Ekspor master = komponen dengan props default; pembandingnya instance default master itu (spec kode-4),
+      // bukan master tersimpan (bind `visible`/nilai default tidak diterapkan pada master di canvas).
+      const inline = masters.has(id)
+        ? buildTree(withDefaultInstance(doc, id), { nodeId: DEFAULT_INSTANCE_ID, icons }, []).root
+        : buildTree(doc, { nodeId: id, icons }, []).root;
       expect(sameTree(effectiveTree(doc, id, icons), inline, false), id).toBe(true);
     }
-  });
+    // Fixture interaksi (spec kode-4) mengekspor ~30 instance, masing-masing membangun komponennya: > 5 s saat suite penuh paralel.
+  }, 60_000);
 });
 
 describe('codegen: fixture komponen', () => {

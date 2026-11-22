@@ -4,3 +4,4 @@ dist/
 coverage/
 bench/runs/
 packages/render/test/out/
+tests/.parity/
