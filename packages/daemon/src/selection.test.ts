@@ -225,6 +225,11 @@ describe('route seleksi', () => {
       // Tercatat di Activity sebagai tool get_selection.
       const calls = t.activity.recent().filter((e) => e.type === 'call' && e.call.tool === 'get_selection');
       expect(calls.length).toBeGreaterThan(0);
+      // Story 3: call selesai membawa dokumen yang dibaca, alamat primer (terakhir), dan jumlah alamat.
+      const done = calls.flatMap((e) => (e.type === 'call' && e.call.status === 'done' ? [e.call] : []));
+      expect(done.find((c) => c.slug === b.slug)).toMatchObject({ slug: b.slug, target: b.board, nodes: 1 });
+      expect(done.find((c) => c.slug === a.slug && c.nodes === 3)).toMatchObject({ target: `${frame}/Aaaaaaa1` });
+      expect(done.find((c) => c.slug === a.slug && c.nodes === 0)).not.toHaveProperty('target');
     } finally {
       failBoard = undefined;
       await t.app.close();

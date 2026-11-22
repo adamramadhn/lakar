@@ -8,6 +8,7 @@ import { callMeta, callTitle, harnessColor, harnessLabel, shortAgo, type Activit
 import { relativeTime } from './format';
 import { useNow } from './hooks';
 import { Icon, type IconName } from './icons';
+import { commitRow, selectionRead } from './liveChanges';
 
 const STATUS_ICON: Record<ActivityCall['status'], IconName> = { running: 'loaderCircle', done: 'circleCheck', warning: 'alert', error: 'circleX' };
 /** Baris yang ditampilkan per sesi. */
@@ -47,12 +48,44 @@ export function ToolCallRow({ call, now, nameOf, offline = false }: { call: Acti
   );
 }
 
-function SessionCard({ view, now, nameOf, offline }: { view: SessionView; now: number; nameOf: (id: string) => string | undefined; offline: boolean }) {
+/**
+ * Agent Commit Row (desain b53rG, bagian 06): call terbaru sesi berupa execute sukses ber-rev. Locate memilih node
+ * utama (atau board) call itu di canvas. Slide-in 180ms dari atas daftar.
+ */
+function AgentCommitRow({ call, meta, locate, now, nameOf, onLocate }: { call: ActivityCall; meta: string; locate: string | undefined; now: number; nameOf: (id: string) => string | undefined; onLocate?: ((id: string) => void) | undefined }) {
+  const at = Date.parse(call.startedAt) + (call.durationMs ?? 0);
+  return (
+    <div className={`agent-commit ${harnessColor(call.client)}`} title={shortAgo(at, now)}>
+      <span className="agent-commit-status">
+        <Icon name="gitCommit" size={14} />
+      </span>
+      <span className="tool-call-body">
+        <span className="tool-call-title">{callTitle(call, nameOf)}</span>
+        <span className="tool-call-meta">
+          <span className="agent-commit-tool">{call.tool}</span>
+          <span className="tool-call-detail">{meta}</span>
+        </span>
+      </span>
+      {locate && onLocate && (
+        <button type="button" className="agent-commit-locate" aria-label="Locate on canvas" title="Locate on canvas" onClick={() => onLocate(locate)}>
+          <Icon name="crosshair" size={13} />
+        </button>
+      )}
+    </div>
+  );
+}
+
+function SessionCard({ view, now, nameOf, offline, onLocate }: { view: SessionView; now: number; nameOf: (id: string) => string | undefined; offline: boolean; onLocate?: ((id: string) => void) | undefined }) {
   const [open, setOpen] = useState<boolean | undefined>(undefined);
   const { session, calls, live, lastCallAt } = view;
   const expanded = open ?? live;
   const color = harnessColor(session.client);
   const callCount = calls.length;
+  const commit = commitRow(calls[0]);
+  // Baris konteks (desain RIpNN "Context"): agen membaca seleksi pengguna lewat get_selection.
+  const read = selectionRead(view);
+  // Alamat komposit AD-12 (`instance/node`): nama dari segmen terakhir bila alamat utuhnya tidak dikenal.
+  const readName = read?.target ? (nameOf(read.target) ?? nameOf(read.target.split('/').pop()!)) : undefined;
   const subtitle = live
     ? `Started ${relativeTime(session.createdAt, now)} · ${callCount} call${callCount === 1 ? '' : 's'}`
     : lastCallAt !== undefined
@@ -78,12 +111,31 @@ function SessionCard({ view, now, nameOf, offline }: { view: SessionView; now: n
         </span>
         <Icon name={expanded ? 'chevronDown' : 'chevronRight'} size={14} className="session-chevron" />
       </button>
+      {expanded && read && (
+        <div className="session-context">
+          <Icon name="eye" size={13} />
+          <span className="session-context-text">
+            {harnessLabel(session.client)} read your selection {relativeTime(Date.parse(read.startedAt) + (read.durationMs ?? 0), now)}
+            {readName ? ':' : ''}
+          </span>
+          {readName && <strong>{readName}</strong>}
+          {readName && read.nodes !== undefined && read.nodes > 1 && <span className="session-context-text">+{read.nodes - 1}</span>}
+        </div>
+      )}
       {expanded && (
         <div className="session-calls">
           {calls.length === 0 ? (
             <div className="muted-note">No tool calls on this document yet.</div>
           ) : (
-            calls.slice(0, CALLS_SHOWN).map((c) => <ToolCallRow key={c.callId} call={c} now={now} nameOf={nameOf} offline={offline} />)
+            calls
+              .slice(0, CALLS_SHOWN)
+              .map((c, i) =>
+                i === 0 && commit ? (
+                  <AgentCommitRow key={`commit:${c.callId}`} call={c} meta={commit.meta} locate={commit.locate} now={now} nameOf={nameOf} onLocate={onLocate} />
+                ) : (
+                  <ToolCallRow key={c.callId} call={c} now={now} nameOf={nameOf} offline={offline} />
+                ),
+              )
           )}
           {/* Desain Waiting: sesi Live yang belum menjalankan execute pada file ini. */}
           {live && !offline && !calls.some((c) => c.tool === 'execute') && (
@@ -105,7 +157,10 @@ export function ActivityPanel({
   follow,
   onFollow,
   nameOf,
+  onLocate,
 }: {
+  /** Locate di Agent Commit Row: pilih node/board di canvas. */
+  onLocate?: (id: string) => void;
   views: SessionView[];
   connected: boolean;
   /** lakard tidak terjangkau (desain "Viewer — … — Offline"). */
@@ -133,7 +188,7 @@ export function ActivityPanel({
           <>
             <div className="section-label activity-label">LIVE SESSIONS</div>
             {views.map((v) => (
-              <SessionCard key={v.session.id} view={v} now={now} nameOf={nameOf} offline={offline} />
+              <SessionCard key={v.session.id} view={v} now={now} nameOf={nameOf} offline={offline} onLocate={onLocate} />
             ))}
           </>
         )}

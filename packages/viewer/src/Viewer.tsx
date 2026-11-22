@@ -29,6 +29,8 @@ import { actionState, EDIT_ACTIONS, nudgeNodes, nudgeOps, planAction, selectAllI
 import { EditMenu } from './EditMenu';
 import { EMPTY_STACKS, recordCommit, settleStep, takeStep, type UndoStacks } from './undoHistory';
 import { attachSelectionReporter } from './selectionSync';
+import { lastAgentLabel, pruneSelection, shareBadgeText, undoSkippedFor } from './liveChanges';
+import { UndoSkippedToast, type UndoSkipped } from './UndoSkippedToast';
 import { activityHub, editChange, goneReason, harnessLabel, revChange, sessionsForSlug, slugAppeared, type StreamEvent } from './activity';
 import { ActivityPanel } from './ActivityPanel';
 import { BottomSheet } from './BottomSheet';
@@ -298,6 +300,24 @@ export function Viewer({ slug }: { slug: string }) {
   const previewDoc = preview?.doc.state === 'ok' ? preview.doc.value : undefined;
   const shown = previewDoc ?? current;
   const index = useMemo(() => (shown ? indexDocument(shown) : new Map<string, NodeInfo>()), [shown]);
+  /** Indeks dokumen terkini (bukan pratinjau): pembersihan seleksi dan target undo (story 3). */
+  const latestIndex = useMemo(() => (current ? (shown === current ? index : indexDocument(current)) : undefined), [current, shown, index]);
+  const latestIndexRef = useRef(latestIndex);
+  latestIndexRef.current = latestIndex;
+  /** Nama node yang pernah terlihat jendela ini (nama node yang sudah dihapus agen untuk toast Undo skipped). */
+  const knownNames = useRef(new Map<string, string>());
+  const prevLatest = useRef<Map<string, NodeInfo> | undefined>(undefined);
+  // Dokumen terkini berganti: node yang hilang (dihapus agen/jendela lain) keluar dari seleksi (dan laporan get_selection).
+  useEffect(() => {
+    if (!latestIndex) return;
+    for (const [id, n] of latestIndex) knownNames.current.set(id, n.name);
+    // Pratinjau versi: tidak dipangkas; dokumen pembanding tetap, jadi node yang dihapus selama pratinjau dibuang sesudahnya.
+    if (previewDoc) return;
+    const prev = prevLatest.current;
+    prevLatest.current = latestIndex;
+    if (!prev || prev === latestIndex) return;
+    setSelection((sel) => pruneSelection(sel, (id) => prev.has(id), (id) => latestIndex.has(id)) as string[]);
+  }, [latestIndex, previewDoc]);
   /** Dokumen tampil ter-resolve (AD-10): nilai token untuk panel Design (swatch, detach). Resolve gagal → nilai tersimpan. */
   const resolvedShown = useMemo(() => {
     if (!shown) return undefined;
@@ -515,6 +535,8 @@ export function Viewer({ slug }: { slug: string }) {
 
   const now = useNow(5000);
   const views = useMemo(() => sessionsForSlug(activity, slug, now), [activity, slug, now]);
+  const viewsRef = useRef(views);
+  viewsRef.current = views;
   /**
    * Kehadiran agen (kursor, outline, baris Layers) tiap sesi Live pada dokumen ini. `now` (5 dtk) cukup untuk
    * jendela sorotan 10 dtk: pudarnya sendiri berjalan di CSS (`forwards`).
@@ -651,7 +673,7 @@ export function Viewer({ slug }: { slug: string }) {
       return api.applyOps(slug, ops, description).then(
         (r) => {
           editing.current--;
-          setStacks(recordCommit(stacks.current, r.inverse, description));
+          setStacks(recordCommit(stacks.current, r.inverse, description, Date.now()));
           loadDoc(true);
           return r;
         },
@@ -666,6 +688,11 @@ export function Viewer({ slug }: { slug: string }) {
     [slug, loadDoc, setToast, setStacks],
   );
   const commitOps = useCallback((ops: DocOp[], description: string): Promise<boolean> => applyEdit(ops, description).then((r) => r !== undefined), [applyEdit]);
+  /** Commit gestur canvas: rev commit (pratinjau ditahan sampai board di-mount dari rev itu), undefined bila gagal. */
+  const commitGesture = useCallback((ops: DocOp[], description: string): Promise<number | undefined> => applyEdit(ops, description).then((r) => r?.rev), [applyEdit]);
+  /** Toast "Undo skipped" (desain r69qO): entri undo/redo dibuang karena target sudah diubah/dihapus perubahan lain. */
+  const [undoSkipped, setUndoSkipped] = useState<UndoSkipped | undefined>(undefined);
+  const closeUndoSkipped = useCallback(() => setUndoSkipped(undefined), []);
   /** Undo atau redo: kirim op invers teratas; sukses → invers respons masuk tumpukan seberang, gagal → entri dibuang. */
   const stepHistory = useCallback(
     (dir: 'undo' | 'redo') => {
@@ -678,7 +705,7 @@ export function Viewer({ slug }: { slug: string }) {
       api.applyOps(slug, entry.ops, `${dir === 'undo' ? 'Undo' : 'Redo'} ${entry.label}`).then(
         (r) => {
           editing.current--;
-          setStacks(settleStep(stacks.current, dir, entry, { ok: true, inverse: r.inverse }));
+          setStacks(settleStep(stacks.current, dir, entry, { ok: true, inverse: r.inverse, at: Date.now() }));
           loadDoc(true);
         },
         (e) => {
@@ -686,7 +713,17 @@ export function Viewer({ slug }: { slug: string }) {
           // Invers ditolak daemon (4xx, mis. NOT_FOUND) → entri dibuang; offline/5xx → entri dikembalikan.
           const transient = !(e instanceof ApiError) || e.status >= 500;
           setStacks(settleStep(stacks.current, dir, entry, { ok: false, transient }));
-          setToast(`Couldn't ${dir}: ${errorText(e)}`);
+          // Ditolak permanen (4xx, mis. agen menghapus target, AD-8): toast desain "Undo skipped" (liveChanges.ts).
+          const skipped = undoSkippedFor(
+            dir,
+            entry.ops,
+            { transient, message: e instanceof ApiError ? e.message : undefined },
+            (id) => latestIndexRef.current?.has(id) ?? true,
+            (id) => knownNames.current.get(id),
+            lastAgentLabel(viewsRef.current, entry.at),
+          );
+          if (skipped) setUndoSkipped({ key: Date.now(), ...skipped });
+          else setToast(`Couldn't ${dir}: ${errorText(e)}`);
           loadDoc(true);
         },
       );
@@ -1032,6 +1069,15 @@ export function Viewer({ slug }: { slug: string }) {
     setSelectedId((sel) => (sel && index.get(sel)?.pageIndex !== i ? undefined : sel));
   };
   const hasLive = views.some((v) => v.live);
+  /** Locate di Agent Commit Row: pilih node lalu geser kamera ke board-nya bila belum terlihat (mekanisme Focus). */
+  const locate = (id: string) => {
+    const info = index.get(id);
+    if (!info || preview) return;
+    select(id);
+    setFocus({ boardId: info.boardId, nonce: Date.now() });
+  };
+  /** Badge "Selection shared with agents" (desain RIpNN): seleksi tidak kosong dan ada agen Live pada dokumen ini. */
+  const shareBadge = selection.length > 0 && !preview && !offline && hasLive ? shareBadgeText(selectedId ? index.get(selectedId)?.name : undefined, selection.length) : undefined;
   /** Rev terakhir tiap board berubah (≤ rev dokumen): PNG board lain dipakai ulang dari cache. */
   const onCanvasInsert = (kind: InsertKind, at: InsertPoint) => {
     beginInsert(canvasInsertTarget(kind, at, boards, page));
@@ -1143,7 +1189,15 @@ export function Viewer({ slug }: { slug: string }) {
         />
         <div className="layer-tree">
           <div className="section-header">
-            <span className="section-label">Layers</span>
+            <span className="section-header-left">
+              <span className="section-label">Layers</span>
+              {shareBadge && (
+                <span className="share-badge compact" title={shareBadge}>
+                  <Icon name="radio" size={10} />
+                  Shared
+                </span>
+              )}
+            </span>
             <AddLayerButton disabled={!editable} disabledReason={preview ? 'Not available while previewing a version' : 'lakard is offline'} hasBoard={boards.length > 0} onPick={onMenuInsert} />
           </div>
           {boards.length === 0 ? <div className="muted-note">No layers yet</div> : <LayerTree key={page?.id} nodes={boards} selectedId={selectedId} selectedIds={selection} selectedPath={selectedInfo} index={index} onSelect={select} onToggle={toggleSelect} onMenu={openLayerMenu} marks={preview ? undefined : marks} />}
@@ -1176,7 +1230,8 @@ export function Viewer({ slug }: { slug: string }) {
         onSelect={select}
         selection={selection}
         onSelectIds={selectIds}
-        onCommit={commitOps}
+        onCommit={commitGesture}
+        shareBadge={shareBadge}
         canUndo={editable && undoDepth.undo > 0}
         canRedo={editable && undoDepth.redo > 0}
         onUndo={undo}
@@ -1197,6 +1252,7 @@ export function Viewer({ slug }: { slug: string }) {
         }}
         overlay={
           <>
+            {undoSkipped && <UndoSkippedToast key={undoSkipped.key} toast={undoSkipped} onHistory={() => openTab('history')} onClose={closeUndoSkipped} />}
             {rollback && (
               <div key={rollback.key} className="rollback-toast canvas-overlay-ui" role="alert">
                 <Icon name="undo2" size={14} />
@@ -1228,7 +1284,7 @@ export function Viewer({ slug }: { slug: string }) {
             />
           )}
           {tab === 'checks' && <ChecksPanel checks={checks} index={index} selectedId={selectedId} onSelect={select} onRun={runChecks} hasBoards={d.pages.some((p) => p.children.length > 0)} />}
-          {tab === 'activity' && <ActivityPanel views={views} connected={activity.connected} offline={offline} follow={follow} onFollow={setFollow} nameOf={nameOf} />}
+          {tab === 'activity' && <ActivityPanel views={views} connected={activity.connected} offline={offline} follow={follow} onFollow={setFollow} nameOf={nameOf} onLocate={locate} />}
           {tab === 'history' && (
             <HistoryPanel
               slug={slug}

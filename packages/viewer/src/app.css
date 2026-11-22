@@ -3586,22 +3586,17 @@ button.panel-tab:hover {
 .agent-node-outline.working {
   animation: agent-pulse 1.6s ease-in-out infinite;
 }
-/* Just changed: fade + naik 8px (180ms, stagger 40ms dari inline delay), tampil 1.5 dtk, pudar 1.5 dtk. */
+/*
+ * Sorotan perubahan agen (story 3, motion card c8ILCm bagian 06): outline node berubah solid 2px + fill 8%, lalu pudar
+ * 1.5 dtk ease-out; node baru fade + naik 8px (180ms, stagger 40ms dari inline delay) lalu pudar.
+ */
 .agent-node-outline.changed {
-  animation: agent-changed 3.18s ease-out both;
+  border-width: 2px;
+  background: color-mix(in srgb, var(--who) 8%, transparent);
+  animation: agent-changed-fade 1.5s ease-out both;
 }
-.agent-badge {
-  position: absolute;
-  left: -1.5px;
-  bottom: calc(100% + 4px);
-  padding: 2px 6px;
-  border-radius: 4px;
-  background: var(--who);
-  color: #ffffff;
-  font-size: 10px;
-  font-weight: 600;
-  line-height: 14px;
-  white-space: nowrap;
+.agent-node-outline.changed.created {
+  animation: agent-changed 1.68s ease-out both;
 }
 @keyframes agent-pulse {
   0%,
@@ -3612,16 +3607,20 @@ button.panel-tab:hover {
     opacity: 0.4;
   }
 }
+@keyframes agent-changed-fade {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
 @keyframes agent-changed {
   0% {
     opacity: 0;
     transform: translateY(8px);
   }
-  5.66% {
-    opacity: 1;
-    transform: translateY(0);
-  }
-  52.8% {
+  10.7% {
     opacity: 1;
     transform: translateY(0);
   }
@@ -4088,8 +4087,11 @@ button.panel-tab:hover {
   .agent-outline {
     border-style: solid;
   }
-  /* Tanpa fade/rise/slide: sorotan tampil diam 3 dtk lalu hilang sekaligus. */
+  /* Tanpa fade/rise/slide: sorotan kanvas tampil diam 1.5 dtk lalu hilang sekaligus (story 3); titik Layers 3 dtk. */
   .agent-node-outline.changed,
+  .agent-node-outline.changed.created {
+    animation: agent-hide 1.5s step-end both;
+  }
   .layer-row.changed .layer-agent-dot {
     animation: agent-hide 3s step-end both;
   }
@@ -5036,6 +5038,249 @@ button.panel-tab:hover {
 .follow-chip {
   display: none;
 }
+/* ---- Agen di canvas (epic agen-di-canvas story 3, desain bagian 06 I4n2yl) ---- */
+/* Selection Share Badge (w6sUHr): canvas kiri atas dan versi ringkas "Shared" di header Layers. */
+.section-header-left {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.share-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px 4px 8px;
+  border-radius: 12px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 13px;
+  white-space: nowrap;
+}
+.share-badge svg {
+  flex: none;
+}
+.share-badge.compact {
+  padding: 2px 8px 2px 6px;
+}
+/* Posisi desain RGOYW: kiri 16, atas 66 (di bawah baris tombol Export). */
+.canvas-share-badge {
+  position: absolute;
+  top: 66px;
+  left: 16px;
+  z-index: 6;
+  max-width: calc(100% - 160px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+}
+.canvas-share-badge span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* Change Highlight Tag (u43MYm): "Just changed · Agen" menggantikan label board, "Added · nama" di node baru. */
+.change-tag {
+  --who: var(--agent);
+  position: absolute;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--who);
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 12px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.change-tag.codex,
+.agent-node-outline.codex .change-tag {
+  --who: var(--codex);
+}
+.agent-node-outline .change-tag {
+  --who: inherit;
+  background: var(--who);
+}
+.change-tag.in-node {
+  left: 4px;
+  top: 4px;
+}
+.change-tag.board-tag {
+  z-index: 1;
+  animation: change-tag-out 1.5s ease-out both;
+}
+.board-label.swapped {
+  animation: change-label-in 1.5s ease-out both;
+}
+@keyframes change-tag-out {
+  0%,
+  80% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes change-label-in {
+  0%,
+  80% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+/* Agent Commit Row (b53rG): commit agen terbaru di atas daftar call sesi. */
+.agent-commit {
+  --who: var(--agent);
+  --who-soft: var(--agent-soft);
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  border-left: 2px solid var(--who);
+  background: var(--who-soft);
+  animation: agent-commit-in 180ms ease-out;
+}
+.agent-commit.codex {
+  --who: var(--codex);
+  --who-soft: var(--codex-soft);
+}
+.agent-commit-status {
+  display: flex;
+  flex-shrink: 0;
+  padding-top: 1px;
+  color: var(--who);
+}
+.agent-commit-tool {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--who);
+}
+.agent-commit-locate {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 5px;
+  color: var(--text-secondary);
+}
+.agent-commit-locate:hover {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+@keyframes agent-commit-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+/* Baris konteks sesi (RIpNN "Context"): agen membaca seleksi pengguna. */
+.session-context {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--accent-soft);
+  color: var(--text-secondary);
+  font-size: 11px;
+  min-width: 0;
+}
+.session-context svg {
+  flex: none;
+  color: var(--accent);
+}
+.session-context strong {
+  overflow: hidden;
+  color: var(--text-primary);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Toast "Undo skipped" (r69qO): di bawah kanvas, naik 8px 200ms. */
+.undo-skipped {
+  position: absolute;
+  left: 50%;
+  bottom: 72px;
+  z-index: 8;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  width: min(440px, calc(100% - 32px));
+  box-sizing: border-box;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: var(--modal);
+  border: 1px solid var(--border);
+  box-shadow: 0 12px 32px #00000052;
+  transform: translateX(-50%);
+  animation: undo-skipped-in 200ms ease-out;
+}
+.undo-skipped-icon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  background: var(--agent-soft);
+  color: var(--agent);
+}
+.undo-skipped-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.undo-skipped-body strong {
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 600;
+}
+.undo-skipped-text {
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+.undo-skipped-actions {
+  display: flex;
+  gap: 14px;
+  padding-top: 6px;
+}
+.undo-skipped-actions .link-btn {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+.undo-skipped-actions .link-btn.accent {
+  color: var(--accent);
+}
+@keyframes undo-skipped-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 8px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .change-tag.board-tag {
+    animation: agent-hide 1.5s step-end both;
+  }
+  .board-label.swapped {
+    animation: change-label-in 1.5s step-end both;
+  }
+  .undo-skipped,
+  .agent-commit {
+    animation: none;
+  }
+}
+
 @media (max-width: 767.98px) {
   .follow-chip {
     position: absolute;
@@ -5106,6 +5351,8 @@ button.panel-tab:hover {
   }
   .viewer .history-rail {
     padding-top: 13px;
+  }
+}
 
 @media (max-width: 767.98px) {
   .main .section-label {

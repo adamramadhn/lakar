@@ -33,6 +33,7 @@ import {
   type ReorderTarget,
 } from './gesture';
 import { normalizeEditedText, textEditPlan } from './editActions';
+import { heldStatus, rebaseNodes, rebaseReorderNode, rebaseResize } from './liveChanges';
 import { Icon } from './icons';
 import { liveElement, measureBoard, pageGeometry } from './liveGeometry';
 import { CLICK_SLOP } from './sheet';
@@ -58,17 +59,22 @@ function styleSaver() {
 }
 type Saver = ReturnType<typeof styleSaver>;
 
-/** `mounts` = hitungan mount board tersentuh saat gestur mulai (mount ulang di tengah gestur membatalkannya). */
+/** `mounts` = hitungan mount board tersentuh saat gestur mulai (mount ulang di tengah gestur → rebase, story 3). */
 type Base = { pointer: number; c0: Point; p0: Point; moved: boolean; mounts?: Record<string, number> };
 type Gesture =
   | (Base & { kind: 'press'; picked: GeoNode; ids: string[]; collapse: string | undefined })
   | (Base & { kind: 'marquee'; p: Point; picked: GeoNode | undefined; candidates: GeoNode[]; base: string[]; shift: boolean })
   | (Base & { kind: 'move'; d: Point; nodes: GeoNode[]; saver: Saver })
   | (Base & { kind: 'reorder'; p: Point; node: GeoNode; container: GeoNode | undefined; target: ReorderTarget | undefined; saver: Saver; ghost: HTMLElement | undefined })
-  | (Base & { kind: 'resize'; handle: Handle; members: GeoNode[]; from: Box; to: Box; saver: Saver });
+  | (Base & { kind: 'resize'; handle: Handle; members: GeoNode[]; from: Box; to: Box; saver: Saver; p?: Point });
 
-/** Pratinjau yang ditahan sesudah commit: berlaku sampai semua board tersentuh di-mount ulang. */
-type Held = { mounts: Record<string, number>; boxes: Map<string, Box>; saver: Saver };
+/**
+ * Pratinjau yang ditahan sesudah commit (agen-di-canvas story 3): berlaku sampai setiap board tersentuh di-mount dari
+ * dokumen ber-rev ≥ `rev` commit (`heldStatus`). Mount ulang dari rev lebih lama (commit agen tiba duluan) →
+ * `apply` menerapkan ulang pratinjau ke DOM baru lewat `extra` (hanya elemen di shadow root, bukan host).
+ */
+type Held = { key: number; mounts: Record<string, number>; boxes: Map<string, Box>; saver: Saver; rev?: number; apply: (s: Saver) => void; extra?: Saver };
+let heldSeq = 0;
 
 /** Jarak waktu maksimal dua tekan sebagai dobel-klik. */
 const DOUBLE_MS = 400;
@@ -100,14 +106,18 @@ export function useCanvasEdit({
   canEdit: boolean;
   selection: readonly string[];
   onSelectIds: (ids: string[]) => void;
-  onCommit: ((ops: DocOp[], description: string) => Promise<boolean>) | undefined;
+  /** Commit satu gestur lewat route ops: rev commit baru, atau undefined bila gagal. */
+  onCommit: ((ops: DocOp[], description: string) => Promise<number | undefined>) | undefined;
 }) {
   const hosts = useRef(new Map<string, HTMLDivElement>());
   const [mounts, setMounts] = useState<Record<string, number>>({});
   const mountsRef = useRef(mounts);
   mountsRef.current = mounts;
-  const onMounted = useCallback((id: string, host: HTMLDivElement) => {
+  /** Rev dokumen yang terakhir di-mount per board (pelepasan pratinjau tertahan). */
+  const mountRevs = useRef<Record<string, number>>({});
+  const onMounted = useCallback((id: string, host: HTMLDivElement, rev?: number) => {
     hosts.current.set(id, host);
+    if (rev !== undefined) mountRevs.current = { ...mountRevs.current, [id]: rev };
     setMounts((m) => ({ ...m, [id]: (m[id] ?? 0) + 1 }));
   }, []);
   const [gesture, setGestureState] = useState<Gesture | null>(null);
@@ -116,7 +126,12 @@ export function useCanvasEdit({
     gRef.current = g;
     setGestureState(g);
   };
-  const [held, setHeld] = useState<Held | null>(null);
+  const [held, setHeldState] = useState<Held | null>(null);
+  const heldRef = useRef<Held | null>(null);
+  const setHeld = useCallback((h: Held | null) => {
+    heldRef.current = h;
+    setHeldState(h);
+  }, []);
   const [hover, setHover] = useState<string | undefined>(undefined);
   const lastDown = useRef<{ t: number; x: number; y: number } | undefined>(undefined);
   /** `startTextEdit` render terakhir (dipanggil tertunda dari dobel-klik). */
@@ -167,14 +182,26 @@ export function useCanvasEdit({
     return true;
   }, []);
 
-  // Board yang sedang digestur di-mount ulang (agen menulis): DOM pratinjau sudah diganti → gestur batal.
-  // Pratinjau tertahan dilepas begitu semua board tersentuh di-mount ulang.
+  // Board yang sedang digestur di-mount ulang (agen menulis, story 3): gestur di-rebase ke geometri baru (node dicari
+  // ulang per id, pratinjau diterapkan ulang), bukan dibatalkan; op dihitung saat dilepas dari nilai terbaru (AD-7).
+  // Pratinjau tertahan dilepas begitu board tersentuh di-mount dari rev commit; mount lebih lama → diterapkan ulang.
+  // Board yang sudah tidak ada di halaman (dihapus) dianggap selesai.
   useEffect(() => {
     const g = gRef.current;
-    if (g?.mounts && Object.entries(g.mounts).some(([b, n]) => (mounts[b] ?? 0) !== n)) cancel();
-    // Board yang sudah tidak ada di halaman (dihapus) dianggap selesai.
-    setHeld((h) => (h && Object.entries(h.mounts).every(([b, n]) => (mounts[b] ?? 0) !== n || !boards.some((x) => x.id === b)) ? null : h));
-  }, [mounts, boards, cancel]);
+    if (g?.mounts && Object.entries(g.mounts).some(([b, n]) => (mounts[b] ?? 0) !== n)) rebase(g);
+    const h = heldRef.current;
+    if (!h) return;
+    const status = heldStatus(h, mounts, mountRevs.current, new Set(boards.map((b) => b.id)));
+    if (status === 'release') {
+      h.extra?.restore();
+      setHeld(null);
+    } else if (status === 'reapply') {
+      h.extra?.restore();
+      const extra = styleSaver();
+      h.apply(extra);
+      setHeld({ ...h, extra, mounts: Object.fromEntries(Object.keys(h.mounts).map((b) => [b, mounts[b] ?? 0])) });
+    }
+  }, [mounts, boards, held]);
   useEffect(() => () => void cancel(), [cancel]);
 
   const mountsOf = (ids: readonly string[]): Record<string, number> => {
@@ -186,21 +213,73 @@ export function useCanvasEdit({
     return out;
   };
 
-  /** Commit satu gestur; pratinjau ditahan sampai mount ulang, dipulihkan bila gagal. */
-  const commit = (ops: DocOp[], description: string, ids: readonly string[], boxes: Map<string, Box>, saver: Saver) => {
+  /**
+   * Commit satu gestur; pratinjau ditahan sampai board tersentuh di-mount dari rev commit (`apply` menerapkannya ulang
+   * bila mount lebih lama tiba lebih dulu), dipulihkan bila gagal.
+   */
+  const commit = (ops: DocOp[], description: string, ids: readonly string[], boxes: Map<string, Box>, saver: Saver, apply: (s: Saver) => void) => {
     if (!ops.length || !onCommit) {
       saver.restore();
       return;
     }
     // Hanya board yang benar-benar diubah op (anggota tanpa op tidak memicu mount ulang).
     const opIds = new Set(ops.flatMap((o) => ('id' in o ? [o.id] : [])));
-    const h: Held = { mounts: mountsOf(ids.filter((id) => opIds.has(id))), boxes, saver };
-    setHeld(h);
-    void onCommit(ops, description).then((ok) => {
-      if (ok) return;
+    const key = ++heldSeq;
+    setHeld({ key, mounts: mountsOf(ids.filter((id) => opIds.has(id))), boxes, saver, apply });
+    void onCommit(ops, description).then((rev) => {
+      const cur = heldRef.current;
+      if (rev !== undefined) {
+        if (cur?.key === key) setHeld({ ...cur, rev });
+        return;
+      }
       saver.restore();
-      setHeld((cur) => (cur === h ? null : cur));
+      if (cur?.key === key) {
+        cur.extra?.restore();
+        setHeld(null);
+      }
     });
+  };
+
+  /** Gestur berjalan sesudah board-nya di-mount ulang: rebase ke geometri baru; tidak ada yang tersisa → batal. */
+  const rebase = (g: Gesture) => {
+    switch (g.kind) {
+      case 'move': {
+        const nodes = rebaseNodes(g.nodes, index, (n) => n.absolute);
+        if (!nodes.length) break;
+        g.saver.restore();
+        const next = { ...g, nodes, saver: styleSaver(), mounts: mountsOf(nodes.map((n) => n.id)) };
+        previewMove(next.nodes, next.d, next.saver);
+        setGesture(next);
+        return;
+      }
+      case 'resize': {
+        const r = rebaseResize(g.members, index, g.handle, g.moved && g.p ? { x: g.p.x - g.p0.x, y: g.p.y - g.p0.y } : undefined);
+        if (!r) break;
+        g.saver.restore();
+        const next = { ...g, ...r, saver: styleSaver(), mounts: mountsOf(r.members.map((n) => n.id)) };
+        if (next.moved) previewResize(next, next.to, next.saver, true);
+        setGesture(next);
+        return;
+      }
+      case 'reorder': {
+        const node = rebaseReorderNode(g.node, index);
+        if (!node) break;
+        g.saver.restore();
+        const saver = styleSaver();
+        dimNode(node.id, saver);
+        setGesture(updateReorder({ ...g, node, saver, mounts: mountsOf([node.id]) }, g.p));
+        return;
+      }
+      default:
+        break;
+    }
+    cancel();
+  };
+  /** Redupkan elemen asli node yang di-reorder (pratinjau). */
+  const dimNode = (id: string, saver: Saver) => {
+    const host = hostOf(id);
+    const el = host && liveElement(host, id);
+    if (el) saver.set(el, 'opacity', '0.35');
   };
 
   const hostOf = (id: string) => {
@@ -234,7 +313,7 @@ export function useCanvasEdit({
       if (el && section.current) {
         ghost = dragGhost(el, single.box);
         section.current.appendChild(ghost);
-        saver.set(el, 'opacity', '0.35');
+        dimNode(single.id, saver);
       }
       setGesture(updateReorder({ ...base, kind: 'reorder', p, node: single, container: undefined, target: undefined, saver, ghost, mounts: mountsOf([single.id]) }, p));
       return;
@@ -257,23 +336,23 @@ export function useCanvasEdit({
   };
 
   /** Pratinjau geser: elemen node absolute digeser lewat left/top (satuan board), board lewat kotak override. */
-  const previewMove = (g: Gesture & { kind: 'move' }, d: Point) => {
-    for (const n of g.nodes) {
+  const previewMove = (nodes: readonly GeoNode[], d: Point, saver: Saver) => {
+    for (const n of nodes) {
       if (n.type === 'board') continue;
       const host = hostOf(n.id);
       const el = host && liveElement(host, n.id);
       if (!el) continue;
-      g.saver.set(el, 'left', `${n.x + d.x}px`);
-      g.saver.set(el, 'top', `${n.y + d.y}px`);
+      saver.set(el, 'left', `${n.x + d.x}px`);
+      saver.set(el, 'top', `${n.y + d.y}px`);
     }
   };
-  const previewResize = (g: Gesture & { kind: 'resize' }, to: Box) => {
+  /** `withHost` false: hanya elemen di shadow root (penerapan ulang pratinjau tertahan; host milik React). */
+  const previewResize = (g: { members: readonly GeoNode[]; from: Box }, to: Box, s: Saver, withHost: boolean) => {
     for (const n of g.members) {
       const b = memberBox(g, n, to);
       const host = hostOf(n.id);
       const el = host && liveElement(host, n.id);
       if (!el) continue;
-      const s = g.saver;
       s.set(el, 'width', `${b.w}px`);
       s.set(el, 'height', `${b.h}px`);
       if (n.type !== 'board') {
@@ -284,7 +363,7 @@ export function useCanvasEdit({
           s.set(el, 'right', 'auto');
           s.set(el, 'bottom', 'auto');
         }
-      } else if (host) {
+      } else if (host && withHost) {
         s.set(host, 'width', `${b.w}px`);
         s.set(host, 'height', `${b.h}px`);
       }
@@ -298,6 +377,9 @@ export function useCanvasEdit({
   const boxOf = (id: string): Box | undefined => previewBoxes.get(id) ?? held?.boxes.get(id) ?? index.get(id)?.box;
   /** Kotak board yang sedang digeser/di-resize (atau tertahan sesudah commit). */
   const boardBox = (id: string): Box | undefined => previewBoxes.get(id) ?? held?.boxes.get(id);
+
+  /** Kandidat marquee dari geometri terkini (board bisa di-mount ulang oleh agen selama marquee): overlay = hasil lepas. */
+  const marqueeCandidates = (g: { picked: GeoNode | undefined }): GeoNode[] => (g.picked ? (index.get(g.picked.id)?.children ?? []) : geo);
 
   const onPointerDown = (e: ReactPointerEvent<HTMLElement>): boolean => {
     if (!active) return false;
@@ -382,7 +464,7 @@ export function useCanvasEdit({
         break;
       case 'move': {
         const d = { x: p.x - g.p0.x, y: p.y - g.p0.y };
-        previewMove(g, d);
+        previewMove(g.nodes, d, g.saver);
         setGesture({ ...g, d });
         break;
       }
@@ -391,8 +473,8 @@ export function useCanvasEdit({
         break;
       case 'resize': {
         const to = resizeBox(g.from, g.handle, p.x - g.p0.x, p.y - g.p0.y);
-        previewResize(g, to);
-        setGesture({ ...g, moved: true, to });
+        previewResize(g, to, g.saver, true);
+        setGesture({ ...g, moved: true, to, p });
         break;
       }
     }
@@ -416,14 +498,14 @@ export function useCanvasEdit({
           else if (!g.shift) onSelectIds([]);
           break;
         }
-        const hits = marqueeSelect(g.candidates, boxFrom(g.p0, g.p));
+        const hits = marqueeSelect(marqueeCandidates(g), boxFrom(g.p0, g.p));
         onSelectIds([...g.base, ...hits.filter((id) => !g.base.includes(id))]);
         break;
       }
       case 'move': {
         const ops = moveOps(g.nodes, g.d.x, g.d.y);
         const boxes = new Map(g.nodes.map((n) => [n.id, { ...n.box, x: n.box.x + g.d.x, y: n.box.y + g.d.y }] as const));
-        commit(ops, g.nodes.length === 1 ? `Move ${g.nodes[0]!.name}` : `Move ${g.nodes.length} layers`, g.nodes.map((n) => n.id), boxes, g.saver);
+        commit(ops, g.nodes.length === 1 ? `Move ${g.nodes[0]!.name}` : `Move ${g.nodes.length} layers`, g.nodes.map((n) => n.id), boxes, g.saver, (s) => previewMove(g.nodes, g.d, s));
         break;
       }
       case 'reorder': {
@@ -433,7 +515,7 @@ export function useCanvasEdit({
           break;
         }
         // Asli tetap redup sampai board di-mount ulang dengan urutan baru (tanpa lompat balik); gagal → dipulihkan.
-        commit([{ op: 'move', id: g.node.id, parentId: t.containerId, index: t.index }], `Reorder ${g.node.name}`, [g.node.id], new Map(), g.saver);
+        commit([{ op: 'move', id: g.node.id, parentId: t.containerId, index: t.index }], `Reorder ${g.node.name}`, [g.node.id], new Map(), g.saver, (s) => dimNode(g.node.id, s));
         break;
       }
       case 'resize': {
@@ -449,7 +531,7 @@ export function useCanvasEdit({
           const op = resizeOp(n, n.box, b);
           if (op) ops.push(op);
         }
-        commit(ops, g.members.length === 1 ? `Resize ${g.members[0]!.name}` : `Resize ${g.members.length} layers`, g.members.map((n) => n.id), boxes, g.saver);
+        commit(ops, g.members.length === 1 ? `Resize ${g.members[0]!.name}` : `Resize ${g.members.length} layers`, g.members.map((n) => n.id), boxes, g.saver, (s) => previewResize(g, g.to, s, false));
         break;
       }
     }
@@ -486,7 +568,7 @@ export function useCanvasEdit({
   // ---- Edit teks inline (story 6, desain "Text editing" UHOWY) ----
   // Elemen teks live di shadow root dijadikan contentEditable: tata letak, wrap, dan font persis sama dengan canvas.
   // Enter/blur = commit satu op `update {content}`; Shift+Enter = baris baru; Escape = batal (isi asli dipulihkan).
-  const textRef = useRef<{ id: string; name: string; board: string; mount: number; el: HTMLElement; host: HTMLElement; original: string; saver: Saver; style: HTMLStyleElement; abort: AbortController } | null>(null);
+  const textRef = useRef<{ id: string; name: string; board: string; mount: number; el: HTMLElement; host: HTMLElement; original: string; saver: Saver; style: HTMLStyleElement; abort: AbortController; latest: { text: string; br: boolean } } | null>(null);
   const [textId, setTextId] = useState<string | undefined>(undefined);
   const [, setTextTick] = useState(0);
   const onCommitRef = useRef(onCommit);
@@ -497,27 +579,30 @@ export function useCanvasEdit({
     textRef.current = null;
     setTextId(undefined);
     t.abort.abort();
-    const after = normalizeEditedText(t.el.innerText, t.el.lastChild?.nodeName === 'BR');
+    // Elemen sudah terlepas (board di-mount ulang oleh agen): pakai isi terakhir yang diketik (dicatat tiap input).
+    const src = t.el.isConnected ? { text: t.el.innerText, br: t.el.lastChild?.nodeName === 'BR' } : t.latest;
+    const after = normalizeEditedText(src.text, src.br);
     t.el.removeAttribute('contenteditable');
     t.el.removeAttribute('data-lakar-editing');
     t.saver.restore();
     t.style.remove();
     if (t.el.isConnected) t.el.ownerDocument.getSelection()?.removeAllRanges();
-    // Board di-mount ulang selama edit (agen menulis): elemen sudah diganti → batal tanpa request.
-    const plan = commitIt && t.el.isConnected ? textEditPlan(t.id, t.name, t.original, after) : undefined;
+    // Board di-mount ulang selama edit (agen menulis, story 3): teks yang sudah diketik di-commit di atas rev terbaru
+    // (AD-7), tidak dibuang; edit inline selesai karena elemennya sudah diganti.
+    const plan = commitIt ? textEditPlan(t.id, t.name, t.original, after) : undefined;
     const commitFn = onCommitRef.current;
     if (!plan || !commitFn) {
       t.el.textContent = t.original;
       return;
     }
     t.el.textContent = after;
-    void commitFn(plan.ops, plan.label).then((ok) => {
-      if (!ok && t.el.isConnected) t.el.textContent = t.original;
+    void commitFn(plan.ops, plan.label).then((rev) => {
+      if (rev === undefined && t.el.isConnected) t.el.textContent = t.original;
     });
   }, []);
   useEffect(() => {
     const t = textRef.current;
-    if (t && (mounts[t.board] ?? 0) !== t.mount) finishText(false);
+    if (t && (mounts[t.board] ?? 0) !== t.mount) finishText(true);
   }, [mounts, finishText]);
   useEffect(() => () => finishText(false), [finishText]);
 
@@ -567,10 +652,18 @@ export function useCanvasEdit({
     );
     el.addEventListener('keyup', (e) => e.stopPropagation(), { signal });
     el.addEventListener('pointerdown', (e) => e.stopPropagation(), { signal });
-    el.addEventListener('input', () => setTextTick((v) => v + 1), { signal });
+    el.addEventListener(
+      'input',
+      () => {
+        const cur = textRef.current;
+        if (cur?.el === el) cur.latest = { text: el.innerText, br: el.lastChild?.nodeName === 'BR' };
+        setTextTick((v) => v + 1);
+      },
+      { signal },
+    );
     // Jendela kehilangan fokus (alt-tab): edit tetap berjalan; fokus kembali ke teks saat jendela aktif lagi.
     el.addEventListener('blur', () => el.ownerDocument.hasFocus() && finishText(true), { signal });
-    textRef.current = { id, name: n.name, board, mount: mountsRef.current[board] ?? 0, el, host, original: el.textContent ?? '', saver, style, abort };
+    textRef.current = { id, name: n.name, board, mount: mountsRef.current[board] ?? 0, el, host, original: el.textContent ?? '', saver, style, abort, latest: { text: el.innerText, br: el.lastChild?.nodeName === 'BR' } };
     setTextId(id);
     el.focus({ preventScroll: true });
     el.ownerDocument.execCommand('selectAll');
@@ -602,7 +695,7 @@ export function useCanvasEdit({
     }
     if (marquee) {
       const rect = boxFrom(marquee.p0, marquee.p);
-      for (const id of marqueeSelect(marquee.candidates, rect)) {
+      for (const id of marqueeSelect(marqueeCandidates(marquee), rect)) {
         const b = boxOf(id);
         if (b) overlay.push(<div key={`mq:${id}`} className="edit-hover" style={scr(b)} />);
       }

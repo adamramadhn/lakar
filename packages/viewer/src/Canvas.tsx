@@ -180,8 +180,14 @@ function AgentLayer({ presence, boardById, cam }: { presence: readonly AgentPres
           const b = boardById.get(c.boardId);
           if (!b) return null;
           return (
-            <div key={`changed:${p.session}:${p.changedKey}:${c.id}`} className={`agent-node-outline ${p.color} changed`} style={{ ...nodeBox(b, c.rect, cam), animationDelay: `${i * 40}ms` }}>
-              {c.id === p.primary && <span className="agent-badge">Just changed</span>}
+            <div key={`changed:${p.session}:${p.changedKey}:${c.id}`} className={`agent-node-outline ${p.color} changed${c.created ? ' created' : ''}`} style={{ ...nodeBox(b, c.rect, cam), animationDelay: `${i * 40}ms` }}>
+              {/* Change Highlight Tag (desain u43MYm): node baru pertama → "Added · nama". */}
+              {p.added?.id === c.id && (
+                <span className="change-tag in-node">
+                  <Icon name="plus" size={10} />
+                  Added · {p.added.name}
+                </span>
+              )}
             </div>
           );
         }),
@@ -249,7 +255,7 @@ const BoardLive = memo(function BoardLive({
   board: CanvasBoard;
   zoom: number;
   /** Mount selesai (geometri seleksi/gestur diukur ulang). */
-  onMounted?: ((boardId: string, host: HTMLDivElement) => void) | undefined;
+  onMounted?: ((boardId: string, host: HTMLDivElement, rev: number) => void) | undefined;
 }) {
   const host = useRef<HTMLDivElement>(null);
   const [state, setState] = useState<{ mounted?: boolean; error?: string; partial?: boolean }>({});
@@ -283,7 +289,7 @@ const BoardLive = memo(function BoardLive({
       if (!current) return;
       mountLive(el, cur.doc, board.id, deps);
       setState({ mounted: true, ...(deps.complete ? {} : { partial: true }) });
-      onMountedRef.current?.(board.id, el);
+      onMountedRef.current?.(board.id, el, cur.doc.rev);
     })().catch((e) => current && setState({ error: errorText(e) }));
     return () => {
       current = false;
@@ -337,6 +343,7 @@ export function Canvas({
   sceneRef,
   onSceneChange,
   onContextMenu,
+  shareBadge,
 }: {
   /** Diisi Canvas: pohon geometri halaman untuk aksi edit (story 6). */
   sceneRef?: MutableRefObject<(() => GeoNode[]) | null>;
@@ -348,8 +355,10 @@ export function Canvas({
   selection?: readonly string[];
   /** Seleksi baru dari klik/Shift-klik/marquee di canvas live. */
   onSelectIds?: (ids: string[]) => void;
-  /** Commit satu gestur (geser/reorder/resize) lewat route ops; false = gagal (pratinjau dipulihkan). */
-  onCommit?: (ops: DocOp[], description: string) => Promise<boolean>;
+  /** Commit satu gestur (geser/reorder/resize/teks) lewat route ops: rev commit, atau undefined bila gagal (pratinjau dipulihkan). */
+  onCommit?: (ops: DocOp[], description: string) => Promise<number | undefined>;
+  /** Label badge "Selection shared with agents" di kiri atas (story 3); undefined = tidak tampil. */
+  shareBadge?: string | undefined;
   canUndo?: boolean;
   canRedo?: boolean;
   onUndo?: () => void;
@@ -745,11 +754,24 @@ export function Canvas({
         const left = cam.x + (ob?.x ?? b.x) * cam.z;
         const top = cam.y + (ob?.y ?? b.y) * cam.z;
         const selected = highlight?.boardId === b.id && !highlight.bounds;
+        // Board baru ditulis agen (story 3, desain iVbC4): label berganti tag "Just changed · Agen" selama 1.5 dtk.
+        const changedBy = preview ? undefined : presence?.find((p) => p.changedKey && p.changedBoards.includes(b.id));
         return (
           <div key={b.id}>
-            <div className={`board-label${highlight?.boardId === b.id ? ' active' : ''}`} data-board-label={b.id} style={{ left, top: top - 18, maxWidth: Math.max(40, bw * cam.z) }}>
+            <div
+              key={changedBy ? `label:${changedBy.session}:${changedBy.changedKey}` : 'label'}
+              className={`board-label${highlight?.boardId === b.id ? ' active' : ''}${changedBy ? ' swapped' : ''}`}
+              data-board-label={b.id}
+              style={{ left, top: top - 18, maxWidth: Math.max(40, bw * cam.z) }}
+            >
               {b.name}
             </div>
+            {changedBy && (
+              <div key={`tag:${changedBy.session}:${changedBy.changedKey}`} className={`change-tag board-tag ${changedBy.color}`} aria-hidden="true" style={{ left, top: top - 20 }}>
+                <Icon name="sparkles" size={10} />
+                Just changed · {changedBy.label}
+              </div>
+            )}
             <div className={`board${selected ? ' selected' : ''}`} data-board={b.id} style={{ left, top, width: bw * cam.z, height: bh * cam.z }}>
               {live && boardSource(live !== undefined, preview !== undefined) === 'live' ? (
                 <BoardLive live={live} board={b} zoom={cam.z} onMounted={edit.onMounted} />
@@ -806,6 +828,13 @@ export function Canvas({
         </div>
       )}
       {overlay}
+
+      {shareBadge && !preview && (
+        <div className="share-badge canvas-share-badge" role="status" title="Agents can read this selection with get_selection">
+          <Icon name="radio" size={12} />
+          <span>{shareBadge}</span>
+        </div>
+      )}
 
       {preview && <PreviewBanner preview={preview} />}
 

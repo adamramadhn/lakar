@@ -116,3 +116,15 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-editor-7-grid-layout.md`
   summary: Panel grid tidak menyunting jenis track (px/fr/auto/minmax) per kolom; jumlah kolom/baris saja, track baru `{fr:1}`/`auto`.
   evidence: Desain tidak memuat editor track. Usul: popover track per kolom bila desain menambahkannya.
+- source_spec: `_bmad-output/implementation-artifacts/spec-agen-3-live-changes.md`
+  summary: Wiring `useCanvasEdit` (rebase gestur saat board di-mount ulang oleh agen, pelepasan/penerapan ulang pratinjau tertahan per rev) tidak dieksekusi tes otomatis.
+  evidence: Viewer belum punya harness tes komponen/DOM; hanya helper murni (`liveChanges.test.ts`) dan smoke msedge. Usul: harness komponen atau skrip playwright di `scripts/` yang menggeser node selama execute agen.
+- source_spec: `_bmad-output/implementation-artifacts/spec-agen-3-live-changes.md`
+  summary: Efek pembersihan seleksi di `Viewer.tsx` (latestIndex/prevLatest) tidak dites di tingkat komponen.
+  evidence: Hanya `pruneSelection` murni yang dites; tanpa harness komponen (pra-ada).
+- source_spec: `_bmad-output/implementation-artifacts/spec-agen-3-live-changes.md`
+  summary: Gerbang render baru (badge Shared, commit row baris 0, tag board saat pratinjau) tidak punya tes render.
+  evidence: Helper turunannya dites; komponen viewer tanpa harness (pra-ada). Usul: pindahkan gerbang badge ke helper murni bila perlu dipin.
+- source_spec: `_bmad-output/implementation-artifacts/spec-agen-3-live-changes.md`
+  summary: Pratinjau tertahan sesudah commit yang tidak mengubah isi board (tanpa mount ulang) bertahan sampai mount berikutnya.
+  evidence: Pra-ada sejak editor story 4; gaya sementara bernilai sama dengan hasil commit. Usul: lepas juga saat dokumen ber-rev ≥ commit termuat dan tanda tangan board tidak berubah.

@@ -298,6 +298,15 @@ function finish(call: ActivityCall, statusCode: number, json: unknown): Activity
     case 'list_boards':
       if (Array.isArray(data.boards)) out.nodes = data.boards.length;
       break;
+    case 'get_selection': {
+      // Viewer menampilkan "… read your selection: {nama}" (agen-di-canvas story 3): dokumen yang benar-benar dibaca
+      // (fallback bisa berbeda dari dokumen aktif sesi), alamat primer (terakhir dipilih), dan jumlah alamat.
+      if (str(data.slug)) out.slug = str(data.slug);
+      const addresses = Array.isArray(data.addresses) ? data.addresses.filter((a): a is string => typeof a === 'string') : undefined;
+      if (addresses?.length) out.target = addresses[addresses.length - 1]!;
+      if (addresses) out.nodes = addresses.length;
+      break;
+    }
   }
   if (out.summary && out.summary.error + out.summary.warning > 0) out.status = 'warning';
   return out;
