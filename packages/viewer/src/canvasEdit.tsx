@@ -5,7 +5,7 @@
 // pratinjau lokal (gaya DOM sementara + overlay); satu `onCommit(ops)` di akhir gestur (AD-7). Escape membatalkan.
 // Sesudah commit pratinjau ditahan sampai board tersentuh di-mount ulang dari rev baru (tanpa lompat balik).
 // Hanya mouse/pen: pointer sentuh tidak masuk ke sini (Canvas mempertahankan pan/pinch/tap lama).
-import { useCallback, useEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode, type RefObject } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode, type RefObject } from 'react';
 import { findBoard } from '@lakar/render';
 import type { DocOp, ResolvedDocument } from '@lakar/schema';
 import {
@@ -37,6 +37,7 @@ import { heldStatus, rebaseNodes, rebaseReorderNode, rebaseResize } from './live
 import { Icon } from './icons';
 import { liveElement, measureBoard, pageGeometry } from './liveGeometry';
 import { CLICK_SLOP } from './sheet';
+import { instanceRootOf, isComposite, type ComponentInfo } from './componentModel';
 import type { Camera } from './viewState';
 
 export type EditBoard = { id: string; name: string; x: number; y: number; width: number; height: number };
@@ -92,7 +93,10 @@ export function useCanvasEdit({
   selection,
   onSelectIds,
   onCommit,
+  components,
 }: {
+  /** Info komponen dokumen tersimpan terkini (epic komponen story 4): penanda master/instance, tag, breadcrumb. */
+  components?: ComponentInfo | undefined;
   section: RefObject<HTMLElement | null>;
   cam: Camera;
   boards: readonly EditBoard[];
@@ -138,7 +142,11 @@ export function useCanvasEdit({
   const startTextRef = useRef<(id: string) => boolean>(() => false);
 
   // Geometri per board di-cache per mount + posisi/ukuran board (pan/zoom tidak mengukur ulang).
-  const cache = useRef(new Map<string, { key: string; geo: GeoNode | undefined }>());
+  const cache = useRef(new Map<string, { key: string; kinds: string; geo: GeoNode | undefined }>());
+  const kinds = components?.kinds;
+  // Tanda tangan isi (bukan identitas peta): `componentInfo` dibuat ulang tiap dokumen termuat, padahal penanda
+  // master/instance jarang berubah; tanpa ini setiap rev mengukur ulang semua board.
+  const kindsKey = useMemo(() => (kinds ? [...kinds].map(([id, k]) => `${id}:${k}`).join(',') : ''), [kinds]);
   const geometry = (): GeoNode[] => {
     if (!active || !doc) return [];
     // Board belum ter-mount: stub tanpa anak (pageGeometry), aksi board tetap tahu posisinya.
@@ -147,10 +155,11 @@ export function useCanvasEdit({
       const n = mounts[b.id] ?? 0;
       const key = `${n}:${b.x}:${b.y}:${b.width}:${b.height}`;
       let c = cache.current.get(b.id);
-      if (!c || c.key !== key) {
+      // Penanda master/instance ikut dokumen tersimpan (bisa berubah tanpa mount ulang): diukur ulang bila berganti.
+      if (!c || c.key !== key || c.kinds !== kindsKey) {
         const host = hosts.current.get(b.id);
         const rb = findBoard(doc, b.id);
-        c = { key, geo: host && rb && n > 0 ? measureBoard(host, rb, { x: b.x, y: b.y }) : undefined };
+        c = { key, kinds: kindsKey, geo: host && rb && n > 0 ? measureBoard(host, rb, { x: b.x, y: b.y }, kinds) : undefined };
         cache.current.set(b.id, c);
       }
       return c.geo;
@@ -302,6 +311,11 @@ export function useCanvasEdit({
     const base = { pointer: g.pointer, c0: g.c0, p0: g.p0, moved: true };
     const single = nodes.length === 1 ? nodes[0]! : undefined;
     if (single && !single.absolute && single.parentId) {
+      // Isi instance (alamat komposit, AD-12) tidak bisa dipindah urutannya: hanya di-update (override).
+      if (isComposite(single.id)) {
+        setGesture(null);
+        return;
+      }
       // Reorder di dalam grid belum didukung (ditunda): jangan sampai drop memindahkan anak grid ke leluhur flex.
       if (index.get(single.parentId)?.layout === 'grid') {
         setGesture(null);
@@ -733,11 +747,14 @@ export function useCanvasEdit({
         );
       }
     } else if (bound && members.length) {
-      if (members.length > 1) for (const m of members) overlay.push(<div key={`member:${m.id}`} className="edit-member" style={scr(m.b)} />);
+      // Seleksi master/instance saja: kotak, handle, dan badge ungu (desain xTIr4 "Selection" $component).
+      const tone = members.every((m) => kinds?.has(m.id)) ? 'component' : undefined;
+      if (members.length > 1) for (const m of members) overlay.push(<div key={`member:${m.id}`} className={`edit-member${tone ? ' component' : ''}`} style={scr(m.b)} />);
       overlay.push(
-        <SelectionBox key="selection" style={scr(bound)} handles={canEdit && !(gesture?.kind === 'move')} label={sizeBadge(members.length, bound)} />,
+        <SelectionBox key="selection" style={scr(bound)} handles={canEdit && !(gesture?.kind === 'move')} label={sizeBadge(members.length, bound)} tone={tone} />,
       );
     }
+    if (components && !reorder && !marquee) overlay.push(...componentMarks(components, selection, index, boxOf, scr, onSelectIds));
   }
 
   return {
@@ -761,13 +778,80 @@ export function useCanvasEdit({
   };
 }
 
+/** Tag komponen di atas node (desain Component Tag gNzrP): master = isi ungu, instance = latar `component-soft`. */
+function ComponentTag({ kind, label, at }: { kind: 'master' | 'instance'; label: string; at: { left: number; top: number } }) {
+  return (
+    <div className={`component-tag ${kind}`} style={{ left: at.left, top: at.top - 18 }}>
+      <Icon name={kind === 'master' ? 'component' : 'diamond'} size={10} />
+      <span>{label}</span>
+    </div>
+  );
+}
+
+/**
+ * Penanda komponen (desain bagian 08): master terpilih → tag master + tag di setiap instancenya; instance terpilih → tag
+ * instance; seleksi komposit (isi instance) → outline putus-putus + tag "<instance> · <master>" di instance terluar dan
+ * breadcrumb "Esc to exit instance" di kiri atas kanvas.
+ */
+function componentMarks(
+  info: ComponentInfo,
+  selection: readonly string[],
+  index: ReadonlyMap<string, GeoNode>,
+  boxOf: (id: string) => Box | undefined,
+  scr: (b: Box) => { left: number; top: number; width: number; height: number },
+  onSelectIds: (ids: string[]) => void,
+): ReactNode[] {
+  const out: ReactNode[] = [];
+  const masterName = (instanceId: string) => info.masterById.get(info.instances.get(instanceId)?.componentId as string)?.name ?? 'Component';
+  const tagged = new Set<string>();
+  const tag = (id: string, kind: 'master' | 'instance', label: string) => {
+    const b = boxOf(id);
+    if (!b || tagged.has(id)) return;
+    tagged.add(id);
+    out.push(<ComponentTag key={`tag:${id}`} kind={kind} label={label} at={scr(b)} />);
+  };
+  const roots = [...new Set(selection.filter(isComposite).map(instanceRootOf))];
+  for (const r of roots) {
+    const b = boxOf(r);
+    if (!b) continue;
+    out.push(<div key={`inst:${r}`} className="edit-instance-outline" style={scr(b)} />);
+    tag(r, 'instance', `${index.get(r)?.name ?? info.stored.get(r)?.name ?? ''} · ${masterName(r)}`);
+  }
+  for (const id of selection) {
+    const kind = info.kinds.get(id);
+    if (kind === 'instance') tag(id, 'instance', masterName(id));
+    else if (kind === 'master') {
+      const m = info.masterById.get(id);
+      tag(id, 'master', m?.name ?? '');
+      for (const i of m?.instances ?? []) tag(i, 'instance', m!.name);
+    }
+  }
+  const primary = selection[selection.length - 1];
+  if (primary && isComposite(primary) && index.has(primary)) {
+    const root = instanceRootOf(primary);
+    out.push(
+      <div key="instance-breadcrumb" className="instance-breadcrumb canvas-overlay-ui" role="navigation" aria-label="Instance">
+        <button type="button" className="instance-breadcrumb-root" title="Select instance" onClick={() => onSelectIds([root])}>
+          <Icon name="diamond" size={12} />
+          <span>{index.get(root)?.name ?? info.stored.get(root)?.name ?? root}</span>
+        </button>
+        <Icon name="chevronRight" size={12} className="instance-breadcrumb-sep" />
+        <span className="instance-breadcrumb-child">{index.get(primary)?.name}</span>
+        <i className="instance-breadcrumb-divider" aria-hidden="true" />
+        <span className="instance-breadcrumb-hint">Esc to exit instance</span>
+      </div>,
+    );
+  }
+  return out;
+}
+
 /** Kotak akhir anggota resize sebagaimana di-commit (`committedBox`): tunggal = kotak handle, multi = diskalakan. */
 const memberBox = (g: { members: readonly GeoNode[]; from: Box }, n: GeoNode, to: Box): Box => committedBox(n, g.members.length === 1 ? to : scaleBox(n.box, g.from, to));
 
 /** Kotak seleksi (desain "Selection"): garis 1.5px accent, 8 handle putih, badge ukuran di bawah. */
-export function SelectionBox({ style, handles, label }: { style: CSSProperties; handles: boolean; label: string }) {
+export function SelectionBox({ style, handles, label, tone }: { style: CSSProperties; handles: boolean; label: string; tone?: 'component' | undefined }) {
   return (
-    <div className="selection" style={style}>
+    <div className={`selection${tone ? ` ${tone}` : ''}`} style={style}>
       {HANDLES.map((h) => (
         <i key={h} className={`handle ${h}${handles ? ' active' : ''}`} data-handle={handles ? h : undefined} style={handles ? { cursor: HANDLE_CURSOR[h] } : undefined} />
       ))}

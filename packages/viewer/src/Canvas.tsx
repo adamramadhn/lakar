@@ -26,6 +26,7 @@ import { boardDepKeys, boardSignature, boardSource, ensureFaces, mountLive, Rend
 import { api, errorText } from './api';
 import { SelectionBox, useCanvasEdit } from './canvasEdit';
 import { INSERT_KINDS, type InsertKind } from './codegen';
+import { COMPONENT_DRAG_TYPE, exitInstanceSelection, type ComponentInfo } from './componentModel';
 import { ExportButton } from './ExportPopover';
 import type { GeoNode } from './gesture';
 import { useOffline, useRetry } from './hooks';
@@ -345,7 +346,13 @@ export function Canvas({
   onContextMenu,
   shareBadge,
   actions,
+  components,
+  onDropComponent,
 }: {
+  /** Info komponen dokumen tersimpan (epic komponen story 4): penanda master/instance dan tag di canvas live. */
+  components?: ComponentInfo | undefined;
+  /** Kartu Assets dilepas di canvas: id master dan titik halaman (koordinat dokumen). */
+  onDropComponent?: (componentId: string, at: Point) => void;
   /** Diisi Canvas: pohon geometri halaman untuk aksi edit (story 6). */
   sceneRef?: MutableRefObject<(() => GeoNode[]) | null>;
   /** Geometri `sceneRef` berubah (board di-mount ulang): pemanggil menghitung ulang ketersediaan aksi. */
@@ -443,7 +450,11 @@ export function Canvas({
     selection,
     onSelectIds: selectIds,
     onCommit,
+    components,
   });
+  /** Seleksi terkini untuk listener keyboard (Escape keluar dari isi instance). */
+  const selectionRef = useRef(selection);
+  selectionRef.current = selection;
   const cancelEdit = edit.cancel;
   if (sceneRef) sceneRef.current = edit.scene;
   const onSceneChangeRef = useRef(onSceneChange);
@@ -591,6 +602,12 @@ export function Canvas({
         // Gestur berjalan: hanya dibatalkan (seleksi tetap).
         if (cancelEdit()) return;
         setTool((t) => (isInsertTool(t) ? 'select' : t));
+        // Isi instance terpilih (alamat komposit, desain dQRib "Esc to exit instance"): naik ke instance terluar.
+        const exited = exitInstanceSelection(selectionRef.current);
+        if (exited) {
+          selectIds(exited);
+          return;
+        }
         onSelect(undefined);
       }
     };
@@ -604,7 +621,7 @@ export function Canvas({
       window.removeEventListener('keyup', up);
       window.removeEventListener('blur', blur);
     };
-  }, [fit, zoomAt, size, onSelect, canInsert, cancelEdit]);
+  }, [fit, zoomAt, size, onSelect, selectIds, canInsert, cancelEdit]);
 
   const onPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
     if ((e.target as HTMLElement).closest('.canvas-overlay-ui')) return;
@@ -739,6 +756,19 @@ export function Canvas({
         // Pratinjau versi (jalur PNG): menu dengan seleksi saat ini, item nonaktif (Viewer: tidak editable).
         const ids = liveActive ? edit.contextSelect(e.clientX, e.clientY) : [...selection];
         if (ids.length) onContextMenu(e.clientX, e.clientY, ids);
+      }}
+      // Kartu komponen dari Assets (desain C2xbUQ "Drag a component onto the canvas"): hanya canvas live yang bisa diedit.
+      onDragOver={(e) => {
+        if (!onDropComponent || !liveActive || !editable || !e.dataTransfer.types.includes(COMPONENT_DRAG_TYPE)) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'copy';
+      }}
+      onDrop={(e) => {
+        const id = e.dataTransfer.getData(COMPONENT_DRAG_TYPE);
+        if (!id || !onDropComponent || !liveActive || !editable) return;
+        e.preventDefault();
+        const r = e.currentTarget.getBoundingClientRect();
+        onDropComponent(id, { x: (e.clientX - r.left - cam.x) / cam.z, y: (e.clientY - r.top - cam.y) / cam.z });
       }}
     >
       {boards.length === 0 && !preview && (

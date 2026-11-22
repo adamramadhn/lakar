@@ -58,6 +58,14 @@ describe('measureBoard', () => {
     expect(g.children.map((c) => c.id)).toEqual(['FFFFFFFF', 'WWWWWWWW']);
     expect(measureBoard(fakeHost({}), board, { x: 0, y: 0 })).toBeUndefined();
   });
+  it('kinds (epic komponen story 4): node master/instance ditandai `component`, node lain tidak', () => {
+    const k = measureBoard(host, board, { x: board.x, y: board.y }, new Map([['FFFFFFFF', 'master' as const], ['CCCCCCCC', 'instance' as const]]))!;
+    const [f, w] = k.children as [NonNullable<typeof k>, NonNullable<typeof k>];
+    expect(f.component).toBe('master');
+    expect(w.children[1]!.component).toBe('instance');
+    expect(w.component).toBeUndefined();
+    expect(k.component).toBeUndefined();
+  });
 });
 
 describe('measureLiveSize', () => {

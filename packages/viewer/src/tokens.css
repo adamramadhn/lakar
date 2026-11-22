@@ -54,6 +54,9 @@
   --agent-soft: #f9731618;
   --codex: #0ea5e9;
   --codex-soft: #0ea5e918;
+  /* Komponen (desain bagian 08): master/instance, terpisah dari accent pengguna dan warna agen. */
+  --component: #9333ea;
+  --component-soft: #9333ea1a;
   --avatar: #16a34a;
   --danger: #dc2626;
   --danger-soft: #dc262614;
@@ -86,6 +89,8 @@
   --accent-soft: #3b82f633;
   --agent-soft: #f9731626;
   --codex-soft: #0ea5e926;
+  --component: #a855f7;
+  --component-soft: #a855f726;
   --danger: #f87171;
   --danger-soft: #f871711f;
   --warning: #eab308;

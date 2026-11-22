@@ -9,6 +9,10 @@
 // Aksi edit (editor-canvas story 6): hapus, group/ungroup, duplikat, urutan z, align/distribute, nudge, dan pilih
 // semua lewat shortcut, menu konteks (canvas + Layers), dan panel Design; satu permintaan route ops per aksi dengan
 // undo/redo dari op invers per jendela (editActions.ts, EditMenu.tsx).
+// Komponen (epic komponen story 4, desain bagian 08): Create component/Detach (menu konteks + shortcut), daftar komponen
+// di Assets (+ sisip, drag ke canvas), ikon master/instance di Layers (pohon dari dokumen ter-resolve sehingga isi
+// instance beralamat komposit bisa dipilih), dan panel Design untuk instance/isi instance (override + Reset), semuanya
+// lewat route ops dengan undo per jendela (componentModel.ts).
 // Kehadiran agen (aplikasi 5): `agentPresence` (presence.ts) dari stream → kursor + outline di Canvas dan state
 // baris Layers (agent / created / changed); disembunyikan saat pratinjau versi.
 // Kelola halaman (aplikasi 8): section Pages (PagesPanel.tsx) menambah/rename/mengurutkan/menghapus halaman lewat
@@ -24,7 +28,24 @@
 // Dashboard/Archive (`requestCloseTab`), bukan 404 mentah. Rename di jendela lain ditangani App (tab ikut pindah).
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { resolveDocument, type DocOp, type LakarDocument } from '@lakar/schema';
-import { toggleSelection, type GeoNode } from './gesture';
+import {
+  COMPONENT_DRAG_TYPE,
+  componentInfo,
+  componentTarget,
+  dropTarget,
+  effectiveNode,
+  instanceNode,
+  instanceRootOf,
+  instancesText,
+  instanceTarget,
+  isComposite,
+  overrideSummary,
+  resetAllOps,
+  type ComponentInfo,
+  type InsertTargetResult,
+} from './componentModel';
+import type { ComponentPanel } from './DesignPanel';
+import { indexGeo, toggleSelection, type GeoNode } from './gesture';
 import { actionState, EDIT_ACTIONS, nudgeNodes, nudgeOps, planAction, selectAllIds, selectionAfter, shortcutAction, type EditAction, type EditPlan } from './editActions';
 import { EditMenu } from './EditMenu';
 import { EMPTY_STACKS, recordCommit, settleStep, takeStep, type UndoStacks } from './undoHistory';
@@ -105,13 +126,19 @@ type Loaded<T> = { state: 'loading' } | { state: 'ok'; value: T } | { state: 'er
 
 type RawNode = Record<string, unknown> & { id: string; name: string; type: string; children?: RawNode[] };
 
-/** Node mentah dokumen berdasarkan id (untuk properti induk di Inspect). */
+/** Node mentah dokumen berdasarkan id (untuk properti induk di Inspect), termasuk isi slot instance (AD-12). */
 function findNode(doc: LakarDocument, id: string): RawNode | undefined {
   const walk = (nodes: readonly RawNode[]): RawNode | undefined => {
     for (const n of nodes) {
       if (n.id === id) return n;
       const hit = walk(n.children ?? []);
       if (hit) return hit;
+      if (n.type === 'instance' && n.slots) {
+        for (const list of Object.values(n.slots as Record<string, RawNode[]>)) {
+          const s = walk(list ?? []);
+          if (s) return s;
+        }
+      }
     }
     return undefined;
   };
@@ -120,6 +147,57 @@ function findNode(doc: LakarDocument, id: string): RawNode | undefined {
     if (hit) return hit;
   }
   return undefined;
+}
+
+/** `resolveDocument` (AD-10) sebagai dokumen mentah; gagal → undefined (pemanggil memakai dokumen tersimpan). */
+function tryResolve(doc: LakarDocument): LakarDocument | undefined {
+  try {
+    return resolveDocument(doc) as unknown as LakarDocument;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Kotak node relatif board dari geometri canvas live (isi instance tidak bisa diukur lewat /inspect): highlight node,
+ * bukan board, sehingga board tidak tampil terpilih.
+ */
+function sceneBounds(scene: readonly GeoNode[], id: string, boards: readonly { id: string; x: number; y: number }[]): [number, number, number, number] | undefined {
+  const idx = indexGeo(scene);
+  const n = idx.get(id);
+  if (!n) return undefined;
+  let root: GeoNode | undefined = n;
+  while (root?.parentId) root = idx.get(root.parentId);
+  const b = boards.find((x) => x.id === root?.id);
+  return b ? [n.box.x - b.x, n.box.y - b.y, n.box.w, n.box.h] : undefined;
+}
+
+/** Info komponen node primer untuk header/grup Instance panel Design. */
+function panelInfo(
+  info: ComponentInfo,
+  id: string,
+  index: ReadonlyMap<string, NodeInfo>,
+  doc: LakarDocument,
+  act: { goTo: (id: string) => void; detach: (id: string, name: string) => void; resetAll: (id: string, name: string) => void },
+): ComponentPanel | undefined {
+  const masterOf = (instanceId: string) => info.masterById.get(info.instances.get(instanceId)?.componentId as string);
+  if (isComposite(id)) {
+    const root = instanceRootOf(id);
+    return { kind: 'inside', instanceName: index.get(root)?.name ?? info.stored.get(root)?.name ?? root, masterName: masterOf(root)?.name ?? 'Component' };
+  }
+  const kind = info.kinds.get(id);
+  if (kind === 'master') return { kind: 'master', instances: info.masterById.get(id)?.instances.length ?? 0 };
+  if (kind !== 'instance') return undefined;
+  const inst = info.instances.get(id)!;
+  const master = masterOf(id);
+  return {
+    kind: 'instance',
+    masterName: master?.name ?? 'Missing component',
+    overrides: overrideSummary(inst, (key) => effectiveNode(doc, `${id}/${key}`)?.name),
+    onGoToMaster: () => master && act.goTo(master.id),
+    onDetach: () => act.detach(id, inst.name),
+    onResetAll: () => act.resetAll(id, inst.name),
+  };
 }
 
 /** Node rect dengan fill gambar: ikon Image di Layers/Assets (desain "Visual"). */
@@ -215,6 +293,8 @@ export function Viewer({ slug }: { slug: string }) {
   const [sheet, setSheet] = useState<SheetState>('half');
   /** Tab panel kiri (desain "Panel Tabs": Layers | Assets). */
   const [leftTab, setLeftTab] = useState<'layers' | 'assets'>('layers');
+  /** Pencarian komponen di tab Assets (desain C2xbUQ "Search components"). */
+  const [assetQuery, setAssetQuery] = useState('');
   /** Menu file dari chevron di header file. */
   const [fileMenu, setFileMenu] = useState<{ x: number; y: number } | undefined>(undefined);
   /** Ringkasan History untuk keterangan header file. */
@@ -307,9 +387,17 @@ export function Viewer({ slug }: { slug: string }) {
   /** Dokumen yang tampil: versi pratinjau bila sudah termuat, selain itu terkini. */
   const previewDoc = preview?.doc.state === 'ok' ? preview.doc.value : undefined;
   const shown = previewDoc ?? current;
-  const index = useMemo(() => (shown ? indexDocument(shown) : new Map<string, NodeInfo>()), [shown]);
+  /** Dokumen tampil ter-resolve (AD-10): nilai token untuk panel Design (swatch, detach). Resolve gagal → nilai tersimpan. */
+  const resolvedShown = useMemo(() => (shown ? tryResolve(shown) : undefined), [shown]);
+  const resolvedCurrent = useMemo(() => (current ? (current === shown ? resolvedShown : tryResolve(current)) : undefined), [current, shown, resolvedShown]);
+  // Indeks dari dokumen ter-resolve (epic komponen story 4): isi instance (alamat komposit) dan isi slot dikenal
+  // seleksi, Layers, dan halaman. Resolve gagal → dokumen tersimpan.
+  const index = useMemo(() => (shown ? indexDocument(resolvedShown ?? shown) : new Map<string, NodeInfo>()), [shown, resolvedShown]);
   /** Indeks dokumen terkini (bukan pratinjau): pembersihan seleksi dan target undo (story 3). */
-  const latestIndex = useMemo(() => (current ? (shown === current ? index : indexDocument(current)) : undefined), [current, shown, index]);
+  const latestIndex = useMemo(() => (current ? (shown === current ? index : indexDocument(resolvedCurrent ?? current)) : undefined), [current, shown, index, resolvedCurrent]);
+  /** Master/instance dokumen tampil (Layers, Assets, panel Design) dan terkini (penanda canvas live). */
+  const components = useMemo(() => (shown ? componentInfo(shown) : undefined), [shown]);
+  const latestComponents = useMemo(() => (current ? (current === shown ? components : componentInfo(current)) : undefined), [current, shown, components]);
   const latestIndexRef = useRef(latestIndex);
   latestIndexRef.current = latestIndex;
   /** Nama node yang pernah terlihat jendela ini (nama node yang sudah dihapus agen untuk toast Undo skipped). */
@@ -326,15 +414,6 @@ export function Viewer({ slug }: { slug: string }) {
     if (!prev || prev === latestIndex) return;
     setSelection((sel) => pruneSelection(sel, (id) => prev.has(id), (id) => latestIndex.has(id)) as string[]);
   }, [latestIndex, previewDoc]);
-  /** Dokumen tampil ter-resolve (AD-10): nilai token untuk panel Design (swatch, detach). Resolve gagal → nilai tersimpan. */
-  const resolvedShown = useMemo(() => {
-    if (!shown) return undefined;
-    try {
-      return resolveDocument(shown) as unknown as LakarDocument;
-    } catch {
-      return undefined;
-    }
-  }, [shown]);
   /** Font terpasang di lakard untuk Typography (GET /viewer/fonts); dimuat saat tab Design dibuka, dicoba lagi saat Retry/koneksi pulih (`attempt`). */
   const [fonts, setFonts] = useState<FontFamily[]>([]);
   const needFonts = tab === 'design' && fonts.length === 0;
@@ -594,7 +673,8 @@ export function Viewer({ slug }: { slug: string }) {
   // Inspect node terpilih: properti tersimpan + bounds terukur (POST /inspect).
   useEffect(() => {
     // Pratinjau: properti terukur hanya ada untuk versi terkini, jadi Inspect menampilkan data JSON versi itu saja.
-    if (!selectedId || preview) {
+    // Isi instance (alamat komposit): POST /inspect hanya menerima ID tersimpan (route lama, AD-4).
+    if (!selectedId || preview || isComposite(selectedId)) {
       setInspect(undefined);
       return;
     }
@@ -956,6 +1036,51 @@ export function Viewer({ slug }: { slug: string }) {
     setEditMenu({ x, y, ids });
   }, []);
 
+  // ---- Komponen (epic komponen story 4): sisip instance dari Assets, Reset all, Detach dari panel Design ----
+  const latestComponentsRef = useRef(latestComponents);
+  latestComponentsRef.current = latestComponents;
+  /** Sisip instance master `masterId` (Assets `+` atau drop): satu permintaan `add`, seleksi = instance baru. */
+  const insertInstance = useCallback(
+    (masterId: string, target: InsertTargetResult) => {
+      if (!editableRef.current || editing.current > 0) return;
+      if ('error' in target) {
+        setToast(target.error);
+        return;
+      }
+      const m = latestComponentsRef.current?.masterById.get(masterId);
+      if (!m) return;
+      void applyEdit([{ op: 'add', parentId: target.parentId, node: instanceNode(m, target.at), ref: 'instance' }], `Insert ${m.name}`).then((r) => {
+        const id = r?.refs.instance;
+        if (!id) return;
+        pendingSelect.current = id;
+        setSelection([id]);
+      });
+    },
+    [applyEdit, setToast],
+  );
+  /**
+   * Detach dari tombol grup Instance: op dibangun dari id tersimpan (bukan geometri canvas, yang bisa belum terukur),
+   * seleksi = node hasil detach.
+   */
+  const detachInstance = useCallback(
+    (instanceId: string, name: string) => {
+      if (!editableRef.current || editing.current > 0) return;
+      void applyEdit([{ op: 'detach', id: instanceId, ref: 'det0' }], `Detach ${name}`).then((r) => {
+        const id = r?.refs.det0;
+        if (id) setSelection([id]);
+      });
+    },
+    [applyEdit],
+  );
+  /** Reset all (grup Instance): buang seluruh override instance dalam satu permintaan. */
+  const resetAllOverrides = useCallback(
+    (instanceId: string, name: string) => {
+      if (!editableRef.current || editing.current > 0) return;
+      void applyEdit(resetAllOps(instanceId), `Reset overrides on ${name}`);
+    },
+    [applyEdit],
+  );
+
   if (gone || (doc.state === 'error' && doc.notFound)) {
     const archived = gone === 'archived' || (!gone && inArchive);
     return (
@@ -1031,9 +1156,11 @@ export function Viewer({ slug }: { slug: string }) {
   const highlight: Highlight | undefined =
     selectedInfo && inspect?.state === 'ok' && inspect.value.node.id === selectedId && inspect.value.node.bounds
       ? { boardId: inspect.value.boardId, bounds: inspect.value.node.bounds }
-      : selectedInfo
-        ? { boardId: selectedInfo.boardId }
-        : undefined;
+      : selectedInfo && selectedId && isComposite(selectedId)
+        ? { boardId: selectedInfo.boardId, bounds: sceneBounds(sceneRef.current?.() ?? [], selectedId, boards) ?? [0, 0, 0, 0] }
+        : selectedInfo
+          ? { boardId: selectedInfo.boardId }
+          : undefined;
   const summary = checks?.state === 'ok' ? checks.value.summary : undefined;
   /** Marker temuan per node (level terberat menang); disembunyikan saat pratinjau versi. */
   const markers: CanvasMarker[] = [];
@@ -1058,19 +1185,36 @@ export function Viewer({ slug }: { slug: string }) {
     tab === 'design'
       ? selection.flatMap((id) => {
           const info = index.get(id);
-          const n = findNode(d, id);
+          // Instance dan isi instance (epic komponen story 4): node efektif hasil ekspansi dengan ref token utuh
+          // (`expandedNodeAt`), jadi edit panel menjadi override di core (AD-12).
+          const inInstance = isComposite(id) || components?.kinds.get(id) === 'instance';
+          const ct = inInstance && components ? componentTarget(d, components, id) : undefined;
+          const n = inInstance ? ct?.stored : findNode(d, id);
           if (!info || !n) return [];
-          const parentLayout = parentLayoutOf(info.type, info.parentId ? findNode(d, info.parentId) : undefined);
+          // Parent dari dokumen ter-resolve: parent isi instance/slot adalah alamat komposit (layout tidak bertoken).
+          const parentRaw = info.parentId ? ((resolvedShown && findNode(resolvedShown, info.parentId)) ?? findNode(d, info.parentId)) : undefined;
+          const parentLayout = parentLayoutOf(n.type, parentRaw);
           const r = resolvedShown ? findNode(resolvedShown, id) : undefined;
           const mode = effectiveMode(findNode(d, info.boardId), d.tokenModes);
-          return [{ id, type: n.type, name: n.name, stored: n, resolved: r ?? n, parentLayout, measured: measureLiveSize(document, info.boardId, id), mode }];
+          return [{ id, type: n.type, name: n.name, stored: n, resolved: r ?? n, parentLayout, measured: measureLiveSize(document, info.boardId, id), mode, overrides: ct?.overrides }];
         })
       : [];
+  /** Header dan grup Instance panel Design untuk seleksi tunggal master/instance/isi instance. */
+  const componentPanel: ComponentPanel | undefined =
+    tab === 'design' && selection.length === 1 && selectedId && components ? panelInfo(components, selectedId, index, d, {
+      goTo: (id) => locate(id),
+      detach: detachInstance,
+      resetAll: resetAllOverrides,
+    }) : undefined;
   const docHasBoards = d.pages.some((p) => p.children.length > 0);
   const meta = previewDoc
     ? `Previewing rev ${d.rev} · latest ${latestDoc.rev}`
     : fileMeta(histInfo, latestDoc.pages.reduce((n, p) => n + p.children.length, 0), loadedAt, (t) => relativeTime(t, now), harnessLabel);
   const assets = leftTab === 'assets' ? collectAssets(d) : [];
+  const q = assetQuery.trim().toLowerCase();
+  const masters = leftTab === 'assets' ? (components?.masters ?? []).filter((m) => !q || m.name.toLowerCase().includes(q)) : [];
+  /** Pohon Layers dari dokumen ter-resolve (isi instance bisa dibuka); resolve gagal → board tersimpan. */
+  const treeBoards = ((resolvedShown?.pages.find((p) => p.id === page?.id)?.children ?? page?.children ?? []) as unknown as TreeNode[]);
   /** Pilih halaman dari Pages: seleksi di halaman lain dilepas (Inspect tidak menampilkan node yang tidak terlihat). */
   const choosePage = (id: string) => {
     setPageId(id);
@@ -1154,8 +1298,71 @@ export function Viewer({ slug }: { slug: string }) {
         </div>
         {leftTab === 'assets' ? (
           <div className="layer-tree assets">
+            {/* Komponen lokal (epic komponen story 4, desain C2xbUQ): klik = pilih master, + = sisip instance, drag = drop ke canvas. */}
+            <div className="assets-components">
+              <label className="assets-search">
+                <Icon name="search" size={13} />
+                <input type="search" placeholder="Search components" aria-label="Search components" value={assetQuery} onChange={(e) => setAssetQuery(e.currentTarget.value)} />
+              </label>
+              <div className="assets-group-header">
+                <span className="label">Local components</span>
+                <span>{components?.masters.length ?? 0}</span>
+              </div>
+              {masters.length === 0 ? (
+                <div className="muted-note">{components?.masters.length ? 'No components match your search.' : 'No components yet. Select layers and choose Create component.'}</div>
+              ) : (
+                masters.map((m) => (
+                  <div
+                    key={m.id}
+                    role="button"
+                    tabIndex={0}
+                    className={`component-card${m.id === selectedId ? ' selected' : ''}`}
+                    draggable={editable && !preview}
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData(COMPONENT_DRAG_TYPE, m.id);
+                      e.dataTransfer.effectAllowed = 'copy';
+                    }}
+                    onClick={() => select(m.id)}
+                    onKeyDown={(e) => {
+                      if (e.target !== e.currentTarget) return;
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        select(m.id);
+                      }
+                    }}
+                  >
+                    <span className="component-card-thumb">
+                      <Icon name="component" size={13} />
+                    </span>
+                    <span className="component-card-info">
+                      <strong>{m.name}</strong>
+                      <span>
+                        {instancesText(m.instances.length)} · {m.boardName}
+                      </span>
+                    </span>
+                    <button
+                      type="button"
+                      className="component-card-insert"
+                      title={editable ? `Insert ${m.name}` : preview ? 'Not available while previewing a version' : 'lakard is offline'}
+                      aria-label={`Insert ${m.name}`}
+                      disabled={!editable}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (latestComponents) insertInstance(m.id, instanceTarget(latestComponents, m.id, selectedId, boards[0]?.id));
+                      }}
+                    >
+                      <Icon name="plus" size={12} />
+                    </button>
+                  </div>
+                ))
+              )}
+              <div className="assets-hint">
+                <Icon name="mousePointerClick" size={13} />
+                <span>Drag a component onto the canvas, or click + to insert an instance into the selected frame.</span>
+              </div>
+            </div>
             <div className="section-header">
-              <span className="section-label">Assets</span>
+              <span className="section-label">Images &amp; icons</span>
             </div>
             {assets.length === 0 ? (
               <div className="muted-note">No assets yet. Images and icons added to this file show up here.</div>
@@ -1209,7 +1416,7 @@ export function Viewer({ slug }: { slug: string }) {
             </span>
             <AddLayerButton disabled={!editable} disabledReason={preview ? 'Not available while previewing a version' : 'lakard is offline'} hasBoard={boards.length > 0} onPick={onMenuInsert} />
           </div>
-          {boards.length === 0 ? <div className="muted-note">No layers yet</div> : <LayerTree key={page?.id} nodes={boards} selectedId={selectedId} selectedIds={selection} selectedPath={selectedInfo} index={index} onSelect={select} onToggle={toggleSelect} onMenu={openLayerMenu} marks={preview ? undefined : marks} />}
+          {boards.length === 0 ? <div className="muted-note">No layers yet</div> : <LayerTree key={page?.id} nodes={treeBoards} kinds={components?.kinds} selectedId={selectedId} selectedIds={selection} selectedPath={selectedInfo} index={index} onSelect={select} onToggle={toggleSelect} onMenu={openLayerMenu} marks={preview ? undefined : marks} />}
         </div>
           </>
         )}
@@ -1249,6 +1456,8 @@ export function Viewer({ slug }: { slug: string }) {
         sceneRef={sceneRef}
         onSceneChange={onSceneChange}
         onContextMenu={(x, y, ids) => setEditMenu({ x, y, ids })}
+        components={latestComponents}
+        onDropComponent={(id, at) => latestComponents && insertInstance(id, dropTarget(latestComponents, id, sceneRef.current?.() ?? [], at))}
         onOpenChecks={() => openTab('checks')}
         preview={canvasPreview}
         editable={editable}
@@ -1293,6 +1502,7 @@ export function Viewer({ slug }: { slug: string }) {
               onCommit={commitOps}
               tokenModes={d.tokenModes}
               tokens={d.tokens}
+              component={componentPanel}
               align={designTargets.length > 1 ? { enabled: editable ? actionState(sceneRef.current?.() ?? [], selection) : NO_ACTIONS, run: (a) => runAction(a) } : undefined}
             />
           )}
@@ -1381,7 +1591,10 @@ function LayerTree({
   onToggle,
   onMenu,
   marks,
+  kinds,
 }: {
+  /** Master/instance tersimpan (epic komponen story 4): ikon component/diamond ungu. */
+  kinds?: ReadonlyMap<string, 'master' | 'instance'> | undefined;
   /** Klik kanan baris: menu aksi edit (story 6) di (x, y). */
   onMenu?: (id: string, x: number, y: number) => void;
   nodes: TreeNode[];
@@ -1424,6 +1637,7 @@ function LayerTree({
     const m = marks?.get(n.id);
     const mark = m?.mark;
     const markClass = m ? ` ${m.mark}${m.color === 'codex' ? ' codex' : ''}` : '';
+    const kind = kinds?.get(n.id.slice(n.id.lastIndexOf('/') + 1));
     rows.push(
       <div
         key={n.id}
@@ -1457,7 +1671,12 @@ function LayerTree({
         >
           {kids.length > 0 && <Icon name={isOpen ? 'chevronDown' : 'chevronRight'} size={12} />}
         </span>
-        <Icon name={isImageNode(n) ? 'image' : (NODE_ICON[n.type] ?? 'square')} size={13} className="type-icon" />
+        {/* Instance bersarang di dalam instance tampil beralamat komposit `I/J`: segmen terakhir = id tersimpan J. */}
+        {kind ? (
+          <Icon name={kind === 'master' ? 'component' : 'diamond'} size={13} className="type-icon component" />
+        ) : (
+          <Icon name={isImageNode(n) ? 'image' : (NODE_ICON[n.type] ?? 'square')} size={13} className="type-icon" />
+        )}
         <span className="layer-label">{n.name}</span>
         {/* Kunci per execute: execute berikutnya pada node yang sama memutar ulang pudar titik. */}
         {(mark === 'agent' || mark === 'changed') && <i key={m?.key ?? mark} className="layer-agent-dot" aria-hidden="true" />}

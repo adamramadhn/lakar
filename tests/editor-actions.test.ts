@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 import type { DocOp, LakarDocument } from '../packages/schema/src/index.ts';
 import { applyOps, beginTransaction, createDocument, transact } from '../packages/core/src/index.ts';
 import { planAction, textEditPlan, type EditAction, type EditPlan } from '../packages/viewer/src/editActions.ts';
+import { componentInfo, instanceNode, instanceTarget, overrideEntry, resetAllOps, resetGroupOps } from '../packages/viewer/src/componentModel.ts';
 import type { Box, GeoNode } from '../packages/viewer/src/gesture.ts';
 
 const seeded = (seed: number) => {
@@ -161,5 +162,56 @@ describe('aksi edit lewat applyOps core', () => {
     const redone = await run(undone.doc, undone.inverse);
     expect(find(redone.doc, ids.a)).toBeUndefined();
     expect(find(redone.doc, ids.r1)).toMatchObject({ width: 222 });
+  });
+});
+
+// Komponen di viewer (epic komponen story 4): Create component, sisip instance, override + reset, dan detach dari
+// componentModel.ts/editActions.ts lewat `applyOps` core, masing-masing satu commit dengan invers yang persis.
+describe('aksi komponen lewat applyOps core', () => {
+  it('create component dari frame, sisip instance, override, reset grup/all, detach', async () => {
+    const { doc, ids, scene } = fixture();
+    const created = await roundTrip(doc, planOf('create-component', scene, [ids.f]));
+    expect(find(created.doc, ids.f)).toMatchObject({ component: { props: [], slots: [] } });
+
+    const target = instanceTarget(componentInfo(created.doc), ids.f, ids.b1, undefined);
+    expect(target).toEqual({ parentId: ids.b1 });
+    if ('error' in target) throw new Error(target.error);
+    const inserted = await roundTrip(created.doc, { ops: [{ op: 'add', parentId: target.parentId, node: instanceNode({ id: ids.f, name: 'F' }), ref: 'instance' }], label: 'Insert F' });
+    const inst = inserted.value.refs.instance!;
+    expect(find(inserted.doc, inst)).toMatchObject({ type: 'instance', componentId: ids.f, name: 'F' });
+
+    // Panel Design: fill akar instance dan lebar isi instance (alamat komposit) menjadi override.
+    const edited = await roundTrip(inserted.doc, {
+      ops: [
+        { op: 'update', id: inst, patch: { fills: [{ type: 'solid', color: '#FF0000' }] } },
+        { op: 'update', id: `${inst}/${ids.f1}`, patch: { width: 5 } },
+      ],
+      label: 'Change fill',
+    });
+    const info = componentInfo(edited.doc);
+    expect(overrideEntry(info, inst)).toEqual({ fills: [{ type: 'solid', color: '#FF0000' }] });
+    expect(overrideEntry(info, `${inst}/${ids.f1}`)).toEqual({ width: 5 });
+    const targets = [{ id: inst, overrides: overrideEntry(info, inst) }, { id: `${inst}/${ids.f1}`, overrides: overrideEntry(info, `${inst}/${ids.f1}`) }];
+    const resetFill = await roundTrip(edited.doc, { ops: resetGroupOps(targets, 'fill'), label: 'Reset override' });
+    expect(find(resetFill.doc, inst)!.overrides).toEqual({ [ids.f1]: { width: 5 } });
+    const resetAll = await roundTrip(edited.doc, { ops: resetAllOps(inst), label: 'Reset overrides' });
+    expect(find(resetAll.doc, inst)).not.toHaveProperty('overrides');
+
+    const instScene: GeoNode[] = [{ ...scene[0]!, children: [...scene[0]!.children, { id: inst, type: 'frame', name: 'F', box: { x: 100, y: 300, w: 100, h: 80 }, parentId: ids.b1, absolute: false, x: 0, y: 0, layout: 'none', children: [], component: 'instance' }] }];
+    const detached = await roundTrip(edited.doc, planOf('detach', instScene, [inst]));
+    const plain = find(detached.doc, detached.value.refs.det0!)!;
+    expect(plain).toMatchObject({ type: 'frame', fills: [{ type: 'solid', color: '#FF0000' }] });
+    expect(find(detached.doc, inst)).toBeUndefined();
+  });
+
+  it('create component dari dua layer: frame Component dijadikan master; + dari isi master menyisip di sampingnya', async () => {
+    const { doc, ids, scene } = fixture();
+    const done = await roundTrip(doc, planOf('create-component', scene, [ids.a, ids.c]));
+    const g = done.value.refs.group!;
+    expect(find(done.doc, g)).toMatchObject({ type: 'frame', name: 'Component', component: { props: [], slots: [] } });
+    expect(childIds(done.doc, g)).toEqual([ids.a, ids.c]);
+    const t = instanceTarget(componentInfo(done.doc), g, ids.a, undefined);
+    expect(t).toEqual({ parentId: ids.b1 });
+    await roundTrip(done.doc, { ops: [{ op: 'add', parentId: ids.b1, node: instanceNode({ id: g, name: 'Component' }) }], label: 'Insert' });
   });
 });

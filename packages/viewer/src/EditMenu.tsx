@@ -1,5 +1,6 @@
 // Menu konteks editor (editor-canvas story 6, desain bagian 05 "Context menu" QvMyG + submenu Align S2WUHS):
-// Group, Ungroup, Duplicate, Delete, Bring forward, Send backward, Align ›, Distribute ›. Dibuka dari klik kanan di
+// Create component (desain 08 ZHqtv) + Detach instance (hanya bila berlaku), Group, Ungroup, Duplicate, Delete, Bring
+// forward, Send backward, Align ›, Distribute ›. Dibuka dari klik kanan di
 // canvas live dan di baris Layers; item yang tidak berlaku untuk seleksi nonaktif (opacity desain 0.4). Pola posisi,
 // fokus, dan keyboard mengikuti `Menu` (FileMenu.tsx); ArrowRight/Enter membuka submenu, ArrowLeft/Escape menutupnya.
 import { useLayoutEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
@@ -11,7 +12,7 @@ const mod = (k: string, shift = false) => (IS_MAC ? `${shift ? '⇧' : ''}⌘${k
 const alt = (k: string, shift = false) => (IS_MAC ? `${shift ? '⇧' : ''}⌥${k}` : `Alt+${shift ? 'Shift+' : ''}${k}`);
 
 /** Label, ikon, dan shortcut tiap aksi (menu, panel Design, tooltip). `shortcut` ditampilkan di menu; `hint` hanya tooltip. */
-export const ACTION_META: Record<EditAction, { label: string; icon: IconName; shortcut?: string; hint?: string; danger?: boolean }> = {
+export const ACTION_META: Record<EditAction, { label: string; icon: IconName; shortcut?: string; hint?: string; danger?: boolean; component?: boolean }> = {
   group: { label: 'Group', icon: 'group', shortcut: mod('G') },
   ungroup: { label: 'Ungroup', icon: 'ungroup', shortcut: mod('G', true) },
   duplicate: { label: 'Duplicate', icon: 'copy', shortcut: mod('D') },
@@ -26,6 +27,8 @@ export const ACTION_META: Record<EditAction, { label: string; icon: IconName; sh
   'align-bottom': { label: 'Align bottom', icon: 'alignBottom', hint: alt('S') },
   'distribute-h': { label: 'Distribute horizontally', icon: 'distributeX', hint: alt('H', true) },
   'distribute-v': { label: 'Distribute vertically', icon: 'distributeY', hint: alt('V', true) },
+  'create-component': { label: 'Create component', icon: 'component', shortcut: IS_MAC ? '⌥⌘K' : 'Ctrl+Alt+K', component: true },
+  detach: { label: 'Detach instance', icon: 'unlink', shortcut: IS_MAC ? '⌥⌘B' : 'Ctrl+Alt+B' },
 };
 
 /** Tooltip tombol: label + shortcut/hint. */
@@ -35,9 +38,12 @@ export const actionTitle = (a: EditAction): string => {
   return k ? `${m.label} (${k})` : m.label;
 };
 
-type Entry = { action: EditAction; separator?: boolean } | { submenu: 'align' | 'distribute'; separator?: boolean };
+/** `optional`: item hanya tampil bila berlaku (Detach instance, tanpa desain: mengikuti Create component). */
+type Entry = { action: EditAction; separator?: boolean; optional?: boolean } | { submenu: 'align' | 'distribute'; separator?: boolean };
 const MAIN: Entry[] = [
-  { action: 'group' },
+  { action: 'create-component' },
+  { action: 'detach', optional: true },
+  { action: 'group', separator: true },
   { action: 'ungroup' },
   { action: 'duplicate', separator: true },
   { action: 'delete' },
@@ -125,7 +131,7 @@ export function EditMenu({ x, y, enabled, onAction, onClose }: { x: number; y: n
     return (
       <div key={a} className="menu-group" role="none">
         {separator && <div className="menu-separator" role="separator" />}
-        <button type="button" role="menuitem" className={`menu-item${m.danger ? ' danger' : ''}`} disabled={!enabled[a]} title={m.hint ? `${m.label} (${m.hint})` : undefined} onClick={() => run(a)} onMouseEnter={inSub ? undefined : () => setSub(undefined)}>
+        <button type="button" role="menuitem" className={`menu-item${m.danger ? ' danger' : ''}${m.component ? ' component' : ''}`} disabled={!enabled[a]} title={m.hint ? `${m.label} (${m.hint})` : undefined} onClick={() => run(a)} onMouseEnter={inSub ? undefined : () => setSub(undefined)}>
           <Icon name={m.icon} size={15} />
           <span className="menu-label">{m.label}</span>
           {m.shortcut && (
@@ -148,7 +154,7 @@ export function EditMenu({ x, y, enabled, onAction, onClose }: { x: number; y: n
     >
       <div ref={ref} className="menu edit-menu" role="menu" tabIndex={-1} aria-label="Layer actions" style={pos} onKeyDown={(e) => nav(e, ref.current, false)}>
         {MAIN.map((en) => {
-          if ('action' in en) return item(en.action, en.separator);
+          if ('action' in en) return en.optional && !enabled[en.action] ? null : item(en.action, en.separator);
           const s = SUB[en.submenu];
           const can = s.items.some((it) => enabled[it.action]);
           const open = sub?.key === en.submenu;

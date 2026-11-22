@@ -10,11 +10,13 @@ const rnd = (v: number): number => Math.round(v) + 0;
 
 export type AlignAction = 'align-left' | 'align-center' | 'align-right' | 'align-top' | 'align-middle' | 'align-bottom';
 export type DistributeAction = 'distribute-h' | 'distribute-v';
-export type EditAction = 'group' | 'ungroup' | 'duplicate' | 'delete' | 'forward' | 'backward' | AlignAction | DistributeAction;
+/** Aksi komponen (epic komponen story 4): jadikan seleksi master, dan detach instance. */
+export type ComponentAction = 'create-component' | 'detach';
+export type EditAction = 'group' | 'ungroup' | 'duplicate' | 'delete' | 'forward' | 'backward' | AlignAction | DistributeAction | ComponentAction;
 
 export const ALIGN_ACTIONS: readonly AlignAction[] = ['align-left', 'align-center', 'align-right', 'align-top', 'align-middle', 'align-bottom'];
 export const DISTRIBUTE_ACTIONS: readonly DistributeAction[] = ['distribute-h', 'distribute-v'];
-export const EDIT_ACTIONS: readonly EditAction[] = ['group', 'ungroup', 'duplicate', 'delete', 'forward', 'backward', ...ALIGN_ACTIONS, ...DISTRIBUTE_ACTIONS];
+export const EDIT_ACTIONS: readonly EditAction[] = ['group', 'ungroup', 'duplicate', 'delete', 'forward', 'backward', ...ALIGN_ACTIONS, ...DISTRIBUTE_ACTIONS, 'create-component', 'detach'];
 
 /**
  * Plan satu aksi. `select`: seleksi sesudah sukses — `ids` langsung, atau `refs` (nama `ref` op add/duplicate yang
@@ -54,12 +56,14 @@ function siblingsOf(scene: readonly GeoNode[], index: ReadonlyMap<string, GeoNod
 /** Asal koordinat x/y node absolut di parentnya (koordinat halaman) = kotak terukur − x/y tersimpan. */
 const originOf = (n: GeoNode) => ({ x: n.box.x - n.x, y: n.box.y - n.y });
 
+const SAME_PARENT = 'Select layers in the same parent to group';
+
 function planGroup(scene: readonly GeoNode[], index: ReadonlyMap<string, GeoNode>, ids: readonly string[]): PlanResult {
   const members = topMost(index, ids);
   if (!members.length) return undefined;
   if (members.some((m) => m.type === 'board')) return { error: "Boards can't be grouped" };
   const parentId = members[0]!.parentId;
-  if (!parentId || members.some((m) => m.parentId !== parentId)) return { error: 'Select layers in the same parent to group' };
+  if (!parentId || members.some((m) => m.parentId !== parentId)) return { error: SAME_PARENT };
   const siblings = siblingsOf(scene, index, members[0]!);
   const at = (m: GeoNode) => siblings.findIndex((s) => s.id === m.id);
   const ordered = [...members].sort((a, b) => at(a) - at(b));
@@ -91,7 +95,8 @@ function planGroup(scene: readonly GeoNode[], index: ReadonlyMap<string, GeoNode
 
 function planUngroup(scene: readonly GeoNode[], index: ReadonlyMap<string, GeoNode>, ids: readonly string[]): PlanResult {
   // Frame kosong tidak di-ungroup (bukan hapus diam-diam berlabel "Ungroup").
-  const frames = topMost(index, ids).filter((n) => n.type === 'frame' && n.parentId && n.children.length > 0);
+  // Instance hasil ekspansi bertipe frame, tetapi isinya bukan node tersimpan: tidak bisa di-ungroup (detach dulu).
+  const frames = topMost(index, ids).filter((n) => n.type === 'frame' && n.component !== 'instance' && n.parentId && n.children.length > 0);
   if (!frames.length) return undefined;
   // Per parent dari indeks terbesar: indeks frame lain di parent yang sama tidak bergeser.
   const at = (n: GeoNode) => siblingsOf(scene, index, n).findIndex((s) => s.id === n.id);
@@ -228,10 +233,68 @@ function planDistribute(index: ReadonlyMap<string, GeoNode>, ids: readonly strin
   return { ops, label: named(h ? 'Distribute horizontally' : 'Distribute vertically', sorted) };
 }
 
+/** Alamat komposit (isi instance, AD-12): hanya bisa di-update/reset, bukan dipindah/dihapus/diduplikat. */
+const composite = (n: GeoNode) => n.id.includes('/');
+/** Aksi yang memindah/menghapus/menyalin node tersimpan: nonaktif bila seleksi memuat alamat komposit. */
+const STRUCTURAL: ReadonlySet<EditAction> = new Set<EditAction>(['group', 'ungroup', 'duplicate', 'delete', 'forward', 'backward']);
+/** Nama master hasil Create component dari beberapa layer (frame pembungkus). */
+export const COMPONENT_FRAME_NAME = 'Component';
+const EMPTY_COMPONENT = { props: [], slots: [] };
+
+/** Leluhur `n` di scene (parent terdekat dulu). */
+function ancestors(index: ReadonlyMap<string, GeoNode>, n: GeoNode): GeoNode[] {
+  const out: GeoNode[] = [];
+  for (let p = n.parentId ? index.get(n.parentId) : undefined; p; p = p.parentId ? index.get(p.parentId) : undefined) out.push(p);
+  return out;
+}
+
+/**
+ * Create component (desain ZHqtv): satu node non-board/non-instance → `setComponent`; beberapa node satu parent (atau
+ * satu instance) → dibungkus frame (plan group), dinamai, lalu frame itu dijadikan master. Satu permintaan.
+ */
+function planCreateComponent(scene: readonly GeoNode[], index: ReadonlyMap<string, GeoNode>, ids: readonly string[]): PlanResult {
+  const members = topMost(index, ids);
+  if (!members.length) return undefined;
+  if (members.some((m) => m.type === 'board')) return { error: "Boards can't become components" };
+  if (members.some((m) => composite(m) || ancestors(index, m).some((a) => composite(a) || a.component === 'instance'))) return { error: "Layers inside an instance can't become components" };
+  // Master tidak boleh bersarang (AD-12): master yang sudah ada tidak bisa dijadikan/dibungkus master baru.
+  if (members.some((m) => m.component === 'master')) return { error: 'This layer is already a component' };
+  if (members.some((m) => ancestors(index, m).some((a) => a.component === 'master'))) return { error: "Layers inside a component can't become components" };
+  const only = members.length === 1 ? members[0]! : undefined;
+  if (only && only.component !== 'instance') {
+    return { ops: [{ op: 'setComponent', id: only.id, component: EMPTY_COMPONENT }], label: label(`Create component ${only.name}`), select: { ids: [only.id] } };
+  }
+  const group = planGroup(scene, index, ids);
+  if (group && 'error' in group && group.error === SAME_PARENT) return { error: 'Select layers in the same parent to create a component' };
+  if (!group || 'error' in group) return group;
+  return {
+    ops: [...group.ops, { op: 'update', id: '@group', patch: { name: COMPONENT_FRAME_NAME } }, { op: 'setComponent', id: '@group', component: EMPTY_COMPONENT }],
+    label: label(`Create component from ${members.length === 1 ? members[0]!.name : `${members.length} layers`}`),
+    select: { refs: ['group'] },
+  };
+}
+
+/** Detach (AD-12): satu op `detach` ber-ref per instance terpilih; seleksi = node hasil detach. */
+function planDetach(index: ReadonlyMap<string, GeoNode>, ids: readonly string[]): PlanResult {
+  const instances = topMost(index, ids).filter((n) => n.component === 'instance' && !composite(n));
+  if (!instances.length) return undefined;
+  const refs = instances.map((_, k) => `det${k}`);
+  return {
+    ops: instances.map((n, k) => ({ op: 'detach', id: n.id, ref: refs[k]! })),
+    label: label(instances.length === 1 ? `Detach ${instances[0]!.name}` : `Detach ${instances.length} instances`),
+    select: { refs },
+  };
+}
+
 /** Rencana aksi `kind` untuk seleksi `ids` di `scene`. */
 export function planAction(kind: EditAction, scene: readonly GeoNode[], ids: readonly string[]): PlanResult {
   const index = indexGeo(scene);
+  if (STRUCTURAL.has(kind) && topMost(index, ids).some(composite)) return undefined;
   switch (kind) {
+    case 'create-component':
+      return planCreateComponent(scene, index, ids);
+    case 'detach':
+      return planDetach(index, ids);
     case 'group':
       return planGroup(scene, index, ids);
     case 'ungroup':
@@ -265,12 +328,16 @@ export function actionState(scene: readonly GeoNode[], ids: readonly string[]): 
   const out = {} as Record<EditAction, boolean>;
   for (const a of ALIGN_ACTIONS) out[a] = canAlign;
   for (const a of DISTRIBUTE_ACTIONS) out[a] = absolute.length >= 3;
-  out.group = any && members.every((m) => m.type !== 'board' && m.parentId !== undefined && m.parentId === parent);
-  out.ungroup = members.some((m) => m.type === 'frame' && m.parentId !== undefined && m.children.length > 0);
-  out.duplicate = any;
-  out.delete = any;
-  out.forward = planZOrder(scene, index, ids, 'forward') !== undefined;
-  out.backward = planZOrder(scene, index, ids, 'backward') !== undefined;
+  const structural = any && !members.some(composite);
+  out.group = structural && members.every((m) => m.type !== 'board' && m.parentId !== undefined && m.parentId === parent);
+  out.ungroup = structural && members.some((m) => m.type === 'frame' && m.component !== 'instance' && m.parentId !== undefined && m.children.length > 0);
+  out.duplicate = structural;
+  out.delete = structural;
+  out.forward = structural && planZOrder(scene, index, ids, 'forward') !== undefined;
+  out.backward = structural && planZOrder(scene, index, ids, 'backward') !== undefined;
+  const create = planCreateComponent(scene, index, ids);
+  out['create-component'] = create !== undefined && !('error' in create);
+  out.detach = planDetach(index, ids) !== undefined;
   return out;
 }
 
@@ -317,6 +384,8 @@ const ARROWS: Record<string, readonly [number, number]> = { ArrowLeft: [-1, 0], 
 export function shortcutAction(e: ShortcutKey): { action: EditAction } | { selectAll: true } | { nudge: readonly [number, number] } | undefined {
   const mod = e.ctrlKey || e.metaKey;
   const k = e.key.toLowerCase();
+  // Komponen (desain ZHqtv): Ctrl/⌘+Alt+K = Create component, Ctrl/⌘+Alt+B = Detach instance (lewat `code`).
+  if (mod && e.altKey && !e.shiftKey) return e.code === 'KeyK' ? { action: 'create-component' } : e.code === 'KeyB' ? { action: 'detach' } : undefined;
   if (!mod && !e.altKey && !e.shiftKey && (e.key === 'Delete' || e.key === 'Backspace')) return { action: 'delete' };
   if (mod && !e.altKey) {
     if (k === 'g') return { action: e.shiftKey ? 'ungroup' : 'group' };

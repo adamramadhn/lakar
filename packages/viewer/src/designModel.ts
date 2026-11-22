@@ -23,6 +23,11 @@ export type DesignTarget = {
   measured?: { w: number; h: number } | undefined;
   /** Mode tema efektif board pemilik (`themeMode` ?? mode pertama; AD-11): nilai token di picker dan detach. */
   mode?: string | undefined;
+  /**
+   * Entri override instance terluar untuk alamat ini (epic komponen story 4): ada untuk akar instance dan isi instance
+   * (alamat komposit), `stored` = node efektif. Override Marker dan Reset membacanya.
+   */
+  overrides?: Readonly<Record<string, unknown>> | undefined;
 };
 
 export type Group = 'position' | 'autoLayout' | 'typography' | 'icon' | 'fill' | 'stroke' | 'radius' | 'effects';

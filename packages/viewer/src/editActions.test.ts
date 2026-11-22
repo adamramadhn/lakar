@@ -286,3 +286,84 @@ describe('perbaikan review', () => {
     ]);
   });
 });
+
+/** Scene komponen: Row R berisi instance I (isi komposit I/T, I/B) dan master M (anak M1); frame F biasa. */
+function componentScene(): GeoNode[] {
+  return [
+    tree(
+      node('B1', { x: 0, y: 0, w: 400, h: 400 }, {
+        type: 'board',
+        absolute: true,
+        layout: 'column',
+        children: [
+          node('R', { x: 0, y: 0, w: 400, h: 100 }, {
+            type: 'frame',
+            layout: 'row',
+            children: [
+              node('I', { x: 0, y: 0, w: 100, h: 100 }, { type: 'frame', layout: 'column', component: 'instance', children: [node('I/T', { x: 0, y: 0, w: 50, h: 20 }, { type: 'text' }), node('I/B', { x: 0, y: 20, w: 100, h: 80 }, { type: 'frame', layout: 'column' })] }),
+              node('M', { x: 100, y: 0, w: 100, h: 100 }, { type: 'frame', layout: 'column', component: 'master', children: [node('M1', { x: 100, y: 0, w: 50, h: 50 })] }),
+              node('F', { x: 200, y: 0, w: 100, h: 100 }, { type: 'frame', layout: 'none', children: [node('F1', { x: 210, y: 10, w: 20, h: 20 }, { absolute: true, x: 10, y: 10 })] }),
+            ],
+          }),
+        ],
+      }),
+    ),
+  ];
+}
+
+describe('aksi komponen (epic komponen story 4)', () => {
+  it('create component: satu node → setComponent; dua node / instance → group + nama + setComponent(@group)', () => {
+    const s = componentScene();
+    expect(planAction('create-component', s, ['F'])).toEqual({
+      ops: [{ op: 'setComponent', id: 'F', component: { props: [], slots: [] } }],
+      label: 'Create component F',
+      select: { ids: ['F'] },
+    });
+    const multi = planAction('create-component', s, ['F', 'I']);
+    expect(multi && 'ops' in multi && multi.ops.slice(-2)).toEqual([
+      { op: 'update', id: '@group', patch: { name: 'Component' } },
+      { op: 'setComponent', id: '@group', component: { props: [], slots: [] } },
+    ]);
+    expect(multi && 'ops' in multi && multi.ops[0]).toMatchObject({ op: 'add', parentId: 'R', ref: 'group' });
+    expect(multi && 'select' in multi && multi.select).toEqual({ refs: ['group'] });
+    const fromInstance = planAction('create-component', s, ['I']);
+    expect(fromInstance && 'label' in fromInstance && fromInstance.label).toBe('Create component from I');
+  });
+
+  it('create component ditolak: board, isi instance, master, di dalam master, parent beda', () => {
+    const s = componentScene();
+    expect(planAction('create-component', s, ['B1'])).toEqual({ error: "Boards can't become components" });
+    expect(planAction('create-component', s, ['I/T'])).toEqual({ error: "Layers inside an instance can't become components" });
+    expect(planAction('create-component', s, ['M'])).toEqual({ error: 'This layer is already a component' });
+    expect(planAction('create-component', s, ['M1'])).toEqual({ error: "Layers inside a component can't become components" });
+    expect(planAction('create-component', s, ['F1', 'I'])).toEqual({ error: 'Select layers in the same parent to create a component' });
+    expect(planAction('create-component', s, ['M', 'F'])).toEqual({ error: 'This layer is already a component' });
+    expect(planAction('create-component', s, [])).toBeUndefined();
+  });
+
+  it('detach: satu op ber-ref per instance terpilih; tanpa instance → tidak ada plan', () => {
+    const s = componentScene();
+    expect(planAction('detach', s, ['I', 'F'])).toEqual({ ops: [{ op: 'detach', id: 'I', ref: 'det0' }], label: 'Detach I', select: { refs: ['det0'] } });
+    expect(planAction('detach', s, ['F'])).toBeUndefined();
+    expect(planAction('detach', s, ['I/T'])).toBeUndefined();
+  });
+
+  it('isi instance: aksi struktural tanpa plan dan nonaktif; ungroup instance nonaktif; update-based tetap', () => {
+    const s = componentScene();
+    for (const a of ['group', 'ungroup', 'duplicate', 'delete', 'forward', 'backward'] as const) expect(planAction(a, s, ['I/T'])).toBeUndefined();
+    const st = actionState(s, ['I/T']);
+    expect([st.group, st.ungroup, st.duplicate, st.delete, st.forward, st.backward, st['create-component'], st.detach]).toEqual([false, false, false, false, false, false, false, false]);
+    expect(planAction('ungroup', s, ['I'])).toBeUndefined();
+    const inst = actionState(s, ['I']);
+    expect([inst.ungroup, inst.duplicate, inst.delete, inst.detach, inst['create-component']]).toEqual([false, true, true, true, true]);
+    expect(actionState(s, ['M'])['create-component']).toBe(false);
+  });
+
+  it('shortcut Ctrl/⌘+Alt+K dan Ctrl/⌘+Alt+B', () => {
+    const k = (code: string, o: Partial<{ ctrlKey: boolean; metaKey: boolean; altKey: boolean; shiftKey: boolean }> = {}) => ({ key: code.slice(3).toLowerCase(), code, ctrlKey: false, metaKey: false, altKey: false, shiftKey: false, ...o });
+    expect(shortcutAction(k('KeyK', { ctrlKey: true, altKey: true }))).toEqual({ action: 'create-component' });
+    expect(shortcutAction(k('KeyK', { metaKey: true, altKey: true }))).toEqual({ action: 'create-component' });
+    expect(shortcutAction(k('KeyB', { ctrlKey: true, altKey: true }))).toEqual({ action: 'detach' });
+    expect(shortcutAction(k('KeyK', { ctrlKey: true, altKey: true, shiftKey: true }))).toBeUndefined();
+  });
+});

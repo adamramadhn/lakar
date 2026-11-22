@@ -45,7 +45,7 @@ export function pageGeometry(boards: readonly { id: string; name: string; x: num
  * Pohon geometri board `board` (posisi halaman `at`) dari DOM live di `host`. Skala = lebar layar elemen board /
  * lebar board. Node tanpa elemen (belum di-mount) dilewati bersama turunannya. Board belum di-mount → undefined.
  */
-export function measureBoard(host: HTMLElement, board: BoardNode, at: { x: number; y: number }): GeoNode | undefined {
+export function measureBoard(host: HTMLElement, board: BoardNode, at: { x: number; y: number }, kinds?: ReadonlyMap<string, 'master' | 'instance'>): GeoNode | undefined {
   const els = new Map<string, Element>();
   for (const el of host.shadowRoot?.querySelectorAll(`[${NODE_ATTR}]`) ?? []) {
     const id = el.getAttribute(NODE_ATTR);
@@ -76,6 +76,9 @@ export function measureBoard(host: HTMLElement, board: BoardNode, at: { x: numbe
       layout,
       children: [],
     };
+    // Master/instance dari dokumen tersimpan (epic komponen story 4): akar instance hasil ekspansi bertipe node master.
+    const kind = kinds?.get(n.id);
+    if (kind) g.component = kind;
     if (n.type === 'frame') for (const c of n.children) {
       const cg = child(c, n.id, layout ?? 'none');
       if (cg) g.children.push(cg);

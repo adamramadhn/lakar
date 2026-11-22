@@ -1645,6 +1645,344 @@ button.panel-tab:hover {
   border: 1.5px solid var(--accent);
   pointer-events: none;
 }
+/* Komponen (epic komponen story 4, desain bagian 08): seleksi master/instance ungu, Component Tag, outline instance
+   saat isinya terpilih (putus-putus 4/3), dan breadcrumb "Esc to exit instance" di kiri atas kanvas. */
+.selection.component {
+  outline-color: var(--component);
+}
+.selection.component .handle {
+  border-color: var(--component);
+}
+.selection.component .size-badge {
+  background: var(--component);
+}
+.edit-member.component {
+  outline-color: var(--component);
+}
+.edit-instance-outline {
+  position: absolute;
+  box-sizing: border-box;
+  border: 1.5px dashed var(--component);
+  pointer-events: none;
+}
+.component-tag {
+  position: absolute;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 16px;
+  padding: 0 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 3;
+}
+.component-tag.master {
+  background: var(--component);
+  color: #fff;
+}
+.component-tag.instance {
+  background: var(--component-soft);
+  color: var(--component);
+}
+.instance-breadcrumb {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: 0 8px 24px #00000033;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.instance-breadcrumb-root {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--component);
+  font: inherit;
+  cursor: pointer;
+}
+.instance-breadcrumb-root:hover span {
+  text-decoration: underline;
+}
+.instance-breadcrumb-sep {
+  color: var(--text-muted);
+}
+.instance-breadcrumb-child {
+  color: var(--text-primary);
+}
+.instance-breadcrumb-divider {
+  width: 1px;
+  height: 14px;
+  background: var(--border);
+}
+.instance-breadcrumb-hint {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 400;
+}
+.menu-item.component svg {
+  color: var(--component);
+}
+.layer-row .type-icon.component,
+.layer-row.selected .type-icon.component {
+  color: var(--component);
+}
+/* Assets (desain C2xbUQ): pencarian, LOCAL COMPONENTS, kartu komponen (thumb 40×32, nama, meta, tombol +), hint. */
+.assets-components {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.assets-search {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 8px;
+  border-radius: 6px;
+  background: var(--input);
+  color: var(--text-muted);
+}
+.assets-search input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: none;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 12px;
+  outline: none;
+}
+.assets-search input::placeholder {
+  color: var(--text-muted);
+}
+.assets-group-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 4px 4px;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+.assets-group-header .label {
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+}
+.component-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.component-card:hover,
+.component-card:focus-visible,
+.component-card.selected {
+  background: var(--surface-hover);
+  outline: none;
+}
+.component-card-thumb {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 40px;
+  height: 32px;
+  border-radius: 4px;
+  background: var(--thumb);
+  border: 1px solid var(--border);
+  box-sizing: border-box;
+  color: var(--component);
+}
+.component-card-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+.component-card-info strong {
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.component-card-info span {
+  color: var(--text-muted);
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.component-card-insert {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: var(--input);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.component-card-insert:hover:not(:disabled) {
+  color: var(--text-primary);
+}
+.component-card-insert:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.assets-hint {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 10px;
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text-secondary);
+  font-size: 11px;
+  line-height: 1.45;
+}
+.assets-hint svg {
+  flex: none;
+  margin-top: 1px;
+}
+/* Panel Design: header komponen, grup Instance (chip master, Detach, ringkasan override), Override Marker. */
+.type-badge.component {
+  background: var(--component-soft);
+  color: var(--component);
+}
+.dp-instance-row {
+  display: flex;
+  gap: 8px;
+}
+.dp-component-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+  height: 28px;
+  padding: 0 8px;
+  border-radius: 5px;
+  background: var(--input);
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 500;
+}
+.dp-component-chip > svg:first-child {
+  color: var(--component);
+  flex: none;
+}
+.dp-component-chip span {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dp-component-chip button {
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.dp-component-chip button:hover {
+  color: var(--text-primary);
+}
+.dp-detach-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 10px;
+  font-size: 12px;
+}
+.dp-overrides-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border-radius: 5px;
+  background: var(--component-soft);
+  font-size: 11px;
+}
+.dp-overrides-row span {
+  flex: 1;
+  min-width: 0;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dp-overrides-row button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--component);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.dp-overrides-row button:disabled,
+.override-marker button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.override-dot {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--component);
+}
+.override-marker {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--component);
+  font-size: 11px;
+  font-weight: 500;
+}
+.override-marker button {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.override-marker button:hover:not(:disabled) {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
 /* Menu konteks editor (QvMyG) dan submenu Align/Distribute (S2WUHS). */
 .edit-menu .menu-item:disabled {
   opacity: 0.4;

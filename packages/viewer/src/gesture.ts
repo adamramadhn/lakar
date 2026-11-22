@@ -24,7 +24,12 @@ export type GeoNode = {
   y: number;
   layout: FlowLayout | 'grid' | 'none' | undefined;
   children: GeoNode[];
+  /** Master atau instance tersimpan (epic komponen story 4); isi instance = alamat komposit (id memuat `/`). */
+  component?: 'master' | 'instance' | undefined;
 };
+
+/** Node yang isinya bukan node tersimpan: instance (akar) dan isi instance (alamat komposit, AD-12). */
+export const isLockedContainer = (n: GeoNode): boolean => n.component === 'instance' || n.id.includes('/');
 
 export type Handle = 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw';
 export const HANDLES: readonly Handle[] = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
@@ -104,7 +109,7 @@ export function marqueeSelect(candidates: readonly GeoNode[], rect: Box): string
   const out: string[] = [];
   for (const c of candidates) {
     if (!intersects(c.box, rect)) continue;
-    if (c.children.length && containsBox(c.box, rect)) out.push(...marqueeSelect(c.children, rect));
+    if (c.children.length && !isLockedContainer(c) && containsBox(c.box, rect)) out.push(...marqueeSelect(c.children, rect));
     else out.push(c.id);
   }
   return out;
@@ -145,7 +150,7 @@ export function dropContainer(path: readonly GeoNode[], draggedId: string): GeoN
   let found: GeoNode | undefined;
   for (const n of path) {
     if (n.id === draggedId) break;
-    if (isFlowContainer(n)) found = n;
+    if (isFlowContainer(n) && !isLockedContainer(n)) found = n;
   }
   return found;
 }

@@ -203,3 +203,14 @@ describe('geser + reorder', () => {
     expect(dropContainer(hitPath([b], { x: 300, y: 280 }), 'A')?.id).toBe('B');
   });
 });
+
+describe('isi instance (epic komponen story 4)', () => {
+  it('drop dan marquee tidak masuk ke instance atau alamat komposit', () => {
+    const inner = node('I/T', { x: 10, y: 10, w: 20, h: 20 }, { parentId: 'I' });
+    const slot = node('I/S', { x: 0, y: 50, w: 100, h: 50 }, { type: 'frame', layout: 'column', parentId: 'I' });
+    const inst = node('I', { x: 0, y: 0, w: 100, h: 100 }, { type: 'frame', layout: 'column', component: 'instance', parentId: 'B', children: [inner, slot] });
+    const b = node('B', { x: 0, y: 0, w: 400, h: 400 }, { type: 'board', layout: 'column', absolute: true, children: [inst] });
+    expect(dropContainer(hitPath([b], { x: 50, y: 70 }), 'X')?.id).toBe('B');
+    expect(marqueeSelect([b], { x: 5, y: 5, w: 30, h: 30 })).toEqual(['I']);
+  });
+});

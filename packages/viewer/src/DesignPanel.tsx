@@ -3,10 +3,11 @@
 // dari node tersimpan (ref token tampil sebagai chip) dan setiap edit yang di-commit (Enter/blur, lepas scrub, pilih
 // segmen/select, tutup color picker) menjadi satu permintaan ops berisi op `update` untuk semua node terpilih (AD-7),
 // lewat `onCommit` Viewer (History + undo, AD-8). Parsing/patch di designValues.ts dan designModel.ts (murni).
-import { Fragment, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { createContext, Fragment, useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { gradientLayerCss } from '@lakar/render';
 import { Blend, type DocOp } from '@lakar/schema';
 import type { FontFamily, InspectNode } from './api';
+import { groupOverrides, instancesText, markerLabel, resetGroupOps } from './componentModel';
 import { copyText } from './Connections';
 import { copyAs, type CopyFormat } from './copyas';
 import { ALIGN_ACTIONS, DISTRIBUTE_ACTIONS, type EditAction } from './editActions';
@@ -56,6 +57,7 @@ import {
   trackCount,
   type Axis,
   type DesignTarget,
+  type Group as DesignGroup,
   type FieldState,
   type FillLike,
   type PaintKind,
@@ -829,13 +831,49 @@ function InlineInput({ value, onCommit, disabled, placeholder, label, className,
   );
 }
 
+/** Grup panel per judul (Override Marker per grup, epic komponen story 4). */
+const TITLE_GROUP: Record<string, DesignGroup> = {
+  'Position & size': 'position',
+  'Auto layout': 'autoLayout',
+  Typography: 'typography',
+  Icon: 'icon',
+  Fill: 'fill',
+  Stroke: 'stroke',
+  Radius: 'radius',
+  Effects: 'effects',
+};
+/** Target + antrean edit untuk Override Marker di header grup (tanpa mengubah tanda tangan tiap grup). */
+const OverrideContext = createContext<Ctx | undefined>(undefined);
+
+/**
+ * Override Marker (desain X826b0): titik + "Overridden" + Reset, tampil bila salah satu target (instance/isi instance)
+ * meng-override properti grup ini. Reset = satu permintaan `resetOverride(alamat, props grup)` per target.
+ */
+function OverrideMarker({ group }: { group: DesignGroup }) {
+  const ctx = useContext(OverrideContext);
+  if (!ctx) return null;
+  const props = groupOverrides(ctx.targets, group);
+  if (!props.length) return null;
+  return (
+    <div className="override-marker">
+      <i className="override-dot" aria-hidden="true" />
+      <span>{markerLabel(props)}</span>
+      <button type="button" title="Reset to component" aria-label="Reset to component" disabled={ctx.disabled} onClick={() => ctx.run((ts) => resetGroupOps(ts, group), 'Reset override')}>
+        <Icon name="rotateCcw" size={12} />
+      </button>
+    </div>
+  );
+}
+
 function Group({ title, action, children, empty }: { title: string; action?: ReactNode; children?: ReactNode; empty?: boolean }) {
+  const key = TITLE_GROUP[title];
   return (
     <section className={`dp-group${empty ? ' empty' : ''}`}>
       <div className="dp-group-header">
         <h3>{title}</h3>
         {action}
       </div>
+      {key && <OverrideMarker group={key} />}
       {children}
     </section>
   );
@@ -1538,7 +1576,48 @@ export type DesignPanelProps = {
   tokenModes?: readonly string[] | undefined;
   /** Token dokumen tampil (epic token-tema story 4): Token Field dan Token Picker. */
   tokens?: TokenMap | undefined;
+  /** Seleksi tunggal master/instance/isi instance (epic komponen story 4): header dan grup Instance. */
+  component?: ComponentPanel | undefined;
 };
+
+/** Info komponen node primer untuk panel (dihitung Viewer dari dokumen tersimpan). */
+export type ComponentPanel =
+  | { kind: 'master'; instances: number }
+  | { kind: 'instance'; masterName: string; overrides: { count: number; text: string }; onGoToMaster: () => void; onDetach: () => void; onResetAll: () => void }
+  | { kind: 'inside'; instanceName: string; masterName: string };
+
+/**
+ * Grup Instance (desain xTIr4 "Group Instance"): chip master (ke master), Detach, dan ringkasan override + Reset all.
+ * Props dan Slots milik story 5.
+ */
+function InstanceGroup({ info, disabled }: { info: Extract<ComponentPanel, { kind: 'instance' }>; disabled: boolean }) {
+  return (
+    <section className="dp-group">
+      <div className="dp-instance-row">
+        <div className="dp-component-chip">
+          <Icon name="component" size={13} />
+          <span title={info.masterName}>{info.masterName}</span>
+          <button type="button" title="Go to component" aria-label="Go to component" onClick={info.onGoToMaster}>
+            <Icon name="arrowUpRight" size={13} />
+          </button>
+        </div>
+        <button type="button" className="btn dp-detach-btn" disabled={disabled} onClick={info.onDetach} title="Detach instance">
+          <Icon name="unlink" size={13} />
+          Detach
+        </button>
+      </div>
+      {info.overrides.count > 0 && (
+        <div className="dp-overrides-row">
+          <i className="override-dot" aria-hidden="true" />
+          <span title={info.overrides.text}>{info.overrides.text}</span>
+          <button type="button" disabled={disabled} onClick={info.onResetAll}>
+            Reset all
+          </button>
+        </div>
+      )}
+    </section>
+  );
+}
 
 /** Grup "Theme mode" board (desain tuEOt/mjY37): ≤ 3 mode = segmented, lebih = select; mode pertama = default. */
 function ThemeModeGroup({ targets, ctx, modes }: { targets: DesignTarget[]; ctx: Ctx; modes: readonly string[] }) {
@@ -1571,7 +1650,7 @@ function AlignGroup({ align, disabled }: { align: NonNullable<DesignPanelProps['
   );
 }
 
-export function DesignPanel({ targets, path, editable, fonts, inspectNode, rev, onCommit, align, tokenModes, tokens }: DesignPanelProps) {
+export function DesignPanel({ targets, path, editable, fonts, inspectNode, rev, onCommit, align, tokenModes, tokens, component }: DesignPanelProps) {
   const [menu, setMenu] = useState<{ x: number; y: number } | undefined>(undefined);
   const [picker, setPicker] = useState<{ anchor: HTMLElement; spec: TokenSpec; trigger: HTMLElement | undefined } | undefined>(undefined);
   // Picker ditutup saat seleksi berganti, panel menjadi baca-saja (pratinjau/offline), atau field jangkarnya hilang
@@ -1652,9 +1731,20 @@ export function DesignPanel({ targets, path, editable, fonts, inspectNode, rev, 
   };
   const types = new Set(targets.map((t) => t.type));
   const typeLabel = TYPE_LABEL[primary.type] ?? primary.type;
+  const parentPath = path.length > 1 ? ` · ${path.slice(0, -1).join(' / ')}` : '';
+  // Header komponen (desain C2xbUQ/xTIr4/dQRib): master "Component · N instances", instance "Instance of <master> ·
+  // <path>", isi instance "<Tipe> · inside <instance> (<master>)".
+  const comp = multi ? undefined : component;
   const subtitle = multi
-    ? `${types.size === 1 ? `${typeLabel}s` : 'Layers'}${path.length > 1 ? ` · ${path.slice(0, -1).join(' / ')}` : ''}`
-    : `${typeLabel}${path.length > 1 ? ` · ${path.slice(0, -1).join(' / ')}` : ''}`;
+    ? `${types.size === 1 ? `${typeLabel}s` : 'Layers'}${parentPath}`
+    : comp?.kind === 'master'
+      ? `Component · ${instancesText(comp.instances)}`
+      : comp?.kind === 'instance'
+        ? `Instance of ${comp.masterName}${parentPath}`
+        : comp?.kind === 'inside'
+          ? `${typeLabel} · inside ${comp.instanceName} (${comp.masterName})`
+          : `${typeLabel}${parentPath}`;
+  const badgeIcon: IconName = comp?.kind === 'master' ? 'component' : comp?.kind === 'instance' ? 'diamond' : multi && types.size > 1 ? 'layers' : (NODE_ICON[primary.type] ?? 'square');
   const node = inspectNode && inspectNode.id === primary.id ? inspectNode : undefined;
   const copy = async (format: CopyFormat) => {
     if (!node) return;
@@ -1671,8 +1761,8 @@ export function DesignPanel({ targets, path, editable, fonts, inspectNode, rev, 
   return (
     <div className="inspect design-panel">
       <div className="selection-header">
-        <span className="type-badge">
-          <Icon name={multi && types.size > 1 ? 'layers' : (NODE_ICON[primary.type] ?? 'square')} size={14} />
+        <span className={`type-badge${comp?.kind === 'master' || comp?.kind === 'instance' ? ' component' : ''}`}>
+          <Icon name={badgeIcon} size={14} />
         </span>
         <div className="selection-info">
           <strong>{multi ? `${targets.length} layers` : primary.name}</strong>
@@ -1711,18 +1801,21 @@ export function DesignPanel({ targets, path, editable, fonts, inspectNode, rev, 
         />
       )}
       {picker && editable && <TokenPicker anchor={picker.anchor} trigger={picker.trigger} spec={picker.spec} ctx={ctx} onClose={() => setPicker(undefined)} />}
-      <Fragment key={selKey}>
-      {multi && align && <AlignGroup align={align} disabled={!editable} />}
-      {tokenModes && tokenModes.length > 0 && targets.every((t) => t.type === 'board') && <ThemeModeGroup targets={targets} ctx={ctx} modes={tokenModes} />}
-      {groups.includes('position') && <PositionGroup targets={targets} ctx={ctx} bounds={bounds} />}
-      {groups.includes('autoLayout') && <AutoLayoutGroup targets={targets} ctx={ctx} />}
-      {groups.includes('typography') && <TypographyGroup targets={targets} ctx={ctx} fonts={fonts} />}
-      {groups.includes('icon') && <IconGroup targets={targets} ctx={ctx} />}
-      {groups.includes('fill') && <FillGroup targets={targets} ctx={ctx} />}
-      {groups.includes('stroke') && <StrokeGroup targets={targets} ctx={ctx} />}
-      {groups.includes('radius') && <RadiusGroup targets={targets} ctx={ctx} />}
-      {groups.includes('effects') && <EffectsGroup targets={targets} ctx={ctx} />}
-      </Fragment>
+      <OverrideContext.Provider value={ctx}>
+        <Fragment key={selKey}>
+          {comp?.kind === 'instance' && <InstanceGroup info={comp} disabled={!editable} />}
+          {multi && align && <AlignGroup align={align} disabled={!editable} />}
+          {tokenModes && tokenModes.length > 0 && targets.every((t) => t.type === 'board') && <ThemeModeGroup targets={targets} ctx={ctx} modes={tokenModes} />}
+          {groups.includes('position') && <PositionGroup targets={targets} ctx={ctx} bounds={bounds} />}
+          {groups.includes('autoLayout') && <AutoLayoutGroup targets={targets} ctx={ctx} />}
+          {groups.includes('typography') && <TypographyGroup targets={targets} ctx={ctx} fonts={fonts} />}
+          {groups.includes('icon') && <IconGroup targets={targets} ctx={ctx} />}
+          {groups.includes('fill') && <FillGroup targets={targets} ctx={ctx} />}
+          {groups.includes('stroke') && <StrokeGroup targets={targets} ctx={ctx} />}
+          {groups.includes('radius') && <RadiusGroup targets={targets} ctx={ctx} />}
+          {groups.includes('effects') && <EffectsGroup targets={targets} ctx={ctx} />}
+        </Fragment>
+      </OverrideContext.Provider>
       {!editable && (
         <div className="read-only-note">
           <Icon name="lock" size={14} />
