@@ -113,6 +113,8 @@ import {
   type TokenSpec,
 } from './tokenPicker';
 import { Icon, NODE_ICON, type IconName } from './icons';
+import type { PathEditPanel } from './pathTools';
+import type { PointType } from './pathEdit';
 
 type Commit = (ops: DocOp[], description: string) => Promise<boolean>;
 
@@ -917,6 +919,52 @@ const FILL_LABEL: Record<string, string> = { linear: 'Linear gradient', radial: 
 // Kelompok
 // ---------------------------------------------------------------------------
 
+/**
+ * Grup Point mode edit titik path (desain J7AmQi/S8w37 "Group Point"): X/Y titik tunggal (px relatif kotak node), tipe
+ * titik untuk semua titik terpilih, Delete point, Open path. Setiap aksi = satu commit lewat pathTools.tsx.
+ */
+function PointGroup({ edit, disabled }: { edit: PathEditPanel; disabled: boolean }) {
+  const none = edit.selected === 0;
+  const xy = (axis: 'x' | 'y') => (
+    <Field
+      label={axis.toUpperCase()}
+      state={{ mixed: false, value: edit.point?.[axis], resolved: undefined }}
+      format={num}
+      parse={(t) => parseNumber(t)}
+      placeholder={none ? '–' : edit.point ? undefined : 'Mixed'}
+      disabled={disabled || !edit.point}
+      onCommit={(v) => (axis === 'x' ? edit.setX(Number(v)) : edit.setY(Number(v)))}
+    />
+  );
+  return (
+    <Group title="Point">
+      <div className="dp-row">
+        {xy('x')}
+        {xy('y')}
+      </div>
+      <Segmented<PointType>
+        label="Point type"
+        options={[
+          { value: 'corner', label: 'Corner' },
+          { value: 'smooth', label: 'Smooth' },
+          { value: 'mirrored', label: 'Mirrored' },
+        ]}
+        active={(v) => edit.type === v}
+        disabled={disabled || none}
+        onPick={(t) => edit.setType(t)}
+      />
+      <div className="dp-row dp-point-actions">
+        <button type="button" className="btn small" disabled={disabled || none} onClick={edit.remove}>
+          <Icon name="trash" size={13} /> Delete point
+        </button>
+        <button type="button" className="btn small" disabled={disabled || !edit.canOpen} title={edit.canOpen ? undefined : 'Select one point with a segment after it'} onClick={edit.open}>
+          <Icon name="scissors" size={13} /> Open path
+        </button>
+      </div>
+    </Group>
+  );
+}
+
 function PositionGroup({ targets, ctx, bounds }: { targets: DesignTarget[]; ctx: Ctx; bounds: [number, number, number, number] | undefined }) {
   const xyEditable = targets.every(canEditXY);
   const board = targets.every((t) => t.type === 'board');
@@ -1671,6 +1719,8 @@ export type DesignPanelProps = {
   componentEdit?: ComponentEdit | undefined;
   /** Buka dialog Export code untuk node primer (epic kode story 5); undefined = item disembunyikan. */
   onExportCode?: ((id: string) => void) | undefined;
+  /** Mode edit titik path node primer (paste-vektor story 5, desain J7AmQi): grup Point menggantikan Position & size. */
+  pathEdit?: PathEditPanel | undefined;
 };
 
 /** Info komponen node primer untuk panel (dihitung Viewer dari dokumen tersimpan). */
@@ -1758,7 +1808,7 @@ function AlignGroup({ align, disabled }: { align: NonNullable<DesignPanelProps['
   );
 }
 
-export function DesignPanel({ targets, path, editable, fonts, inspectNode, rev, onCommit, align, tokenModes, tokens, component, componentEdit, onExportCode }: DesignPanelProps) {
+export function DesignPanel({ targets, path, editable, fonts, inspectNode, rev, onCommit, align, tokenModes, tokens, component, componentEdit, onExportCode, pathEdit }: DesignPanelProps) {
   const [menu, setMenu] = useState<{ x: number; y: number } | undefined>(undefined);
   const [picker, setPicker] = useState<{ anchor: HTMLElement; spec: TokenSpec; trigger: HTMLElement | undefined } | undefined>(undefined);
   // Picker ditutup saat seleksi berganti, panel menjadi baca-saja (pratinjau/offline), atau field jangkarnya hilang
@@ -1843,7 +1893,10 @@ export function DesignPanel({ targets, path, editable, fonts, inspectNode, rev, 
   // Header komponen (desain C2xbUQ/xTIr4/dQRib): master "Component · N instances", instance "Instance of <master> ·
   // <path>", isi instance "<Tipe> · inside <instance> (<master>)".
   const comp = multi ? undefined : component;
-  const subtitle = multi
+  const points = !multi && pathEdit && pathEdit.nodeId === primary.id ? pathEdit : undefined;
+  const subtitle = points
+    ? `Path · editing points · ${points.selected} of ${points.total} selected`
+    : multi
     ? `${types.size === 1 ? `${typeLabel}s` : 'Layers'}${parentPath}`
     : comp?.kind === 'master'
       ? `Component · ${instancesText(comp.instances)}`
@@ -1931,7 +1984,8 @@ export function DesignPanel({ targets, path, editable, fonts, inspectNode, rev, 
           {comp?.kind === 'slotFrame' && componentEdit && <SlotFrameGroup {...comp} edit={componentEdit} disabled={!editable} />}
           {multi && align && <AlignGroup align={align} disabled={!editable} />}
           {tokenModes && tokenModes.length > 0 && targets.every((t) => t.type === 'board') && <ThemeModeGroup targets={targets} ctx={ctx} modes={tokenModes} />}
-          {groups.includes('position') && <PositionGroup targets={targets} ctx={ctx} bounds={bounds} />}
+          {points && <PointGroup edit={points} disabled={!editable} />}
+          {groups.includes('position') && !points && <PositionGroup targets={targets} ctx={ctx} bounds={bounds} />}
           {groups.includes('autoLayout') && <AutoLayoutGroup targets={targets} ctx={ctx} />}
           {groups.includes('typography') && <TypographyGroup targets={targets} ctx={ctx} fonts={fonts} />}
           {groups.includes('icon') && <IconGroup targets={targets} ctx={ctx} />}

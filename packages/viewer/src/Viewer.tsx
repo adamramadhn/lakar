@@ -64,6 +64,7 @@ import { BottomSheet } from './BottomSheet';
 import { AddLayerButton, IconPicker, Toast, type ToastState } from './AddLayer';
 import { api, ApiError, errorText, OfflineError, type FontFamily, type HistoryEntry, type InspectResult, type LayoutCheck } from './api';
 import { Canvas, type CanvasMarker, type CanvasPreview, type Focus, type Highlight, type InsertPoint } from './Canvas';
+import type { PathEditPanel } from './pathTools';
 import { failureText, imageFileProblem, insertBoardAt, insertBoardPlaced, insertIntoBoard, canvasInsertTarget, menuInsertTarget, type InsertExtra, type InsertKind, type InsertTarget } from './codegen';
 import { resolvePageIndex } from './pages';
 import { PagesPanel } from './PagesPanel';
@@ -808,6 +809,18 @@ export function Viewer({ slug }: { slug: string }) {
   const commitOps = useCallback((ops: DocOp[], description: string): Promise<boolean> => applyEdit(ops, description).then((r) => r !== undefined), [applyEdit]);
   /** Commit gestur canvas: rev commit (pratinjau ditahan sampai board di-mount dari rev itu), undefined bila gagal. */
   const commitGesture = useCallback((ops: DocOp[], description: string): Promise<number | undefined> => applyEdit(ops, description).then((r) => r?.rev), [applyEdit]);
+  /** Commit yang membuat node (Pen tool, paste-vektor story 5): node baru terpilih begitu ada di dokumen. */
+  const commitCreate = useCallback(
+    (ops: DocOp[], description: string): Promise<string | undefined> =>
+      applyEdit(ops, description).then((r) => {
+        const id = r?.created[0]?.id;
+        if (id) pendingSelect.current = id;
+        return id;
+      }),
+    [applyEdit],
+  );
+  /** Mode edit titik path di canvas (grup Point panel Design, desain J7AmQi). */
+  const [pathEdit, setPathEdit] = useState<PathEditPanel | undefined>(undefined);
   /** Toast "Undo skipped" (desain r69qO): entri undo/redo dibuang karena target sudah diubah/dihapus perubahan lain. */
   const [undoSkipped, setUndoSkipped] = useState<UndoSkipped | undefined>(undefined);
   const closeUndoSkipped = useCallback(() => setUndoSkipped(undefined), []);
@@ -1581,6 +1594,8 @@ export function Viewer({ slug }: { slug: string }) {
         selection={selection}
         onSelectIds={selectIds}
         onCommit={commitGesture}
+        onCommitCreate={commitCreate}
+        onPathEdit={setPathEdit}
         shareBadge={shareBadge}
         actions={<ThemeButton open={themeOpen} onToggle={() => setThemeOpen((o) => !o)} />}
         canUndo={editable && undoDepth.undo > 0}
@@ -1643,6 +1658,7 @@ export function Viewer({ slug }: { slug: string }) {
               tokens={d.tokens}
               component={componentPanel}
               componentEdit={componentEdit}
+              pathEdit={pathEdit}
               onExportCode={preview ? undefined : setCodeExport}
               align={designTargets.length > 1 ? { enabled: editable ? actionState(sceneRef.current?.() ?? [], selection) : NO_ACTIONS, run: (a) => runAction(a) } : undefined}
             />

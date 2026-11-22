@@ -95,11 +95,17 @@ export function useCanvasEdit({
   onCommit,
   components,
   pastedTag,
+  onEnterPath,
+  pathEditing,
 }: {
   /** Info komponen dokumen tersimpan terkini (epic komponen story 4): penanda master/instance, tag, breadcrumb. */
   components?: ComponentInfo | undefined;
   /** Label "Pasted · nama" di bawah node hasil paste HTML (desain rkIyP Pasted Tag), selama node itu terpilih. */
   pastedTag?: { id: string; label: string } | undefined;
+  /** Dobel-klik path → mode edit titik (story vektor 5); false = tidak bisa (mis. berotasi), klik biasa berlaku. */
+  onEnterPath?: ((id: string) => boolean) | undefined;
+  /** Mode edit titik atau pen berjalan: kotak seleksi, handle, dan hover tidak digambar (overlay milik pathTools). */
+  pathEditing?: boolean | undefined;
   section: RefObject<HTMLElement | null>;
   cam: Camera;
   boards: readonly EditBoard[];
@@ -432,6 +438,15 @@ export function useCanvasEdit({
       setTimeout(() => startTextRef.current(id), 0);
       return true;
     }
+    // Dobel-klik path → mode edit titik (desain J7AmQi); path terpilih tunggal.
+    if (double && !labelId && picked?.type === 'path' && canEdit && onEnterPath) {
+      const id = picked.id;
+      onSelectIds([id]);
+      if (onEnterPath(id)) {
+        e.preventDefault();
+        return true;
+      }
+    }
     if (!picked || (picked.type === 'board' && !selSet.has(picked.id) && !labelId)) {
       setGesture({ ...base, kind: 'marquee', p, picked, candidates: picked ? picked.children : geo, base: e.shiftKey ? [...selection] : [], shift: e.shiftKey });
       return true;
@@ -703,7 +718,7 @@ export function useCanvasEdit({
   // ---- Overlay ----
   const scr = (b: Box) => ({ left: cam.x + b.x * cam.z, top: cam.y + b.y * cam.z, width: Math.max(1, b.w * cam.z), height: Math.max(1, b.h * cam.z) });
   const overlay: ReactNode[] = [];
-  if (active) {
+  if (active && !pathEditing) {
     const reorder = gesture?.kind === 'reorder' ? gesture : undefined;
     const marquee = gesture?.kind === 'marquee' && gesture.moved ? gesture : undefined;
     if (hover && hoverable && !gesture && !textId) {
@@ -788,6 +803,13 @@ export function useCanvasEdit({
     contextSelect,
     startTextEdit,
     textEditing: textId !== undefined,
+    /** Geometri live node (edit titik path, pathTools.tsx). */
+    nodeGeo: (id: string): GeoNode | undefined => index.get(id),
+    /** Elemen live node di shadow root board-nya (pratinjau `d`). */
+    liveEl: (id: string): HTMLElement | undefined => {
+      const host = hostOf(id);
+      return host ? liveElement(host, id) : undefined;
+    },
   };
 }
 

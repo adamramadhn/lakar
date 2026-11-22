@@ -7423,3 +7423,129 @@ button.panel-tab:hover {
 .dot.accent {
   background: var(--accent);
 }
+
+/* Pen tool dan edit titik path (epic paste-vektor story 5, desain bagian 10 DHXJM/J7AmQi; Vector Anchor JZqLc,
+   Bezier Handle NVyza). Overlay SVG dalam koordinat layar kanvas; hit-test di pathTools.tsx (pointer-events mati). */
+.path-overlay {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+.path-overlay .pv-drawn {
+  fill: none;
+  stroke: #111111;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.path-overlay .pv-outline,
+.path-overlay .pv-handle-line {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 1;
+}
+.path-overlay .pv-preview {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 1;
+  stroke-dasharray: 4 4;
+}
+.path-overlay .pv-anchor {
+  fill: #ffffff;
+  stroke: var(--accent);
+  stroke-width: 1.5;
+}
+.path-overlay .pv-anchor.selected {
+  fill: var(--accent);
+  stroke: #ffffff;
+}
+.path-overlay .pv-handle {
+  fill: #ffffff;
+  stroke: var(--accent);
+  stroke-width: 1.5;
+}
+.path-overlay .pv-close {
+  fill: #3b82f633;
+  stroke: var(--accent);
+  stroke-width: 1.5;
+}
+.path-add-point {
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  border-radius: 9px;
+  background: var(--accent);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+.pen-cursor-tip {
+  position: absolute;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  font-size: 10px;
+  font-weight: 500;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.path-banner {
+  position: absolute;
+  top: 16px;
+  /* Kiri atas (desain: banner di kiri tombol Theme/Export); kanvas sempit → teks dipotong, bukan menimpa tombol. */
+  left: 16px;
+  max-width: calc(100% - 260px);
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: 0 8px 24px #00000033;
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.path-banner > * {
+  flex: none;
+}
+.path-banner > .path-banner-text {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.path-banner-icon {
+  color: var(--accent);
+}
+.path-banner-title {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+.path-banner-text {
+  color: var(--text-secondary);
+}
+.path-banner-divider {
+  width: 1px;
+  height: 14px;
+  background: var(--border);
+}
+.path-banner-keys {
+  color: var(--text-muted);
+}
+/* Tombol Delete point / Open path (desain Group Point Row Actions): dua kolom sama lebar. */
+.dp-point-actions .btn {
+  flex: 1;
+  min-width: 0;
+  gap: 6px;
+}

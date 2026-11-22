@@ -25,6 +25,7 @@ import { resolveDocument, type DocOp, type FindingLevel, type FindingSummary, ty
 import { boardDepKeys, boardSignature, boardSource, ensureFaces, mountLive, RenderDepsCache } from './liveBoard';
 import { api, errorText } from './api';
 import { SelectionBox, useCanvasEdit } from './canvasEdit';
+import { usePathTools, type PathEditPanel } from './pathTools';
 import { INSERT_KINDS, type InsertKind } from './codegen';
 import { COMPONENT_DRAG_TYPE, exitInstanceSelection, type ComponentInfo } from './componentModel';
 import { ExportButton } from './ExportPopover';
@@ -57,8 +58,10 @@ export type CanvasPreview = {
 export type InsertPoint = { boardId: string; x: number; y: number } | { boardId?: undefined; x: number; y: number };
 /** Marker temuan layout_check: tanpa `bounds` = temuan pada board (lingkaran di sudut board saja). */
 export type CanvasMarker = { nodeId: string; boardId: string; bounds?: [number, number, number, number]; level: FindingLevel };
-type Tool = 'select' | 'hand' | InsertKind;
-const isInsertTool = (t: Tool): t is InsertKind => t !== 'select' && t !== 'hand';
+type Tool = 'select' | 'hand' | 'pen' | InsertKind;
+const isInsertTool = (t: Tool): t is InsertKind => t !== 'select' && t !== 'hand' && t !== 'pen';
+/** Tool sisip atau Pen (kembali ke Select saat pratinjau/offline atau Escape). */
+const isDrawTool = (t: Tool) => isInsertTool(t) || t === 'pen';
 const TOOL_ICON: Record<InsertKind, IconName> = { frame: 'frame', rect: 'square', ellipse: 'circle', text: 'text', image: 'image', icon: 'shapes' };
 const TOOL_KEYS: Record<string, InsertKind> = { f: 'frame', r: 'rect', o: 'ellipse', t: 'text', i: 'icon' };
 const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
@@ -350,7 +353,13 @@ export function Canvas({
   components,
   onDropComponent,
   pastedTag,
+  onCommitCreate,
+  onPathEdit,
 }: {
+  /** Commit yang membuat node (Pen tool, epic paste-vektor story 5): id node baru, undefined bila gagal. */
+  onCommitCreate?: ((ops: DocOp[], description: string) => Promise<string | undefined>) | undefined;
+  /** Mode edit titik path berubah: data grup Point panel Design (undefined = tidak sedang mengedit). */
+  onPathEdit?: ((p: PathEditPanel | undefined) => void) | undefined;
   /** Label "Pasted · nama" node hasil paste HTML (desain rkIyP). */
   pastedTag?: { id: string; label: string } | undefined;
   /** Info komponen dokumen tersimpan (epic komponen story 4): penanda master/instance dan tag di canvas live. */
@@ -439,12 +448,32 @@ export function Canvas({
   const canInsert = editable && !preview && onInsert !== undefined;
   // Pratinjau/offline: tool sisip yang aktif kembali ke Select.
   useEffect(() => {
-    if (!canInsert) setTool((t) => (isInsertTool(t) ? 'select' : t));
+    if (!canInsert) setTool((t) => (isDrawTool(t) ? 'select' : t));
   }, [canInsert]);
   const [spaceHeld, setSpaceHeld] = useState(false);
   // Seleksi + gestur editor di canvas live (canvasEdit.tsx); jalur PNG (pratinjau versi) memakai klik board lama.
   const liveActive = live?.ok === true && !preview;
   const selectIds = useCallback((ids: string[]) => (onSelectIds ? onSelectIds(ids) : onSelect(ids[ids.length - 1])), [onSelectIds, onSelect]);
+  // Pen tool dan edit titik path (pathTools.tsx, epic paste-vektor story 5). Geometri/elemen live dibaca lewat hook
+  // edit (dipanggil sesudahnya), jadi diakses lewat ref.
+  const editRef = useRef<{ nodeGeo: (id: string) => GeoNode | undefined; liveEl: (id: string) => HTMLElement | undefined } | null>(null);
+  const canPen = canInsert && liveActive && onCommitCreate !== undefined;
+  const paths = usePathTools({
+    section: ref,
+    cam,
+    doc: live?.ok ? live.doc : undefined,
+    boards,
+    penActive: tool === 'pen' && canPen,
+    canEdit: editable && !preview && liveActive && tool === 'select' && onCommit !== undefined,
+    selection,
+    onCommit,
+    onCommitCreate,
+    onPenDone: () => setTool('select'),
+    nodeGeo: (id) => editRef.current?.nodeGeo(id),
+    liveEl: (id) => editRef.current?.liveEl(id),
+    onPanel: onPathEdit,
+  });
+  const pathMode = paths.editingId !== undefined || paths.penDrawing;
   const edit = useCanvasEdit({
     section: ref,
     cam,
@@ -458,7 +487,10 @@ export function Canvas({
     onCommit,
     components,
     pastedTag,
+    onEnterPath: (id) => paths.enter(id),
+    pathEditing: pathMode,
   });
+  editRef.current = edit;
   /** Seleksi terkini untuk listener keyboard (Escape keluar dari isi instance). */
   const selectionRef = useRef(selection);
   selectionRef.current = selection;
@@ -469,7 +501,7 @@ export function Canvas({
   useEffect(() => onSceneChangeRef.current?.(), [edit.sceneKey]);
   /** Enter dengan satu teks terpilih → edit inline (nilai render terakhir untuk listener keyboard). */
   const enterText = useRef<() => boolean>(() => false);
-  enterText.current = () => selection.length === 1 && edit.startTextEdit(selection[0]!);
+  enterText.current = () => selection.length === 1 && (edit.startTextEdit(selection[0]!) || paths.enter(selection[0]!));
   const [panning, setPanning] = useState(false);
   /** Satu pointer: `pan` = gerak menggeser kamera, `tap` = lepas tanpa gerak memilih/menyisip. */
   const drag = useRef<{ id: number; x: number; y: number; cam: Camera; moved: boolean; pan: boolean; tap: boolean; slop: number; target: string | undefined } | null>(null);
@@ -596,6 +628,8 @@ export function Canvas({
       else if (e.key === 'h' || e.key === 'H') setTool('hand');
       else if (insertKey && !e.shiftKey) {
         if (canInsert) setTool(insertKey);
+      } else if ((e.key === 'p' || e.key === 'P') && !e.shiftKey) {
+        if (canPen) setTool('pen');
       }
       else if (e.key === 'Enter' && !e.shiftKey) {
         // Satu teks terpilih → edit inline; preventDefault supaya Enter tidak masuk ke teks yang baru difokus.
@@ -608,7 +642,7 @@ export function Canvas({
       else if (e.key === 'Escape') {
         // Gestur berjalan: hanya dibatalkan (seleksi tetap).
         if (cancelEdit()) return;
-        setTool((t) => (isInsertTool(t) ? 'select' : t));
+        setTool((t) => (isDrawTool(t) ? 'select' : t));
         // Isi instance terpilih (alamat komposit, desain dQRib "Esc to exit instance"): naik ke instance terluar.
         const exited = exitInstanceSelection(selectionRef.current);
         if (exited) {
@@ -628,7 +662,7 @@ export function Canvas({
       window.removeEventListener('keyup', up);
       window.removeEventListener('blur', blur);
     };
-  }, [fit, zoomAt, size, onSelect, selectIds, canInsert, cancelEdit]);
+  }, [fit, zoomAt, size, onSelect, selectIds, canInsert, canPen, cancelEdit]);
 
   const onPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
     if ((e.target as HTMLElement).closest('.canvas-overlay-ui')) return;
@@ -653,6 +687,9 @@ export function Canvas({
     }
     // Sentuh: satu jari menggeser di Select/Hand; tap tetap memilih (Select) atau menyisip (tool sisip).
     const { pan, tap, slop } = pointerIntent({ touch, tool, spaceHeld, button: e.button });
+    // Pen tool (mouse/pen pointer): titik path baru; edit titik path mendahului seleksi biasa.
+    if (!touch && tool === 'pen' && canPen && !pan && e.button === 0 && paths.pen.onPointerDown(e)) return;
+    if (!touch && tool === 'select' && !pan && e.button === 0 && paths.editingId && paths.edit.onPointerDown(e)) return;
     // Mouse/pen dengan tool Select di canvas live: seleksi, marquee, dan gestur edit (sentuh tidak pernah ke sini).
     if (!touch && tool === 'select' && !pan && e.button === 0 && edit.onPointerDown(e)) return;
     const boardEl = (e.target as HTMLElement).closest<HTMLElement>('[data-board]');
@@ -673,6 +710,11 @@ export function Canvas({
       setCam(next);
       return;
     }
+    if (tool === 'pen' && canPen && e.pointerType !== 'touch' && !drag.current) {
+      paths.pen.onPointerMove(e);
+      return;
+    }
+    if (paths.edit.onPointerMove(e)) return;
     if (edit.onPointerMove(e)) return;
     const d = drag.current;
     if (!d || d.id !== e.pointerId) return;
@@ -699,6 +741,11 @@ export function Canvas({
   };
   const onPointerUp = (e: ReactPointerEvent<HTMLDivElement>) => {
     if (releaseTouch(e.pointerId)) return;
+    if (tool === 'pen' && canPen && e.pointerType !== 'touch' && !drag.current) {
+      paths.pen.onPointerUp(e);
+      return;
+    }
+    if (paths.edit.onPointerUp(e)) return;
     if (edit.onPointerUp(e)) return;
     const d = drag.current;
     if (d && d.id !== e.pointerId) return;
@@ -727,6 +774,8 @@ export function Canvas({
   /** Gestur dibatalkan (mis. sistem mengambil alih pointer): jari pinch → jari tersisa lanjut menggeser; selain itu bersihkan tanpa memilih. */
   const onPointerCancel = (e: ReactPointerEvent<HTMLDivElement>) => {
     if (releaseTouch(e.pointerId)) return;
+    if (tool === 'pen' && canPen && e.pointerType !== 'touch') paths.pen.onPointerCancel(e);
+    if (paths.edit.onPointerCancel(e)) return;
     if (edit.onPointerCancel(e)) return;
     if (drag.current && drag.current.id !== e.pointerId) return;
     drag.current = null;
@@ -749,13 +798,16 @@ export function Canvas({
   return (
     <section
       ref={ref}
-      className={`canvas${handMode ? ' hand' : isInsertTool(tool) ? ' inserting' : ''}${panning ? ' panning' : ''}${preview ? ' previewing' : ''}${stale !== undefined ? ' stale' : ''}${liveActive ? ' live-edit' : ''}${edit.dragging ? ' dragging' : ''}`}
+      className={`canvas${handMode ? ' hand' : isDrawTool(tool) ? ' inserting' : ''}${panning ? ' panning' : ''}${preview ? ' previewing' : ''}${stale !== undefined ? ' stale' : ''}${liveActive ? ' live-edit' : ''}${edit.dragging ? ' dragging' : ''}`}
       aria-label="Canvas"
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerCancel}
-      onPointerLeave={edit.onPointerLeave}
+      onPointerLeave={() => {
+        edit.onPointerLeave();
+        paths.pen.onPointerLeave();
+      }}
       onContextMenu={(e) => {
         if ((e.target as HTMLElement).closest('.canvas-overlay-ui') || e.nativeEvent.composedPath().some((n) => n instanceof HTMLElement && n.isContentEditable)) return;
         if (!onContextMenu) return;
@@ -829,7 +881,7 @@ export function Canvas({
         );
       })}
       {liveActive
-        ? edit.overlay
+        ? [...edit.overlay, ...paths.overlay]
         : hRect && (
             <SelectionBox
               style={{ left: cam.x + hRect.x * cam.z, top: cam.y + hRect.y * cam.z, width: Math.max(1, hRect.w * cam.z), height: Math.max(1, hRect.h * cam.z) }}
@@ -937,6 +989,17 @@ export function Canvas({
             </button>
           );
         })}
+        <button
+          type="button"
+          className={`tool${tool === 'pen' ? ' active' : ''}`}
+          aria-label="Pen (P)"
+          title={canPen ? 'Pen (P)' : preview ? 'Pen: not available while previewing a version' : !editable ? 'Pen: lakard is offline' : 'Pen: available once the canvas has rendered'}
+          aria-pressed={tool === 'pen'}
+          disabled={!canPen}
+          onClick={() => setTool(tool === 'pen' ? 'select' : 'pen')}
+        >
+          <Icon name="penTool" />
+        </button>
         <span className="divider" />
         <button type="button" className="tool zoom-btn" aria-label="Zoom out" title="Zoom out (-)" onClick={() => zoomAt(1 / 1.25, ...center())}>
           <Icon name="minus" />
