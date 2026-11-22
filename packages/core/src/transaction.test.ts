@@ -63,6 +63,33 @@ function expectAtomic(doc: LakarDocument, setup: (tx: Transaction) => void, fail
   expect(ra.entry).toEqual(rb.entry);
 }
 
+describe('add ke halaman', () => {
+  /** Fixture + halaman kedua kosong (ID halaman tidak pernah terlihat agen; dipakai viewer). */
+  const twoPages = () => {
+    const f = fixture();
+    const doc = structuredClone(f.doc);
+    doc.pages.push({ id: 'PageTwo2', name: 'Page 2', children: [] });
+    return { ...f, doc };
+  };
+
+  it('add(pageId, board) → board di halaman itu; add(null) tetap halaman pertama', () => {
+    const { doc } = twoPages();
+    const tx = beginTransaction(doc, { sessionId: 's' });
+    const b = tx.add('PageTwo2', boardIn('Baru'));
+    const c = tx.add(null, boardIn('Pertama'));
+    const r = tx.commit('add');
+    expect(r.doc.pages[1]!.children.map((n) => n.id)).toEqual([b]);
+    expect(r.doc.pages[0]!.children.map((n) => n.id)).toContain(c);
+    expect(r.created.map((e) => e.id)).toEqual([b, c]);
+    expect(parseDocument(r.doc)).toEqual(r.doc);
+  });
+
+  it('add(pageId, bukan board) → SCHEMA_INVALID, tidak berubah', () => {
+    const { doc, home } = twoPages();
+    expectAtomic(doc, (tx) => tx.update(home, { name: 'H' }), (tx) => tx.add('PageTwo2', { type: 'rect', name: 'R' }), 'SCHEMA_INVALID');
+  });
+});
+
 describe('update', () => {
   it('merge dangkal; null menghapus kunci opsional; hasil valid', () => {
     const { doc, isi } = fixture();

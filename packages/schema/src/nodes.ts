@@ -408,6 +408,8 @@ export type HistoryEntry = {
   description: string;
   opsSummary: string;
   at: string;
+  /** Klien sesi penulis (opsional; entri lama dan entri aplikasi tanpa field ini). */
+  client?: string;
 };
 
 /** `path` = list nama dari board ke node (nama boleh memuat " / "); hanya untuk dibaca, alamat op tetap `id`. */

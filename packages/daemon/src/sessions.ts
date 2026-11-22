@@ -97,6 +97,33 @@ export class Sessions {
     const at = (s: Session) => s.lastAt ?? s.createdAt;
     return [...this.#map.values()].sort((a, b) => (at(a) < at(b) ? 1 : at(a) > at(b) ? -1 : 0)).slice(0, limit);
   }
+  /** Semua sesi (urutan pembuatan), tanpa efek samping. */
+  all(): Session[] {
+    return [...this.#map.values()];
+  }
+  /**
+   * Alihkan `activeSlug` setiap sesi yang menunjuk `from` ke `to` (rename), atau kosongkan bila `to`
+   * undefined (archive/delete: agen lalu mendapat NO_ACTIVE_DOC). Mengembalikan jumlah sesi yang diubah.
+   */
+  retarget(from: string, to: string | undefined): number {
+    let n = 0;
+    for (const s of this.#map.values()) {
+      if (s.activeSlug !== from) continue;
+      if (to === undefined) delete s.activeSlug;
+      else s.activeSlug = to;
+      n++;
+    }
+    return n;
+  }
+  /** Sesi dengan id penuh, tanpa efek samping. */
+  byId(id: string): Session | undefined {
+    return this.#map.get(id);
+  }
+  /** Sesi dari header tanpa efek samping (tidak mengubah `lastAt`, tidak melempar). */
+  peek(header: string | string[] | undefined): Session | undefined {
+    const id = Array.isArray(header) ? header[0] : header;
+    return id ? this.#map.get(id) : undefined;
+  }
   /** Sesi dari header; tidak ada/tidak dikenal → NOT_FOUND (HTTP 401) agar klien membuat sesi baru. */
   require(header: string | string[] | undefined): Session {
     const id = Array.isArray(header) ? header[0] : header;

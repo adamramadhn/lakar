@@ -36,6 +36,7 @@ export async function startDaemon(config: DaemonConfig, opts: StartOptions = {})
     pageUrl: () => `${url}/render/page`,
     timeoutMs: config.renderTimeoutMs,
     pages: config.renderPages,
+    ...(config.browserChannel ? { browserChannel: config.browserChannel } : {}),
     fonts,
     icons,
     ...(opts.onLease ? { onLease: opts.onLease } : {}),

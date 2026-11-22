@@ -34,6 +34,7 @@ import { readAsset } from './assets.js';
 import { PhotoService, SEARCH_LIMIT_MAX } from './photos/service.js';
 import { notFound } from './errors.js';
 import { runCheck } from './check.js';
+import { CheckLedger } from './checks.js';
 import { readRenderModule, RENDER_PAGE_HTML } from './chromium.js';
 import type { DaemonConfig } from './config.js';
 import { FontRegistry } from './fonts.js';
@@ -41,6 +42,12 @@ import { INSPECT_DEPTH_DEFAULT, INSPECT_DEPTH_MAX, WIP_PREFIX, boundsMap, inspec
 import { readPngSize } from './png.js';
 import { Sessions, UnknownSessionError, logExecute, recallFailed, rememberFailed } from './sessions.js';
 import { DocStore } from './store.js';
+import { ActivityBus, registerActivityHooks } from './events.js';
+import { registerConnectionRoutes } from './connections.js';
+import { registerFileRoutes } from './files.js';
+import { registerPageRoutes } from './pages.js';
+import { registerExportRoutes } from './export.js';
+import { VIEWER_DIST_DIR, registerViewerRoutes } from './viewer.js';
 
 const STATUS: Record<ErrorCode, number> = {
   SCHEMA_INVALID: 400,
@@ -56,6 +63,18 @@ const STATUS: Record<ErrorCode, number> = {
   EXPORT_FAILED: 500,
   VERSION_MISMATCH: 409,
 };
+
+const SVG_TAGS = new Set(['path', 'circle', 'ellipse', 'rect', 'line', 'polyline', 'polygon']);
+const xmlAttr = (v: string) => v.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+/** Glyph katalog → SVG mandiri (warna netral, terbaca di tema gelap dan terang). */
+function glyphSvg(g: IconGlyph): string {
+  const paint = g.kind === 'stroke' ? 'fill="none" stroke="#8A8A8A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"' : 'fill="#8A8A8A"';
+  const body = g.nodes
+    .filter(([tag]) => SVG_TAGS.has(tag))
+    .map(([tag, attrs]) => `<${tag} ${Object.entries(attrs).filter(([k]) => /^[a-z-]+$/i.test(k)).map(([k, v]) => `${k}="${xmlAttr(String(v))}"`).join(' ')}/>`)
+    .join('');
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${g.viewBox.join(' ')}" ${paint}>${body}</svg>`;
+}
 
 /** Route statis (modul render, font, aset): `<what> tidak ada`. */
 const fileNotFound = (what: string) => notFound(`${what} tidak ada`, 'periksa path');
@@ -163,6 +182,8 @@ export type BuildOptions = {
   skillsDir?: string;
   /** Layanan foto stok (default: Unsplash → Wikimedia → Openverse dengan key dari `config.unsplashKeyFile`). */
   photos?: PhotoService;
+  /** Interval heartbeat SSE `/viewer/events` (default 15 dtk; untuk test). */
+  activityHeartbeatMs?: number;
 };
 
 export type Daemon = {
@@ -172,6 +193,8 @@ export type Daemon = {
   fonts: FontRegistry;
   icons: IconCatalogPort<string, IconGlyph>;
   photos: PhotoService;
+  /** Bus event aktivitas viewer (`GET /viewer/events`). */
+  activity: ActivityBus;
   startedAt: string;
 };
 
@@ -182,11 +205,14 @@ export function buildServer({
   icons = IconCatalog.load(),
   skillsDir = SKILLS_DIR,
   photos = new PhotoService({ dataDir: config.dataDir, keyFile: config.pexelsKeyFile, unsplashKeyFile: config.unsplashKeyFile, unsplashAppName: config.unsplashAppName }),
+  activityHeartbeatMs,
 }: BuildOptions): Daemon {
   const app = Fastify({ logger: false, bodyLimit: 1024 * 1024 });
   const startedAt = new Date();
   const store = new DocStore(config.dataDir);
   const sessions = new Sessions();
+  const activity = new ActivityBus();
+  const checks = new CheckLedger();
   const docLocks = new DocumentLocks();
   /** Daemon pemilik tunggal (AD-1): salinan terkini per slug. */
   const docs = new Map<string, LakarDocument>();
@@ -217,6 +243,28 @@ export function buildServer({
       { code: 'EXEC_ERROR', message: `kesalahan internal daemon: ${errorMessage(err)}`, hint: 'coba lagi; periksa log lakard', retryable: true },
       500,
     );
+  });
+
+  // Stream aktivitas viewer (Viewer B slice 2): hook di luar handler + `GET /viewer/events`. Didaftarkan
+  // sebelum route supaya hook berlaku untuk semua route tool.
+  registerActivityHooks(app, { sessions, bus: activity, ...(activityHeartbeatMs !== undefined ? { heartbeatMs: activityHeartbeatMs } : {}) });
+
+  // Route tulis `/viewer/*` tanpa sesi: tolak permintaan lintas situs. Browser selalu mengirim `Origin` pada POST/DELETE
+  // (juga `mode:'no-cors'` tanpa preflight); origin selain daemon sendiri → 403. Tanpa Origin (CLI, tes, MCP) tetap boleh.
+  app.addHook('onRequest', async (req, reply) => {
+    if (req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS' || !req.url.startsWith('/viewer/')) return;
+    const origin = req.headers.origin;
+    if (origin === undefined) return;
+    const addr = app.server.address();
+    const port = addr && typeof addr === 'object' ? addr.port : config.port;
+    let host: string | undefined;
+    try {
+      host = new URL(origin).host;
+    } catch {
+      host = undefined;
+    }
+    if (host === `127.0.0.1:${port}` || host === `localhost:${port}`) return;
+    return fail(reply, { code: 'SCHEMA_INVALID', message: `origin ${origin} tidak diizinkan`, hint: `buka viewer dari http://127.0.0.1:${port}/app/`, retryable: false }, 403);
   });
 
   const parse = <T>(schema: z.ZodType<T>, body: unknown, hint: string): T => {
@@ -378,7 +426,9 @@ export function buildServer({
 
     // 4. Transaksi + snippet → commit → simpan → keep.
     const data = await docLocks.run(slug, async () => {
-      const doc = docs.get(slug)!;
+      // Rename/archive/delete yang antre lebih dulu di kunci ini bisa melepas slug dari sesi: sama dengan cek awal.
+      const doc = docs.get(slug);
+      if (!doc) throw new LakarError('NO_ACTIVE_DOC', 'sesi ini belum punya dokumen aktif', { hint: 'panggil open_doc {slug} terlebih dahulu' });
       let committed;
       try {
         // AD-4: error tak tertangkap di snippet → lempar di dalam body → rollback penuh oleh `transact`.
@@ -424,8 +474,10 @@ export function buildServer({
           checkMs: Math.round((performance.now() - t0) * 10) / 10,
           summary,
         };
-        await store.commit(slug, committed.doc, committed.entry);
+        // Klien sesi ikut dicatat (opsional) supaya "Last agent" Dashboard tetap terbaca setelah restart.
+        await store.commit(slug, committed.doc, session.client ? { ...committed.entry, client: session.client } : committed.entry);
         docs.set(slug, committed.doc);
+        checks.record(committed.doc.id, doc.rev, committed.doc.rev, ran.boards);
         result = { docId: committed.doc.id, rev: committed.doc.rev, created: committed.created };
       }
       session.keep = run.keep;
@@ -588,6 +640,7 @@ export function buildServer({
     } else boardIds = doc.pages.flatMap((p) => p.children.map((b) => b.id));
     for (const id of boardIds) assertIcons(findBoard(doc, id)!);
     const ran = await runCheck(render, doc, boardIds);
+    checks.record(stored.id, stored.rev, stored.rev, ran.boards);
     return ok(reply, { docId: stored.id, rev: stored.rev, boards: ran.boards, summary: summarizeFindings(ran.findings), findings: ran.findings });
   });
 
@@ -626,6 +679,26 @@ export function buildServer({
     return reply.type('font/woff2').header('cache-control', 'public, max-age=31536000, immutable').send(await readFile(path));
   });
 
+  // Viewer baca-saja (Viewer B slice 1): `/viewer/*` dan `/app/*`. Route lama tidak berubah.
+  registerViewerRoutes(app, { docs, store, sessions, checks, distDir: config.viewerDir ?? VIEWER_DIST_DIR });
+  registerFileRoutes(app, { docs, store, sessions, docLocks, activity, dataDir: config.dataDir });
+  registerPageRoutes(app, { docs, store, docLocks, activity });
+  registerExportRoutes(app, { docs, store, render, icons });
+  registerConnectionRoutes(app, { host: config.host, port: config.port, ...(config.mcpEntry ? { mcpEntry: config.mcpEntry } : {}) });
+
+  // Pratinjau ikon untuk pemilih Icon… di viewer (aplikasi 4): glyph katalog sebagai SVG statis. Pencarian tetap lewat
+  // `/icons/search`; route ini hanya menggambar hasilnya. Tag di luar daftar putih dilewati.
+  app.get<{ Params: { lib: string; icon: string } }>('/viewer/icons/:lib/:icon', async (req, reply) => {
+    const { lib, icon } = req.params;
+    const glyph = (ICON_LIBS as readonly string[]).includes(lib) ? (icons.glyph(lib as (typeof ICON_LIBS)[number], icon) as IconGlyph | undefined) : undefined;
+    if (!glyph) throw fileNotFound(`ikon ${lib}/${icon}`);
+    return reply
+      .type('image/svg+xml; charset=utf-8')
+      .header('cache-control', 'public, max-age=86400')
+      .header('content-security-policy', "default-src 'none'; style-src 'unsafe-inline'")
+      .send(glyphSvg(glyph));
+  });
+
   // Aset gambar (story 8): `<dataDir>/assets/<sha256>`, hanya raster dari magic bytes; lainnya → 404.
   // Aset jarak jauh (Unsplash): meta tanpa byte di `assets/`, disajikan dari cache render daemon (hotlink resmi saat
   // miss); cache dingin + jaringan gagal → placeholder berwarna foto (`no-store`, dicatat untuk respons screenshot/export).
@@ -637,5 +710,5 @@ export function buildServer({
     return reply.type(remote.type).header('cache-control', remote.placeholder ? 'no-store' : 'no-cache').send(remote.body);
   });
 
-  return { app, store, sessions, fonts, icons, photos, startedAt: startedAt.toISOString() };
+  return { app, store, sessions, fonts, icons, photos, activity, startedAt: startedAt.toISOString() };
 }
