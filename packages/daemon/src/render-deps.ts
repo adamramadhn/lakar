@@ -77,4 +77,10 @@ export function registerRenderDepsRoutes(app: FastifyInstance, { fonts, icons }:
     }
     return reply.code(200).header('cache-control', 'no-cache').send({ ok: true, data });
   });
+
+  // Daftar font terpasang untuk panel Design (editor-canvas story 5): keluarga + bobot + gaya, urut nama. Baca-saja.
+  app.get('/viewer/fonts', async (_req, reply) => {
+    const families = fonts.entries().sort((a, b) => a.family.localeCompare(b.family));
+    return reply.code(200).header('cache-control', 'no-cache').send({ ok: true, data: { families } });
+  });
 }

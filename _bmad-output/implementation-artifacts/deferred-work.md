@@ -92,3 +92,12 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-editor-4-select-move-resize.md`
   summary: Wiring gestur `useCanvasEdit` (pointer → satu `onCommit` per gestur, Escape tanpa request, reorder noop, pratinjau tertahan) dan alur integrasi viewer + daemon (rev per gestur, undo round trip) belum punya tes otomatis; hanya smoke Playwright manual.
   evidence: Vitest tanpa environment DOM; helper murni (`gesture.ts`, `liveGeometry.ts`, `undoHistory.ts`) sudah dites. Usul: ekstrak mesin state gestur murni atau e2e Playwright `/app/` (bersama deferred story 3).
+- source_spec: `_bmad-output/implementation-artifacts/spec-editor-5-design-panel.md`
+  summary: Ikon mata (visibilitas) pada baris fill dan shadow di desain bagian 05 tidak ditampilkan karena skema v3 tidak punya `visible` pada Fill/Shadow.
+  evidence: AD-1 melarang properti tanpa padanan render; menambah `visible` butuh kenaikan schemaVersion (AD-3), pemetaan render/codegen, dan korpus. Usul: gabungkan dengan story skema berikutnya (mis. story 7 grid v4).
+- source_spec: `_bmad-output/implementation-artifacts/spec-editor-5-design-panel.md`
+  summary: Scrub nilai di panel Design hanya mempratinjau angka di kolom; canvas live baru berubah sesudah commit saat lepas.
+  evidence: AD-7 hanya mewajibkan pratinjau lokal; pratinjau canvas butuh pemetaan properti → gaya DOM sementara per node (css.ts). Usul: pakai deklarasi `@lakar/render` css.ts pada elemen live selama scrub.
+- source_spec: `_bmad-output/implementation-artifacts/spec-editor-5-design-panel.md`
+  summary: Wiring komponen `DesignPanel` (Field Enter/blur/Escape/scrub, color picker `change`, drag urutan fill) belum punya tes otomatis; logika patch/parse dites murni dan alur dicek dengan smoke Playwright msedge.
+  evidence: Vitest viewer tanpa environment DOM. Usul: e2e Playwright `/app/` bersama deferred story 3 dan 4.

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import { NODE_ATTR } from '@lakar/render';
 import type { BoardNode } from '@lakar/schema';
-import { measureBoard } from './liveGeometry.js';
+import { measureBoard, measureLiveSize } from './liveGeometry.js';
 
 /** Host palsu: shadow root dengan elemen ber-`data-lakar-id` dan kotak layar (skala 0.5, board di layar (100, 50)). */
 function fakeHost(rects: Record<string, [number, number, number, number]>) {
@@ -56,5 +57,27 @@ describe('measureBoard', () => {
   it('node tanpa elemen dilewati; board belum di-mount → undefined', () => {
     expect(g.children.map((c) => c.id)).toEqual(['FFFFFFFF', 'WWWWWWWW']);
     expect(measureBoard(fakeHost({}), board, { x: 0, y: 0 })).toBeUndefined();
+  });
+});
+
+describe('measureLiveSize', () => {
+  // Host natural 400 px, tampil 200 px (zoom 0.5). Selektor harus persis atribut Canvas (`data-live-board`) dan
+  // render (`NODE_ATTR`). Elemen SVG 50×25 px di layar → 100×50 desain; elemen HTML memakai offsetWidth/Height.
+  const svg = { getBoundingClientRect: () => ({ left: 0, top: 0, width: 50, height: 25 }) };
+  const html = { offsetWidth: 120, offsetHeight: 40, getBoundingClientRect: () => ({ left: 0, top: 0, width: 999, height: 999 }) };
+  const nodes: Record<string, unknown> = { [`[${NODE_ATTR}="NNNNNNNN"]`]: svg, [`[${NODE_ATTR}="HHHHHHHH"]`]: html };
+  const host = {
+    offsetWidth: 400,
+    getBoundingClientRect: () => ({ left: 0, top: 0, width: 200, height: 150 }),
+    shadowRoot: { querySelector: (sel: string) => nodes[sel] ?? null },
+  };
+  const root = { querySelector: (sel: string) => (sel === '[data-live-board="BBBBBBBB"]' ? host : null) } as unknown as ParentNode;
+  it('SVG: ukuran layar dibagi skala host; HTML: ukuran layout tanpa transform (rotasi tidak menggelembung)', () => {
+    expect(measureLiveSize(root, 'BBBBBBBB', 'NNNNNNNN')).toEqual({ w: 100, h: 50 });
+    expect(measureLiveSize(root, 'BBBBBBBB', 'HHHHHHHH')).toEqual({ w: 120, h: 40 });
+  });
+  it('board atau node belum di-mount → undefined', () => {
+    expect(measureLiveSize(root, 'XXXXXXXX', 'NNNNNNNN')).toBeUndefined();
+    expect(measureLiveSize(root, 'BBBBBBBB', 'ZZZZZZZZ')).toBeUndefined();
   });
 });

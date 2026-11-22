@@ -100,3 +100,16 @@ describe('parse kunci', () => {
     expect(parseIconKey('simple-icons/github')).toEqual({ lib: 'simple-icons', icon: 'github' });
   });
 });
+
+describe('GET /viewer/fonts', () => {
+  it('keluarga terpasang + bobot + gaya, urut nama', async () => {
+    const r = await app.inject({ method: 'GET', url: '/viewer/fonts' });
+    expect(r.statusCode).toBe(200);
+    const { families } = r.json().data as { families: { family: string; weights: number[]; styles: string[] }[] };
+    const names = families.map((f) => f.family);
+    expect(names).toEqual([...names].sort((a, b) => a.localeCompare(b)));
+    const inter = families.find((f) => f.family === 'Inter');
+    expect(inter?.weights).toContain(400);
+    expect(inter?.styles).toContain('normal');
+  });
+});

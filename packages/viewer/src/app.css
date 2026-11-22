@@ -2009,59 +2009,6 @@ button.panel-tab:hover {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.inspect-section {
-  padding: 12px 14px;
-  border-bottom: 1px solid var(--border);
-}
-.inspect-section h3 {
-  margin: 0 0 8px;
-  font-size: 11px;
-  font-weight: 600;
-}
-.prop {
-  display: grid;
-  grid-template-columns: 110px minmax(0, 1fr);
-  gap: 8px;
-  min-height: 26px;
-  align-items: center;
-  font-size: 12px;
-}
-.prop-label {
-  color: var(--text-secondary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.prop-value {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-family: var(--font-mono);
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-.clamp {
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-.swatch {
-  width: 14px;
-  height: 14px;
-  border-radius: 3px;
-  flex: none;
-  box-shadow: inset 0 0 0 1px #8080804d;
-}
-.copy-as {
-  display: flex;
-  gap: 6px;
-}
-.copy-as .btn {
-  flex: 1;
-  min-width: 0;
-  height: 30px;
-  gap: 6px;
-}
 .read-only-note {
   margin-top: auto;
   display: flex;
@@ -2070,6 +2017,344 @@ button.panel-tab:hover {
   padding: 12px 14px;
   color: var(--text-secondary);
   font-size: 11px;
+}
+
+/* Panel Design (editor-canvas story 5): komponen Section 00 DESIGN PANEL dan grup bagian 05 Editor. */
+.design-panel .selection-header {
+  padding: 10px 14px;
+}
+.design-panel .selection-info {
+  flex: 1;
+}
+.dp-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 14px 10px;
+  border-bottom: 1px solid var(--border);
+}
+.dp-group.empty {
+  gap: 0;
+}
+.dp-group-header {
+  display: flex;
+  align-items: center;
+  min-height: 13px;
+}
+.dp-group-header h3 {
+  flex: 1;
+  margin: 0;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.dp-header-btn {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  margin: -3px -3px -3px 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.dp-header-btn:hover:not(:disabled) {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+.dp-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.dp-row > * {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.dp-row > .dp-w96 {
+  flex: 0 0 96px;
+}
+.dp-row > .dp-w64 {
+  flex: 0 0 64px;
+}
+.dp-row > .dp-grow {
+  flex: 1 1 0;
+}
+.dp-row > .dp-icon-btn,
+.dp-row > .dp-row-label {
+  flex: none;
+}
+.dp-row-label {
+  margin-right: auto;
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+.dp-row > .dp-sides {
+  flex: 0 0 148px;
+}
+.dp-field,
+.dp-select {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 28px;
+  padding: 0 8px;
+  border-radius: 5px;
+  background: var(--input);
+  font-size: 12px;
+  min-width: 0;
+}
+.dp-select {
+  gap: 6px;
+}
+.dp-field:focus-within,
+.dp-select:focus-within {
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+.dp-field.disabled,
+.dp-select.disabled {
+  opacity: 0.6;
+}
+.dp-field-label {
+  flex: none;
+  color: var(--text-muted);
+  font-size: 11px;
+  white-space: nowrap;
+  user-select: none;
+}
+.dp-field-label.scrub {
+  cursor: ew-resize;
+}
+.dp-field-value,
+.dp-inline {
+  flex: 1;
+  min-width: 0;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 12px;
+}
+.dp-field-value::placeholder,
+.dp-inline::placeholder {
+  color: var(--text-muted);
+}
+.dp-select select {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding: 0 14px 0 0;
+  border: 0;
+  outline: 0;
+  appearance: none;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.dp-select select option {
+  background: var(--modal);
+  color: var(--text-primary);
+}
+.dp-select-chevron {
+  position: absolute;
+  right: 8px;
+  color: var(--text-secondary);
+  pointer-events: none;
+}
+.dp-token {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  height: 18px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 4px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.dp-token.static {
+  cursor: default;
+}
+.dp-seg {
+  display: flex;
+  gap: 2px;
+  height: 28px;
+  padding: 2px;
+  border-radius: 6px;
+  background: var(--input);
+}
+.dp-seg-item {
+  flex: 1 1 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-width: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.dp-seg-item:hover:not(:disabled):not(.active) {
+  color: var(--text-primary);
+}
+.dp-seg-item.active {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.dp-seg-item:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+.dp-seg-item.active:disabled {
+  opacity: 0.7;
+}
+.dp-paint {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.dp-paint.drop-over .dp-paint-box {
+  box-shadow: inset 0 2px 0 var(--accent);
+}
+.dp-paint-box {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 28px;
+  padding: 0 6px;
+  border-radius: 5px;
+  background: var(--input);
+  min-width: 0;
+}
+.dp-paint-box:focus-within {
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+.dp-paint-value {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+.dp-paint-value .dp-inline,
+.dp-paint-opacity .dp-inline {
+  font-family: var(--font-mono);
+}
+.dp-paint-opacity {
+  flex: none;
+  width: 42px;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  text-align: right;
+}
+.dp-paint-opacity .dp-inline {
+  text-align: right;
+  color: var(--text-secondary);
+}
+.dp-muted {
+  color: var(--text-muted);
+  font-family: var(--font-ui);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dp-swatch {
+  position: relative;
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+.dp-swatch i {
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+  box-shadow: inset 0 0 0 1px var(--border);
+  background-color: transparent;
+}
+.dp-swatch input[type='color'] {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+.dp-swatch:disabled,
+.dp-swatch.disabled {
+  cursor: default;
+}
+.dp-icon-btn {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 28px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.dp-icon-btn.boxed {
+  width: 28px;
+}
+.dp-icon-btn:hover:not(:disabled) {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+.dp-icon-btn.active {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.dp-icon-btn:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+.copy-menu-btn.done {
+  color: var(--success);
+}
+.dp-fill {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.dp-fill-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-left: 12px;
+  padding-left: 10px;
+  border-left: 1px solid var(--border);
 }
 .checks-summary {
   padding: 14px;

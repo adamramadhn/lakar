@@ -16,19 +16,6 @@ export function relativeTime(iso: string | number, now = Date.now()): string {
   return new Date(t).toLocaleDateString();
 }
 
-/** Nilai properti apa adanya: token → `$nama`, array/objek → JSON ringkas. */
-export function formatValue(v: unknown): string {
-  if (v === undefined || v === null) return '–';
-  if (typeof v === 'object' && v !== null && '$token' in v) return `$${String((v as { $token: unknown }).$token)}`;
-  if (typeof v === 'number') return String(Math.round(v * 100) / 100);
-  if (typeof v === 'string' || typeof v === 'boolean') return String(v);
-  if (Array.isArray(v) && v.every((x) => typeof x === 'number' || (typeof x === 'object' && x !== null && '$token' in x))) return v.map(formatValue).join(', ');
-  return JSON.stringify(v);
-}
-
-/** Warna hex yang bisa digambar sebagai swatch (bukan token). */
-export const hexColor = (v: unknown): string | undefined => (typeof v === 'string' && /^#[0-9a-f]{6}([0-9a-f]{2})?$/i.test(v) ? v : undefined);
-
 export type TreeNode = { id: string; name: string; type: string; children?: TreeNode[] };
 export type NodeInfo = { id: string; name: string; type: string; boardId: string; pageIndex: number; path: string[]; parentId: string | undefined };
 

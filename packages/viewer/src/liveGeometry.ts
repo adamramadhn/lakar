@@ -12,6 +12,26 @@ export function liveElement(host: HTMLElement, id: string): HTMLElement | undefi
 }
 
 /**
+ * Ukuran node `id` di board live `boardId` dalam koordinat desain (panel Design story 5: W/H hug/fill dan Fixed dari
+ * ukuran terukur). Host `[data-live-board]` berukuran natural dan diskalakan `transform`, jadi skala = lebar layar host
+ * ÷ `offsetWidth`. ID node/board alfanumerik (skema), sehingga aman dipakai langsung di selektor atribut.
+ */
+export function measureLiveSize(root: ParentNode, boardId: string, id: string): { w: number; h: number } | undefined {
+  const host = root.querySelector<HTMLElement>(`[data-live-board="${boardId}"]`);
+  const el = host?.shadowRoot?.querySelector(`[${NODE_ATTR}="${id}"]`);
+  if (!host || !el) return undefined;
+  const round = (n: number) => Math.round(n * 100) / 100;
+  // Elemen HTML: ukuran layout tanpa transform (rotasi node dan skala kamera tidak menggelembungkan kotak).
+  const box = el as Partial<HTMLElement>;
+  if (typeof box.offsetWidth === 'number' && typeof box.offsetHeight === 'number') return { w: round(box.offsetWidth), h: round(box.offsetHeight) };
+  // Elemen SVG (tanpa offsetWidth): kotak layar dibagi skala host.
+  const hr = host.getBoundingClientRect();
+  const k = host.offsetWidth > 0 && hr.width > 0 ? hr.width / host.offsetWidth : 1;
+  const r = el.getBoundingClientRect();
+  return { w: round(r.width / k), h: round(r.height / k) };
+}
+
+/**
  * Pohon geometri board `board` (posisi halaman `at`) dari DOM live di `host`. Skala = lebar layar elemen board /
  * lebar board. Node tanpa elemen (belum di-mount) dilewati bersama turunannya. Board belum di-mount → undefined.
  */

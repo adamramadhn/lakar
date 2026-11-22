@@ -20,14 +20,14 @@
 // ulang dokumen, dan dokumen yang diarsip/dihapus di jendela lain menampilkan pesan dengan jalan kembali ke
 // Dashboard/Archive (`requestCloseTab`), bukan 404 mentah. Rename di jendela lain ditangani App (tab ikut pindah).
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
-import type { DocOp, LakarDocument } from '@lakar/schema';
+import { resolveDocument, type DocOp, type LakarDocument } from '@lakar/schema';
 import { toggleSelection } from './gesture';
 import { EMPTY_STACKS, recordCommit, settleStep, takeStep, type UndoStacks } from './undoHistory';
 import { activityHub, editChange, goneReason, harnessLabel, revChange, sessionsForSlug, slugAppeared, type StreamEvent } from './activity';
 import { ActivityPanel } from './ActivityPanel';
 import { BottomSheet } from './BottomSheet';
 import { AddLayerButton, IconPicker, Toast, type ToastState } from './AddLayer';
-import { api, ApiError, errorText, OfflineError, type HistoryEntry, type InspectResult, type LayoutCheck } from './api';
+import { api, ApiError, errorText, OfflineError, type FontFamily, type HistoryEntry, type InspectResult, type LayoutCheck } from './api';
 import { Canvas, type CanvasMarker, type CanvasPreview, type Focus, type Highlight, type InsertPoint } from './Canvas';
 import { failureText, imageFileProblem, insertBoardAt, insertBoardPlaced, insertIntoBoard, canvasInsertTarget, menuInsertTarget, removeNode, type InsertExtra, type InsertKind, type InsertTarget } from './codegen';
 import { resolvePageIndex } from './pages';
@@ -39,7 +39,10 @@ import { FileMenu } from './FileMenu';
 import { useNow, useOffline, useRetry } from './hooks';
 import { Icon, NODE_ICON } from './icons';
 import { Modal } from './NewFileDialog';
-import { ChecksPanel, InspectPanel } from './panels';
+import { ChecksPanel } from './panels';
+import { DesignPanel } from './DesignPanel';
+import { parentLayoutOf, type DesignTarget } from './designModel';
+import { measureLiveSize } from './liveGeometry';
 import { agentPresence, layerMarks, type LayerMarkInfo } from './presence';
 import { sheetForTab, type SheetState } from './sheet';
 import { requestCloseTab } from './tabs';
@@ -67,7 +70,7 @@ const DRAWER_QUERY = '(max-width: 1100px)';
 type Tab = PanelTab;
 const TABS: { id: Tab; label: string }[] = [
   { id: 'activity', label: 'Activity' },
-  { id: 'inspect', label: 'Inspect' },
+  { id: 'design', label: 'Design' },
   { id: 'checks', label: 'Checks' },
   { id: 'history', label: 'History' },
 ];
@@ -282,6 +285,29 @@ export function Viewer({ slug }: { slug: string }) {
   const previewDoc = preview?.doc.state === 'ok' ? preview.doc.value : undefined;
   const shown = previewDoc ?? current;
   const index = useMemo(() => (shown ? indexDocument(shown) : new Map<string, NodeInfo>()), [shown]);
+  /** Dokumen tampil ter-resolve (AD-10): nilai token untuk panel Design (swatch, detach). Resolve gagal → nilai tersimpan. */
+  const resolvedShown = useMemo(() => {
+    if (!shown) return undefined;
+    try {
+      return resolveDocument(shown) as unknown as LakarDocument;
+    } catch {
+      return undefined;
+    }
+  }, [shown]);
+  /** Font terpasang di lakard untuk Typography (GET /viewer/fonts); dimuat saat tab Design dibuka, dicoba lagi saat Retry/koneksi pulih (`attempt`). */
+  const [fonts, setFonts] = useState<FontFamily[]>([]);
+  const needFonts = tab === 'design' && fonts.length === 0;
+  useEffect(() => {
+    if (!needFonts) return;
+    let live = true;
+    api.fonts().then(
+      (f) => live && setFonts(f),
+      () => {},
+    );
+    return () => {
+      live = false;
+    };
+  }, [needFonts, attempt]);
   // Halaman aktif per ID. Tidak ada di dokumen: pratinjau versi lama atau halaman baru yang belum termuat → indeks
   // terakhir; selain itu halaman sudah dihapus → tetangga (resolvePageIndex).
   const pageFound = pageId !== undefined && !!shown?.pages.some((p) => p.id === pageId);
@@ -516,7 +542,8 @@ export function Viewer({ slug }: { slug: string }) {
       return;
     }
     let live = true;
-    setInspect({ state: 'loading' });
+    // Node sama (rev baru): data lama tetap tampil sampai hasil baru tiba (tanpa kedip highlight).
+    setInspect((p) => (p?.state === 'ok' && p.value.node.id === selectedId ? p : { state: 'loading' }));
     api.inspect(slug, selectedId, 0).then(
       (r) => live && setInspect({ state: 'ok', value: r }),
       (e) => live && setInspect({ state: 'error', message: errorText(e) }),
@@ -524,7 +551,8 @@ export function Viewer({ slug }: { slug: string }) {
     return () => {
       live = false;
     };
-  }, [slug, selectedId, attempt, preview]);
+    // Panel Design: diukur ulang tiap rev (Copy as dan posisi terukur mengikuti edit); tab lain hanya saat seleksi berubah.
+  }, [slug, selectedId, attempt, preview, tab === 'design' ? currentRev : undefined]);
 
   useRetry(() => {
     loadDoc();
@@ -889,8 +917,21 @@ export function Viewer({ slug }: { slug: string }) {
     }
     markers.push(...byNode.values());
   }
-  /** Induk node terpilih (frame/board berlayout) untuk "Parent layout" di Inspect. */
-  const parentNode = selectedInfo?.parentId ? findNode(d, selectedInfo.parentId) : undefined;
+  /**
+   * Target panel Design (story 5): node tersimpan + pasangan ter-resolve + layout induk + ukuran terukur DOM live, urut
+   * seleksi (terakhir = primer). Hanya dihitung saat tab Design terbuka.
+   */
+  const designTargets: DesignTarget[] =
+    tab === 'design'
+      ? selection.flatMap((id) => {
+          const info = index.get(id);
+          const n = findNode(d, id);
+          if (!info || !n) return [];
+          const parentLayout = parentLayoutOf(info.type, info.parentId ? findNode(d, info.parentId) : undefined);
+          const r = resolvedShown ? findNode(resolvedShown, id) : undefined;
+          return [{ id, type: n.type, name: n.name, stored: n, resolved: r ?? n, parentLayout, measured: measureLiveSize(document, info.boardId, id) }];
+        })
+      : [];
   const docHasBoards = d.pages.some((p) => p.children.length > 0);
   const meta = previewDoc
     ? `Previewing rev ${d.rev} · latest ${latestDoc.rev}`
@@ -1083,7 +1124,17 @@ export function Viewer({ slug }: { slug: string }) {
 
       <BottomSheet state={sheet} onState={setSheet} tabs={TABS} tab={tab} onTab={openTab} summary={summary} onChecks={() => openTab('checks')}>
         <div className="panel-body">
-          {tab === 'inspect' && <InspectPanel info={selectedInfo} inspect={inspect} parent={parentNode} />}
+          {tab === 'design' && (
+            <DesignPanel
+              targets={designTargets}
+              path={selectedInfo?.path ?? []}
+              editable={editable}
+              fonts={fonts}
+              inspectNode={inspect?.state === 'ok' ? inspect.value.node : undefined}
+              rev={d.rev}
+              onCommit={commitOps}
+            />
+          )}
           {tab === 'checks' && <ChecksPanel checks={checks} index={index} selectedId={selectedId} onSelect={select} onRun={runChecks} hasBoards={d.pages.some((p) => p.children.length > 0)} />}
           {tab === 'activity' && <ActivityPanel views={views} connected={activity.connected} offline={offline} follow={follow} onFollow={setFollow} nameOf={nameOf} />}
           {tab === 'history' && (

@@ -85,6 +85,8 @@ export type PageResult = { slug: string; rev: number; pageId: string };
  * di commit ini, termasuk subtree yang disisip ulang `insert` (undo hapus) dengan ID lamanya, jadi bukan hanya node baru.
  */
 export type OpsResult = { slug: string; rev: number; created: { id: string; name: string; path: string[] }[]; inverse: DocOp[]; refs: Record<string, string> };
+/** Font terpasang (GET /viewer/fonts). */
+export type FontFamily = { family: string; weights: number[]; styles: string[] };
 export type LayoutCheck = { docId: string; rev: number; boards: unknown; summary: FindingSummary; findings: Finding[]; ranAt: number };
 
 /** lakard tidak bisa dihubungi (jaringan). */
@@ -280,6 +282,12 @@ class ViewerClient {
     for (const i of keys.icons) qs.append('icon', i);
     const s = qs.toString();
     return request<RenderDepsResult>('GET', `/viewer/render-deps${s ? `?${s}` : ''}`);
+  }
+
+  /** Font terpasang di lakard (GET /viewer/fonts): keluarga + bobot + gaya, urut nama (panel Design). */
+  async fonts(): Promise<FontFamily[]> {
+    const { families } = await request<{ families: FontFamily[] }>('GET', '/viewer/fonts');
+    return families;
   }
 
   /** Riwayat revisi dokumen (GET /viewer/docs/:slug/history), urut rev turun. */
