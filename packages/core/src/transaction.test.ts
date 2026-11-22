@@ -421,7 +421,7 @@ describe('commit', () => {
       tx.update(judul, { x: 1 });
     } catch {}
     const r = tx.commit('baca saja');
-    expect(r).toEqual({ doc, entry: null, created: [] });
+    expect(r).toEqual({ doc, entry: null, created: [], inverse: [] });
     expect(r.doc).toBe(doc);
     expect(tx.open).toBe(false);
   });
@@ -521,7 +521,7 @@ describe('transact', () => {
   it('tanpa op → entry null, dokumen asli', async () => {
     const doc = createDocument();
     const r = await transact(doc, { sessionId: 's', description: 'baca' }, () => 2);
-    expect(r).toEqual({ value: 2, doc, entry: null, created: [] });
+    expect(r).toEqual({ value: 2, doc, entry: null, created: [], inverse: [] });
   });
 
   it('commit gagal (TOKEN_UNKNOWN) dilempar, dokumen utuh', async () => {

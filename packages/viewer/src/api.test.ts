@@ -343,6 +343,24 @@ describe('History (aplikasi 3)', () => {
     await expect(api.deletePage('a', 'Pg000001')).rejects.toMatchObject({ code: 'CONFLICT', status: 409 });
   });
 
+  it('applyOps: POST /viewer/docs/:slug/ops tanpa sesi, description opsional, invalidasi slug; gagal → ApiError', async () => {
+    const result = { slug: 'a', rev: 4, created: [], inverse: [{ op: 'update', id: 'Nnnnnnn1', patch: { gap: 8 } }], refs: {} };
+    const calls = fakeFetch((c) => {
+      if (c.body?.ops?.[0]?.op === 'remove') return { status: 404, body: { ok: false, error: { code: 'NOT_FOUND', message: 'ops[0] remove: node Zzzzzzzz tidak ada', hint: 'muat ulang' } } };
+      return ok(result);
+    });
+    const api = await freshApi();
+    const changed = vi.fn();
+    api.onDocsChanged(changed);
+    await expect(api.applyOps('a', [{ op: 'update', id: 'Nnnnnnn1', patch: { gap: 12 } }])).resolves.toEqual(result);
+    expect(calls.at(-1)).toMatchObject({ method: 'POST', path: '/viewer/docs/a/ops', body: { ops: [{ op: 'update', id: 'Nnnnnnn1', patch: { gap: 12 } }] }, session: undefined });
+    expect(calls.at(-1)!.body).not.toHaveProperty('description');
+    expect(changed).toHaveBeenCalledOnce();
+    await api.applyOps('a', result.inverse as never, 'Undo');
+    expect(calls.at(-1)).toMatchObject({ body: { ops: result.inverse, description: 'Undo' } });
+    await expect(api.applyOps('a', [{ op: 'remove', id: 'Zzzzzzzz' }])).rejects.toMatchObject({ code: 'NOT_FOUND', status: 404 });
+  });
+
   it('restore dengan baseRev usang → ApiError CONFLICT 409 dengan hint', async () => {
     fakeFetch((c) => {
       if (c.path === '/viewer/docs/a/restore') return { status: 409, body: { ok: false, error: { code: 'CONFLICT', message: 'dokumen a sudah berubah ke r9', hint: 'ada perubahan yang lebih baru', retryable: false } } };

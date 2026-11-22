@@ -4,6 +4,7 @@
 // History (aplikasi 3): versi lama dari snapshot (GET revs/:rev, POST revs/:rev/screenshot, di-cache per
 // `slug@rev`, isinya tidak pernah berubah) dan Restore (tulis, lewat antrean yang sama).
 // Kelola halaman (aplikasi 8): tambah/rename/pindah/hapus halaman (tulis, lewat antrean yang sama).
+// Ops (editor canvas, AD-7/AD-8): POST /viewer/docs/:slug/ops = satu commit semua-atau-tidak; respons membawa op invers (undo).
 // Layer manual (aplikasi 4): `execute` (POST /execute dari sesi viewer sendiri, kode dari codegen.ts), unggah
 // gambar (POST /viewer/assets, byte mentah), dan cari ikon (POST /icons/search).
 // Folder (aplikasi 10): GET/POST /viewer/folders*, tulis lewat antrean yang sama (memanggil pendengar `onDocsChanged`).
@@ -12,7 +13,7 @@
 // Memori: blob URL PNG di-revoke saat entri cache dibuang (dengan jeda, supaya <img> yang masih memakainya sempat
 // diganti); cache versi lama (`#revDocs`, `#revShots`) dibatasi LRU.
 // Bentuk respons AD-11: {ok:true,data} | {ok:false,error}.
-import type { Finding, FindingSummary, LakarDocument } from '@lakar/schema';
+import type { DocOp, Finding, FindingSummary, LakarDocument } from '@lakar/schema';
 
 /** Header sesi (sama dengan SESSION_HEADER @lakar/schema; disalin agar bundle tidak menarik zod). */
 const SESSION_HEADER = 'x-lakar-session';
@@ -74,6 +75,12 @@ export type UploadedAsset = { assetId: string; mime: string; width: number; heig
 export type IconResult = { lib: string; icon: string; title?: string; aliasOf?: string };
 /** Hasil operasi halaman (`/viewer/docs/:slug/pages…`). */
 export type PageResult = { slug: string; rev: number; pageId: string };
+/**
+ * Hasil `POST /viewer/docs/:slug/ops`: `inverse` = op yang membatalkan commit ini (kosong bila tanpa efek). ID node baru
+ * per op diketahui lewat `refs` (ref lokal → ID; kirim `ref` pada add/duplicate). `created` = semua node yang muncul
+ * di commit ini, termasuk subtree yang disisip ulang `insert` (undo hapus) dengan ID lamanya, jadi bukan hanya node baru.
+ */
+export type OpsResult = { slug: string; rev: number; created: { id: string; name: string; path: string[] }[]; inverse: DocOp[]; refs: Record<string, string> };
 export type LayoutCheck = { docId: string; rev: number; boards: unknown; summary: FindingSummary; findings: Finding[]; ranAt: number };
 
 /** lakard tidak bisa dihubungi (jaringan). */
@@ -468,6 +475,17 @@ class ViewerClient {
   movePage(slug: string, pageId: string, index: number): Promise<PageResult> {
     return this.#write(
       () => request<PageResult>('POST', `${pagesPath(slug, pageId)}/move`, { index }),
+      () => [slug],
+    );
+  }
+
+  /**
+   * Terapkan `ops` sebagai satu commit semua-atau-tidak (lewat antrean tulis). Op gagal → ApiError (error op
+   * pertama, prefiks `ops[i]`), dokumen tidak berubah. Undo/redo = kirim `inverse` hasil sebelumnya.
+   */
+  applyOps(slug: string, ops: DocOp[], description?: string): Promise<OpsResult> {
+    return this.#write(
+      () => request<OpsResult>('POST', `/viewer/docs/${encodeURIComponent(slug)}/ops`, { ops, ...(description !== undefined ? { description } : {}) }),
       () => [slug],
     );
   }

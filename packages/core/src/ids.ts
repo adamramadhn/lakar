@@ -31,6 +31,10 @@ export class IdAllocator {
     }
     throw new Error('IdAllocator: gagal mendapat ID unik setelah 1000 percobaan');
   }
+  /** Tandai `id` terpakai (ID yang disisip ulang `insert`); `next()` tidak akan mengembalikannya. */
+  reserve(id: string): void {
+    this.#used.add(id);
+  }
   static forDocument(doc: Doc, random?: RandomSource): IdAllocator {
     return new IdAllocator(collectIds(doc), random);
   }

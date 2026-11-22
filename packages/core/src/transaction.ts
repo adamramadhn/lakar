@@ -1,6 +1,7 @@
-// Transaksi operasi (AD-4): add | update | replace | move | duplicate | remove | setTokens | setTokenModes di atas
+// Transaksi operasi (AD-4): add | update | replace | move | duplicate | remove | insert | setTokens | setTokenModes di atas
 // salinan copy-on-write. Setiap op atomik sendiri: semua validasi selesai sebelum salinan kerja diubah,
-// sehingga op gagal yang ditangkap snippet tidak meninggalkan jejak. Tanpa IO.
+// sehingga op gagal yang ditangkap snippet tidak meninggalkan jejak. Setiap op sukses mencatat op inversnya (AD-8);
+// commit mengembalikan daftar invers yang, diterapkan sebagai transaksi baru, mengembalikan isi dokumen. Tanpa IO.
 import {
   ID_PATTERN,
   LakarError,
@@ -14,8 +15,9 @@ import {
   resolveDocument,
   zodToLakarError,
   type AnyNode,
-  type BoardNode,
-  type ChildNode,
+  BoardNode,
+  ChildNode,
+  type DocOp,
   type CreatedEntry,
   type HistoryEntry,
   type LakarDocument as Doc,
@@ -23,17 +25,19 @@ import {
 } from '@lakar/schema';
 import { host } from './host.js';
 import { isPlainObject } from './object.js';
-import { IdAllocator, type RandomSource } from './ids.js';
+import { IdAllocator, collectIds, type RandomSource } from './ids.js';
 import { inferTokens, tokenTypeOfValue } from './tokens-infer.js';
 import { indexNodes, isContainer, locate, subtree, type Container, type Location } from './tree.js';
 
-export type OpKind = 'add' | 'update' | 'replace' | 'move' | 'duplicate' | 'remove' | 'setTokens' | 'setTokenModes';
+export type OpKind = 'add' | 'update' | 'replace' | 'move' | 'duplicate' | 'remove' | 'insert' | 'setTokens' | 'setTokenModes';
 
 /**
  * Hasil commit. `entry === null` berarti tidak ada op yang sukses: tidak ada revisi baru, `doc` adalah
- * dokumen asli (rev tetap), dan pemanggil tidak menulis file maupun riwayat.
+ * dokumen asli (rev tetap), dan pemanggil tidak menulis file maupun riwayat. `inverse` (AD-8) = op yang, di-commit
+ * sebagai transaksi baru pada `doc`, mengembalikan `pages`/`tokens`/`tokenModes` seperti sebelum commit ini
+ * (ID node sama); kosong bila tidak ada op yang berefek.
  */
-export type CommitResult = { doc: Doc; entry: HistoryEntry | null; created: CreatedEntry[] };
+export type CommitResult = { doc: Doc; entry: HistoryEntry | null; created: CreatedEntry[]; inverse: DocOp[] };
 
 export interface Transaction {
   /**
@@ -51,6 +55,12 @@ export interface Transaction {
   duplicate(id: string, patch?: unknown): string;
   /** Hapus node beserta subtree-nya. */
   remove(id: string): void;
+  /**
+   * Sisipkan node tersimpan utuh (dengan `id` dan `children`) beserta ID aslinya: `parentId` = ID halaman (board),
+   * board/frame (node anak), atau `null` = halaman pertama; `index` default akhir. Dipakai invers `remove` (AD-8).
+   * ID yang sudah ada di dokumen (atau ganda di subtree) → CONFLICT. Mengembalikan ID akar.
+   */
+  insert(parentId: string | null, node: unknown, index?: number): string;
   /**
    * Merge peta token ke `doc.tokens` (AD-11). Nilai: `null` menghapus; string/angka datar mengganti `value` token
    * yang ada (`type`/`modes` tetap) atau membuat token baru yang tipenya diinferensi saat commit; objek
@@ -100,6 +110,33 @@ function propsOf(n: AnyNode): Record<string, unknown> {
   const { id: _id, ...rest } = n as AnyNode & { children?: unknown };
   delete (rest as { children?: unknown }).children;
   return rest;
+}
+
+/** Kesamaan struktural nilai JSON (urutan kunci objek tidak diperhatikan). */
+function sameValue(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  if (Array.isArray(a) || Array.isArray(b)) {
+    return Array.isArray(a) && Array.isArray(b) && a.length === b.length && a.every((v, i) => sameValue(v, b[i]));
+  }
+  if (!isPlainObject(a) || !isPlainObject(b)) return false;
+  const ka = Object.keys(a);
+  if (ka.length !== Object.keys(b).length) return false;
+  return ka.every((k) => Object.hasOwn(b, k) && sameValue(a[k], b[k]));
+}
+
+/**
+ * Patch `update` yang mengubah properti `after` kembali ke `before`: hanya kunci yang berbeda, nilai lama atau
+ * `null` (kunci dulu tidak ada). Kosong → `undefined`.
+ */
+function revertPatch(before: AnyNode, after: AnyNode): Record<string, unknown> | undefined {
+  const b = propsOf(before);
+  const a = propsOf(after);
+  const patch: Record<string, unknown> = {};
+  for (const key of new Set([...Object.keys(b), ...Object.keys(a)])) {
+    if (sameValue(b[key], a[key])) continue;
+    patch[key] = Object.hasOwn(b, key) ? host.structuredClone(b[key]) : null;
+  }
+  return Object.keys(patch).length ? patch : undefined;
 }
 
 function parseInput(op: OpKind, raw: unknown): NodeInput {
@@ -204,6 +241,8 @@ export function beginTransaction(doc: Doc, opts: TransactionOptions): Transactio
   /** ID node baru dalam urutan pembuatan; difilter ke yang masih ada saat commit. */
   const createdIds: string[] = [];
   const ops = new Map<OpKind, number>();
+  /** Invers per op sukses, urut penerapan (AD-8); dibalik saat commit. */
+  const inverses: DocOp[][] = [];
   /** Token baru dari nilai datar di transaksi ini: tipenya diinferensi saat commit (AD-11, seperti migrasi). */
   const pendingFlat = new Set<string>();
   const now = opts.now ?? (() => new Date());
@@ -212,10 +251,15 @@ export function beginTransaction(doc: Doc, opts: TransactionOptions): Transactio
     if (!work) throw new Error('transaksi sudah ditutup (commit/rollback)');
     return work;
   };
-  /** Jalankan op: hitung hanya bila sukses (op yang melempar tidak meninggalkan jejak). */
-  const op = <T>(kind: OpKind, fn: (w: Doc) => T): T => {
-    const result = fn(live());
+  /**
+   * Jalankan op: hitung dan catat inversnya hanya bila sukses (op yang melempar tidak meninggalkan jejak).
+   * `undo` dipanggil op sesudah validasi, dengan op yang membatalkan efeknya.
+   */
+  const op = <T>(kind: OpKind, fn: (w: Doc, undo: (inv: DocOp) => void) => T): T => {
+    const inv: DocOp[] = [];
+    const result = fn(live(), (o) => inv.push(o));
     ops.set(kind, (ops.get(kind) ?? 0) + 1);
+    inverses.push(inv);
     return result;
   };
 
@@ -229,7 +273,7 @@ export function beginTransaction(doc: Doc, opts: TransactionOptions): Transactio
     },
 
     add(parentId, raw) {
-      return op('add', (w) => {
+      return op('add', (w, undo) => {
         const pid = parentId === null ? null : requireId('add', 'parentId', parentId);
         // Parent dicari tanpa throw dulu (normalisasi x/y); urutan error lama tetap (skema → parent).
         const input = parseInput('add', implicitAbsolute(pid === null ? null : locate(w, pid)?.node, raw));
@@ -265,20 +309,24 @@ export function beginTransaction(doc: Doc, opts: TransactionOptions): Transactio
         if (target === null) page!.children.push(node as BoardNode);
         else target.children.push(node as ChildNode);
         createdIds.push(id);
+        undo({ op: 'remove', id });
         return id;
       });
     },
 
     update(id, patch) {
-      op('update', (w) => {
+      op('update', (w, undo) => {
         const loc = mustLocate(w, 'update', requireId('update', 'id', id));
         const input = mergePatch('update', loc.node, implicitAbsolute(loc.parent, patch));
-        loc.siblings[loc.index] = buildNode(input, loc.node.id, 'children' in loc.node ? loc.node.children : undefined);
+        const next = buildNode(input, loc.node.id, 'children' in loc.node ? loc.node.children : undefined);
+        const revert = revertPatch(loc.node, next);
+        loc.siblings[loc.index] = next;
+        if (revert) undo({ op: 'update', id: next.id, patch: revert });
       });
     },
 
     replace(id, raw) {
-      op('replace', (w) => {
+      op('replace', (w, undo) => {
         const loc = mustLocate(w, 'replace', requireId('replace', 'id', id));
         if (isPlainObject(raw) && (Object.hasOwn(raw, 'id') || Object.hasOwn(raw, 'children'))) {
           throw new LakarError('SCHEMA_INVALID', 'replace: node pengganti tidak boleh membawa id atau children', {
@@ -304,11 +352,12 @@ export function beginTransaction(doc: Doc, opts: TransactionOptions): Transactio
           });
         }
         loc.siblings[loc.index] = buildNode(input, old.id, children);
+        undo({ op: 'replace', id: old.id, node: host.structuredClone(propsOf(old)) });
       });
     },
 
     move(id, parentId, index) {
-      op('move', (w) => {
+      op('move', (w, undo) => {
         const loc = mustLocate(w, 'move', requireId('move', 'id', id));
         const node = loc.node;
         let dest: AnyNode[];
@@ -346,12 +395,15 @@ export function beginTransaction(doc: Doc, opts: TransactionOptions): Transactio
           });
         }
         loc.siblings.splice(loc.index, 1);
-        dest.splice(index ?? dest.length, 0, node);
+        const at = index ?? dest.length;
+        dest.splice(at, 0, node);
+        // Pindah ke posisi yang sama (wadah dan indeks akhir sama) tidak menghasilkan invers.
+        if (dest !== loc.siblings || at !== loc.index) undo({ op: 'move', id: node.id, parentId: loc.parent ? loc.parent.id : null, index: loc.index });
       });
     },
 
     duplicate(id, patch) {
-      return op('duplicate', (w) => {
+      return op('duplicate', (w, undo) => {
         const loc = mustLocate(w, 'duplicate', requireId('duplicate', 'id', id));
         const rootInput = patch === undefined ? undefined : mergePatch('duplicate', loc.node, implicitAbsolute(loc.parent, patch));
         const copy = host.structuredClone(loc.node);
@@ -363,21 +415,84 @@ export function beginTransaction(doc: Doc, opts: TransactionOptions): Transactio
         const root = rootInput ? buildNode(rootInput, copy.id, 'children' in copy ? copy.children : undefined) : copy;
         loc.siblings.splice(loc.index + 1, 0, root);
         createdIds.push(...fresh);
+        undo({ op: 'remove', id: root.id });
         return root.id;
       });
     },
 
     remove(id) {
-      op('remove', (w) => {
+      op('remove', (w, undo) => {
         const loc = mustLocate(w, 'remove', requireId('remove', 'id', id));
         loc.siblings.splice(loc.index, 1);
+        // Board: parent = ID halamannya (bisa bukan halaman pertama).
+        const node = host.structuredClone(loc.node) as unknown as Record<string, unknown>;
+        undo({ op: 'insert', parentId: loc.parent ? loc.parent.id : loc.page.id, node, index: loc.index });
+      });
+    },
+
+    insert(parentId, raw, index) {
+      return op('insert', (w, undo) => {
+        const pid = parentId === null ? null : requireId('insert', 'parentId', parentId);
+        if (!isPlainObject(raw)) {
+          throw new LakarError('SCHEMA_INVALID', `insert: node harus objek node tersimpan, bukan ${Array.isArray(raw) ? 'array' : JSON.stringify(raw) ?? 'undefined'}`, {
+            hint: 'insert menerima node utuh dengan id dan children (mis. dari op invers remove)',
+          });
+        }
+        const page = pid === null ? w.pages[0]! : w.pages.find((p) => p.id === pid);
+        let dest: AnyNode[];
+        let node: AnyNode;
+        if (page) {
+          if (raw.type !== 'board') {
+            throw new LakarError('SCHEMA_INVALID', `insert(pageId, …) hanya untuk board, bukan ${JSON.stringify(raw.type) ?? 'undefined'}`, {
+              hint: 'anak halaman hanya board; sisipkan node anak ke board atau frame',
+            });
+          }
+          const parsed = BoardNode.safeParse(raw);
+          if (!parsed.success) throw zodToLakarError(parsed.error, 'insert');
+          dest = page.children;
+          node = parsed.data;
+        } else {
+          const parent = mustLocate(w, 'insert', pid!, 'parent');
+          if (raw.type === 'board') throw new LakarError('SCHEMA_INVALID', 'board hanya boleh menjadi anak halaman', { hint: 'insert(pageId | null, board)' });
+          if (!isContainer(parent.node)) {
+            throw new LakarError('SCHEMA_INVALID', `node ${parent.node.type} ${pid} tidak bisa punya anak`, {
+              hint: 'hanya board dan frame yang bisa punya anak; sisipkan ke board atau frame',
+            });
+          }
+          const parsed = ChildNode.safeParse(raw);
+          if (!parsed.success) throw zodToLakarError(parsed.error, 'insert');
+          dest = parent.node.children;
+          node = parsed.data;
+        }
+        if (index !== undefined && (typeof index !== 'number' || !Number.isInteger(index) || index < 0 || index > dest.length)) {
+          throw new LakarError('SCHEMA_INVALID', `insert: index harus integer 0..${dest.length}, bukan ${JSON.stringify(index) ?? 'undefined'}`, {
+            hint: 'index = posisi di antara anak parent tujuan; hilangkan index untuk menaruh di akhir',
+          });
+        }
+        const fresh = subtree(node).map((n) => n.id);
+        const taken = new Set(collectIds(w));
+        const seen = new Set<string>();
+        for (const nid of fresh) {
+          if (taken.has(nid) || seen.has(nid)) {
+            throw new LakarError('CONFLICT', `insert: ID ${nid} sudah dipakai di dokumen`, {
+              hint: 'node dengan ID ini sudah ada (mis. undo yang sudah diterapkan); muat ulang dokumen',
+            });
+          }
+          seen.add(nid);
+        }
+        dest.splice(index ?? dest.length, 0, node);
+        for (const nid of fresh) ids.reserve(nid);
+        createdIds.push(...fresh);
+        undo({ op: 'remove', id: node.id });
+        return node.id;
       });
     },
 
     setTokens(map) {
-      op('setTokens', (w) => {
+      op('setTokens', (w, undo) => {
         const tokens = { ...(w.tokens ?? {}) };
         const entries = parseTokenPatch(map, tokens, pendingFlat);
+        const prev = { ...tokens };
         for (const e of entries) {
           if (e.kind === 'delete') {
             delete tokens[e.name];
@@ -394,17 +509,27 @@ export function beginTransaction(doc: Doc, opts: TransactionOptions): Transactio
           }
         }
         w.tokens = tokens;
+        // Invers hanya untuk token yang benar-benar berubah (set ke nilai sama / hapus token tak ada → tanpa invers).
+        const revert: Record<string, unknown> = {};
+        for (const e of entries) {
+          if (sameValue(prev[e.name], tokens[e.name])) continue;
+          revert[e.name] = Object.hasOwn(prev, e.name) ? host.structuredClone(prev[e.name]) : null;
+        }
+        if (Object.keys(revert).length) undo({ op: 'setTokens', tokens: revert });
       });
     },
 
     setTokenModes(modes) {
-      op('setTokenModes', (w) => {
+      op('setTokenModes', (w, undo) => {
+        const revert: DocOp = { op: 'setTokenModes', modes: w.tokenModes ? [...w.tokenModes] : null };
         if (modes === null) {
+          if (w.tokenModes !== undefined) undo(revert);
           delete w.tokenModes;
           return;
         }
         const r = TokenModes.safeParse(modes);
         if (!r.success) throw new LakarError('SCHEMA_INVALID', zodToLakarError(r.error, 'setTokenModes').message, { hint: TOKEN_MODES_HINT });
+        if (!sameValue(w.tokenModes, r.data)) undo(revert);
         w.tokenModes = r.data;
       });
     },
@@ -412,13 +537,26 @@ export function beginTransaction(doc: Doc, opts: TransactionOptions): Transactio
     commit(description) {
       const w = live();
       work = undefined;
-      if (ops.size === 0) return { doc, entry: null, created: [] };
+      if (ops.size === 0) return { doc, entry: null, created: [], inverse: [] };
+      const inverse = inverses.reverse().flat();
       // AD-11: token baru dari nilai datar mendapat tipe dari pemakaiannya (ref slot lain di-detach), seperti migrasi.
       const fresh = [...pendingFlat].filter((n) => Object.hasOwn(w.tokens ?? {}, n));
       if (fresh.length) {
         const flat = Object.fromEntries(fresh.map((n) => [n, w.tokens![n]!.value]));
         const inferred = inferTokens(flat, w.pages);
         w.tokens = { ...w.tokens, ...(inferred.tokens as Record<string, TokenDefT>) };
+        if (inferred.detached > 0) {
+          // Ref yang di-detach inferensi bisa ada di node yang tidak disentuh op: pulihkan lebih dulu (AD-8).
+          const pre = indexNodes(w);
+          const post = indexNodes({ ...w, pages: inferred.pages as Doc['pages'] });
+          const restore: DocOp[] = [];
+          for (const [nid, hit] of post) {
+            const old = pre.get(nid);
+            const revert = old && revertPatch(old.node, hit.node);
+            if (revert) restore.push({ op: 'update', id: nid, patch: revert });
+          }
+          inverse.unshift(...restore);
+        }
         w.pages = inferred.pages as Doc['pages'];
       }
       // AD-16: ref token tak dikenal → TOKEN_UNKNOWN, token salah tipe → SCHEMA_INVALID, keduanya saat
@@ -433,7 +571,7 @@ export function beginTransaction(doc: Doc, opts: TransactionOptions): Transactio
         const hit = index.get(cid);
         if (hit) created.push({ id: cid, name: hit.node.name, path: hit.path });
       }
-      return { doc: w, entry, created };
+      return { doc: w, entry, created, inverse };
     },
 
     rollback() {
