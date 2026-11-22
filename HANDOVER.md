@@ -12,7 +12,8 @@ Semua PR ada di repo GitHub `fatmuh/lakar` (dulu `adamramadhn/lakar`; alamat lam
 | `claude/app-design-parity` | Semua fitur edit di aplikasi + audit desain (lihat di bawah) | #6 → `claude/desktop-tauri-f5e05a` | Draft, CI hijau |
 | (sudah di-merge ke `claude/app-design-parity`) | #7 presence agen, #8 search + Settings General, #9 tab title bar + window chrome, #10 Pages, #11 tablet/mobile, #12 folder, #13 tema layar mulai desktop, #14 kolom List Dashboard | — | Merged |
 | `g1` | Pekerjaan G1 dari VPS (2026-11-19): aturan `layout_check` sisa, skill per domain, rubrik v2.3, golden A–E di Lakar | #15 → `main` | Terbuka; merge tanpa konflik dengan #6 |
-| `docs/new-initiative` | Inisiatif baru `initiative-lakar-paper`, inisiatif lama ditutup | #16 → `claude/app-design-parity` | Terbuka |
+| `docs/new-initiative` | Inisiatif baru `initiative-lakar-paper`, inisiatif lama ditutup | #16 → `claude/app-design-parity` | Merged |
+| `docs/new-initiative` | Spine arsitektur model dokumen (epic 1) + penyelarasan inisiatif, AGENTS.md | #17 → `claude/app-design-parity` | Terbuka |
 
 **Urutan ke `main`:**
 1. Approve dan merge #5.
@@ -55,7 +56,10 @@ Perubahan sesudah gelombang fitur di atas:
 ## Langkah berikutnya
 
 1. **Bawa ke `main`.** Ikuti urutan di bagian "Branch dan PR".
-2. **Epic 1 inisiatif baru: model dokumen.** Semua epic lain menunggu keputusan ini (skema JSON Lakar diperluas, atau model HTML/CSS seperti Paper). Jalankan `bmad-architecture`.
+2. **Epic 1 inisiatif baru: model dokumen.** Arsitekturnya sudah diputuskan dan disetujui Fatmuh pada 2026-11-22. Spine-nya ada di `_bmad-output/initiative-lakar-paper/tickets/epic-model-dokumen/architecture-model-dokumen/architecture-model-dokumen.md`.
+   - Model dokumen: JSON Lakar bertipe dengan semantik CSS (AD-1).
+   - Route dan tool lama: kompatibilitas mundur menggantikan pembekuan (AD-4).
+   - Berikutnya: minta Sofia (`bmad-agent-po`) memecah epic model dokumen menjadi story. Story pertamanya mengumpulkan korpus dokumen v1/v2 dari data dir lokal dan VPS ke `tests/fixtures/docs/`. Sesudah itu, refine epic 2–7 di atas spine.
 3. **Item tertunda.** Lihat `_bmad-output/implementation-artifacts/deferred-work.md`.
 
 ## Merapikan lingkungan lokal

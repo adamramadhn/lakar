@@ -5,7 +5,8 @@ parent: none
 sources:
   - _bmad-output/initiative-lakar-paper/brief-lakar-paper/brief-lakar-paper.md
   - _bmad-output/initiative-lakar/initiative-lakar.md
-companions: []
+companions:
+  - _bmad-output/initiative-lakar-paper/tickets/epic-model-dokumen/architecture-model-dokumen/architecture-model-dokumen.md
 after: []
 risk: high
 ---
@@ -48,7 +49,10 @@ Fatmuh bisa mendesain sendiri atau bersama agen di Lakar seperti di paper.design
 - C2 (brief §Arahan pemilik): untuk sekarang lokal, satu pengguna, tanpa akun. Akun, tim, berbagi, dan cloud menyusul di inisiatif berikutnya.
 - C3 (initiative-lakar C1, C5): format dokumen milik Lakar, dengan `schemaVersion` dan migrasi. Tanpa Penpot, dan tanpa format `.pen` atau Paper.
 - C4 (initiative-lakar C3): bila kualitas hasil desain bertukar dengan kecepatan membangun, kualitas yang menang.
-- C5 (AGENTS.md): aturan repo tetap berlaku: route dan tool lama dibekukan untuk bench, arah dependensi viewer dijaga, dan route tulis `/viewer/*` dilindungi guard Origin.
+- C5 (AGENTS.md; architecture-model-dokumen AD-4, AD-17): aturan repo tetap berlaku:
+  - route dan tool MCP lama dijaga kompatibel mundur, tidak lagi dibekukan demi bench;
+  - arah dependensi dijaga;
+  - route tulis `/viewer/*` dilindungi guard Origin.
 - C6 (arahan Fatmuh 2026-11-22): UI, UX, dan motion mengikuti `design/lakar-ui.pen` yang sudah ada. Layar atau komponen yang belum ada didesain dulu di Pencil, lalu dikodekan dari desain itu lewat MCP pencil (design to code). Tidak ada UI baru yang dikodekan tanpa desain di pen.
 
 ## Done when
@@ -81,9 +85,10 @@ Fatmuh bisa mendesain sendiri atau bersama agen di Lakar seperti di paper.design
 - Decision: 2026-11-22 — pemilik keputusan sekarang Fatmuh. Arah Paper menjadi inisiatif baru, dan initiative-lakar ditutup pada G0 + B supaya riwayat keputusan Adam tetap utuh (Sofia atas delegasi Fatmuh).
 - Decision: 2026-11-22 — inisiatif ini tidak terikat pada initiative-lakar maupun gerbang benchmark apa pun (G1 vs pen.dev atau pembanding Paper). Aplikasi desktop sudah dibangun lewat GitHub Actions dan terpasang aman di mesin Fatmuh, jadi pekerjaannya melengkapi fitur. R8, C5 lama, dan epic gerbang kualitas dihapus (arahan Fatmuh).
 - Decision: 2026-11-22 — paste dari Figma dan ekstensi Snapshot di luar cakupan awal. Paste HTML dan SVG masuk cakupan (R6).
-- Open question: model dokumen. Pilihannya tetap skema JSON Lakar yang diperluas, atau bergeser ke model HTML/CSS-native seperti Paper. Menunggu `bmad-architecture` sebelum epic editor di-refine.
+- Open question (ditutup 2026-11-22 oleh architecture-model-dokumen AD-1): model dokumen. Pilihannya tetap skema JSON Lakar yang diperluas, atau bergeser ke model HTML/CSS-native seperti Paper. Keputusan: JSON Lakar bertipe dengan semantik properti CSS, tanpa HTML/CSS mentah.
 - Open question (ditutup 2026-11-22 oleh C6): desain UI untuk panel baru belum ada di `design/lakar-ui.pen`. Setiap epic membuka dengan story desain di pen.
 - Decision: 2026-11-22 — epic disetujui Fatmuh, satu per kemampuan yang bisa dikirim sendiri. Epic pembuka memutuskan model dokumen (`bmad-architecture`), dan epic lain menunggu keputusan itu.
 - Decision: 2026-11-22 — tidak ada epic platform-baseline. Monorepo, CI, daemon, viewer, dan release desktop sudah ada dari initiative-lakar.
 - Decision: 2026-11-22 — alur kerja desain-dulu (C6) punya satu tempat, yaitu Constraints inisiatif ini. Setiap epic 2–7 membuka dengan story desain di pen (hitl, disetujui Fatmuh) sebelum story kode.
-- Open question: route daemon dan tool MCP lama dibekukan demi bench (AGENTS.md). Tanpa bench, apakah pembekuan itu masih perlu? Diputuskan di epic model dokumen; sampai saat itu aturan AGENTS.md tetap berlaku.
+- Open question (ditutup 2026-11-22 oleh architecture-model-dokumen AD-4): route daemon dan tool MCP lama dibekukan demi bench (AGENTS.md). Tanpa bench, apakah pembekuan itu masih perlu? Keputusan: pembekuan dicabut, diganti kontrak kompatibilitas mundur. AGENTS.md dan C5 sudah diselaraskan.
+- Decision: 2026-11-22 — spine architecture-model-dokumen (AD-1 sampai AD-17) disetujui Fatmuh dan menjadi companion inisiatif ini. Epic 2–7 membangun di atasnya.

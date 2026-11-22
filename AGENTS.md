@@ -27,8 +27,15 @@ pnpm lakard         # jalankan daemon (viewer: http://127.0.0.1:7466/app/)
 
 ## Aturan yang tidak boleh dilanggar
 
-- **Route dan tool lama dibekukan.** Route daemon lama, bentuk respons, pesan error, dan tool MCP dipakai bench G1. Hanya boleh menambah route baru, misalnya di bawah `/viewer/*` (lihat `packages/daemon/src/files.ts`), atau field opsional baru. Default config daemon juga tidak boleh berubah.
-- **Arah dependensi.** `tests/dependency-direction.test.ts` melarang viewer bergantung pada `@lakar/core`, `@lakar/exec`, atau `@lakar/icons`. Tes yang perlu sandbox asli diletakkan di `tests/` dan mengimpor lewat path relatif ke `packages/*/src`.
+- **Route dan tool lama kompatibel mundur** (sejak 2026-11-22, AD-4 di `_bmad-output/initiative-lakar-paper/tickets/epic-model-dokumen/architecture-model-dokumen/architecture-model-dokumen.md`). Pembekuan demi bench G1 dicabut.
+  - Tetap dijaga: nama tool MCP dan route lama, input yang dulu valid (termasuk node v2 dan token datar di `setTokens`), kode error, status HTTP, dan default config yang membuat config lama tetap berlaku.
+  - Respons hanya boleh bertambah field. Pesan dan hint error boleh diperbaiki, dan tesnya diperbarui di PR yang sama.
+  - Route baru diletakkan di bawah `/viewer/*` (lihat `packages/daemon/src/files.ts`). Perubahan yang memutus kompatibilitas butuh persetujuan Fatmuh.
+- **Model dokumen.** Spine `architecture-model-dokumen` (AD-1 sampai AD-17) mengikat semua epic `initiative-lakar-paper`:
+  - JSON bertipe dengan semantik CSS, tanpa HTML/CSS mentah;
+  - semua tulis lewat op `core`;
+  - setiap perubahan skema menaikkan `schemaVersion` disertai migrasi.
+- **Arah dependensi.** `tests/dependency-direction.test.ts` melarang viewer bergantung pada `@lakar/core`, `@lakar/exec`, atau `@lakar/icons`. AD-17 mengizinkan viewer bergantung pada `render` dan `codegen`; `EDGES` diperluas saat paket itu dipakai. Tes yang perlu sandbox asli diletakkan di `tests/` dan mengimpor lewat path relatif ke `packages/*/src`.
 - **Route tulis `/viewer/*`** dilindungi guard Origin (CSRF localhost). Request lintas-origin ditolak 403.
 - **Bahasa.**
   - Bahasa Indonesia: spec, dokumen, dan komentar kode.
