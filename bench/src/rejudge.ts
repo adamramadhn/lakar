@@ -305,6 +305,11 @@ export type RejudgeOptions = {
   prefixArgs?: string[];
 };
 
+/** Teks juri yang dibatasi ke prompt putaran sumber (murni; urutan mengikuti `prompts`). */
+export function sourceJudgeTexts(texts: JudgeTexts, prompts: readonly string[]): JudgeTexts {
+  return Object.fromEntries(prompts.filter((p) => texts[p]).map((p) => [p, texts[p]!]));
+}
+
 /** Inti `rejudge` (bisa dites dengan `claude` palsu). Mengembalikan exit code. */
 export async function runRejudge(o: RejudgeOptions): Promise<number> {
   const { from, label, resume, dryRun } = o.args;
@@ -319,7 +324,10 @@ export async function runRejudge(o: RejudgeOptions): Promise<number> {
     console.error(`rejudge: sumber tidak lengkap:\n  ${problems.join('\n  ')}`);
     return 1;
   }
-  const info = judgeTextInfo(o.judgeTexts);
+  // Teks juri dan cek sha hanya untuk prompt putaran sumber (mis. A/B): prompt protokol lain (C–E) yang belum di-snapshot
+  // di rubric.json tidak memblokir rejudge.
+  const sourceTexts = sourceJudgeTexts(o.judgeTexts, sources.map((s) => s.prompt));
+  const info = judgeTextInfo(sourceTexts);
   const shaProblems = rubricShaProblems({ version: info.rubricVersion, sha: info.textSha256 }, o.rubric);
   const missing = sources.filter((s) => !o.judgeTexts[s.prompt]).map((s) => s.prompt);
   if (missing.length) {
@@ -446,7 +454,9 @@ export async function rejudgeMain(argv: string[]): Promise<number> {
     return 64;
   }
   const protocol = loadProtocol();
-  const judgeTexts = prepareJudgeTexts(protocol);
+  // Hanya prompt putaran sumber (A/B untuk putaran G0): teks C–E yang belum di-snapshot tidak dibangun/dicek di sini.
+  const sourceIds = loadRejudgeSources(parsed.value.from, BENCH_ROOT, REPO_ROOT).sources.map((s) => s.prompt);
+  const judgeTexts = prepareJudgeTexts(protocol, sourceIds.filter((p) => (protocol.config.promptIds as readonly string[]).includes(p)));
   let claudeVersion: string;
   try {
     claudeVersion = execFileSync('claude', ['--version'], { encoding: 'utf8' }).trim();

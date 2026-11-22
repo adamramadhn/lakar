@@ -3,7 +3,7 @@ title: 'Pool render hangat, tool MCP v1 lengkap, dan lakard sebagai service'
 type: feature
 ticket: '12'
 created: '2026-11-18'
-status: built
+status: done
 baseline_revision: '47c7e112abcc90b21c6e7b0245e3d101694937f5'
 route: full
 route_source: auto

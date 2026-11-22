@@ -1,0 +1,2240 @@
+{
+  "schemaVersion": 2,
+  "id": "lhFIhJR1",
+  "rev": 5,
+  "tokens": {},
+  "pages": [
+    {
+      "id": "qE37aeJM",
+      "name": "Page 1",
+      "children": [
+        {
+          "type": "board",
+          "name": "Singgah / Checkout · mobile · Ramah",
+          "x": 0,
+          "y": 0,
+          "width": 390,
+          "height": 1974,
+          "screen": "mobile",
+          "fills": [
+            {
+              "type": "solid",
+              "color": "#F3F7F6"
+            }
+          ],
+          "id": "Pk1YyPMN",
+          "children": [
+            {
+              "type": "frame",
+              "name": "Status bar",
+              "layout": "row",
+              "padding": [
+                0,
+                24
+              ],
+              "align": "center",
+              "justify": "space-between",
+              "width": "fill",
+              "height": 54,
+              "fills": [
+                {
+                  "type": "solid",
+                  "color": "#FFFFFF"
+                }
+              ],
+              "id": "Od8wAUKM",
+              "children": [
+                {
+                  "type": "text",
+                  "name": "Jam",
+                  "content": "09:41",
+                  "family": "DM Sans",
+                  "weight": 600,
+                  "size": 14,
+                  "lineHeight": 20,
+                  "letterSpacing": 0,
+                  "numeric": "tabular",
+                  "color": "#101828",
+                  "id": "MYyRsq6T"
+                },
+                {
+                  "type": "frame",
+                  "name": "Sinyal",
+                  "layout": "row",
+                  "gap": 6,
+                  "align": "center",
+                  "id": "9mBmFktq",
+                  "children": [
+                    {
+                      "type": "icon",
+                      "name": "Icon / lucide / signal",
+                      "lib": "lucide",
+                      "icon": "signal",
+                      "version": "1.74.0",
+                      "size": 16,
+                      "color": "#101828",
+                      "id": "nqk0DLTR"
+                    },
+                    {
+                      "type": "icon",
+                      "name": "Icon / lucide / wifi",
+                      "lib": "lucide",
+                      "icon": "wifi",
+                      "version": "1.74.0",
+                      "size": 16,
+                      "color": "#101828",
+                      "id": "lhTKAjCY"
+                    },
+                    {
+                      "type": "icon",
+                      "name": "Icon / lucide / battery-full",
+                      "lib": "lucide",
+                      "icon": "battery-full",
+                      "version": "1.74.0",
+                      "size": 16,
+                      "color": "#101828",
+                      "id": "PRrrXN7a"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "name": "Header",
+              "layout": "column",
+              "gap": 12,
+              "padding": [
+                4,
+                20,
+                16,
+                20
+              ],
+              "width": "fill",
+              "fills": [
+                {
+                  "type": "solid",
+                  "color": "#FFFFFF"
+                }
+              ],
+              "stroke": {
+                "color": "#E4E7EC",
+                "width": 1,
+                "align": "inside",
+                "sides": [
+                  "bottom"
+                ]
+              },
+              "id": "fh2onqqF",
+              "children": [
+                {
+                  "type": "frame",
+                  "name": "Baris judul",
+                  "layout": "row",
+                  "gap": 8,
+                  "align": "center",
+                  "width": "fill",
+                  "id": "FhYy9OA6",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "name": "IconButton / Kembali",
+                      "layout": "row",
+                      "align": "center",
+                      "justify": "center",
+                      "width": 44,
+                      "height": 44,
+                      "fills": [
+                        {
+                          "type": "solid",
+                          "color": "#F2F4F7"
+                        }
+                      ],
+                      "radius": 9999,
+                      "id": "qsjdF8Tk",
+                      "children": [
+                        {
+                          "type": "icon",
+                          "name": "Icon / lucide / arrow-left",
+                          "lib": "lucide",
+                          "icon": "arrow-left",
+                          "version": "1.74.0",
+                          "size": 24,
+                          "color": "#101828",
+                          "id": "hxBalwli"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "text",
+                      "name": "Judul",
+                      "content": "Konfirmasi pesanan",
+                      "family": "DM Sans",
+                      "weight": 700,
+                      "size": 28,
+                      "lineHeight": 36,
+                      "letterSpacing": -0.01,
+                      "color": "#101828",
+                      "width": "fill",
+                      "id": "2Ot0gRUd"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "name": "Indikator langkah",
+                  "layout": "column",
+                  "gap": 8,
+                  "width": "fill",
+                  "id": "vgbn9eMm",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "name": "Segmen",
+                      "layout": "row",
+                      "gap": 8,
+                      "align": "center",
+                      "width": "fill",
+                      "id": "8FQ7HcKx",
+                      "children": [
+                        {
+                          "type": "rect",
+                          "name": "Segmen / Kamar",
+                          "width": "fill",
+                          "height": 4,
+                          "fills": [
+                            {
+                              "type": "solid",
+                              "color": "#0F766E"
+                            }
+                          ],
+                          "radius": 9999,
+                          "id": "h6he4A5s"
+                        },
+                        {
+                          "type": "rect",
+                          "name": "Segmen / Data & bayar",
+                          "width": "fill",
+                          "height": 4,
+                          "fills": [
+                            {
+                              "type": "solid",
+                              "color": "#0F766E"
+                            }
+                          ],
+                          "radius": 9999,
+                          "id": "4JAB6Sgf"
+                        },
+                        {
+                          "type": "rect",
+                          "name": "Segmen / Selesai",
+                          "width": "fill",
+                          "height": 4,
+                          "fills": [
+                            {
+                              "type": "solid",
+                              "color": "#D0D5DD"
+                            }
+                          ],
+                          "radius": 9999,
+                          "id": "UxMkcV5Q"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "name": "Teks",
+                      "layout": "row",
+                      "align": "center",
+                      "justify": "space-between",
+                      "width": "fill",
+                      "id": "rgXBHOat",
+                      "children": [
+                        {
+                          "type": "text",
+                          "name": "Langkah",
+                          "content": "Langkah 2 dari 3",
+                          "family": "DM Sans",
+                          "weight": 600,
+                          "size": 12,
+                          "lineHeight": 16,
+                          "letterSpacing": 0,
+                          "color": "#0F766E",
+                          "id": "xaCaJlK2"
+                        },
+                        {
+                          "type": "text",
+                          "name": "Nama langkah",
+                          "content": "Data pemesan & pembayaran",
+                          "family": "DM Sans",
+                          "weight": 500,
+                          "size": 12,
+                          "lineHeight": 16,
+                          "letterSpacing": 0,
+                          "color": "#475467",
+                          "id": "reqgk6MV"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "name": "Konten",
+              "layout": "column",
+              "gap": 24,
+              "padding": [
+                24,
+                20,
+                0,
+                20
+              ],
+              "width": "fill",
+              "id": "6VJPSgfC",
+              "children": [
+                {
+                  "type": "frame",
+                  "name": "Seksi / Kamar",
+                  "layout": "column",
+                  "width": "fill",
+                  "clip": true,
+                  "fills": [
+                    {
+                      "type": "solid",
+                      "color": "#FFFFFF"
+                    }
+                  ],
+                  "stroke": {
+                    "color": "#E4E7EC",
+                    "width": 1,
+                    "align": "inside"
+                  },
+                  "radius": 16,
+                  "id": "eXElHp0l",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "name": "Image / Kamar deluxe dengan jendela besar",
+                      "width": "fill",
+                      "height": 168,
+                      "fills": [
+                        {
+                          "type": "image",
+                          "assetId": "4c2867d97815431a70052647b6ec4e6142e4ed5869537050e1e9cc6e53c33743",
+                          "fit": "cover"
+                        }
+                      ],
+                      "id": "LGdUp7Lg",
+                      "children": []
+                    },
+                    {
+                      "type": "frame",
+                      "name": "Isi",
+                      "layout": "column",
+                      "gap": 8,
+                      "padding": 16,
+                      "width": "fill",
+                      "id": "ejYszimG",
+                      "children": [
+                        {
+                          "type": "frame",
+                          "name": "Judul",
+                          "layout": "row",
+                          "gap": 8,
+                          "align": "start",
+                          "width": "fill",
+                          "id": "JwY8Y75K",
+                          "children": [
+                            {
+                              "type": "frame",
+                              "name": "Nama",
+                              "layout": "column",
+                              "gap": 2,
+                              "width": "fill",
+                              "id": "3j4LVv3q",
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "name": "Hotel",
+                                  "content": "Wisma Braga, Bandung",
+                                  "family": "DM Sans",
+                                  "weight": 600,
+                                  "size": 20,
+                                  "lineHeight": 28,
+                                  "letterSpacing": 0,
+                                  "color": "#101828",
+                                  "width": "fill",
+                                  "id": "V5I4WPXv"
+                                },
+                                {
+                                  "type": "text",
+                                  "name": "Tipe",
+                                  "content": "Deluxe King · 24 m² · sarapan untuk 2",
+                                  "family": "DM Sans",
+                                  "weight": 400,
+                                  "size": 14,
+                                  "lineHeight": 20,
+                                  "letterSpacing": 0,
+                                  "color": "#475467",
+                                  "width": "fill",
+                                  "id": "TYiQCe2G"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "name": "Rating",
+                              "layout": "row",
+                              "gap": 4,
+                              "padding": [
+                                4,
+                                0,
+                                0,
+                                0
+                              ],
+                              "align": "center",
+                              "id": "WMfjnfCn",
+                              "children": [
+                                {
+                                  "type": "icon",
+                                  "name": "Icon / lucide / star",
+                                  "lib": "lucide",
+                                  "icon": "star",
+                                  "version": "1.74.0",
+                                  "size": 16,
+                                  "color": "#CA8A04",
+                                  "filled": true,
+                                  "id": "cMNsDtEt"
+                                },
+                                {
+                                  "type": "text",
+                                  "name": "Nilai",
+                                  "content": "4,7",
+                                  "family": "DM Sans",
+                                  "weight": 600,
+                                  "size": 14,
+                                  "lineHeight": 20,
+                                  "letterSpacing": 0,
+                                  "numeric": "tabular",
+                                  "color": "#101828",
+                                  "id": "FEyeuSNb"
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "name": "Meta",
+                          "layout": "row",
+                          "gap": 8,
+                          "align": "center",
+                          "width": "fill",
+                          "id": "Nn8sTGYp",
+                          "children": [
+                            {
+                              "type": "text",
+                              "name": "Ulasan",
+                              "content": "1.024 ulasan · 350 m dari Jl. Braga",
+                              "family": "DM Sans",
+                              "weight": 500,
+                              "size": 12,
+                              "lineHeight": 16,
+                              "letterSpacing": 0,
+                              "color": "#667085",
+                              "width": "fill",
+                              "id": "JCK3acaA"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "name": "Badge / Gratis batal sampai Rab, 9 Des · 14.00",
+                          "layout": "row",
+                          "gap": 4,
+                          "padding": [
+                            0,
+                            8
+                          ],
+                          "align": "center",
+                          "width": "hug",
+                          "height": 24,
+                          "fills": [
+                            {
+                              "type": "solid",
+                              "color": "#15803D1F"
+                            }
+                          ],
+                          "radius": 9999,
+                          "id": "iyKL4RV2",
+                          "children": [
+                            {
+                              "type": "icon",
+                              "name": "Icon / lucide / circle-check",
+                              "lib": "lucide",
+                              "icon": "circle-check",
+                              "version": "1.74.0",
+                              "size": 14,
+                              "color": "#0a401e",
+                              "id": "QjhpGDqk"
+                            },
+                            {
+                              "type": "text",
+                              "name": "Teks",
+                              "content": "Gratis batal sampai Rab, 9 Des · 14.00",
+                              "family": "DM Sans",
+                              "weight": 500,
+                              "size": 12,
+                              "lineHeight": 16,
+                              "letterSpacing": 0,
+                              "color": "#0a401e",
+                              "id": "oN2Pmr2E"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "name": "Seksi / Tanggal & tamu",
+                  "layout": "column",
+                  "gap": 16,
+                  "padding": 16,
+                  "width": "fill",
+                  "fills": [
+                    {
+                      "type": "solid",
+                      "color": "#FFFFFF"
+                    }
+                  ],
+                  "stroke": {
+                    "color": "#E4E7EC",
+                    "width": 1,
+                    "align": "inside"
+                  },
+                  "radius": 16,
+                  "id": "FMqdwtqI",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "name": "Header",
+                      "layout": "row",
+                      "align": "center",
+                      "justify": "space-between",
+                      "width": "fill",
+                      "id": "7F4cteSu",
+                      "children": [
+                        {
+                          "type": "text",
+                          "name": "Judul",
+                          "content": "Tanggal menginap",
+                          "family": "DM Sans",
+                          "weight": 600,
+                          "size": 20,
+                          "lineHeight": 28,
+                          "letterSpacing": 0,
+                          "color": "#101828",
+                          "id": "nTA6eKG1"
+                        },
+                        {
+                          "type": "frame",
+                          "name": "Badge / 2 malam",
+                          "layout": "row",
+                          "gap": 4,
+                          "padding": [
+                            0,
+                            8
+                          ],
+                          "align": "center",
+                          "width": "hug",
+                          "height": 24,
+                          "fills": [
+                            {
+                              "type": "solid",
+                              "color": "#0F766E1F"
+                            }
+                          ],
+                          "radius": 9999,
+                          "id": "SDLEDl9K",
+                          "children": [
+                            {
+                              "type": "icon",
+                              "name": "Icon / lucide / moon",
+                              "lib": "lucide",
+                              "icon": "moon",
+                              "version": "1.74.0",
+                              "size": 14,
+                              "color": "#073b37",
+                              "id": "pzkPz8mV"
+                            },
+                            {
+                              "type": "text",
+                              "name": "Teks",
+                              "content": "2 malam",
+                              "family": "DM Sans",
+                              "weight": 500,
+                              "size": 12,
+                              "lineHeight": 16,
+                              "letterSpacing": 0,
+                              "color": "#073b37",
+                              "id": "UWhaVWYr"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "name": "Tanggal",
+                      "layout": "row",
+                      "gap": 12,
+                      "align": "stretch",
+                      "width": "fill",
+                      "id": "CcVRuR0r",
+                      "children": [
+                        {
+                          "type": "frame",
+                          "name": "Tanggal / Check-in",
+                          "layout": "column",
+                          "gap": 4,
+                          "padding": 12,
+                          "width": "fill",
+                          "fills": [
+                            {
+                              "type": "solid",
+                              "color": "#EAF4F2"
+                            }
+                          ],
+                          "radius": 8,
+                          "id": "zhBYWYqJ",
+                          "children": [
+                            {
+                              "type": "frame",
+                              "name": "Label",
+                              "layout": "row",
+                              "gap": 6,
+                              "align": "center",
+                              "id": "Qn9MS1Ek",
+                              "children": [
+                                {
+                                  "type": "icon",
+                                  "name": "Icon / lucide / calendar",
+                                  "lib": "lucide",
+                                  "icon": "calendar",
+                                  "version": "1.74.0",
+                                  "size": 16,
+                                  "color": "#0F766E",
+                                  "id": "8fhrSI9y"
+                                },
+                                {
+                                  "type": "text",
+                                  "name": "Teks",
+                                  "content": "Check-in",
+                                  "family": "DM Sans",
+                                  "weight": 500,
+                                  "size": 12,
+                                  "lineHeight": 16,
+                                  "letterSpacing": 0,
+                                  "color": "#475467",
+                                  "id": "jCohUkFQ"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "text",
+                              "name": "Nilai",
+                              "content": "Jum, 11 Des 2026",
+                              "family": "DM Sans",
+                              "weight": 600,
+                              "size": 14,
+                              "lineHeight": 20,
+                              "letterSpacing": 0,
+                              "numeric": "tabular",
+                              "color": "#101828",
+                              "id": "VKYfcGB0"
+                            },
+                            {
+                              "type": "text",
+                              "name": "Jam",
+                              "content": "mulai 14.00",
+                              "family": "DM Sans",
+                              "weight": 500,
+                              "size": 12,
+                              "lineHeight": 16,
+                              "letterSpacing": 0,
+                              "numeric": "tabular",
+                              "color": "#475467",
+                              "id": "DfrZpFeX"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "name": "Tanggal / Check-out",
+                          "layout": "column",
+                          "gap": 4,
+                          "padding": 12,
+                          "width": "fill",
+                          "fills": [
+                            {
+                              "type": "solid",
+                              "color": "#EAF4F2"
+                            }
+                          ],
+                          "radius": 8,
+                          "id": "IleC9WfR",
+                          "children": [
+                            {
+                              "type": "frame",
+                              "name": "Label",
+                              "layout": "row",
+                              "gap": 6,
+                              "align": "center",
+                              "id": "TegPMvgR",
+                              "children": [
+                                {
+                                  "type": "icon",
+                                  "name": "Icon / lucide / calendar",
+                                  "lib": "lucide",
+                                  "icon": "calendar",
+                                  "version": "1.74.0",
+                                  "size": 16,
+                                  "color": "#0F766E",
+                                  "id": "9YaxLBtY"
+                                },
+                                {
+                                  "type": "text",
+                                  "name": "Teks",
+                                  "content": "Check-out",
+                                  "family": "DM Sans",
+                                  "weight": 500,
+                                  "size": 12,
+                                  "lineHeight": 16,
+                                  "letterSpacing": 0,
+                                  "color": "#475467",
+                                  "id": "NUSs2TWg"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "text",
+                              "name": "Nilai",
+                              "content": "Min, 13 Des 2026",
+                              "family": "DM Sans",
+                              "weight": 600,
+                              "size": 14,
+                              "lineHeight": 20,
+                              "letterSpacing": 0,
+                              "numeric": "tabular",
+                              "color": "#101828",
+                              "id": "S6SBBy8c"
+                            },
+                            {
+                              "type": "text",
+                              "name": "Jam",
+                              "content": "sebelum 12.00",
+                              "family": "DM Sans",
+                              "weight": 500,
+                              "size": 12,
+                              "lineHeight": 16,
+                              "letterSpacing": 0,
+                              "numeric": "tabular",
+                              "color": "#475467",
+                              "id": "fTpkjpju"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "name": "Tamu",
+                      "layout": "column",
+                      "gap": 12,
+                      "padding": [
+                        16,
+                        0,
+                        0,
+                        0
+                      ],
+                      "width": "fill",
+                      "stroke": {
+                        "color": "#E4E7EC",
+                        "width": 1,
+                        "align": "inside",
+                        "sides": [
+                          "top"
+                        ]
+                      },
+                      "id": "lDXdG2Wr",
+                      "children": [
+                        {
+                          "type": "frame",
+                          "name": "Tamu / Dewasa",
+                          "layout": "row",
+                          "gap": 12,
+                          "align": "center",
+                          "width": "fill",
+                          "id": "aewNYQBf",
+                          "children": [
+                            {
+                              "type": "frame",
+                              "name": "Teks",
+                              "layout": "column",
+                              "gap": 2,
+                              "width": "fill",
+                              "id": "6Lb12kYJ",
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "name": "Nama",
+                                  "content": "Dewasa",
+                                  "family": "DM Sans",
+                                  "weight": 600,
+                                  "size": 14,
+                                  "lineHeight": 20,
+                                  "letterSpacing": 0,
+                                  "color": "#101828",
+                                  "id": "OqJjhL6z"
+                                },
+                                {
+                                  "type": "text",
+                                  "name": "Meta",
+                                  "content": "13 tahun ke atas",
+                                  "family": "DM Sans",
+                                  "weight": 500,
+                                  "size": 12,
+                                  "lineHeight": 16,
+                                  "letterSpacing": 0,
+                                  "color": "#667085",
+                                  "id": "Xz5ROqZN"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "name": "Stepper / Dewasa",
+                              "layout": "row",
+                              "gap": 8,
+                              "align": "center",
+                              "height": 44,
+                              "id": "8ensPLxH",
+                              "children": [
+                                {
+                                  "type": "frame",
+                                  "name": "IconButton / Kurangi dewasa",
+                                  "layout": "row",
+                                  "align": "center",
+                                  "justify": "center",
+                                  "width": 44,
+                                  "height": 44,
+                                  "stroke": {
+                                    "color": "#7D8798",
+                                    "width": 1,
+                                    "align": "inside"
+                                  },
+                                  "radius": 9999,
+                                  "id": "vfI0bnpS",
+                                  "children": [
+                                    {
+                                      "type": "icon",
+                                      "name": "Icon / lucide / minus",
+                                      "lib": "lucide",
+                                      "icon": "minus",
+                                      "version": "1.74.0",
+                                      "size": 20,
+                                      "color": "#101828",
+                                      "id": "TEsRM1Ce"
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "frame",
+                                  "name": "Nilai",
+                                  "layout": "row",
+                                  "align": "center",
+                                  "justify": "center",
+                                  "width": 32,
+                                  "id": "KrJDIo6L",
+                                  "children": [
+                                    {
+                                      "type": "text",
+                                      "name": "Angka",
+                                      "content": "2",
+                                      "family": "DM Sans",
+                                      "weight": 600,
+                                      "size": 16,
+                                      "lineHeight": 24,
+                                      "letterSpacing": 0,
+                                      "align": "center",
+                                      "numeric": "tabular",
+                                      "color": "#101828",
+                                      "id": "CpNz468Y"
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "frame",
+                                  "name": "IconButton / Tambah dewasa",
+                                  "layout": "row",
+                                  "align": "center",
+                                  "justify": "center",
+                                  "width": 44,
+                                  "height": 44,
+                                  "stroke": {
+                                    "color": "#7D8798",
+                                    "width": 1,
+                                    "align": "inside"
+                                  },
+                                  "radius": 9999,
+                                  "id": "GTO9tejv",
+                                  "children": [
+                                    {
+                                      "type": "icon",
+                                      "name": "Icon / lucide / plus",
+                                      "lib": "lucide",
+                                      "icon": "plus",
+                                      "version": "1.74.0",
+                                      "size": 20,
+                                      "color": "#101828",
+                                      "id": "aWc9UvGI"
+                                    }
+                                  ]
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "name": "Tamu / Anak",
+                          "layout": "row",
+                          "gap": 12,
+                          "align": "center",
+                          "width": "fill",
+                          "id": "8qp94dom",
+                          "children": [
+                            {
+                              "type": "frame",
+                              "name": "Teks",
+                              "layout": "column",
+                              "gap": 2,
+                              "width": "fill",
+                              "id": "lpAAnTGW",
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "name": "Nama",
+                                  "content": "Anak",
+                                  "family": "DM Sans",
+                                  "weight": 600,
+                                  "size": 14,
+                                  "lineHeight": 20,
+                                  "letterSpacing": 0,
+                                  "color": "#101828",
+                                  "id": "dwVkPRxc"
+                                },
+                                {
+                                  "type": "text",
+                                  "name": "Meta",
+                                  "content": "2–12 tahun",
+                                  "family": "DM Sans",
+                                  "weight": 500,
+                                  "size": 12,
+                                  "lineHeight": 16,
+                                  "letterSpacing": 0,
+                                  "color": "#667085",
+                                  "id": "2nrp5RY7"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "name": "Stepper / Anak",
+                              "layout": "row",
+                              "gap": 8,
+                              "align": "center",
+                              "height": 44,
+                              "id": "pholybFA",
+                              "children": [
+                                {
+                                  "type": "frame",
+                                  "name": "IconButton / Kurangi anak",
+                                  "layout": "row",
+                                  "align": "center",
+                                  "justify": "center",
+                                  "width": 44,
+                                  "height": 44,
+                                  "stroke": {
+                                    "color": "#E4E7EC",
+                                    "width": 1,
+                                    "align": "inside"
+                                  },
+                                  "radius": 9999,
+                                  "id": "pg2dInzF",
+                                  "children": [
+                                    {
+                                      "type": "icon",
+                                      "name": "Icon / lucide / minus",
+                                      "lib": "lucide",
+                                      "icon": "minus",
+                                      "version": "1.74.0",
+                                      "size": 20,
+                                      "color": "#667085",
+                                      "id": "iXTqaITG"
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "frame",
+                                  "name": "Nilai",
+                                  "layout": "row",
+                                  "align": "center",
+                                  "justify": "center",
+                                  "width": 32,
+                                  "id": "8aUTeIhR",
+                                  "children": [
+                                    {
+                                      "type": "text",
+                                      "name": "Angka",
+                                      "content": "0",
+                                      "family": "DM Sans",
+                                      "weight": 600,
+                                      "size": 16,
+                                      "lineHeight": 24,
+                                      "letterSpacing": 0,
+                                      "align": "center",
+                                      "numeric": "tabular",
+                                      "color": "#101828",
+                                      "id": "Bs2C2xox"
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "frame",
+                                  "name": "IconButton / Tambah anak",
+                                  "layout": "row",
+                                  "align": "center",
+                                  "justify": "center",
+                                  "width": 44,
+                                  "height": 44,
+                                  "stroke": {
+                                    "color": "#7D8798",
+                                    "width": 1,
+                                    "align": "inside"
+                                  },
+                                  "radius": 9999,
+                                  "id": "hjGqEiFi",
+                                  "children": [
+                                    {
+                                      "type": "icon",
+                                      "name": "Icon / lucide / plus",
+                                      "lib": "lucide",
+                                      "icon": "plus",
+                                      "version": "1.74.0",
+                                      "size": 20,
+                                      "color": "#101828",
+                                      "id": "SeDKop5O"
+                                    }
+                                  ]
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "name": "Catatan",
+                          "content": "Maks. 3 tamu per kamar.",
+                          "family": "DM Sans",
+                          "weight": 500,
+                          "size": 12,
+                          "lineHeight": 16,
+                          "letterSpacing": 0,
+                          "color": "#667085",
+                          "id": "fxV9XYCm"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "name": "Seksi / Data pemesan",
+                  "layout": "column",
+                  "gap": 16,
+                  "padding": 16,
+                  "width": "fill",
+                  "fills": [
+                    {
+                      "type": "solid",
+                      "color": "#FFFFFF"
+                    }
+                  ],
+                  "stroke": {
+                    "color": "#E4E7EC",
+                    "width": 1,
+                    "align": "inside"
+                  },
+                  "radius": 16,
+                  "id": "mSvIEwFg",
+                  "children": [
+                    {
+                      "type": "text",
+                      "name": "Judul",
+                      "content": "Data pemesan",
+                      "family": "DM Sans",
+                      "weight": 600,
+                      "size": 20,
+                      "lineHeight": 28,
+                      "letterSpacing": 0,
+                      "color": "#101828",
+                      "id": "Uykiqv52"
+                    },
+                    {
+                      "type": "frame",
+                      "name": "Field",
+                      "layout": "column",
+                      "gap": 16,
+                      "width": "fill",
+                      "id": "lJ1DNBEA",
+                      "children": [
+                        {
+                          "type": "frame",
+                          "name": "Grup / Nama lengkap",
+                          "layout": "column",
+                          "gap": 8,
+                          "width": "fill",
+                          "id": "J18hbpsq",
+                          "children": [
+                            {
+                              "type": "text",
+                              "name": "Label",
+                              "content": "Nama lengkap",
+                              "family": "DM Sans",
+                              "weight": 600,
+                              "size": 14,
+                              "lineHeight": 20,
+                              "letterSpacing": 0,
+                              "color": "#101828",
+                              "id": "roRe5e0x"
+                            },
+                            {
+                              "type": "frame",
+                              "name": "Input / Nama lengkap",
+                              "layout": "row",
+                              "gap": 8,
+                              "padding": [
+                                0,
+                                16
+                              ],
+                              "align": "center",
+                              "width": "fill",
+                              "height": 48,
+                              "fills": [
+                                {
+                                  "type": "solid",
+                                  "color": "#FFFFFF"
+                                }
+                              ],
+                              "stroke": {
+                                "color": "#7D8798",
+                                "width": 1,
+                                "align": "inside"
+                              },
+                              "radius": 8,
+                              "id": "tlsHUUaW",
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "name": "Nilai",
+                                  "content": "Nadia Putri Rahman",
+                                  "family": "DM Sans",
+                                  "weight": 400,
+                                  "size": 16,
+                                  "lineHeight": 24,
+                                  "letterSpacing": 0,
+                                  "color": "#101828",
+                                  "width": "fill",
+                                  "id": "WMOeyzIX"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "text",
+                              "name": "Bantuan",
+                              "content": "Sesuai KTP, untuk check-in di resepsionis.",
+                              "family": "DM Sans",
+                              "weight": 400,
+                              "size": 14,
+                              "lineHeight": 20,
+                              "letterSpacing": 0,
+                              "color": "#667085",
+                              "width": "fill",
+                              "id": "wZ1lR4lz"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "name": "Grup / Email",
+                          "layout": "column",
+                          "gap": 8,
+                          "width": "fill",
+                          "id": "pAo8GQv4",
+                          "children": [
+                            {
+                              "type": "text",
+                              "name": "Label",
+                              "content": "Email",
+                              "family": "DM Sans",
+                              "weight": 600,
+                              "size": 14,
+                              "lineHeight": 20,
+                              "letterSpacing": 0,
+                              "color": "#101828",
+                              "id": "9Txqr05F"
+                            },
+                            {
+                              "type": "frame",
+                              "name": "Input / Email",
+                              "layout": "row",
+                              "gap": 8,
+                              "padding": [
+                                0,
+                                16
+                              ],
+                              "align": "center",
+                              "width": "fill",
+                              "height": 48,
+                              "fills": [
+                                {
+                                  "type": "solid",
+                                  "color": "#FFFFFF"
+                                }
+                              ],
+                              "stroke": {
+                                "color": "#DC2626",
+                                "width": 1.5,
+                                "align": "inside"
+                              },
+                              "radius": 8,
+                              "id": "rYapH1hM",
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "name": "Nilai",
+                                  "content": "nadia.rahman@gmail",
+                                  "family": "DM Sans",
+                                  "weight": 400,
+                                  "size": 16,
+                                  "lineHeight": 24,
+                                  "letterSpacing": 0,
+                                  "color": "#101828",
+                                  "width": "fill",
+                                  "id": "qJmTPWrR"
+                                },
+                                {
+                                  "type": "icon",
+                                  "name": "Icon / lucide / circle-exclamation-point",
+                                  "lib": "lucide",
+                                  "icon": "circle-exclamation-point",
+                                  "version": "1.74.0",
+                                  "size": 20,
+                                  "color": "#DC2626",
+                                  "id": "5X4KGtFF"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "name": "Pesan error",
+                              "layout": "row",
+                              "gap": 6,
+                              "align": "start",
+                              "width": "fill",
+                              "id": "MX4WEl6p",
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "name": "Teks",
+                                  "content": "Tambahkan domain email, mis. @gmail.com.",
+                                  "family": "DM Sans",
+                                  "weight": 400,
+                                  "size": 14,
+                                  "lineHeight": 20,
+                                  "letterSpacing": 0,
+                                  "color": "#DC2626",
+                                  "width": "fill",
+                                  "id": "gj1g5Ii4"
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "name": "Grup / Nomor HP",
+                          "layout": "column",
+                          "gap": 8,
+                          "width": "fill",
+                          "id": "nTlapQSt",
+                          "children": [
+                            {
+                              "type": "text",
+                              "name": "Label",
+                              "content": "Nomor HP",
+                              "family": "DM Sans",
+                              "weight": 600,
+                              "size": 14,
+                              "lineHeight": 20,
+                              "letterSpacing": 0,
+                              "color": "#101828",
+                              "id": "53zMyKqS"
+                            },
+                            {
+                              "type": "frame",
+                              "name": "Input / Nomor HP",
+                              "layout": "row",
+                              "gap": 8,
+                              "padding": [
+                                0,
+                                16
+                              ],
+                              "align": "center",
+                              "width": "fill",
+                              "height": 48,
+                              "fills": [
+                                {
+                                  "type": "solid",
+                                  "color": "#FFFFFF"
+                                }
+                              ],
+                              "stroke": {
+                                "color": "#7D8798",
+                                "width": 1,
+                                "align": "inside"
+                              },
+                              "radius": 8,
+                              "id": "tXxJykU1",
+                              "children": [
+                                {
+                                  "type": "frame",
+                                  "name": "Prefiks",
+                                  "layout": "row",
+                                  "gap": 8,
+                                  "padding": [
+                                    0,
+                                    12,
+                                    0,
+                                    0
+                                  ],
+                                  "align": "center",
+                                  "height": "fill",
+                                  "stroke": {
+                                    "color": "#E4E7EC",
+                                    "width": 1,
+                                    "align": "inside",
+                                    "sides": [
+                                      "right"
+                                    ]
+                                  },
+                                  "id": "wVWIOutt",
+                                  "children": [
+                                    {
+                                      "type": "text",
+                                      "name": "Teks",
+                                      "content": "+62",
+                                      "family": "DM Sans",
+                                      "weight": 500,
+                                      "size": 16,
+                                      "lineHeight": 24,
+                                      "letterSpacing": 0,
+                                      "color": "#101828",
+                                      "id": "350Yvx2P"
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "text",
+                                  "name": "Nilai",
+                                  "content": "812 3456 7890",
+                                  "family": "DM Sans",
+                                  "weight": 400,
+                                  "size": 16,
+                                  "lineHeight": 24,
+                                  "letterSpacing": 0,
+                                  "color": "#101828",
+                                  "width": "fill",
+                                  "id": "061n2jxs"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "text",
+                              "name": "Bantuan",
+                              "content": "Kode konfirmasi dikirim lewat WhatsApp.",
+                              "family": "DM Sans",
+                              "weight": 400,
+                              "size": 14,
+                              "lineHeight": 20,
+                              "letterSpacing": 0,
+                              "color": "#667085",
+                              "width": "fill",
+                              "id": "lHuwULQH"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "name": "Seksi / Pembayaran",
+                  "layout": "column",
+                  "gap": 12,
+                  "padding": 0,
+                  "width": "fill",
+                  "fills": [],
+                  "radius": 0,
+                  "id": "2cPpqs35",
+                  "children": [
+                    {
+                      "type": "text",
+                      "name": "Judul",
+                      "content": "Metode pembayaran",
+                      "family": "DM Sans",
+                      "weight": 600,
+                      "size": 20,
+                      "lineHeight": 28,
+                      "letterSpacing": 0,
+                      "color": "#101828",
+                      "id": "lMYqvgM7"
+                    },
+                    {
+                      "type": "frame",
+                      "name": "Pilihan",
+                      "layout": "column",
+                      "gap": 12,
+                      "width": "fill",
+                      "id": "9YRUQ02E",
+                      "children": [
+                        {
+                          "type": "frame",
+                          "name": "Radio / QRIS",
+                          "layout": "row",
+                          "gap": 12,
+                          "padding": [
+                            12,
+                            16
+                          ],
+                          "align": "center",
+                          "width": "fill",
+                          "fills": [
+                            {
+                              "type": "solid",
+                              "color": "#0F766E0F"
+                            }
+                          ],
+                          "stroke": {
+                            "color": "#0F766E",
+                            "width": 1.5,
+                            "align": "inside"
+                          },
+                          "radius": 12,
+                          "id": "WX5rL1F9",
+                          "children": [
+                            {
+                              "type": "frame",
+                              "name": "Ikon",
+                              "layout": "row",
+                              "align": "center",
+                              "justify": "center",
+                              "width": 40,
+                              "height": 40,
+                              "fills": [
+                                {
+                                  "type": "solid",
+                                  "color": "#EAF4F2"
+                                }
+                              ],
+                              "radius": 8,
+                              "id": "d5813uXQ",
+                              "children": [
+                                {
+                                  "type": "icon",
+                                  "name": "Icon / lucide / qr-code",
+                                  "lib": "lucide",
+                                  "icon": "qr-code",
+                                  "version": "1.74.0",
+                                  "size": 20,
+                                  "color": "#0F766E",
+                                  "id": "x6JRQp5V"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "name": "Teks",
+                              "layout": "column",
+                              "gap": 2,
+                              "width": "fill",
+                              "id": "MDxHSylk",
+                              "children": [
+                                {
+                                  "type": "frame",
+                                  "name": "Judul",
+                                  "layout": "row",
+                                  "gap": 8,
+                                  "align": "center",
+                                  "id": "QXveX4L3",
+                                  "children": [
+                                    {
+                                      "type": "text",
+                                      "name": "Nama",
+                                      "content": "QRIS",
+                                      "family": "DM Sans",
+                                      "weight": 600,
+                                      "size": 14,
+                                      "lineHeight": 20,
+                                      "letterSpacing": 0,
+                                      "color": "#101828",
+                                      "id": "H8j8ZLGV"
+                                    },
+                                    {
+                                      "type": "frame",
+                                      "name": "Badge / Tanpa biaya",
+                                      "layout": "row",
+                                      "gap": 4,
+                                      "padding": [
+                                        0,
+                                        6
+                                      ],
+                                      "align": "center",
+                                      "width": "hug",
+                                      "height": 20,
+                                      "fills": [
+                                        {
+                                          "type": "solid",
+                                          "color": "#15803D1F"
+                                        }
+                                      ],
+                                      "radius": 9999,
+                                      "id": "nrOyPgmx",
+                                      "children": [
+                                        {
+                                          "type": "text",
+                                          "name": "Teks",
+                                          "content": "Tanpa biaya",
+                                          "family": "DM Sans",
+                                          "weight": 500,
+                                          "size": 12,
+                                          "lineHeight": 16,
+                                          "letterSpacing": 0,
+                                          "color": "#0a401e",
+                                          "id": "4KUJJZZZ"
+                                        }
+                                      ]
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "text",
+                                  "name": "Detail",
+                                  "content": "Dari m-banking atau dompet digital",
+                                  "family": "DM Sans",
+                                  "weight": 500,
+                                  "size": 12,
+                                  "lineHeight": 16,
+                                  "letterSpacing": 0,
+                                  "color": "#475467",
+                                  "width": "fill",
+                                  "id": "XjuRarEM"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "name": "Kontrol",
+                              "layout": "none",
+                              "width": 24,
+                              "height": 24,
+                              "id": "GmkFl6Ch",
+                              "children": [
+                                {
+                                  "type": "ellipse",
+                                  "name": "Cincin",
+                                  "width": 24,
+                                  "height": 24,
+                                  "stroke": {
+                                    "color": "#0F766E",
+                                    "width": 1.5,
+                                    "align": "inside"
+                                  },
+                                  "id": "OCrcGddw"
+                                },
+                                {
+                                  "type": "ellipse",
+                                  "name": "Titik",
+                                  "position": "absolute",
+                                  "x": 6,
+                                  "y": 6,
+                                  "width": 12,
+                                  "height": 12,
+                                  "fills": [
+                                    {
+                                      "type": "solid",
+                                      "color": "#0F766E"
+                                    }
+                                  ],
+                                  "id": "zC4EH2Hs"
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "name": "Radio / Virtual account",
+                          "layout": "row",
+                          "gap": 12,
+                          "padding": [
+                            12,
+                            16
+                          ],
+                          "align": "center",
+                          "width": "fill",
+                          "fills": [
+                            {
+                              "type": "solid",
+                              "color": "#FFFFFF"
+                            }
+                          ],
+                          "stroke": {
+                            "color": "#7D8798",
+                            "width": 1,
+                            "align": "inside"
+                          },
+                          "radius": 12,
+                          "id": "R3t0P45Z",
+                          "children": [
+                            {
+                              "type": "frame",
+                              "name": "Ikon",
+                              "layout": "row",
+                              "align": "center",
+                              "justify": "center",
+                              "width": 40,
+                              "height": 40,
+                              "fills": [
+                                {
+                                  "type": "solid",
+                                  "color": "#F6F7F9"
+                                }
+                              ],
+                              "radius": 8,
+                              "id": "UsbwajMt",
+                              "children": [
+                                {
+                                  "type": "icon",
+                                  "name": "Icon / lucide / landmark",
+                                  "lib": "lucide",
+                                  "icon": "landmark",
+                                  "version": "1.74.0",
+                                  "size": 20,
+                                  "color": "#475467",
+                                  "id": "Ry4mtjDV"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "name": "Teks",
+                              "layout": "column",
+                              "gap": 2,
+                              "width": "fill",
+                              "id": "MaZYqO50",
+                              "children": [
+                                {
+                                  "type": "frame",
+                                  "name": "Judul",
+                                  "layout": "row",
+                                  "gap": 8,
+                                  "align": "center",
+                                  "id": "Q4erSmtB",
+                                  "children": [
+                                    {
+                                      "type": "text",
+                                      "name": "Nama",
+                                      "content": "Virtual account",
+                                      "family": "DM Sans",
+                                      "weight": 600,
+                                      "size": 14,
+                                      "lineHeight": 20,
+                                      "letterSpacing": 0,
+                                      "color": "#101828",
+                                      "id": "M0HZrkX4"
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "text",
+                                  "name": "Detail",
+                                  "content": "BCA, Mandiri, BNI, BRI",
+                                  "family": "DM Sans",
+                                  "weight": 500,
+                                  "size": 12,
+                                  "lineHeight": 16,
+                                  "letterSpacing": 0,
+                                  "color": "#667085",
+                                  "width": "fill",
+                                  "id": "MzU7Yf0Q"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "name": "Kontrol",
+                              "layout": "none",
+                              "width": 24,
+                              "height": 24,
+                              "id": "bClPC7ld",
+                              "children": [
+                                {
+                                  "type": "ellipse",
+                                  "name": "Cincin",
+                                  "width": 24,
+                                  "height": 24,
+                                  "stroke": {
+                                    "color": "#7D8798",
+                                    "width": 1.5,
+                                    "align": "inside"
+                                  },
+                                  "id": "KaGY2ly3"
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "name": "Radio / Kartu kredit/debit",
+                          "layout": "row",
+                          "gap": 12,
+                          "padding": [
+                            12,
+                            16
+                          ],
+                          "align": "center",
+                          "width": "fill",
+                          "fills": [
+                            {
+                              "type": "solid",
+                              "color": "#FFFFFF"
+                            }
+                          ],
+                          "stroke": {
+                            "color": "#7D8798",
+                            "width": 1,
+                            "align": "inside"
+                          },
+                          "radius": 12,
+                          "id": "8FXuudGp",
+                          "children": [
+                            {
+                              "type": "frame",
+                              "name": "Ikon",
+                              "layout": "row",
+                              "align": "center",
+                              "justify": "center",
+                              "width": 40,
+                              "height": 40,
+                              "fills": [
+                                {
+                                  "type": "solid",
+                                  "color": "#F6F7F9"
+                                }
+                              ],
+                              "radius": 8,
+                              "id": "sxJcLkRd",
+                              "children": [
+                                {
+                                  "type": "icon",
+                                  "name": "Icon / lucide / credit-card",
+                                  "lib": "lucide",
+                                  "icon": "credit-card",
+                                  "version": "1.74.0",
+                                  "size": 20,
+                                  "color": "#475467",
+                                  "id": "D6uKVkN8"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "name": "Teks",
+                              "layout": "column",
+                              "gap": 2,
+                              "width": "fill",
+                              "id": "3LjiWT9V",
+                              "children": [
+                                {
+                                  "type": "frame",
+                                  "name": "Judul",
+                                  "layout": "row",
+                                  "gap": 8,
+                                  "align": "center",
+                                  "id": "ylVPIKnD",
+                                  "children": [
+                                    {
+                                      "type": "text",
+                                      "name": "Nama",
+                                      "content": "Kartu kredit/debit",
+                                      "family": "DM Sans",
+                                      "weight": 600,
+                                      "size": 14,
+                                      "lineHeight": 20,
+                                      "letterSpacing": 0,
+                                      "color": "#101828",
+                                      "id": "WM8wHaSY"
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "text",
+                                  "name": "Detail",
+                                  "content": "Visa, Mastercard, JCB",
+                                  "family": "DM Sans",
+                                  "weight": 500,
+                                  "size": 12,
+                                  "lineHeight": 16,
+                                  "letterSpacing": 0,
+                                  "color": "#667085",
+                                  "width": "fill",
+                                  "id": "jXXu97SJ"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "name": "Kontrol",
+                              "layout": "none",
+                              "width": 24,
+                              "height": 24,
+                              "id": "1tDvL8jN",
+                              "children": [
+                                {
+                                  "type": "ellipse",
+                                  "name": "Cincin",
+                                  "width": 24,
+                                  "height": 24,
+                                  "stroke": {
+                                    "color": "#7D8798",
+                                    "width": 1.5,
+                                    "align": "inside"
+                                  },
+                                  "id": "GIUmLuIC"
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "name": "Seksi / Rincian harga",
+                  "layout": "column",
+                  "gap": 12,
+                  "padding": 16,
+                  "width": "fill",
+                  "fills": [
+                    {
+                      "type": "solid",
+                      "color": "#FFFFFF"
+                    }
+                  ],
+                  "stroke": {
+                    "color": "#E4E7EC",
+                    "width": 1,
+                    "align": "inside"
+                  },
+                  "radius": 16,
+                  "id": "2JgYTiWE",
+                  "children": [
+                    {
+                      "type": "text",
+                      "name": "Judul",
+                      "content": "Rincian harga",
+                      "family": "DM Sans",
+                      "weight": 600,
+                      "size": 20,
+                      "lineHeight": 28,
+                      "letterSpacing": 0,
+                      "color": "#101828",
+                      "id": "hxu34Zua"
+                    },
+                    {
+                      "type": "frame",
+                      "name": "Baris / Rp 685.000 × 2 malam",
+                      "layout": "row",
+                      "gap": 12,
+                      "align": "center",
+                      "justify": "space-between",
+                      "width": "fill",
+                      "id": "8iLmePC8",
+                      "children": [
+                        {
+                          "type": "text",
+                          "name": "Label",
+                          "content": "Rp 685.000 × 2 malam",
+                          "family": "DM Sans",
+                          "weight": 400,
+                          "size": 14,
+                          "lineHeight": 20,
+                          "letterSpacing": 0,
+                          "color": "#475467",
+                          "width": "fill",
+                          "id": "qViLs6SK"
+                        },
+                        {
+                          "type": "text",
+                          "name": "Nilai",
+                          "content": "Rp 1.370.000",
+                          "family": "DM Sans",
+                          "weight": 500,
+                          "size": 14,
+                          "lineHeight": 20,
+                          "letterSpacing": 0,
+                          "align": "right",
+                          "numeric": "tabular",
+                          "color": "#101828",
+                          "id": "wYtozV5Q"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "name": "Baris / Pajak hotel 10%",
+                      "layout": "row",
+                      "gap": 12,
+                      "align": "center",
+                      "justify": "space-between",
+                      "width": "fill",
+                      "id": "8wfzJhhk",
+                      "children": [
+                        {
+                          "type": "text",
+                          "name": "Label",
+                          "content": "Pajak hotel 10%",
+                          "family": "DM Sans",
+                          "weight": 400,
+                          "size": 14,
+                          "lineHeight": 20,
+                          "letterSpacing": 0,
+                          "color": "#475467",
+                          "width": "fill",
+                          "id": "2HmKbdJK"
+                        },
+                        {
+                          "type": "text",
+                          "name": "Nilai",
+                          "content": "Rp 137.000",
+                          "family": "DM Sans",
+                          "weight": 500,
+                          "size": 14,
+                          "lineHeight": 20,
+                          "letterSpacing": 0,
+                          "align": "right",
+                          "numeric": "tabular",
+                          "color": "#101828",
+                          "id": "EmopM3Ry"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "name": "Baris / Biaya layanan",
+                      "layout": "row",
+                      "gap": 12,
+                      "align": "center",
+                      "justify": "space-between",
+                      "width": "fill",
+                      "id": "mThVDaEb",
+                      "children": [
+                        {
+                          "type": "text",
+                          "name": "Label",
+                          "content": "Biaya layanan",
+                          "family": "DM Sans",
+                          "weight": 400,
+                          "size": 14,
+                          "lineHeight": 20,
+                          "letterSpacing": 0,
+                          "color": "#475467",
+                          "width": "fill",
+                          "id": "FtT3g8fu"
+                        },
+                        {
+                          "type": "text",
+                          "name": "Nilai",
+                          "content": "Rp 15.000",
+                          "family": "DM Sans",
+                          "weight": 500,
+                          "size": 14,
+                          "lineHeight": 20,
+                          "letterSpacing": 0,
+                          "align": "right",
+                          "numeric": "tabular",
+                          "color": "#101828",
+                          "id": "hczCNTCb"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "name": "Baris / Total",
+                      "layout": "row",
+                      "gap": 12,
+                      "padding": [
+                        12,
+                        0,
+                        0,
+                        0
+                      ],
+                      "align": "center",
+                      "justify": "space-between",
+                      "width": "fill",
+                      "stroke": {
+                        "color": "#E4E7EC",
+                        "width": 1,
+                        "align": "inside",
+                        "sides": [
+                          "top"
+                        ]
+                      },
+                      "id": "GCFJViPW",
+                      "children": [
+                        {
+                          "type": "text",
+                          "name": "Label",
+                          "content": "Total",
+                          "family": "DM Sans",
+                          "weight": 600,
+                          "size": 14,
+                          "lineHeight": 20,
+                          "letterSpacing": 0,
+                          "color": "#101828",
+                          "width": "fill",
+                          "id": "9lw05bqb"
+                        },
+                        {
+                          "type": "text",
+                          "name": "Nilai",
+                          "content": "Rp 1.522.000",
+                          "family": "DM Sans",
+                          "weight": 700,
+                          "size": 20,
+                          "lineHeight": 28,
+                          "letterSpacing": 0,
+                          "align": "right",
+                          "numeric": "tabular",
+                          "color": "#101828",
+                          "id": "wY5G6GIT"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "name": "Overlay / Bilah bawah",
+              "position": "absolute",
+              "x": 0,
+              "y": 1812,
+              "layout": "column",
+              "gap": 12,
+              "padding": [
+                16,
+                20
+              ],
+              "width": 390,
+              "height": 128,
+              "fills": [
+                {
+                  "type": "solid",
+                  "color": "#FFFFFF"
+                }
+              ],
+              "stroke": {
+                "color": "#E4E7EC",
+                "width": 1,
+                "align": "inside",
+                "sides": [
+                  "top"
+                ]
+              },
+              "id": "pYICcG6s",
+              "children": [
+                {
+                  "type": "frame",
+                  "name": "Ringkasan",
+                  "layout": "row",
+                  "align": "center",
+                  "justify": "space-between",
+                  "width": "fill",
+                  "id": "mH8hlW5K",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "name": "Teks",
+                      "layout": "column",
+                      "gap": 0,
+                      "id": "I9tIlDgI",
+                      "children": [
+                        {
+                          "type": "text",
+                          "name": "Label",
+                          "content": "Total · 2 malam, 2 tamu",
+                          "family": "DM Sans",
+                          "weight": 500,
+                          "size": 12,
+                          "lineHeight": 16,
+                          "letterSpacing": 0,
+                          "color": "#475467",
+                          "id": "Ez7QQcC2"
+                        },
+                        {
+                          "type": "text",
+                          "name": "Nilai",
+                          "content": "Rp 1.522.000",
+                          "family": "DM Sans",
+                          "weight": 700,
+                          "size": 20,
+                          "lineHeight": 28,
+                          "letterSpacing": 0,
+                          "numeric": "tabular",
+                          "color": "#101828",
+                          "id": "2pIi1uuz"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "name": "Keamanan",
+                      "layout": "row",
+                      "gap": 4,
+                      "align": "center",
+                      "id": "OWyur17J",
+                      "children": [
+                        {
+                          "type": "icon",
+                          "name": "Icon / lucide / lock",
+                          "lib": "lucide",
+                          "icon": "lock",
+                          "version": "1.74.0",
+                          "size": 16,
+                          "color": "#15803D",
+                          "id": "bwHBa8lR"
+                        },
+                        {
+                          "type": "text",
+                          "name": "Teks",
+                          "content": "Pembayaran aman",
+                          "family": "DM Sans",
+                          "weight": 500,
+                          "size": 12,
+                          "lineHeight": 16,
+                          "letterSpacing": 0,
+                          "color": "#475467",
+                          "id": "jgRvb75W"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "name": "Button / Bayar",
+                  "layout": "row",
+                  "gap": 8,
+                  "align": "center",
+                  "justify": "center",
+                  "width": "fill",
+                  "height": 56,
+                  "fills": [
+                    {
+                      "type": "solid",
+                      "color": "#0F766E"
+                    }
+                  ],
+                  "radius": 12,
+                  "id": "WaaJvK88",
+                  "children": [
+                    {
+                      "type": "text",
+                      "name": "Label",
+                      "content": "Bayar Rp 1.522.000",
+                      "family": "DM Sans",
+                      "weight": 600,
+                      "size": 16,
+                      "lineHeight": 24,
+                      "letterSpacing": 0,
+                      "numeric": "tabular",
+                      "color": "#FFFFFF",
+                      "id": "kuSAqCwb"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "name": "Home indicator",
+              "position": "absolute",
+              "x": 0,
+              "y": 1940,
+              "layout": "row",
+              "align": "center",
+              "justify": "center",
+              "width": 390,
+              "height": 34,
+              "fills": [
+                {
+                  "type": "solid",
+                  "color": "#FFFFFF"
+                }
+              ],
+              "id": "HhmRuo6z",
+              "children": [
+                {
+                  "type": "rect",
+                  "name": "Garis",
+                  "width": 134,
+                  "height": 5,
+                  "fills": [
+                    {
+                      "type": "solid",
+                      "color": "#101828"
+                    }
+                  ],
+                  "radius": 9999,
+                  "id": "cWPdWgFr"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

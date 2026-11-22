@@ -3,7 +3,7 @@ title: 'Baseline waktu pen.dev A dan B terukur dengan pembungkus resmi'
 type: feature
 ticket: '4'
 created: '2026-11-17'
-status: built
+status: done
 baseline_revision: 'a1a75938038489a97b07237a4dab43c7074dd032'
 route: full
 route_source: auto

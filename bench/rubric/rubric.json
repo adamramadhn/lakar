@@ -1,12 +1,15 @@
 {
-  "version": "2.2",
+  "version": "2.3",
   "date": "2026-11-19",
   "judgeTextSha256": {
     "A": "e3213b0bfccaf09eaab9d317ede5b961a1081b67feaf748e2d60474bb95aa7d7",
-    "B": "e098f100c8561f809ac6c238fd701d62bd8b2777145c148e414685ec73891e06"
+    "B": "63d86a4231c30be0458b988b8ebed27d9a00410077314033fc420cf46f013655",
+    "C": "3bf18cc6ee538769cb0221134ca9266eabee087a3bbb9fd4ad349633f5b3d5b4",
+    "D": "a16e6fcc2b751edfb72ee3b33cd4aee614e89c21447cea86324ce77ef511efce",
+    "E": "d3e5324acdef057f4b12fbd817123840f258fd9dc63eb06d05ea60d786544891"
   },
   "sourceSha256": {
-    "lampiran-b.md": "4d228aa68e7c2026cbe40744b0809656cc73a49e99f17ac297cf9a9075d3b0a2",
-    "golden-kriteria.md": "46de49e3a77602a39cf33bf45dbade5da155c73544c9e92b8ae1d90211cb7d5b"
+    "lampiran-b.md": "b8a7bf4230beb585a269d790d1a761d31f4f6897c015d1fce793b1a6dd2508eb",
+    "golden-kriteria.md": "f1ad623f14eb0c10f7f1e55b3dc9bbf4249ed76c60d237aa1b0f3b67d886c774"
   }
 }

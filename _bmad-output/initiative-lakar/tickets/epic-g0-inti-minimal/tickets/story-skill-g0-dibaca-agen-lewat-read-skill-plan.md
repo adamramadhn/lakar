@@ -3,7 +3,7 @@ title: 'Skill G0 dibaca agen lewat read_skill'
 type: feature
 ticket: '13'
 created: '2026-11-18'
-status: built
+status: done
 baseline_revision: 'fb9fd08579df2e0269c78117dbb0884d264653ad'
 route: full
 route_source: auto

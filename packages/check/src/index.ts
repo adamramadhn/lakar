@@ -3,7 +3,7 @@
 import type { BoardMeasure } from '@lakar/ports';
 import { findBoard, type Finding, type ResolvedBoardNode as BoardNode, type ResolvedDocument } from '@lakar/schema';
 import { codePoints, graphemes, isEmojiGrapheme, leadingIconGlyph, onlyIconGlyphs } from './glyphs.js';
-import { capWarnings, lc01a, lc01b, lc02a, lc02b, lc04, lc05, lc11, lc12, lc18, lc20, lc23, lc24, lc25, lc26, lc27, lc28, lc29, lc30, lc31 } from './rules.js';
+import { capWarnings, lc01a, lc01b, lc02a, lc02b, lc02c, lc03, lc04, lc05, lc06, lc07, lc08, lc09, lc10, lc11, lc12, lc13, lc14, lc15, lc16, lc17, lc18, lc19, lc20, lc21, lc22, lc23, lc24, lc25, lc26, lc27, lc28, lc29, lc30, lc31 } from './rules.js';
 import { boardContext } from './tree.js';
 
 export const PACKAGE = '@lakar/check';
@@ -11,23 +11,43 @@ export const PACKAGE = '@lakar/check';
 export { codePoints, emojiIn, graphemes, isEmojiGrapheme, leadingIconGlyph, LC01B_GLYPHS, onlyIconGlyphs } from './glyphs.js';
 export {
   BOTTOM_BAR_CLEARANCE,
+  BOX_CLEARANCE_MAX,
+  BOX_OVERFLOW_MIN,
   BOTTOM_BAR_MAX_GAP,
   bottomZone,
+  CONVENTIONS,
+  DEFAULT_LAYER_NAME,
+  DRAWN_ICON_MAX,
+  EFFECT_AREA_RATIO,
+  EFFECT_BLUR_MIN,
+  MAX_RADII,
   capWarnings,
-  CONTRAST_MIN,
-  CONTRAST_MIN_LARGE,
   contrastRatio,
-  isLargeText,
   lc01a,
   lc01b,
   lc02a,
   lc02b,
+  lc02c,
+  lc03,
   lc04,
   lc05,
+  lc06,
+  lc07,
+  lc08,
+  lc09,
+  lc10,
   lc11,
   lc12,
+  lc13,
+  lc14,
+  lc15,
+  lc16,
+  lc17,
   lc18,
+  lc19,
   lc20,
+  lc21,
+  lc22,
   lc23,
   lc24,
   lc25,
@@ -38,6 +58,12 @@ export {
   lc30,
   lc31,
   FIT_SLACK_MAX,
+  LINE_HEIGHT_TOL,
+  MAX_FONT_FAMILIES,
+  MOBILE_MAX_WIDTH,
+  PARAGRAPH_MIN_WORDS,
+  TEXT_BOX_OVERFLOW_MIN,
+  LIST_TOP_MIN,
   MAX_WARNINGS_PER_RULE,
   MIN_TEXT_SIZE,
   ORPHAN_MIN_BODY,
@@ -45,8 +71,11 @@ export {
   parseHex,
   RANGE_HYPHEN,
   SCREEN_SIZES,
+  SECTION_MIN_NODES,
+  SECTION_SIMILARITY_MIN,
   type BottomZone,
 } from './rules.js';
+export { CONTRAST_MIN, isLargeText, LARGE_TEXT } from '@lakar/schema';
 export { changedNodeIds, touchedBoards } from './touched.js';
 export { TOLERANCE, visibleRect } from './tree.js';
 
@@ -78,10 +107,12 @@ export function glyphScan(board: BoardNode): { findings: Finding[]; allowGlyphs:
   return { findings: [...lc01a(ctx), ...lc01b(ctx)], allowGlyphs: [...allow].sort((a, b) => a - b) };
 }
 
-const RULE_ORDER = ['LC-01a', 'LC-01b', 'LC-02a', 'LC-02b', 'LC-04', 'LC-05', 'LC-11', 'LC-12', 'LC-18', 'LC-20', 'LC-23', 'LC-24', 'LC-25', 'LC-26', 'LC-27', 'LC-28', 'LC-29', 'LC-30', 'LC-31'];
+const RULE_ORDER = ['LC-01a', 'LC-01b', 'LC-02a', 'LC-02b', 'LC-02c', 'LC-03', 'LC-04', 'LC-05', 'LC-06', 'LC-07', 'LC-08', 'LC-09', 'LC-10', 'LC-11', 'LC-12', 'LC-13', 'LC-14', 'LC-15', 'LC-16', 'LC-17', 'LC-18', 'LC-19', 'LC-20', 'LC-21', 'LC-22', 'LC-23', 'LC-24', 'LC-25', 'LC-26', 'LC-27', 'LC-28', 'LC-29', 'LC-30', 'LC-31'];
+
+const LEVEL_ORDER = { error: 0, warning: 1, info: 2 } as const;
 
 /**
- * Urutan stabil: error lalu warning, lalu urutan dokumen (`order` id → indeks) dan urutan aturan.
+ * Urutan stabil: error, warning, lalu info; lalu urutan dokumen (`order` id → indeks) dan urutan aturan.
  * Tanpa `order`: hanya level dipisah, urutan masukan dipertahankan.
  */
 export function sortFindings(findings: readonly Finding[], order?: ReadonlyMap<string, number>): Finding[] {
@@ -89,32 +120,51 @@ export function sortFindings(findings: readonly Finding[], order?: ReadonlyMap<s
     .map((f, i) => ({ f, i }))
     .sort(
       (a, b) =>
-        (a.f.level === 'error' ? 0 : 1) - (b.f.level === 'error' ? 0 : 1) ||
+        LEVEL_ORDER[a.f.level] - LEVEL_ORDER[b.f.level] ||
         (order ? (order.get(a.f.nodeId) ?? 0) - (order.get(b.f.nodeId) ?? 0) || RULE_ORDER.indexOf(a.f.rule) - RULE_ORDER.indexOf(b.f.rule) : 0) ||
         a.i - b.i,
     )
     .map((x) => x.f);
 }
 
-/** Semua aturan G0 untuk satu board (urutan stabil). Board tidak ada → []. */
+/** Semua aturan yang berjalan untuk satu board (urutan stabil). Board tidak ada → []. */
 export function checkBoard({ doc, boardId, measure }: { doc: ResolvedDocument; boardId: string; measure: BoardMeasure }): Finding[] {
   const board = findBoard(doc, boardId);
   if (!board) return [];
   const ctx = boardContext(board, measure);
   const clipped = lc02a(ctx);
   const cut = new Set(clipped.map((f) => f.nodeId));
+  // Teks yang sudah error LC-02a/LC-02b tidak dilaporkan lagi sebagai warning LC-03.
+  const inkOver = lc02b(ctx).filter((f) => !cut.has(f.nodeId));
+  const textCut = new Set([...cut, ...inkOver.map((f) => f.nodeId)]);
   const all = [
     ...lc01a(ctx),
     ...lc01b(ctx),
     ...clipped,
     // Teks yang elemennya sudah terpotong clip (LC-02a) tidak dilaporkan lagi sebagai luapan ink.
-    ...lc02b(ctx).filter((f) => !cut.has(f.nodeId)),
+    ...inkOver,
+    // Non-teks yang sudah terpotong clip (LC-02a) juga tidak dilaporkan lagi.
+    ...lc02c(ctx, cut),
+    ...lc03(ctx, textCut),
     ...lc04(ctx),
     ...lc05(ctx),
+    ...lc06(ctx),
+    ...lc07(ctx),
+    ...lc08(ctx),
+    ...lc09(ctx),
+    ...lc10(ctx),
     ...lc11(ctx),
     ...lc12(ctx, doc),
+    ...lc13(ctx),
+    ...lc14(ctx),
+    ...lc15(ctx),
+    ...lc16(ctx),
+    ...lc17(ctx),
     ...lc18(ctx),
+    ...lc19(ctx),
     ...lc20(ctx),
+    ...lc21(ctx),
+    ...lc22(ctx),
     ...lc23(ctx),
     ...lc24(ctx),
     ...lc25(ctx),

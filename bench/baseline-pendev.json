@@ -3,6 +3,15 @@
   "date": "2026-11-17T23:27:28.982Z",
   "status": "lengkap",
   "protocolHash": "907cb36f4674d422feded4506851b6391082b40b918dd46841edae607bedb85d",
+  "promptHashes": {
+    "A": "52421295264835d6a78ac2a9ba1002d6e4eb9f8d1dd7013d275c05f190a15a7e",
+    "B": "8f6991343d9e2cb58606897575c96d6cc2360222cecea5ec6d2721750bbcfbba"
+  },
+  "promptHashMigration": {
+    "fromProtocolHash": "907cb36f4674d422feded4506851b6391082b40b918dd46841edae607bedb85d",
+    "legacyDir": "bench/protocol/legacy/907cb36f",
+    "date": "2026-11-19"
+  },
   "model": "claude-opus-5-5",
   "modelUsageKeys": [
     "claude-opus-5-5"

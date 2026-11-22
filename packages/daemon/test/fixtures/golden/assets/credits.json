@@ -1,0 +1,29 @@
+{
+  "note": "Aset lokal golden A/B/D (story G1 2.8): byte Wikimedia Commons yang diimpor lewat photo_search tanpa key Unsplash, lalu diperkecil (ImageMagick, JPEG q82-85) agar fixture kecil. Nama file = sha256 byte = assetId di dokumen golden.",
+  "assets": {
+    "2756734761c6a8da8580ca260bc8915409a7a5e68a12dbac9cadc8efe986d55b": {
+      "use": "B: Image / Avatar Raka (dipotong ke wajah, 160 × 160)",
+      "ref": "wikimedia:202342374",
+      "attribution": "\"Professional portrait of a confident young man in business attire, smiling warmly against a neutral background.\" oleh Emkaija, CC BY-SA 3.0, via Wikimedia Commons",
+      "sourcePageUrl": "https://commons.wikimedia.org/wiki/File:Professional_portrait_of_a_confident_young_man_in_business_attire,_smiling_warmly_against_a_neutral_background..jpg"
+    },
+    "56bdc32255a11f3581c7f588046b748a672979f703d0b50d142592b5a0d1da05": {
+      "use": "B: Image / Pelari di jalan aspal (900 px)",
+      "ref": "wikimedia:154235543",
+      "attribution": "\"Human running gait - terminal swing to heel strike (runner with Asics Metaspeed Edge Paris - 2024 Ljubljana Marathon)\" oleh Petar Milošević, CC BY-SA 4.0, via Wikimedia Commons",
+      "sourcePageUrl": "https://commons.wikimedia.org/wiki/File:Human_running_gait_-_terminal_swing_to_heel_strike_(runner_with_Asics_Metaspeed_Edge_Paris_-_2024_Ljubljana_Marathon).jpg"
+    },
+    "c6ccc6f03abd710852c57a20712e9061ab9a6ed2562e360811de45e503ecb00e": {
+      "use": "B: Image / Latihan dumbbell (900 px)",
+      "ref": "wikimedia:193413094",
+      "attribution": "\"Fitness enthusiast lifts vibrant dumbbell during home workout\" oleh Shixart1985, CC BY 2.0, via Wikimedia Commons",
+      "sourcePageUrl": "https://commons.wikimedia.org/wiki/File:Fitness_enthusiast_lifts_vibrant_dumbbell_during_home_workout.jpg"
+    },
+    "4c2867d97815431a70052647b6ec4e6142e4ed5869537050e1e9cc6e53c33743": {
+      "use": "D: Image / Kamar deluxe dengan jendela besar (1200 px)",
+      "ref": "wikimedia:189521326",
+      "attribution": "\"Modern hotel room with large window and stylish furnishings near a city center during daytime\" oleh Shixart1985, CC BY 2.0, via Wikimedia Commons",
+      "sourcePageUrl": "https://commons.wikimedia.org/wiki/File:Modern_hotel_room_with_large_window_and_stylish_furnishings_near_a_city_center_during_daytime.jpg"
+    }
+  }
+}

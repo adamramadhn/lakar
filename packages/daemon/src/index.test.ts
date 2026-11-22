@@ -10,7 +10,7 @@ import { crc32, deflateSync } from 'node:zlib';
 import { fileURLToPath } from 'node:url';
 import { ChromiumRenderer, FontRegistry, IconCatalog, PACKAGE, PhotoService, RENDER_DIST_DIR, SafeNet, buildServer, loadConfig, startDaemon, type RunningDaemon } from './index.js';
 import { API } from '@lakar/exec';
-import { LakarError, SCHEMA_VERSION } from '@lakar/schema';
+import { LakarError, SCHEMA_VERSION, findingLine } from '@lakar/schema';
 import { countDarkPixels, decodePng, readPngSize } from './png.js';
 import { chromiumInstalled } from '../../../tests/support/browser.ts';
 import { postJson } from '../../../tests/support/http.ts';
@@ -590,10 +590,10 @@ describe.skipIf(!browserInstalled)('check G0 (AD-8): execute + /layout-check', (
   const file = () => join(dataDir, 'docs', `${slug}.lakar.json`);
   const FIXTURE = `
     const b = add(null, {type:'board', name:'Home · mobile', x:0, y:0, width:390, height:800, screen:'mobile'});
-    add(b, {type:'text', name:'Sapaan', content:'Halo 👋', size:16});
-    add(b, {type:'text', name:'Rating', content:'★★★★★', size:16});
+    add(b, {type:'text', name:'Sapaan', content:'Halo 👋', size:16, lineHeight:24});
+    add(b, {type:'text', name:'Rating', content:'★★★★★', size:16, lineHeight:24});
     add(b, {type:'text', name:'Caption', content:'Catatan kecil', size:11});
-    add(b, {type:'text', name:'Hak cipta', content:'© 2026 Kopi', size:12});
+    add(b, {type:'text', name:'Hak cipta', content:'© 2026 Kopi', size:12, lineHeight:16});
     const k = add(b, {type:'frame', name:'Kartu', width:200, height:40, clip:true});
     add(k, {type:'rect', name:'Lebar', width:260, height:20, fills:[{type:'solid', color:'#DDDDDD'}]});
     const c = add(b, {type:'frame', name:'Konten', layout:'column', width:390});
@@ -617,7 +617,7 @@ describe.skipIf(!browserInstalled)('check G0 (AD-8): execute + /layout-check', (
     expect(check.boards).toEqual([boardId]);
     expect(check.findings.map((f: { rule: string }) => f.rule)).toEqual(SIX);
     expect(check.findings.map((f: { nodeName: string }) => f.nodeName)).toEqual(['Sapaan', 'Rating', 'Caption', 'Lebar', 'Konten', 'Home · mobile']);
-    expect(check.summary).toEqual({ error: 5, warning: 1, gate: 5 });
+    expect(check.summary).toEqual({ error: 5, warning: 1, gate: 5, info: 0 });
     expect(check.findings.some((f: { nodeId: string }) => f.nodeId === byName['Hak cipta'])).toBe(false);
     expect(check.findings[0]).toMatchObject({ level: 'error', rule: 'LC-01a', nodeId: byName.Sapaan, detail: 'emoji "👋" U+1F44B di "Halo 👋"' });
     expect(check.findings[3].detail).toMatch(/^keluar 60px di kanan dari clip Kartu/);
@@ -631,15 +631,109 @@ describe.skipIf(!browserInstalled)('check G0 (AD-8): execute + /layout-check', (
 
     const lc = await call('/layout-check', {}, s);
     expect(lc.status, JSON.stringify(lc.body.error)).toBe(200);
-    expect(lc.body.data).toMatchObject({ docId: r.body.data.docId, rev: 1, boards: [{ id: boardId, name: 'Home · mobile', summary: { error: 5, warning: 1, gate: 5 } }], summary: { error: 5, warning: 1, gate: 5 } });
-    expect(lc.body.data.findings).toEqual(check.findings);
+    // layout_check = temuan execute + info (LC-22: board memuat `Overlay /`), urut setelah warning.
+    const lcSummary = { error: 5, warning: 1, gate: 5, info: 1 };
+    expect(lc.body.data).toMatchObject({ docId: r.body.data.docId, rev: 1, boards: [{ id: boardId, name: 'Home · mobile', summary: lcSummary }], summary: lcSummary });
+    expect(lc.body.data.findings.slice(0, 6)).toEqual(check.findings);
+    expect(lc.body.data.findings.slice(6)).toMatchObject([{ level: 'info', rule: 'LC-22', nodeId: boardId, detail: 'Crop 0, Overlay 1, Scroll 0, Ekstra 0' }]);
     const one = await call('/layout-check', { boardId }, s);
-    expect(one.body.data.findings).toEqual(check.findings);
+    expect(one.body.data.findings).toEqual(lc.body.data.findings);
     // screenshot tetap FONT_MISSING untuk emoji (allowGlyphs hanya untuk ukur)
     const shot = await call('/screenshot', { boardId }, s);
     expect(shot.status).toBe(422);
     expect(shot.body.error!.code).toBe('FONT_MISSING');
   }, 60_000);
+
+  it('temuan info (LC-13, LC-22) tidak ada di execute; layout_check memuatnya sesudah warning + summary.info', async () => {
+    const sid = await newSession();
+    await call('/docs/open', { slug: 'check-info' }, sid);
+    const code = `
+      const b = add(null, {type:'board', name:'Info · mobile', x:0, y:0, width:390, height:844, screen:'mobile'});
+      add(b, {type:'rect', name:'Rectangle', width:390, height:200, fills:[{type:'solid', color:'#EEEEEE'}]});
+      add(b, {type:'frame', name:'Overlay / Tab bar', position:'absolute', x:0, y:780, width:390, height:64, fills:[{type:'solid', color:'#FFFFFF'}]});
+      b`;
+    const r = await call('/execute', { code, description: 'board dengan nama default dan overlay' }, sid);
+    expect(r.status, JSON.stringify(r.body.error)).toBe(200);
+    const boardId = r.body.data.value as string;
+    expect(r.body.data.check).toEqual({ boards: [boardId], summary: { error: 0, warning: 0, gate: 0, info: 0 }, findings: [] });
+    const lc = await call('/layout-check', { boardId }, sid);
+    expect(lc.status, JSON.stringify(lc.body.error)).toBe(200);
+    expect(lc.body.data.summary).toEqual({ error: 0, warning: 0, gate: 0, info: 2 });
+    expect(lc.body.data.boards[0].summary).toEqual({ error: 0, warning: 0, gate: 0, info: 2 });
+    expect(lc.body.data.findings.map((f: { level: string; rule: string; nodeName: string }) => [f.level, f.rule, f.nodeName])).toEqual([
+      ['info', 'LC-22', 'Info · mobile'],
+      ['info', 'LC-13', 'Rectangle'],
+    ]);
+  }, 60_000);
+
+  it('dokumen asli P8 polish-4: LC-02c pada Batang mini dan LC-31 pada baris terakhir tabel (error gerbang)', async () => {
+    const { mkdir } = await import('node:fs/promises');
+    await mkdir(join(dataDir, 'docs'), { recursive: true });
+    const src = fileURLToPath(new URL('../test/fixtures/p8-polish-4-lumbung.lakar.json', import.meta.url));
+    await writeFile(join(dataDir, 'docs', 'p8-polish-4.lakar.json'), await readFile(src, 'utf8'), 'utf8');
+    const sid = await newSession();
+    expect((await call('/docs/open', { slug: 'p8-polish-4' }, sid)).body.ok).toBe(true);
+    const lc = await call('/layout-check', {}, sid);
+    expect(lc.status, JSON.stringify(lc.body.error)).toBe(200);
+    const found = lc.body.data.findings.filter((f: { rule: string }) => f.rule === 'LC-02c' || f.rule === 'LC-31');
+    expect(found.map((f: { level: string; rule: string; nodeName: string }) => [f.level, f.rule, f.nodeName])).toEqual([
+      ['error', 'LC-02c', 'Batang mini'],
+      ['error', 'LC-31', 'Baris / Pasar Induk Cipinang Kios 14B'],
+    ]);
+    expect(found[0].detail).toMatch(/^meluap 19\.5px di kanan \(sisa 4\.5px ke tepi Kartu \/ Pengiriman\)/);
+    expect(found[1].detail).toBe('baris terakhir rata di tepi bawah Kartu / Pesanan keluar (bawah 0px, atas 20px)');
+    expect(found.map((f: Parameters<typeof findingLine>[0]) => findingLine(f).split(' (')[0])).toEqual([
+      'error·gerbang · LC-02c · Batang mini',
+      'error·gerbang · LC-31 · Baris / Pasar Induk Cipinang Kios 14B',
+    ]);
+    expect(lc.body.data.summary.gate).toBeGreaterThanOrEqual(2);
+  }, 60_000);
+
+  // Regresi golden (story G1 2.8 + 2.9, R3): desain target A–E dibangun ulang di Lakar; foto = byte lokal (tanpa Unsplash, AD-10).
+  describe('regresi golden A–E (dokumen nyata)', () => {
+    const GOLDEN = new URL('../test/fixtures/golden/', import.meta.url);
+    const cases = [
+      // Tinggi = tinggi pas hasil build (landing: bawah footer; mobile: satu board panjang ≥ 844, zona bawah menempel).
+      { file: 'A-kasku.lakar.json', board: 'Kasku / Beranda · landing · Jernih', screen: 'landing', width: 1440, height: 3954, assets: 0 },
+      { file: 'B-gerak.lakar.json', board: 'Gerak / Beranda · mobile · Malam', screen: 'mobile', width: 390, height: 1292, assets: 3 },
+      { file: 'D-singgah.lakar.json', board: 'Singgah / Checkout · mobile · Ramah', screen: 'mobile', width: 390, height: 1974, assets: 1 },
+      // Web app: ukuran board persis permintaan (C 1440 × 1024 sidebar 248; E 1440 × 900 sidebar 72 + panel detail).
+      { file: 'C-arus.lakar.json', board: 'Arus / Ringkasan penjualan · app · Padat', screen: 'app', width: 1440, height: 1024, assets: 0 },
+      { file: 'E-gudangku.lakar.json', board: 'Gudangku / Inventaris barang · app · Padat', screen: 'app', width: 1440, height: 900, assets: 0 },
+    ];
+    beforeAll(async () => {
+      const { mkdir, copyFile } = await import('node:fs/promises');
+      await mkdir(join(dataDir, 'assets'), { recursive: true });
+      await mkdir(join(dataDir, 'docs'), { recursive: true });
+      for (const f of readdirSync(fileURLToPath(new URL('assets/', GOLDEN)))) {
+        if (/^[0-9a-f]{64}$/.test(f)) await copyFile(fileURLToPath(new URL(`assets/${f}`, GOLDEN)), join(dataDir, 'assets', f));
+      }
+    });
+    for (const c of cases) {
+      it(`${c.file}: 0 error, LC-17/18/19 = 0, satu board ${c.width} × ${c.height}, aset lokal saja`, async () => {
+        const raw = await readFile(fileURLToPath(new URL(c.file, GOLDEN)), 'utf8');
+        // Aset jarak jauh (Unsplash) tidak punya byte di store: setiap assetId harus berupa file byte di fixture.
+        const assets = [...raw.matchAll(/"assetId":\s*"([^"]*)"/g)].map((m) => m[1]!);
+        expect(assets).toHaveLength(c.assets);
+        for (const a of assets) expect(existsSync(fileURLToPath(new URL(`assets/${a}`, GOLDEN))), `aset ${a} ada di fixture`).toBe(true);
+        const slug = `golden-${c.file.slice(0, 1).toLowerCase()}`;
+        await writeFile(join(dataDir, 'docs', `${slug}.lakar.json`), raw, 'utf8');
+        const sid = await newSession();
+        expect((await call('/docs/open', { slug }, sid)).body.ok).toBe(true);
+        const boards = (await call('/boards', {}, sid)).body.data.boards as { name: string; screen: string; width: number; height: number }[];
+        expect(boards.map((b) => [b.name, b.screen, b.width, b.height])).toEqual([[c.board, c.screen, c.width, c.height]]);
+        if (c.screen === 'mobile') expect(c.height).toBeGreaterThanOrEqual(844);
+        const lc = await call('/layout-check', {}, sid);
+        expect(lc.status, JSON.stringify(lc.body.error)).toBe(200);
+        const findings = lc.body.data.findings as Parameters<typeof findingLine>[0][];
+        expect(findings.filter((f) => f.level === 'error').map(findingLine)).toEqual([]);
+        expect(findings.filter((f) => ['LC-17', 'LC-18', 'LC-19'].includes(f.rule)).map(findingLine)).toEqual([]);
+        expect(lc.body.data.summary).toMatchObject({ error: 0, gate: 0 });
+        // Dibangun dengan 0 warning; warning baru = regresi aturan atau render yang perlu diperiksa.
+        expect(findings.filter((f) => f.level === 'warning').map(findingLine)).toEqual([]);
+      }, 120_000);
+    }
+  });
 
   it('/layout-check: board tak ada → 404 NOT_FOUND + hint; body asing → 400; tanpa dokumen aktif → NO_ACTIVE_DOC', async () => {
     const r = await call('/layout-check', { boardId: 'Zzzzzzzz' }, s);
@@ -653,17 +747,17 @@ describe.skipIf(!browserInstalled)('check G0 (AD-8): execute + /layout-check', (
   it('board bersih: summary 0, findings [], bounds = board + node baru; get() saja → tanpa check/bounds', async () => {
     const r = await call(
       '/execute',
-      { code: `const b = add(null, {type:'board', name:'Bersih', x:500, y:0, width:390, height:844, screen:'mobile'}); add(b, {type:'text', name:'Judul', content:'Kopi pagi', size:24}); b`, description: 'board bersih tanpa temuan' },
+      { code: `const b = add(null, {type:'board', name:'Bersih', x:500, y:0, width:390, height:844, screen:'mobile'}); add(b, {type:'text', name:'Judul', content:'Kopi pagi', size:24, lineHeight:32}); b`, description: 'board bersih tanpa temuan' },
       s,
     );
     expect(r.status, JSON.stringify(r.body.error)).toBe(200);
-    expect(r.body.data.check).toEqual({ boards: [r.body.data.value], summary: { error: 0, warning: 0, gate: 0 }, findings: [] });
+    expect(r.body.data.check).toEqual({ boards: [r.body.data.value], summary: { error: 0, warning: 0, gate: 0, info: 0 }, findings: [] });
     expect(Object.keys(r.body.data.bounds).sort()).toEqual(r.body.data.created.map((c: { id: string }) => c.id).sort());
     const ro = await call('/execute', { code: `get('${r.body.data.value}').name`, description: 'baca nama board saja' }, s);
     expect(ro.body.data).toEqual({ docId: r.body.data.docId, rev: r.body.data.rev, created: [], value: 'Bersih' });
     // update satu node → bounds memuat board + node yang berubah
     const judul = r.body.data.created[1].id;
-    const u = await call('/execute', { code: `update('${judul}', {size: 28})`, description: 'perbesar judul board bersih' }, s);
+    const u = await call('/execute', { code: `update('${judul}', {size: 28, lineHeight: 36})`, description: 'perbesar judul board bersih' }, s);
     expect(Object.keys(u.body.data.bounds)).toEqual([r.body.data.value, judul]);
   }, 60_000);
 
@@ -703,9 +797,11 @@ describe.skipIf(!browserInstalled)('check G0 (AD-8): execute + /layout-check', (
       ['LC-12', 'Feed akhir'],
     ]);
     const lc = await call('/layout-check', { boardId: akhir }, sid);
-    expect(lc.body.data.findings.map((f: { rule: string }) => f.rule)).toEqual(['LC-20', 'LC-12']);
+    // layout_check menambah info LC-22 (Scroll / + Overlay /) sesudah warning.
+    expect(lc.body.data.findings.map((f: { rule: string }) => f.rule)).toEqual(['LC-20', 'LC-12', 'LC-22']);
     const f0 = (await call('/layout-check', { boardId: awal }, sid)).body.data.findings;
-    expect(f0.map((f: { nodeName: string }) => f.nodeName)).toEqual(['Kartu 4']);
+    expect(f0.map((f: { nodeName: string }) => f.nodeName)).toEqual(['Kartu 4', 'Feed awal']);
+    expect(f0[1]).toMatchObject({ level: 'info', rule: 'LC-22', detail: 'Crop 0, Overlay 1, Scroll 1, Ekstra 0' });
     expect(f0[0].detail).toMatch(/^kartu terpotong zona bawah: terlihat y 664–780, tertutup "Overlay \/ Tab bar" \(\w+\) mulai y 780$/);
   }, 60_000);
 
@@ -719,8 +815,8 @@ describe.skipIf(!browserInstalled)('check G0 (AD-8): execute + /layout-check', (
     const before = await readFile(path, 'utf8');
     const code = `
       const b = add(null, {type:'board', name:'Campur', x:500, y:0, width:390, height:844, screen:'mobile'});
-      add(b, {type:'text', name:'Favorit', content:'❤️ Favorit', size:16});
-      add(b, {type:'text', name:'Suka', content:'Suka ❤', size:16});
+      add(b, {type:'text', name:'Favorit', content:'❤️ Favorit', size:16, lineHeight:24});
+      add(b, {type:'text', name:'Suka', content:'Suka ❤', size:16, lineHeight:24});
       b`;
     const r = await call('/execute', { code, description: 'emoji dan glyph sama di satu board' }, sid);
     expect(r.status, JSON.stringify(r.body)).toBe(422);
@@ -775,8 +871,8 @@ describe.skipIf(!browserInstalled)('check G0 (AD-8): execute + /layout-check', (
       for (let i = 0; i < 30; i++) {
         const row = add(list, {type:'frame', name:'Baris ' + i, layout:'row', gap:8, padding:[4, 16], width:'fill', align:'center'});
         add(row, {type:'icon', lib:'lucide', icon:'coffee', size:20});
-        keep.items.push(add(row, {type:'text', name:'Nama', content:'Kopi susu ' + i, size:14}));
-        add(row, {type:'text', name:'Harga', content:'Rp 25.000', size:13, color:'#555555'});
+        keep.items.push(add(row, {type:'text', name:'Nama', content:'Kopi susu ' + i, size:14, lineHeight:20}));
+        add(row, {type:'text', name:'Harga', content:'Rp 25.000', size:12, lineHeight:16, color:'#555555'});
         add(row, {type:'rect', name:'Garis', width:40, height:1, fills:[{type:'solid', color:'#E5E5E5'}]});
       }
       b`;
@@ -794,7 +890,7 @@ describe.skipIf(!browserInstalled)('check G0 (AD-8): execute + /layout-check', (
     const p50 = sorted[Math.floor((sorted.length - 1) * 0.5)]!;
     const p95 = sorted[Math.ceil((sorted.length - 1) * 0.95)]!;
     testLog(`[check] latensi render + check (1 board, 152 node, 12 execute): p50 ${p50} ms, p95 ${p95} ms`);
-    expect(d.sessions.require(sid).log.at(-1)!.summary).toEqual({ error: 0, warning: 0, gate: 0 });
+    expect(d.sessions.require(sid).log.at(-1)!.summary).toEqual({ error: 0, warning: 0, gate: 0, info: 0 });
     expect(p50).toBeLessThanOrEqual(600);
   }, 120_000);
 });
@@ -899,7 +995,7 @@ describe('RENDER_FAILED', () => {
       broken = false;
       const again = await post('/execute', { editId: r.json().error.editId }, s);
       expect(again.statusCode, again.body).toBe(200);
-      expect(again.json().data).toMatchObject({ rev: 1, check: { summary: { error: 0, warning: 0, gate: 0 } } });
+      expect(again.json().data).toMatchObject({ rev: 1, check: { summary: { error: 0, warning: 0, gate: 0, info: 0 } } });
     } finally {
       await app.close();
       await rm(tmp, { recursive: true, force: true });
@@ -985,7 +1081,7 @@ describe('font lokal (registry + FONT_MISSING)', () => {
     expect(arrow.message).toContain('U+2192');
     expect(arrow.hint).toContain('Inter');
     expect(arrow.hint).toMatch(/node icon/);
-    const cmd = await expectFontMissing(`add(b,{type:'text',name:'Pintasan',content:'⌘K cari',size:14})`, 'Pintasan');
+    const cmd = await expectFontMissing(`add(b,{type:'text',name:'Pintasan',content:'⌘K cari',size:14,lineHeight:20})`, 'Pintasan');
     expect(cmd.message).toContain('U+2318');
     const heart = await expectFontMissing(`add(b,{type:'text',name:'Suka',content:'Suka ❤',size:14})`, 'Suka');
     expect(heart.message).toContain('U+2764');
@@ -993,7 +1089,7 @@ describe('font lokal (registry + FONT_MISSING)', () => {
     const fixed = await call('/execute', { editId: cmd.editId, edits: [{ find: '⌘K cari', replace: 'Ctrl K cari' }] }, s);
     expect(fixed.status, JSON.stringify(fixed.body.error)).toBe(200);
     expect(fixed.body.data.rev).toBe(rev + 1);
-    expect(fixed.body.data.check.summary).toEqual({ error: 0, warning: 1, gate: 0 });
+    expect(fixed.body.data.check.summary).toEqual({ error: 0, warning: 1, gate: 0, info: 0 });
   }, 60_000);
 
   it.skipIf(!browserInstalled)('face gagal dimuat (URL 404) → LakarError FONT_MISSING non-retryable, renderer tetap bisa dipakai', async () => {

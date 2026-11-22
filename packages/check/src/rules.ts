@@ -1,5 +1,28 @@
 // Aturan G0 (AD-8): satu fungsi per aturan. Masukan: board ter-resolve + hasil ukur render. Murni.
-import { G0_RULES, type Finding, type ResolvedDocument, type ResolvedFill, type ResolvedTextNode as TextNode } from '@lakar/schema';
+import {
+  COMPONENT_SIZES,
+  CONTRAST_MIN,
+  CONTROL_PREFIXES,
+  DISPLAY_SIZES,
+  ICON_GROUP_LABEL_MAX,
+  FORBIDDEN_EXEMPT,
+  forbiddenPhrasesIn,
+  G0_RULES,
+  HOME_INDICATOR_INSET,
+  KPI_LINE_HEIGHT_RATIO,
+  KPI_SIZES,
+  PARAGRAPH_MIN,
+  PARAGRAPH_MIN_IN_CARD,
+  SCRIM_MIN_ALPHA,
+  SPACING_VALUES,
+  textContrastMin,
+  TOUCH_MIN,
+  TYPE_SCALE,
+  type Finding,
+  type ResolvedDocument,
+  type ResolvedFill,
+  type ResolvedTextNode as TextNode,
+} from '@lakar/schema';
 import { cpLabel, codePoints, emojiIn, GLYPH_ICON, leadingIconGlyph } from './glyphs.js';
 import {
   ancestors,
@@ -742,6 +765,10 @@ const strokeAll = (n: ChildNode): boolean => {
 };
 const dropShadow = (n: ChildNode): boolean => ((n as { shadows?: readonly { type?: string }[] }).shadows ?? []).some((s) => s.type !== 'inner');
 
+/** Ber-cat: fill tak transparan, stroke, atau bayangan luar. */
+const paintedCard = (n: ChildNode): boolean =>
+  fillsOf(n).some((f) => f.type !== 'solid' || parseHex((f as { color: string }).color)[3] > 0) || (n as { stroke?: unknown }).stroke !== undefined || dropShadow(n);
+
 /** Batasi detail warning ≤ 120 karakter. */
 const clip120 = (s: string): string => ([...s].length > 120 ? `${[...s].slice(0, 119).join('')}…` : s);
 
@@ -831,6 +858,82 @@ export function lc02b(ctx: BoardContext): Finding[] {
 }
 
 // ---------------------------------------------------------------------------
+// LC-02c · non-teks meluap dari isi wadah tampak
+// ---------------------------------------------------------------------------
+
+/** Luapan > 1 px dari content box dihitung. */
+export const BOX_OVERFLOW_MIN = 1;
+/**
+ * Luapan non-teks baru cacat bila sisa jarak ke tepi wadah tampak di sisi itu < min(8, padding wadah di sisi itu / 2)
+ * (negatif = tumpah keluar). Luapan kecil ke padding yang masih lega tidak terlihat sebagai cacat.
+ */
+export const BOX_CLEARANCE_MAX = 8;
+
+const padSide = (p: Pad, s: Side): number => (s === 'kiri' ? p.l : s === 'kanan' ? p.r : s === 'atas' ? p.t : p.b);
+const contentBox = (r: Rect, p: Pad): Rect => ({ x: r.x + p.l, y: r.y + p.t, width: r.width - p.l - p.r, height: r.height - p.t - p.b });
+
+/**
+ * Anak flow non-teks `n` (induk `P`) yang melewati content box `P` > 1 px dan content box wadah tampak `W` > 1 px, dengan
+ * sisa jarak ke tepi `W` < min(8, padding `W` / 2). `W` = leluhur ber-cat terdekat (mulai `P`, bukan board) yang dicapai
+ * lewat rantai anak flow. Dikecualikan: `Overlay /`/`Crop /` (node/leluhur), rotasi di rantai, induk gap negatif, sisi
+ * atas/bawah di bawah `Scroll /`/`scrollY`, dan node LC-02a (`skip`). Hanya node terluar.
+ */
+export function lc02c(ctx: BoardContext, skip: ReadonlySet<string> = new Set()): Finding[] {
+  const out: Finding[] = [];
+  const reported = new Set<string>();
+  for (const n of ctx.nodes) {
+    if (n.type === 'text' || skip.has(n.id) || rotated(n) || named(n, 'Overlay /') || named(n, 'Crop /')) continue;
+    const r = ctx.bounds.get(n.id);
+    if (!r || area(r) <= 0) continue;
+    const anc = ancestors(ctx, n);
+    // Keturunan node LC-02a (dibungkam lc02a) dan keturunan node LC-02c yang sudah dilaporkan dilewati.
+    if (anc.some((a) => reported.has(a.id) || skip.has(a.id))) continue;
+    const parent = anc[0]!;
+    if (parent.type === 'board' || !isFlowChild(parent, n) || ((parent.gap ?? 0) as number) < 0) continue;
+    if (anc.some((a) => a.type === 'frame' && (named(a, 'Overlay /') || named(a, 'Crop /') || rotated(a)))) continue;
+    // Wadah tampak: leluhur ber-cat terdekat lewat rantai anak flow.
+    let wrap: FrameNode | undefined;
+    for (let i = 0; i < anc.length; i++) {
+      const a = anc[i]!;
+      if (a.type === 'board') break;
+      if (paintedCard(a)) {
+        wrap = a;
+        break;
+      }
+      if (!isFlowChild(anc[i + 1]!, a)) break;
+    }
+    if (!wrap) continue;
+    const pr = ctx.bounds.get(parent.id);
+    const wr = ctx.bounds.get(wrap.id);
+    if (!pr || !wr) continue;
+    const wp = paddingOf(wrap);
+    const fromP = overflow(r, contentBox(pr, paddingOf(parent)));
+    const fromW = overflow(r, contentBox(wr, wp));
+    const edge = overflow(r, wr);
+    const scrolled = anc.some((a) => a.type === 'frame' && (named(a, 'Scroll /') || (a.scrollY ?? 0) > 0));
+    const hits = SIDES.filter(
+      (s) =>
+        !(scrolled && (s === 'atas' || s === 'bawah')) &&
+        fromP[s] > BOX_OVERFLOW_MIN &&
+        fromW[s] > BOX_OVERFLOW_MIN &&
+        -edge[s] < Math.min(BOX_CLEARANCE_MAX, padSide(wp, s) / 2),
+    );
+    if (!hits.length) continue;
+    reported.add(n.id);
+    out.push(
+      finding(
+        'LC-02c',
+        levelOf('LC-02c'),
+        n,
+        clip120(`meluap ${hits.map((s) => `${num(fromW[s])}px di ${s} (sisa ${num(-edge[s])}px ke tepi ${wrap.name})`).join(', ')} dari isi ${parent.name}`),
+        'di dalam isi wadah: kecilkan, bungkus, atau beri ruang (sisa ke tepi ≥ 8 atau ≥ separuh padding)',
+      ),
+    );
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------------
 // LC-11 · saudara tumpang tindih sebagian
 // ---------------------------------------------------------------------------
 
@@ -897,135 +1000,394 @@ export function contrastRatio(a: RGB, b: RGB): number {
 }
 const toHex = (c: RGB) => `#${c.map((v) => Math.round(v * 255).toString(16).padStart(2, '0')).join('').toUpperCase()}`;
 
-export const CONTRAST_MIN = 4.5;
-export const CONTRAST_MIN_LARGE = 3;
-/** Teks besar: ≥ 24px, atau ≥ 19px dengan bobot ≥ 700. */
-export const isLargeText = (t: { size: number; weight?: number | undefined }): boolean => t.size >= 24 || (t.size >= 19 && (t.weight ?? 400) >= 700);
 const MAX_CANDIDATES = 64;
 type Effects = { opacity?: number | undefined; blend?: string | undefined; backdropBlur?: number | undefined };
 const effectsOf = (n: unknown): Effects => n as Effects;
+const isPainter = (n: ChildNode): boolean => (n.type === 'frame' || n.type === 'rect' || n.type === 'ellipse' || n.type === 'path') && fillsOf(n).length > 0;
+const stopsOf = (f: ResolvedFill): string[] => (f.type === 'solid' ? [f.color] : (f as { stops: { color: string }[] }).stops.map((s) => s.color));
+const busyFill = (f: ResolvedFill): boolean => f.type === 'image' || f.type === 'noise' || f.type === 'mesh';
+
+/** Opacity jalur node + frame leluhurnya (alpha) dan apakah opacity < 1 / blend ada di jalur (perkiraan). */
+function pathAlpha(ctx: BoardContext, n: ChildNode): { alpha: number; warn: boolean } {
+  let alpha = 1;
+  let warn = false;
+  for (const x of [n, ...ancestors(ctx, n).filter((a): a is FrameNode => a.type === 'frame')]) {
+    const e = effectsOf(x);
+    if (e.opacity !== undefined && e.opacity < 1) {
+      alpha *= e.opacity;
+      warn = true;
+    }
+    if (e.blend && e.blend !== 'normal') warn = true;
+  }
+  return { alpha, warn };
+}
+
+/** Latar efektif di belakang `rect`: kandidat warna (stop gradien → beberapa) atau alasan dilewati (tak tentu). */
+type Backdrop = { cands: RGB[]; warn: boolean } | { skip: 'image' | 'partial' | 'cover' | 'many' };
+
+/**
+ * Latar efektif LC-04 untuk persegi target (ink teks, bounds ikon/kontrol) dengan urutan dokumen `order`. Lapisan = node
+ * ber-fill sebelum `order` yang beririsan `rect` (leluhur target, atau memuat `rect` penuh; sebagian/ellipse/path → tak
+ * tentu), kecuali id di `exclude`; node ber-fill sesudah `order` yang beririsan → tak tentu; gambar/noise/mesh → tak tentu;
+ * gradien/opacity/blend/backdrop blur → `warn`. Dikomposit dari lapisan teratas sampai fill opak (tanpa fill: board, lalu putih).
+ */
+function backdrop(ctx: BoardContext, painters: readonly ChildNode[], rect: Rect, order: number, ancIds: ReadonlySet<string>, exclude: ReadonlySet<string>): Backdrop {
+  let warn = false;
+  for (const p of painters) {
+    if (ctx.order.get(p.id)! <= order || exclude.has(p.id)) continue;
+    const v = visibleRect(ctx, p);
+    if (v && intersect(v, rect)) return { skip: 'cover' };
+  }
+  type Layer = { node: ChildNode | Container; partial: boolean; alpha: number };
+  const layers: Layer[] = [];
+  for (const p of painters) {
+    if (ctx.order.get(p.id)! >= order || exclude.has(p.id)) continue;
+    const isAnc = ancIds.has(p.id);
+    const v = visibleRect(ctx, p);
+    if (!v || !intersect(v, rect)) continue;
+    const shape = p.type === 'ellipse' || p.type === 'path';
+    const partial = shape || (!isAnc && !contains(v, rect));
+    let alpha = 1;
+    for (const n of [p, ...ancestors(ctx, p).filter((a) => a.type === 'frame' && !ancIds.has(a.id))]) {
+      const e = effectsOf(n);
+      if (e.opacity !== undefined && e.opacity < 1) alpha *= e.opacity;
+      if ((e.opacity !== undefined && e.opacity < 1) || (e.blend && e.blend !== 'normal') || (e.backdropBlur ?? 0) > 0) warn = true;
+    }
+    layers.push({ node: p, partial, alpha });
+  }
+  layers.sort((a, b) => (ctx.order.get(a.node.id) ?? 0) - (ctx.order.get(b.node.id) ?? 0));
+  // Turun dari lapisan teratas sampai fill opak penuh (dasar).
+  type Paint = { fill: ResolvedFill; alpha: number };
+  const above: Paint[] = [];
+  let base: RGB[] | undefined;
+  scan: for (let i = layers.length - 1; i >= 0; i--) {
+    const l = layers[i]!;
+    if (l.partial) return { skip: 'partial' };
+    const fills = fillsOf(l.node);
+    for (let j = fills.length - 1; j >= 0; j--) {
+      const f = fills[j]!;
+      if (busyFill(f)) return { skip: 'image' };
+      const stops = stopsOf(f);
+      if (f.type !== 'solid') warn = true;
+      if (l.alpha >= 1 && stops.every((c) => parseHex(c)[3] >= 1)) {
+        base = stops.map((c) => parseHex(c).slice(0, 3) as RGB);
+        break scan;
+      }
+      above.push({ fill: f, alpha: l.alpha });
+    }
+  }
+  if (!base) {
+    const bf = fillsOf(ctx.board);
+    if (bf.some(busyFill)) return { skip: 'image' };
+    base = [[1, 1, 1]];
+    for (const f of bf) {
+      if (f.type !== 'solid') warn = true;
+      const stops = stopsOf(f);
+      base = base.flatMap((c) => stops.map((s) => over(parseHex(s), c)));
+    }
+  }
+  let cands = base;
+  for (let k = above.length - 1; k >= 0; k--) {
+    const { fill: f, alpha } = above[k]!;
+    const stops = stopsOf(f);
+    cands = cands.flatMap((c) => stops.map((s) => over(parseHex(s), c, alpha)));
+    if (cands.length > MAX_CANDIDATES) return { skip: 'many' };
+  }
+  return { cands, warn };
+}
+
+/** Rasio terburuk warna `fg` (alpha × `alpha`) dikomposit di atas setiap kandidat latar. */
+function worstOver(fg: RGBA, alpha: number, cands: readonly RGB[]): { ratio: number; fg: RGB; bg: RGB } | undefined {
+  let worst: { ratio: number; fg: RGB; bg: RGB } | undefined;
+  for (const bg of cands) {
+    const c = over(fg, bg, alpha);
+    const ratio = contrastRatio(c, bg);
+    if (!worst || ratio < worst.ratio) worst = { ratio, fg: c, bg };
+  }
+  return worst;
+}
+
+const floor2 = (r: number): number => Math.floor(r * 100) / 100;
+const idsOf = (n: ChildNode): Set<string> => new Set([n.id, ...descendants(n).map((d) => d.id)]);
+
+const CONTROL_EXPECTED = `≥ ${CONTRAST_MIN.nonText}:1 terhadap latar: stroke border-input (#7D8798) atau fill kontrol yang kontras`;
+
+/** Batas kontrol `Input /`, `Radio /`, `Checkbox /` (terluar) ≥ 3:1 terhadap latar. */
+function controlIssues(ctx: BoardContext, painters: readonly ChildNode[]): Finding[] {
+  const out: Finding[] = [];
+  for (const k of ctx.nodes) {
+    if (k.type !== 'frame' || !namedAny(k, CONTROL_PREFIXES)) continue;
+    const anc = ancestors(ctx, k);
+    if (anc.some((a) => a.type === 'frame' && namedAny(a, CONTROL_PREFIXES))) continue;
+    const v = visibleRect(ctx, k);
+    if (!v || area(v) <= 0) continue;
+    const path = pathAlpha(ctx, k);
+    if (path.alpha <= 0) continue;
+    const bd = backdrop(ctx, painters, v, ctx.order.get(k.id)!, new Set(anc.map((a) => a.id)), idsOf(k));
+    if ('skip' in bd) continue;
+    // Cat batas: stroke + fill kontrol; tanpa keduanya → keturunan frame/rect/ellipse bercat (bukan teks/ikon).
+    type BorderPaint = { colors: string[]; alpha: number };
+    const own = (n: ChildNode, alpha: number): BorderPaint[] | undefined => {
+      const paints: BorderPaint[] = [];
+      const s = (n as { stroke?: { color: string } }).stroke;
+      if (s) paints.push({ colors: [s.color], alpha });
+      for (const f of fillsOf(n)) {
+        if (busyFill(f)) return undefined;
+        const colors = stopsOf(f);
+        if (colors.some((c) => parseHex(c)[3] > 0)) paints.push({ colors, alpha });
+      }
+      return paints;
+    };
+    let paints = own(k, path.alpha);
+    if (paints === undefined) continue;
+    let warn = path.warn || bd.warn;
+    if (paints.length === 0) {
+      const iconBorder = namedAny(k, ['Checkbox /', 'Radio /']);
+      for (const d of descendants(k)) {
+        // Checkbox/Radio digambar dengan ikon (mis. lucide square/circle): ikon = batas.
+        if (iconBorder && d.type === 'icon' && visibleRect(ctx, d)) {
+          const dp = pathAlpha(ctx, d);
+          if (dp.alpha <= 0) continue;
+          warn ||= dp.warn;
+          paints.push({ colors: [d.color ?? '#000000'], alpha: dp.alpha });
+          continue;
+        }
+        if ((d.type !== 'frame' && d.type !== 'rect' && d.type !== 'ellipse') || !visibleRect(ctx, d)) continue;
+        const dp = pathAlpha(ctx, d);
+        if (dp.alpha <= 0) continue;
+        const p = own(d, dp.alpha);
+        if (p === undefined) {
+          paints = undefined;
+          break;
+        }
+        if (p.length) warn ||= dp.warn;
+        paints.push(...p);
+      }
+      if (paints === undefined) continue;
+    }
+    const level = warn ? 'warning' : levelOf('LC-04');
+    if (paints.length === 0) {
+      out.push(finding('LC-04', level, k, 'batas kontrol: tanpa batas terlihat (tanpa stroke dan fill)', CONTROL_EXPECTED));
+      continue;
+    }
+    // Rasio = maksimum atas cat batas; tiap cat dinilai terhadap kandidat latar terburuk (stop gradien terburuk).
+    let best: { ratio: number; fg: RGB; bg: RGB } | undefined;
+    for (const p of paints) {
+      let worst: { ratio: number; fg: RGB; bg: RGB } | undefined;
+      for (const c of p.colors) {
+        const w = worstOver(parseHex(c), p.alpha, bd.cands);
+        if (w && (!worst || w.ratio < worst.ratio)) worst = w;
+      }
+      if (worst && (!best || worst.ratio > best.ratio)) best = worst;
+    }
+    if (!best || best.ratio >= CONTRAST_MIN.nonText) continue;
+    out.push(
+      finding(
+        'LC-04',
+        level,
+        k,
+        clip120(`batas kontrol ${floor2(best.ratio)}:1 (${toHex(best.fg)} di atas ${toHex(best.bg)}${warn ? ', gradien/opacity/blend: perkiraan' : ''})`),
+        CONTROL_EXPECTED,
+      ),
+    );
+  }
+  return out;
+}
+
+/** Komponen yang labelnya = teks di dalam komponen terdekat. */
+const LABEL_COMPONENTS = ['Button /', 'IconButton /', 'Tab /', 'Link /', 'Chip /', 'Badge /', 'Input /', 'Radio /', 'Checkbox /', 'Stepper /'];
+/** Chrome sistem (dirender OS di atas apa pun): ikon dan teks di dalamnya tidak dinilai ikon tanpa label/scrim. */
+const SYSTEM_CHROME = ['Status bar', 'Home indicator'];
+const ICON_BRAND_LIBS = new Set(['simple-icons']);
+
+/** Isi tampak untuk pencarian label ikon: teks tak kosong, ikon, path, node bercat, atau frame berisi itu. */
+const hasContent = (n: ChildNode): boolean =>
+  n.type === 'text'
+    ? nonEmpty(n)
+    : n.type === 'icon' || n.type === 'path' || fillsOf(n).length > 0 || (n as { stroke?: unknown }).stroke !== undefined || (n.type === 'frame' && n.children.some(hasContent));
+const hasVisibleText = (ctx: BoardContext, scope: Container): boolean =>
+  (scope.type === 'board' ? ctx.nodes : [scope, ...descendants(scope)]).some((t) => t.type === 'text' && nonEmpty(t) && (t.opacity ?? 1) > 0 && visibleRect(ctx, t) !== undefined);
+
+const iconOnly = (n: ChildNode): boolean => n.type === 'icon' || (n.type === 'frame' && n.children.length > 0 && n.children.every(iconOnly));
+/** Teks nilai pendek: terlihat, berangka, ≤ ICON_GROUP_LABEL_MAX karakter. */
+const valueLabel = (ctx: BoardContext, c: ChildNode): boolean =>
+  c.type === 'text' && nonEmpty(c) && /\d/.test(c.content) && [...c.content.trim()].length <= ICON_GROUP_LABEL_MAX && (c.opacity ?? 1) > 0 && visibleRect(ctx, c) !== undefined;
+
+/**
+ * Ikon berlabel: komponen terdekat memuat teks; tanpa komponen, leluhur pertama yang punya anak lain berisi konten memuat teks.
+ * Deretan ikon saja (anak lain di leluhur itu hanya ikon, mis. baris bintang rating) berlabel bila di leluhur pertama dengan
+ * konten bukan-ikon ada teks nilai pendek bersebelahan (anak langsung, berangka, ≤ 40 karakter: "4,8", "1.284 ulasan").
+ */
+function iconLabeled(ctx: BoardContext, n: ChildNode, anc: readonly Container[]): boolean {
+  const comp = anc.find((a) => a.type === 'frame' && namedAny(a, LABEL_COMPONENTS));
+  if (comp) return hasVisibleText(ctx, comp);
+  let cur: { id: string } = n;
+  let group = false;
+  for (const a of anc) {
+    const others = a.children.filter((c) => c.id !== cur.id && hasContent(c));
+    cur = a;
+    if (!others.length) continue;
+    if (!group) {
+      if (others.every(iconOnly)) {
+        group = true;
+        continue;
+      }
+      // Deretan ikon sama tanpa pembungkus (mis. bintang langsung di baris): berlabel hanya oleh teks nilai, sama dengan deretan berbungkus.
+      if (n.type === 'icon' && others.some((c) => c.type === 'icon' && c.lib === n.lib && c.icon === n.icon)) return others.some((c) => valueLabel(ctx, c));
+      return hasVisibleText(ctx, a);
+    }
+    if (others.every(iconOnly)) continue;
+    return others.some((c) => valueLabel(ctx, c));
+  }
+  return false;
+}
+
+const ICON_EXPECTED = `≥ ${CONTRAST_MIN.nonText}:1 terhadap latar (mis. amber gelap untuk bintang), atau beri label teks (mis. nilai rating di baris itu)`;
+
+/** Ikon UI tanpa label teks ≥ 3:1 terhadap latar (logo `simple-icons` dan ikon chrome dilewati). */
+function iconIssues(ctx: BoardContext, painters: readonly ChildNode[]): Finding[] {
+  const out: Finding[] = [];
+  for (const n of ctx.nodes) {
+    if (n.type !== 'icon' || ICON_BRAND_LIBS.has(n.lib)) continue;
+    const v = visibleRect(ctx, n);
+    if (!v || area(v) <= 0) continue;
+    const anc = ancestors(ctx, n);
+    if (anc.some((a) => namedAny(a, SYSTEM_CHROME))) continue;
+    const path = pathAlpha(ctx, n);
+    if (path.alpha <= 0 || iconLabeled(ctx, n, anc)) continue;
+    const bd = backdrop(ctx, painters, v, ctx.order.get(n.id)!, new Set(anc.map((a) => a.id)), new Set([n.id]));
+    if ('skip' in bd) continue;
+    const worst = worstOver(parseHex(n.color ?? '#000000'), path.alpha, bd.cands);
+    if (!worst || worst.ratio >= CONTRAST_MIN.nonText) continue;
+    const warn = path.warn || bd.warn;
+    out.push(
+      finding(
+        'LC-04',
+        warn ? 'warning' : levelOf('LC-04'),
+        n,
+        clip120(`ikon tanpa label ${floor2(worst.ratio)}:1 (${toHex(worst.fg)} di atas ${toHex(worst.bg)}${warn ? ', gradien/opacity/blend: perkiraan' : ''})`),
+        ICON_EXPECTED,
+      ),
+    );
+  }
+  return out;
+}
+
+/** Keempat sudut `r` di dalam elips yang mengisi `v`. */
+const inEllipse = (v: Rect, r: Rect): boolean => {
+  const cx = v.x + v.width / 2;
+  const cy = v.y + v.height / 2;
+  const rx = v.width / 2;
+  const ry = v.height / 2;
+  if (rx <= 0 || ry <= 0) return false;
+  return [
+    [r.x, r.y],
+    [right(r), r.y],
+    [r.x, bottom(r)],
+    [right(r), bottom(r)],
+  ].every(([x, y]) => ((x! - cx) / rx) ** 2 + ((y! - cy) / ry) ** 2 <= 1);
+};
+
+const SCRIM_EXPECTED = `taruh scrim fill solid opacity ≥ ${String(SCRIM_MIN_ALPHA).replace('.', ',')} di antara gambar/efek dan teks, atau pindah ke zona tenang`;
+
+/** Teks di atas foto/gradien multi-hue/efek blur tanpa scrim (fill solid alpha × opacity ≥ 0,5 yang memuat ink) → warning; chrome sistem dilewati. */
+function scrimIssues(ctx: BoardContext): Finding[] {
+  const out: Finding[] = [];
+  const layersAll = ctx.nodes.filter((p) => (p.type === 'frame' || p.type === 'rect' || p.type === 'ellipse' || p.type === 'path') && (fillsOf(p).length > 0 || ((p as { blur?: number }).blur ?? 0) > 0));
+  for (const t of texts(ctx)) {
+    if (!nonEmpty(t) || (t.opacity ?? 1) <= 0 || !visibleRect(ctx, t)) continue;
+    const ink = inkRect(ctx, t);
+    if (!ink || area(ink) <= 0) continue;
+    const anc = ancestors(ctx, t);
+    if (anc.some((a) => namedAny(a, SYSTEM_CHROME))) continue;
+    const order = ctx.order.get(t.id)!;
+    const ancIds = new Set(anc.map((a) => a.id));
+    const under: (ChildNode | Container)[] = [ctx.board];
+    for (const p of layersAll) {
+      if (ctx.order.get(p.id)! >= order) continue;
+      const v = visibleRect(ctx, p);
+      if (v && intersect(v, ink)) under.push(p);
+    }
+    // Fill solid ≥ SCRIM_MIN_ALPHA (alpha warna × opacity jalur di luar leluhur teks) yang memuat ink; `from` = indeks fill pertama.
+    const scrimFill = (p: ChildNode | Container, from = 0): boolean => {
+      if (p.type === 'path') return false;
+      const v = p.type === 'board' ? ctx.boardRect : visibleRect(ctx, p);
+      if (!v || !contains(v, ink)) return false;
+      if (p.type === 'ellipse' && !inEllipse(ctx.bounds.get(p.id) ?? v, ink)) return false;
+      let a = 1;
+      if (p.type !== 'board')
+        for (const q of [p, ...ancestors(ctx, p)]) {
+          const o = effectsOf(q).opacity;
+          if (o !== undefined && !ancIds.has(q.id)) a *= o;
+        }
+      return fillsOf(p)
+        .slice(from)
+        .some((f) => f.type === 'solid' && parseHex(f.color)[3] * a >= SCRIM_MIN_ALPHA);
+    };
+    let busy = -1;
+    let busyAt = 0;
+    let kind = '';
+    under.forEach((p, i) => {
+      const fills = fillsOf(p);
+      const img = fills.findLastIndex((f) => f.type === 'image');
+      const fx = fills.findLastIndex((f) => f.type === 'noise' || f.type === 'mesh');
+      const grad = fills.findLastIndex(multiHue);
+      const top = Math.max(img, fx, grad);
+      if (top >= 0) {
+        busy = i;
+        busyAt = top + 1;
+        kind = top === img ? 'foto' : top === grad ? 'gradien' : 'efek';
+      } else if (p.type !== 'board' && ((p as { blur?: number }).blur ?? 0) >= EFFECT_BLUR_MIN && !scrimFill(p)) {
+        busy = i;
+        busyAt = fills.length;
+        kind = 'efek';
+      }
+    });
+    if (busy < 0) continue;
+    // Scrim: fill solid di atas lapisan sibuk (di node yang sama sesudah fill sibuk, atau lapisan sesudahnya).
+    if (scrimFill(under[busy]!, busyAt) || under.slice(busy + 1).some((p) => scrimFill(p))) continue;
+    out.push(
+      finding(
+        'LC-04',
+        'warning',
+        t,
+        clip120(`scrim: teks di atas ${kind} tanpa scrim (fill solid ≥ ${String(SCRIM_MIN_ALPHA).replace('.', ',')}) ${quote(t.content)}`),
+        SCRIM_EXPECTED,
+      ),
+    );
+  }
+  return out;
+}
 
 export function lc04(ctx: BoardContext): Finding[] {
   const out: Finding[] = [];
-  const painters = ctx.nodes.filter((n) => (n.type === 'frame' || n.type === 'rect' || n.type === 'ellipse' || n.type === 'path') && fillsOf(n).length > 0);
+  const painters = ctx.nodes.filter(isPainter);
   for (const t of texts(ctx)) {
     if (!nonEmpty(t) || (t.opacity ?? 1) <= 0) continue;
     const ink = inkRect(ctx, t);
     if (!ink || area(ink) <= 0 || !visibleRect(ctx, t)) continue;
-    const order = ctx.order.get(t.id)!;
     const anc = ancestors(ctx, t);
-    const ancIds = new Set(anc.map((a) => a.id));
-    let warn = false;
-    let alphaText = 1;
-    for (const n of [t, ...anc.filter((a): a is FrameNode => a.type === 'frame')]) {
-      const e = effectsOf(n);
-      if (e.opacity !== undefined && e.opacity < 1) {
-        alphaText *= e.opacity;
-        warn = true;
-      }
-      if (e.blend && e.blend !== 'normal') warn = true;
-    }
-    // Penutup di atas teks (urutan sesudahnya) → tak tentu.
-    let indeterminate = false;
-    for (const p of painters) {
-      if (ctx.order.get(p.id)! <= order) continue;
-      const v = visibleRect(ctx, p);
-      if (v && intersect(v, ink)) {
-        indeterminate = true;
-        break;
-      }
-    }
-    if (indeterminate) continue;
-    // Lapisan di bawah teks: leluhur + node sebelumnya yang memuat penuh ink (lainnya yang beririsan = sebagian).
-    type Layer = { node: ChildNode | Container; partial: boolean; alpha: number };
-    const layers: Layer[] = [];
-    for (const p of painters) {
-      if (ctx.order.get(p.id)! >= order) continue;
-      const isAnc = ancIds.has(p.id);
-      const v = visibleRect(ctx, p);
-      if (!v || !intersect(v, ink)) continue;
-      const shape = p.type === 'ellipse' || p.type === 'path';
-      const partial = shape || (!isAnc && !contains(v, ink));
-      let alpha = 1;
-      for (const n of [p, ...ancestors(ctx, p).filter((a) => a.type === 'frame' && !ancIds.has(a.id))]) {
-        const e = effectsOf(n);
-        if (e.opacity !== undefined && e.opacity < 1) alpha *= e.opacity;
-        if ((e.opacity !== undefined && e.opacity < 1) || (e.blend && e.blend !== 'normal') || (e.backdropBlur ?? 0) > 0) warn = true;
-      }
-      layers.push({ node: p, partial, alpha });
-    }
-    layers.sort((a, b) => (ctx.order.get(a.node.id) ?? 0) - (ctx.order.get(b.node.id) ?? 0));
-    // Turun dari lapisan teratas sampai fill opak penuh (dasar).
-    type Paint = { fill: ResolvedFill; alpha: number };
-    const above: Paint[] = [];
-    let base: RGB[] | undefined;
-    let skip = false;
-    scan: for (let i = layers.length - 1; i >= 0; i--) {
-      const l = layers[i]!;
-      if (l.partial) {
-        skip = true;
-        break;
-      }
-      const fills = fillsOf(l.node);
-      for (let j = fills.length - 1; j >= 0; j--) {
-        const f = fills[j]!;
-        if (f.type === 'image' || f.type === 'noise' || f.type === 'mesh') {
-          skip = true;
-          break scan;
-        }
-        const stops = f.type === 'solid' ? [f.color] : f.stops.map((s) => s.color);
-        if (f.type !== 'solid') warn = true;
-        if (l.alpha >= 1 && stops.every((c) => parseHex(c)[3] >= 1)) {
-          base = stops.map((c) => parseHex(c).slice(0, 3) as RGB);
-          break scan;
-        }
-        above.push({ fill: f, alpha: l.alpha });
-      }
-    }
-    if (skip) continue;
-    if (!base) {
-      const bf = fillsOf(ctx.board);
-      if (bf.some((f) => f.type === 'image' || f.type === 'noise' || f.type === 'mesh')) continue;
-      base = [[1, 1, 1]];
-      for (const f of bf) {
-        const stops = f.type === 'solid' ? [f.color] : (f as { stops: { color: string }[] }).stops.map((s) => s.color);
-        if (f.type !== 'solid') warn = true;
-        base = base.flatMap((c) => stops.map((s) => over(parseHex(s), c)));
-      }
-    }
-    let cands = base;
-    for (let k = above.length - 1; k >= 0; k--) {
-      const { fill: f, alpha } = above[k]!;
-      const stops = f.type === 'solid' ? [f.color] : (f as { stops: { color: string }[] }).stops.map((s) => s.color);
-      cands = cands.flatMap((c) => stops.map((s) => over(parseHex(s), c, alpha)));
-      if (cands.length > MAX_CANDIDATES) {
-        skip = true;
-        break;
-      }
-    }
-    if (skip) continue;
-    const fg = parseHex(t.color ?? '#000000');
-    let worst: { ratio: number; text: RGB; bg: RGB } | undefined;
-    for (const bg of cands) {
-      const text = over(fg, bg, alphaText);
-      const ratio = contrastRatio(text, bg);
-      if (!worst || ratio < worst.ratio) worst = { ratio, text, bg };
-    }
+    const path = pathAlpha(ctx, t);
+    const bd = backdrop(ctx, painters, ink, ctx.order.get(t.id)!, new Set(anc.map((a) => a.id)), new Set());
+    if ('skip' in bd) continue;
+    const warn = path.warn || bd.warn;
+    const worst = worstOver(parseHex(t.color ?? '#000000'), path.alpha, bd.cands);
     if (!worst) continue;
-    const min = isLargeText(t) ? CONTRAST_MIN_LARGE : CONTRAST_MIN;
+    const min = textContrastMin(t);
     if (worst.ratio >= min) continue;
-    const ratio = Math.floor(worst.ratio * 100) / 100;
     out.push(
       finding(
         'LC-04',
         warn ? 'warning' : levelOf('LC-04'),
         t,
-        clip120(`kontras ${ratio}:1 (${toHex(worst.text)} di atas ${toHex(worst.bg)}${warn ? ', gradien/opacity/blend: perkiraan' : ''}) ${quote(t.content)}`),
+        clip120(`kontras ${floor2(worst.ratio)}:1 (${toHex(worst.fg)} di atas ${toHex(worst.bg)}${warn ? ', gradien/opacity/blend: perkiraan' : ''}) ${quote(t.content)}`),
         `≥ ${min}:1 setelah komposit: teks lebih gelap/terang atau latar lebih kontras; acc2/kuning bukan teks kecil`,
       ),
     );
   }
-  return out;
+  // Teks yang sudah punya temuan kontras tidak diberi warning scrim lagi (satu slot cap per teks).
+  const flagged = new Set(out.map((f) => f.nodeId));
+  return [...out, ...controlIssues(ctx, painters), ...iconIssues(ctx, painters), ...scrimIssues(ctx).filter((f) => !flagged.has(f.nodeId))];
 }
 
 // ---------------------------------------------------------------------------
@@ -1311,27 +1673,322 @@ export function lc30(ctx: BoardContext): Finding[] {
   return out;
 }
 
+// ===========================================================================
+// Tipografi dan spacing (story G1 5): LC-03, LC-06, LC-07, LC-08, LC-09, LC-10 (warning). Angka dari design-tokens.
+// ===========================================================================
+
+/** Komponen kecil: isinya bukan paragraf (LC-06) dan tingginya dinilai terhadap token (LC-07). */
+const SMALL_COMPONENTS = ['Button /', 'IconButton /', 'Badge /', 'Chip /', 'Tab /', 'Link /', 'Input /', 'Radio /', 'Checkbox /', 'Stepper /'];
+/** Kontrol persegi: lebar juga dinilai (LC-07). */
+const SQUARE_CONTROLS = ['IconButton /', 'Checkbox /', 'Radio /'];
+/** Komponen interaktif yang dinilai target sentuhnya (LC-10). */
+const TOUCH_COMPONENTS = ['Button /', 'IconButton /', 'Tab /', 'Input /', 'Radio /', 'Checkbox /', 'Stepper /', 'Link /'];
+const namedAny = (n: { name: string }, prefixes: readonly string[]): boolean => prefixes.some((p) => named(n, p));
+const ancestorFrames = (ctx: BoardContext, n: ChildNode): FrameNode[] => ancestors(ctx, n).filter((a): a is FrameNode => a.type === 'frame');
+const visibleTexts = (ctx: BoardContext): TextNode[] => texts(ctx).filter((t) => nonEmpty(t) && visibleRect(ctx, t) !== undefined);
+
+// ---------------------------------------------------------------------------
+// LC-03 · teks tetap berisiko meluber (warning)
+// ---------------------------------------------------------------------------
+
+/** Ink melewati kotak teks (kiri/kanan) atau tinggi baris melewati tinggi kotak > 1 px. */
+export const TEXT_BOX_OVERFLOW_MIN = 1;
+
+export function lc03(ctx: BoardContext, skip: ReadonlySet<string> = new Set()): Finding[] {
+  const out: Finding[] = [];
+  const expected = `wrap:'wrap' dengan lebar fill/angka, atau beri ruang`;
+  for (const t of visibleTexts(ctx)) {
+    if (skip.has(t.id)) continue;
+    const tm = ctx.textMeasure.get(t.id);
+    if (t.wrap === 'fixed' && tm && tm.lines >= 2) {
+      out.push(finding('LC-03', levelOf('LC-03'), t, clip120(`wrap fixed: ${tm.lines} baris terukur di ${quote(t.content)}`), expected));
+      continue;
+    }
+    const b = ctx.bounds.get(t.id);
+    if (!b) continue;
+    const ink = ctx.ink.get(t.id);
+    const ox = ink ? Math.max(b.x - ink.x, right(ink) - right(b)) : 0;
+    if (ox > TEXT_BOX_OVERFLOW_MIN) {
+      out.push(finding('LC-03', levelOf('LC-03'), t, clip120(`teks melewati kotaknya ${num(ox)}px (wrap ${t.wrap ?? 'auto'}) di ${quote(t.content)}`), expected));
+      continue;
+    }
+    if (tm && tm.lines * tm.lineHeight > b.height + TEXT_BOX_OVERFLOW_MIN) {
+      out.push(
+        finding('LC-03', levelOf('LC-03'), t, clip120(`${tm.lines} baris × ${num(tm.lineHeight)} > tinggi kotak ${num(b.height)} di ${quote(t.content)}`), expected),
+      );
+    }
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+// LC-06 · paragraf di bawah minimum (warning)
+// ---------------------------------------------------------------------------
+
+/** Paragraf = ≥ 2 baris terukur, ≥ 6 kata, bobot < 600. */
+export const PARAGRAPH_MIN_WORDS = 6;
+const PARAGRAPH_MAX_WEIGHT = 600;
+
+/** Nama token skala berbobot 400 untuk ukuran minimum (16 → body, 14 → body-sm). */
+const tokenFor = (size: number): string => Object.entries(TYPE_SCALE).find(([, t]) => t.size === size && t.weight === 400)?.[0] ?? `${size}px`;
+
+export function lc06(ctx: BoardContext): Finding[] {
+  const out: Finding[] = [];
+  for (const t of visibleTexts(ctx)) {
+    const lines = ctx.textMeasure.get(t.id)?.lines ?? 0;
+    if (lines < 2 || (t.weight ?? 400) >= PARAGRAPH_MAX_WEIGHT) continue;
+    if (t.content.trim().split(/\s+/).length < PARAGRAPH_MIN_WORDS) continue;
+    const frames = ancestorFrames(ctx, t);
+    if (namedAny(t, SMALL_COMPONENTS) || frames.some((a) => namedAny(a, SMALL_COMPONENTS))) continue;
+    const inCard = frames.some((a) => paintedCard(a));
+    const min = inCard ? PARAGRAPH_MIN_IN_CARD : PARAGRAPH_MIN[ctx.board.screen];
+    if (t.size >= min) continue;
+    const where = inCard ? 'di kartu' : `di board ${ctx.board.screen}`;
+    out.push(finding('LC-06', levelOf('LC-06'), t, clip120(`paragraf ${num(t.size)}px ${lines} baris ${where}: ${quote(t.content)}`), `≥ ${min}px (${tokenFor(min)}${inCard ? ' di kartu' : ''})`));
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+// LC-07 · spacing dan ukuran komponen di luar himpunan token (warning)
+// ---------------------------------------------------------------------------
+
+const CHROME_FRAMES = ['Status bar', 'Home indicator'];
+const LC07_EXPECTED = `token spacing ${[...SPACING_VALUES].sort((a, b) => a - b).join('/')}; komponen juga ${COMPONENT_SIZES.join('/')}`;
+const componentSizeOk = (v: number): boolean => SPACING_VALUES.has(v) || COMPONENT_SIZES.includes(v);
+
+export function lc07(ctx: BoardContext): Finding[] {
+  const out: Finding[] = [];
+  for (const n of ctx.nodes) {
+    if (n.type !== 'frame') continue;
+    if (namedAny(n, CHROME_FRAMES) || ancestorFrames(ctx, n).some((a) => namedAny(a, CHROME_FRAMES))) continue;
+    const bad: string[] = [];
+    if (typeof n.gap === 'number' && n.gap >= 0 && !SPACING_VALUES.has(n.gap)) bad.push(`gap ${num(n.gap)}`);
+    const p = paddingOf(n);
+    const pads = [p.t, p.r, p.l, ...(p.b === HOME_INDICATOR_INSET ? [] : [p.b])];
+    const off = [...new Set(pads.filter((v) => !SPACING_VALUES.has(v)))];
+    if (off.length) bad.push(`padding ${off.map(num).join('/')}`);
+    if (namedAny(n, SMALL_COMPONENTS)) {
+      if (typeof n.height === 'number' && !componentSizeOk(n.height)) bad.push(`height ${num(n.height)}`);
+      if (namedAny(n, SQUARE_CONTROLS) && typeof n.width === 'number' && !componentSizeOk(n.width)) bad.push(`width ${num(n.width)}`);
+    }
+    if (bad.length) out.push(finding('LC-07', levelOf('LC-07'), n, clip120(bad.join(', ')), LC07_EXPECTED));
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+// LC-08 · ukuran di luar skala atau triple tidak cocok (warning)
+// ---------------------------------------------------------------------------
+
+/** Toleransi line-height terhadap token (px). */
+export const LINE_HEIGHT_TOL = 0.5;
+const SCALE = Object.values(TYPE_SCALE);
+const SCALE_SIZES: ReadonlySet<number> = new Set(SCALE.map((t) => t.size));
+const LC08_EXPECTED = `skala tipe DESIGN.md (TY): ${[...new Set(SCALE.map((t) => `${t.size}/${t.lineHeight}`))].sort((a, b) => parseFloat(a) - parseFloat(b)).join(', ')}`;
+
+export function lc08(ctx: BoardContext): Finding[] {
+  const out: Finding[] = [];
+  const expected = LC08_EXPECTED;
+  for (const t of visibleTexts(ctx)) {
+    // < 12px sudah error LC-05; tidak dilaporkan ganda.
+    if (t.size < MIN_TEXT_SIZE) continue;
+    const lh = t.lineHeight ?? ctx.textMeasure.get(t.id)?.lineHeight;
+    const triple = `${num(t.size)}/${lh === undefined ? '?' : num(lh)}`;
+    const kpi = named(t, 'KPI / Nilai');
+    if (named(t, 'Display /')) {
+      if (!SCALE_SIZES.has(t.size) && !DISPLAY_SIZES.includes(t.size)) out.push(finding('LC-08', levelOf('LC-08'), t, `${triple} di luar skala`, `Display: skala tipe atau ${DISPLAY_SIZES.join('/')}`));
+      continue;
+    }
+    const tokens = [...new Set(SCALE.filter((s) => s.size === t.size).map((s) => s.lineHeight))];
+    const fits = (x: number) => lh !== undefined && Math.abs(x - lh) <= LINE_HEIGHT_TOL;
+    if (kpi && KPI_SIZES.includes(t.size)) {
+      // KPI: size × 1,2, atau triple skala tipe berukuran sama (mis. 28/36, 32/40) juga sah.
+      const want = t.size * KPI_LINE_HEIGHT_RATIO;
+      if (lh !== undefined && !fits(want) && !tokens.some(fits)) {
+        out.push(finding('LC-08', levelOf('LC-08'), t, `${triple} (KPI ${[num(want), ...tokens.map(num)].map((x) => `${num(t.size)}/${x}`).join(' atau ')})`, `KPI / Nilai: line-height = size × ${KPI_LINE_HEIGHT_RATIO} atau token skala`));
+      }
+      continue;
+    }
+    if (!SCALE_SIZES.has(t.size)) {
+      out.push(finding('LC-08', levelOf('LC-08'), t, `${triple} di luar skala`, kpi ? `KPI / Nilai: ${KPI_SIZES.join('/')} atau skala tipe` : expected));
+      continue;
+    }
+    if (lh !== undefined && !tokens.some(fits)) {
+      out.push(finding('LC-08', levelOf('LC-08'), t, `${triple} (token ${tokens.map((x) => `${num(t.size)}/${x}`).join(' atau ')})`, expected));
+    }
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+// LC-09 · lebih dari 2 keluarga font (warning)
+// ---------------------------------------------------------------------------
+
+export const MAX_FONT_FAMILIES = 2;
+/** Keluarga default renderer bila `family` tidak diisi. */
+const DEFAULT_FAMILY = 'Inter';
+
+export function lc09(ctx: BoardContext): Finding[] {
+  const fams = [...new Set(visibleTexts(ctx).map((t) => t.family ?? DEFAULT_FAMILY))].filter((f) => !/mono/i.test(f));
+  if (fams.length <= MAX_FONT_FAMILIES) return [];
+  return [finding('LC-09', levelOf('LC-09'), ctx.board, clip120(`${fams.length} keluarga font: ${fams.join(', ')}`), `≤ ${MAX_FONT_FAMILIES} keluarga (judul + isi); mono hanya untuk kode/SKU`)];
+}
+
+// ---------------------------------------------------------------------------
+// LC-10 · target sentuh kecil di board mobile (warning)
+// ---------------------------------------------------------------------------
+
+/** Board mobile = `screen:'mobile'` dengan lebar terukur ≤ 430 (bukan tablet). */
+export const MOBILE_MAX_WIDTH = 430;
+
+export function lc10(ctx: BoardContext): Finding[] {
+  if (ctx.board.screen !== 'mobile' || ctx.boardRect.width > MOBILE_MAX_WIDTH) return [];
+  const out: Finding[] = [];
+  for (const n of ctx.nodes) {
+    if (!namedAny(n, TOUCH_COMPONENTS) || !visibleRect(ctx, n)) continue;
+    const b = ctx.bounds.get(n.id)!;
+    if (b.width >= TOUCH_MIN - TOLERANCE && b.height >= TOUCH_MIN - TOLERANCE) continue;
+    out.push(finding('LC-10', levelOf('LC-10'), n, `${num(b.width)}×${num(b.height)} < ${TOUCH_MIN}×${TOUCH_MIN}`, `target sentuh ≥ ${TOUCH_MIN}×${TOUCH_MIN}: perbesar tinggi/lebar atau padding`));
+  }
+  return out;
+}
+
+// ===========================================================================
+// Konten dan struktur seksi (story G1 6): LC-17, LC-19 (warning). Frasa dari content-rules.
+// ===========================================================================
+
+// ---------------------------------------------------------------------------
+// LC-17 · struktur seksi mirip (warning)
+// ---------------------------------------------------------------------------
+
+/** Kemiripan multiset (Jaccard Σmin/Σmax) minimum antarseksi, dan jumlah node terlihat minimum per seksi. */
+export const SECTION_SIMILARITY_MIN = 0.9;
+export const SECTION_MIN_NODES = 6;
+
+/**
+ * Tumpukan utama board tanpa `Seksi /`: turun dari board selama wadah hanya punya satu anak flow terlihat (selain chrome)
+ * berupa frame. Kandidat seksi = anak flow frame wadah itu yang bukan `layout:'row'` (baris daftar, bukan seksi), hanya
+ * bila wadah kolom (board atau `layout:'column'`).
+ */
+function stackSections(ctx: BoardContext): FrameNode[] {
+  let c: Container = ctx.board;
+  for (;;) {
+    const flow: ChildNode[] = c.children.filter((k) => isFlowChild(c, k) && !isChrome(k) && visibleRect(ctx, k));
+    if (flow.length === 1 && flow[0]!.type === 'frame') {
+      c = flow[0]!;
+      continue;
+    }
+    const column = c.type === 'board' || c.layout === 'column';
+    return column ? flow.filter((k): k is FrameNode => k.type === 'frame' && k.layout !== 'row') : [];
+  }
+}
+
+/** Multiset keturunan terlihat (kedalaman penuh; anak berulang dihitung): `text <size>` untuk teks, tipe untuk lainnya. */
+function sectionBag(ctx: BoardContext, sec: FrameNode): Map<string, number> {
+  const bag = new Map<string, number>();
+  const walk = (n: Container) => {
+    for (const c of n.children) {
+      if (!visibleRect(ctx, c)) continue;
+      const k = c.type === 'text' ? `text ${num(c.size)}` : c.type;
+      bag.set(k, (bag.get(k) ?? 0) + 1);
+      if (c.type === 'frame') walk(c);
+    }
+  };
+  walk(sec);
+  return bag;
+}
+
+function jaccard(a: ReadonlyMap<string, number>, b: ReadonlyMap<string, number>): number {
+  let min = 0;
+  let max = 0;
+  for (const k of new Set([...a.keys(), ...b.keys()])) {
+    const x = a.get(k) ?? 0;
+    const y = b.get(k) ?? 0;
+    min += Math.min(x, y);
+    max += Math.max(x, y);
+  }
+  return max > 0 ? min / max : 0;
+}
+
+export function lc17(ctx: BoardContext): Finding[] {
+  const named17 = ctx.nodes.filter((n): n is FrameNode => n.type === 'frame' && named(n, 'Seksi /') && visibleRect(ctx, n) !== undefined);
+  const secs = (named17.length ? named17 : stackSections(ctx))
+    .map((s) => ({ s, bag: sectionBag(ctx, s) }))
+    .filter((x) => [...x.bag.values()].reduce((a, b) => a + b, 0) >= SECTION_MIN_NODES);
+  const nested = (a: FrameNode, b: FrameNode) => ancestors(ctx, b).includes(a) || ancestors(ctx, a).includes(b);
+  const out: Finding[] = [];
+  for (let j = 1; j < secs.length; j++) {
+    const B = secs[j]!;
+    let best: { s: FrameNode; sim: number } | undefined;
+    for (let i = 0; i < j; i++) {
+      const A = secs[i]!;
+      if (nested(A.s, B.s)) continue;
+      const sim = jaccard(A.bag, B.bag);
+      if (sim >= SECTION_SIMILARITY_MIN && sim > (best?.sim ?? -1)) best = { s: A.s, sim };
+    }
+    if (!best) continue;
+    out.push(
+      finding(
+        'LC-17',
+        levelOf('LC-17'),
+        B.s,
+        clip120(`mirip ${best.s.name} (${best.s.id}): ${Math.round(best.sim * 100)}%`),
+        'variasikan komposisi antar-seksi (tata letak, jenis isi), bukan judul + kartu identik berulang',
+      ),
+    );
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+// LC-19 · frasa terlarang (warning)
+// ---------------------------------------------------------------------------
+
+function exemptFromPhrases(ctx: BoardContext, t: TextNode): boolean {
+  const chain: { name: string }[] = [t, ...ancestorFrames(ctx, t)];
+  if (chain.some((n) => named(n, FORBIDDEN_EXEMPT.inside))) return true;
+  const label = chain.some((n) => n.name === FORBIDDEN_EXEMPT.layer);
+  return label && !chain.some((n) => namedAny(n, FORBIDDEN_EXEMPT.labelNotInside));
+}
+
+export function lc19(ctx: BoardContext): Finding[] {
+  const out: Finding[] = [];
+  for (const t of visibleTexts(ctx)) {
+    if (exemptFromPhrases(ctx, t)) continue;
+    const hits = forbiddenPhrasesIn(t.content);
+    if (!hits.length) continue;
+    const list = hits.map((h) => `"${h.phrase}" (${h.lang})`).join(', ');
+    out.push(finding('LC-19', levelOf('LC-19'), t, clip120(`frasa terlarang ${list} di ${quote(t.content)}`), 'ganti dengan aksi/klaim spesifik dari konten'));
+  }
+  return out;
+}
+
 // ---------------------------------------------------------------------------
 // Batas warning per board
 // ---------------------------------------------------------------------------
 
 export const MAX_WARNINGS_PER_RULE = 3;
 
-/** Maks 3 warning per aturan; sisanya dicatat di detail temuan ketiga sebagai `(+n serupa)`. Detail ≤ 120 karakter. */
+/**
+ * Maks 3 warning (dan maks 3 info) per aturan; sisanya dicatat di detail temuan ketiga sebagai `(+n serupa)`. Detail ≤ 120
+ * karakter. Error tidak dibatasi.
+ */
 export function capWarnings(findings: readonly Finding[]): Finding[] {
+  const key = (f: Finding) => `${f.level} ${f.rule}`;
   const count = new Map<string, number>();
-  for (const f of findings) if (f.level === 'warning') count.set(f.rule, (count.get(f.rule) ?? 0) + 1);
+  for (const f of findings) if (f.level !== 'error') count.set(key(f), (count.get(key(f)) ?? 0) + 1);
   const seen = new Map<string, number>();
   const out: Finding[] = [];
   for (const f of findings) {
-    if (f.level !== 'warning') {
+    if (f.level === 'error') {
       out.push(f);
       continue;
     }
-    const k = (seen.get(f.rule) ?? 0) + 1;
-    seen.set(f.rule, k);
+    const k = (seen.get(key(f)) ?? 0) + 1;
+    seen.set(key(f), k);
     if (k > MAX_WARNINGS_PER_RULE) continue;
-    const extra = k === MAX_WARNINGS_PER_RULE ? count.get(f.rule)! - MAX_WARNINGS_PER_RULE : 0;
+    const extra = k === MAX_WARNINGS_PER_RULE ? count.get(key(f))! - MAX_WARNINGS_PER_RULE : 0;
     const suffix = extra > 0 ? ` (+${extra} serupa)` : '';
     const room = 120 - [...suffix].length;
     const d = [...f.detail];
@@ -1341,7 +1998,7 @@ export function capWarnings(findings: readonly Finding[]): Finding[] {
 }
 
 // ---------------------------------------------------------------------------
-// LC-31 · mockup terpotong rata di tepi bawah seksi
+// LC-31 · konten terpotong rata di tepi bawah
 // ---------------------------------------------------------------------------
 
 /** Luapan minimal di bawah tepi clip (px) dan toleransi "rata" tepi clip ↔ tepi bawah seksi/board (px). */
@@ -1349,31 +2006,62 @@ export const CUT_OVER_MIN = 1;
 export const FLUSH_TOL = 2;
 /** Seksi = leluhur selebar ≥ 90% board. */
 const SECTION_MIN_W_RATIO = 0.9;
-
-/** Ber-cat: fill tak transparan, stroke, atau bayangan luar. */
-const paintedCard = (n: ChildNode): boolean =>
-  fillsOf(n).some((f) => f.type !== 'solid' || parseHex((f as { color: string }).color)[3] > 0) || (n as { stroke?: unknown }).stroke !== undefined || dropShadow(n);
+/** Daftar rata: ruang atas minimal (px) yang menandakan ruang bawah memang diharapkan. */
+export const LIST_TOP_MIN = 8;
 
 /**
- * Frame ber-cat berisi teks yang melewati tepi bawah clip terdekat (frame `clip:true`, termasuk `Crop /`, atau board) > 1 px,
- * dengan tepi bawah clip rata (≤ 2 px) dengan tepi bawah seksi (leluhur selebar ≥ 90% board) atau board. Hanya node terluar.
+ * Daftar rata: `k` frame ber-cat `layout:'column'` (bukan di `Crop /`) yang dua anak flow terakhirnya frame ber-cat berisi
+ * teks, baris terakhir berakhir ≤ 2 px dari tepi bawah `k` (tanpa menggantung > 2 px), sedangkan anak flow pertama mulai ≥ 8 px dari tepi atas.
+ */
+function flushListRow(ctx: BoardContext, k: FrameNode, kr: Rect): { row: FrameNode; below: number; above: number } | undefined {
+  if (k.layout !== 'column' || ancestors(ctx, k).some((a) => a.type === 'frame' && named(a, 'Crop /'))) return undefined;
+  const flow = k.children.filter((c) => isFlowChild(k, c) && (ctx.bounds.get(c.id)?.height ?? 0) > 0);
+  if (flow.length < 2) return undefined;
+  const isRow = (c: ChildNode): c is FrameNode => c.type === 'frame' && paintedCard(c) && textsIn(c).length > 0;
+  const last = flow[flow.length - 1]!;
+  if (!isRow(last) || !isRow(flow[flow.length - 2]!)) return undefined;
+  const below = bottom(kr) - bottom(ctx.bounds.get(last.id)!);
+  const above = ctx.bounds.get(flow[0]!.id)!.y - kr.y;
+  return below <= FLUSH_TOL && below >= -FLUSH_TOL && above >= LIST_TOP_MIN ? { row: last, below, above } : undefined;
+}
+
+/**
+ * Frame ber-cat berisi teks (hanya node terluar) yang terpotong atau rata di tepi bawah:
+ * (a) melewati tepi bawah clip terdekat (frame `clip:true`, termasuk `Crop /`, atau board) > 1 px, dengan tepi bawah clip
+ * rata (≤ 2 px) dengan tepi bawah seksi (leluhur selebar ≥ 90% board) atau board;
+ * (b) sama, tetapi tepi bawah node rata dengan tepi clip (−2..+1 px), node lebar < 90% board, tidak mulai dari tepi atas
+ * clip atau tepi atas isi induknya, dan tidak menempel tepi kiri/kanan board (≤ 2 px) (bukan sidebar, footer, tab bar, atau
+ * panel penuh);
+ * (c) daftar rata (`flushListRow`): temuan pada baris terakhir.
  * Dikecualikan: leluhur `Scroll /`, rotasi, `Overlay /`, dan node yang sudah dilaporkan LC-02a (`skip`).
  */
 export function lc31(ctx: BoardContext, skip: ReadonlySet<string> = new Set()): Finding[] {
   const out: Finding[] = [];
+  const done = new Set<string>();
   const minW = SECTION_MIN_W_RATIO * ctx.boardRect.width;
   const walk = (children: readonly ChildNode[]) => {
     for (const n of children) {
-      if (skip.has(n.id) || rotated(n) || named(n, 'Overlay /') || named(n, 'Scroll /')) continue;
+      if (skip.has(n.id) || done.has(n.id) || rotated(n) || named(n, 'Overlay /') || named(n, 'Scroll /')) continue;
       if (n.type !== 'frame') continue;
       const r = ctx.bounds.get(n.id);
-      if (r && area(r) > 0 && paintedCard(n) && textsIn(n).length > 0) {
-        const anc = ancestors(ctx, n);
+      const anc = ancestors(ctx, n);
+      if (r && area(r) > 0 && paintedCard(n) && textsIn(n).length > 0 && !anc.some((a) => a.type === 'frame' && rotated(a))) {
         const clipIdx = anc.findIndex((a) => a.type === 'board' || a.clip === true);
         const clip = anc[clipIdx]!;
         const cr = clip.type === 'board' ? ctx.boardRect : ctx.bounds.get(clip.id);
         const over = cr ? bottom(r) - bottom(cr) : 0;
-        if (cr && over > CUT_OVER_MIN && r.y < bottom(cr) - CUT_OVER_MIN && !anc.some((a) => a.type === 'frame' && rotated(a))) {
+        const cut = over > CUT_OVER_MIN;
+        // Panel penuh (bukan kartu): mulai di tepi atas clip, menempel tepi kiri/kanan board, atau mulai di tepi atas isi induknya.
+        const par = anc[0]!;
+        const parR = par.type === 'board' ? ctx.boardRect : ctx.bounds.get(par.id);
+        const panel =
+          cr === undefined ||
+          r.y <= cr.y + FLUSH_TOL ||
+          r.x <= FLUSH_TOL ||
+          right(r) >= ctx.boardRect.width - FLUSH_TOL ||
+          (parR !== undefined && r.y <= parR.y + paddingOf(par).t + FLUSH_TOL);
+        const flush = !cut && over >= -FLUSH_TOL && r.width < minW - TOLERANCE && !panel;
+        if (cr && (cut || flush) && r.y < bottom(cr) - CUT_OVER_MIN) {
           // Seksi rata: clip itu sendiri atau leluhurnya selebar ≥ 90% board yang tepi bawahnya rata dengan tepi clip; atau board.
           let section: Container | undefined = Math.abs(ctx.boardRect.height - bottom(cr)) <= FLUSH_TOL ? ctx.board : undefined;
           for (const a of anc.slice(clipIdx)) {
@@ -1384,16 +2072,31 @@ export function lc31(ctx: BoardContext, skip: ReadonlySet<string> = new Set()): 
           }
           if (section) {
             out.push(
-              finding(
-                'LC-31',
-                levelOf('LC-31'),
-                n,
-                `terpotong rata ${num(over)}px di tepi bawah ${section.name}`,
-                'tampilkan utuh (padding bawah ≥ 64) atau kurangi isi',
-              ),
+              cut
+                ? finding('LC-31', levelOf('LC-31'), n, `terpotong rata ${num(over)}px di tepi bawah ${section.name}`, 'tampilkan utuh (padding bawah ≥ 64) atau kurangi isi')
+                : finding(
+                    'LC-31',
+                    levelOf('LC-31'),
+                    n,
+                    clip120(`rata di tepi bawah ${section.name} tanpa ruang bawah (sisa ${num(-over)}px)`),
+                    'beri ruang bawah (padding atau margin ≥ 24) atau tampilkan utuh',
+                  ),
             );
             continue;
           }
+        }
+        const list = flushListRow(ctx, n, r);
+        if (list && !skip.has(list.row.id)) {
+          done.add(list.row.id);
+          out.push(
+            finding(
+              'LC-31',
+              levelOf('LC-31'),
+              list.row,
+              clip120(`baris terakhir rata di tepi bawah ${n.name} (bawah ${num(list.below)}px, atas ${num(list.above)}px)`),
+              'padding bawah setara padding atas, atau tampilkan baris utuh',
+            ),
+          );
         }
       }
       walk(n.children);
@@ -1402,4 +2105,317 @@ export function lc31(ctx: BoardContext, skip: ReadonlySet<string> = new Set()): 
   // Leluhur Scroll / dilewati seluruhnya (dok lama dengan posisi gulir).
   walk(ctx.board.children);
   return out;
+}
+
+// ===========================================================================
+// Aturan struktural G1 (story 4): LC-13, LC-14, LC-15, LC-16, LC-21, LC-22.
+// ===========================================================================
+
+// ---------------------------------------------------------------------------
+// LC-13 · nama layer default (info)
+// ---------------------------------------------------------------------------
+
+/** Nama default editor (Lampiran A) + padanan tipe node AD-15, opsional diikuti angka. */
+export const DEFAULT_LAYER_NAME = /^(rectangle|ellipse|path|group|board|image|svg|frame|rect|text|icon|vector)\s*\d*$/i;
+
+export function lc13(ctx: BoardContext): Finding[] {
+  return [ctx.board, ...ctx.nodes]
+    .filter((n) => DEFAULT_LAYER_NAME.test(n.name.trim()))
+    .map((n) => finding('LC-13', levelOf('LC-13'), n, clip120(`nama default ${quote(n.name)} (${n.type})`), 'nama bermakna sesuai peran (mis. "Kartu / Harga", "Image / Kamar", "Judul")'));
+}
+
+// ---------------------------------------------------------------------------
+// LC-14 · absolut di dalam flex tanpa Overlay / (warning)
+// ---------------------------------------------------------------------------
+
+/** Nama yang sah absolut: tumpukan sengaja dan bidang efek (`Overlay /`, `Crop /`) dan chrome perangkat. */
+const ABSOLUTE_OK = ['Overlay /', 'Crop /', 'Status bar', 'Home indicator'];
+
+export function lc14(ctx: BoardContext): Finding[] {
+  const out: Finding[] = [];
+  for (const n of ctx.nodes) {
+    if (n.position !== 'absolute' || ABSOLUTE_OK.some((p) => named(n, p))) continue;
+    const parent = ctx.parentOf.get(n.id)!;
+    const layout = parent.type === 'board' ? 'column' : (parent.layout ?? 'none');
+    if (layout === 'none') continue;
+    if (ancestors(ctx, n).some((a) => a.type === 'frame' && (named(a, 'Overlay /') || named(a, 'Crop /')))) continue;
+    out.push(
+      finding(
+        'LC-14',
+        levelOf('LC-14'),
+        n,
+        clip120(`absolut di dalam ${parent.type === 'board' ? 'board' : `layout ${layout}`} ${parent.name} (${parent.id})`),
+        'jadikan anak flow (gap/padding); tumpukan sengaja: nama "Overlay / …", bidang efek terpotong: "Crop / …"',
+      ),
+    );
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+// LC-15 · > 1 pustaka ikon UI (warning)
+// ---------------------------------------------------------------------------
+
+/** Pustaka logo merek, bukan ikon UI. */
+const BRAND_ICON_LIBS = new Set(['simple-icons']);
+
+export function lc15(ctx: BoardContext): Finding[] {
+  const libs = new Map<string, number>();
+  for (const n of ctx.nodes) if (n.type === 'icon' && !BRAND_ICON_LIBS.has(n.lib)) libs.set(n.lib, (libs.get(n.lib) ?? 0) + 1);
+  if (libs.size <= 1) return [];
+  const list = [...libs].map(([lib, k]) => `${lib} ${k}`).join(', ');
+  return [finding('LC-15', levelOf('LC-15'), ctx.board, clip120(`${libs.size} pustaka ikon UI: ${list}`), 'satu pustaka ikon UI per board (simple-icons untuk logo tidak dihitung)')];
+}
+
+// ---------------------------------------------------------------------------
+// LC-16 · ikon digambar manual (error, bukan gerbang)
+// ---------------------------------------------------------------------------
+
+/** Ukuran maksimal `path` yang dianggap ikon (px). */
+export const DRAWN_ICON_MAX = 32;
+
+export function lc16(ctx: BoardContext): Finding[] {
+  const out: Finding[] = [];
+  for (const n of ctx.nodes) {
+    if (n.type !== 'path' || named(n, 'Chart /') || named(n, 'Shape /') || (n.opacity ?? 1) <= 0) continue;
+    const b = ctx.bounds.get(n.id);
+    // Punya bounds tetapi tidak terlihat sama sekali (di luar clip/board): bukan ikon yang tampil.
+    if (b && !visibleRect(ctx, n)) continue;
+    const w = b?.width ?? (typeof n.width === 'number' ? n.width : n.viewBox[2]);
+    const h = b?.height ?? (typeof n.height === 'number' ? n.height : n.viewBox[3]);
+    if (w > DRAWN_ICON_MAX + TOLERANCE || h > DRAWN_ICON_MAX + TOLERANCE) continue;
+    out.push(
+      finding(
+        'LC-16',
+        levelOf('LC-16'),
+        n,
+        clip120(`path ${num(w)}×${num(h)} ${quote(n.name)} digambar manual`),
+        'pakai node icon (icon_search); bentuk sengaja: nama "Shape / …", bagian grafik: "Chart / …"',
+      ),
+    );
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+// LC-21 · pemeriksaan struktural murah (warning): radius, spacer kosong, padding ganda, teks di baris tabel, bidang efek
+// ---------------------------------------------------------------------------
+
+export const MAX_RADII = 3;
+/** Bidang efek: blur dekoratif minimal (px) dan luas gradien multi-hue minimal (rasio layar). */
+export const EFFECT_BLUR_MIN = 24;
+export const EFFECT_AREA_RATIO = 0.2;
+/** Tinggi layar untuk luas bidang efek: board panjang dihitung per layar. */
+const SCREEN_H = { mobile: 844, other: 900 };
+/** Rentang toleransi kesejajaran kolom tabel dan lebar isi induk (px). */
+const ALIGN_TOL = 1;
+
+/** Ber-cat: fill tak transparan, stroke, bayangan luar, atau backdrop blur. */
+const paintedAny = (n: ChildNode): boolean => paintedCard(n) || ((n as { backdropBlur?: number }).backdropBlur ?? 0) > 0;
+
+/** RGB [0,1] → [hue°, saturasi HSL]. */
+function hueSat(r: number, g: number, b: number): [number, number] {
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const d = max - min;
+  const l = (max + min) / 2;
+  if (d === 0) return [0, 0];
+  const sat = d / (1 - Math.abs(2 * l - 1));
+  let h = max === r ? ((g - b) / d) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
+  h *= 60;
+  return [h < 0 ? h + 360 : h, sat];
+}
+
+/** Gradien multi-hue: ≥ 2 stop kromatik (saturasi ≥ 0,2, alpha ≥ 0,15) dengan beda hue ≥ 30°. */
+function multiHue(f: ResolvedFill): boolean {
+  if (f.type !== 'linear' && f.type !== 'radial' && f.type !== 'conic') return false;
+  const hues: number[] = [];
+  for (const s of f.stops) {
+    const [r, g, b, a] = parseHex(s.color);
+    const [h, sat] = hueSat(r, g, b);
+    if (sat >= 0.2 && a >= 0.15) hues.push(h);
+  }
+  for (let i = 0; i < hues.length; i++)
+    for (let j = i + 1; j < hues.length; j++) {
+      const d = Math.abs(hues[i]! - hues[j]!);
+      if (Math.min(d, 360 - d) >= 30) return true;
+    }
+  return false;
+}
+
+function radiusIssue(ctx: BoardContext): Finding[] {
+  const values = new Set<number>();
+  for (const n of ctx.nodes) {
+    if ((n.type !== 'frame' && n.type !== 'rect') || (n.opacity ?? 1) <= 0) continue;
+    if (!(paintedAny(n) || (n.type === 'frame' && n.clip === true))) continue;
+    const v = visibleRect(ctx, n);
+    const r = ctx.bounds.get(n.id);
+    if (!v || !r || area(v) <= 0) continue;
+    const full = Math.min(r.width, r.height) / 2 - TOLERANCE;
+    const raw = n.radius ?? 0;
+    for (const x of typeof raw === 'number' ? [raw] : raw) if (x > 0 && x < full) values.add(x);
+  }
+  if (values.size <= MAX_RADII) return [];
+  const list = [...values].sort((a, b) => a - b).map(num).join(', ');
+  return [finding('LC-21', levelOf('LC-21'), ctx.board, clip120(`radius: ${values.size} nilai (${list})`), `≤ ${MAX_RADII} nilai radius per board (mis. kecil/sedang/besar) + pill/lingkaran`)];
+}
+
+function spacerIssue(ctx: BoardContext): Finding[] {
+  const out: Finding[] = [];
+  for (const n of ctx.nodes) {
+    if (n.type !== 'frame' && n.type !== 'rect') continue;
+    if ((n.type === 'frame' && n.children.length > 0) || paintedAny(n) || named(n, 'Image /')) continue;
+    const parent = ctx.parentOf.get(n.id)!;
+    if (!isFlowChild(parent, n)) continue;
+    const r = ctx.bounds.get(n.id);
+    // Node seukuran titik (0×0) tidak memakan ruang: bukan spacer.
+    if (r && r.width <= TOLERANCE && r.height <= TOLERANCE) continue;
+    const size = r ? ` ${num(r.width)}×${num(r.height)}` : '';
+    out.push(finding('LC-21', levelOf('LC-21'), n, clip120(`spacer kosong: ${n.type}${size} tanpa isi dan cat di ${parent.name} (${parent.id})`), 'hapus; jarak lewat gap/padding induk'));
+  }
+  return out;
+}
+
+function doublePaddingIssue(ctx: BoardContext): Finding[] {
+  if (ctx.board.screen !== 'mobile') return [];
+  const out: Finding[] = [];
+  for (const n of ctx.nodes) {
+    if (n.type !== 'frame' || !n.children.length || paintedAny(n) || inComponent(ctx, n)) continue;
+    const parent = ctx.parentOf.get(n.id)!;
+    if (!isFlowChild(parent, n)) continue;
+    const pad = paddingOf(n);
+    if (pad.l <= 0 && pad.r <= 0) continue;
+    const r = ctx.bounds.get(n.id);
+    const pr = parent.type === 'board' ? ctx.boardRect : ctx.bounds.get(parent.id);
+    if (!r || !pr) continue;
+    const pp = paddingOf(parent);
+    if (Math.abs(r.width - (pr.width - pp.l - pp.r)) > ALIGN_TOL) continue;
+    let hit: { side: 'kiri' | 'kanan'; own: number; outer: number; by: Container } | undefined;
+    for (const a of ancestors(ctx, n)) {
+      const ap = paddingOf(a);
+      if (pad.l > 0 && ap.l > 0) hit = { side: 'kiri', own: pad.l, outer: ap.l, by: a };
+      else if (pad.r > 0 && ap.r > 0) hit = { side: 'kanan', own: pad.r, outer: ap.r, by: a };
+      if (hit || a.type === 'board' || paintedAny(a)) break;
+    }
+    if (!hit) continue;
+    out.push(
+      finding(
+        'LC-21',
+        levelOf('LC-21'),
+        n,
+        clip120(`padding ganda: padding ${hit.side} ${num(hit.own)} di dalam padding ${hit.side} ${num(hit.outer)} ${hit.by.name} (${hit.by.id})`),
+        'satu lapis padding horizontal per layar (wadah luar); anak selebar isi tanpa padding sisi',
+      ),
+    );
+  }
+  return out;
+}
+
+function tableTextIssue(ctx: BoardContext): Finding[] {
+  const out: Finding[] = [];
+  const containers: Container[] = [ctx.board, ...ctx.nodes.filter((n): n is FrameNode => n.type === 'frame')];
+  for (const c of containers) {
+    const rows = c.children.flatMap((k) => {
+      if (k.type !== 'frame' || k.layout !== 'row') return [];
+      const kids = k.children.filter((x) => isFlowChild(k, x));
+      const xs = kids.map((x) => ctx.bounds.get(x.id)?.x);
+      if (kids.length < 3 || xs.some((x) => x === undefined)) return [];
+      return [{ row: k, kids, xs: xs as number[] }];
+    });
+    const grouped = new Set<string>();
+    for (const ref of rows) {
+      if (grouped.has(ref.row.id)) continue;
+      const group = rows.filter((o) => !grouped.has(o.row.id) && o.kids.length === ref.kids.length && o.xs.every((x, i) => Math.abs(x - ref.xs[i]!) <= ALIGN_TOL));
+      if (group.length < 3) continue;
+      for (const g of group) grouped.add(g.row.id);
+      for (const g of group) {
+        const withText = g.kids.filter((x) => textsIn(x).length > 0).length;
+        const direct = g.kids.filter((x) => x.type === 'text' && nonEmpty(x)).length;
+        // Daftar (nomor/meta + tumpukan teks + status) punya ≤ 1 teks lepas; baris tabel punya ≥ 2 sel teks lepas.
+        if (withText < 3 || direct < 2) continue;
+        out.push(
+          finding(
+            'LC-21',
+            levelOf('LC-21'),
+            g.row,
+            clip120(`teks di baris tabel: ${direct} teks langsung di baris (${group.length} baris sejajar di ${c.name})`),
+            'tiap sel = frame lebar tetap/fill (sel berisi teks), kolom sejajar antarbaris',
+          ),
+        );
+      }
+    }
+  }
+  return out;
+}
+
+function effectFieldIssue(ctx: BoardContext): Finding[] {
+  const screenH = Math.min(ctx.boardRect.height, ctx.board.screen === 'mobile' ? SCREEN_H.mobile : SCREEN_H.other);
+  const minArea = EFFECT_AREA_RATIO * ctx.boardRect.width * screenH;
+  const effects: { n: ChildNode; v: Rect }[] = [];
+  for (const n of ctx.nodes) {
+    const fills = fillsOf(n);
+    if (!fills.length || (n.opacity ?? 1) <= 0) continue;
+    const v = visibleRect(ctx, n);
+    if (!v || area(v) <= 0) continue;
+    const blur = (n as { blur?: number }).blur ?? 0;
+    const isEffect =
+      fills.some((f) => f.type === 'mesh') ||
+      (blur >= EFFECT_BLUR_MIN && fills.some((f) => f.type !== 'image')) ||
+      (fills.some(multiHue) && area(v) >= minArea);
+    if (isEffect) effects.push({ n, v });
+  }
+  if (effects.length < 2) return [];
+  // Union-find: node efek bersarang di node efek lain atau beririsan dengannya = satu bidang.
+  const root = effects.map((_, i) => i);
+  const find = (i: number): number => (root[i] === i ? i : (root[i] = find(root[i]!)));
+  // Juga satu bidang: node efek dengan wadah potong terdekat yang sama (leluhur `Crop /` atau frame `clip:true`, bukan board).
+  const holder = effects.map((e) => ancestors(ctx, e.n).find((a) => a.type === 'frame' && (named(a, 'Crop /') || a.clip === true))?.id);
+  for (let i = 0; i < effects.length; i++) {
+    const inside = new Set(descendants(effects[i]!.n).map((d) => d.id));
+    for (let j = i + 1; j < effects.length; j++) {
+      const same = holder[i] !== undefined && holder[i] === holder[j];
+      if (same || inside.has(effects[j]!.n.id) || intersect(effects[i]!.v, effects[j]!.v)) root[find(j)] = find(i);
+    }
+  }
+  // Label bidang = node efek terluas di bidang itu (urutan dokumen bidang dipertahankan).
+  const fields = new Map<number, { n: ChildNode; v: Rect }>();
+  effects.forEach((e, i) => {
+    const cur = fields.get(find(i));
+    if (!cur || area(e.v) > area(cur.v)) fields.set(find(i), e);
+  });
+  if (fields.size < 2) return [];
+  const names = [...fields.values()].map((e) => `"${e.n.name}"`).join(', ');
+  return [
+    finding(
+      'LC-21',
+      levelOf('LC-21'),
+      ctx.board,
+      clip120(`bidang efek: ${fields.size} bidang terpisah (${names})`),
+      'maks 1 bidang efek ekspresif per board (mesh, blur dekoratif, gradien multi-warna luas); sisanya solid',
+    ),
+  ];
+}
+
+export function lc21(ctx: BoardContext): Finding[] {
+  return [...radiusIssue(ctx), ...spacerIssue(ctx), ...doublePaddingIssue(ctx), ...tableTextIssue(ctx), ...effectFieldIssue(ctx)];
+}
+
+// ---------------------------------------------------------------------------
+// LC-22 · jumlah node berkonvensi (info)
+// ---------------------------------------------------------------------------
+
+export const CONVENTIONS = ['Crop', 'Overlay', 'Scroll', 'Ekstra'] as const;
+
+export function lc22(ctx: BoardContext): Finding[] {
+  const counts = CONVENTIONS.map((c) => ctx.nodes.filter((n) => named(n, `${c} /`)).length);
+  if (counts.every((k) => k === 0)) return [];
+  return [
+    finding(
+      'LC-22',
+      levelOf('LC-22'),
+      ctx.board,
+      CONVENTIONS.map((c, i) => `${c} ${counts[i]}`).join(', '),
+      'sebut di artefak konvensi: (batas Crop ≤ 2, Ekstra ≤ 1 per board)',
+    ),
+  ];
 }

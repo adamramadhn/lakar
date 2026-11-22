@@ -6,14 +6,32 @@ import { describe, expect, it } from 'vitest';
 import { renderApiMarkdown } from '../packages/exec/src/api-md.ts';
 import { IconCatalog } from '../packages/icons/src/index.ts';
 import { FontRegistry } from '../packages/daemon/src/fonts.ts';
-import { SKILL_NAMES, SKILLS_DIR, estimateTokens, splitCode } from '../packages/skills/src/index.ts';
+import { DOMAIN_SKILLS, SCREEN_SKILLS, SKILL_NAMES, SKILLS_DIR, estimateTokens, splitCode } from '../packages/skills/src/index.ts';
 import { testLog } from './support/log.ts';
 
 const read = (name: string) => readFileSync(join(SKILLS_DIR, `${name}.md`), 'utf8');
 const REGEN = 'regenerasi: /opt/node-26/bin/pnpm build && /opt/node-26/bin/node scripts/gen-skill-api.mjs';
 
-/** Batas token (DESIGN.md §Turunan): core total; polish/landing/mobile/webapp prosa + total. */
-const LIMITS = { core: { total: 4000 }, polish: { prose: 3000, total: 3200 }, landing: { prose: 1500, total: 3500 }, mobile: { prose: 1500, total: 3500 }, webapp: { prose: 1500, total: 3500 } } as const;
+/**
+ * Batas token (DESIGN.md §Turunan): core total; delapan domain total (ui juga prosa: memuat contoh); landing/mobile/webapp
+ * prosa + total. Total muat per jenis layar (core + 8 domain + 1 jenis layar) ≤ LOAD_LIMIT; lewat batas → padatkan.
+ */
+const LIMITS = {
+  core: { total: 2600 },
+  layout: { total: 600 },
+  typography: { total: 400 },
+  color: { total: 550 },
+  accessibility: { total: 400 },
+  ui: { prose: 800, total: 1200 },
+  interface: { total: 550 },
+  writing: { total: 450 },
+  review: { total: 550 },
+  landing: { prose: 1100, total: 3200 },
+  mobile: { prose: 1100, total: 3000 },
+  webapp: { prose: 1000, total: 3000 },
+} as const;
+/** Iterasi 6 story 2.16: 11.500 → 9.600 (biaya berpikir agen); turun saja, jangan naik. */
+const LOAD_LIMIT = 9_600;
 
 describe('skill: batas token (estimateTokens = karakter / 3.2)', () => {
   it.each(Object.entries(LIMITS))('%s', (name, lim) => {
@@ -23,6 +41,23 @@ describe('skill: batas token (estimateTokens = karakter / 3.2)', () => {
     testLog(`[skills] ${name}.md: total ${total} token, prosa ${prose} token`);
     expect(total, `${name}.md total ${total} > ${lim.total}`).toBeLessThanOrEqual(lim.total);
     if ('prose' in lim) expect(prose, `${name}.md prosa ${prose} > ${lim.prose}`).toBeLessThanOrEqual(lim.prose);
+  });
+
+  it('setiap skill domain dan jenis layar punya batas', () => {
+    expect(Object.keys(LIMITS).sort()).toEqual(['core', ...DOMAIN_SKILLS, ...SCREEN_SKILLS].sort());
+  });
+
+  it.each(SCREEN_SKILLS)(`muat %s: core + 8 domain + skill jenis layar ≤ ${LOAD_LIMIT}`, (screen) => {
+    const names = ['core', ...DOMAIN_SKILLS, screen];
+    const total = names.reduce((a, n) => a + estimateTokens(read(n)), 0);
+    testLog(`[skills] muat ${screen}: ${total} token (${names.join(' + ')})`);
+    expect(total, `muat ${screen} ${total} > ${LOAD_LIMIT}`).toBeLessThanOrEqual(LOAD_LIMIT);
+  });
+
+  it('daftar skill: 14 nama, tanpa polish; domain berjudul "# Lakar: <nama>"', () => {
+    expect(SKILL_NAMES).toHaveLength(14);
+    expect(SKILL_NAMES).not.toContain('polish');
+    for (const n of DOMAIN_SKILLS) expect(read(n).split('\n')[0], n).toBe(`# Lakar: ${n}`);
   });
 });
 
@@ -41,7 +76,7 @@ describe('skill: struktur', () => {
     expect(md.startsWith('# ')).toBe(true);
     const { blocks } = splitCode(md);
     for (const b of blocks) expect(['js', 'text'], `${name}.md blok berbahasa "${b.lang}"`).toContain(b.lang);
-    expect(md.match(/^```/gm)!.length).toBe(blocks.length * 2);
+    expect((md.match(/^```/gm) ?? []).length).toBe(blocks.length * 2);
   });
 
   it('core.md punya tepat satu blok prelude (baris pertama // prelude); blok // pakai prelude ada di landing, mobile, dan webapp', () => {

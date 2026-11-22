@@ -3,7 +3,7 @@ title: 'Render layout flex, teks, dan font lokal'
 type: feature
 ticket: '7'
 created: '2026-11-18'
-status: built
+status: done
 baseline_revision: 'f81e3eb69029365038a44d7b0a26a58571d755db'
 route: full
 route_source: auto

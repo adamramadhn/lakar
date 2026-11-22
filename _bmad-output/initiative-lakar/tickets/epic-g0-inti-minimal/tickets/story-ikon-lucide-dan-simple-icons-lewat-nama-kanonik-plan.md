@@ -3,7 +3,7 @@ title: 'Ikon Lucide dan Simple Icons lewat nama kanonik'
 type: feature
 ticket: '10'
 created: '2026-11-18'
-status: built
+status: done
 baseline_revision: 'e5fdd26d3caab26a16cd74aab6d4ae07be5079e7'
 route: full
 route_source: auto

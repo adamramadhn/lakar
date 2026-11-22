@@ -13,16 +13,57 @@ import { emptyRecord } from '../pendev/run.js';
 import type { TimedLine } from '../stream-metrics.js';
 import { timedLines, toolResultEvent, toolUseEvent } from '../../../tests/support/stream.ts';
 import { countAgentEmoji, countEmojiInText, countLintEmoji } from './emoji.js';
-import { claudeSemver, copyPngExclusive, photoProbeProblems, scoreReportBase, judgePrompt, ROUND_JUDGE_REUSE, staleJudgeTexts, frozenDrift, harnessErrorStatus, isFinalRun, officialFreezeProblems, parseRoundArgs, penBaseline, roundOutcome, roundStartProblem, type OfficialFreezeInput } from './main.js';
+import {
+  claudeSemver,
+  conventionFor,
+  copyPngExclusive,
+  g1Input,
+  isG1Protocol,
+  photoProbeProblems,
+  roundOrder,
+  scoreReportBase,
+  judgePrompt,
+  ROUND_JUDGE_REUSE,
+  staleJudgeTexts,
+  frozenDrift,
+  harnessErrorStatus,
+  isFinalRun,
+  officialFreezeProblems,
+  parseRoundArgs,
+  penBaseline,
+  roundOutcome,
+  roundStartProblem,
+  type OfficialFreezeInput,
+} from './main.js';
+import { indexBaselines } from '../baselines.js';
 import { LAKAR_INIT_RULES } from '../lakar/run.js';
 import { validateInit } from '../stream-metrics.js';
 import { lakarReconnect, pendevReconnect } from './reconnect.js';
 import { AWAITING_ADAM, frozenG0Rules, isOfficialRound, r3r7Missing, renderRoundMarkdown, renderScoreMarkdown, ROUND_ID, type RoundPrompt, type RoundReport } from './report.js';
-import { aggregateScores, appealAxis, decide, decideG0, lakarGate, type Decision, type DecisionInput, type GateResult, type PromptScore } from './score.js';
+import { aggregateScores, appealAxis, decide, decideG0, decideG1, lakarGate, technicalScores, type Decision, type DecisionInput, type G1PromptInput, type GateResult, type PromptScore } from './score.js';
 
 const L = (evs: unknown[]): TimedLine[] => timedLines(evs, 1000);
 
 describe('argumen dan konvensi putaran', () => {
+  it('urutan run dan konvensi diturunkan dari prompt protokol', () => {
+    expect(roundOrder(['A', 'B'])).toEqual([
+      ['A', 'pendev'],
+      ['A', 'lakar'],
+      ['B', 'pendev'],
+      ['B', 'lakar'],
+    ]);
+    expect(roundOrder(['A', 'B', 'C', 'D', 'E'])).toHaveLength(10);
+    expect(conventionFor(['A', 'B'])[1]).toBe(
+      'Satu putaran = A dan B, urutan run A-pen.dev, A-Lakar, B-pen.dev, B-Lakar, lalu juri 3× per prompt. Satu run per alat per prompt; run tidak diulang untuk memilih hasil (C8).',
+    );
+    expect(conventionFor(['A', 'B', 'C', 'D', 'E'])[1]).toContain('Satu putaran = A, B, C, D, dan E, urutan run A-pen.dev, A-Lakar, B-pen.dev');
+    expect(conventionFor(['A', 'B', 'C', 'D', 'E']).join('\n')).toContain('decideG1');
+    expect(conventionFor(['A', 'B']).join('\n')).not.toContain('decideG1');
+    expect(isG1Protocol(['A', 'B', 'C', 'D', 'E'])).toBe(true);
+    expect(isG1Protocol(['A', 'B'])).toBe(false);
+    expect(isG1Protocol(loadProtocol().config.promptIds)).toBe(true);
+  });
+
   it('ID putaran: uji-<k> atau angka polos', () => {
     for (const ok of ['uji-1', 'uji-12', '1', '16']) expect(ROUND_ID.test(ok), ok).toBe(true);
     for (const bad of ['round-1', '0', 'uji-0', 'uji-', '01', 'uji-1a', '']) expect(ROUND_ID.test(bad), bad).toBe(false);
@@ -226,7 +267,7 @@ describe('laporan (snapshot)', () => {
       slug: 'gerak-beranda',
       opened: ['gerak-beranda'],
       boards: [{ id: 'b1', name: 'Beranda', page: 'P', width: 390, height: 844, x: 0, y: 0, wip: false }],
-      layout: { rev: 4, summary: { error: 0, warning: 1, gate: 0 }, findings: [], boards: [] },
+      layout: { rev: 4, summary: { error: 0, warning: 1, gate: 0, info: 0 }, findings: [], boards: [] },
       docPath: 'bench/runs/rounds/uji-1/B-lakar/doc/gerak-beranda.lakar.json',
       historyPath: undefined,
       daemonBefore: undefined,
@@ -364,6 +405,53 @@ describe('laporan (snapshot)', () => {
     expect(renderRoundMarkdown(report)).not.toContain('- Foto:');
   });
 
+  it('putaran G1: bagian Keputusan G1 menggantikan G0, R3/R7 per prompt, hash per prompt di Versi beku', () => {
+    const tech = technicalScores([{ rule: 'LC-06', level: 'warning' }, { rule: 'LC-30', level: 'warning' }]);
+    const gp: RoundPrompt = { ...p, technical: tech, baselineSource: 'bench/baseline-pendev.json' };
+    // C: tanpa baseline dan tanpa temuan layout_check → gerbang gagal (waktu tak terukur, R3/R7 tak terukur) → Kalah.
+    const cGate = lakarGate({ promptId: 'C', layoutGate: 0, sizeProblems: [], wallMs: 120_000, baselineMedianMs: undefined, technical: null });
+    const cNoBaseline: RoundPrompt = {
+      ...gp,
+      prompt: 'C',
+      baselineMedianMs: undefined,
+      baselineCostUsd: undefined,
+      baselineSource: undefined,
+      technical: null,
+      gate: cGate,
+      decision: decide({ gate: cGate, lakarRunOk: true, pendevRunOk: true, score: sc, pendevBrief: { sizeProblems: [] } }),
+    };
+    expect(cGate.ok).toBe(false);
+    const { baselineProtocolHash: _omit, ...frozenG1 } = report.frozen;
+    const g1Report: RoundReport = {
+      ...report,
+      round: '3',
+      frozen: {
+        ...frozenG1,
+        promptHashes: { B: 'hb', C: 'hc' },
+        promptBaselines: { B: { promptHash: 'hb', source: 'bench/baseline-pendev.json', date: '2026-11-17' }, C: null },
+        baselinesByPrompt: { B: { model: 'claude-opus-5-5', claude: '2.1.325', pendevDesktop: '1.2.23' }, C: null },
+      },
+      results: [gp, cNoBaseline],
+      g1: { decision: 'tidak dapat diputuskan', why: 'prompt A tidak ada di putaran' },
+    };
+    const md = renderRoundMarkdown(g1Report);
+    expect(md).toContain('## Keputusan G1 (sementara, menunggu konfirmasi Adam)');
+    expect(md).not.toContain('## Keputusan G0');
+    expect(md).toContain('### Gerbang G1 Lakar (otomatis)');
+    expect(md).not.toContain('R3/R7 tidak dihitung di G0');
+    expect(md).toContain('R3 = 1 (LC-07 0, LC-11 0, LC-06 1), R7 = 2 (0 error non-gerbang, 0 warning struktural)');
+    expect(md).toContain('tidak terukur (temuan layout_check tidak ada) → gerbang gagal');
+    expect(md).toContain('- hash prompt B: `hb` (baseline `bench/baseline-pendev.json` 2026-11-17: sama)');
+    expect(md).toContain('- hash prompt C: `hc` (**baseline belum diukur**)');
+    expect(md).toContain('Keputusan G1 final: menunggu konfirmasi Adam (sementara: tidak dapat diputuskan)');
+    expect(md).toContain('`--round 4` untuk B, C');
+    expect(md).not.toContain('C4: G1 tidak dimulai');
+    expect(md).toMatchSnapshot();
+    // Flag false positive Adam bila error non-gerbang > 0.
+    const flagged = renderRoundMarkdown({ ...g1Report, results: [{ ...gp, technical: technicalScores([{ rule: 'LC-12', level: 'error' }]) }] });
+    expect(flagged).toContain('periksa Adam: false positive?');
+  });
+
   it('score md: 8 kriteria × 2 alat, bukti per ulangan, pemetaan X/Y setelah penilaian, ulangan failed dicatat', () => {
     const md = renderScoreMarkdown('uji-1', p);
     expect(md).toContain('putaran uji-1');
@@ -380,11 +468,15 @@ describe('penjaga awal dan status putaran', () => {
     expect(roundStartProblem({ mdExists: true, resume: true, dryRun: false })).toBeUndefined();
     expect(roundStartProblem({ mdExists: true, resume: false, dryRun: true })).toBeUndefined();
   });
-  it('hash protokol beda dari baseline → abort (exit 1) sebelum run', () => {
-    const r = roundStartProblem({ mdExists: false, resume: false, dryRun: false, protocolHash: 'aa', baselineHash: 'bb' });
+  it('masalah baseline per prompt (hash ≠, belum diukur) → abort (exit 1) sebelum run, semua putaran non-dry-run; dry-run hanya mencetak', () => {
+    const problems = ['hash prompt C aa ≠ baseline bb (bench/x.json)', 'baseline D, E belum diukur'];
+    const r = roundStartProblem({ mdExists: false, resume: false, dryRun: false, baselineProblems: problems });
     expect(r).toMatchObject({ exitCode: 1 });
-    expect(r!.message).toContain('aa');
-    expect(roundStartProblem({ mdExists: false, resume: false, dryRun: false, protocolHash: 'aa', baselineHash: 'aa' })).toBeUndefined();
+    expect(r!.message).toContain('hash prompt C aa ≠ baseline bb');
+    expect(r!.message).toContain('baseline D, E belum diukur');
+    expect(roundStartProblem({ mdExists: false, resume: true, dryRun: false, baselineProblems: problems })).toMatchObject({ exitCode: 1 });
+    expect(roundStartProblem({ mdExists: false, resume: false, dryRun: true, baselineProblems: problems })).toBeUndefined();
+    expect(roundStartProblem({ mdExists: false, resume: false, dryRun: false, baselineProblems: [] })).toBeUndefined();
   });
   it('.pen lama berubah → dibatalkan exit 1; juri/run invalid → dibatalkan; lengkap → 0; kurang → 2', () => {
     const none = { changed: [], removed: [] };
@@ -452,13 +544,23 @@ describe('keputusan G0 (sementara)', () => {
 });
 
 describe('pembekuan putaran resmi', () => {
+  const baselineJson = (promptHashes: Record<string, string>, date = '2026-11-17T00:00:00.000Z') => ({
+    date,
+    model: 'claude-opus-5-5',
+    claudeVersion: '2.1.325',
+    toolVersions: { 'pen.dev desktop (X-AppImage-Version)': '1.2.23' },
+    promptHashes,
+    runsPerPrompt: 3,
+    summary: Object.keys(promptHashes).map((prompt) => ({ prompt, successes: 3, wallMs: { median: 100_000 }, costUsd: { median: 0.5 } })),
+  });
   const base: OfficialFreezeInput = {
     porcelainCode: '',
-    protocolHash: 'h',
+    promptIds: ['A', 'B'],
+    promptHashes: { A: 'ha', B: 'hb' },
     model: 'claude-opus-5-5',
     claude: '2.1.325 (Claude Code)',
     pendevDesktop: '1.2.23',
-    baseline: { protocolHash: 'h', model: 'claude-opus-5-5', claude: '2.1.325', pendevDesktop: '1.2.23' },
+    baselines: indexBaselines([{ source: 'bench/baseline-pendev.json', json: baselineJson({ A: 'ha', B: 'hb' }) }]),
     lakard: { startedAt: '2026-11-18T06:00:00.000Z', fonts: { families: ['Inter'], missing: [] }, pool: { size: 2, ready: 2, recreated: 0 }, schemaVersion: SCHEMA_VERSION, photos: { provider: 'unsplash', keyFile: 'present', imported: 0 } },
     newestDistMtimeMs: Date.parse('2026-11-18T05:00:00.000Z'),
     checkLakardFresh: true,
@@ -473,11 +575,35 @@ describe('pembekuan putaran resmi', () => {
   it('bersih → tanpa masalah', () => expect(officialFreezeProblems(base)).toEqual([]));
   it('kode kotor / claude / pen / model / hash berubah → masalah', () => {
     expect(officialFreezeProblems({ ...base, porcelainCode: ' M bench/src/x.ts' })[0]).toContain('kode tidak beku');
-    expect(officialFreezeProblems({ ...base, claude: '2.1.326 (Claude Code)' })[0]).toContain('claude 2.1.326 ≠ baseline 2.1.325');
-    expect(officialFreezeProblems({ ...base, pendevDesktop: '1.2.24' })[0]).toContain('pen.dev desktop');
-    expect(officialFreezeProblems({ ...base, pendevDesktop: undefined })[0]).toContain('pen.dev desktop');
-    expect(officialFreezeProblems({ ...base, model: 'm' })[0]).toContain('model');
-    expect(officialFreezeProblems({ ...base, protocolHash: 'x' })[0]).toContain('protocolHash');
+    expect(officialFreezeProblems({ ...base, claude: '2.1.326 (Claude Code)' })[0]).toContain('claude A: 2.1.326 ≠ baseline 2.1.325');
+    expect(officialFreezeProblems({ ...base, pendevDesktop: '1.2.24' })[0]).toContain('pen.dev desktop A: 1.2.24');
+    expect(officialFreezeProblems({ ...base, pendevDesktop: undefined })[0]).toContain('pen.dev desktop A: (tidak terbaca)');
+    expect(officialFreezeProblems({ ...base, model: 'm' })[0]).toContain('model A');
+    expect(officialFreezeProblems({ ...base, promptHashes: { A: 'ha', B: 'x' } })).toEqual(['hash prompt B x ≠ baseline hb (bench/baseline-pendev.json)']);
+  });
+  it('hash per prompt: prompt tanpa baseline, baseline tanpa promptHashes, baseline terbaru menang', () => {
+    const ae = { ...base, promptIds: ['A', 'B', 'C', 'D', 'E'], promptHashes: { A: 'ha', B: 'hb', C: 'hc', D: 'hd', E: 'he' } };
+    expect(officialFreezeProblems(ae)).toEqual(['baseline C, D, E belum diukur']);
+    const withCde = indexBaselines([
+      { source: 'bench/baseline-pendev.json', json: baselineJson({ A: 'ha', B: 'hb' }) },
+      { source: 'bench/baseline-pendev-CDE-2026-11-20.json', json: baselineJson({ C: 'hc', D: 'hd', E: 'he' }, '2026-11-20T00:00:00.000Z') },
+    ]);
+    expect(officialFreezeProblems({ ...ae, baselines: withCde })).toEqual([]);
+    // Claude Code naik versi: baseline lama tetap tercatat, tetapi pembekuan gagal sampai A–E diukur ulang.
+    expect(officialFreezeProblems({ ...ae, baselines: withCde, claude: '2.1.400' }).filter((x) => x.startsWith('claude'))).toHaveLength(5);
+    const remeasured = indexBaselines([
+      { source: 'bench/baseline-pendev.json', json: baselineJson({ A: 'ha', B: 'hb' }) },
+      { source: 'bench/baseline-pendev-ABCDE-2026-11-21.json', json: { ...baselineJson({ A: 'ha', B: 'hb', C: 'hc', D: 'hd', E: 'he' }, '2026-11-21T00:00:00.000Z'), claudeVersion: '2.1.400' } },
+    ]);
+    expect(officialFreezeProblems({ ...ae, baselines: remeasured, claude: '2.1.400 (Claude Code)' })).toEqual([]);
+    expect(remeasured.superseded.map((x) => `${x.prompt} ${x.source}`)).toEqual(['A bench/baseline-pendev.json', 'B bench/baseline-pendev.json']);
+    expect(remeasured.byPrompt.A!.source).toBe('bench/baseline-pendev-ABCDE-2026-11-21.json');
+    // Baseline tanpa promptHashes = masalah, tanpa fallback ke hash utuh.
+    const legacy = indexBaselines([{ source: 'bench/baseline-pendev.json', json: { ...baselineJson({}), promptHashes: undefined, protocolHash: '907cb36f' } }]);
+    expect(officialFreezeProblems({ ...base, baselines: legacy })).toEqual([
+      'bench/baseline-pendev.json: tanpa promptHashes (hash protokol utuh tidak dipakai sebagai penjaga; migrasikan atau ukur ulang)',
+      'baseline A, B belum diukur',
+    ]);
   });
   it('lakard basi (startedAt ≤ mtime dist) → masalah hanya bila dicek sesudah restart', () => {
     const stale = { ...base, newestDistMtimeMs: Date.parse('2026-11-18T07:00:00.000Z') };
@@ -621,17 +747,94 @@ describe('round --resume dengan hasil juri rubrik lama', () => {
 });
 
 describe('daftar aturan R3/R7 yang belum dihitung diturunkan dari G0_RULES', () => {
-  it('G0_RULES saat ini: LC-11 dan LC-18 sudah ada', () => {
-    expect(r3r7Missing()).toBe('aturan LC-03/06/07/13/14/17/21 belum ada di `G0_RULES`.');
+  it('G0_RULES saat ini: semua aturan R3/R7 (LC-03, 06, 07, 11, 13, 14, 17, 18, 21) sudah ada', () => {
+    expect(r3r7Missing()).toBe('semua aturan katalog LC-03/06/07/11/13/14/17/18/21 sudah ada di `G0_RULES`.');
   });
   it('laporan memakai G0_RULES beku putaran (pra-1.23 tanpa LC-11/LC-18); tidak terbaca → aturan saat ini', () => {
     const pre = JSON.stringify({ 'LC-01a': {}, 'LC-02a': {}, 'LC-05': {}, 'LC-12': {}, 'LC-20': {} });
     expect(r3r7Missing(frozenG0Rules(pre))).toBe('aturan LC-03/06/07/11/13/14/17/18/21 belum ada di `G0_RULES`.');
-    for (const bad of [undefined, '[]', 'bukan json']) expect(r3r7Missing(frozenG0Rules(bad))).toBe('aturan LC-03/06/07/13/14/17/21 belum ada di `G0_RULES`.');
+    for (const bad of [undefined, '[]', 'bukan json']) expect(r3r7Missing(frozenG0Rules(bad))).toBe('semua aturan katalog LC-03/06/07/11/13/14/17/18/21 sudah ada di `G0_RULES`.');
   });
   it('tanpa aturan katalog / semua ada', () => {
     expect(r3r7Missing({})).toBe('aturan LC-03/06/07/11/13/14/17/18/21 belum ada di `G0_RULES`.');
     const all = Object.fromEntries(['LC-03', 'LC-06', 'LC-07', 'LC-11', 'LC-13', 'LC-14', 'LC-17', 'LC-18', 'LC-21'].map((r) => [r, 1]));
     expect(r3r7Missing(all)).toContain('semua aturan katalog');
+  });
+});
+
+describe('R3/R7 mekanis (putaran G1)', () => {
+  const f = (rule: string, level: 'error' | 'warning', n = 1) => Array.from({ length: n }, () => ({ rule, level }));
+  it('R3 dari LC-07/LC-11/LC-06; R7 dari error non-gerbang + warning struktural', () => {
+    expect(technicalScores(f('LC-07', 'warning', 6))).toMatchObject({ R3: 0, R7: 2 });
+    expect(technicalScores(f('LC-06', 'warning', 2))).toMatchObject({ R3: 1, R7: 2 });
+    expect(technicalScores([])).toMatchObject({ R3: 2, R7: 2, nonGateErrors: 0, structuralWarnings: 0, flags: [] });
+    expect(technicalScores([...f('LC-07', 'warning', 2), ...f('LC-11', 'error', 2), ...f('LC-06', 'warning', 1)])).toMatchObject({ R3: 1 });
+    expect(technicalScores([...f('LC-07', 'warning', 2), ...f('LC-11', 'error', 2), ...f('LC-06', 'warning', 2)])).toMatchObject({ R3: 0 });
+    expect(technicalScores(f('LC-18', 'warning', 3))).toMatchObject({ R7: 2, structuralWarnings: 3 });
+    expect(technicalScores(f('LC-18', 'warning', 4))).toMatchObject({ R7: 1, structuralWarnings: 4 });
+    expect(technicalScores([...f('LC-03', 'warning', 4), ...f('LC-21', 'warning', 4)])).toMatchObject({ R7: 1, structuralWarnings: 8 });
+    expect(technicalScores([...f('LC-13', 'warning', 5), ...f('LC-14', 'warning', 2), ...f('LC-17', 'warning', 2)])).toMatchObject({ R7: 0, structuralWarnings: 9 });
+    // Warning non-struktural (mis. LC-30) dan error gerbang (LC-02a) tidak dihitung R7.
+    expect(technicalScores([...f('LC-30', 'warning', 20), ...f('LC-02a', 'error', 3)])).toMatchObject({ R3: 2, R7: 2, nonGateErrors: 0 });
+    // Error non-gerbang: aturan bukan gerbang di katalog @lakar/schema (atau belum ada di katalog).
+    const two = technicalScores(f('LC-12', 'error', 2));
+    expect(two).toMatchObject({ R7: 1, nonGateErrors: 2, flags: ['periksa Adam: false positive? (2 error non-gerbang)'] });
+    expect(technicalScores(f('LC-13', 'error', 3))).toMatchObject({ R7: 0, nonGateErrors: 3 });
+    expect(technicalScores([...f('LC-12', 'error', 1), ...f('LC-18', 'warning', 9)])).toMatchObject({ R7: 0 });
+  });
+
+  it('R3 = 0 atau R7 = 0 → gerbang G1 gagal; tanpa `technical` (G0, latihan) tidak dihitung', () => {
+    const g = { promptId: 'C', layoutGate: 0, sizeProblems: [], wallMs: 100_000, baselineMedianMs: 100_000 };
+    expect(lakarGate(g)).toEqual({ ok: true, reasons: [], timeRatio: 1 });
+    expect(lakarGate({ ...g, technical: technicalScores([]) }).ok).toBe(true);
+    expect(lakarGate({ ...g, technical: technicalScores(f('LC-07', 'warning', 6)) }).reasons).toEqual(['R3 = 0 (LC-07 6, LC-11 0, LC-06 0; > 5)']);
+    expect(lakarGate({ ...g, technical: technicalScores(f('LC-12', 'error', 3)) }).reasons).toEqual(['R7 = 0 (3 error non-gerbang, 0 warning struktural)']);
+    expect(lakarGate({ ...g, technical: null }).reasons).toEqual(['R3/R7 tidak terukur (temuan layout_check tidak ada)']);
+    const gate = lakarGate({ ...g, technical: technicalScores(f('LC-07', 'warning', 6)) });
+    expect(decide({ gate, lakarRunOk: true, pendevRunOk: true, score: undefined, pendevBrief: { sizeProblems: [] } }).decision).toBe('Kalah');
+  });
+});
+
+describe('keputusan G1 (sementara)', () => {
+  const ok = { agent: 0, lint: 0, judge: 0 };
+  const r = (prompt: string, decision: Decision, x: Partial<G1PromptInput> = {}): G1PromptInput => ({ prompt, decision: { decision, why: 'x' }, timeRatio: 1.2, emoji: ok, ...x });
+  const five = (ds: Decision[]) => ['A', 'B', 'C', 'D', 'E'].map((p, i) => r(p, ds[i]!));
+  it('lolos: ≥ 4 Setara/Lebih baik, ≥ 1 Lebih baik, emoji 0, rasio ≤ 1,5', () => {
+    expect(decideG1(five(['Lebih baik', 'Setara', 'Setara', 'Setara', 'Kalah']), 'lengkap').decision).toBe('lolos');
+    expect(decideG1(five(['Lebih baik', 'Setara', 'Setara', 'Setara', 'Setara']), 'tidak lengkap').decision).toBe('lolos');
+  });
+  it('gagal: 2 Kalah, tanpa Lebih baik, emoji > 0, rasio > 1,5', () => {
+    expect(decideG1(five(['Lebih baik', 'Setara', 'Setara', 'Kalah', 'Kalah']), 'lengkap')).toEqual({ decision: 'gagal', why: 'Setara/Lebih baik paling banyak 3 dari 5 < 4 (Kalah di D, E)' });
+    expect(decideG1(five(['Setara', 'Setara', 'Setara', 'Setara', 'Setara']), 'lengkap')).toEqual({ decision: 'gagal', why: 'tidak ada prompt Lebih baik' });
+    const emoji = five(['Lebih baik', 'Setara', 'Setara', 'Setara', 'Setara']);
+    emoji[2] = { ...emoji[2]!, emoji: { agent: 0, lint: 1, judge: 0 } };
+    expect(decideG1(emoji, 'lengkap')).toEqual({ decision: 'gagal', why: 'C emoji Lakar (b) 1' });
+    const slow = five(['Lebih baik', 'Setara', 'Setara', 'Setara', 'Setara']);
+    slow[4] = { ...slow[4]!, timeRatio: 1.51 };
+    expect(decideG1(slow, 'lengkap')).toEqual({ decision: 'gagal', why: 'E rasio waktu 1.51 > 1.5' });
+    // Gagal pasti walau ada prompt yang belum pasti: 2 Kalah + 1 tidak dapat dinilai.
+    expect(decideG1(five(['Lebih baik', 'Setara', 'Kalah', 'Kalah', 'tidak dapat dinilai']), 'tidak lengkap').decision).toBe('gagal');
+  });
+  it('tidak dapat diputuskan: dibatalkan, prompt hilang, tidak dapat dinilai yang masih bisa mengubah hasil, waktu/emoji tak terukur', () => {
+    expect(decideG1(five(['Lebih baik', 'Setara', 'Setara', 'Setara', 'Setara']), 'dibatalkan')).toEqual({ decision: 'tidak dapat diputuskan', why: 'putaran dibatalkan' });
+    expect(decideG1(five(['Lebih baik', 'Setara', 'Setara', 'Setara', 'Setara']).slice(0, 4), 'tidak lengkap')).toEqual({ decision: 'tidak dapat diputuskan', why: 'prompt E tidak ada di putaran' });
+    expect(decideG1(five(['Lebih baik', 'Setara', 'Setara', 'Kalah', 'tidak dapat dinilai']), 'lengkap')).toEqual({ decision: 'tidak dapat diputuskan', why: 'E tidak dapat dinilai' });
+    expect(decideG1(five(['Setara', 'Setara', 'Setara', 'Setara', 'tidak dapat dinilai']), 'lengkap').decision).toBe('tidak dapat diputuskan');
+    const t = five(['Lebih baik', 'Setara', 'Setara', 'Setara', 'Setara']);
+    t[1] = { ...t[1]!, timeRatio: undefined };
+    t[3] = { ...t[3]!, emoji: { agent: 0, lint: undefined, judge: undefined } };
+    expect(decideG1(t, 'lengkap')).toEqual({ decision: 'tidak dapat diputuskan', why: 'B waktu tidak terukur; D emoji (b)/(c) tidak terukur' });
+  });
+  it('g1Input mengambil rasio gerbang dan emoji Lakar (a)/(b)/(c) dari hasil putaran', () => {
+    const pr = {
+      prompt: 'C',
+      baselineMedianMs: 1,
+      runs: { lakar: { agentEmoji: { emoji: 1, glyphs: 0, samples: [] }, lintEmoji: { lc01a: 2, lc01b: 3 } } },
+      gate: { ok: true, reasons: [], timeRatio: 1.1 },
+      sizeProblems: [],
+      score: { tools: { lakar: { emoji: { median: 0 } } } },
+      decision: { decision: 'Setara', why: 'x' },
+    } as unknown as RoundPrompt;
+    expect(g1Input(pr)).toEqual({ prompt: 'C', decision: { decision: 'Setara', why: 'x' }, timeRatio: 1.1, emoji: { agent: 1, lint: 5, judge: 0 } });
   });
 });

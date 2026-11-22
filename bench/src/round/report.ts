@@ -7,7 +7,29 @@ import type { LakarExtra } from '../lakar/run.js';
 import type { RunRecord } from '../report.js';
 import type { TextEmojiCount } from './emoji.js';
 import type { Reconnect } from './reconnect.js';
-import { appealAxis, TOOL_LABEL, TOOLS, type Agg, type DecisionResult, type G0Decision, type GateResult, type PromptScore } from './score.js';
+import {
+  ADAM_FALSE_POSITIVE_FLAG,
+  appealAxis,
+  G1_MIN_BETTER,
+  G1_MIN_PASS,
+  G1_PROMPTS,
+  R3_ONE_MAX,
+  R3_RULES,
+  R7_ONE_MAX_ERRORS,
+  R7_ONE_MAX_WARNINGS,
+  R7_STRUCTURAL_RULES,
+  R7_TWO_MAX_WARNINGS,
+  TIME_GATE_FACTOR,
+  TOOL_LABEL,
+  TOOLS,
+  type Agg,
+  type DecisionResult,
+  type G0Decision,
+  type G1Decision,
+  type GateResult,
+  type PromptScore,
+  type TechnicalScores,
+} from './score.js';
 
 /** Aturan katalog R3/R7 (Lampiran A: LC-03/06/07/11/13/14/17/18/21) yang belum ada di `G0_RULES`, dihitung dari `G0_RULES`. */
 const R3R7_RULES = ['LC-03', 'LC-06', 'LC-07', 'LC-11', 'LC-13', 'LC-14', 'LC-17', 'LC-18', 'LC-21'] as const;
@@ -37,6 +59,7 @@ const PROVISIONAL = 'sementara, menunggu konfirmasi Adam';
 /** Isi sel/baris yang hanya boleh diisi Adam (agen tidak pernah mengisinya). */
 export const AWAITING_ADAM = 'menunggu konfirmasi Adam';
 const C4_LINE = 'C4: G1 tidak dimulai sebelum G0 lolos dan dikonfirmasi Adam.';
+const G1_LINE = 'Keputusan G1 final hanya dari Adam; agen tidak mengonfirmasi atau menutup G1.';
 
 export type RoundRun = {
   key: string;
@@ -66,6 +89,10 @@ export type RoundPrompt = {
   decision: DecisionResult;
   /** Masalah ukuran frame pen.dev terhadap ukuran mengikat (`boardSizeProblems`); kosong = sesuai. */
   pendevSizeProblems?: string[];
+  /** Putaran G1: file baseline pen.dev yang dipakai prompt ini (baseline terbaru yang mencakupnya). */
+  baselineSource?: string | undefined;
+  /** Putaran G1: R3/R7 mekanis (`technicalScores`); null = temuan layout_check tidak ada. Tanpa field = G0 (tidak dihitung). */
+  technical?: TechnicalScores | null;
 };
 
 /** Hasil probe foto sebelum run (putaran resmi). */
@@ -83,7 +110,14 @@ export type FrozenVersions = {
   /** `git status --porcelain` penuh (file plan untracked/terubah boleh ada). */
   porcelainAll?: string;
   protocolHash: string;
-  baselineProtocolHash: string;
+  /** G0: protocolHash `bench/baseline-pendev.json`. Tidak ada di putaran G1 (sumber baseline per prompt di `promptBaselines`). */
+  baselineProtocolHash?: string;
+  /** Hash per prompt saat ini (G1). */
+  promptHashes?: Record<string, string>;
+  /** Baseline per prompt yang dipakai (G1); null = belum diukur. */
+  promptBaselines?: Record<string, { promptHash: string; source: string; date: string } | null>;
+  /** Versi baseline per prompt (G1). */
+  baselinesByPrompt?: Record<string, { model: string | undefined; claude: string | undefined; pendevDesktop: string | undefined } | null>;
   model: string;
   claude: string;
   lakard: { version?: string; schemaVersion?: number; pid?: number; startedAt?: string; browser?: string; node?: string };
@@ -125,6 +159,8 @@ export type RoundReport = {
   results: RoundPrompt[];
   /** Keputusan G0 sementara (`decideG0`), menunggu konfirmasi Adam. */
   g0: { decision: G0Decision; why: string };
+  /** Putaran G1 (A–E): keputusan G1 sementara (`decideG1`); bila ada, laporan merender bagian G1 menggantikan G0. */
+  g1?: { decision: G1Decision; why: string };
   /** Strip keempat run untuk Adam, dengan status commit. */
   pngs: { prompt: string; tool: Tool; path: string | undefined; status: string }[];
   judgeCostUsd: number;
@@ -165,14 +201,17 @@ export function renderRoundMarkdown(r: RoundReport): string {
     );
   }
   L.push('');
-  L.push(`## Keputusan G0 (sementara, ${AWAITING_ADAM})`, '');
-  L.push(`Keputusan G0: **${r.g0.decision}** (${PROVISIONAL}). Alasan: ${r.g0.why}.`, '');
-  L.push('| Prompt | Keputusan | Alasan | Median waktu baseline pen.dev (dtk) | Median biaya baseline pen.dev |');
-  L.push('|---|---|---|---|---|');
-  for (const p of r.results) L.push(`| ${p.prompt} | ${p.decision.decision} | ${cell(p.decision.why)} | ${sec(p.baselineMedianMs)} | ${usd(p.baselineCostUsd)} |`);
-  L.push('');
-  L.push('Aturan: putaran dibatalkan → tidak dapat diputuskan; ada prompt Kalah → gagal; A dan B sama-sama Setara/Lebih baik → lolos; selebihnya → tidak dapat diputuskan. Biaya hanya dilaporkan (C8).', '');
-  L.push(`- ${C4_LINE}`, '');
+  if (r.g1) renderG1Section(L, r, r.g1);
+  else {
+    L.push(`## Keputusan G0 (sementara, ${AWAITING_ADAM})`, '');
+    L.push(`Keputusan G0: **${r.g0.decision}** (${PROVISIONAL}). Alasan: ${r.g0.why}.`, '');
+    L.push('| Prompt | Keputusan | Alasan | Median waktu baseline pen.dev (dtk) | Median biaya baseline pen.dev |');
+    L.push('|---|---|---|---|---|');
+    for (const p of r.results) L.push(`| ${p.prompt} | ${p.decision.decision} | ${cell(p.decision.why)} | ${sec(p.baselineMedianMs)} | ${usd(p.baselineCostUsd)} |`);
+    L.push('');
+    L.push('Aturan: putaran dibatalkan → tidak dapat diputuskan; ada prompt Kalah → gagal; A dan B sama-sama Setara/Lebih baik → lolos; selebihnya → tidak dapat diputuskan. Biaya hanya dilaporkan (C8).', '');
+    L.push(`- ${C4_LINE}`, '');
+  }
   for (const p of r.results) {
     L.push(`## Prompt ${p.prompt}`, '');
     L.push('### Waktu dan biaya', '');
@@ -192,12 +231,14 @@ export function renderRoundMarkdown(r: RoundReport): string {
     for (const t of TOOLS) if (p.runs[t]?.previous.length) L.push(`- Percobaan ${TOOL_LABEL[t]} sebelumnya (tidak dihitung): ${p.runs[t]!.previous.map((x) => `\`${x}\``).join(', ')}`);
     L.push('');
     const lk = p.runs.lakar?.record.lakar;
-    L.push('### Gerbang G0 Lakar (otomatis)', '');
+    L.push(`### Gerbang ${r.g1 ? 'G1' : 'G0'} Lakar (otomatis)`, '');
     L.push(`- layout_check harness: ${lk?.layout ? `gate = ${lk.layout.summary.gate}, error ${lk.layout.summary.error}, warning ${lk.layout.summary.warning} (rev ${lk.layout.rev})` : '–'}`);
     L.push(`- Ukuran board: ${lk?.boards.length ? lk.boards.map((b) => `${b.name} ${b.width}×${b.height}`).join(', ') : '–'}${p.sizeProblems.length ? ` → ${p.sizeProblems.join('; ')}` : ' → sesuai'}`);
     L.push(`- Waktu ≤ 1,5 × median baseline: ${p.gate?.timeRatio === undefined ? '–' : `rasio ${p.gate.timeRatio.toFixed(2)}`}`);
+    if (r.g1) L.push(`- R3/R7 mekanis (temuan layout_check final per ID aturan): ${technicalText(p.technical)}`);
     L.push(`- Hasil: ${p.gate ? (p.gate.ok ? '**lolos**' : `**gagal** (${p.gate.reasons.join('; ')})`) : '–'}`);
-    L.push(`- R3/R7 tidak dihitung di G0 (keputusan epic): ${r3r7Missing(frozenG0Rules(r.frozen?.g0Rules))}`);
+    if (r.g1) L.push(`- Aturan R3/R7 yang belum ada di katalog dihitung 0 temuan: ${r3r7Missing(frozenG0Rules(r.frozen?.g0Rules))}`);
+    else L.push(`- R3/R7 tidak dihitung di G0 (keputusan epic): ${r3r7Missing(frozenG0Rules(r.frozen?.g0Rules))}`);
     if (lk) L.push(`- Dokumen Lakar: slug \`${lk.slug ?? '–'}\` (dibuka agen: ${lk.opened.join(', ') || '–'}), salinan \`${lk.docPath ?? '–'}\``);
     L.push('');
     L.push('### Emoji', '');
@@ -234,9 +275,11 @@ export function renderRoundMarkdown(r: RoundReport): string {
     L.push(`Strip: ${TOOLS.map((t) => (p.runs[t]?.strip ? `\`${p.runs[t]!.strip!.path}\` (${p.runs[t]!.strip!.width}×${p.runs[t]!.strip!.height}, ${p.runs[t]!.strip!.boards} board)` : `${TOOL_LABEL[t]} –`)).join(', ')}`, '');
   }
   L.push(`Biaya juri total: ${usd(r.judgeCostUsd)}.`, '');
-  if (r.g0.decision !== 'lolos') {
+  const gateName = r.g1 ? 'G1' : 'G0';
+  const gateDecision = r.g1 ?? r.g0;
+  if (gateDecision.decision !== 'lolos') {
     L.push('## Evaluasi arah', '');
-    L.push(`G0 **${r.g0.decision}** (${PROVISIONAL}). Fakta per prompt:`, '');
+    L.push(`${gateName} **${gateDecision.decision}** (${PROVISIONAL}). Fakta per prompt:`, '');
     for (const p of r.results) {
       const sc = p.score?.tools;
       const ch = p.decision.checks;
@@ -248,9 +291,9 @@ export function renderRoundMarkdown(r: RoundReport): string {
       L.push(`  - Rasio waktu Lakar/median baseline: ${ratio(p.runs.lakar?.record.wallMs, p.baselineMedianMs)}; Lakar/pen.dev putaran ini: ${ratio(p.runs.lakar?.record.wallMs, p.runs.pendev?.record.wallMs)}.`);
     }
     L.push('');
-    L.push(`- ${C4_LINE}`);
+    L.push(`- ${r.g1 ? G1_LINE : C4_LINE}`);
     L.push(`- Opsi yang ${AWAITING_ADAM} (agen tidak memilih):`);
-    L.push(`  1. Perbaiki penyebabnya, lalu putaran resmi baru \`--round ${isOfficialRound(r.round) ? Number(r.round) + 1 : '<n+1>'}\` untuk A dan B (putaran baru, bukan mengulang run; C8).`);
+    L.push(`  1. Perbaiki penyebabnya, lalu putaran resmi baru \`--round ${isOfficialRound(r.round) ? Number(r.round) + 1 : '<n+1>'}\` untuk ${r.g1 ? r.results.map((p) => p.prompt).join(', ') : 'A dan B'} (putaran baru, bukan mengulang run; C8).`);
     L.push('  2. Evaluasi ulang arah editor milik Lakar.');
     L.push('');
   }
@@ -268,16 +311,25 @@ export function renderRoundMarkdown(r: RoundReport): string {
     L.push(`| ${p.prompt} | ${p.decision.decision} | ${flagged.join(', ') || 'tidak ada'} | ${AWAITING_ADAM} | ${AWAITING_ADAM} |`);
   }
   L.push('');
-  L.push(`Keputusan G0 final: ${AWAITING_ADAM} (sementara: ${r.g0.decision}).`, '');
+  L.push(`Keputusan ${gateName} final: ${AWAITING_ADAM} (sementara: ${gateDecision.decision}).`, '');
   L.push('## Versi beku', '');
   const f = r.frozen;
   const block = (s: string) => `**tidak kosong**:\n\n\`\`\`\n${s}\n\`\`\``;
   L.push(`- git HEAD: \`${f.head}\`; \`git status --porcelain -- packages tools .mcp.json\`: ${f.porcelain ? block(f.porcelain) : 'kosong'}`);
   if (f.porcelainCode !== undefined) L.push(`- \`git status --porcelain -- ${OFFICIAL_CODE_PATHS.join(' ')}\`: ${f.porcelainCode ? block(f.porcelainCode) : 'kosong'}`);
   if (f.porcelainAll !== undefined) L.push(`- \`git status --porcelain\` penuh: ${f.porcelainAll ? `\n\n\`\`\`\n${f.porcelainAll}\n\`\`\`\n` : 'kosong'}`);
-  L.push(`- protocolHash: \`${f.protocolHash}\` (baseline: \`${f.baselineProtocolHash}\`, ${f.protocolHash === f.baselineProtocolHash ? 'sama' : '**beda**'})`);
+  if (f.promptHashes) {
+    L.push(`- protocolHash (info, byte ketiga file protokol): \`${f.protocolHash}\`; penjaga baseline = hash per prompt`);
+    for (const [id, h] of Object.entries(f.promptHashes)) {
+      const b = f.promptBaselines?.[id];
+      L.push(`- hash prompt ${id}: \`${h}\` (${b ? `baseline \`${b.source}\` ${b.date}: ${b.promptHash === h ? 'sama' : `**beda** \`${b.promptHash}\``}` : '**baseline belum diukur**'})`);
+    }
+  } else L.push(`- protocolHash: \`${f.protocolHash}\` (baseline: \`${f.baselineProtocolHash}\`, ${f.protocolHash === f.baselineProtocolHash ? 'sama' : '**beda**'})`);
   L.push(`- Model agen dan juri: \`${f.model}\`; Claude Code: ${f.claude}`);
   if (f.baseline) L.push(`- Baseline pen.dev (\`bench/baseline-pendev.json\`): model \`${f.baseline.model}\`, Claude Code ${f.baseline.claude}, pen.dev desktop ${f.baseline.pendevDesktop ?? '–'}`);
+  if (f.baselinesByPrompt)
+    for (const [id, b] of Object.entries(f.baselinesByPrompt))
+      L.push(`- Baseline pen.dev ${id}${f.promptBaselines?.[id] ? ` (\`${f.promptBaselines[id]!.source}\`)` : ''}: ${b ? `model \`${b.model ?? '–'}\`, Claude Code ${b.claude ?? '–'}, pen.dev desktop ${b.pendevDesktop ?? '–'}` : 'belum diukur'}`);
   L.push(`- lakard: version ${f.lakard.version ?? '–'}, schemaVersion ${f.lakard.schemaVersion ?? '–'}, pid ${f.lakard.pid ?? '–'}, startedAt ${f.lakard.startedAt ?? '–'}, Chromium ${f.lakard.browser ?? '–'}${f.lakard.node ? `, Node ${f.lakard.node}` : ''}`);
   if (f.playwright) L.push(`- playwright-core: ${f.playwright}`);
   if (f.fonts) L.push(`- Font (/status): ${f.fonts.families.join(', ') || '–'}; missing: ${f.fonts.missing.length ? f.fonts.missing.join(', ') : '[]'}; paket: ${Object.entries(f.fonts.packages).map(([k, v]) => `${k} ${v}`).join(', ') || '–'}`);
@@ -323,6 +375,39 @@ export function renderRoundMarkdown(r: RoundReport): string {
     L.push('');
   }
   return L.join('\n');
+}
+
+/** Ringkasan R3/R7 satu prompt (G1). */
+export function technicalText(t: TechnicalScores | null | undefined): string {
+  if (t === undefined) return '–';
+  if (t === null) return 'tidak terukur (temuan layout_check tidak ada) → gerbang gagal';
+  const r3 = R3_RULES.map((x) => `${x} ${t.r3Counts[x]}`).join(', ');
+  return `R3 = ${t.R3} (${r3}), R7 = ${t.R7} (${t.nonGateErrors} error non-gerbang, ${t.structuralWarnings} warning struktural)${t.flags.length ? ` **${t.flags.join('; ')}**` : ''}`;
+}
+
+function renderG1Section(L: string[], r: RoundReport, g1: NonNullable<RoundReport['g1']>): void {
+  L.push(`## Keputusan G1 (sementara, ${AWAITING_ADAM})`, '');
+  L.push(`Keputusan G1: **${g1.decision}** (${PROVISIONAL}). Alasan: ${g1.why}.`, '');
+  L.push('| Prompt | Keputusan | Alasan | Rasio waktu (Lakar/baseline) | Emoji Lakar (a) / (b) / (c) | R3 / R7 | Baseline pen.dev (dtk, biaya, sumber) |');
+  L.push('|---|---|---|---|---|---|---|');
+  for (const p of r.results) {
+    const lk = p.runs.lakar;
+    const emoji = [lk?.agentEmoji?.emoji, lk?.lintEmoji ? lk.lintEmoji.lc01a + lk.lintEmoji.lc01b : undefined, p.score?.tools.lakar.emoji.median].map(num).join(' / ');
+    const t = p.technical;
+    const tech = t ? `${t.R3} / ${t.R7}${t.flags.length ? ` (${ADAM_FALSE_POSITIVE_FLAG})` : ''}` : t === null ? 'tidak terukur' : '–';
+    L.push(
+      `| ${p.prompt} | ${p.decision.decision} | ${cell(p.decision.why)} | ${p.gate?.timeRatio === undefined ? '–' : p.gate.timeRatio.toFixed(2)} | ${emoji} | ${tech} | ${sec(p.baselineMedianMs)}, ${usd(p.baselineCostUsd)}, ${p.baselineSource ? `\`${p.baselineSource}\`` : 'belum diukur'} |`,
+    );
+  }
+  L.push('');
+  L.push(
+    `Aturan (Lampiran B): putaran dibatalkan → tidak dapat diputuskan; lolos bila ≥ ${G1_MIN_PASS} dari ${G1_PROMPTS.length} prompt (${G1_PROMPTS.join(', ')}) Setara/Lebih baik, ≥ ${G1_MIN_BETTER} Lebih baik, emoji Lakar (a)/(b)/(c) = 0 dan rasio waktu ≤ ${TIME_GATE_FACTOR} di semua prompt; gagal bila ada emoji > 0, rasio > ${TIME_GATE_FACTOR}, atau jumlah itu tidak bisa tercapai lagi; selebihnya (prompt hilang/tidak dapat dinilai yang masih bisa mengubah hasil, waktu/emoji tidak terukur) → tidak dapat diputuskan. Biaya hanya dilaporkan (C8).`,
+    '',
+  );
+  L.push(
+    `- Gerbang Lakar G1 menambah R3/R7 mekanis: R3 = 2 bila ${R3_RULES.join(', ')} semuanya 0, 1 bila totalnya ≤ ${R3_ONE_MAX}, 0 bila lebih; R7 = 2 bila 0 error non-gerbang dan ≤ ${R7_TWO_MAX_WARNINGS} warning struktural (${R7_STRUCTURAL_RULES.join('/')}), 1 bila ≤ ${R7_ONE_MAX_ERRORS} error non-gerbang (ditandai "${ADAM_FALSE_POSITIVE_FLAG}") dan ≤ ${R7_ONE_MAX_WARNINGS} warning struktural, 0 selebihnya. R3 = 0 atau R7 = 0 → gerbang gagal (Kalah).`,
+  );
+  L.push(`- ${G1_LINE}`, '');
 }
 
 const repStatus = (r: JudgeRepRecord) =>

@@ -91,7 +91,10 @@ describe('config.toml (kunci datar, env menang)', () => {
     expect(() => loadConfig({ LAKAR_CONFIG: join(dir, 'tidak-ada.toml') })).toThrow(/LAKAR_CONFIG menunjuk file yang tidak ada/);
     // Key Unsplash: default ~/.config/lakar/unsplash-access-key; config/env menimpa; utm_source divalidasi.
     expect(none.unsplashKeyFile).toMatch(/\/\.config\/lakar\/unsplash-access-key$/);
-    expect(none.unsplashAppName).toBe('lakar');
+    // Default bawaan diuji dengan file config kosong agar ~/.config/lakar/config.toml milik mesin tidak ikut terbaca.
+    const kosong = join(dir, 'kosong.toml');
+    await writeFile(kosong, '', 'utf8');
+    expect(loadConfig({ LAKAR_CONFIG: kosong }).unsplashAppName).toBe('lakar');
     const u = join(dir, 'unsplash.toml');
     await writeFile(u, 'unsplash_key_file = "/tmp/k"\nunsplash_app_name = "lakar_studio"\n', 'utf8');
     expect(loadConfig({ LAKAR_CONFIG: u })).toMatchObject({ unsplashKeyFile: '/tmp/k', unsplashAppName: 'lakar_studio' });
@@ -378,7 +381,7 @@ describe.skipIf(!browserInstalled)('pool render (AD-18) + endpoint story 12, Chr
     expect((await c.call('/inspect', { id: boardId, depth: 7 }, s)).status).toBe(400);
   }, 60_000);
 
-  it('screenshot nodeId → potret node (skala 1); boardId + nodeId → SCHEMA_INVALID', async () => {
+  it('screenshot nodeId → potret node (skala 1; scale 2 = 2× piksel); boardId + nodeId / scale 3 → SCHEMA_INVALID', async () => {
     const { s, boardId, created } = await c.boardDoc('pool-node', 390, 844, '#FFFFFF', `add(b,{type:'rect',name:'Kotak',width:120,height:80,fills:[{type:'solid',color:'#FF00FF'}]})`);
     const kotak = created.find((x) => x.name === 'Kotak')!.id;
     const r = await c.call('/screenshot', { nodeId: kotak }, s);
@@ -391,6 +394,18 @@ describe.skipIf(!browserInstalled)('pool render (AD-18) + endpoint story 12, Chr
     expect(both.status).toBe(400);
     expect(both.body.error!.code).toBe('SCHEMA_INVALID');
     expect((await c.call('/screenshot', { nodeId: 'Zzzzzzzz' }, s)).status).toBe(404);
+    // Zoom review (story 2.16): scale 2 = PNG 2× piksel bounds node; scale lain → SCHEMA_INVALID.
+    const z = await c.call('/screenshot', { nodeId: kotak, scale: 2 }, s);
+    expect(z.status, JSON.stringify(z.body.error)).toBe(200);
+    expect(z.body.data).toMatchObject({ boardId, nodeId: kotak, width: 240, height: 160 });
+    expect(readPngSize(Buffer.from(z.body.data.png, 'base64'))).toEqual({ width: 240, height: 160 });
+    const zb = await c.call('/screenshot', { boardId, scale: 2 }, s);
+    expect(zb.status, JSON.stringify(zb.body.error)).toBe(200);
+    expect(readPngSize(Buffer.from(zb.body.data.png, 'base64'))).toEqual({ width: 780, height: 1688 });
+    expect({ width: zb.body.data.width, height: zb.body.data.height }).toEqual({ width: 780, height: 1688 });
+    const s3 = await c.call('/screenshot', { nodeId: kotak, scale: 3 }, s);
+    expect(s3.status).toBe(400);
+    expect(s3.body.error!.code).toBe('SCHEMA_INVALID');
   }, 60_000);
 
   it('export: skala 1 / 2 (DPR asli) / node; scale 3 → 400; id tak ada → 404; gagal tulis → EXPORT_FAILED', async () => {
@@ -439,26 +454,27 @@ describe.skipIf(!browserInstalled)('pool render (AD-18) + endpoint story 12, Chr
     expect(fail.body.error!.code).toBe('EXPORT_FAILED');
   }, 60_000);
 
-  it('read_skill: tanpa name → daftar; core → isi; landing (file belum ada) / x → NOT_FOUND + daftar', async () => {
+  it('read_skill: tanpa name → daftar; core → isi; landing (file belum ada) / x / polish (dipecah) → NOT_FOUND + daftar', async () => {
     const s = await c.session();
     const list = await c.call('/skills/read', {}, s);
     expect(list.body.data.skills).toEqual([
       { name: 'core', available: true },
-      { name: 'polish', available: false },
-      { name: 'landing', available: false },
-      { name: 'mobile', available: false },
-      { name: 'webapp', available: false },
-      { name: 'icons', available: false },
-      { name: 'api', available: false },
+      ...['landing', 'mobile', 'webapp', 'layout', 'typography', 'color', 'accessibility', 'ui', 'interface', 'writing', 'review', 'icons', 'api'].map((name) => ({ name, available: false })),
     ]);
     expect((await c.call('/skills/read', { name: 'core' }, s)).body.data).toEqual({ name: 'core', content: '# Lakar core\nisi uji' });
     for (const name of ['landing', 'x']) {
       const r = await c.call('/skills/read', { name }, s);
       expect(r.status).toBe(404);
       expect(r.body.error!.code).toBe('NOT_FOUND');
-      expect(r.body.error!.hint).toContain('core, polish, landing, mobile, webapp, icons, api');
+      expect(r.body.error!.hint).toContain('core, landing, mobile, webapp, layout, typography, color, accessibility, ui, interface, writing, review, icons, api');
       expect(r.body.error!.hint).toContain('tersedia: core');
     }
+    // Nama lama `polish` (story 2.16): NOT_FOUND dengan pesan pemecahannya, bukan alias.
+    const old = await c.call('/skills/read', { name: 'polish' }, s);
+    expect(old.status).toBe(404);
+    expect(old.body.error!.code).toBe('NOT_FOUND');
+    expect(old.body.error!.message).toBe('skill "polish" tidak ada: skill polish dipecah menjadi layout, typography, color, accessibility, ui, interface, writing, review');
+    expect(old.body.error!.hint).not.toContain('polish');
     expect((await c.call('/skills/read', {})).status).toBe(401);
   });
 });

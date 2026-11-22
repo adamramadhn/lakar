@@ -734,3 +734,415 @@ cacat nyata, kartu berisi teks yang terpotong rata di tepi bawah `Seksi / Hero`:
 | P9 | 14–9 | 4–3 | Lebih baik | 221,6 / 161,9, 1,37 | 0 | 0 |
 
 - Biaya iterasi $5,34; kumulatif seri $18,08 (1.24: $5,34 dari $17,50). P7 Lakar kini satu board 390×1442 dan 51 dtk lebih cepat dari iterasi 2. pen.dev P7 R1 0 → 2 karena rubrik 2.2; pen.dev P9 T 12 → 9 di juri ulang (PNG sama, variasi juri).
+
+# §2.3 Skill dipadatkan dan sidebar webapp 248 (G1 story 3)
+
+## Pemadatan skill (sesi baru, C7)
+
+Token (`estimateTokens`, total / prosa). Baseline `725a282`; seri iterasi 4 memakai `ac4961c`; sesudah review `b89bb64`.
+
+| Skill | Batas (prosa / total) | Sebelum | `ac4961c` (diuji seri) | Sesudah review | Ruang sesudah |
+|---|---|---|---|---|---|
+| core | – / 4000 | 3967 / 3251 | 3571 / 2855 | 3576 / 2861 | 424 total (10,6%) |
+| polish | 3000 / 3200 | 2207 / 1818 | 2454 / 2064 | 2453 / 2064 | 747 total, 936 prosa |
+| landing | 1500 / 3500 | 3486 / 1500 | 3073 / 1087 | 3085 / 1099 | 401 prosa (26,7%), 415 total |
+| mobile | 1500 / 3500 | 3176 / 1369 | 2900 / 1093 | 2904 / 1096 | 404 prosa, 596 total |
+| webapp | 1500 / 3500 | 2825 / 930 | 2735 / 840 | 2735 / 840 | 660 prosa, 765 total |
+
+- `LIMITS` di `tests/skills.test.ts` tidak berubah. Kode contoh tidak diubah, kecuali sidebar webapp `width:240` → `248`.
+- Aturan lintas layar kini ditulis sekali. **polish:** seksi baru Bidang efek (resep lapis mesh → struktur → noise → cahaya gelap, zona tenang, kontras, panel solid; sebelumnya ditulis di core, landing, dan mobile), aturan overline maks 2 dan maks 2 "·" per baris, arg ke-6 `Badge` di permukaan gelap, kartu sederet satu tinggi (sebelumnya dua kali), dan glow (sebelumnya dua kali).
+- **core:** pointer yang duplikat dihapus (`webapp`, frasa terlarang, foto gagal, konsentris/ritme). Hex netral terang dan status kini merujuk `C` prelude (nilainya identik). Prosa dirapatkan. Prelude dan baris `Font terpasang` byte-identik.
+- **landing, mobile, webapp:** aturan yang sudah diajarkan core/polish dihapus (kontras, overline, rating, logo/wadah ikon, sorotan, foto `limit:12`, tile kategori, seri `C.data`, delta, alur ganda). Yang khas per layar tetap.
+- Sidebar webapp 240 → 248 sesuai DESIGN.md §Web app/dashboard. Contoh tetap 0/0/0 dan PNG diperiksa tanpa luberan.
+- Patch review (sesudah seri, mengembalikan kata asli): proses 6 kembali "Screenshot vs 12 anti-pattern"; landing struktur efek kembali menyebut kontur, kisi, dan partikel; mobile efek kembali menyebut partikel, dan "busur berurutan" diganti "satu busur per seri"; "·" kembali berlaku per baris (bukan hanya baris meta). Kelima patch ini mengembalikan perilaku baseline (`725a282`, sudah diuji di polish-3) dan tidak di-bench ulang.
+
+## Seri polish iterasi 4 (`bench/polish-4.md`, rubrik 2.3, pen.dev dipakai ulang dari iterasi 1): **lulus**
+
+- Perintah: `practice --series polish --iter 4 --reuse-pendev 1`. Peta reuse disesuaikan dari `P7=3,P8=1,P9=1`: iterasi 3 tidak punya run pen.dev P7 yang sah (batal di `pen-newdoc`), dan polish-3 memakai iterasi 1 untuk P7–P9. Tidak ada run pen.dev baru, MCP pencil tidak dipanggil, dan pen-desktop tidak di-restart.
+- Percobaan pertama P7 Lakar terhenti setelah ±27 dtk (baca skill + `open_doc`, belum ada board) karena proses harness mati bersama sesi subagen yang menjalankannya. Penyebabnya infrastruktur, bukan hasil desain. `--resume` mengulang run `aborted` sesuai README, dan percobaan lama disimpan harness di `bench/runs/practice-polish/4/P7-lakar.prev-20261119T033213Z` (salinan juga di `bench/runs/aborted-killed/`). Percobaan itu tidak dinilai juri. Biayanya tidak tercatat karena tidak ada event result (perkiraan < $0,10).
+
+| Prompt | polish-3 (rubrik 2.2): T L–P, D L–P, keputusan, waktu L / P (rasio), biaya L | polish-4 (rubrik 2.3): T L–P, D L–P, keputusan, waktu L / P (rasio), biaya L |
+|---|---|---|
+| P7 | 16–13, 4–4, Lebih baik, 123,3 / 97,5 (1,27), $0,77 | 15–14, 4–4, **Setara**, 89,0 / 97,5 (0,91), $0,58 |
+| P8 | 16–16, 4–4, Setara, 216,1 / 213,6 (1,01), $0,91 | 16–16, 4–4, **Setara**, 153,6 / 213,6 (0,72), $0,69 |
+| P9 | 14–9, 4–3, Lebih baik, 221,6 / 161,9 (1,37), $1,39 | 15–12, 4–4, **Lebih baik**, 204,5 / 161,9 (1,26), $1,02 |
+
+- Emoji 0 dan gate 0 di ketiga prompt. Biaya iterasi $4,50 (Lakar $2,29, juri $2,21). Kumulatif seri $22,58 dari $30,24.
+- P7 turun dari Lebih baik ke Setara. PNG pen.dev identik (iterasi 1), tetapi skornya naik 13 → 14 di juri ulang, dan T Lakar turun 16 → 15. Rubrik juga berubah 2.2 → 2.3, dan board Lakar 390×1354 sah di keduanya. Selisih ini dalam batas variasi juri. Lakar lebih cepat dan lebih murah di ketiga prompt (rata-rata −27% waktu, −25% biaya). Ini bisa karena skill lebih pendek, bisa juga karena derau run. Satu run tidak cukup untuk memisahkannya (C8).
+- Iterasi 5 tidak dijalankan karena iterasi 4 lulus.
+- Catatan C7: output `practice --dry-run` mencetak teks prompt latihan P7–P9 (argv agen), dan builder membacanya sesudah skill di-commit. Patch review sesudah itu hanya mengembalikan kata baseline, tanpa isi baru. Untuk story berikutnya: jalankan dry-run dengan output yang disaring.
+
+# §2.4 Check struktural LC-13, 14, 15, 16, 21, 22 (G1 story 4)
+
+Plan: `_bmad-output/initiative-lakar/tickets/epic-g1-inti-lengkap/tickets/story-check-struktural-lc-13-14-15-16-21-22-plan.md`.
+
+## Pindaian arsip layout_check
+
+Arsip: 120 dokumen (`bench/runs/**`, `~/.local/share/lakar/docs`, `~/.local/share/lakar/archive`), 157 board, 0 gagal;
+daemon dist sementara (port acak, dataDir salinan, tanpa key foto). Sebelum = dist `5d022b1`; sesudah = dist story 4.
+Temuan aturan lama identik per dokumen (rule, level, node, detail); dokumen dengan gate > 0 tetap 74.
+
+| Aturan | Level | Sesudah (temuan / dok) |
+|---|---|---|
+| LC-13 nama layer default | info | 0 |
+| LC-14 absolut di dalam flex | warning | 6 / 4 |
+| LC-15 > 1 pustaka ikon UI | warning | 0 (skema hanya punya `lucide` + `simple-icons`; aturan siaga) |
+| LC-16 ikon digambar manual | error (bukan gerbang) | **0** |
+| LC-21 radius | warning | 70 / 66 |
+| LC-21 spacer kosong | warning | 11 / 9 |
+| LC-21 padding ganda | warning | 0 |
+| LC-21 teks di baris tabel | warning | 22 / 12 |
+| LC-21 bidang efek | warning | 6 / 6 |
+| LC-22 jumlah node berkonvensi | info | 132 / 99 |
+
+Jumlah dihitung sesudah batas 3 temuan per aturan per board (LC-21 satu ID untuk kelima sub-cek; temuan board-level
+radius/bidang efek mendahului temuan node di urutan dokumen).
+
+Tinjauan (crop PNG `archcheck.mjs --shots LC-14,LC-21`):
+
+- **LC-16:** 0 temuan di arsip; tidak ada crop yang perlu diperiksa.
+- **LC-14:** `Mockup / Kelas live` absolut di kolom `Hero / Visual` (kartu melayang menumpuk mockup) dan `Latar / Cahaya
+  senja` / `Latar / Tekstur butir` absolut di board Senyap: tumpukan sengaja tanpa nama `Overlay /`/`Crop /` = sesuai
+  konvensi (temuan benar).
+- **LC-21 radius:** contoh Mejaku landing 6 (kursi denah), 8 (tombol, stat), 12 (wadah ikon, FAQ), 16 (kartu) = 4 nilai,
+  melanggar "maksimal tiga nilai radius per board" (DESIGN.md). Sebagian besar berasal dari pola skill (lihat di bawah).
+- **LC-21 bidang efek:** Lintas Arus landing: bidang efek di hero dan di ajakan akhir (dua bidang terpisah) = benar.
+- **LC-21 spacer kosong:** `Pengisi` 216×252 di sidebar, sel kosong `Kolom dokter`/`Sela` di sumbu jam, rect `Garis`
+  ber-fill transparan selebar baris = benar.
+- **Perbaikan definisi (umum, sekali):** (1) teks di baris tabel kini butuh ≥ 2 teks langsung: baris antrean Dentara
+  (nomor "02" + avatar berinisial + tumpukan teks + status) adalah daftar, bukan tabel (26 → 22 temuan). (2) spacer kosong
+  melewati node 0×0 (frame `Isi` kosong di baris kode Rakit Kode tidak memakan ruang; 15 → 11). (3) label bidang efek =
+  node efek terluas di bidang itu. (4, sesudah review) node efek dengan wadah potong terdekat yang sama (`Crop /` atau
+  frame `clip:true`, bukan board) = satu bidang; LC-16 melewati path tersembunyi (opacity 0 atau tidak terlihat sama
+  sekali). Pindaian ulang (`after2.json`): semua angka di tabel tidak berubah, aturan lama tetap identik per dokumen.
+
+## Pola skill yang memicu aturan baru (untuk story 2.10; skill tidak diubah, C7)
+
+`layout_check` atas contoh skill (daemon dist sementara):
+
+- `landing.md` (daftar mockup hero `Baris / <cabang>`): LC-21 teks di baris tabel ×3 (teks `Cabang`/`Biji`/`Jumlah`
+  langsung di baris), LC-22 info `Crop 1`.
+- `webapp.md` (tabel "Siap diambil"): LC-21 teks di baris tabel pada `Header tabel` (3 teks kolom langsung di baris).
+- `mobile.md`: LC-21 radius 4 nilai (8, 16, 20, 24), LC-22 info `Crop 1, Overlay 1`.
+- `core.md`, `polish.md`, `icons.md`: 0 temuan.
+- Arsip: radius 4–5 nilai di 66 dokumen (tombol 8, kartu 12/16, wadah ikon 12, sorotan 24).
+
+`packages/daemon/src/skills-examples.test.ts` mencatat tiga pola ini sebagai `PENDING_2_10` (warning lain tetap gagal).
+
+# §2.15 Check luapan non-teks (LC-02c) dan konten terpotong rata (LC-31 diperluas) (G1 story 15)
+
+Plan: `_bmad-output/initiative-lakar/tickets/epic-g1-inti-lengkap/tickets/story-check-luapan-non-teks-dan-konten-terpotong-di-tepi-board-plan.md`.
+
+## Pindaian arsip layout_check
+
+Arsip sama dengan §2.4: 120 dokumen, 0 gagal; daemon dist sementara (port acak, dataDir salinan, tanpa key foto).
+Sebelum = `after2.json` (dist story 4); sesudah = dist story 15. Temuan aturan lain identik per dokumen (rule, level,
+node, detail); temuan LC-31 lama (12 dokumen, mockup hero di `Crop /`) identik.
+
+| Aturan | Sesudah: temuan / dok (baru) | Kasus unik (nilai `sisa` = jarak ke tepi wadah tampak) |
+|---|---|---|
+| LC-02c non-teks meluap | 32 / 14 | KPI P8 `Batang mini` 19,5px kanan, sisa 4,5 (2 dok); badge Kasku sisa 6 (2 dok); `Orang`/`Hasil` testimoni sisa 0 (4 dok); `Ikon baris` di kartu gambar Gerak sisa 0 (2 dok); badge/`Orang /` Lintas Arus tumpah −4/−24 (2 dok); `Bawah` mentor Rakit Kode tumpah −2 dan segmen `Status alumni` tumpah −31 (2 dok, keduanya) |
+| LC-31 (b) rata tepi bawah board/seksi | 0 | belum ada contoh arsip (fixture sintetis) |
+| LC-31 (c) daftar rata | 2 / 2 | P8 `Kartu / Pesanan keluar`: baris `Pasar Induk Cipinang Kios 14B` rata (bawah 0, atas 20) — salinan bench + `~/.local/share/lakar/docs` |
+
+Dokumen gagal gerbang: **74 → 80** (+6: dua salinan P8 polish-4 Lumbung, Lintas Arus effects-3 dan practice-effects/2,
+Gerak verifikasi-review dan rounds/uji-1/B). 8 dokumen LC-02c lain sudah gagal gerbang sebelumnya.
+
+Tinjauan crop (wadah `W` per kasus, `archcheck.mjs --shots LC-02c,LC-31` + crop wadah): setiap kasus unik di atas
+cacat nyata (batang menempel tepi kanan kartu KPI; badge/baris orang menempel atau keluar tepi bawah kartu; bar segmen
+keluar kartu; baris tabel terakhir tanpa ruang bawah). **0 positif palsu.** Tanpa perubahan definisi dari plan.
+
+Kasus batas yang **tidak** dilaporkan (sisa ≥ min(8, padding/2)), crop diperiksa — terlihat wajar atau sempit tanpa cacat:
+
+| Node | Wadah (padding sisi) | Luapan / sisa |
+|---|---|---|
+| `Orang` (Bayu Hasibuan, Mejaku polish-3) | kartu testimoni (24) | 15 / **9** (terdekat ke ambang; sempit, tidak dipilih agar 0 positif palsu) |
+| `Daftar` (Ruang tunggu, Dentara practice-6) | kartu (24) | 14 / 10 |
+| `Teks` (`Info / Porsi`, Dapur Wening) | info (12) | 1,1 / 10,9 (ambang padding/2 = 6) |
+| `Daftar` (Kartu / Bahan, Dentara), `Detail` (Kasku umkm), `Daftar` (Pemasok terlambat, Lumbung polish-3) | kartu (24, 24, 20) | 12 / 12 |
+
+Sesudah review (LC-02c melewati keturunan node LC-02a; LC-31 (b) mengecualikan panel yang menempel tepi kiri/kanan board
+atau mulai di tepi atas isi induknya; daftar rata tidak menerima baris yang menggantung > 2px): pindaian ulang
+`after15b.json` identik dengan `after15.json` per dokumen (120 dok, 0 gagal, gagal gerbang 80).
+
+## Contoh skill
+
+`skills-examples.test.ts` lulus tanpa entri `PENDING_2_10` baru: contoh skill tidak memicu LC-02c atau LC-31.
+
+# §2.5 Check tipografi dan spacing LC-03, 06, 07, 08, 09, 10 (G1 story 5)
+
+Plan: `_bmad-output/initiative-lakar/tickets/epic-g1-inti-lengkap/tickets/story-check-tipografi-dan-spacing-lc-03-06-07-08-09-10-plan.md`.
+Angka token dari `packages/schema/src/design-tokens.ts` (dijaga `tests/design-tokens.test.ts` terhadap prelude `core.md`
+dan frontmatter DESIGN.md).
+
+## Pindaian arsip layout_check
+
+Arsip sama dengan §2.4/§2.15: 120 dokumen, 157 board, 0 gagal; daemon dist sementara (port acak, dataDir salinan, tanpa
+key foto). Sebelum = `after15b.json` (dist story 15); sesudah = dist story 5. Temuan aturan lama identik per dokumen
+(rule, level, node, detail), ringkasan error/gerbang sama; dokumen gagal gerbang tetap **80** (keenam aturan warning).
+
+| Aturan | Sesudah: temuan / dok (sesudah cap 3 per aturan per board) | Prototipe (tanpa render, tanpa cap) | Contoh |
+|---|---|---|---|
+| LC-03 teks berisiko meluber | 46 / 20 (sebelum patch review: 56 / 26) | 84 / 26 (ink > kotak) | `Sub` "Rata-rata tunggu 14 mnt (target 15 mnt)" 20,2px, `Judul` "Kekuatan tubuh atas" 16,5px, `Meta`/`Nama` sel tabel Dentara 1,1–7,5px — semua teks `auto` yang disusutkan flex; `wrap:'fixed'` ≥ 2 baris: 0 |
+| LC-06 paragraf di bawah minimum | 13 / 7 | 13 / 7 | metadata 12px 2 baris di kartu: `Peran` testimoni Kasku, `Meta` mentor Rakit Kode, `Meta` Dentara, `Kredit foto` |
+| LC-07 spacing di luar himpunan | 250 / 78 | 497 frame / 79 | padding 10 (67), `Tab /` height 52 (44), padding seksi 112 (27) / 120 (20), `Chip /` height 28 (20), gap 10 (18), padding 42/176/38/28/14…; padding bawah 34 `Overlay / Bilah bawah` bebas |
+| LC-08 skala / triple | 155 / 61 (ukuran 19 / 11, triple 137 / 57) | ukuran 57 / 9, triple 124 / 46 | `KPI / Nilai` 28/32 (58), 16/20 (18), `Jam`/`Kode` 13/20 (12), 12/14 (10), 32/39 tanpa lineHeight (8), `Display / Headline` 56/64 (7), 20/24 dan 20/30, 14/28 |
+| LC-09 > 2 keluarga font | 0 | 0 | siaga |
+| LC-10 target sentuh < 44 (mobile) | 110 / 44 | 153 / ±46 | `Link / Semua` teks 20px tinggi (78, pola `mobile.md`), `Tab /` 169×40 dan 169×36 (22), `IconButton /` 40×40 dan 32×32 (8), `Button / Pesan` 72×40 (2) |
+
+Selisih ke prototipe: cap 3 warning per aturan per board (LC-03, LC-07, LC-10); LC-08 ukuran turun karena `KPI / Nilai`
+dan `Display /` kini dinilai terhadap pengecualiannya dan teks < 12px tidak dilaporkan ganda (sudah error LC-05).
+
+Tinjauan crop (`archcheck.mjs --shots LC-03,LC-10`, crop node): LC-03 — kotak teks memotong glyph terakhir ("Kekuatan
+tubuh at…", "Rata-rata tunggu 14 mnt (target 15 m…", "Gigi umum · 8 janj…" 1,3px): ink memang melewati kotaknya,
+berisiko menimpa saudara; wajar sebagai warning. LC-10 — `Tab / Bahan` 169×40, `IconButton / Kurangi porsi` 32×32,
+`Button / Pesan` 72×40: target sentuh nyata di bawah 44. Wajar.
+
+**Perbaikan definisi (umum, sekali):** pindaian pertama memberi LC-08 206 temuan, 119 di antaranya `KPI / Nilai` dengan
+triple skala yang sah (28/36 = `mobile-title-lg`, 32/40 = `h2`) yang ditolak karena hanya size × 1,2 diterima. KPI kini
+menerima size × 1,2 **atau** line-height token berukuran sama; 28/32 (bukan keduanya) tetap temuan. Juga teks < 12px
+dilewati LC-08 (fixture daemon: `Caption` 11px sudah error LC-05). Pindaian ulang (`after5.json`): angka di tabel.
+
+**Patch review:** LC-03 melewati teks yang sudah error LC-02a/LC-02b (satu cacat, satu temuan); pindaian ulang
+(`after5b.json`): LC-03 56 → 46 temuan (26 → 20 dok), aturan lain identik dengan `after5.json`, aturan lama identik
+dengan `after15b.json`, gagal gerbang 80.
+
+## Contoh skill
+
+`skills-examples.test.ts`: entri `PENDING_2_10` baru (pencocokan persis aturan + nama node + awal detail), untuk 2.10:
+
+- `mobile.md`: LC-10 `Link / Semua` 82.2×20 (link teks "Lihat semua" tanpa area sentuh 44).
+- `webapp.md`: LC-07 padding 10 di `Grup label` dan `Nav / Ringkasan|Pesanan|Antar-jemput|Pendapatan|Pelanggan` (sidebar).
+- `api.md`: LC-08 `Judul` contoh API minimal tanpa `lineHeight` (32/39, 40/49) dan 16 tanpa lineHeight (16/20).
+
+# §2.6 Check konten dan struktur seksi LC-17, LC-19 (G1 story 6)
+
+Plan: `_bmad-output/initiative-lakar/tickets/epic-g1-inti-lengkap/tickets/story-check-konten-dan-struktur-seksi-lc-17-dan-lc-19-plan.md`.
+Daftar frasa dari `packages/schema/src/content-rules.ts` (dijaga `tests/content-rules.test.ts` terhadap DESIGN.md dan
+baris "Frasa terlarang" `polish.md`).
+
+## Pindaian arsip layout_check
+
+Arsip sama dengan §2.4/§2.15/§2.5: 120 dokumen, 157 board, 0 gagal; daemon dist sementara (port acak, dataDir salinan,
+tanpa key foto). Sebelum = `after5b.json` (dist story 5); sesudah = `after6.json` (dist story 6). Temuan aturan lama
+identik per dokumen (rule, level, node, detail), ringkasan error/gerbang sama; dokumen gagal gerbang tetap **80**.
+
+| Aturan | Sesudah: temuan / dok | Prototipe | Contoh terdekat (tidak dilaporkan) |
+|---|---|---|---|
+| LC-17 struktur seksi mirip (Jaccard ≥ 0,9) | 0 | 0 pasangan ≥ 0,9 | Rakit Kode `Seksi / Alur belajar` ~ `Seksi / Alumni` 0,83; Dapur Wening `Grup / Bahan utama` ~ `Grup / Bumbu halus` 0,82 (fallback tumpukan `Bahan`); Kasku `Seksi / Fitur` ~ `Seksi / Testimoni` 0,82 (golden A); 18 pasangan / 14 dok ≥ 0,75 |
+| LC-19 frasa terlarang | 0 | 0 (substring sekalipun) | — |
+
+Penilaian: keduanya siaga di arsip, sesuai prototipe. LC-17 tidak memicu pada seksi landing arsip yang berbeda jumlah
+atau jenis isi (pasangan teratas 0,83 berbeda 6–8 node dari 61–67); ambang 0,9 hanya menangkap pengulangan judul + kartu
+yang hampir identik (fixture). LC-19: arsip tidak memuat satu pun frasa daftar; perilaku dibuktikan fixture (kata
+utuh, tanpa beda huruf, spasi ganda, tanda hubung, pengecualian `Input /` dan `Label`). Uji execute lakard: board landing
+dengan dua `Seksi /` identik dan tombol "Pelajari lebih lanjut" → `warning · LC-17` dan `warning · LC-19`, 0 gerbang.
+
+**Perbaikan definisi (umum, sekali):** contoh `polish.md` (daftar pinjaman, tanpa `Seksi /`) memicu LC-17 pada
+`Item / …`: tumpukan utama `Daftar pinjaman` (kolom) berisi baris daftar `layout:'row'` berpola sama, yang bukan seksi.
+Fallback tumpukan utama kini melewati anak `layout:'row'` (baris daftar), sejalan dengan "anak row/grid bukan seksi".
+Pindaian arsip tidak berubah (0; pasangan ≥ 0,75 tetap 18 / 14 dok).
+
+## Contoh skill
+
+`skills-examples.test.ts` lulus tanpa entri `PENDING_2_10` baru (sesudah perbaikan definisi di atas).
+
+# §2.7 LC-04 lengkap: ambang kontras satu sumber, batas kontrol, ikon tanpa label, scrim (G1 story 7)
+
+Plan: `_bmad-output/initiative-lakar/tickets/epic-g1-inti-lengkap/tickets/story-lc-04-lengkap-dan-ambang-kontras-selaras-dengan-design-md-plan.md`.
+Ambang dari `packages/schema/src/contrast-rules.ts` (dijaga `tests/contrast-rules.test.ts` terhadap tabel Ambang kontras
+dan baris LC-04 Lampiran A DESIGN.md): teks 4.5:1; teks besar (≥ 24px, atau ≥ 18,66px berat ≥ 700) 3:1; layer
+`Placeholder` selalu 4.5:1; batas kontrol dan ikon tanpa label 3:1; scrim = fill solid alpha × opacity ≥ 0,5.
+
+## Pindaian arsip layout_check
+
+Arsip sama dengan §2.4/§2.15/§2.5/§2.6: 120 dokumen, 157 board, 0 gagal; daemon dist sementara (port acak, dataDir
+salinan, tanpa key foto). Sebelum = `after6.json` (dist story 6); sesudah = `after7b.json` (dist story 7). Aturan lain
+identik per dokumen (rule, level, node, detail). Temuan LC-04 teks lama identik (619 → 619; error dan warning per
+dokumen sama): arsip tidak memuat teks tebal 18,66–19px atau `Placeholder` ≥ 24px yang berubah ambang.
+
+| Sub-cek LC-04 (awalan detail) | Sesudah: temuan / dok | Kasus unik |
+|---|---|---|
+| `batas kontrol …` (error · gerbang) | 5 / 5 | `Input / Gudang` stroke #D0D5DD di #F3F5F9 1,35:1 (Lumbung polish-3/4, 2 dok); `Input / Cari pasien` stroke #D0D5DD 1,47:1 (Dentara, 2 dok); `Input / Cari` fill #F6F7F9 tanpa stroke 1,07:1 (Pustaka Kampus) |
+| `ikon tanpa label …` (error · gerbang) | 62 / 8 | semuanya baris bintang rating tanpa nilai: testimoni Lapak Cuci #F5B700 1,8:1; testimoni Mejaku #D99A1E 2,11–2,44:1 (4 dok); ulasan Dapur Wening #E09B0E 2,36:1 dan bintang kosong #D0D5DD 1,47:1 (3 dok) |
+| `scrim: …` (warning) | 34 / 14 (+92 di "+n serupa") | teks di atas mesh/efek tanpa scrim: Lintas Arus landing (nav, hero) dan Senyap onboarding (efek-1..3 + salinan practice-effects); gradien multi-hue: sampul podcast Siaru "Obrolan Senja" (2 dok) |
+
+Dokumen gagal gerbang: **80 → 86** (+6). Karena bintang rating (dicatat terpisah, keputusan checkpoint plan): Mejaku
+`~/.local/share/lakar/docs` dan practice-polish/4 P9, Dapur Wening resep effects-1 dan practice/8 P3 (4 dok). Karena
+batas kontrol: dua salinan Lumbung (polish-4 arsip, practice-polish/3 P8). Dokumen lain dengan error baru (Lapak Cuci,
+Pustaka Kampus, Dentara ×2, Mejaku polish-3 dan practice-polish/2) sudah gagal gerbang sebelumnya.
+
+Tinjauan crop (`archcheck.mjs --shots LC-04` + crop leluhur per kasus unik, `shots.mjs`): batas `Input /` pucat nyaris
+tak terlihat di latar abu/putih (WCAG 1.4.11); baris bintang testimoni/ulasan tanpa nilai rating di baris/komponennya
+(keputusan checkpoint: cacat nyata). **0 positif palsu** sesudah dua perbaikan definisi:
+
+1. **Deretan ikon berlabel teks nilai.** Pindaian pertama (`after7.json`): ikon 99 / 12 dok, termasuk bintang yang
+   jelas berlabel — Mejaku hero/header `Rating` [`Bintang`, "4,8 dari 312 ulasan pemilik"], Dapur Wening `Skor`
+   ["4,8", `Bintang`, "1.284 ulasan"] dan `Ringkasan` ["4,8", [`Baris bintang`, "1.284 ulasan · 94% …"]]: bintang
+   dikelompokkan di frame sendiri sehingga "leluhur pertama dengan konten lain" hanya berisi ikon. Definisi umum: deretan
+   ikon saja (anak lain hanya ikon) berlabel bila di leluhur pertama dengan konten bukan-ikon ada teks nilai pendek
+   bersebelahan (anak langsung, berangka, ≤ 40 karakter). Kutipan testimoni (panjang) dan nama/tanggal di frame lain
+   bukan label → bintang testimoni tetap temuan. Hasil: 62 / 8 dok.
+2. **Chrome sistem dilewati scrim.** Pindaian pertama memberi warning scrim pada jam `Status bar` ("09:41", "21:47")
+   di atas foto/efek; status bar dirender OS di atas apa pun, jadi teks di `Status bar`/`Home indicator` dilewati
+   (sama dengan pengecualian ikon). Scrim 40 / 20 → 34 / 14.
+
+Prototipe plan (99 ikon gagal di 10 dok) memakai definisi tanpa perbaikan 1; kontrol (5) sesuai prototipe.
+
+## Contoh skill
+
+`skills-examples.test.ts`: entri `PENDING_2_10` baru (pencocokan persis aturan + nama node + awal detail), untuk revisi skill:
+
+- `landing.md` (`Overline`, `Headline`, `Subjudul`), `mobile.md` (`Label`, `Nilai`, `Teks` kartu target), `api.md`
+  (`Judul` "Malam yang tenang"): warning scrim, teks langsung di atas mesh tanpa scrim.
+- `webapp.md`: `Input / Outlet` stroke `C.line2` #D0D5DD di #F3F6F5 → batas kontrol 1,35:1 (error · gerbang).
+- `icons.md`: `Bintang 1–5` #F5B700 tanpa nilai rating → ikon tanpa label 1,8:1 (error · gerbang ×5).
+- `polish.md` baris kontras masih "≥ 19 tebal" dan "ikon" tanpa syarat label: dicatat untuk revisi skill (tidak diubah, C7).
+
+## Patch review (2.7)
+
+Lima patch review (quick): deretan ikon berulang tanpa bungkus frame (mis. bintang langsung di baris bersama nama)
+juga hanya berlabel oleh teks nilai pendek; ikon `square`/`circle` di `Checkbox /`/`Radio /` tanpa cat dihitung sebagai
+batas; elips scrim dari bounds node (bukan persegi terpotong); teks yang sudah kena temuan kontras tidak diberi scrim;
+`ICON_GROUP_LABEL_MAX` pindah ke `contrast-rules.ts` (dijaga tes terhadap Lampiran A). Pindaian ulang `after7c.json`
+(120 dok, 0 gagal) vs `after7b.json`: aturan lain, LC-04 teks, batas kontrol, ikon tanpa label identik; scrim 34 → 32
+(Siaru "Obrolan Senja" ×2 kini hanya warning kontras 4,23:1); gagal gerbang tetap **86**; tidak ada error baru.
+
+# §2.16 Skill desain bawaan per domain (G1 story 16)
+
+## Pemecahan skill (sesi baru, C7)
+
+`polish.md` dihapus; isinya dan bagian lintas layar `core.md` dipindah tanpa duplikasi ke delapan skill domain:
+`layout`, `typography`, `color`, `accessibility`, `ui`, `interface`, `writing`, `review`. `read_skill('polish')` = NOT_FOUND
+dengan pesan "skill polish dipecah menjadi layout, typography, color, accessibility, ui, interface, writing, review". Aturan muat
+(instruksi MCP + deskripsi `read_skill` + `core` langkah 1): core + 8 domain + 1 jenis layar paralel di satu giliran. Prelude dan
+baris `Font terpasang` byte-identik.
+
+- **Tambahan (arahan Adam):** butir 1 → `layout` (hitung sisa lebar sebelum elemen lebar tetap sebaris, visual samping
+  `fill` + `maxWidth`, padding bawah = atas); butir 3 → `typography` (pasangan display + teks dari nada brief) dan `landing`
+  (momen angka besar, seksi kontras berisi, tanpa ruang kosong mati); butir 4 → `review` (screenshot board, lalu
+  `screenshot({nodeId, scale:2})` area terpadat + 8 pertanyaan tetap, satu execute perbaikan); butir 6 → `writing` (angka
+  konsisten lintas elemen, nama/lokasi Indonesia wajar dan beragam, tanpa kalimat generik). `accessibility` baru (WCAG 2.2
+  AA + DESIGN.md §Ambang kontras), `ui` + tabel umum dan form dasar, `color` + elips peredam terukur.
+- **Contoh skill:** semua `PENDING_2_10` umum selesai; tinggal entri `api.md`. landing: sel tabel = frame, elips peredam
+  `C.field` E6 blur 48 di `Crop / Kontur`; mobile: pil tab radius full (radius 8/20/24), `Link / Semua` frame 44 (H 1114 →
+  1146), elips peredam B3 menutup semua teks kartu target; webapp: padding sidebar 10 → 12, `Input / Outlet` garis `#7D8798`,
+  sel tabel = frame, header tabel 40; icons: bintang + nilai "4,8". 0 error / 0 gerbang / 0 warning.
+- **Daemon/MCP:** `screenshot` menerima `scale` 1|2 (scale lain → SCHEMA_INVALID).
+- **Seri polish:** maks 6 iterasi, anggaran kumulatif $34,58 ($22,58 terpakai + $12 story 2.16), keputusan plan checkpoint.
+- **Token badge:** `badge.height-sm: 20px` ditambahkan di frontmatter DESIGN.md (dijaga `tests/design-tokens.test.ts` = prelude
+  `Badge` sm 20 / md 24).
+
+Token (`estimateTokens`, total / prosa). Sebelum = `5e10f50`.
+
+| Skill | Batas (prosa / total) | Sebelum | Sesudah |
+|---|---|---|---|
+| core | – / 3200 (dulu 4000) | 3576 / 2861 | 2578 / 1862 |
+| polish | dihapus (dulu 3000 / 3200) | 2453 / 2064 | – |
+| layout | – / 1000 | – | 689 |
+| typography | – / 800 | – | 416 |
+| color | – / 1000 | – | 583 |
+| accessibility | – / 700 | – | 410 |
+| ui | 1400 / 2600 | – | 1199 / 810 |
+| interface | – / 700 | – | 540 |
+| writing | – / 900 | – | 456 |
+| review | – / 900 | – | 570 |
+| landing | 1500 / 3500 | 3085 / 1099 | 3287 / 1212 |
+| mobile | 1500 / 3500 | 2904 / 1096 | 2984 / 1086 |
+| webapp | 1500 / 3500 | 2735 / 840 | 2745 / 819 |
+
+| Muat per jenis layar (batas 11.500) | Sebelum (core + polish + layar) | Sesudah (core + 8 domain + layar) | Selisih |
+|---|---|---|---|
+| landing | 9.114 | 10.728 | +17,7% |
+| mobile | 8.933 | 10.425 | +16,7% |
+| webapp | 8.764 | 10.186 | +16,2% |
+
+PNG contoh (pemeriksaan visual, tanpa luberan): `LAKAR_SKILL_PNG_DIR=<dir> vitest run packages/daemon/src/skills-examples.test.ts`.
+
+## Revisi iterasi 6 (sesi baru, C7): pangkas biaya berpikir
+
+**Diagnosis (run iterasi 5, hanya angka).** Skill domain menaikkan mutu, tetapi agen terlalu lambat. Gerbang waktu ≤ 1,5×
+gagal di mobile (149,9 dtk vs batas 146) dan landing (264,7 vs 242,9); dashboard lolos (192,5 vs 320).
+
+| Layar | Token berpikir it. 4 → 5 | Token keluaran it. 4 → 5 | Waktu ke execute pertama it. 4 → 5 | Putaran perbaikan it. 5 |
+|---|---|---|---|---|
+| mobile | 2.491 → 6.528 | 9.415 → 15.253 | 62 → 95 dtk | 5 execute (LC-02a/LC-20 zona bawah) |
+| dashboard | 5.052 → 8.772 | 16.058 → 19.552 | 112 → 136 dtk | 9 error LC-02c di execute pertama |
+| landing | 6.519 → 11.258 | 22.269 → 28.247 | 57 → 118 dtk (kode execute pertama sama, ±7.300 karakter) | 1–2 error (LC-04, LC-02c); warning LC-25/18/23 |
+
+Langkah zoom review murah (`screenshot scale 2` ±1–2 dtk + satu execute ±10–15 dtk); membaca 10 skill paralel ±6 dtk. Yang
+mahal adalah berpikir: delapan pertanyaan dijawab di kepala, aturan "hitung sebelum menaruh", dan menimbang tiap aturan skill
+sebelum menulis.
+
+**Perubahan.**
+- **Alur kerja `core` (saran 2):** langkah 2 = rencana singkat ≤ 5 baris (konten + angka berpembanding, langkah khas,
+  arketipe, slot foto), tanpa menimbang aturan satu per satu, mulai dari contoh teruji; langkah 3 = langsung tulis execute
+  pertama; langkah 4 = semua temuan `check` diperbaiki sekaligus. Instruksi MCP ikut: "open_doc, rencana singkat, dan langsung
+  bangun …". Proses anti-slop (6 butir berpenjelasan) dilebur menjadi templat blok `proses:` di Ringkasan akhir.
+- **Padatkan (saran 1):** angka yang sudah dilaporkan `check` beserta perbaikannya dihapus dari skill (DESIGN.md §Turunan):
+  LC-23 gap ≥ 8, LC-26 ritme judul, LC-11, LC-24 tinggi/teks badge, LC-18 penjelasan, LC-27/28/29 angka skala, LC-30 en dash
+  dan elipsis, LC-04/05/06/10 ambang angka, LC-09, LC-21 spacer. Duplikasi lintas skill dihapus: ritme jarak landing/mobile
+  (= tabel proximity `layout`), emoji/rata tengah/kartu tiga lapis di `review` (= `core`/`ui`), komentar efek di contoh (=
+  `color`). Daftar panjang → resep tindakan.
+- **Review (saran 3):** enam pertanyaan singkat (utuh; rapi; terbaca; angka; buram + kerangka; tukar), dijawab `ok` atau
+  temuan + node tanpa prosa; satu execute perbaikan. 12 anti-pattern + tanda slop visual → satu daftar "Slop yang dicari".
+- **Butir 1 dan 3 (saran 4):** geometri `layout` = satu kalimat resep; pasangan huruf `typography` = satu baris nada → pasangan.
+- **Pola yang sering gagal (saran 5):** LC-02c → kalimat geometri `layout` ("isi lebar tetap di kartu ≤ lebar isi kartu,
+  sisanya `width:'fill'`"); LC-20/LC-02a mobile → seksi baru "Tinggi dan zona bawah" di awal `mobile` (H dihitung sekali; isi
+  terakhir ≥ 24 di atas zona); LC-25 → satu kalimat `layout` ("dalam = luar − padding, min 6; tidak cukup → tanpa radius/cat").
+- Contoh teruji: hanya komentar dipersingkat (mobile, landing); kode sama. PNG diperiksa
+  (`LAKAR_SKILL_PNG_DIR=<scratchpad>/png6`). `LOAD_LIMIT` 11.500 → 9.600; batas per skill diturunkan.
+
+Token (`estimateTokens`, total / prosa). Sebelum = `a01fc67`.
+
+| Skill | Batas sebelum → sesudah (prosa / total) | Sebelum | Sesudah |
+|---|---|---|---|
+| core | – / 3200 → – / 2600 | 2578 / 1862 | 2461 / 1659 |
+| layout | – / 1000 → – / 600 | 689 | 500 |
+| typography | – / 800 → – / 400 | 416 | 288 |
+| color | – / 1000 → – / 550 | 583 | 448 |
+| accessibility | – / 700 → – / 400 | 410 | 302 |
+| ui | 1400 / 2600 → 800 / 1200 | 1199 / 810 | 1092 / 703 |
+| interface | – / 700 → – / 550 | 540 | 444 |
+| writing | – / 900 → – / 450 | 456 | 385 |
+| review | – / 900 → – / 550 | 570 | 455 |
+| landing | 1500 / 3500 → 1100 / 3200 | 3287 / 1212 | 3065 / 997 |
+| mobile | 1500 / 3500 → 1100 / 3000 | 2984 / 1086 | 2719 / 937 |
+| webapp | 1500 / 3500 → 1000 / 3000 | 2745 / 819 | 2729 / 802 |
+
+| Muat per jenis layar | Iterasi 4 (core + polish + layar) | Iterasi 5 (batas 11.500) | Iterasi 6 (batas 9.600) | Selisih 5 → 6 |
+|---|---|---|---|---|
+| landing | 9.114 | 10.728 | 9.440 | −12,0% |
+| mobile | 8.933 | 10.425 | 9.094 | −12,8% |
+| webapp | 8.764 | 10.186 | 9.104 | −10,6% |
+
+## Seri polish iterasi 5 dan 6 (`bench/polish-5.md`, `bench/polish-6.md`, rubrik 2.3, pen.dev dipakai ulang dari iterasi 1)
+
+- Perintah: `practice --series polish --iter <5|6> --reuse-pendev 1` (sesi utama). Satu run per alat per prompt per iterasi
+  (C8), tanpa run pen.dev baru, tanpa MCP pencil, tanpa restart pen-desktop. Iterasi 5 = skill `a01fc67`; iterasi 6 = skill
+  `ff56e47`. Iterasi 6 dijalankan karena iterasi 5 gagal gerbang waktu (syarat plan).
+
+| Prompt | polish-4: T L–P, D L–P, keputusan, waktu L / P (rasio), biaya L | iterasi 5 | iterasi 6 |
+|---|---|---|---|
+| P7 mobile | 15–14, 4–4, Setara, 89,0 / 97,5 (0,91), $0,58 | 16–13, 4–4, **Kalah** (waktu), 149,9 (1,54), $0,92 | 14–12, 4–4, **Setara**, 120,8 (1,24), $0,75 |
+| P8 dashboard | 16–16, 4–4, Setara, 153,6 / 213,6 (0,72), $0,69 | 16–15, 4–4, **Setara**, 192,5 (0,90), $0,86 | 16–14, 4–4, **Setara**, 207,3 (0,97), $0,98 |
+| P9 landing | 15–12, 4–4, Lebih baik, 204,5 / 161,9 (1,26), $1,02 | 14–10, 4–3, **Kalah** (waktu), 264,7 (1,64), $1,55 | 16–12, 4–4, **Lebih baik**, 238,9 (1,48), $1,44 |
+
+- **Iterasi 6 lulus**: P7 Setara, P8 Setara, P9 Lebih baik (tidak turun dari polish-4), rasio ≤ 1,5, emoji 0, gate 0. Margin
+  waktu P9 tipis (238,9 dari batas 242,9 dtk). Skor T pen.dev untuk PNG yang sama bergeser antar-juri (P7 14 → 13 → 12,
+  P8 16 → 15 → 14, P9 12 → 10 → 12); selisih Lakar–pen.dev naik, tetapi sebagian karena variasi juri.
+- **Biaya:** iterasi 5 $5,64, iterasi 6 $5,59; story 2.16 **$11,23** (≤ $12). Kumulatif seri $33,81 dari $34,58.
+- **Token agen (keluaran / berpikir):** P7 9.415/2.491 (it. 4) → 15.253/6.528 (it. 5) → 13.041/3.998 (it. 6); P8 16.058/5.052 →
+  19.552/8.772 → 21.718/9.959; P9 22.269/6.519 → 28.247/11.258 → 25.977/10.169.
+- **Dampak langkah review zoom:** `screenshot scale 2` sendiri 0,4–1,4 dtk. Jeda screenshot → execute perbaikan: it. 4
+  (tanpa zoom) P7 3 dtk, P8 16 dtk, P9 27 dtk (termasuk `inspect`); it. 6 P7 11 dtk, P9 22 dtk; P8 it. 6 tidak memakai zoom
+  (hanya screenshot board, lalu dua execute perbaikan). Dampak zoom ±0–10 dtk per run; kenaikan waktu iterasi 5 terutama
+  dari berpikir sebelum execute pertama (lihat diagnosis di atas), bukan dari zoom.
+- **PNG untuk penilaian cepat Adam** (Setara/Kalah/Lebih baik per prompt): Lakar iterasi 5 `bench/practice/polish/5/P{7,8,9}-lakar.png`,
+  iterasi 6 `bench/practice/polish/6/P{7,8,9}-lakar.png` (tracked); pen.dev yang dipakai ulang
+  `bench/runs/practice-polish/1/P{7,8,9}-pendev.png` (lokal, EULA).
+- **Catatan C7:** (1) dry-run iterasi 5 disaring dengan pola yang kurang ketat, sehingga satu baris teks prompt P7 tercetak ke
+  sesi utama. Sesi utama tidak menyunting skill; revisi iterasi 6 ditulis subagen baru yang tidak melihatnya, dan dry-run
+  iterasi 6 disaring dengan pola berjangkar (`^(biaya:|bench: rubrik|Abort|masalah)`). (2) Subagen implementasi pertama
+  sempat melihat satu baris tabel Lampiran B lewat `grep badge` di DESIGN.md; tidak dipakai, isi skill terkait sudah ada
+  sebelum story ini.

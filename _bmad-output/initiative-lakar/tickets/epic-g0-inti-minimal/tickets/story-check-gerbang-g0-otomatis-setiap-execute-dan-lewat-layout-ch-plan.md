@@ -3,7 +3,7 @@ title: 'Check gerbang G0 otomatis setiap execute dan lewat layout_check'
 type: feature
 ticket: '11'
 created: '2026-11-18'
-status: built
+status: done
 baseline_revision: '9c9e8c086bb011d44469ca85a55cfc5f34d82831'
 route: full
 route_source: auto

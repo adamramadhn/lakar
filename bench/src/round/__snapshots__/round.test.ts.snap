@@ -1,5 +1,272 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
+exports[`laporan (snapshot) > putaran G1: bagian Keputusan G1 menggantikan G0, R3/R7 per prompt, hash per prompt di Versi beku 1`] = `
+"# Putaran 3: Lakar vs pen.dev
+
+Status: **lengkap**. Tanggal: 2026-11-18T00:00:00.000Z.
+
+Keputusan di laporan ini **sementara, menunggu konfirmasi Adam**.
+
+## Ringkasan
+
+| Prompt | Waktu Lakar (dtk) | Waktu pen.dev (dtk) | Lakar/pen.dev | Lakar/baseline | Biaya Lakar | Biaya pen.dev | Gerbang Lakar | Total Lakar (maks 16) | Total pen.dev | Daya tarik Lakar | Daya tarik pen.dev | Keputusan |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| B | 120.0 | 130.0 | 0.92 | 0.91 | $0.70 | $0.60 | lolos | 8 | 12 | 2 | 3 | Kalah (sementara, menunggu konfirmasi Adam) |
+| C | 120.0 | 130.0 | 0.92 | – | $0.70 | $0.60 | gagal | 8 | 12 | 2 | 3 | Kalah (sementara, menunggu konfirmasi Adam) |
+
+## Keputusan G1 (sementara, menunggu konfirmasi Adam)
+
+Keputusan G1: **tidak dapat diputuskan** (sementara, menunggu konfirmasi Adam). Alasan: prompt A tidak ada di putaran.
+
+| Prompt | Keputusan | Alasan | Rasio waktu (Lakar/baseline) | Emoji Lakar (a) / (b) / (c) | R3 / R7 | Baseline pen.dev (dtk, biaya, sumber) |
+|---|---|---|---|---|---|---|
+| B | Kalah | total 8 < 12 − 1 | 0.91 | 0 / 0 / 0 | 1 / 2 | 131.3, –, \`bench/baseline-pendev.json\` |
+| C | Kalah | gerbang gagal: R3/R7 tidak terukur (temuan layout_check tidak ada); waktu tidak terukur | – | 0 / 0 / 0 | tidak terukur | –, –, belum diukur |
+
+Aturan (Lampiran B): putaran dibatalkan → tidak dapat diputuskan; lolos bila ≥ 4 dari 5 prompt (A, B, C, D, E) Setara/Lebih baik, ≥ 1 Lebih baik, emoji Lakar (a)/(b)/(c) = 0 dan rasio waktu ≤ 1.5 di semua prompt; gagal bila ada emoji > 0, rasio > 1.5, atau jumlah itu tidak bisa tercapai lagi; selebihnya (prompt hilang/tidak dapat dinilai yang masih bisa mengubah hasil, waktu/emoji tidak terukur) → tidak dapat diputuskan. Biaya hanya dilaporkan (C8).
+
+- Gerbang Lakar G1 menambah R3/R7 mekanis: R3 = 2 bila LC-07, LC-11, LC-06 semuanya 0, 1 bila totalnya ≤ 5, 0 bila lebih; R7 = 2 bila 0 error non-gerbang dan ≤ 3 warning struktural (LC-03/LC-13/LC-14/LC-17/LC-18/LC-21), 1 bila ≤ 2 error non-gerbang (ditandai "periksa Adam: false positive?") dan ≤ 8 warning struktural, 0 selebihnya. R3 = 0 atau R7 = 0 → gerbang gagal (Kalah).
+- Keputusan G1 final hanya dari Adam; agen tidak mengonfirmasi atau menutup G1.
+
+## Prompt B
+
+### Waktu dan biaya
+
+| Alat | Status | Wall (dtk) | duration_ms | Biaya | Turns | Tool call | Board/frame | Run |
+|---|---|---|---|---|---|---|---|---|
+| Lakar | success | 120.0 | – | $0.70 | 9 | 8 | 390×844 | \`bench/runs/rounds/uji-1/B-lakar\` |
+| pen.dev | success | 130.0 | – | $0.60 | – | – | 390×844 | \`bench/runs/rounds/uji-1/B-pendev\` |
+
+- Rasio Lakar/pen.dev (putaran ini): 0.92
+- Rasio Lakar/median baseline pen.dev (131.3 dtk): 0.91
+- Rasio pen.dev putaran ini/median baseline pen.dev: 0.99 (indikator drift, bukan gerbang)
+
+### Gerbang G1 Lakar (otomatis)
+
+- layout_check harness: gate = 0, error 0, warning 1 (rev 4)
+- Ukuran board: Beranda 390×844 → sesuai
+- Waktu ≤ 1,5 × median baseline: rasio 0.91
+- R3/R7 mekanis (temuan layout_check final per ID aturan): R3 = 1 (LC-07 0, LC-11 0, LC-06 1), R7 = 2 (0 error non-gerbang, 0 warning struktural)
+- Hasil: **lolos**
+- Aturan R3/R7 yang belum ada di katalog dihitung 0 temuan: aturan LC-03/06/07/11/13/14/17/18/21 belum ada di \`G0_RULES\`.
+- Dokumen Lakar: slug \`gerak-beranda\` (dibuka agen: gerak-beranda), salinan \`bench/runs/rounds/uji-1/B-lakar/doc/gerak-beranda.lakar.json\`
+
+### Emoji
+
+| Alat | (a) di input tool_use agen | glyph LC-01b di input (terpisah) | (b) LC-01a / LC-01b layout_check | (c) juri (median, rentang) |
+|---|---|---|---|---|
+| Lakar | 0 | 1 | 0 / 0 | 0 (rentang 0) |
+| pen.dev | 2 (🔥) | 0 | tidak dilint (EULA) | 0 (rentang 0) |
+
+### Reconnect (dilaporkan terpisah, tidak dikurangkan dari waktu)
+
+| Alat | Jumlah | ms tool_use→tool_result terdampak | Kejadian |
+|---|---|---|---|
+| Lakar | 0 | 0 | – |
+| pen.dev | 1 | 900 | mcp__pencil__execute (900 ms): error |
+
+### Skor juri (median 3 ulangan)
+
+Ulangan valid: 2 dari 3. Detail dan bukti: \`bench/score-B.md\`.
+
+| Kriteria | Lakar | pen.dev |
+|---|---|---|
+| R1 | 1 (rentang 2) **periksa Adam** | 1.5 (rentang 1) |
+| R2 | 1 (rentang 2) **periksa Adam** | 1.5 (rentang 1) |
+| R4 | 1 (rentang 2) **periksa Adam** | 1.5 (rentang 1) |
+| R5 | 1 (rentang 2) **periksa Adam** | 1.5 (rentang 1) |
+| R6 | 1 (rentang 2) **periksa Adam** | 1.5 (rentang 1) |
+| R8 | 1 (rentang 2) **periksa Adam** | 1.5 (rentang 1) |
+| R9 | 1 (rentang 2) **periksa Adam** | 1.5 (rentang 1) |
+| R10 | 1 (rentang 2) **periksa Adam** | 1.5 (rentang 1) |
+| **Total (jumlah median, maks 16)** | **8** | **12** |
+| **Daya tarik D = R9 + R10 (maks 4)** | **2** | **3** |
+| Slop (juri) | 1 (rentang 2) **periksa Adam** | 1.5 (rentang 1) |
+
+Brief mengikat pen.dev (ukuran frame): sesuai.
+
+### Keputusan: **Kalah** (sementara, menunggu konfirmasi Adam)
+
+Alasan: total 8 < 12 − 1.
+
+Strip: \`bench/runs/rounds/uji-1/B-lakar.png\` (390×844, 1 board), pen.dev –
+
+## Prompt C
+
+### Waktu dan biaya
+
+| Alat | Status | Wall (dtk) | duration_ms | Biaya | Turns | Tool call | Board/frame | Run |
+|---|---|---|---|---|---|---|---|---|
+| Lakar | success | 120.0 | – | $0.70 | 9 | 8 | 390×844 | \`bench/runs/rounds/uji-1/B-lakar\` |
+| pen.dev | success | 130.0 | – | $0.60 | – | – | 390×844 | \`bench/runs/rounds/uji-1/B-pendev\` |
+
+- Rasio Lakar/pen.dev (putaran ini): 0.92
+- Rasio Lakar/median baseline pen.dev (– dtk): –
+- Rasio pen.dev putaran ini/median baseline pen.dev: – (indikator drift, bukan gerbang)
+
+### Gerbang G1 Lakar (otomatis)
+
+- layout_check harness: gate = 0, error 0, warning 1 (rev 4)
+- Ukuran board: Beranda 390×844 → sesuai
+- Waktu ≤ 1,5 × median baseline: –
+- R3/R7 mekanis (temuan layout_check final per ID aturan): tidak terukur (temuan layout_check tidak ada) → gerbang gagal
+- Hasil: **gagal** (R3/R7 tidak terukur (temuan layout_check tidak ada); waktu tidak terukur)
+- Aturan R3/R7 yang belum ada di katalog dihitung 0 temuan: aturan LC-03/06/07/11/13/14/17/18/21 belum ada di \`G0_RULES\`.
+- Dokumen Lakar: slug \`gerak-beranda\` (dibuka agen: gerak-beranda), salinan \`bench/runs/rounds/uji-1/B-lakar/doc/gerak-beranda.lakar.json\`
+
+### Emoji
+
+| Alat | (a) di input tool_use agen | glyph LC-01b di input (terpisah) | (b) LC-01a / LC-01b layout_check | (c) juri (median, rentang) |
+|---|---|---|---|---|
+| Lakar | 0 | 1 | 0 / 0 | 0 (rentang 0) |
+| pen.dev | 2 (🔥) | 0 | tidak dilint (EULA) | 0 (rentang 0) |
+
+### Reconnect (dilaporkan terpisah, tidak dikurangkan dari waktu)
+
+| Alat | Jumlah | ms tool_use→tool_result terdampak | Kejadian |
+|---|---|---|---|
+| Lakar | 0 | 0 | – |
+| pen.dev | 1 | 900 | mcp__pencil__execute (900 ms): error |
+
+### Skor juri (median 3 ulangan)
+
+Ulangan valid: 2 dari 3. Detail dan bukti: \`bench/score-C.md\`.
+
+| Kriteria | Lakar | pen.dev |
+|---|---|---|
+| R1 | 1 (rentang 2) **periksa Adam** | 1.5 (rentang 1) |
+| R2 | 1 (rentang 2) **periksa Adam** | 1.5 (rentang 1) |
+| R4 | 1 (rentang 2) **periksa Adam** | 1.5 (rentang 1) |
+| R5 | 1 (rentang 2) **periksa Adam** | 1.5 (rentang 1) |
+| R6 | 1 (rentang 2) **periksa Adam** | 1.5 (rentang 1) |
+| R8 | 1 (rentang 2) **periksa Adam** | 1.5 (rentang 1) |
+| R9 | 1 (rentang 2) **periksa Adam** | 1.5 (rentang 1) |
+| R10 | 1 (rentang 2) **periksa Adam** | 1.5 (rentang 1) |
+| **Total (jumlah median, maks 16)** | **8** | **12** |
+| **Daya tarik D = R9 + R10 (maks 4)** | **2** | **3** |
+| Slop (juri) | 1 (rentang 2) **periksa Adam** | 1.5 (rentang 1) |
+
+Brief mengikat pen.dev (ukuran frame): sesuai.
+
+### Keputusan: **Kalah** (sementara, menunggu konfirmasi Adam)
+
+Alasan: gerbang gagal: R3/R7 tidak terukur (temuan layout_check tidak ada); waktu tidak terukur.
+
+Strip: \`bench/runs/rounds/uji-1/B-lakar.png\` (390×844, 1 board), pen.dev –
+
+Biaya juri total: $0.50.
+
+## Evaluasi arah
+
+G1 **tidak dapat diputuskan** (sementara, menunggu konfirmasi Adam). Fakta per prompt:
+
+- **B** — Kalah: total 8 < 12 − 1.
+  - Gerbang: lolos.
+  - Total: Lakar 8 vs pen.dev 12; daya tarik: Lakar 2 vs pen.dev 3.
+  - R dengan Lakar 0 vs pen.dev 2: tidak ada.
+  - Pelanggaran brief pen.dev: tidak ada.
+  - Rasio waktu Lakar/median baseline: 0.91; Lakar/pen.dev putaran ini: 0.92.
+- **C** — Kalah: gerbang gagal: R3/R7 tidak terukur (temuan layout_check tidak ada); waktu tidak terukur.
+  - Gerbang: gagal (R3/R7 tidak terukur (temuan layout_check tidak ada); waktu tidak terukur).
+  - Total: Lakar 8 vs pen.dev 12; daya tarik: Lakar – vs pen.dev –.
+  - R dengan Lakar 0 vs pen.dev 2: –.
+  - Pelanggaran brief pen.dev: –.
+  - Rasio waktu Lakar/median baseline: –; Lakar/pen.dev putaran ini: 0.92.
+
+- Keputusan G1 final hanya dari Adam; agen tidak mengonfirmasi atau menutup G1.
+- Opsi yang menunggu konfirmasi Adam (agen tidak memilih):
+  1. Perbaiki penyebabnya, lalu putaran resmi baru \`--round 4\` untuk B, C (putaran baru, bukan mengulang run; C8).
+  2. Evaluasi ulang arah editor milik Lakar.
+
+## PNG untuk Adam
+
+| Prompt | Alat | Strip | Status commit |
+|---|---|---|---|
+| B | Lakar | \`bench/runs/rounds/uji-1/B-lakar.png\` | lokal (putaran uji, gitignored) |
+| B | pen.dev | – | strip tidak ada |
+
+## Konfirmasi Adam
+
+Status: **menunggu konfirmasi Adam**. Bagian ini hanya diisi Adam; agen tidak pernah mengisinya.
+
+| Prompt | Keputusan sementara | Kriteria rentang > 1 | Keputusan Adam | Koreksi skor |
+|---|---|---|---|---|
+| B | Kalah | R1 Lakar, R2 Lakar, R4 Lakar, R5 Lakar, R6 Lakar, R8 Lakar, R9 Lakar, R10 Lakar | menunggu konfirmasi Adam | menunggu konfirmasi Adam |
+| C | Kalah | R1 Lakar, R2 Lakar, R4 Lakar, R5 Lakar, R6 Lakar, R8 Lakar, R9 Lakar, R10 Lakar | menunggu konfirmasi Adam | menunggu konfirmasi Adam |
+
+Keputusan G1 final: menunggu konfirmasi Adam (sementara: tidak dapat diputuskan).
+
+## Versi beku
+
+- git HEAD: \`abc\`; \`git status --porcelain -- packages tools .mcp.json\`: kosong
+- protocolHash (info, byte ketiga file protokol): \`h\`; penjaga baseline = hash per prompt
+- hash prompt B: \`hb\` (baseline \`bench/baseline-pendev.json\` 2026-11-17: sama)
+- hash prompt C: \`hc\` (**baseline belum diukur**)
+- Model agen dan juri: \`claude-opus-5-5\`; Claude Code: 2.1.325
+- Baseline pen.dev B (\`bench/baseline-pendev.json\`): model \`claude-opus-5-5\`, Claude Code 2.1.325, pen.dev desktop 1.2.23
+- Baseline pen.dev C: belum diukur
+- lakard: version 0.1.0, schemaVersion 2, pid –, startedAt –, Chromium –
+- Ikon (/status): lucide 1.74.0
+- skill \`core.md\` sha256 \`aa\`
+- \`G0_RULES\`: \`{}\`
+- sha256 \`packages/check/dist\`: \`cc\`
+- pen.dev desktop: 1.2.23; MCP server: pencil 1.0.0
+- Juri: model \`claude-opus-5-5\`; argv \`claude -p\`
+- Versi rubrik: 2
+- sha256 teks juri B: \`b2\`
+
+## Protokol
+
+### Pembungkus (bench/protocol/wrapper.txt, kata per kata)
+
+\`\`\`
+W {{PROMPT}}
+\`\`\`
+
+### Prompt B
+
+\`\`\`
+prompt B
+\`\`\`
+
+### Argumen claude
+
+Lakar:
+
+\`\`\`
+a
+\`\`\`
+
+pen.dev:
+
+\`\`\`
+b
+\`\`\`
+
+Juri:
+
+\`\`\`
+c
+\`\`\`
+
+Env proses claude (agen dan juri): \`ENABLE_TOOL_SEARCH=false\`; dibuang dari env pemanggil: \`CLAUDE_EFFORT\`
+
+### Konvensi putaran
+
+- k
+
+### Definisi waktu dan reconnect
+
+- d
+
+## Penjaga .pen lama
+
+- 3 file \`.pen\` di-md5 sebelum putaran (\`~/.pencil/documents\`, \`/root/lakar/design\`, \`/root/comprice\`, \`/opt/pen\`).
+- Berubah: tidak ada; hilang: tidak ada; baru: 1.
+- \`systemctl --user is-active lakard\` sesudah putaran: active
+"
+`;
+
 exports[`laporan (snapshot) > putaran resmi: Keputusan G0 setelah Ringkasan; Evaluasi arah/PNG/Konfirmasi Adam sebelum Versi beku; Konfirmasi tidak diisi 1`] = `
 "# Putaran 1: Lakar vs pen.dev
 

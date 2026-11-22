@@ -324,10 +324,11 @@ describe('practice: seri (story 22)', () => {
     expect(passMinOf(EFFECTS_SERIES, 2)).toBe(2);
   });
 
-  it('config polish: P7–P9 beku, maks 5 iterasi, $30,24 kumulatif, perkiraan biaya sendiri, semua prompt wajib lulus, banding iterasi 1, laporan/run/PNG terpisah', () => {
-    expect(POLISH_SERIES).toMatchObject({ id: 'polish', promptsPath: POLISH_PROMPTS_PATH, sha: POLISH_PROMPTS_SHA256, maxIter: 5, budgetUsd: 30.24, passRule: 'all', reportPrefix: 'polish', runsRoot: POLISH_RUNS, restartPenDesktop: true, compareWithFirst: true });
+  it('config polish: P7–P9 beku, maks 6 iterasi, $34,58 kumulatif, perkiraan biaya sendiri, semua prompt wajib lulus, banding iterasi 1, laporan/run/PNG terpisah', () => {
+    expect(POLISH_SERIES).toMatchObject({ id: 'polish', promptsPath: POLISH_PROMPTS_PATH, sha: POLISH_PROMPTS_SHA256, maxIter: 6, budgetUsd: 34.58, passRule: 'all', reportPrefix: 'polish', runsRoot: POLISH_RUNS, restartPenDesktop: true, compareWithFirst: true });
     expect(POLISH_SERIES.costEstimate).toEqual({ pendev: 0.6, lakar: 1.15, judge: 0.8 });
-    expect(parsePracticeArgs(['--series', 'polish', '--iter', '6'])).toMatchObject({ ok: false, error: '--iter 6 > 5: iterasi seri polish maksimal 5' });
+    expect(parsePracticeArgs(['--series', 'polish', '--iter', '6', '--reuse-pendev', '1'])).toMatchObject({ ok: true, value: { series: 'polish', iter: 6, reusePendev: 1 } });
+    expect(parsePracticeArgs(['--series', 'polish', '--iter', '7'])).toMatchObject({ ok: false, error: '--iter 7 > 6: iterasi seri polish maksimal 6' });
     expect(POLISH_SERIES.runsRoot.endsWith('bench/runs/practice-polish')).toBe(true);
     expect(POLISH_SERIES.pngDir.endsWith('bench/practice/polish')).toBe(true);
     expect(SERIES.polish).toBe(POLISH_SERIES);
@@ -387,7 +388,10 @@ describe('story 24: pakai ulang pen.dev per prompt, biaya seri, perbandingan ite
     expect(estimateCost({ prompts: ids, reusePendev: new Set(['P8', 'P9']), doneRuns: new Set(), doneJudge: new Set(), estimate: est })).toBe(6.45);
     expect(estimateCost({ prompts: ids, reusePendev: new Set(ids), doneRuns: new Set(), doneJudge: new Set(), estimate: est })).toBe(5.85);
     expect(budgetProblem(12.74, 6.45, POLISH_SERIES.budgetUsd)).toBeUndefined();
-    expect(budgetProblem(25, 5.85, POLISH_SERIES.budgetUsd)).toMatch(/> \$30\.24/);
+    // Story 2.16: iterasi 5 (reuse penuh) dari $22,58 terpakai = $28,43 ≤ $34,58; iterasi 6 sesudahnya pun muat.
+    expect(budgetProblem(22.58, 5.85, POLISH_SERIES.budgetUsd)).toBeUndefined();
+    expect(budgetProblem(28.43, 5.85, POLISH_SERIES.budgetUsd)).toBeUndefined();
+    expect(budgetProblem(30, 5.85, POLISH_SERIES.budgetUsd)).toMatch(/> \$34\.58/);
   });
 
   it('frozen.reusePendev peta: drift terbaca; Versi beku menyebut sumber per prompt', () => {
