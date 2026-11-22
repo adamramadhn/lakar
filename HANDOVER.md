@@ -55,7 +55,10 @@ Perubahan sesudah gelombang fitur di atas:
 ## Langkah berikutnya
 
 1. **Bawa ke `main`.** Ikuti urutan di bagian "Branch dan PR".
-2. **Epic 1 inisiatif baru: model dokumen.** Semua epic lain menunggu keputusan ini (skema JSON Lakar diperluas, atau model HTML/CSS seperti Paper). Jalankan `bmad-architecture`.
+2. **Epic 1 inisiatif baru: model dokumen.** Arsitekturnya sudah diputuskan dan disetujui Fatmuh pada 2026-11-22. Spine-nya ada di `_bmad-output/initiative-lakar-paper/tickets/epic-model-dokumen/architecture-model-dokumen/architecture-model-dokumen.md`.
+   - Model dokumen: JSON Lakar bertipe dengan semantik CSS (AD-1).
+   - Route dan tool lama: kompatibilitas mundur menggantikan pembekuan (AD-4).
+   - Berikutnya: minta Sofia (`bmad-agent-po`) memecah epic model dokumen menjadi story. Story pertamanya mengumpulkan korpus dokumen v1/v2 dari data dir lokal dan VPS ke `tests/fixtures/docs/`. Sesudah itu, refine epic 2–7 di atas spine.
 3. **Item tertunda.** Lihat `_bmad-output/implementation-artifacts/deferred-work.md`.
 
 ## Merapikan lingkungan lokal
