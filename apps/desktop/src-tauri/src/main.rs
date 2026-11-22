@@ -18,8 +18,8 @@ use serde::Serialize;
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::webview::DownloadEvent;
-use tauri::utils::config::{LogicalPosition, WindowConfig};
-use tauri::{AppHandle, Manager, RunEvent, TitleBarStyle, WebviewWindowBuilder, WindowEvent};
+use tauri::utils::config::{Color, LogicalPosition, WindowConfig};
+use tauri::{AppHandle, Manager, RunEvent, Theme, TitleBarStyle, WebviewWindowBuilder, WindowEvent};
 
 /// Port default lakard (sama dengan DEFAULT_LAKARD_PORT @lakar/schema) agar config MCP stabil.
 const DEFAULT_PORT: u16 = 7466;
@@ -506,6 +506,86 @@ fn restart_daemon(app: AppHandle) {
     restart_daemon_bg(&app);
 }
 
+/// Nama file (di direktori config aplikasi) yang menyimpan pilihan tema viewer untuk peluncuran berikutnya.
+const THEME_FILE: &str = "theme";
+
+/// Pilihan tema Settings → General viewer (`lakar.viewer.theme`: `system | light | dark`).
+#[derive(Clone, Copy, Debug, PartialEq)]
+enum UiTheme {
+    System,
+    Light,
+    Dark,
+}
+
+/// Nilai tersimpan/terkirim → pilihan; selain tiga nilai sah → `None` (pemanggil memakai `System`).
+fn parse_ui_theme(value: &str) -> Option<UiTheme> {
+    match value.trim() {
+        "system" => Some(UiTheme::System),
+        "light" => Some(UiTheme::Light),
+        "dark" => Some(UiTheme::Dark),
+        _ => None,
+    }
+}
+
+fn ui_theme_name(theme: UiTheme) -> &'static str {
+    match theme {
+        UiTheme::System => "system",
+        UiTheme::Light => "light",
+        UiTheme::Dark => "dark",
+    }
+}
+
+/// Tema native jendela. Webview ikut tema ini (`prefers-color-scheme` layar mulai dan viewer); `None` = ikut OS.
+fn native_theme(theme: UiTheme) -> Option<Theme> {
+    match theme {
+        UiTheme::System => None,
+        UiTheme::Light => Some(Theme::Light),
+        UiTheme::Dark => Some(Theme::Dark),
+    }
+}
+
+/// Warna latar native sebelum halaman ter-paint = `--bg` layar mulai (ui/index.html); `System` = bawaan platform.
+fn window_background(theme: UiTheme) -> Option<Color> {
+    match theme {
+        UiTheme::System => None,
+        UiTheme::Light => Some(Color(0xfa, 0xfa, 0xfa, 0xff)),
+        UiTheme::Dark => Some(Color(0x11, 0x11, 0x13, 0xff)),
+    }
+}
+
+fn apply_ui_theme(config: &mut WindowConfig, theme: UiTheme) {
+    config.theme = native_theme(theme);
+    config.background_color = window_background(theme);
+}
+
+fn theme_file(app: &AppHandle) -> Option<PathBuf> {
+    app.path().app_config_dir().ok().map(|d| dunce::simplified(&d).join(THEME_FILE))
+}
+
+/// Pilihan tersimpan; file tidak ada/rusak → `System` (perilaku lama: ikut OS).
+fn read_ui_theme(path: Option<&Path>) -> UiTheme {
+    path.and_then(|p| fs::read_to_string(p).ok()).and_then(|s| parse_ui_theme(&s)).unwrap_or(UiTheme::System)
+}
+
+/// Dipanggil viewer (theme.ts) saat mulai dan saat pilihan berubah: simpan untuk layar mulai berikutnya dan
+/// terapkan ke jendela sekarang (layar mulai setelah restart lakard ikut tema baru).
+#[tauri::command]
+async fn set_ui_theme(app: AppHandle, theme: String) -> Result<(), String> {
+    let theme = parse_ui_theme(&theme).ok_or_else(|| format!("tema tidak dikenal: {theme}"))?;
+    let name = ui_theme_name(theme);
+    if let Some(path) = theme_file(&app) {
+        // Viewer memanggil ini setiap kali dimuat: tulis hanya bila isi berubah.
+        if fs::read_to_string(&path).ok().as_deref().map(str::trim) != Some(name) {
+            fs::write(&path, name).map_err(|e| format!("gagal menulis {}: {e}", path.display()))?;
+        }
+    }
+    if let Some(win) = app.get_webview_window("main") {
+        let _ = win.set_theme(native_theme(theme));
+        let _ = win.set_background_color(window_background(theme));
+    }
+    Ok(())
+}
+
 fn build_tray(app: &AppHandle) -> tauri::Result<()> {
     let open = MenuItem::with_id(app, "open", "Open Lakar", true, None::<&str>)?;
     let restart = MenuItem::with_id(app, "restart", "Restart lakard", true, None::<&str>)?;
@@ -590,6 +670,8 @@ fn build_main_window(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> 
         .cloned()
         .ok_or("konfigurasi jendela main tidak ada di tauri.conf.json")?;
     apply_chrome(&mut config, cfg!(target_os = "macos"));
+    // Tema pilihan Settings sebelum jendela dibuat: layar mulai langsung ter-paint dengan warna yang benar.
+    apply_ui_theme(&mut config, read_ui_theme(theme_file(app).as_deref()));
     WebviewWindowBuilder::from_config(app, &config)?
         .on_download(|webview, event| {
             if let DownloadEvent::Requested { destination, .. } = event {
@@ -609,7 +691,7 @@ fn main() {
         // Instance kedua hanya memunculkan jendela yang ada (satu daemon per data dir).
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| show_main(app)))
         .manage(DaemonState::default())
-        .invoke_handler(tauri::generate_handler![daemon_state, restart_daemon])
+        .invoke_handler(tauri::generate_handler![daemon_state, restart_daemon, set_ui_theme])
         .setup(|app| {
             build_main_window(app.handle())?;
             build_tray(app.handle())?;
@@ -688,7 +770,10 @@ mod tests {
         let cap: serde_json::Value = serde_json::from_str(include_str!("../capabilities/viewer-window.json")).unwrap();
         assert_eq!(cap["remote"]["urls"], json!(["http://127.0.0.1:*"]));
         assert_eq!(cap["windows"], json!(["main"]));
-        assert_eq!(cap["permissions"], json!(WINDOW_PERMISSIONS));
+        // Satu-satunya command aplikasi untuk halaman remote: sinkron tema; daemon_state/restart_daemon tidak.
+        let mut expected: Vec<&str> = WINDOW_PERMISSIONS.to_vec();
+        expected.push("allow-set-ui-theme");
+        assert_eq!(cap["permissions"], json!(expected));
     }
 
     #[test]
@@ -696,9 +781,60 @@ mod tests {
         let cap: serde_json::Value = serde_json::from_str(include_str!("../capabilities/default.json")).unwrap();
         assert!(cap.get("remote").is_none());
         let perms = cap["permissions"].as_array().unwrap();
-        for p in WINDOW_PERMISSIONS {
+        // Manifest ACL aplikasi (build.rs) membuat command layar mulai wajib diizinkan eksplisit.
+        for p in WINDOW_PERMISSIONS.iter().chain(&["allow-daemon-state", "allow-restart-daemon"]) {
             assert!(perms.contains(&json!(p)), "{p} tidak ada di default.json");
         }
+    }
+
+    #[test]
+    fn build_manifest_lists_every_command() {
+        let build = include_str!("../build.rs");
+        for cmd in ["daemon_state", "restart_daemon", "set_ui_theme"] {
+            assert!(build.contains(&format!("\"{cmd}\"")), "{cmd} tidak ada di manifest build.rs");
+        }
+    }
+
+    #[test]
+    fn ui_theme_parses_only_known_values() {
+        assert_eq!(parse_ui_theme("light"), Some(UiTheme::Light));
+        assert_eq!(parse_ui_theme("dark\r\n"), Some(UiTheme::Dark));
+        assert_eq!(parse_ui_theme("system"), Some(UiTheme::System));
+        for v in ["", "Dark", "blue"] {
+            assert_eq!(parse_ui_theme(v), None);
+        }
+        for t in [UiTheme::System, UiTheme::Light, UiTheme::Dark] {
+            assert_eq!(parse_ui_theme(ui_theme_name(t)), Some(t));
+        }
+    }
+
+    #[test]
+    fn ui_theme_sets_native_theme_and_background() {
+        let mut config = WindowConfig::default();
+        apply_ui_theme(&mut config, UiTheme::Dark);
+        assert_eq!(config.theme, Some(Theme::Dark));
+        assert_eq!(config.background_color, Some(Color(0x11, 0x11, 0x13, 0xff)));
+        apply_ui_theme(&mut config, UiTheme::Light);
+        assert_eq!(config.theme, Some(Theme::Light));
+        assert_eq!(config.background_color, Some(Color(0xfa, 0xfa, 0xfa, 0xff)));
+        // System: kembali ke perilaku lama (ikut OS, latar bawaan).
+        apply_ui_theme(&mut config, UiTheme::System);
+        assert_eq!(config.theme, None);
+        assert_eq!(config.background_color, None);
+    }
+
+    #[test]
+    fn read_ui_theme_falls_back_to_system() {
+        let dir = std::env::temp_dir().join(format!("lakar-theme-test-{}", std::process::id()));
+        fs::create_dir_all(&dir).unwrap();
+        let file = dir.join(THEME_FILE);
+        assert_eq!(read_ui_theme(None), UiTheme::System);
+        assert_eq!(read_ui_theme(Some(&file)), UiTheme::System);
+        fs::write(&file, "dark").unwrap();
+        assert_eq!(read_ui_theme(Some(&file)), UiTheme::Dark);
+        fs::write(&file, "garbage").unwrap();
+        assert_eq!(read_ui_theme(Some(&file)), UiTheme::System);
+        let _ = fs::remove_dir_all(&dir);
     }
 
     #[test]
