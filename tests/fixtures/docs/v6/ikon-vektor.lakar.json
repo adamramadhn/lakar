@@ -1,0 +1,212 @@
+{
+  "schemaVersion": 6,
+  "id": "DocVek01",
+  "rev": 3,
+  "tokens": {},
+  "pages": [
+    {
+      "id": "PgVek001",
+      "name": "Ikon",
+      "children": [
+        {
+          "type": "board",
+          "id": "BrdBel01",
+          "name": "Ikon / lonceng",
+          "x": 0,
+          "y": 0,
+          "width": 96,
+          "height": 96,
+          "screen": "app",
+          "children": [
+            {
+              "type": "frame",
+              "id": "FrmBel01",
+              "name": "Icon / bell",
+              "width": 96,
+              "height": 96,
+              "children": [
+                {
+                  "type": "path",
+                  "id": "PthBel01",
+                  "name": "Clapper",
+                  "d": "M10.268 21a2 2 0 0 0 3.464 0",
+                  "viewBox": [0, 0, 24, 24],
+                  "width": 96,
+                  "height": 96,
+                  "stroke": { "color": "#111827", "width": 8, "align": "center" },
+                  "strokeLinecap": "round",
+                  "strokeLinejoin": "round"
+                },
+                {
+                  "type": "path",
+                  "id": "PthBel02",
+                  "name": "Body",
+                  "d": "M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326",
+                  "viewBox": [0, 0, 24, 24],
+                  "width": 96,
+                  "height": 96,
+                  "stroke": { "color": "#111827", "width": 8, "align": "center" },
+                  "strokeLinecap": "round",
+                  "strokeLinejoin": "round"
+                },
+                {
+                  "type": "path",
+                  "id": "PthBel03",
+                  "name": "Badge",
+                  "d": "M19 1.5a3 3 0 1 0 0 6a3 3 0 1 0 0-6z",
+                  "viewBox": [0, 0, 24, 24],
+                  "width": 96,
+                  "height": 96,
+                  "fills": [{ "type": "solid", "color": "#EF4444" }]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "board",
+          "id": "BrdCin01",
+          "name": "Ikon / cincin",
+          "x": 120,
+          "y": 0,
+          "width": 96,
+          "height": 96,
+          "screen": "app",
+          "children": [
+            {
+              "type": "frame",
+              "id": "FrmCin01",
+              "name": "Icon / ring",
+              "width": 96,
+              "height": 96,
+              "children": [
+                {
+                  "type": "path",
+                  "id": "PthCin01",
+                  "name": "Ring",
+                  "d": "M12 2a10 10 0 1 0 0 20a10 10 0 1 0 0-20zM12 7a5 5 0 1 0 0 10a5 5 0 1 0 0-10z",
+                  "viewBox": [0, 0, 24, 24],
+                  "width": 96,
+                  "height": 96,
+                  "fills": [{ "type": "solid", "color": "#2563EB" }],
+                  "stroke": { "color": "#1E3A8A", "width": 4, "align": "center" },
+                  "fillRule": "evenodd",
+                  "svg": { "stroke-opacity": "0.6", "paint-order": "stroke" }
+                },
+                {
+                  "type": "path",
+                  "id": "PthCin02",
+                  "name": "Core",
+                  "d": "M10 10h4v4h-4z",
+                  "viewBox": [0, 0, 24, 24],
+                  "width": 96,
+                  "height": 96,
+                  "fills": [{ "type": "solid", "color": "#2563EB" }],
+                  "svg": { "fill-opacity": "0.5" }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "board",
+          "id": "BrdZig01",
+          "name": "Ikon / zigzag",
+          "x": 240,
+          "y": 0,
+          "width": 96,
+          "height": 96,
+          "screen": "app",
+          "children": [
+            {
+              "type": "frame",
+              "id": "FrmZig01",
+              "name": "Icon / zigzag",
+              "width": 96,
+              "height": 96,
+              "children": [
+                {
+                  "type": "path",
+                  "id": "PthZig01",
+                  "name": "Zigzag",
+                  "d": "M3 18L8 6L13 18L18 6L21 12",
+                  "viewBox": [0, 0, 24, 24],
+                  "width": 96,
+                  "height": 96,
+                  "stroke": { "color": "#DC2626", "width": 8, "align": "center" },
+                  "strokeLinecap": "square",
+                  "strokeLinejoin": "miter",
+                  "strokeMiterlimit": 2
+                },
+                {
+                  "type": "path",
+                  "id": "PthZig02",
+                  "name": "Dashes",
+                  "d": "M3 21.5h18",
+                  "viewBox": [0, 0, 24, 24],
+                  "width": 96,
+                  "height": 96,
+                  "stroke": { "color": "#16A34A", "width": 8, "align": "center" },
+                  "strokeLinecap": "butt",
+                  "strokeDasharray": [8, 8],
+                  "svg": { "stroke-dashoffset": "4", "shape-rendering": "geometricPrecision" }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "board",
+          "id": "BrdLen01",
+          "name": "Ikon / lencana",
+          "x": 360,
+          "y": 0,
+          "width": 96,
+          "height": 96,
+          "screen": "app",
+          "children": [
+            {
+              "type": "frame",
+              "id": "FrmLen01",
+              "name": "Icon / badge",
+              "width": 96,
+              "height": 96,
+              "children": [
+                {
+                  "type": "path",
+                  "id": "PthLen01",
+                  "name": "Tile",
+                  "d": "M2 2h20v20h-20z",
+                  "viewBox": [0, 0, 24, 24],
+                  "position": "absolute",
+                  "x": 4,
+                  "y": 4,
+                  "width": 48,
+                  "height": 48,
+                  "fills": [{ "type": "solid", "color": "#FDE68A" }],
+                  "stroke": { "color": "#92400E", "width": 4, "align": "inside" },
+                  "strokeLinejoin": "bevel"
+                },
+                {
+                  "type": "path",
+                  "id": "PthLen02",
+                  "name": "Pill",
+                  "d": "M12 2a10 10 0 1 0 0 20a10 10 0 1 0 0-20z",
+                  "viewBox": [0, 0, 24, 24],
+                  "position": "absolute",
+                  "x": 50,
+                  "y": 60,
+                  "width": 40,
+                  "height": 20,
+                  "fills": [{ "type": "solid", "color": "#A7F3D0CC" }],
+                  "stroke": { "color": "#065F46", "width": 3, "align": "outside" },
+                  "opacity": 0.9
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

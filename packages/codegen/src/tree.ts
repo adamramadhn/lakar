@@ -245,11 +245,13 @@ function svgElement(spec: SvgSpec, name: string, nodeId: string, inner: boolean)
 
 /** Bentuk (path, ellipse busur): lapisan fill ber-mask + svg stroke. */
 function shapeChildren(ctx: TreeCtx, e: CodeElement, n: ExpandedChildNode & { fills?: unknown; stroke?: unknown }, shape: Shape): void {
+  const at = e.children.length;
   const bg = background(ctx, e, n.fills);
   if (bg.length) e.children.push(el('div', `${e.name}Fill`, n.id, [...shapeFillLayerDecls(shape), ...bg]));
   if (n.stroke) {
     const spec = strokeSvgSpec(shape, n.stroke as Parameters<typeof strokeSvgSpec>[1], `${ctx.idPrefix}-${n.id.replace(/[^A-Za-z0-9]/g, '-')}-stroke`);
-    if (spec) e.children.push(svgElement(spec, `${e.name}Stroke`, n.id, false));
+    // `paint-order` stroke sebelum fill (AD-14): urutan anak sama dengan render.
+    if (spec) e.children.splice(shape.strokeUnder ? at : e.children.length, 0, svgElement(spec, `${e.name}Stroke`, n.id, false));
   }
 }
 

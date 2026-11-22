@@ -28,6 +28,7 @@ export { DEFAULT_ICON_COLOR, DEFAULT_ICON_STROKE_WIDTH, iconKey, iconRefs, type 
 export { DEFAULT_ASSET_BASE, DROP_SHADOW_BLUR_FACTOR } from './paint.js';
 export { ellipseShape, pathShape, shapeFillLayerDecls, strokeSvgSpec, svgPaint, type Shape, type ViewBox } from './shape.js';
 export { iconSvgSpec } from './icon.js';
+export { vectorToSvg, type SvgDropped, type SvgExport } from './svg.js';
 // Pemetaan CSS tunggal (AD-5): dipakai render, Copy as viewer, dan codegen.
 export {
   BOARD_DEFAULT_BACKGROUND,
@@ -47,6 +48,11 @@ export {
   strokeOverlayDecls,
   textDecls,
   textWrapMode,
+  strokeBeforeFill,
+  vectorSvgAttrs,
+  type SvgAttr,
+  type VectorLike,
+  type VectorSvgAttrs,
   tokenValueCss,
   type ChildLike,
   type EffectsLike,

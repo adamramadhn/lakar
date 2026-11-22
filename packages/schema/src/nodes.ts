@@ -1,4 +1,4 @@
-// Skema dokumen Lakar v5 (AD-2, AD-11, AD-12, AD-13, AD-15, AD-16): primitif, token, properti visual, katalog node, dokumen.
+// Skema dokumen Lakar v6 (AD-2, AD-11, AD-12, AD-13, AD-14, AD-15, AD-16): primitif, token, properti visual, katalog node, dokumen.
 // v2 (story 22) menambah fill `conic`, `noise`, `mesh`; dokumen v1 dimigrasi identitas (`@lakar/core` MIGRATIONS[1]).
 // v3 (epic model-dokumen story 2) mengganti token datar dengan token bertipe + mode tema; dokumen v2 dimigrasi
 // lewat inferensi tipe (`@lakar/core` MIGRATIONS[2]).
@@ -13,7 +13,10 @@ import { NODE_ADDRESS_PATTERN } from './selection.js';
 // penempatan anak `gridColumn`/`gridRow`; dokumen v3 dimigrasi identitas (`@lakar/core` MIGRATIONS[3]).
 // v5 (epic komponen story 2, AD-12) menambah master `component {props, slots}` dan tipe node `instance`; dokumen v4
 // dimigrasi identitas (`@lakar/core` MIGRATIONS[4]). Ekspansi instance ada di components.ts.
-export const SCHEMA_VERSION = 5 as const;
+// v6 (epic paste-vektor story 2, AD-14) menambah atribut presentasi SVG bertipe pada node `path` (`fillRule`,
+// `strokeLinecap`, `strokeLinejoin`, `strokeDasharray`, `strokeMiterlimit`) dan record `svg` terbatas allowlist;
+// dokumen v5 dimigrasi identitas (`@lakar/core` MIGRATIONS[5]).
+export const SCHEMA_VERSION = 6 as const;
 
 // ---------------------------------------------------------------------------
 // Primitif
@@ -496,6 +499,47 @@ const ellipseShape = {
   inner: z.number().min(0).lt(1).optional(),
 };
 
+// ---------------------------------------------------------------------------
+// Vektor (v6, AD-14): atribut presentasi SVG bertipe + allowlist `svg`. Pemetaan ke atribut SVG di render css.ts
+// (`vectorSvgAttrs`). Panjang stroke (dash, dashoffset) dalam px seperti `stroke.width` (stroke non-scaling).
+// ---------------------------------------------------------------------------
+
+export const FILL_RULES = ['nonzero', 'evenodd'] as const;
+export const STROKE_LINECAPS = ['butt', 'round', 'square'] as const;
+export const STROKE_LINEJOINS = ['miter', 'round', 'bevel'] as const;
+export const STROKE_DASH_MAX = 16;
+export const STROKE_MITERLIMIT_MAX = 100;
+
+const OPACITY_ATTR = /^(?:(?:0|1)(?:\.0+)?|0?\.\d+|(?:100(?:\.0+)?|\d{1,2}(?:\.\d+)?)%)$/;
+/** Pola nilai per atribut allowlist `svg` (tanpa `url()`, tanpa string bebas). */
+export const SVG_ATTR_PATTERNS = {
+  'fill-opacity': OPACITY_ATTR,
+  'paint-order': /^(?:normal|(fill|stroke|markers)(?: (?!\1)(fill|stroke|markers)(?: (?!\1|\2)(?:fill|stroke|markers))?)?)$/,
+  'shape-rendering': /^(?:auto|optimizeSpeed|crispEdges|geometricPrecision)$/,
+  'stroke-dashoffset': /^-?(?:\d+(?:\.\d+)?|\.\d+)(?:px)?$/,
+  'stroke-opacity': OPACITY_ATTR,
+} as const;
+export type SvgPresentationAttr = keyof typeof SVG_ATTR_PATTERNS;
+/** Allowlist atribut presentasi SVG yang belum punya properti bertipe (urut abjad). */
+export const SVG_PRESENTATION_ATTRS = Object.keys(SVG_ATTR_PATTERNS) as SvgPresentationAttr[];
+const SVG_ALLOWLIST_MESSAGE = `atribut svg harus salah satu allowlist: ${SVG_PRESENTATION_ATTRS.join(', ')}`;
+export const SvgAttrs = z.strictObject(
+  Object.fromEntries(
+    SVG_PRESENTATION_ATTRS.map((k) => [k, z.string().regex(SVG_ATTR_PATTERNS[k], `svg ${k}: nilai tidak sah untuk atribut ini`).optional()]),
+  ) as { [K in SvgPresentationAttr]: z.ZodOptional<z.ZodString> },
+  { error: (i) => (i.code === 'unrecognized_keys' ? `${SVG_ALLOWLIST_MESSAGE} (bukan ${i.keys.join(', ')})` : undefined) },
+);
+export type SvgAttrs = z.infer<typeof SvgAttrs>;
+
+const vectorShape = {
+  fillRule: z.enum(FILL_RULES).optional(),
+  strokeLinecap: z.enum(STROKE_LINECAPS).optional(),
+  strokeLinejoin: z.enum(STROKE_LINEJOINS).optional(),
+  strokeDasharray: z.array(Size).min(1).max(STROKE_DASH_MAX).optional(),
+  strokeMiterlimit: z.number().finite().min(1).max(STROKE_MITERLIMIT_MAX).optional(),
+  svg: SvgAttrs.optional(),
+};
+
 const pathShape = {
   type: z.literal('path'),
   ...childBase,
@@ -504,6 +548,7 @@ const pathShape = {
   viewBox: z.tuple([Px, Px, Positive, Positive]),
   ...sizingShape,
   ...paintShape,
+  ...vectorShape,
 };
 
 const iconShape = {

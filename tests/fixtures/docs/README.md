@@ -29,6 +29,9 @@ Loader bersama ada di `tests/support/doc-corpus.ts`.
 | `v3/tema-mode` | token bertipe semua tipe (`color` … `letterSpacing`), `tokenModes: [light, dark]`, token dengan `modes` (warna, spacing, fontWeight), board `themeMode: dark` dan board tanpa `themeMode`, token di gap/padding/maxWidth/radius/size icon |
 | `v4/grid-galeri` | frame `layout:'grid'` dengan track px/`fr`/`auto`/`minmax`, `gridTemplateRows`, `columnGap`/`rowGap` token dan `gap`, `align`/`justify`, anak `gridColumn`/`gridRow` (`span`, `start`+`span`, `start`/`end` negatif), anak `hug`/`fill`/fixed/tanpa ukuran, anak absolute di grid |
 | `v5/komponen-kartu` | master `component` dengan prop `text`/`boolean` (`visible`)/`enum` dan slot, token di master, instance ber-override (akar, anak, dan path bersarang `InsBadg0/TxtBadg1`), instance dengan props dan isi slot, instance bersarang di dalam master (alamat tiga segmen), instance kedua dari master lain |
+| `v6/ikon-vektor` | empat board ikon 96×96: frame multi-path stroke (`strokeLinecap`/`strokeLinejoin` round) + path fill, `fillRule:'evenodd'` dengan `svg` `stroke-opacity`/`paint-order`/`fill-opacity`, `strokeLinecap` square/butt + `strokeMiterlimit` + `strokeDasharray` + `svg` `stroke-dashoffset`/`shape-rendering`, stroke `inside`/`outside` pada path absolute berskala tak seragam |
+
+SVG sumber tiga board ikon pertama ada di `tests/fixtures/svg/ikon-vektor/*.svg`; `packages/render/test/corpus.test.ts` membandingkan render board dengan render SVG sumber itu, dan render ekspor `vectorToSvg` dengan render Lakar (selisih piksel ≤ 1%).
 
 Gabungan korpus wajib tetap mencakup semua tipe node, semua jenis fill, dan properti di atas. Bila skema bertambah properti, tambahkan pemakaiannya ke fixture versi baru.
 

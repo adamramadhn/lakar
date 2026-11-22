@@ -143,7 +143,8 @@ function renderShape(d: Document, n: EllipseNode | PathNode, shape: Shape | unde
   const layer = fillLayer(d, shape);
   if (applyFills(layer.style, n.fills, fillContext(d, n, ctx))) el.appendChild(layer);
   const stroke = n.stroke ? strokeSvg(d, shape, n.stroke) : undefined;
-  if (stroke) el.appendChild(stroke);
+  // `paint-order` stroke sebelum fill (AD-14): overlay stroke dipasang di bawah lapisan fill.
+  if (stroke) el.insertBefore(stroke, shape.strokeUnder ? el.firstChild : null);
   return el;
 }
 

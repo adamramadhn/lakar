@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { beginTransaction, migrateDocument, parseDocument } from '../packages/core/src/index.ts';
-import { expandInstances, instanceIssues, NODE_TYPES, resolveDocument, resolveTokens, SCHEMA_VERSION, TOKEN_TYPES, type LakarDocument } from '../packages/schema/src/index.ts';
+import { expandInstances, instanceIssues, NODE_TYPES, resolveDocument, resolveTokens, SCHEMA_VERSION, SVG_PRESENTATION_ATTRS, TOKEN_TYPES, type LakarDocument } from '../packages/schema/src/index.ts';
 import { boardsOf, loadDocCorpus, missingVersions, type CorpusDoc } from './support/doc-corpus.ts';
 
 const corpus = loadDocCorpus();
@@ -185,7 +185,7 @@ function byAddress(doc: unknown): Map<string, Record<string, unknown>> {
 
 describe('korpus dokumen: migrasi v4 → v5 (komponen, AD-12)', () => {
   it.each(corpus.filter((d) => d.version === 4).map((d): [string, CorpusDoc] => [`v${d.version}/${d.name}`, d]))('identitas: %s', (_label, d) => {
-    expect(migrateDocument(d.raw), d.path).toEqual({ ...d.raw, schemaVersion: 5 });
+    expect(migrateDocument(d.raw, { target: 5 }), d.path).toEqual({ ...d.raw, schemaVersion: 5 });
   });
 
   it.each(corpus.filter((d) => d.version < 5).map((d): [string, CorpusDoc] => [`v${d.version}/${d.name}`, d]))('%s: tanpa instance, expandInstances = dokumen itu sendiri', (_label, d) => {
@@ -258,6 +258,49 @@ describe('korpus dokumen: migrasi v4 → v5 (komponen, AD-12)', () => {
     const tx = beginTransaction(doc, { sessionId: 'tes-korpus' });
     tx.add('BdyCard1', { type: 'instance', name: 'Siklus', componentId: 'MstCard1' });
     expect(thrownCode(() => tx.commit('siklus'))).toBe('SCHEMA_INVALID');
+    expect(doc).toEqual(before);
+  });
+});
+
+describe('korpus dokumen: migrasi v5 → v6 (vektor, AD-14)', () => {
+  it.each(corpus.filter((d) => d.version === 5).map((d): [string, CorpusDoc] => [`v${d.version}/${d.name}`, d]))('identitas: %s', (_label, d) => {
+    expect(migrateDocument(d.raw), d.path).toEqual({ ...d.raw, schemaVersion: 6 });
+  });
+
+  it.each(corpus.filter((d) => d.version < 6).map((d): [string, CorpusDoc] => [`v${d.version}/${d.name}`, d]))('%s: hasil v5 = hasil versi kini kecuali versi', (_label, d) => {
+    const v5 = migrateDocument(d.raw, { target: 5 }) as Record<string, unknown>;
+    expect(parseDocument(d.raw), d.path).toEqual({ ...v5, schemaVersion: SCHEMA_VERSION });
+  });
+
+  it('fixture v6 memakai semua atribut vektor bertipe, semua atribut allowlist svg, dan frame ikon multi-path', () => {
+    const nodes = corpus.filter((d) => d.version === 6).flatMap((d) => allNodes(parseDocument(d.raw))) as Record<string, unknown>[];
+    const paths = nodes.filter((n) => n.type === 'path');
+    for (const k of ['fillRule', 'strokeLinecap', 'strokeLinejoin', 'strokeDasharray', 'strokeMiterlimit']) expect(paths.some((p) => p[k] !== undefined), k).toBe(true);
+    expect(new Set(paths.map((p) => p.fillRule).filter(Boolean))).toEqual(new Set(['evenodd']));
+    expect(new Set(paths.map((p) => p.strokeLinecap).filter(Boolean))).toEqual(new Set(['round', 'square', 'butt']));
+    expect(new Set(paths.map((p) => p.strokeLinejoin).filter(Boolean))).toEqual(new Set(['round', 'miter', 'bevel']));
+    const attrs = new Set(paths.flatMap((p) => Object.keys((p.svg as object | undefined) ?? {})));
+    expect([...attrs].sort()).toEqual([...SVG_PRESENTATION_ATTRS]);
+    const frames = nodes.filter((n) => n.type === 'frame' && (n.children as { type: string }[]).length > 1 && (n.children as { type: string }[]).every((c) => c.type === 'path'));
+    expect(frames.length).toBeGreaterThan(0);
+    expect(new Set(paths.map((p) => (p.stroke as { align?: string } | undefined)?.align).filter(Boolean))).toEqual(new Set(['center', 'inside', 'outside']));
+  });
+
+  const v6 = () => parseDocument(corpus.find((x) => x.version === 6 && x.name === 'ikon-vektor')!.raw);
+
+  it('jalur mutasi core: update properti vektor diterima; svg di luar allowlist ditolak SCHEMA_INVALID, dokumen asli utuh', () => {
+    const ok = beginTransaction(v6(), { sessionId: 'tes-korpus' });
+    ok.update('PthZig01', { strokeLinecap: 'round', strokeDasharray: [4, 2], svg: { 'stroke-opacity': '0.5' } });
+    expect(byAddress(ok.commit('vektor').doc).get('PthZig01')).toMatchObject({ strokeLinecap: 'round', strokeDasharray: [4, 2], svg: { 'stroke-opacity': '0.5' } });
+    const doc = v6();
+    const before = structuredClone(doc);
+    for (const patch of [{ svg: { transform: 'rotate(4)' } }, { svg: { 'stroke-opacity': 'url(#a)' } }]) {
+      const tx = beginTransaction(doc, { sessionId: 'tes-korpus' });
+      expect(thrownCode(() => {
+        tx.update('PthZig01', patch);
+        tx.commit('di luar allowlist');
+      })).toBe('SCHEMA_INVALID');
+    }
     expect(doc).toEqual(before);
   });
 });

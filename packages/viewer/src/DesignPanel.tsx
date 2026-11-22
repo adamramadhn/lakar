@@ -56,6 +56,13 @@ import {
   strokeColor,
   strokeSides,
   toggleSide,
+  formatDash,
+  isVectorSelection,
+  MITER_MAX,
+  parseDash,
+  parseMiter,
+  setVector,
+  vectorValue,
   trackCount,
   type Axis,
   type DesignTarget,
@@ -1366,6 +1373,18 @@ function FillGroup({ targets, ctx }: { targets: DesignTarget[]; ctx: Ctx }) {
           </div>
         );
       })}
+      {rows.length > 0 && isVectorSelection(targets) && (
+        <SelectField
+          label="Fill rule"
+          state={readField(targets, (n) => vectorValue(n, 'fillRule'))}
+          options={[
+            ['nonzero', 'Nonzero'],
+            ['evenodd', 'Evenodd'],
+          ]}
+          disabled={ctx.disabled}
+          onPick={(v) => ctx.run((ts) => setVector(ts, 'fillRule', v), 'Change fill rule')}
+        />
+      )}
     </Group>
   );
 }
@@ -1377,6 +1396,7 @@ function StrokeGroup({ targets, ctx }: { targets: DesignTarget[]; ctx: Ctx }) {
   const width = readField(targets, (n) => (n.stroke as Raw | undefined)?.width);
   const align = readField(targets, (n) => (n.stroke as Raw | undefined)?.align);
   const sides = readField(targets, (n) => strokeSides(n.stroke));
+  const vector = isVectorSelection(targets);
   return (
     <Group
       title="Stroke"
@@ -1413,20 +1433,90 @@ function StrokeGroup({ targets, ctx }: { targets: DesignTarget[]; ctx: Ctx }) {
               onPick={(v) => ctx.run((ts) => setStroke(ts, { align: v }), 'Change stroke align')}
             />
           </div>
-          <div className="dp-row">
-            <span className="dp-row-label">Sides</span>
-            <Segmented<Side>
-              label="Stroke sides"
-              className="dp-sides"
-              options={SIDES.map((s) => ({ value: s, icon: (`panel${s[0]!.toUpperCase()}${s.slice(1)}` as IconName), title: `${s[0]!.toUpperCase()}${s.slice(1)}` }))}
-              active={(s) => !sides.mixed && (sides.value as Side[]).includes(s)}
-              disabled={ctx.disabled || !has}
-              onPick={(s) => ctx.run((ts) => toggleSide(ts, s), 'Change stroke sides')}
-            />
-          </div>
+          {vector ? (
+            <VectorStrokeRows targets={targets} ctx={ctx} disabled={ctx.disabled || !has} />
+          ) : (
+            <div className="dp-row">
+              <span className="dp-row-label">Sides</span>
+              <Segmented<Side>
+                label="Stroke sides"
+                className="dp-sides"
+                options={SIDES.map((s) => ({ value: s, icon: (`panel${s[0]!.toUpperCase()}${s.slice(1)}` as IconName), title: `${s[0]!.toUpperCase()}${s.slice(1)}` }))}
+                active={(s) => !sides.mixed && (sides.value as Side[]).includes(s)}
+                disabled={ctx.disabled || !has}
+                onPick={(s) => ctx.run((ts) => toggleSide(ts, s), 'Change stroke sides')}
+              />
+            </div>
+          )}
         </>
       )}
     </Group>
+  );
+}
+
+/** Baris stroke vektor path (desain J7AmQi/S8w37): Cap, Join, lalu Dash + Miter. Nilai kosong tampil sebagai bawaan. */
+function VectorStrokeRows({ targets, ctx, disabled }: { targets: DesignTarget[]; ctx: Ctx; disabled: boolean }) {
+  const cap = readField(targets, (n) => vectorValue(n, 'strokeLinecap'));
+  const join = readField(targets, (n) => vectorValue(n, 'strokeLinejoin'));
+  const dash = readField(targets, (n) => n.strokeDasharray);
+  const miter = readField(targets, (n) => vectorValue(n, 'strokeMiterlimit'));
+  return (
+    <>
+      <div className="dp-row">
+        <span className="dp-row-label dp-vec-label">Cap</span>
+        <Segmented<'butt' | 'round' | 'square'>
+          label="Stroke cap"
+          className="dp-grow"
+          options={[
+            { value: 'butt', label: 'Butt' },
+            { value: 'round', label: 'Round' },
+            { value: 'square', label: 'Square' },
+          ]}
+          value={cap.mixed ? undefined : (cap.value as 'butt')}
+          disabled={disabled}
+          onPick={(v) => ctx.run((ts) => setVector(ts, 'strokeLinecap', v), 'Change stroke cap')}
+        />
+      </div>
+      <div className="dp-row">
+        <span className="dp-row-label dp-vec-label">Join</span>
+        <Segmented<'miter' | 'round' | 'bevel'>
+          label="Stroke join"
+          className="dp-grow"
+          options={[
+            { value: 'miter', label: 'Miter' },
+            { value: 'round', label: 'Round' },
+            { value: 'bevel', label: 'Bevel' },
+          ]}
+          value={join.mixed ? undefined : (join.value as 'miter')}
+          disabled={disabled}
+          onPick={(v) => ctx.run((ts) => setVector(ts, 'strokeLinejoin', v), 'Change stroke join')}
+        />
+      </div>
+      <div className="dp-row">
+        <Field
+          className="dp-grow"
+          label="Dash"
+          title="Dash pattern in px, e.g. 4 2"
+          placeholder="None"
+          state={dash}
+          format={formatDash}
+          parse={parseDash}
+          disabled={disabled}
+          onCommit={(v) => ctx.run((ts) => setVector(ts, 'strokeDasharray', v), 'Change stroke dash')}
+        />
+        <Field
+          className="dp-grow"
+          label="Miter"
+          title="Miter limit"
+          state={miter}
+          format={num}
+          parse={parseMiter}
+          scrub={{ step: 0.1, min: 1, max: MITER_MAX }}
+          disabled={disabled}
+          onCommit={(v) => ctx.run((ts) => setVector(ts, 'strokeMiterlimit', v), 'Change miter limit')}
+        />
+      </div>
+    </>
   );
 }
 

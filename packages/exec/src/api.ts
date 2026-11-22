@@ -844,7 +844,8 @@ export const API_REFERENCE: readonly ApiReferenceSection[] = [
       "frame: `layout?:'none'|'row'|'column'|'grid'` (default `'none'` = semua anak absolut di x/y, default 0,0; grid: bagian Grid), `gap?` (boleh negatif), `padding?`, `align?:'start'|'center'|'end'|'stretch'` (sumbu silang), `justify?:'start'|'center'|'end'|'space-between'` (sumbu utama), `clip?`, `scrollY?` (geser isi ke atas), sizing, cat, radius, efek.",
       "text: `content, size, family?` (default Inter), `weight?` (100–900, default 400), `style?:'normal'|'italic'`, `lineHeight?` (px), `letterSpacing?` (em), `align?:'left'|'center'|'right'|'justify'`, `wrap?`, `numeric?:'proportional'|'tabular'`, `color?` (default #000000), sizing, efek.",
       'rect: sizing, cat, radius, efek. ellipse: sizing, cat, efek + `startDeg?` (0 = jam 12, searah jarum jam), `sweepDeg?` (-360..360), `inner?` (rasio lubang [0,1)) untuk busur/ring.',
-      'path: `d` (SVG path), `viewBox:[x,y,w,h]`, sizing, cat, efek. icon: `lib, icon, size, color?, strokeWidth?, filled?`, efek (lihat add).',
+      "path: `d` (SVG path), `viewBox:[x,y,w,h]`, sizing, cat, efek; vektor opsional `fillRule?:'nonzero'|'evenodd'`, `strokeLinecap?:'butt'|'round'|'square'`, `strokeLinejoin?:'miter'|'round'|'bevel'`, `strokeDasharray?` (px kotak render seperti stroke.width, bukan unit viewBox: kalikan skala saat menyalin dari SVG), `strokeMiterlimit?` (1..100), `svg?` (nilai string, mis. {'stroke-opacity':'0.5'}; allowlist: fill-opacity, paint-order, shape-rendering, stroke-dashoffset (px), stroke-opacity). " +
+        'icon: `lib, icon, size, color?, strokeWidth?, filled?`, efek (lihat add).',
     ],
     example:
       `${BOARD}\nconst f = add(b, {type:'frame', name:'Kartu', layout:'column', gap:8, padding:16, width:'fill', radius:12, fills:[{type:'solid', color:'#F6F7F9'}]});\n` +

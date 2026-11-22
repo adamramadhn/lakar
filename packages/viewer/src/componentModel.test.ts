@@ -134,6 +134,14 @@ describe('alamat dan override', () => {
     expect(resetAllOps('InstAAAA')).toEqual([{ op: 'update', id: 'InstAAAA', patch: { overrides: null } }]);
   });
 
+  it('properti vektor (v6) masuk marker dan reset grup Fill/Stroke', () => {
+    const targets = [{ id: 'InstAAAA/PathAAAA', overrides: { fillRule: 'evenodd', strokeLinecap: 'round', strokeDasharray: [4, 2], strokeLinejoin: 'bevel', strokeMiterlimit: 8, svg: { 'stroke-opacity': '0.5' } } }];
+    expect(groupOverrides(targets, 'fill')).toEqual(['fillRule']);
+    expect(groupOverrides(targets, 'stroke')).toEqual(['strokeLinecap', 'strokeLinejoin', 'strokeDasharray', 'strokeMiterlimit', 'svg']);
+    expect(resetGroupOps(targets, 'stroke')).toEqual([{ op: 'resetOverride', id: 'InstAAAA/PathAAAA', props: ['strokeLinecap', 'strokeLinejoin', 'strokeDasharray', 'strokeMiterlimit', 'svg'] }]);
+    expect(resetGroupOps(targets, 'fill')).toEqual([{ op: 'resetOverride', id: 'InstAAAA/PathAAAA', props: ['fillRule'] }]);
+  });
+
   it('ringkasan override: akar "Fill", node lain "<nama> text", yatim, kosong', () => {
     const info = componentInfo(doc());
     const names: Record<string, string> = { TitleAAA: 'Title' };

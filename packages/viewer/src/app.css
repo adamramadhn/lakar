@@ -2816,6 +2816,11 @@ button.panel-tab:hover {
   color: var(--text-secondary);
   font-size: 11px;
 }
+/* Label baris stroke vektor (desain J7AmQi: lebar tetap 44px). */
+.dp-row > .dp-vec-label {
+  flex: 0 0 44px;
+  margin-right: 0;
+}
 .dp-row > .dp-sides {
   flex: 0 0 148px;
 }

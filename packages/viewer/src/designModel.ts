@@ -2,7 +2,7 @@
 // pembangun op `update` untuk route ops viewer (AD-7). Murni: masukan = node tersimpan (ref token utuh) + pasangan
 // ter-resolve (AD-10); keluaran = DocOp[] tanpa op untuk node yang nilainya tidak berubah. Patch hanya memakai
 // properti skema v3 (AD-1, AD-13); `null` menghapus properti opsional (core `update`).
-import { GRID_TRACKS_MAX, type DocOp } from '@lakar/schema';
+import { GRID_TRACKS_MAX, STROKE_DASH_MAX, STROKE_MITERLIMIT_MAX, type DocOp } from '@lakar/schema';
 import { isTokenRef, joinHex, parseNumber, round2, sameValue, splitHex, withHex } from './designValues.js';
 
 export type Raw = Record<string, unknown>;
@@ -353,6 +353,46 @@ export function toggleSide(targets: readonly DesignTarget[], side: Side): DocOp[
     return { stroke: next.length === SIDES.length ? rest : { ...rest, sides: next } };
   });
 }
+
+// ---------------------------------------------------------------------------
+// Vektor (epic paste-vektor story 2, AD-14; desain J7AmQi/S8w37): fill rule, cap, join, dash, miter pada path
+// ---------------------------------------------------------------------------
+
+/** Kontrol vektor tampil hanya bila semua node terpilih adalah path. */
+export const isVectorSelection = (targets: readonly DesignTarget[]) => targets.length > 0 && targets.every((t) => t.type === 'path');
+
+/** Nilai bawaan SVG/render yang ditampilkan bila properti belum diisi. */
+export const VECTOR_DEFAULTS = { fillRule: 'nonzero', strokeLinecap: 'butt', strokeLinejoin: 'miter', strokeMiterlimit: 4 } as const;
+export type VectorProp = 'fillRule' | 'strokeLinecap' | 'strokeLinejoin' | 'strokeDasharray' | 'strokeMiterlimit';
+export const DASH_MAX = STROKE_DASH_MAX;
+export const MITER_MAX = STROKE_MITERLIMIT_MAX;
+
+/** Nilai vektor node atau bawaannya (untuk tampilan). */
+export const vectorValue = (n: Raw, key: Exclude<VectorProp, 'strokeDasharray'>): unknown => n[key] ?? VECTOR_DEFAULTS[key];
+
+/** Tulis satu properti vektor ke semua path terpilih (`null` = hapus). */
+export const setVector = (targets: readonly DesignTarget[], key: VectorProp, value: unknown): DocOp[] =>
+  opsFor(targets, (t) => (t.type === 'path' ? { [key]: value } : undefined));
+
+/**
+ * Teks Dash → `strokeDasharray`: angka ≥ 0 dipisah spasi/koma (maks 16). Kosong, `none`, atau semua 0 → `null`
+ * (garis utuh, properti dihapus). Tidak valid → undefined.
+ */
+export function parseDash(text: string): number[] | null | undefined {
+  const t = text.trim();
+  if (t === '' || t.toLowerCase() === 'none') return null;
+  const parts = t.split(/[\s,]+/).filter(Boolean);
+  if (parts.length > DASH_MAX) return undefined;
+  const nums = parts.map((p) => parseNumber(p, { min: 0 }));
+  if (nums.some((n) => n === undefined)) return undefined;
+  return (nums as number[]).every((n) => n === 0) ? null : (nums as number[]);
+}
+
+/** `strokeDasharray` → teks Dash (`4 2`); tidak diisi → kosong. */
+export const formatDash = (v: unknown): string => (Array.isArray(v) ? v.map((n) => String(round2(Number(n)))).join(' ') : '');
+
+/** Teks Miter → `strokeMiterlimit` (1..100). */
+export const parseMiter = (text: string) => parseNumber(text, { min: 1, max: MITER_MAX });
 
 // ---------------------------------------------------------------------------
 // Radius

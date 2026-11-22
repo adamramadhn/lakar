@@ -145,8 +145,8 @@ export const GROUP_PROPS: Readonly<Record<Group, readonly string[]>> = {
   autoLayout: ['layout', 'gap', 'padding', 'align', 'justify', 'gridTemplateColumns', 'gridTemplateRows', 'columnGap', 'rowGap', 'clip', 'scrollY'],
   typography: ['content', 'family', 'weight', 'style', 'size', 'lineHeight', 'letterSpacing', 'align', 'wrap', 'numeric', 'color'],
   icon: ['lib', 'icon', 'version', 'size', 'color', 'strokeWidth', 'filled'],
-  fill: ['fills'],
-  stroke: ['stroke'],
+  fill: ['fills', 'fillRule'],
+  stroke: ['stroke', 'strokeLinecap', 'strokeLinejoin', 'strokeDasharray', 'strokeMiterlimit', 'svg'],
   radius: ['radius'],
   effects: ['opacity', 'blend', 'blur', 'backdropBlur', 'shadows'],
 };

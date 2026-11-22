@@ -706,3 +706,67 @@ export function tokenValueCss(type: string, value: unknown): string | undefined 
  * atribut presentasi).
  */
 export type SvgSpec = { tag: string; attrs: [name: string, value: string][]; style: CssDecl[]; children: SvgSpec[] };
+
+/** Atribut SVG `[nama, nilai]`. */
+export type SvgAttr = [name: string, value: string];
+
+export type VectorLike = {
+  readonly fillRule?: unknown;
+  readonly strokeLinecap?: unknown;
+  readonly strokeLinejoin?: unknown;
+  readonly strokeDasharray?: unknown;
+  readonly strokeMiterlimit?: unknown;
+  readonly svg?: unknown;
+};
+
+/** Atribut vektor node path yang sudah dipetakan ke SVG (AD-14). */
+export type VectorSvgAttrs = {
+  /** `fill-rule` mask fill, clipPath stroke inside, dan mask stroke outside. */
+  rule: 'nonzero' | 'evenodd';
+  /** Atribut tambahan path mask fill (`fill-opacity`, `shape-rendering`). */
+  fill: SvgAttr[];
+  /** Atribut path stroke: `stroke-linejoin` selalu pertama (default `miter`), lalu yang diisi. */
+  stroke: SvgAttr[];
+  /** `paint-order` menaruh stroke sebelum fill → overlay stroke di bawah lapisan fill. */
+  strokeUnder: boolean;
+};
+
+const CAPS = new Set(['butt', 'round', 'square']);
+const JOINS = new Set(['miter', 'round', 'bevel']);
+const svgNum = (n: number) => String(+n.toFixed(6));
+
+/** `paint-order` → stroke dilukis sebelum fill? Kata yang tidak disebut menyusul urutan bawaan fill, stroke, markers. */
+export function strokeBeforeFill(order: unknown): boolean {
+  if (typeof order !== 'string' || order.trim() === 'normal') return false;
+  const listed = order.trim().split(/\s+/);
+  const full = [...listed, ...['fill', 'stroke', 'markers'].filter((k) => !listed.includes(k))];
+  return full.indexOf('stroke') < full.indexOf('fill');
+}
+
+/**
+ * Pemetaan tunggal properti vektor path → atribut SVG (AD-5, AD-14), dipakai render, codegen, dan serializer ekspor.
+ * Nilai tak terpetakan dilewati. Node tanpa properti vektor → `{rule:'nonzero', fill:[], stroke:[['stroke-linejoin','miter']]}`.
+ */
+export function vectorSvgAttrs(n: VectorLike): VectorSvgAttrs {
+  const svg = (typeof n.svg === 'object' && n.svg !== null ? n.svg : {}) as Record<string, unknown>;
+  const str = (k: string) => (typeof svg[k] === 'string' ? (svg[k] as string) : undefined);
+  const fill: SvgAttr[] = [];
+  const stroke: SvgAttr[] = [['stroke-linejoin', typeof n.strokeLinejoin === 'string' && JOINS.has(n.strokeLinejoin) ? n.strokeLinejoin : 'miter']];
+  if (typeof n.strokeLinecap === 'string' && CAPS.has(n.strokeLinecap)) stroke.push(['stroke-linecap', n.strokeLinecap]);
+  if (isNum(n.strokeMiterlimit)) stroke.push(['stroke-miterlimit', svgNum(n.strokeMiterlimit)]);
+  if (Array.isArray(n.strokeDasharray) && n.strokeDasharray.length && n.strokeDasharray.every(isNum)) {
+    stroke.push(['stroke-dasharray', (n.strokeDasharray as number[]).map(svgNum).join(' ')]);
+  }
+  for (const k of ['stroke-dashoffset', 'stroke-opacity']) {
+    const v = str(k);
+    if (v !== undefined) stroke.push([k, v]);
+  }
+  const fo = str('fill-opacity');
+  if (fo !== undefined) fill.push(['fill-opacity', fo]);
+  const sr = str('shape-rendering');
+  if (sr !== undefined) {
+    fill.push(['shape-rendering', sr]);
+    stroke.push(['shape-rendering', sr]);
+  }
+  return { rule: n.fillRule === 'evenodd' ? 'evenodd' : 'nonzero', fill, stroke, strokeUnder: strokeBeforeFill(svg['paint-order']) };
+}

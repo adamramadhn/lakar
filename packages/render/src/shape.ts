@@ -2,11 +2,22 @@
 // Geometri bentuk non-box (Design Notes story 8): busur ellipse dan path. Bentuk diisi lewat lapisan
 // fill ber-`mask-image` SVG dan diberi stroke lewat overlay `<svg>` internal (keduanya tanpa data-lakar-id).
 import type { ResolvedEllipseNode as EllipseNode, ResolvedPathNode as PathNode, ResolvedStroke as Stroke } from '@lakar/schema';
-import { isTokenRef, tokenVar, type CssDecl, type StrokeLike, type SvgSpec } from './css.js';
+import { isTokenRef, tokenVar, vectorSvgAttrs, type CssDecl, type StrokeLike, type SvgAttr, type SvgSpec, type VectorLike } from './css.js';
 
 export type ViewBox = readonly [number, number, number, number];
-/** Bentuk di ruang `viewBox`, dipetakan non-uniform ke box node. */
-export type Shape = { viewBox: ViewBox; d: string; rule: 'nonzero' | 'evenodd' };
+/**
+ * Bentuk di ruang `viewBox`, dipetakan non-uniform ke box node. Atribut vektor path (AD-14, `vectorSvgAttrs`):
+ * `fillAttrs` di path mask fill, `strokeAttrs` di path stroke (tanpa isi = `stroke-linejoin="miter"`), dan
+ * `strokeUnder` = overlay stroke di bawah lapisan fill (`paint-order`).
+ */
+export type Shape = {
+  viewBox: ViewBox;
+  d: string;
+  rule: 'nonzero' | 'evenodd';
+  fillAttrs?: SvgAttr[];
+  strokeAttrs?: SvgAttr[];
+  strokeUnder?: boolean;
+};
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const UNIT: ViewBox = [0, 0, 1, 1];
@@ -44,8 +55,13 @@ export function ellipseShape(n: Pick<EllipseNode, 'startDeg' | 'sweepDeg' | 'inn
   return { viewBox: UNIT, d, rule: 'evenodd' };
 }
 
-export function pathShape(n: Pick<PathNode, 'd' | 'viewBox'>): Shape {
-  return { viewBox: n.viewBox, d: n.d, rule: 'nonzero' };
+/** Bentuk node path: `d` + viewBox + atribut vektor bertipe dan `svg` (AD-14). */
+export function pathShape(n: Pick<PathNode, 'd' | 'viewBox'> & VectorLike): Shape {
+  const v = vectorSvgAttrs(n);
+  const shape: Shape = { viewBox: n.viewBox, d: n.d, rule: v.rule, strokeAttrs: v.stroke };
+  if (v.fill.length) shape.fillAttrs = v.fill;
+  if (v.strokeUnder) shape.strokeUnder = true;
+  return shape;
 }
 
 const xmlAttr = (s: string) => s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
@@ -54,7 +70,7 @@ const xmlAttr = (s: string) => s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').
 function maskImage(shape: Shape): string {
   const svg =
     `<svg xmlns="${SVG_NS}" viewBox="${shape.viewBox.map(num).join(' ')}" preserveAspectRatio="none">` +
-    `<path d="${xmlAttr(shape.d)}" fill="#000" fill-rule="${shape.rule}"/></svg>`;
+    `<path d="${xmlAttr(shape.d)}" fill="#000" fill-rule="${shape.rule}"${(shape.fillAttrs ?? []).map(([k, v]) => ` ${k}="${xmlAttr(v)}"`).join('')}/></svg>`;
   return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
 }
 
@@ -120,7 +136,7 @@ export function strokeSvgSpec(shape: Shape, s: StrokeLike, id: string): SvgSpec 
     const v = tokenVar(s.width as { $token: string });
     pathStyle.push(['stroke-width', s.align === 'center' ? v : `calc(2 * ${v})`]);
   }
-  pathAttrs.push(['vector-effect', 'non-scaling-stroke'], ['stroke-linejoin', 'miter']);
+  pathAttrs.push(['vector-effect', 'non-scaling-stroke'], ...(shape.strokeAttrs ?? [['stroke-linejoin', 'miter'] as SvgAttr]));
   const children: SvgSpec[] = [];
   if (s.align !== 'center') {
     if (s.align === 'inside') {
