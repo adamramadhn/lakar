@@ -28,6 +28,7 @@ import { toggleSelection, type GeoNode } from './gesture';
 import { actionState, EDIT_ACTIONS, nudgeNodes, nudgeOps, planAction, selectAllIds, selectionAfter, shortcutAction, type EditAction, type EditPlan } from './editActions';
 import { EditMenu } from './EditMenu';
 import { EMPTY_STACKS, recordCommit, settleStep, takeStep, type UndoStacks } from './undoHistory';
+import { attachSelectionReporter } from './selectionSync';
 import { activityHub, editChange, goneReason, harnessLabel, revChange, sessionsForSlug, slugAppeared, type StreamEvent } from './activity';
 import { ActivityPanel } from './ActivityPanel';
 import { BottomSheet } from './BottomSheet';
@@ -459,6 +460,20 @@ export function Viewer({ slug }: { slug: string }) {
       }),
     [],
   );
+  // Seleksi canvas dilaporkan ke daemon (AD-9, debounce) supaya agen membacanya lewat get_selection; dikirim ulang
+  // saat stream tersambung lagi (daemon mungkin restart) dan dikosongkan saat Viewer ditutup.
+  const reporter = useRef<ReturnType<typeof attachSelectionReporter> | undefined>(undefined);
+  useEffect(() => {
+    const r = attachSelectionReporter(slug, selectionRef.current, (s, addresses) => api.putSelection(s, addresses), (l) => activityHub.listen(l));
+    reporter.current = r;
+    return () => {
+      r.dispose();
+      if (reporter.current === r) reporter.current = undefined;
+    };
+  }, [slug]);
+  useEffect(() => {
+    reporter.current?.update(selection);
+  }, [selection]);
   // Tidak ditemukan: cek arsip supaya pesan bisa menunjuk ke Archive.
   const notFound = doc.state === 'error' && doc.notFound === true;
   useEffect(() => {

@@ -47,6 +47,7 @@ import { registerConnectionRoutes } from './connections.js';
 import { registerFileRoutes } from './files.js';
 import { registerPageRoutes } from './pages.js';
 import { registerOpsRoutes } from './ops.js';
+import { SelectionStore, registerSelectionRoutes } from './selection.js';
 import { registerRenderDepsRoutes } from './render-deps.js';
 import { registerExportRoutes } from './export.js';
 import { VIEWER_DIST_DIR, registerViewerRoutes } from './viewer.js';
@@ -194,6 +195,8 @@ export type Daemon = {
   photos: PhotoService;
   /** Bus event aktivitas viewer (`GET /viewer/events`). */
   activity: ActivityBus;
+  /** Seleksi canvas efemeral per dokumen (AD-9). */
+  selections: SelectionStore;
   startedAt: string;
 };
 
@@ -215,6 +218,8 @@ export function buildServer({
   const docLocks = new DocumentLocks();
   /** Daemon pemilik tunggal (AD-1): salinan terkini per slug. */
   const docs = new Map<string, LakarDocument>();
+  /** Seleksi canvas per slug, hanya di memori (AD-9). */
+  const selections = new SelectionStore();
 
   const ok = (reply: FastifyReply, data: unknown) => reply.code(200).send({ ok: true, data });
   /** Catatan aditif: foto jarak jauh yang tampil sebagai placeholder (cache dingin + jaringan gagal). */
@@ -674,9 +679,10 @@ export function buildServer({
 
   // Viewer baca-saja (Viewer B slice 1): `/viewer/*` dan `/app/*`. Route lama tidak berubah.
   registerViewerRoutes(app, { docs, store, sessions, checks, distDir: config.viewerDir ?? VIEWER_DIST_DIR });
-  registerFileRoutes(app, { docs, store, sessions, docLocks, activity, dataDir: config.dataDir });
+  registerFileRoutes(app, { docs, store, sessions, docLocks, activity, dataDir: config.dataDir, onChange: (c) => selections.onFileChange(c) });
   registerPageRoutes(app, { docs, store, docLocks, activity });
   registerOpsRoutes(app, { docs, store, docLocks, activity, icons });
+  registerSelectionRoutes(app, { docs, store, sessions, selections, activity, render, assertIcons });
   registerRenderDepsRoutes(app, { fonts, icons });
   registerExportRoutes(app, { docs, store, render, icons });
   registerConnectionRoutes(app, { host: config.host, port: config.port, ...(config.mcpEntry ? { mcpEntry: config.mcpEntry } : {}) });
@@ -705,5 +711,5 @@ export function buildServer({
     return reply.type(remote.type).header('cache-control', remote.placeholder ? 'no-store' : 'no-cache').send(remote.body);
   });
 
-  return { app, store, sessions, fonts, icons, photos, activity, startedAt: startedAt.toISOString() };
+  return { app, store, sessions, fonts, icons, photos, activity, selections, startedAt: startedAt.toISOString() };
 }

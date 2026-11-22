@@ -11,6 +11,7 @@ export * from './icons.js';
 export * from './nodes.js';
 export * from './ops.js';
 export * from './resolve.js';
+export * from './selection.js';
 export * from './tokens.js';
 export * from './version.js';
 

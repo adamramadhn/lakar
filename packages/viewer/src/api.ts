@@ -136,7 +136,7 @@ export const connection = {
   },
 };
 
-async function request<T>(method: 'GET' | 'POST' | 'DELETE', path: string, body?: unknown, session?: string): Promise<T> {
+async function request<T>(method: 'GET' | 'POST' | 'PUT' | 'DELETE', path: string, body?: unknown, session?: string): Promise<T> {
   let res: Response;
   try {
     res = await fetch(path, {
@@ -512,6 +512,14 @@ class ViewerClient {
       () => request<OpsResult>('POST', `/viewer/docs/${encodeURIComponent(slug)}/ops`, { ops, ...(description !== undefined ? { description } : {}) }),
       () => [slug],
     );
+  }
+
+  /**
+   * Laporkan seleksi canvas ke daemon (PUT /viewer/docs/:slug/selection, AD-9). Hanya di memori daemon: bukan tulis
+   * dokumen, jadi tidak lewat antrean tulis dan tidak membuang cache.
+   */
+  putSelection(slug: string, addresses: readonly string[]): Promise<{ slug: string; rev: number; addresses: string[] }> {
+    return request('PUT', `/viewer/docs/${encodeURIComponent(slug)}/selection`, { addresses });
   }
 
   /** Hapus halaman beserta board-nya; halaman terakhir → ApiError CONFLICT. */

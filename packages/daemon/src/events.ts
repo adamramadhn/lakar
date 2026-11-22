@@ -39,6 +39,7 @@ export const TOOL_ROUTES: Readonly<Record<string, string>> = {
   '/layout-check': 'layout_check',
   '/icons/search': 'icon_search',
   '/photos/search': 'photo_search',
+  '/viewer/selection': 'get_selection',
 };
 
 export const publicSessionId = (id: string) => id.slice(0, 8);
@@ -109,11 +110,15 @@ export type DocChange = {
 };
 export type ChangeEvent = { seq: number; type: 'change'; change: DocChange };
 
+/** Seleksi canvas dokumen `slug` berubah (AD-9): alamat node terbaru, rev dokumen saat itu, jendela pengirim. */
+export type DocSelection = { slug: string; addresses: string[]; rev?: number; origin?: string };
+export type SelectionEvent = { seq: number; type: 'selection'; selection: DocSelection };
+
 export type ActivityEvent = { seq: number; type: 'call'; call: ActivityCall } | { seq: number; type: 'session'; session: ActivitySession };
 type ActivityPayload = { type: 'call'; call: ActivityCall } | { type: 'session'; session: ActivitySession };
 
-/** Semua event bus: aktivitas (masuk ring) + perubahan aplikasi (tidak masuk ring). */
-export type BusEvent = ActivityEvent | ChangeEvent;
+/** Semua event bus: aktivitas (masuk ring) + perubahan aplikasi dan seleksi (tidak masuk ring). */
+export type BusEvent = ActivityEvent | ChangeEvent | SelectionEvent;
 export type ActivityListener = (event: ActivityEvent) => void;
 export type BusListener = (event: BusEvent) => void;
 
@@ -145,9 +150,16 @@ export class ActivityBus {
     this.#broadcast(event);
     return event;
   }
+  /** Siarkan perubahan seleksi (AD-9; tanpa ring, hanya pelanggan `subscribeAll`). Field kosong dibuang. */
+  selection(selection: DocSelection): SelectionEvent {
+    const clean = Object.fromEntries(Object.entries(selection).filter(([, v]) => v !== undefined)) as DocSelection;
+    const event: SelectionEvent = { seq: ++this.#seq, type: 'selection', selection: clean };
+    this.#broadcast(event);
+    return event;
+  }
   #broadcast(event: BusEvent): void {
     for (const [l, { all }] of [...this.#listeners]) {
-      if (event.type === 'change' && !all) continue;
+      if ((event.type === 'change' || event.type === 'selection') && !all) continue;
       try {
         l(event);
       } catch {
@@ -163,7 +175,7 @@ export class ActivityBus {
   subscribe(l: ActivityListener): () => void {
     return this.#add(l as BusListener, false);
   }
-  /** Event aktivitas + event `change`. */
+  /** Event aktivitas + event `change` dan `selection`. */
   subscribeAll(l: BusListener): () => void {
     return this.#add(l, true);
   }

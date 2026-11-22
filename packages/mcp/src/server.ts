@@ -1,5 +1,5 @@
-// Server MCP Lakar: 11 tool (AD-11 + photo_search) → HTTP lakard: status, read_skill, open_doc, list_boards, execute,
-// inspect, layout_check, screenshot, export, icon_search, photo_search.
+// Server MCP Lakar: 12 tool (AD-11 + photo_search + get_selection) → HTTP lakard: status, read_skill, open_doc,
+// list_boards, execute, inspect, layout_check, screenshot, export, icon_search, photo_search, get_selection.
 import { McpServer, type CallToolResult } from '@modelcontextprotocol/server';
 import { z } from 'zod';
 import { LAKAR_VERSION, SCHEMA_VERSION, VERSION_HINT, errorMessage, findingLine, summaryText, type ApiResult, type Finding, type FindingSummary } from '@lakar/schema';
@@ -243,6 +243,16 @@ export const PHOTO_SEARCH_DESCRIPTION =
   'Bila kosong, daemon menyederhanakan kata kunci sendiri (query = yang dipakai, tried = yang dicoba): jangan mengulang pencarian. ' +
   'Cari di awal (maks 2 pencarian per desain, paralel, sebelum execute pertama). Tidak ada hasil → NOT_FOUND; penyedia sibuk/gagal → EXEC_ERROR (retryable): satu percobaan saja, lalu pakai blok gambar pengganti.';
 
+/** Deskripsi tool `get_selection` (AD-9). */
+export const GET_SELECTION_DESCRIPTION =
+  'Baca node yang sedang dipilih pengguna di canvas viewer Lakar (seleksi hidup, hanya di memori daemon; tidak ada di dokumen maupun riwayat). ' +
+  'Tanpa slug → dokumen aktif sesi; belum open_doc → dokumen yang seleksinya terakhir berubah. ' +
+  'Mengembalikan {slug, rev, addresses, nodes:[{address, id, type, name, boardId, bounds?}], missing?, unmeasured?, updatedAt?}: ' +
+  'addresses = urutan pilihan pengguna (ID atau alamat komposit id/id); bounds [x,y,w,h] hasil render, dibulatkan, relatif board (board = [0,0,w,h]); ' +
+  'missing = alamat yang tidak ada lagi di dokumen; unmeasured = board yang gagal dirender (node tetap tercantum tanpa bounds). ' +
+  'addresses kosong = pengguna belum memilih apa pun. Pakai id untuk inspect, execute (get/update), atau open_doc {slug} dulu bila slug bukan dokumen aktif. ' +
+  'Tanpa dokumen aktif dan tanpa seleksi → NO_ACTIVE_DOC.';
+
 export function createLakarMcpServer(daemonUrl: string): McpServer {
   const client = new DaemonClient(daemonUrl);
   const server = new McpServer({ name: SERVER_NAME, version: SERVER_VERSION }, { instructions: SERVER_INSTRUCTIONS });
@@ -413,6 +423,15 @@ export function createLakarMcpServer(daemonUrl: string): McpServer {
           ];
         });
       }),
+  );
+
+  server.registerTool(
+    'get_selection',
+    {
+      description: GET_SELECTION_DESCRIPTION,
+      inputSchema: z.object({ slug: z.string().optional().describe('slug dokumen; kosongkan untuk dokumen aktif sesi (atau dokumen dengan seleksi terakhir)') }),
+    },
+    ({ slug }) => guarded(async () => asText(await client.call('/viewer/selection', slug !== undefined ? { slug } : {}))),
   );
 
   server.registerTool(

@@ -8,6 +8,7 @@ export {
   formatExecute,
   formatLayoutCheck,
   formatStatus,
+  GET_SELECTION_DESCRIPTION,
   INSPECT_DESCRIPTION,
   LAYOUT_CHECK_DESCRIPTION,
   LAYOUT_CHECK_FINDING_LINES,

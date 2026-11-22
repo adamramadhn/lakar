@@ -361,6 +361,17 @@ describe('History (aplikasi 3)', () => {
     await expect(api.applyOps('a', [{ op: 'remove', id: 'Zzzzzzzz' }])).rejects.toMatchObject({ code: 'NOT_FOUND', status: 404 });
   });
 
+  it('putSelection: PUT /viewer/docs/:slug/selection tanpa sesi, tanpa invalidasi; gagal → ApiError', async () => {
+    const calls = fakeFetch((c) => (c.path === '/viewer/docs/hilang/selection' ? { status: 404, body: { ok: false, error: { code: 'NOT_FOUND', message: 'dokumen hilang tidak ada', hint: '' } } } : ok({ slug: 'a', rev: 2, addresses: c.body.addresses })));
+    const api = await freshApi();
+    const changed = vi.fn();
+    api.onDocsChanged(changed);
+    await expect(api.putSelection('a', ['Nnnnnnn1'])).resolves.toEqual({ slug: 'a', rev: 2, addresses: ['Nnnnnnn1'] });
+    expect(calls.at(-1)).toMatchObject({ method: 'PUT', path: '/viewer/docs/a/selection', body: { addresses: ['Nnnnnnn1'] }, session: undefined });
+    expect(changed).not.toHaveBeenCalled();
+    await expect(api.putSelection('hilang', [])).rejects.toMatchObject({ code: 'NOT_FOUND', status: 404 });
+  });
+
   it('restore dengan baseRev usang → ApiError CONFLICT 409 dengan hint', async () => {
     fakeFetch((c) => {
       if (c.path === '/viewer/docs/a/restore') return { status: 409, body: { ok: false, error: { code: 'CONFLICT', message: 'dokumen a sudah berubah ke r9', hint: 'ada perubahan yang lebih baru', retryable: false } } };

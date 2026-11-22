@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { Client, InMemoryTransport } from '@modelcontextprotocol/client';
 import { StdioClientTransport } from '@modelcontextprotocol/client/stdio';
 import { LAKAR_VERSION, SCHEMA_VERSION } from '@lakar/schema';
-import { PACKAGE, PHOTO_SEARCH_DESCRIPTION, READ_SKILL_DESCRIPTION, SERVER_INSTRUCTIONS, SERVER_VERSION, createLakarMcpServer, formatStatus } from './index.js';
+import { GET_SELECTION_DESCRIPTION, PACKAGE, PHOTO_SEARCH_DESCRIPTION, READ_SKILL_DESCRIPTION, SERVER_INSTRUCTIONS, SERVER_VERSION, createLakarMcpServer, formatStatus } from './index.js';
 import { readFile } from 'node:fs/promises';
 import { chromiumInstalled, DEFAULT_BROWSERS_PATH } from '../../../tests/support/browser.ts';
 import { testLog } from '../../../tests/support/log.ts';
@@ -107,6 +107,13 @@ function fakeDaemon() {
       const results = Array.from({ length: 8 }, (_, i) => ({ ref: `openverse:${i}`, width: 40, height: 30, alt: 'kamar', creator: 'Budi', license: 'CC BY 2.0', sourcePageUrl: 'https://x', credit: 'kredit' }));
       return send(200, { ok: true, data: { provider: 'openverse', fallbackReason: 'no-key', query: body.query, results, thumbnails: results.map((r) => ({ ref: r.ref, mimeType: 'image/png', data: PNG_B64 })) } });
     }
+    if (req.url === '/viewer/selection') {
+      if (body.slug === 'hilang') return send(404, { ok: false, error: { code: 'NOT_FOUND', message: 'dokumen hilang tidak ada', hint: 'pakai slug dari GET /viewer/docs', retryable: false } });
+      return send(200, {
+        ok: true,
+        data: { slug: body.slug ?? 'landing-kopi', rev: 4, addresses: ['Ffffffff'], nodes: [{ address: 'Ffffffff', id: 'Ffffffff', type: 'frame', name: 'Hero', boardId: 'Bbbbbbbb', bounds: [0, 0, 390, 200] }] },
+      });
+    }
     if (req.url === '/boards') return send(200, { ok: true, data: { docId: 'Dddddddd', slug: 'a', rev: 1, boards: [{ id: 'Bbbbbbbb', name: '[WIP] Home', wip: true }] } });
     if (req.url === '/inspect') {
       if (body.id === 'Zzzzzzzz') return send(404, { ok: false, error: { code: 'NOT_FOUND', message: 'node Zzzzzzzz tidak ada', hint: 'pakai ID', retryable: false } });
@@ -159,14 +166,32 @@ describe('@lakar/mcp', () => {
     expect(PACKAGE).toBe('@lakar/mcp');
   });
 
-  it('daftar tool lengkap (10 AD-11 + photo_search); SERVER_VERSION = LAKAR_VERSION', async () => {
+  it('daftar tool lengkap (10 AD-11 + photo_search + get_selection); SERVER_VERSION = LAKAR_VERSION', async () => {
     const c = await connect(url);
     const { tools } = await c.listTools();
     expect(tools.map((t) => t.name).sort()).toEqual(
-      ['execute', 'export', 'icon_search', 'inspect', 'layout_check', 'list_boards', 'open_doc', 'photo_search', 'read_skill', 'screenshot', 'status'].sort(),
+      ['execute', 'export', 'get_selection', 'icon_search', 'inspect', 'layout_check', 'list_boards', 'open_doc', 'photo_search', 'read_skill', 'screenshot', 'status'].sort(),
     );
     expect(SERVER_VERSION).toBe(LAKAR_VERSION);
     expect(c.getServerVersion()?.version).toBe(LAKAR_VERSION);
+  });
+
+  it('get_selection → POST /viewer/selection dalam sesi; slug opsional diteruskan; teks JSON; error terformat', async () => {
+    fake.seen.length = 0;
+    const c = await connect(url);
+    const r = await c.callTool({ name: 'get_selection', arguments: {} });
+    expect(r.isError).toBeFalsy();
+    const data = JSON.parse((r.content as any[])[0].text);
+    expect(data).toMatchObject({ slug: 'landing-kopi', rev: 4, addresses: ['Ffffffff'], nodes: [{ id: 'Ffffffff', type: 'frame', name: 'Hero', bounds: [0, 0, 390, 200] }] });
+    const call = fake.seen.find((s) => s.path === '/viewer/selection')!;
+    expect(call.body).toEqual({});
+    expect(call.session).toMatch(/^s\d+$/);
+    const other = await c.callTool({ name: 'get_selection', arguments: { slug: 'lain' } });
+    expect(JSON.parse((other.content as any[])[0].text).slug).toBe('lain');
+    const gone = await c.callTool({ name: 'get_selection', arguments: { slug: 'hilang' } });
+    expect(gone.isError).toBe(true);
+    expect((gone.content as any[])[0].text).toContain('NOT_FOUND: dokumen hilang tidak ada');
+    expect(GET_SELECTION_DESCRIPTION).toContain('NO_ACTIVE_DOC');
   });
 
   it('photo_search → teks JSON (tanpa data thumbnail) + maks 6 image content; argumen diteruskan; error terformat', async () => {
@@ -507,7 +532,7 @@ describe('@lakar/mcp', () => {
       const r = await c2.callTool({ name: 'execute', arguments: { code: '1' } });
       expect(r.isError).toBe(true);
       expect((r.content as any)[0].text).toContain('http://127.0.0.1:1');
-      expect((await c2.listTools()).tools).toHaveLength(11);
+      expect((await c2.listTools()).tools).toHaveLength(12);
     } finally {
       await c2.close();
       await deadTransport.close();

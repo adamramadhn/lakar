@@ -95,6 +95,8 @@ export type FileRoutesOptions = {
   dataDir?: string;
   /** Pencatat masalah non-fatal (file arsip rusak dilewati). Default `console.warn`. */
   log?: (message: string) => void;
+  /** Kait sesudah setiap perubahan file (mis. seleksi efemeral slug yang di-rename/diarsipkan/dihapus dibuang). */
+  onChange?: (change: DocChange) => void;
 };
 
 const parse = <T>(schema: z.ZodType<T>, body: unknown, hint: string): T => {
@@ -153,7 +155,7 @@ const historyEntry = (rev: number, description: string, opsSummary = ''): Histor
   at: new Date().toISOString(),
 });
 
-export function registerFileRoutes(app: FastifyInstance, { docs, store, sessions, docLocks, activity, dataDir, log = (m) => console.warn(m) }: FileRoutesOptions): void {
+export function registerFileRoutes(app: FastifyInstance, { docs, store, sessions, docLocks, activity, dataDir, log = (m) => console.warn(m), onChange }: FileRoutesOptions): void {
   /** Jalankan `fn` memegang kunci setiap slug (urut, unik); `locked` memegang `#files` dulu. Kunci tidak reentrant. */
   const lockSlugs = <T>(slugs: string[], fn: () => Promise<T>): Promise<T> => {
     const keys = [...new Set(slugs)].sort();
@@ -186,6 +188,7 @@ export function registerFileRoutes(app: FastifyInstance, { docs, store, sessions
   /** Pancarkan perubahan untuk jendela viewer lain, dengan id jendela pengirim bila ada. */
   const notify = (headers: Record<string, string | string[] | undefined>, change: DocChange) => {
     const origin = originOf(headers);
+    onChange?.(change);
     activity?.change({ ...change, ...(origin ? { origin } : {}) });
   };
   /** Metadata folder; tanpa `dataDir` tidak ada folder (route folder tidak didaftarkan, kait tidak berbuat apa-apa). */
