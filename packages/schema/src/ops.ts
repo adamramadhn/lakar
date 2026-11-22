@@ -23,6 +23,8 @@ export type DocOp =
   | { op: 'remove'; id: string }
   | { op: 'insert'; parentId: string | null; node: Props; index?: number }
   | { op: 'setTokens'; tokens: Record<string, unknown> }
-  | { op: 'setTokenModes'; modes: string[] | null };
+  | { op: 'setTokenModes'; modes: string[] | null }
+  /** Ganti nama token beserta semua ref `{$token}` (epic token-tema story 2); inversnya rename balik. */
+  | { op: 'renameToken'; from: string; to: string };
 
 export type DocOpKind = DocOp['op'];

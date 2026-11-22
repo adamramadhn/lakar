@@ -191,16 +191,25 @@ describe.skipIf(!browserInstalled)('alur agen dari seleksi: get_selection → ex
       expect(report.rev).toBe(out.rev);
       expect(report.check).toBeUndefined();
       const v = report.value;
-      expect(v.literal).toEqual([expect.objectContaining({ name: 'Judul', prop: 'color', value: '#0F766E', token: 'colors.accent' })]);
+      // Sejawat bertoken (judul kartu) dan nilai token dokumen tanpa sejawat (gap 24 = spacing.card, lewat getTokens).
+      expect(v.literal).toEqual([
+        expect.objectContaining({ id: fitur, name: 'Seksi / Fitur', prop: 'gap', value: 24, token: 'spacing.card' }),
+        expect.objectContaining({ name: 'Judul', prop: 'color', value: '#0F766E', token: 'colors.accent' }),
+      ]);
+      const judulLiteral = v.literal[1];
       expect(v.nearColors).toEqual([{ colors: ['#475467FF', '#475569FF'], nodes: expect.any(Array) }]);
       expect(v.nearColors[0].nodes).toHaveLength(3);
       expect(v.uneven).toEqual(expect.arrayContaining([expect.objectContaining({ prop: 'gap', nodes: expect.arrayContaining([expect.objectContaining({ id: cards[1], value: 10 })]) })]));
       expect(v.offGrid.map((n: any) => n.id)).toEqual([cards[1]]);
       expect((await req('GET', `/viewer/docs/${SLUG}/history`)).body.data.entries[0].rev).toBe(out.rev);
 
-      // Seleksi seluruh board: judul hero (induk `Seksi / …`) bukan sejawat judul kartu (`Kartu / …`).
+      // Seleksi seluruh board: judul hero (induk `Seksi / …`) bukan sejawat judul kartu (`Kartu / …`); gap hero sudah
+      // 32 (edit manual) jadi tidak sama dengan spacing.card.
       const whole = await agent.callTool({ name: 'execute', arguments: { code: withSelection(checkCode, [board]), description: 'cek konsistensi board' } });
-      expect(JSON.parse(text(whole).split('\n')[0]!).value.literal).toEqual([expect.objectContaining({ id: v.literal[0].id, token: 'colors.accent' })]);
+      expect(JSON.parse(text(whole).split('\n')[0]!).value.literal).toEqual([
+        expect.objectContaining({ id: fitur, prop: 'gap', token: 'spacing.card' }),
+        expect.objectContaining({ id: judulLiteral.id, token: 'colors.accent' }),
+      ]);
 
       // layout_check terpisah atas varian (langkah tiket): sama dengan check di respons execute.
       const lc = await agent.callTool({ name: 'layout_check', arguments: { boardId: variants[0] } });
@@ -229,4 +238,52 @@ describe.skipIf(!browserInstalled)('alur agen dari seleksi: get_selection → ex
       await stream.close();
     }
   }, 120_000);
+
+  // epic token-tema story 2: impor CSS variables dan getTokens lewat tool MCP execute; cek `literal` skill selection
+  // memakai nilai token mode efektif board (dark) dan tipe utama slot.
+  it('MCP execute: importCssVariables + getTokens; literal cocok dengan nilai mode dark, bukan nilai light', async () => {
+    const agent = new Client({ name: 'agen-token', version: '0' });
+    try {
+      const [ct, st] = InMemoryTransport.createLinkedPair();
+      await createLakarMcpServer(d.url).connect(st);
+      await agent.connect(ct);
+      expect((await agent.callTool({ name: 'open_doc', arguments: { slug: 'tema-css' } })).isError).toBeFalsy();
+      const css = ':root { --colors-bg: #ffffff; --radius-md: 12px; --shadow-card: 0 8px 24px #0003; } [data-theme="dark"] { --colors-bg: #0f0f0f; }';
+      const imp = await agent.callTool({ name: 'execute', arguments: { code: `importCssVariables(${JSON.stringify(css)})`, description: 'impor token dari css' } });
+      expect(imp.isError, text(imp)).toBeFalsy();
+      const impOut = JSON.parse(text(imp).split('\n')[0]!);
+      expect(impOut.value.tokens.map((t: any) => `${t.variable}→${t.token}:${t.type}`)).toEqual(['--colors-bg→colors.bg:color', '--radius-md→radius.md:radius']);
+      expect(impOut.value.modes).toEqual(['light', 'dark']);
+      expect(impOut.value.skipped).toEqual([expect.objectContaining({ source: '--shadow-card', reason: 'unsupported-value' })]);
+
+      const read = await agent.callTool({ name: 'execute', arguments: { code: 'getTokens()', description: 'baca token dokumen' } });
+      const readOut = JSON.parse(text(read).split('\n')[0]!);
+      expect(readOut.rev).toBe(impOut.rev);
+      expect(readOut.value).toEqual({ tokens: { 'colors.bg': { type: 'color', value: '#FFFFFF', modes: { dark: '#0F0F0F' } }, 'radius.md': { type: 'radius', value: 12 } }, modes: ['light', 'dark'] });
+
+      const mk = await agent.callTool({
+        name: 'execute',
+        arguments: {
+          code:
+            "const b = add(null, {type:'board', name:'Gelap', x:0, y:0, width:390, height:844, screen:'mobile', themeMode:'dark'});" +
+            "add(b, {type:'frame', name:'Kartu Gelap', width:100, height:40, fills:[{type:'solid', color:'#0F0F0F'}]});" +
+            "add(b, {type:'frame', name:'Kartu Terang', width:100, height:40, fills:[{type:'solid', color:'#FFFFFF'}]});" +
+            "add(b, {type:'rect', name:'Sudut', width:40, height:40, radius:12, fills:[{type:'solid', color:'#123456'}]}); b",
+          description: 'board gelap dengan literal',
+        },
+      });
+      expect(mk.isError, text(mk)).toBeFalsy();
+      const board = JSON.parse(text(mk).split('\n')[0]!).value as string;
+      const skill = text(await agent.callTool({ name: 'read_skill', arguments: { name: 'selection' } }));
+      const checkCode = splitCode(skill).blocks.find((b) => b.lang === 'js' && b.code.startsWith(READ_ONLY_MARK))!.code;
+      const ck = await agent.callTool({ name: 'execute', arguments: { code: withSelection(checkCode, [board]), description: 'cek konsistensi token gelap' } });
+      expect(ck.isError, text(ck)).toBeFalsy();
+      expect(JSON.parse(text(ck).split('\n')[0]!).value.literal).toEqual([
+        expect.objectContaining({ name: 'Kartu Gelap', prop: 'fills', value: '#0F0F0F', token: 'colors.bg' }),
+        expect.objectContaining({ name: 'Sudut', prop: 'radius', value: 12, token: 'radius.md' }),
+      ]);
+    } finally {
+      await agent.close();
+    }
+  }, 60_000);
 });

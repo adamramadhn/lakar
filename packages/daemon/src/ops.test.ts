@@ -287,3 +287,50 @@ describe('POST /viewer/docs/:slug/ops', () => {
     }
   });
 });
+
+// epic token-tema story 2: agen membaca/impor token lewat execute, viewer mengganti nama token lewat route ops.
+describe('token: execute getTokens/importCssVariables + route ops renameToken', () => {
+  it('impor CSS variables lewat execute, getTokens tanpa rev baru, renameToken route ops + undo invers', async () => {
+    const t = await setup();
+    try {
+      const { slug, board } = await t.create('Ops Token');
+      const s = await t.post('/sessions', { client: 'claude-code' });
+      const session = { 'x-lakar-session': s.json().data.sessionId as string };
+      expect((await t.post('/docs/open', { slug }, session)).statusCode).toBe(200);
+      const css = ':root { --colors-bg: #ffffff; --radius-md: 12px; --shadow-card: 0 8px 24px #0003; } [data-theme="dark"] { --colors-bg: #0f0f0f; }';
+      const imp = await t.post('/execute', { code: `importCssVariables(${JSON.stringify(css)})`, description: 'impor token dari css' }, session);
+      expect(imp.statusCode, imp.body).toBe(200);
+      const impData = imp.json().data;
+      expect(impData.value.tokens.map((x: any) => [x.variable, x.token, x.type, x.status])).toEqual([
+        ['--colors-bg', 'colors.bg', 'color', 'new'],
+        ['--radius-md', 'radius.md', 'radius', 'new'],
+      ]);
+      expect(impData.value.skipped).toEqual([expect.objectContaining({ source: '--shadow-card', reason: 'unsupported-value' })]);
+      const ex = await t.post(
+        '/execute',
+        { code: `update('${board}', {themeMode:'dark', fills:[{type:'solid', color:{$token:'colors.bg'}}]});`, description: 'pakai token latar' },
+        session,
+      );
+      expect(ex.statusCode, ex.body).toBe(200);
+      const read = await t.post('/execute', { code: 'getTokens()', description: 'baca token dokumen' }, session);
+      expect(read.statusCode, read.body).toBe(200);
+      expect(read.json().data.rev).toBe(ex.json().data.rev);
+      expect(read.json().data.value).toEqual({
+        tokens: { 'colors.bg': { type: 'color', value: '#FFFFFF', modes: { dark: '#0F0F0F' } }, 'radius.md': { type: 'radius', value: 12 } },
+        modes: ['light', 'dark'],
+      });
+
+      const before = await t.doc(slug);
+      const ren = await t.ops(slug, { ops: [{ op: 'renameToken', from: 'colors.bg', to: 'colors.surface' }] });
+      expect(ren.rev).toBe(before.rev + 1);
+      expect(ren.inverse).toEqual([{ op: 'renameToken', from: 'colors.surface', to: 'colors.bg' }]);
+      const renamed = await t.doc(slug);
+      expect(Object.keys(renamed.tokens!)).toEqual(['colors.surface', 'radius.md']);
+      expect(node(renamed, board).fills).toEqual([{ type: 'solid', color: { $token: 'colors.surface' } }]);
+      await t.ops(slug, { ops: ren.inverse });
+      expect(content(await t.doc(slug))).toEqual(content(before));
+    } finally {
+      await t.app.close();
+    }
+  });
+});

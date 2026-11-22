@@ -62,7 +62,7 @@ out;
 
 Baca saja (snippet tanpa op mutasi tidak menambah rev); hasil di `data.value`. Laporkan per temuan: node (nama + id), nilai sekarang, usulan. Perbaiki hanya bila diminta, dalam satu execute.
 
-- `literal`: node sejenis (nama, properti, dan prefiks nama induk sama, mis. `Kartu / …`) memakai `{$token}`, node ini literal → pakai `token` itu.
+- `literal`: node sejenis (nama, properti, dan prefiks nama induk sama, mis. `Kartu / …`) memakai `{$token}`, atau nilainya sama dengan nilai token dokumen (`getTokens()`, mode board) bertipe utama slot (warna → color, radius → radius, gap → spacing), node ini literal → pakai `token` itu.
 - `nearColors`: warna literal yang hampir sama (selisih kanal ≤ 8, alpha sama) beserta node pemakainya → satukan.
 - `uneven`: saudara sejenis (frame dengan `layout` sama di induk sama) dengan `gap`/`columnGap`/`rowGap`/`padding` berbeda → samakan ke nilai terbanyak.
 - `offGrid`: jarak di luar skala `core` (kelipatan 4, plus 2 dan 6).
@@ -83,8 +83,12 @@ for (const n of all) {
 const kind = ([n, prop]) => `${n.parentId ? get(n.parentId).name.split(' / ')[0] : ''}|${n.name}|${prop}`;
 const peerTok = {};
 for (const u of uses) if (tok(u[2])) peerTok[kind(u)] ??= u[2].$token;
-const literal = uses.filter((u) => !tok(u[2]) && peerTok[kind(u)]).map((u) => ({ id: u[0].id, name: u[0].name, prop: u[1], value: u[2], token: peerTok[kind(u)] }));
 const hex = (v) => (v.length === 7 ? v + 'FF' : v).toUpperCase();
+const { tokens: T, modes: M } = getTokens();
+const brd = (n) => (n.parentId ? brd(get(n.parentId)) : n);
+const same = (a, b) => (typeof a === 'string' && typeof b === 'string' ? hex(a) === hex(b) : a === b);
+const valTok = ([n, p, v]) => Object.keys(T).find((t) => T[t].type === (p === 'radius' ? 'radius' : GAPS.includes(p) ? 'spacing' : 'color') && same(v, T[t].modes?.[brd(n).themeMode ?? M[0]] ?? T[t].value));
+const literal = uses.filter((u) => !tok(u[2])).map((u) => ({ id: u[0].id, name: u[0].name, prop: u[1], value: u[2], token: peerTok[kind(u)] ?? valTok(u) })).filter((x) => x.token);
 const byHex = {};
 for (const [n, p, v] of uses) if (p !== 'radius' && !GAPS.includes(p) && typeof v === 'string') (byHex[hex(v)] ??= []).push(n.id);
 const hexes = Object.keys(byHex);

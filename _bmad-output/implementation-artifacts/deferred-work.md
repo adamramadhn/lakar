@@ -80,6 +80,7 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-model-dokumen-2-token-bertipe-v3.md`
   summary: Agen tidak punya API baca untuk `tokens` dan `tokenModes` dokumen, jadi tidak bisa melihat definisi token atau daftar mode sebelum memanggil `setTokenModes`.
   evidence: `get`/`find` di API `execute` hanya mengembalikan node. Celah sudah ada sejak token v2. Usul: fungsi baca kepala dokumen di epic token (aditif, AD-4).
+  resolved: 2026-11-22 di `spec-token-2-read-api.md` (epic token-tema story 2). `execute` mendapat `getTokens()` yang mengembalikan `{tokens, modes}`.
 - source_spec: `_bmad-output/implementation-artifacts/spec-editor-2-ops-route.md`
   summary: Op core `insert` (sisip ulang subtree dengan ID asli, dipakai invers `remove`) belum diekspos di sandbox `execute`, padahal AD-2 meminta kemampuan tulis baru diekspos di `execute` dan route ops.
   evidence: Agen tidak memakai tumpukan undo (AD-8), jadi belum ada kebutuhan. Mengekspos berarti menambah entri `api.ts`/`api.md` exec dan tes ukuran skill (aditif, AD-4).
@@ -131,3 +132,7 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-agen-4-variant-flow.md`
   summary: Cek konsistensi `literal` di skill `selection` hanya membandingkan dengan node sejawat bertoken, bukan dengan nilai token dokumen.
   evidence: Sandbox execute belum bisa membaca nilai token (API baca token = epic token-tema story 2), jadi literal yang nilainya sama dengan token tanpa sejawat bertoken tidak terlapor. Usul: sesudah API baca token ada, bandingkan nilai literal dengan nilai token (mode aktif) di contoh skill dan tes selection-flow.
+  resolved: 2026-11-22 di `spec-token-2-read-api.md` (epic token-tema story 2). Contoh `literal` di skill `selection` kini juga membandingkan literal dengan nilai token dokumen (`getTokens()`, mode efektif board, tipe sesuai slot).
+- source_spec: `_bmad-output/implementation-artifacts/spec-token-2-read-api.md`
+  summary: Dua token berbeda nama tetapi sama variabel CSS (mis. `a.b` dan `a-b`) bisa ada berdampingan dan bertabrakan saat ekspor/impor.
+  evidence: `cssVarName` tidak injektif; `setTokens` sudah bisa membuat pasangan seperti itu sebelum story ini, `renameToken` juga tidak menolaknya, dan impor memilih token pertama. Usul: tolak saat commit (CONFLICT) atau tangani di codegen (epic kode).

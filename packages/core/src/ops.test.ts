@@ -285,3 +285,30 @@ describe('applyOps: error dan rollback', () => {
     expect((await rejects(run(agent.doc, done.inverse))).code).toBe('NOT_FOUND');
   });
 });
+
+describe('applyOps: renameToken (epic token-tema story 2)', () => {
+  it('rename lewat op JSON: satu commit, invers rename balik, bolak-balik persis', async () => {
+    const f = fixture();
+    const base = (await run(f.doc, [
+      { op: 'setTokens', tokens: { 'colors.a': { type: 'color', value: '#111111' } } },
+      { op: 'update', id: f.garis, patch: { fills: [{ type: 'solid', color: { $token: 'colors.a' } }] } },
+      { op: 'update', id: f.kotak, patch: { stroke: { color: { $token: 'colors.a' }, width: 1, align: 'inside' } } },
+    ])).doc;
+    const { done } = await roundTrip(base, [{ op: 'renameToken', from: 'colors.a', to: 'colors.ink' }]);
+    expect(done.inverse).toEqual([{ op: 'renameToken', from: 'colors.ink', to: 'colors.a' }]);
+    expect(find(done.doc, f.kotak)!.stroke.color).toEqual({ $token: 'colors.ink' });
+    expect(done.entry!.opsSummary).toBe('renameToken×1');
+  });
+
+  it('bentuk op salah → SCHEMA_INVALID; token tak dikenal → TOKEN_UNKNOWN dengan prefiks ops[i]', async () => {
+    const f = fixture();
+    const shape = await rejects(run(f.doc, [{ op: 'renameToken', from: 'a' }]));
+    expect(shape.code).toBe('SCHEMA_INVALID');
+    expect(shape.message).toContain('to');
+    const extra = await rejects(run(f.doc, [{ op: 'renameToken', from: 'a', to: 'b', x: 1 }]));
+    expect(extra.message).toContain('kunci tidak dikenal x');
+    const unknown = await rejects(run(f.doc, [{ op: 'renameToken', from: 'colors.nope', to: 'colors.b' }]));
+    expect(unknown.code).toBe('TOKEN_UNKNOWN');
+    expect(unknown.message.startsWith('ops[0] ')).toBe(true);
+  });
+});

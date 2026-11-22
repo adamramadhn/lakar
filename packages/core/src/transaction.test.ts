@@ -680,3 +680,69 @@ describe('setTokenModes', () => {
     expectAtomic(createDocument(seeded(8)), (tx) => tx.setTokens({ 'colors.y': '#FFFFFF' }), (tx) => tx.setTokenModes(modes), 'SCHEMA_INVALID');
   });
 });
+
+// epic token-tema story 2: renameToken memindah definisi dan semua ref dalam satu commit (AD-2, AD-8).
+describe('renameToken', () => {
+  /** Fixture + token `colors.a` (fill Garis, stop gradien Isi), `spacing.s` (padding tuple Isi), `colors.z`. */
+  const withTokens = () => {
+    const f = fixture();
+    const tx = beginTransaction(f.doc, { sessionId: 's', random: seeded(3) });
+    tx.setTokens({ 'colors.z': { type: 'color', value: '#000000' }, 'colors.a': { type: 'color', value: '#111111' }, 'spacing.s': { type: 'spacing', value: 4 } });
+    tx.update(f.garis, { fills: [{ type: 'solid', color: { $token: 'colors.a' } }] });
+    tx.update(f.isi, {
+      padding: [{ $token: 'spacing.s' }, 16],
+      fills: [{ type: 'linear', angle: 90, stops: [{ offset: 0, color: { $token: 'colors.a' } }, { offset: 1, color: '#FFFFFF' }] }],
+    });
+    return { ...f, doc: tx.commit('token').doc };
+  };
+
+  it('memindah definisi (posisi tetap) dan semua ref; invers mengembalikan dokumen', () => {
+    const f = withTokens();
+    const tx = beginTransaction(f.doc, { sessionId: 's' });
+    tx.renameToken('colors.a', 'colors.brand');
+    const r = tx.commit('rename');
+    expect(Object.keys(r.doc.tokens!)).toEqual(['colors.z', 'colors.brand', 'spacing.s']);
+    expect(r.doc.tokens!['colors.brand']).toEqual({ type: 'color', value: '#111111' });
+    expect(find(r.doc, f.garis)!.fills[0].color).toEqual({ $token: 'colors.brand' });
+    expect(find(r.doc, f.isi)!.fills[0].stops[0].color).toEqual({ $token: 'colors.brand' });
+    expect(find(r.doc, f.isi)!.padding).toEqual([{ $token: 'spacing.s' }, 16]);
+    expect(JSON.stringify(r.doc)).not.toContain('"colors.a"');
+    expect(r.entry!.opsSummary).toBe('renameToken×1');
+    expect(r.inverse).toEqual([{ op: 'renameToken', from: 'colors.brand', to: 'colors.a' }]);
+    expect(f.doc.tokens!['colors.a']).toBeDefined();
+    const back = beginTransaction(r.doc, { sessionId: 's' });
+    back.renameToken('colors.brand', 'colors.a');
+    const b = back.commit('undo');
+    expect({ pages: b.doc.pages, tokens: b.doc.tokens }).toEqual({ pages: f.doc.pages, tokens: f.doc.tokens });
+  });
+
+  it('error: tak dikenal → TOKEN_UNKNOWN + saran; bentrok → CONFLICT; nama salah → SCHEMA_INVALID; atomik', () => {
+    const f = withTokens();
+    const e = caught(() => beginTransaction(f.doc, { sessionId: 's' }).renameToken('colors.b', 'colors.c'));
+    expect(e.code).toBe('TOKEN_UNKNOWN');
+    expect(e.message).toContain('colors.a');
+    expectAtomic(f.doc, () => {}, (tx) => tx.renameToken('colors.a', 'colors.z'), 'CONFLICT');
+    expectAtomic(f.doc, () => {}, (tx) => tx.renameToken('colors.a', 'Bad Name'), 'SCHEMA_INVALID');
+    expectAtomic(f.doc, () => {}, (tx) => tx.renameToken(42, 'colors.b'), 'SCHEMA_INVALID');
+  });
+
+  it('from === to tanpa efek dan tanpa invers', () => {
+    const f = withTokens();
+    const tx = beginTransaction(f.doc, { sessionId: 's' });
+    tx.renameToken('colors.a', 'colors.a');
+    const r = tx.commit('noop');
+    expect(r.inverse).toEqual([]);
+    expect(r.doc.tokens).toEqual(f.doc.tokens);
+  });
+
+  it('token datar baru di transaksi yang sama ikut pindah nama dan tetap diinferensi saat commit', () => {
+    const f = fixture();
+    const tx = beginTransaction(f.doc, { sessionId: 's' });
+    tx.setTokens({ 'radius.tmp': 8 });
+    tx.update(f.garis, { radius: { $token: 'radius.tmp' } });
+    tx.renameToken('radius.tmp', 'radius.md');
+    const r = tx.commit('flat');
+    expect(r.doc.tokens!['radius.md']).toEqual({ type: 'radius', value: 8 });
+    expect(find(r.doc, f.garis)!.radius).toEqual({ $token: 'radius.md' });
+  });
+});

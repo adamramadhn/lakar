@@ -15,6 +15,7 @@ const OP_KEYS: Record<DocOpKind, { required: readonly string[]; optional: readon
   insert: { required: ['parentId', 'node'], optional: ['index'] },
   setTokens: { required: ['tokens'], optional: [] },
   setTokenModes: { required: ['modes'], optional: [] },
+  renameToken: { required: ['from', 'to'], optional: [] },
 };
 
 const OPS_HINT =
@@ -106,6 +107,9 @@ export function applyOps(tx: Transaction, ops: unknown): ApplyOpsResult {
           break;
         case 'setTokenModes':
           tx.setTokenModes(o.modes);
+          break;
+        case 'renameToken':
+          tx.renameToken(o.from, o.to);
           break;
       }
       if ((o.op === 'add' || o.op === 'duplicate') && o.ref !== undefined && id !== undefined) refs[o.ref] = id;

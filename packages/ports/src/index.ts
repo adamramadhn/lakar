@@ -95,3 +95,44 @@ export type PhotoInfo = {
 export interface PhotoLibraryPort {
   resolve(ref: string): PhotoInfo | undefined;
 }
+
+/** Nilai token hasil impor CSS variables (bentuk JSON `TokenDef` @lakar/schema; ports tidak bergantung pada schema). */
+export type CssTokenValue = string | number;
+
+/** Satu variabel CSS yang menjadi token bertipe. `cssVarName(token) === variable` selalu berlaku (AD-11). */
+export type CssVariableEntry = {
+  /** Nama variabel sumber, mis. `--colors-bg`. */
+  variable: string;
+  /** Nama token, mis. `colors.bg`. */
+  token: string;
+  /** Tipe token (salah satu `TOKEN_TYPES`). */
+  type: string;
+  value: CssTokenValue;
+  /** Nilai per mode yang berbeda dari `value`. */
+  modes?: Record<string, CssTokenValue>;
+  /** `update` = token bernama sama sudah ada di dokumen (definisinya diganti; ref tetap). */
+  status: 'new' | 'update';
+};
+
+/** Alasan variabel/selektor dilewati (kode stabil; `detail` = kalimat Inggris pendek untuk UI). */
+export type CssVariableSkipReason = 'invalid-name' | 'invalid-mode' | 'unsupported-selector' | 'unsupported-value' | 'mixed-values';
+
+export type CssVariableSkip = { source: string; reason: CssVariableSkipReason; detail: string };
+
+/** Hasil parse CSS variables: token bertipe, rencana `tokenModes` (null = tidak berubah), dan yang dilewati. */
+export type CssVariablesImport = { entries: CssVariableEntry[]; tokenModes: string[] | null; skipped: CssVariableSkip[] };
+
+/** Keadaan dokumen yang dipakai parser: token yang ada dan `tokenModes`. */
+export type CssVariablesParseOptions = {
+  /** Token dokumen: tipe menentukan nama/tipe ulang; `value`/`modes` dipakai untuk menggabung token bertipe sama. */
+  tokens?: Readonly<Record<string, { readonly type: string; readonly value?: CssTokenValue; readonly modes?: Readonly<Record<string, CssTokenValue>> }>>;
+  modes?: readonly string[];
+};
+
+/**
+ * Parser CSS variables murni (epic token-tema story 2). Adaptor: `parseCssVariables` @lakar/render (di sebelah
+ * `cssVarName`, AD-5/AD-11), disuntikkan daemon ke `execute` karena exec tidak bergantung pada render (AD-17).
+ */
+export interface CssVariablesPort {
+  parse(css: string, opts?: CssVariablesParseOptions): CssVariablesImport;
+}

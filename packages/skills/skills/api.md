@@ -127,6 +127,38 @@ const b = add(null, {type:'board', name:'Beranda', x:0, y:0, width:390, height:8
 update(b, {themeMode:'dark', fills:[{type:'solid', color:{$token:'colors.bg'}}]});
 ```
 
+### renameToken
+
+`renameToken(from: string, to: string): void`
+
+Ganti nama token: definisi pindah (urutan tetap) dan setiap ref {$token: from} di dokumen ikut berganti dalam commit yang sama. from tidak ada → TOKEN_UNKNOWN; to sudah dipakai → CONFLICT.
+
+- Mengembalikan: undefined
+- Error: SCHEMA_INVALID, TOKEN_UNKNOWN, CONFLICT
+
+```js
+setTokens({'colors.primary': '#0F62FE'});
+const b = add(null, {type:'board', name:'Beranda', x:0, y:0, width:390, height:844, screen:'mobile'});
+add(b, {type:'rect', name:'Aksen', width:40, height:40, fills:[{type:'solid', color:{$token:'colors.primary'}}]});
+renameToken('colors.primary', 'colors.brand');
+```
+
+### importCssVariables
+
+`importCssVariables(css: string): {tokens: {variable, token, type, status}[], modes: string[], skipped: {source, reason, detail}[]}`
+
+Buat token bertipe dari isi file CSS variables. Blok :root/html = nilai default, [data-theme="x"] = mode x (didaftarkan ke tokenModes; dokumen tanpa mode: :root menjadi mode light). Nama: token dokumen yang cssVar-nya sama dipakai ulang (status update, ref tetap; nilai mode yang tidak disebut CSS dipertahankan), selain itu '-' → '.' (--colors-bg → colors.bg). Tipe dari nilai dan nama (warna → color; radius, space/gap, text/font-size, font-weight, leading, tracking, font family); rem = 16px. Variabel tak terpetakan (bayangan, unit lain, selektor lain) dilewati dan dilaporkan di skipped; tidak ada token sama sekali → SCHEMA_INVALID.
+
+- Mengembalikan: {tokens: [{variable, token, type, status}], modes, skipped: [{source, reason, detail}]}
+- Error: SCHEMA_INVALID, EXEC_ERROR
+
+```js
+importCssVariables(':root { --colors-bg: #ffffff; --radius-md: 12px; } [data-theme="dark"] { --colors-bg: #0f0f0f; }');
+const b = add(null, {type:'board', name:'Beranda', x:0, y:0, width:390, height:844, screen:'mobile'});
+update(b, {themeMode:'dark'});
+add(b, {type:'rect', name:'Kartu', width:120, height:80, radius:{$token:'radius.md'}, fills:[{type:'solid', color:{$token:'colors.bg'}}]});
+```
+
 ### get
 
 `get(id: string): NodeView`
@@ -170,6 +202,22 @@ Anak langsung node dalam urutan dokumen; null = board di halaman. Node daun → 
 const b = add(null, {type:'board', name:'Beranda', x:0, y:0, width:390, height:844, screen:'mobile'});
 add(b, {type:'text', name:'Judul', content:'Halo', size:32});
 children(b).map((n) => n.name);
+```
+
+### getTokens
+
+`getTokens(): {tokens: {[name: string]: {type, value, modes?}}, modes: string[]}`
+
+Baca token dokumen dalam bentuk tersimpan (type, value, modes per mode tema) dan daftar mode tema (tokenModes; elemen pertama = default, [] bila tanpa mode). Melihat perubahan snippet ini. Nilai mode efektif board = modes[board.themeMode ?? modes[0]] ?? value.
+
+- Mengembalikan: {tokens: {[name]: {type, value, modes?}}, modes: string[]}
+- Error: SCHEMA_INVALID
+
+```js
+setTokenModes(['light', 'dark']);
+setTokens({'colors.bg': {type:'color', value:'#FFFFFF', modes:{dark:'#0B0C0F'}}, 'spacing.4': 16});
+const { tokens, modes } = getTokens();
+[modes, tokens['colors.bg'].modes.dark];
 ```
 
 ### place
@@ -321,6 +369,7 @@ add(b, {type:'frame', name:'Kartu terangkat', width:200, height:120, radius:12, 
 - Token bertipe `{type, value, modes?}`: warna → color; radius/gap/columnGap/rowGap/padding/ukuran/stroke.width/size icon → radius|spacing|container|breakpoint; text size → fontSize; family/weight/lineHeight/letterSpacing → tipe senama. Salah slot → SCHEMA_INVALID.
 - Nilai per tipe (value dan modes): color hex #RRGGBB/#RRGGBBAA; fontFamily string tak kosong; fontWeight 100–900 kelipatan 100; lineHeight > 0; letterSpacing angka apa pun; tipe lain angka ≥ 0.
 - Mode tema: `setTokenModes(['light','dark'])`, token `modes:{dark:'#000000'}`, board `themeMode:'dark'` (default mode pertama).
+- Baca: `getTokens()` → `{tokens, modes}`. Ganti nama: `renameToken(from, to)` (semua ref ikut). Dari codebase: `importCssVariables(css)` (`:root` + `[data-theme]`; variabel CSS = `--` + nama dengan `.` → `-`).
 
 ## Respons execute
 

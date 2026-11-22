@@ -2,7 +2,7 @@
 // (`LakarApi`) dan tabel runtime `API` (signature, doc, contoh yang dites, implementasi host).
 // Tanpa IO. Semua op baca bekerja di salinan kerja transaksi dan mengembalikan salinan.
 import { isPlainObject, type Transaction } from '@lakar/core';
-import type { IconCatalogMatch, IconCatalogPort, PhotoInfo, PhotoLibraryPort } from '@lakar/ports';
+import type { CssVariableSkip, CssVariablesPort, IconCatalogMatch, IconCatalogPort, PhotoInfo, PhotoLibraryPort } from '@lakar/ports';
 import { ICON_SEARCH_DEFAULT_LIMIT, ICON_SEARCH_MAX_LIMIT, ID_PATTERN, LakarError, NODE_TYPES, type AnyNode, type ErrorCode, type LakarDocument as Doc, type NodeInput, type NodeType } from '@lakar/schema';
 
 // ---------------------------------------------------------------------------
@@ -84,6 +84,15 @@ export type NodePatch = Record<string, unknown>;
 export type TokenTypeName = 'color' | 'radius' | 'spacing' | 'container' | 'breakpoint' | 'fontFamily' | 'fontWeight' | 'fontSize' | 'lineHeight' | 'letterSpacing';
 /** Token bertipe; `modes` = nilai per mode tema (kunci dari `setTokenModes`). */
 export type TokenDefinition = { type: TokenTypeName; value: string | number; modes?: Record<string, string | number> };
+/** Hasil `getTokens`: salinan token dokumen + `tokenModes` (`[]` bila tidak ada). */
+export type TokensView = { tokens: Record<string, TokenDefinition>; modes: string[] };
+/** Hasil `importCssVariables`. */
+export type CssImportResult = {
+  tokens: { variable: string; token: string; type: TokenTypeName; status: 'new' | 'update' }[];
+  /** `tokenModes` dokumen sesudah impor. */
+  modes: string[];
+  skipped: CssVariableSkip[];
+};
 
 /** Fungsi global yang tersedia di snippet `execute`. */
 export interface LakarApi {
@@ -116,12 +125,21 @@ export interface LakarApi {
   setTokens(map: Record<string, string | number | TokenDefinition | null>): void;
   /** Daftar mode tema dokumen (elemen pertama = default); `null` menghapus. Board memilih mode lewat `themeMode`. */
   setTokenModes(modes: string[] | null): void;
+  /** Ganti nama token beserta semua ref `{$token}` di dokumen (satu commit). */
+  renameToken(from: string, to: string): void;
+  /**
+   * Buat token bertipe dari stylesheet CSS variables (`:root` = nilai default, `[data-theme="dark"]` = mode `dark`);
+   * mode baru didaftarkan, token bernama sama diperbarui (mode yang tidak disebut CSS tetap). Variabel yang tak terpetakan dilaporkan di `skipped`.
+   */
+  importCssVariables(css: string): CssImportResult;
   /** Baca satu node (salinan datar). */
   get(id: string): NodeView;
   /** Cari node dalam urutan dokumen. */
   find(query?: FindQuery): NodeView[];
   /** Anak langsung node (`null` = board di halaman). */
   children(id: string | null): NodeView[];
+  /** Token dokumen (bentuk tersimpan) dan daftar mode tema (`[]` bila tanpa mode). */
+  getTokens(): TokensView;
   /** Posisi bebas tumpang tindih untuk board baru berukuran `w`×`h`. */
   place(w: number, h: number, opts?: PlaceOptions): Point;
   /**
@@ -148,7 +166,12 @@ export type ApiContext = {
   icons: IconCatalogPort;
   /** Foto terimpor (`photo`); tidak ada → setiap `photo()` NOT_FOUND. */
   photos?: PhotoLibraryPort;
+  /** Parser CSS variables (`importCssVariables`), disuntikkan daemon dari @lakar/render; tidak ada → EXEC_ERROR. */
+  cssVariables?: CssVariablesPort;
 };
+
+/** Ukuran maksimum stylesheet `importCssVariables` (karakter). */
+export const CSS_IMPORT_MAX_CHARS = 256 * 1024;
 
 /** Format ref foto (`photo_search`): `unsplash:<id>`, `wikimedia:<pageid>`, `openverse:<uuid>`, atau `pexels:<id>` (lama). */
 export const PHOTO_REF_PATTERN = /^(?:unsplash:[A-Za-z0-9_-]{6,32}|(?:pexels|openverse):[A-Za-z0-9-]{1,64}|wikimedia:\d{1,12})$/;
@@ -327,6 +350,8 @@ const boardRect = (n: AnyNode): Rect => {
 /** Dua kotak terlalu dekat (jarak < gap di kedua sumbu) = tumpang tindih. */
 const clash = (a: Rect, b: Rect, gap: number) => a.x < b.x + b.w + gap && b.x < a.x + a.w + gap && a.y < b.y + b.h + gap && b.y < a.y + a.h + gap;
 
+const CSS_IMPORT_HINT = "contoh: importCssVariables(':root { --colors-bg: #ffffff; } [data-theme=\"dark\"] { --colors-bg: #0f0f0f; }'); hanya custom property (--nama) di :root/html dan [data-theme=\"…\"]";
+
 const BOARD = "const b = add(null, {type:'board', name:'Beranda', x:0, y:0, width:390, height:844, screen:'mobile'});";
 
 // ---------------------------------------------------------------------------
@@ -448,6 +473,61 @@ export const API: { readonly [K in keyof LakarApi]: ApiFunction } = {
       return undefined;
     },
   },
+  renameToken: {
+    kind: 'op',
+    signature: 'renameToken(from: string, to: string): void',
+    doc: 'Ganti nama token: definisi pindah (urutan tetap) dan setiap ref {$token: from} di dokumen ikut berganti dalam commit yang sama. from tidak ada → TOKEN_UNKNOWN; to sudah dipakai → CONFLICT.',
+    returns: 'undefined',
+    errors: ['SCHEMA_INVALID', 'TOKEN_UNKNOWN', 'CONFLICT'],
+    example:
+      "setTokens({'colors.primary': '#0F62FE'});\n" +
+      `${BOARD}\nadd(b, {type:'rect', name:'Aksen', width:40, height:40, fills:[{type:'solid', color:{$token:'colors.primary'}}]});\n` +
+      "renameToken('colors.primary', 'colors.brand');",
+    call(ctx, [from, to]) {
+      mutation(ctx, () => ctx.tx.renameToken(from, to));
+      return undefined;
+    },
+  },
+  importCssVariables: {
+    kind: 'op',
+    signature: 'importCssVariables(css: string): {tokens: {variable, token, type, status}[], modes: string[], skipped: {source, reason, detail}[]}',
+    doc:
+      'Buat token bertipe dari isi file CSS variables. Blok :root/html = nilai default, [data-theme="x"] = mode x (didaftarkan ke tokenModes; dokumen tanpa mode: :root menjadi mode light). ' +
+      "Nama: token dokumen yang cssVar-nya sama dipakai ulang (status update, ref tetap; nilai mode yang tidak disebut CSS dipertahankan), selain itu '-' → '.' (--colors-bg → colors.bg). " +
+      'Tipe dari nilai dan nama (warna → color; radius, space/gap, text/font-size, font-weight, leading, tracking, font family); rem = 16px. ' +
+      'Variabel tak terpetakan (bayangan, unit lain, selektor lain) dilewati dan dilaporkan di skipped; tidak ada token sama sekali → SCHEMA_INVALID.',
+    returns: '{tokens: [{variable, token, type, status}], modes, skipped: [{source, reason, detail}]}',
+    errors: ['SCHEMA_INVALID', 'EXEC_ERROR'],
+    example:
+      "importCssVariables(':root { --colors-bg: #ffffff; --radius-md: 12px; } [data-theme=\"dark\"] { --colors-bg: #0f0f0f; }');\n" +
+      `${BOARD}\nupdate(b, {themeMode:'dark'});\nadd(b, {type:'rect', name:'Kartu', width:120, height:80, radius:{$token:'radius.md'}, fills:[{type:'solid', color:{$token:'colors.bg'}}]});`,
+    call(ctx, [css]) {
+      if (typeof css !== 'string' || !css.trim()) {
+        throw new LakarError('SCHEMA_INVALID', `importCssVariables: css harus string isi stylesheet, bukan ${show(css)}`, { hint: CSS_IMPORT_HINT });
+      }
+      if (css.length > CSS_IMPORT_MAX_CHARS) {
+        throw new LakarError('SCHEMA_INVALID', `importCssVariables: css maks ${CSS_IMPORT_MAX_CHARS / 1024} K karakter, dikirim ${css.length}`, { hint: 'impor per file atau per bagian' });
+      }
+      if (!ctx.cssVariables) {
+        throw new LakarError('EXEC_ERROR', 'importCssVariables: parser CSS variables tidak tersedia di host ini', { hint: 'jalankan lewat lakard (tool execute MCP)' });
+      }
+      const doc = ctx.view();
+      const parsed = ctx.cssVariables.parse(css, { tokens: doc.tokens ?? {}, ...(doc.tokenModes ? { modes: doc.tokenModes } : {}) });
+      if (!parsed.entries.length) {
+        const why = parsed.skipped.slice(0, 5).map((s) => `${s.source}: ${s.reason}`);
+        throw new LakarError('SCHEMA_INVALID', `importCssVariables: tidak ada CSS variable yang bisa diimpor${why.length ? ` (${why.join('; ')})` : ''}`, { hint: CSS_IMPORT_HINT });
+      }
+      if (parsed.tokenModes) mutation(ctx, () => ctx.tx.setTokenModes(parsed.tokenModes));
+      const map = Object.fromEntries(parsed.entries.map((e) => [e.token, { type: e.type, value: e.value, ...(e.modes ? { modes: e.modes } : {}) }]));
+      mutation(ctx, () => ctx.tx.setTokens(map));
+      const out: CssImportResult = {
+        tokens: parsed.entries.map((e) => ({ variable: e.variable, token: e.token, type: e.type as TokenTypeName, status: e.status })),
+        modes: [...(ctx.view().tokenModes ?? [])],
+        skipped: parsed.skipped,
+      };
+      return JSON.parse(JSON.stringify(out)) as unknown;
+    },
+  },
   get: {
     kind: 'read',
     signature: 'get(id: string): NodeView',
@@ -509,6 +589,27 @@ export const API: { readonly [K in keyof LakarApi]: ApiFunction } = {
       const nid = requireId('children', 'id', id);
       mustFind('children', doc, nid);
       return walk(doc).filter((e) => e.parentId === nid).map(toView);
+    },
+  },
+  getTokens: {
+    kind: 'read',
+    signature: 'getTokens(): {tokens: {[name: string]: {type, value, modes?}}, modes: string[]}',
+    doc:
+      'Baca token dokumen dalam bentuk tersimpan (type, value, modes per mode tema) dan daftar mode tema (tokenModes; elemen pertama = default, [] bila tanpa mode). ' +
+      'Melihat perubahan snippet ini. Nilai mode efektif board = modes[board.themeMode ?? modes[0]] ?? value.',
+    returns: '{tokens: {[name]: {type, value, modes?}}, modes: string[]}',
+    errors: ['SCHEMA_INVALID'],
+    example:
+      "setTokenModes(['light', 'dark']);\n" +
+      "setTokens({'colors.bg': {type:'color', value:'#FFFFFF', modes:{dark:'#0B0C0F'}}, 'spacing.4': 16});\n" +
+      'const { tokens, modes } = getTokens();\n' +
+      "[modes, tokens['colors.bg'].modes.dark];",
+    call(ctx, args) {
+      if (args.some((a) => a !== undefined)) {
+        throw new LakarError('SCHEMA_INVALID', `getTokens: tanpa argumen, dikirim ${show(args.find((a) => a !== undefined))}`, { hint: 'const { tokens, modes } = getTokens();' });
+      }
+      const doc = ctx.view();
+      return JSON.parse(JSON.stringify({ tokens: doc.tokens ?? {}, modes: doc.tokenModes ?? [] })) as unknown;
     },
   },
   place: {
@@ -732,6 +833,7 @@ export const API_REFERENCE: readonly ApiReferenceSection[] = [
       "Token bertipe `{type, value, modes?}`: warna → color; radius/gap/columnGap/rowGap/padding/ukuran/stroke.width/size icon → radius|spacing|container|breakpoint; text size → fontSize; family/weight/lineHeight/letterSpacing → tipe senama. Salah slot → SCHEMA_INVALID.",
       'Nilai per tipe (value dan modes): color hex #RRGGBB/#RRGGBBAA; fontFamily string tak kosong; fontWeight 100–900 kelipatan 100; lineHeight > 0; letterSpacing angka apa pun; tipe lain angka ≥ 0.',
       "Mode tema: `setTokenModes(['light','dark'])`, token `modes:{dark:'#000000'}`, board `themeMode:'dark'` (default mode pertama).",
+      "Baca: `getTokens()` → `{tokens, modes}`. Ganti nama: `renameToken(from, to)` (semua ref ikut). Dari codebase: `importCssVariables(css)` (`:root` + `[data-theme]`; variabel CSS = `--` + nama dengan `.` → `-`).",
     ],
   },
   {

@@ -13,6 +13,7 @@ import {
   XY_HINT,
   isTokenValueOf,
   resolveDocument,
+  suggestTokens,
   zodToLakarError,
   type AnyNode,
   BoardNode,
@@ -29,7 +30,7 @@ import { IdAllocator, collectIds, type RandomSource } from './ids.js';
 import { inferTokens, tokenTypeOfValue } from './tokens-infer.js';
 import { indexNodes, isContainer, locate, subtree, type Container, type Location } from './tree.js';
 
-export type OpKind = 'add' | 'update' | 'replace' | 'move' | 'duplicate' | 'remove' | 'insert' | 'setTokens' | 'setTokenModes';
+export type OpKind = 'add' | 'update' | 'replace' | 'move' | 'duplicate' | 'remove' | 'insert' | 'setTokens' | 'setTokenModes' | 'renameToken';
 
 /**
  * Hasil commit. `entry === null` berarti tidak ada op yang sukses: tidak ada revisi baru, `doc` adalah
@@ -69,6 +70,11 @@ export interface Transaction {
   setTokens(map: unknown): void;
   /** Ganti daftar mode tema dokumen (elemen pertama = default); `null` menghapus `tokenModes`. Konsistensi dicek saat commit. */
   setTokenModes(modes: unknown): void;
+  /**
+   * Ganti nama token `from` → `to`: definisi pindah (posisi kunci tetap) dan setiap ref `{$token: from}` di semua
+   * halaman ikut berganti. `from` tidak ada → TOKEN_UNKNOWN; `to` sudah ada → CONFLICT; `from === to` tanpa efek.
+   */
+  renameToken(from: unknown, to: unknown): void;
   /**
    * Salinan kerja hidup (melihat op yang sudah sukses di transaksi ini). Hanya-baca menurut kontrak:
    * pemanggil tidak boleh memutasinya. Melempar bila transaksi sudah ditutup.
@@ -193,6 +199,30 @@ function buildNode(input: NodeInput, id: string, children: ChildNode[] | undefin
 
 const TOKENS_HINT =
   'setTokens({"colors.text-primary": "#1A1A1A", "spacing.2": 8}) atau bertipe {"colors.bg": {type:"color", value:"#FFFFFF", modes:{dark:"#000000"}}}; nama: segmen [a-z0-9-] dipisah titik; nilai datar: angka atau string tak kosong; null menghapus token';
+const RENAME_HINT = "renameToken('colors.primary', 'colors.brand'): nama lama harus ada, nama baru belum dipakai; nama: segmen [a-z0-9-] dipisah titik";
+
+function requireTokenName(what: string, v: unknown): string {
+  if (typeof v !== 'string' || !TokenName.safeParse(v).success) {
+    throw new LakarError('SCHEMA_INVALID', `renameToken: ${what} harus nama token (segmen [a-z0-9-] dipisah titik, maks 64), bukan ${JSON.stringify(v) ?? 'undefined'}`, { hint: RENAME_HINT });
+  }
+  return v;
+}
+
+/** Ganti setiap ref `{$token: from}` di dalam nilai JSON (in place); mengembalikan jumlah ref yang diganti. */
+function renameRefs(value: unknown, from: string, to: string): number {
+  if (Array.isArray(value)) return value.reduce<number>((n, v) => n + renameRefs(v, from, to), 0);
+  if (!isPlainObject(value)) return 0;
+  const keys = Object.keys(value);
+  if (keys.length === 1 && keys[0] === '$token') {
+    if (value.$token !== from) return 0;
+    value.$token = to;
+    return 1;
+  }
+  let n = 0;
+  for (const k of keys) n += renameRefs(value[k], from, to);
+  return n;
+}
+
 const TOKEN_MODES_HINT = 'setTokenModes(["light","dark"]): nama mode [a-z0-9-] (maks 32), minimal satu, tanpa duplikat, elemen pertama = default; null menghapus tokenModes';
 
 /** Satu entri `setTokens` tervalidasi: hapus, nilai datar, atau definisi bertipe lengkap. */
@@ -531,6 +561,29 @@ export function beginTransaction(doc: Doc, opts: TransactionOptions): Transactio
         if (!r.success) throw new LakarError('SCHEMA_INVALID', zodToLakarError(r.error, 'setTokenModes').message, { hint: TOKEN_MODES_HINT });
         if (!sameValue(w.tokenModes, r.data)) undo(revert);
         w.tokenModes = r.data;
+      });
+    },
+
+    renameToken(fromRaw, toRaw) {
+      op('renameToken', (w, undo) => {
+        const from = requireTokenName('from', fromRaw);
+        const to = requireTokenName('to', toRaw);
+        const tokens = w.tokens ?? {};
+        if (!Object.hasOwn(tokens, from)) {
+          const s = suggestTokens(from, Object.keys(tokens));
+          throw new LakarError('TOKEN_UNKNOWN', `renameToken: token ${from} tidak ada${s.length ? ` (mungkin: ${s.join(', ')})` : ''}`, { hint: RENAME_HINT });
+        }
+        if (from === to) return;
+        if (Object.hasOwn(tokens, to)) {
+          throw new LakarError('CONFLICT', `renameToken: nama ${to} sudah dipakai token lain`, {
+            hint: 'pilih nama baru yang belum ada, atau hapus token itu dulu dengan setTokens({nama: null})',
+          });
+        }
+        // Posisi kunci dipertahankan (urutan panel Theme dan ekspor tetap).
+        w.tokens = Object.fromEntries(Object.entries(tokens).map(([k, v]) => [k === from ? to : k, v]));
+        renameRefs(w.pages, from, to);
+        if (pendingFlat.delete(from)) pendingFlat.add(to);
+        undo({ op: 'renameToken', from: to, to: from });
       });
     },
 

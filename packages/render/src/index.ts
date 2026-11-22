@@ -60,6 +60,8 @@ export {
   type StopLike,
   type TokenRef,
 } from './css.js';
+// Impor CSS variables (epic token-tema story 2): kebalikan cssVarName, dipakai execute (lewat daemon) dan viewer.
+export { CSS_IMPORT_MODE_NAME, CSS_IMPORT_TOKEN_NAME, parseCssColor, parseCssVariables } from './css-vars.js';
 export { measureBoard, type BoardMeasure, type NodeBounds, type TextMeasure } from './measure.js';
 
 /** Argumen Chromium bersama daemon dan harness tes (stabilitas golden). */

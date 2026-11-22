@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { beginTransaction, createDocument } from '@lakar/core';
-import type { IconCatalogPort, PhotoInfo, PhotoLibraryPort } from '@lakar/ports';
+import type { CssVariablesParseOptions, CssVariablesPort, IconCatalogPort, PhotoInfo, PhotoLibraryPort } from '@lakar/ports';
 import { LakarDocument, LakarError, resolveTokens, type LakarDocument as Doc } from '@lakar/schema';
 import { API, API_GLOBALS, MAX_OPS, PACKAGE, photoRefsInCode, runSnippet as runSnippetRaw, type RunOptions, type RunResult } from './index.js';
 
@@ -53,8 +53,27 @@ const fakePhotos: PhotoLibraryPort & { asked: string[] } = {
     return ref === 'pexels:2014422' || ref === 'unsplash:Kq3wLm8xT0a' ? { ...FAKE_PHOTO } : undefined;
   },
 };
+/**
+ * Parser CSS variables palsu (struktural): hasil tetap untuk stylesheet berisi `--colors-bg`, kosong untuk lainnya.
+ * Parser asli (@lakar/render) dites di render dan lewat `runSnippet` di tests/css-variables-import.test.ts.
+ */
+const fakeCss: CssVariablesPort & { calls: { css: string; opts: CssVariablesParseOptions | undefined }[] } = {
+  calls: [],
+  parse(css, opts) {
+    this.calls.push({ css, opts });
+    if (!css.includes('--colors-bg')) return { entries: [], tokenModes: null, skipped: [{ source: 'body', reason: 'unsupported-selector', detail: 'Only :root and [data-theme="…"] blocks are imported.' }] };
+    return {
+      entries: [
+        { variable: '--colors-bg', token: 'colors.bg', type: 'color', value: '#FFFFFF', modes: { dark: '#0F0F0F' }, status: opts?.tokens?.['colors.bg'] ? 'update' : 'new' },
+        { variable: '--radius-md', token: 'radius.md', type: 'radius', value: 12, status: 'new' },
+      ],
+      tokenModes: opts?.modes?.includes('dark') ? null : ['light', 'dark'],
+      skipped: [{ source: '--shadow-card', reason: 'unsupported-value', detail: 'x' }],
+    };
+  },
+};
 const runSnippet = (code: string, tx: Parameters<typeof runSnippetRaw>[1], opts: Partial<RunOptions> = {}) =>
-  runSnippetRaw(code, tx, { icons: fakeIcons, photos: fakePhotos, ...opts });
+  runSnippetRaw(code, tx, { icons: fakeIcons, photos: fakePhotos, cssVariables: fakeCss, ...opts });
 
 const tracer = `const b=add(null,{type:'board',name:'Tracer',x:0,y:0,width:390,height:844,screen:'mobile'}); add(b,{type:'text',name:'Judul',content:'Halo dari Lakar',size:32})`;
 const BOARD = (name = 'B', x = 0, w = 390, h = 844) => `add(null,{type:'board',name:'${name}',x:${x},y:0,width:${w},height:${h},screen:'mobile'})`;
@@ -78,7 +97,7 @@ async function commitRun(code: string, doc: Doc = createDocument()) {
 describe('@lakar/exec', () => {
   it('mengekspor nama paket dan permukaan API lengkap (AD-7)', () => {
     expect(PACKAGE).toBe('@lakar/exec');
-    expect(Object.keys(API)).toEqual(['add', 'update', 'replace', 'move', 'duplicate', 'remove', 'setTokens', 'setTokenModes', 'get', 'find', 'children', 'place', 'iconSearch', 'photo']);
+    expect(Object.keys(API)).toEqual(['add', 'update', 'replace', 'move', 'duplicate', 'remove', 'setTokens', 'setTokenModes', 'renameToken', 'importCssVariables', 'get', 'find', 'children', 'getTokens', 'place', 'iconSearch', 'photo']);
     for (const [name, fn] of Object.entries(API)) {
       expect(fn.signature.startsWith(`${name}(`), name).toBe(true);
       expect(fn.doc.length, name).toBeGreaterThan(20);
@@ -296,7 +315,7 @@ describe('@lakar/exec', () => {
       const ts = errRun(await runSnippet('const a = 1;\nconst b: number = 2', txFor()));
       expect(ts.message).toMatch(/^baris 2:\d+: SyntaxError/);
       const ref = errRun(await runSnippet('fetch("x")', txFor()));
-      expect(ref.hint).toContain('add, update, replace, move, duplicate, remove, setTokens, setTokenModes, get, find, children, place, iconSearch, photo, keep, console.log');
+      expect(ref.hint).toContain('add, update, replace, move, duplicate, remove, setTokens, setTokenModes, renameToken, importCssVariables, get, find, children, getTokens, place, iconSearch, photo, keep, console.log');
     });
 
     it('error host yang ditangkap snippet tidak membatalkan transaksi; e.code tersedia', async () => {
@@ -447,6 +466,56 @@ describe('@lakar/exec', () => {
       const code = `const a = photo('pexels:2014422');\nconst b = photo( "openverse:${uuid}" );\nconst c = photo('wikimedia:98688894');\nconst d = photo('unsplash:Zp9_rT2uVb1');\nphoto('pexels:2014422'); photo(x); photo('foo'); photo(\`pexels:1\`); photo('pexels:12")`;
       expect(photoRefsInCode(code)).toEqual(['pexels:2014422', `openverse:${uuid}`, 'wikimedia:98688894', 'unsplash:Zp9_rT2uVb1']);
       expect(photoRefsInCode('add(b, {})')).toEqual([]);
+    });
+  });
+
+  describe('token: getTokens, renameToken, importCssVariables (epic token-tema story 2)', () => {
+    it('getTokens: dokumen baru → {tokens:{}, modes:[]}; melihat op snippet yang sama; tanpa op → rev tetap', async () => {
+      const tx = txFor();
+      expect(okRun(await runSnippet('getTokens()', tx)).value).toEqual({ tokens: {}, modes: [] });
+      const r = okRun(await runSnippet("setTokenModes(['light','dark']); setTokens({'colors.bg': {type:'color', value:'#FFFFFF', modes:{dark:'#000000'}}, 's.2': 8}); getTokens()", txFor()));
+      expect(r.value).toEqual({ tokens: { 'colors.bg': { type: 'color', value: '#FFFFFF', modes: { dark: '#000000' } }, 's.2': { type: 'spacing', value: 8 } }, modes: ['light', 'dark'] });
+      const ro = txFor();
+      okRun(await runSnippet('const t = getTokens(); t.tokens.x = 1; getTokens()', ro));
+      expect(ro.commit('baca').entry).toBeNull();
+      expect(errRun(await runSnippet('getTokens(1)', txFor())).code).toBe('SCHEMA_INVALID');
+    });
+
+    it('renameToken lewat execute: ref ikut, error core diteruskan', async () => {
+      const { c } = await commitRun(`setTokens({'colors.a': '#111111'}); const b = ${BOARD()}; add(b, {type:'rect', name:'R', width:10, height:10, fills:[{type:'solid', color:{$token:'colors.a'}}]}); renameToken('colors.a', 'colors.b');`);
+      expect(Object.keys(c.doc.tokens!)).toEqual(['colors.b']);
+      expect(JSON.stringify(c.doc.pages)).toContain('{"$token":"colors.b"}');
+      expect(c.inverse[0]).toEqual({ op: 'renameToken', from: 'colors.b', to: 'colors.a' });
+      expect(errRun(await runSnippet("renameToken('colors.x', 'colors.y')", txFor())).code).toBe('TOKEN_UNKNOWN');
+      expect(errRun(await runSnippet("setTokens({'a': '#111111', 'b': '#222222'}); renameToken('a', 'b')", txFor())).code).toBe('CONFLICT');
+    });
+
+    it('importCssVariables: commit setTokenModes + setTokens dari port, hasil ringkas, opsi keadaan dokumen', async () => {
+      fakeCss.calls.length = 0;
+      const { r, c } = await commitRun("setTokens({'colors.bg': '#000000'}); importCssVariables(':root{--colors-bg:#fff}')");
+      expect(r.value).toEqual({
+        tokens: [
+          { variable: '--colors-bg', token: 'colors.bg', type: 'color', status: 'update' },
+          { variable: '--radius-md', token: 'radius.md', type: 'radius', status: 'new' },
+        ],
+        modes: ['light', 'dark'],
+        skipped: [{ source: '--shadow-card', reason: 'unsupported-value', detail: 'x' }],
+      });
+      expect(fakeCss.calls[0]!.opts).toEqual({ tokens: { 'colors.bg': { type: 'color', value: '#000000' } } });
+      expect(c.doc.tokens).toEqual({ 'colors.bg': { type: 'color', value: '#FFFFFF', modes: { dark: '#0F0F0F' } }, 'radius.md': { type: 'radius', value: 12 } });
+      expect(c.doc.tokenModes).toEqual(['light', 'dark']);
+      expect(c.entry!.opsSummary).toBe('setTokens×2, setTokenModes×1');
+    });
+
+    it('importCssVariables: argumen salah, tanpa token, besar, dan tanpa port', async () => {
+      expect(errRun(await runSnippet('importCssVariables(42)', txFor())).code).toBe('SCHEMA_INVALID');
+      expect(errRun(await runSnippet("importCssVariables('  ')", txFor())).code).toBe('SCHEMA_INVALID');
+      const none = errRun(await runSnippet("importCssVariables('body{color:red}')", txFor()));
+      expect(none.code).toBe('SCHEMA_INVALID');
+      expect(none.message).toContain('body: unsupported-selector');
+      expect(errRun(await runSnippet("importCssVariables(':root{--colors-bg:#fff}' + ' '.repeat(300000))", txFor())).code).toBe('SCHEMA_INVALID');
+      const noPort = errRun(await runSnippetRaw("importCssVariables(':root{--colors-bg:#fff}')", txFor(), { icons: fakeIcons }));
+      expect(noPort.code).toBe('EXEC_ERROR');
     });
   });
 });
