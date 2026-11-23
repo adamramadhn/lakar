@@ -62,6 +62,7 @@ export const STYLE_PROPS = [
   'flex-basis',
   'justify-content',
   'align-items',
+  'align-content',
   'align-self',
   'justify-items',
   'justify-self',

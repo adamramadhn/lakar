@@ -111,3 +111,26 @@ covers = ["R1"]
 after = [1]
 hitl = false
 risk = "medium"
+
+[[entry]]
+id = 11
+type = "story"
+title = "Desain revisi: blok About di Settings-Updates dan alur instal MCP ke harness"
+description = "Revisi Section 11 di lakar-ui.pen: (a) blok About di layar Settings-Updates dipoles (garis pembatas atas/bawah terlihat kasar; samakan dengan pola pembatas section Settings yang ada); (b) di layar koneksi MCP, selain salin config ada alur 'Install to app': pengguna memilih harness yang terdeteksi (Claude, Codex, Pi, OpenCode, dan lainnya), dengan state belum terpasang, terpasang, harness tidak ditemukan, dan gagal; salin config tetap sebagai fallback."
+verify = "Revisi blok About dan layar/state instal-ke-harness ada di lakar-ui.pen (dark dan light), memakai komponen dan token yang ada, tercatat di design/README.md."
+covers = ["R2"]
+after = []
+hitl = true
+risk = "low"
+notes = ["Persetujuan desain didelegasikan Fatmuh (terima jadi, 2026-11-23).", "Masukan Fatmuh 2026-11-23: blok About jelek; koneksi MCP harus bisa instal otomatis ke harness, bukan hanya salin config."]
+
+[[entry]]
+id = 12
+type = "story"
+title = "Instal konfigurasi MCP Lakar ke harness otomatis"
+description = "Daemon/viewer menyediakan aksi instal server MCP 'lakar' ke config harness yang terdeteksi di mesin (Claude, Codex, Pi, OpenCode, dst): mendeteksi harness terpasang, menulis/memperbarui entri config-nya dengan aman (backup, tidak menimpa pengaturan lain), melaporkan sukses/gagal/tidak ditemukan. Route baru di /viewer/* dengan guard Origin. Salin config tetap ada sebagai fallback. Ikut menerapkan polesan blok About Settings-Updates bila revisi desain story 11 mengubahnya."
+verify = "Tes daemon: instal menulis entri MCP ke config harness uji tanpa merusak isi lain; harness tak terpasang dilaporkan; tes DOM aksi instal dan state-nya sesuai desain story 11; tidak ada kredensial/path sensitif di log."
+covers = ["R2"]
+after = [11]
+hitl = false
+risk = "medium"

@@ -58,6 +58,8 @@ const RULE_TITLE: Record<string, string> = {
   'LC-31': 'Content cut flat at the bottom edge',
   'LC-32': 'Instance no longer matches its master',
   'LC-33': 'Skeleton placeholder not filled',
+  'LC-34': 'Siblings overlap by accident',
+  'LC-35': 'Text spills out of its frame',
 };
 const ruleTitle = (rule: string) => RULE_TITLE[rule] ?? (G0_RULES as Record<string, { title: string }>)[rule]?.title ?? rule;
 const TOTAL_RULES = Object.keys(G0_RULES).length;

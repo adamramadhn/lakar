@@ -450,6 +450,7 @@ export type FrameLike = {
   readonly gap?: unknown;
   readonly columnGap?: unknown;
   readonly rowGap?: unknown;
+  readonly wrap?: unknown;
   readonly align?: unknown;
   readonly justify?: unknown;
   readonly padding?: unknown;
@@ -480,6 +481,8 @@ export function frameDecls(n: FrameLike): CssDecl[] {
       if (rows) out.push(['grid-template-rows', rows]);
     } else {
       out.push(['display', 'flex'], ['flex-direction', layout]);
+      // `wrap` (v9): hanya boolean true → flex-wrap; layout none/grid mengabaikannya, nowrap tidak ditulis.
+      if (n.wrap === true) out.push(['flex-wrap', 'wrap']);
     }
     if ((isNum(n.gap) && n.gap >= 0) || isTokenRef(n.gap)) out.push(['gap', lengthCss(n.gap)!]);
     // Gap per sumbu menimpa `gap` (CSS column-gap/row-gap; berlaku juga di flex).

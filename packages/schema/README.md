@@ -1,6 +1,6 @@
 # @lakar/schema
 
-Satu sumber kebenaran untuk bentuk data Lakar: skema dokumen v8 (zod, tipe TS diturunkan dari sini),
+Satu sumber kebenaran untuk bentuk data Lakar: skema dokumen v9 (zod, tipe TS diturunkan dari sini),
 token, kontrak error, temuan check, dan konstanta yang dipakai lebih dari satu paket. Tanpa IO.
 
 - **AD terkait:** AD-2 (skema + JSON Schema hasil zod), AD-11 (bentuk `{ok, data|error}`, enum `ErrorCode`),
@@ -18,6 +18,7 @@ token, kontrak error, temuan check, dan konstanta yang dipakai lebih dari satu p
   allowlist `SVG_PRESENTATION_ATTRS` dengan pola nilai `SVG_ATTR_PATTERNS`). Pemetaan ke SVG dan serializer ekspor `vectorToSvg` ada di `@lakar/render`.
 - Tag semantik (AD-1, v7): `tag` opsional pada frame dan text dari allowlist `HTML_TAGS`, hanya untuk ekspor kode (codegen menulisnya sebagai nama elemen); render canvas mengabaikannya.
 - Tinggi board hug (v8, spec-board-hug-height): `BoardHeight` (angka | `'hug'`), `isHugBoard`. Tinggi board hug = isi flow, diukur saat render; tidak tersimpan di dokumen.
+- Flex wrap (v9, epic adopsi-open-pencil): `wrap?:boolean` pada frame — `true` = anak flex row/column membungkus ke baris berikut (CSS `flex-wrap: wrap`); jarak antarbaris lewat `rowGap`/`columnGap`.
 - Komponen (AD-12): `ComponentDef`, `InstanceNode`, `OVERRIDABLE_PROPS`, `componentIssues` (siklus, master tak ada, master bersarang,
   ID ganda), `expandInstances` (tahap ekspansi; alamat komposit `<instanceId>/<masterNodeId>…`), `instanceIssues` (referensi basi,
   dibaca check sebagai LC-32), tipe `Expanded*`.

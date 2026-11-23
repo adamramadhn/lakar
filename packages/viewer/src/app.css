@@ -1336,6 +1336,20 @@ code {
   gap: 8px;
   padding-top: 4px;
 }
+/* Langkah progres dialog Import from URL (desain section 11). */
+.import-steps {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 12px;
+}
+.import-steps li + li::before {
+  content: '→ ';
+  color: var(--text-muted);
+}
 
 /* ---- Viewer ---- */
 .viewer {

@@ -11,7 +11,7 @@ import { Modal } from './NewFileDialog';
 const MENU_ICON: Record<InsertKind, IconName> = { frame: 'frame', rect: 'square', ellipse: 'circle', text: 'text', image: 'image', icon: 'shapes' };
 
 /** Tombol "+" header Layers + menu Add layer. Tanpa board (`hasBoard` false) hanya Frame (board baru) yang aktif. */
-export function AddLayerButton({ disabled, disabledReason, hasBoard, onPick }: { disabled: boolean; disabledReason: string; hasBoard: boolean; onPick: (kind: InsertKind) => void }) {
+export function AddLayerButton({ disabled, disabledReason, hasBoard, onPick, onImportUrl }: { disabled: boolean; disabledReason: string; hasBoard: boolean; onPick: (kind: InsertKind) => void; /** Diberikan → item "Import page from URL…" (epic adopsi open-pencil story 8) membuka dialog impor. */ onImportUrl?: () => void }) {
   const [at, setAt] = useState<{ x: number; y: number } | undefined>(undefined);
   const items: Item[] = INSERT_KINDS.map(({ kind, label }) => {
     const needsBoard = kind !== 'frame' && !hasBoard;
@@ -28,6 +28,17 @@ export function AddLayerButton({ disabled, disabledReason, hasBoard, onPick }: {
       },
     };
   });
+  if (onImportUrl) {
+    items.push({
+      label: 'Import page from URL…',
+      icon: 'link',
+      separator: true,
+      run: () => {
+        setAt(undefined);
+        onImportUrl();
+      },
+    });
+  }
   return (
     <>
       <button

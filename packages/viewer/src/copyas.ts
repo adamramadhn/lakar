@@ -86,6 +86,7 @@ export function cssDeclarations(node: Node): CssDecl[] {
     if (flex) {
       push('display', 'flex');
       push('flex-direction', node.layout as string);
+      if (node.wrap === true) push('flex-wrap', 'wrap');
     } else {
       push('display', 'grid');
       push('grid-template-columns', gridTemplateCss(node.gridTemplateColumns));
@@ -159,6 +160,8 @@ export function toTailwind(node: Node): string {
   const ta = get('text-align');
   if (ta !== undefined) cls.push(`text-${ta}`);
   if (get('display') === 'flex') cls.push('flex', get('flex-direction') === 'column' ? 'flex-col' : 'flex-row');
+  const fw = get('flex-wrap');
+  if (fw !== undefined) cls.push(`flex-${fw}`);
   if (get('display') === 'grid') cls.push('grid');
   add('grid-cols', 'grid-template-columns');
   add('grid-rows', 'grid-template-rows');

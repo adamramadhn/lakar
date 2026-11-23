@@ -20,7 +20,9 @@ import { NODE_ADDRESS_PATTERN } from './selection.js';
 // untuk ekspor kode; render canvas mengabaikannya. Dokumen v6 dimigrasi identitas (`@lakar/core` MIGRATIONS[6]).
 // v8 (spec-board-hug-height) membolehkan `height:'hug'` pada board: tinggi board = tinggi isi flow, diukur saat render.
 // Dokumen v7 (tinggi board selalu angka) dimigrasi identitas (`@lakar/core` MIGRATIONS[7]).
-export const SCHEMA_VERSION = 8 as const;
+// v9 (story flex-wrap, epic adopsi-open-pencil) menambah `wrap?:boolean` pada frame (anak flex row/column membungkus
+// ke baris berikut, CSS flex-wrap); dokumen v8 dimigrasi identitas (`@lakar/core` MIGRATIONS[8]).
+export const SCHEMA_VERSION = 9 as const;
 
 // ---------------------------------------------------------------------------
 // Primitif
@@ -472,6 +474,8 @@ const frameShape = {
   /** Gap per sumbu (CSS column-gap/row-gap); menimpa `gap` di sumbu itu. */
   columnGap: tok(Size).optional(),
   rowGap: tok(Size).optional(),
+  /** v9: `true` = anak flex membungkus ke baris berikut (CSS flex-wrap: wrap); hanya bermakna di layout row/column. */
+  wrap: z.boolean().optional(),
   ...sizingShape,
   clip: z.boolean().optional(),
   scrollY: Size.optional(),

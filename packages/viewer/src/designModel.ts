@@ -149,9 +149,15 @@ export const layoutOf = (n: Raw) => (n.layout === 'row' || n.layout === 'column'
 /**
  * Ganti arah layout. Keluar dari grid menghapus `columnGap`/`rowGap`: di flex keduanya tetap berlaku (CSS) tetapi
  * panel flex hanya menampilkan Gap, jadi tanpa ini Gap tertimpa nilai yang tidak terlihat. Template track dipertahankan.
+ * Keluar dari flex (ke grid/none) juga menghapus `wrap` (v9): properti itu hanya bermakna di row/column dan panel
+ * menyembunyikannya di luar flex, jadi tidak boleh tersimpan sebagai nilai tak terlihat.
  */
 export const setLayout = (targets: readonly DesignTarget[], layout: ParentLayout | null) =>
-  opsFor(targets, (t) => (t.stored.layout === 'grid' && layout !== 'grid' ? { layout, columnGap: null, rowGap: null } : { layout }));
+  opsFor(targets, (t) => ({
+    layout,
+    ...(layout === 'row' || layout === 'column' ? {} : { wrap: null }),
+    ...(t.stored.layout === 'grid' && layout !== 'grid' ? { columnGap: null, rowGap: null } : {}),
+  }));
 
 export { GRID_TRACKS_MAX };
 
@@ -190,12 +196,12 @@ export function setTrackCount(targets: readonly DesignTarget[], axis: TrackAxis,
   });
 }
 
-/** Masuk mode grid: `layout:'grid'` + kolom `{fr:1}` sebanyak min(max(anak, 1), 3) bila template kolom belum ada. */
+/** Masuk mode grid: `layout:'grid'` + kolom `{fr:1}` sebanyak min(max(anak, 1), 3) bila template kolom belum ada. `wrap` (hanya flex) dihapus. */
 export function enterGrid(targets: readonly DesignTarget[]): DocOp[] {
   return opsFor(targets, (t) => {
-    if (tracksOf(t.stored, 'gridTemplateColumns').length) return { layout: 'grid' };
+    if (tracksOf(t.stored, 'gridTemplateColumns').length) return { layout: 'grid', wrap: null };
     const kids = Array.isArray(t.stored.children) ? t.stored.children.length : 0;
-    return { layout: 'grid', gridTemplateColumns: Array.from({ length: Math.min(Math.max(kids, 1), 3) }, () => ({ fr: 1 })) };
+    return { layout: 'grid', wrap: null, gridTemplateColumns: Array.from({ length: Math.min(Math.max(kids, 1), 3) }, () => ({ fr: 1 })) };
   });
 }
 

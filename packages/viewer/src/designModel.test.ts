@@ -138,6 +138,17 @@ describe('designModel', () => {
     expect(setLayout([f], null)).toEqual([]);
   });
 
+  it('wrap (v9): dihapus saat arah → grid/none; flex → flex mempertahankannya; boolean via setProp', () => {
+    const w = t('w', 'frame', { layout: 'row', wrap: true });
+    expect(setLayout([w], 'column')).toEqual([{ op: 'update', id: 'w', patch: { layout: 'column' } }]);
+    expect(setLayout([w], null)).toEqual([{ op: 'update', id: 'w', patch: { layout: null, wrap: null } }]);
+    expect(setLayout([w], 'grid')).toEqual([{ op: 'update', id: 'w', patch: { layout: 'grid', wrap: null } }]);
+    expect(setProp([t('u', 'frame', { layout: 'row' })], 'wrap', true)).toEqual([{ op: 'update', id: 'u', patch: { wrap: true } }]);
+    // "No wrap" menulis null (hapus), bukan false — dokumen lama tetap minimal.
+    expect(setProp([w], 'wrap', null)).toEqual([{ op: 'update', id: 'w', patch: { wrap: null } }]);
+    expect(setProp([t('n', 'frame', { layout: 'row' })], 'wrap', null)).toEqual([]);
+  });
+
   it('fill: urutan tampil, tambah, hapus, pindah, warna/alpha, Mixed', () => {
     const fills = [
       { type: 'solid', color: '#FFFFFF' },
@@ -241,12 +252,13 @@ describe('designModel: grid (v4)', () => {
     expect(canEditXY(t('a', 'rect', { position: 'absolute' }, { parentLayout: 'grid' }))).toBe(true);
   });
 
-  it('enterGrid: kolom fr = min(max(anak,1),3) bila template belum ada; template ada → hanya layout', () => {
+  it('enterGrid: kolom fr = min(max(anak,1),3) bila template belum ada; template ada → hanya layout; wrap (v9) dihapus', () => {
     expect(enterGrid([t('a', 'frame', { layout: 'row', children: [{}, {}] })])).toEqual([{ op: 'update', id: 'a', patch: { layout: 'grid', gridTemplateColumns: [fr, fr] } }]);
     expect(enterGrid([t('a', 'frame', { children: [] })])[0]!).toMatchObject({ patch: { gridTemplateColumns: [fr] } });
     expect(enterGrid([t('a', 'frame', { children: [{}, {}, {}, {}, {}] })])[0]!).toMatchObject({ patch: { gridTemplateColumns: [fr, fr, fr] } });
     expect(enterGrid([t('a', 'frame', { gridTemplateColumns: [80, fr] })])).toEqual([{ op: 'update', id: 'a', patch: { layout: 'grid' } }]);
     expect(enterGrid([t('a', 'frame', { layout: 'grid', gridTemplateColumns: [fr] })])).toEqual([]);
+    expect(enterGrid([t('w', 'frame', { layout: 'row', wrap: true, children: [{}, {}] })])).toEqual([{ op: 'update', id: 'w', patch: { layout: 'grid', wrap: null, gridTemplateColumns: [fr, fr] } }]);
   });
 
   it('setTrackCount: naik menambah default, turun memangkas, 0 menghapus, di luar batas tanpa op', () => {
@@ -264,12 +276,16 @@ describe('designModel: grid (v4)', () => {
     expect(setTrackCount([g], 'gridTemplateColumns', -1)).toEqual([]);
   });
 
-  it('setLayout keluar dari grid menghapus columnGap/rowGap (template tetap); ke grid / dari flex hanya layout', () => {
+  it('setLayout keluar dari grid menghapus columnGap/rowGap (template tetap); ke grid / dari flex hanya layout; wrap ikut dihapus ke grid/none', () => {
     const g = t('g', 'frame', { layout: 'grid', gridTemplateColumns: [fr], columnGap: 8, rowGap: 4 });
     expect(setLayout([g], 'row')).toEqual([{ op: 'update', id: 'g', patch: { layout: 'row', columnGap: null, rowGap: null } }]);
     expect(setLayout([g], null)).toEqual([{ op: 'update', id: 'g', patch: { layout: null, columnGap: null, rowGap: null } }]);
     expect(setLayout([t('h', 'frame', { layout: 'grid' })], 'column')).toEqual([{ op: 'update', id: 'h', patch: { layout: 'column' } }]);
     expect(setLayout([t('r', 'frame', { layout: 'row', columnGap: 8 })], 'column')).toEqual([{ op: 'update', id: 'r', patch: { layout: 'column' } }]);
+    // Grid basi ber-wrap → flex: wrap bertahan (bermakna di flex); → none: wrap ikut terhapus.
+    const gw = t('gw', 'frame', { layout: 'grid', gridTemplateColumns: [fr], wrap: true, columnGap: 8 });
+    expect(setLayout([gw], 'row')).toEqual([{ op: 'update', id: 'gw', patch: { layout: 'row', columnGap: null } }]);
+    expect(setLayout([gw], null)).toEqual([{ op: 'update', id: 'gw', patch: { layout: null, wrap: null, columnGap: null } }]);
   });
 
   it('parse Columns/Rows panel: Columns 0/abc/25 batal; Rows kosong = 0 (hapus), format 0 = kosong', () => {

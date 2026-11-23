@@ -1107,6 +1107,140 @@ export function lc11(ctx: BoardContext): Finding[] {
 }
 
 // ---------------------------------------------------------------------------
+// LC-34 · saudara tumpang tindih tanpa sengaja (warning)
+// ---------------------------------------------------------------------------
+
+/** Lencana: luas node kecil × 5 ≤ luas node besar (yang besar bukan teks) dianggap tumpukan sah. */
+export const BADGE_AREA_RATIO = 5;
+
+/** Kotak `[x,y,w,h]` dibulatkan untuk teks temuan. */
+const boxText = (r: Rect): string => `[${[r.x, r.y, r.width, r.height].map((v) => Math.round(v)).join(',')}]`;
+
+type ContentKind = 'teks' | 'ikon' | 'gambar' | 'grup';
+const isContentLeaf = (n: ChildNode): boolean => (n.type === 'text' && nonEmpty(n)) || n.type === 'icon' || hasImage(n);
+/** Kelas konten node; undefined = dekoratif (latar, blob, garis, frame kosong). */
+function contentKind(n: ChildNode): ContentKind | undefined {
+  if (n.type === 'text') return nonEmpty(n) ? 'teks' : undefined;
+  if (n.type === 'icon') return 'ikon';
+  if (n.type === 'frame' && descendants(n).some(isContentLeaf)) return 'grup';
+  return hasImage(n) ? 'gambar' : undefined;
+}
+
+/**
+ * Pasangan saudara konten (teks, ikon, gambar, grup berisi konten) yang beririsan ≥ 1×1 tanpa saling memuat, di luar
+ * domain LC-11 (bukan keduanya flow, bukan keduanya berteks). Dikecualikan: lencana kecil di atas non-teks, `Overlay /`,
+ * `Crop /`, rotasi, opacity 0, wadah gap negatif atau di dalam `Overlay /`/`Crop /`/`Chart /`, anggota zona bawah
+ * LC-20 dan chrome. Satu temuan per node (yang belakangan di urutan dokumen).
+ */
+export function lc34(ctx: BoardContext): Finding[] {
+  const out: Finding[] = [];
+  const zone = bottomZone(ctx);
+  const excluded = new Set<string>();
+  for (const n of [...(zone?.members.map((m) => m.node) ?? []), ...ctx.nodes.filter(isChrome)]) {
+    excluded.add(n.id);
+    for (const d of descendants(n)) excluded.add(d.id);
+  }
+  // Wadah tumpukan sengaja, terotasi, atau tak terlihat (opacity 0): isinya tidak dinilai.
+  const layered = (a: Container): boolean => a.type === 'frame' && (named(a, 'Overlay /') || named(a, 'Crop /') || named(a, 'Chart /') || rotated(a) || (a.opacity ?? 1) <= 0);
+  const containers: Container[] = [ctx.board, ...ctx.nodes.filter((n): n is FrameNode => n.type === 'frame')];
+  for (const c of containers) {
+    if (c.type === 'frame' && (((c.gap ?? 0) as number) < 0 || excluded.has(c.id) || layered(c) || ancestors(ctx, c).some(layered))) continue;
+    const kids = c.children.flatMap((k) => {
+      if (excluded.has(k.id) || named(k, 'Overlay /') || named(k, 'Crop /') || rotated(k) || (k.opacity ?? 1) <= 0) return [];
+      const kind = contentKind(k);
+      if (!kind || !visibleRect(ctx, k)) return [];
+      const r = k.type === 'text' ? inkRect(ctx, k) : ctx.bounds.get(k.id);
+      if (!r || area(r) <= 0) return [];
+      const hasText = k.type === 'text' ? nonEmpty(k) : textsIn(k).length > 0;
+      return [{ k, r, kind, flow: isFlowChild(c, k), hasText }];
+    });
+    for (let j = 1; j < kids.length; j++) {
+      const b = kids[j]!;
+      for (let i = 0; i < j; i++) {
+        const a = kids[i]!;
+        // Domain LC-11: keduanya flow atau keduanya berteks.
+        if ((a.flow && b.flow) || (a.hasText && b.hasText)) continue;
+        const ix = intersect(a.r, b.r);
+        if (!ix || ix.width < 1 || ix.height < 1) continue;
+        if (contains(a.r, b.r) || contains(b.r, a.r)) continue;
+        const [small, big] = area(a.r) <= area(b.r) ? [a, b] : [b, a];
+        if (big.k.type !== 'text' && area(small.r) * BADGE_AREA_RATIO <= area(big.r)) continue;
+        const pct = Math.round((100 * area(ix)) / area(small.r));
+        out.push(
+          finding(
+            'LC-34',
+            levelOf('LC-34'),
+            b.k,
+            clip120(`${b.kind} tumpang tindih ${a.kind} ${a.k.name} (${a.k.id}) di ${c.name}; irisan ${boxText(ix)} (${pct}% dari yang lebih kecil)`),
+            `pisahkan (geser, perkecil, atau beri ruang lewat padding/gap); tumpukan sengaja: frame "Overlay / …"`,
+          ),
+        );
+        break;
+      }
+    }
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+// LC-35 · teks keluar dari frame induk (warning)
+// ---------------------------------------------------------------------------
+
+/** Kutip konten teks pendek (≤ 16 karakter) agar bounds di detail tidak terpotong batas 120 karakter. */
+const shortQuote = (s: string): string => {
+  const chars = [...s];
+  return JSON.stringify(chars.length > 16 ? `${chars.slice(0, 15).join('')}…` : s);
+};
+
+/**
+ * Teks (kotak ∪ ink terukur) yang keluar > 1 px dari kotak luar frame induk tanpa clip. Dikecualikan: induk board,
+ * induk `clip:true`, leluhur `Crop /`/`Overlay /`/rotasi, sumbu vertikal di bawah `Scroll /`/`scrollY`, teks kosong
+ * atau tak terlihat, dan teks yang sudah LC-02a/LC-02b/LC-03 (`skip`). Saran `Wrap text` hanya untuk luapan kiri/kanan
+ * di induk flow ber-layout.
+ */
+export function lc35(ctx: BoardContext, skip: ReadonlySet<string> = new Set()): Finding[] {
+  const out: Finding[] = [];
+  for (const t of texts(ctx)) {
+    if (!nonEmpty(t) || skip.has(t.id) || rotated(t) || named(t, 'Overlay /') || !visibleRect(ctx, t)) continue;
+    const anc = ancestors(ctx, t);
+    const parent = anc[0]!;
+    if (parent.type === 'board' || parent.clip === true) continue;
+    // Keturunan node yang sudah dilaporkan (mis. frame LC-02a) juga dilewati, sama dengan pembungkaman di lc02a/lc02c.
+    if (anc.some((a) => skip.has(a.id) || (a.type === 'frame' && (named(a, 'Crop /') || named(a, 'Overlay /') || rotated(a))))) continue;
+    const b = ctx.bounds.get(t.id);
+    const pr = ctx.bounds.get(parent.id);
+    if (!b || !pr || area(pr) <= 0) continue;
+    const ink = ctx.ink.get(t.id);
+    const rect = ink ? union(b, ink) : b;
+    const o = overflow(rect, pr);
+    const scrolled = anc.some((a) => a.type === 'frame' && (named(a, 'Scroll /') || (a.scrollY ?? 0) > 0));
+    const sides = SIDES.filter((s) => o[s] > INK_OVERFLOW_MIN && !(scrolled && (s === 'atas' || s === 'bawah')));
+    if (!sides.length) continue;
+    const horizontal = sides.some((s) => s === 'kiri' || s === 'kanan');
+    const wrapped = t.width === 'fill' && t.wrap === 'wrap';
+    const flow = isFlowChild(parent, t);
+    const wrapFix = horizontal && flow && !wrapped ? patchFix('Wrap text', t.id, { width: 'fill', wrap: 'wrap' }) : undefined;
+    out.push(
+      finding(
+        'LC-35',
+        levelOf('LC-35'),
+        t,
+        clip120(
+          `teks ${shortQuote(t.content)} keluar ${sides.map((s) => `${num(o[s])}px di ${s}`).join(', ')} dari frame ${parent.name} (${parent.id}); teks ${boxText(rect)}, frame ${boxText(pr)}`,
+        ),
+        !horizontal
+          ? `di dalam frame induk: tinggi frame hug/lebih besar, atau perpendek isi`
+          : flow
+            ? `di dalam frame induk: teks width:'fill' + wrap:'wrap' (dibungkus), perlebar frame, atau perpendek isi`
+            : `di dalam frame induk: geser teks ke dalam frame, beri lebar angka + wrap:'wrap', perlebar frame, atau perpendek isi`,
+        { suggestions: [wrapFix] },
+      ),
+    );
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------------
 // LC-04 · kontras teks setelah komposit
 // ---------------------------------------------------------------------------
 
