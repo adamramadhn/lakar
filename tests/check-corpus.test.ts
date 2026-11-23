@@ -44,6 +44,8 @@ describe.skipIf(!browserInstalled)('korpus dokumen: check setiap board (0 error 
     const old = errors.filter((f) => f.rule !== 'LC-34' && f.rule !== 'LC-35');
     if (old.length) testLog(`[check-corpus] ${label}: error aturan lama ${old.map((f) => `${f.rule} ${f.nodeId}`).join(', ')}`);
     expect(errors.filter((f) => !old.includes(f)).map((f) => `${f.rule} ${f.nodeName} (${f.nodeId}) · ${f.detail}`), label).toEqual([]);
-    for (const f of fresh) expect(f.level, `${f.rule} ${f.nodeId}`).toBe('warning');
+    // Penjaga false positive: korpus saat ini tanpa temuan LC-34/LC-35 sama sekali. Temuan baru di sini harus ditinjau
+    // (cacat nyata di fixture → catat; false positive → perbaiki aturan), bukan langsung diterima.
+    expect(fresh.map((f) => `${f.rule} ${f.nodeName} (${f.nodeId}) · ${f.detail}`), label).toEqual([]);
   }, 30_000);
 });

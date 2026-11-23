@@ -1122,8 +1122,8 @@ const isContentLeaf = (n: ChildNode): boolean => (n.type === 'text' && nonEmpty(
 function contentKind(n: ChildNode): ContentKind | undefined {
   if (n.type === 'text') return nonEmpty(n) ? 'teks' : undefined;
   if (n.type === 'icon') return 'ikon';
-  if (hasImage(n)) return 'gambar';
-  return n.type === 'frame' && descendants(n).some(isContentLeaf) ? 'grup' : undefined;
+  if (n.type === 'frame' && descendants(n).some(isContentLeaf)) return 'grup';
+  return hasImage(n) ? 'gambar' : undefined;
 }
 
 /**
@@ -1140,7 +1140,8 @@ export function lc34(ctx: BoardContext): Finding[] {
     excluded.add(n.id);
     for (const d of descendants(n)) excluded.add(d.id);
   }
-  const layered = (a: Container): boolean => a.type === 'frame' && (named(a, 'Overlay /') || named(a, 'Crop /') || named(a, 'Chart /'));
+  // Wadah tumpukan sengaja, terotasi, atau tak terlihat (opacity 0): isinya tidak dinilai.
+  const layered = (a: Container): boolean => a.type === 'frame' && (named(a, 'Overlay /') || named(a, 'Crop /') || named(a, 'Chart /') || rotated(a) || (a.opacity ?? 1) <= 0);
   const containers: Container[] = [ctx.board, ...ctx.nodes.filter((n): n is FrameNode => n.type === 'frame')];
   for (const c of containers) {
     if (c.type === 'frame' && (((c.gap ?? 0) as number) < 0 || excluded.has(c.id) || layered(c) || ancestors(ctx, c).some(layered))) continue;
@@ -1204,7 +1205,8 @@ export function lc35(ctx: BoardContext, skip: ReadonlySet<string> = new Set()): 
     const anc = ancestors(ctx, t);
     const parent = anc[0]!;
     if (parent.type === 'board' || parent.clip === true) continue;
-    if (anc.some((a) => a.type === 'frame' && (named(a, 'Crop /') || named(a, 'Overlay /') || rotated(a)))) continue;
+    // Keturunan node yang sudah dilaporkan (mis. frame LC-02a) juga dilewati, sama dengan pembungkaman di lc02a/lc02c.
+    if (anc.some((a) => skip.has(a.id) || (a.type === 'frame' && (named(a, 'Crop /') || named(a, 'Overlay /') || rotated(a))))) continue;
     const b = ctx.bounds.get(t.id);
     const pr = ctx.bounds.get(parent.id);
     if (!b || !pr || area(pr) <= 0) continue;
@@ -1216,7 +1218,8 @@ export function lc35(ctx: BoardContext, skip: ReadonlySet<string> = new Set()): 
     if (!sides.length) continue;
     const horizontal = sides.some((s) => s === 'kiri' || s === 'kanan');
     const wrapped = t.width === 'fill' && t.wrap === 'wrap';
-    const wrapFix = horizontal && isFlowChild(parent, t) && !wrapped ? patchFix('Wrap text', t.id, { width: 'fill', wrap: 'wrap' }) : undefined;
+    const flow = isFlowChild(parent, t);
+    const wrapFix = horizontal && flow && !wrapped ? patchFix('Wrap text', t.id, { width: 'fill', wrap: 'wrap' }) : undefined;
     out.push(
       finding(
         'LC-35',
@@ -1225,9 +1228,11 @@ export function lc35(ctx: BoardContext, skip: ReadonlySet<string> = new Set()): 
         clip120(
           `teks ${shortQuote(t.content)} keluar ${sides.map((s) => `${num(o[s])}px di ${s}`).join(', ')} dari frame ${parent.name} (${parent.id}); teks ${boxText(rect)}, frame ${boxText(pr)}`,
         ),
-        horizontal
-          ? `di dalam frame induk: teks width:'fill' + wrap:'wrap' (dibungkus), perlebar frame, atau perpendek isi`
-          : `di dalam frame induk: tinggi frame hug/lebih besar, atau perpendek isi`,
+        !horizontal
+          ? `di dalam frame induk: tinggi frame hug/lebih besar, atau perpendek isi`
+          : flow
+            ? `di dalam frame induk: teks width:'fill' + wrap:'wrap' (dibungkus), perlebar frame, atau perpendek isi`
+            : `di dalam frame induk: geser teks ke dalam frame, beri lebar angka + wrap:'wrap', perlebar frame, atau perpendek isi`,
         { suggestions: [wrapFix] },
       ),
     );

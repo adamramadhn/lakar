@@ -1163,6 +1163,13 @@ describe('LC-34 saudara tumpang tindih tanpa sengaja (warning)', () => {
       const wrapped = clean([frame(name, [0, 0, 300, 40], spec.children, { layout: 'none' })]);
       expect(only(runAll(wrapped), 'LC-34'), name).toEqual([]);
     }
+    // Wadah (atau leluhurnya) terotasi atau opacity 0: isinya tidak dinilai.
+    for (const extra of [{ rotation: 5 }, { opacity: 0 }]) {
+      const { spec } = input(ico([160, 10, 20, 20]), extra);
+      expect(only(runAll(spec), 'LC-34'), JSON.stringify(extra)).toEqual([]);
+      const outer = clean([frame('Pembungkus', [0, 0, 300, 40], spec.children, extra)]);
+      expect(only(runAll(outer), 'LC-34'), `leluhur ${JSON.stringify(extra)}`).toEqual([]);
+    }
   });
 
   it('negatif: anggota zona bawah LC-20 dan chrome (Status bar, Home indicator)', () => {
@@ -1212,7 +1219,11 @@ describe('LC-35 teks keluar dari frame induk (warning)', () => {
   });
 
   it('positif: teks sudah fill+wrap → warning tanpa saran; induk layout none → tanpa saran', () => {
-    expect(only(runAll(spill({ layout: 'none' }).spec), 'LC-35')[0]!.suggestions).toBeUndefined();
+    const none = only(runAll(spill({ layout: 'none' }).spec), 'LC-35')[0]!;
+    expect(none.suggestions).toBeUndefined();
+    // Induk non-flow: width:'fill' tidak berlaku, hint tidak menyarankannya.
+    expect(none.expected).not.toContain("width:'fill'");
+    expect(none.expected).toContain('geser teks ke dalam frame');
     const { spec } = spill({}, { width: 'fill', wrap: 'wrap' });
     const f = only(runAll(spec), 'LC-35');
     expect(f).toHaveLength(1);
@@ -1263,6 +1274,12 @@ describe('LC-35 teks keluar dari frame induk (warning)', () => {
       row.children[0]._r = [16, 10, 201, 20];
       return [row];
     }).spec), 'LC-35')).toEqual([]);
+    // Keturunan node LC-02a (Kartu melewati tepi board): teks yang meluap dari Row-nya tidak dilaporkan lagi.
+    const cutT = text('Harga mulai Rp 25.000', [250, 10, 90, 20], { _ink: [250, 10, 90, 20], _lh: 20 });
+    const cutRow = frame('Baris', [250, 10, 60, 20], [cutT], { layout: 'row' });
+    const cutAll = runAll(clean([frame('Kartu', [250, 0, 200, 40], [cutRow])]));
+    expect(only(cutAll, 'LC-02a').length).toBeGreaterThan(0);
+    expect(only(cutAll, 'LC-35')).toEqual([]);
     // Teks kosong.
     expect(only(runAll(spill({}, { content: '  ' }).spec), 'LC-35')).toEqual([]);
     // Tak terlihat: di luar clip leluhur.

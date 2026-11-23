@@ -3,14 +3,14 @@ title: 'layout_check: saudara tumpang-tindih tanpa sengaja (LC-34) dan teks kelu
 type: feature
 ticket: '3'
 created: '2026-11-23'
-status: in-progress
+status: built
 baseline_revision: '01390e5ca062fc1b6f6020cd6fcdeb84bc80037e'
 route: full
 route_source: auto
 risk: medium
-review: ''
-review_source: ''
-lenses_ran: []
+review: quick
+review_source: pinned
+lenses_ran: [quick]
 review_loop_iteration: 0
 followup_review_recommended: false
 context: []
@@ -92,9 +92,40 @@ Temuan membawa bounds di `detail` (`[x,y,w,h]`) dan hint di `expected`. LC-35 me
 
 ## Implementation Notes
 
+- Run pertama terputus di tingkat harness setelah subagen implementasi selesai menulis kode. Hasilnya utuh dan di-commit sebagai checkpoint `c4d13f4`. File sampah bernama `{` dari redirect shell yang salah sudah dihapus.
+- File yang disentuh:
+  - `packages/check/src/rules.ts` (`lc34`, `lc35`, `BADGE_AREA_RATIO`);
+  - `index.ts` (wiring, `RULE_ORDER`, skip LC-35 = LC-02a ∪ LC-02b ∪ LC-03);
+  - `fixes.ts` (`AUTOFIX`);
+  - `packages/schema/src/findings.ts` beserta tesnya;
+  - `packages/viewer/src/panels.tsx` (`RULE_TITLE`);
+  - `packages/mcp/src/server.ts` dan `tests/execute-description.test.ts`;
+  - `packages/skills/skills/break-ui.md` dan `packages/check/README.md`;
+  - tes `index.test.ts`, `fixes.test.ts`, dan tes baru `tests/check-corpus.test.ts`.
+- `G1_FILTERED` di `index.test.ts` ditambah LC-34/LC-35 agar ekspektasi fixture G0 sintetis lama tetap. Tes baru memakai `runAll`.
+- **Korpus dokumen.** LC-34/LC-35 menghasilkan 0 temuan di 19 board. Korpus sudah punya error aturan lama sebelum story ini:
+  - v1 landing: LC-02b, LC-04;
+  - v2 mobile-gulir: LC-02a;
+  - v4 grid-galeri: LC-04;
+  - v7 html-paste: LC-16, LC-04.
+
+  Karena itu tes korpus menegaskan 0 error dari LC-34/LC-35 dan mencatat error lama lewat `testLog`, bukan 0 error total.
+- **Golden A–E** (`packages/daemon/src/index.test.ts -t golden`): 5/5 lulus, 0 error.
+- **Kinerja.** Tes `kinerja aturan murni` (500 node + zona bawah) lulus saat dijalankan sendiri: sekitar 60 ms dengan aturan baru, sekitar 45–60 ms tanpa, batas 100 ms. Saat seluruh tes berjalan paralel di Windows, waktunya bisa melewati 100 ms karena kontensi (baseline timing Windows yang sudah dikenal). CI Linux adalah acuan.
+
 ## Plan Change Log
 
 ## Review Triage Log
+
+### 2026-11-23 — Review pass
+- verdicts: 6 findings — high 0, medium 1, low 4, false 1, maybe-false 0
+- findings:
+  - `[medium]` `[patch]` `tests/check-corpus.test.ts`: asersi hampa, karena LC-34/LC-35 berlevel warning sehingga filter error tidak pernah memuatnya. Patch: tes kini menegaskan 0 temuan LC-34/LC-35 di setiap board korpus (penjaga false positive). Lulus 19/19.
+  - `[low]` `[patch]` `lc35` tidak melewati keturunan node yang sudah dilaporkan (mis. teks di dalam frame LC-02a). Patch: `anc.some((a) => skip.has(a.id) …)`, sama dengan pembungkaman lc02a/lc02c. Tes baru: Kartu melewati tepi board, LC-35 diam.
+  - `[low]` `[patch]` `lc34` tidak mengecualikan wadah atau leluhur terotasi dan opacity 0, sehingga tumpukan tak terlihat bisa dilaporkan. Patch: `layered` mencakup `rotated(a) || opacity <= 0`. Tes baru: wadah dan leluhur `rotation:5` / `opacity:0`.
+  - `[low]` `[patch]` `lc35` menyarankan `width:'fill'` di `expected` untuk induk non-flow, padahal fill tidak berlaku di sana. Patch: hint terpisah untuk induk non-flow ("geser teks ke dalam frame, beri lebar angka + wrap"). Tes memeriksa `expected`.
+  - `[low]` `[patch]` `contentKind` memberi label `gambar` pada frame ber-fill gambar yang berisi teks, padahal Design Notes menyebutnya `grup`. Patch: cek `grup` sebelum `gambar`. Sub-klaim lencana di atas grup berteks sesuai huruf spec ("yang besar bukan node teks"), jadi tidak diubah.
+  - `[false]` `[reject]` `tests/check-corpus.test.ts` tidak memverifikasi nama file aset = sha256. Aset korpus yang sama sudah dijaga `packages/render/test/corpus.test.ts` (asersi `${id}.png` = nama file), jadi aset rusak tetap gagal di sana. Tidak ada celah deteksi.
 
 ## Design Notes
 
@@ -122,3 +153,40 @@ Temuan membawa bounds di `detail` (`[x,y,w,h]`) dan hint di `expected`. LC-35 me
 - `pnpm exec vitest run packages/check packages/schema tests/execute-description.test.ts tests/check-c7.test.ts tests/skills.test.ts tests/check-corpus.test.ts` -- expected: hijau.
 - `pnpm exec vitest run packages/daemon/src/index.test.ts -t "golden"` -- expected: A–E 0 error.
 - `pnpm test` (dengan `LAKAR_C7_ALLOW_MISSING_SOURCES=1`) -- expected: tanpa kegagalan baru dibanding baseline Windows.
+
+## Auto Run Result
+
+Status: built
+
+**Ringkasan.** `layout_check`/`execute` kini punya dua aturan warning baru (bukan gerbang):
+- **LC-34**, saudara konten yang tumpang tindih tanpa sengaja di luar domain LC-11, misalnya ikon atau gambar absolut menimpa teks atau grup. Detail memuat irisan `[x,y,w,h]`.
+- **LC-35**, teks yang kotak atau ink terukurnya keluar > 1 px dari frame induk tanpa clip. Detail memuat sisi, px, dan bounds teks serta frame. Saran `Wrap text` `{width:'fill', wrap:'wrap'}` diterapkan lewat `fix_check {suggestions:true}`.
+
+Tidak ada fix aman, skema `Finding` tidak berubah, dan tidak ada UI baru.
+
+**File:**
+- `packages/check/src/rules.ts`: `lc34`, `lc35`, `BADGE_AREA_RATIO`.
+- `packages/check/src/index.ts`: wiring, `RULE_ORDER`, skip LC-35, ekspor.
+- `packages/check/src/fixes.ts`: `AUTOFIX` LC-34 `none`, LC-35 `suggestion`.
+- `packages/schema/src/findings.ts` + `findings.test.ts`: katalog `G0_RULES` +2 warning.
+- `packages/viewer/src/panels.tsx`: judul UI Inggris di `RULE_TITLE`.
+- `packages/mcp/src/server.ts` + `tests/execute-description.test.ts`: deskripsi `layout_check`.
+- `packages/skills/skills/break-ui.md`: LC-34/LC-35 di daftar "pecah".
+- `packages/check/README.md`: daftar aturan.
+- `packages/check/src/index.test.ts`, `fixes.test.ts`: tes matriks.
+- `tests/check-corpus.test.ts` (baru): render + check korpus dokumen.
+
+**Review (quick, 1 pass).** 6 temuan: 5 patch (1 medium, 4 low), 0 ditunda, 1 ditolak (verifikasi aset korpus sudah dijaga `packages/render/test/corpus.test.ts`). Rincian ada di Review Triage Log.
+
+**Follow-up review:** `false`. Pass pertama tanpa patch high dan hanya satu patch medium.
+
+**Verifikasi:**
+- `pnpm build` sukses.
+- `vitest run packages/check packages/schema tests/execute-description.test.ts tests/check-c7.test.ts tests/check-corpus.test.ts tests/dependency-direction.test.ts`: 660/660 lulus. Korpus 19 board, 0 temuan LC-34/LC-35.
+- `vitest run packages/daemon/src/index.test.ts packages/daemon/src/fix-check.test.ts -t "golden|fix"`: lulus. Golden A–E 0 error.
+- `pnpm test` penuh (sebelum patch review): 54 gagal dari 2955. Angka ini dalam baseline Windows 49–55, dan semuanya kategori yang dikenal: izin key foto, SIGTERM/SIGKILL, hash/ukuran CRLF skill dan bench, serta timing render. Tidak ada di check, schema, mcp, atau viewer. `.snap` yang ditulis ulang vitest hanya beda CRLF dan sudah di-revert.
+- `tests/skills.test.ts`: 2 kegagalan CRLF baseline (judul `\r`, `api.md`). Bukan dari story ini.
+
+**Risiko tersisa:**
+- LC-34 heuristik: kolase atau komposisi hero yang sengaja menumpuk bisa menerima warning. Jalan keluarnya membungkus dengan `Overlay /`, dan warning dibatasi 3 per board.
+- Tes kinerja 500 node bisa melewati 100 ms saat seluruh tes berjalan paralel di Windows. Saat dijalankan sendiri sekitar 60 ms.
