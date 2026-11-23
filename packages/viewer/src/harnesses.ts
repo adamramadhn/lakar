@@ -17,6 +17,7 @@ export const MCP_TOOLS = [
   'execute',
   'inspect',
   'layout_check',
+  'visual_diff',
   'screenshot',
   'export',
   'export_code',

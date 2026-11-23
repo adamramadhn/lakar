@@ -139,7 +139,7 @@ export type PasteRoutesOptions = {
   fonts?: FontLookup;
   /** Direktori data daemon (store aset untuk gambar data URI HTML). */
   dataDir?: string;
-  /** Tumpukan undo agen (spec-agent-undo): paste sesi agen dicatat sebagai satu langkah. */
+  /** Hook tulis agen (spec-agent-undo, spec-agent-visual-diff): paste sesi agen = satu langkah undo + dasar visual_diff. */
   agentSteps?: AgentSteps;
 };
 
@@ -220,7 +220,8 @@ async function commitPaste(opts: PasteRoutesOptions, slug: string, body: PasteBo
     const boards = touchedBoards(resolveDocument(current!), resolveDocument(committed.doc));
     await opts.store.commit(slug, committed.doc, { ...entry, ...authorOf(actor) });
     opts.docs.set(slug, committed.doc);
-    if (actor.session) opts.agentSteps?.record(actor.session, committed.doc.id, current!.rev, committed.doc.rev, committed.inverse, description);
+    // Hook tulis agen tunggal (undo + dasar visual_diff), spec-agent-visual-diff X1.
+    if (actor.session) opts.agentSteps?.onAgentWrite(actor.session, committed.doc.id, current!.rev, committed.doc.rev, committed.inverse, description);
     return { doc: committed.doc, created: committed.created, inverse: committed.inverse, refs: committed.value.refs, nodeId: committed.value.refs[ROOT_REF]!, boards, report: imported.report };
   });
 }

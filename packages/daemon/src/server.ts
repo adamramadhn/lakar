@@ -53,6 +53,7 @@ import { registerPasteRoutes, type HtmlSnapshotter } from './paste.js';
 import { SelectionStore, registerSelectionRoutes } from './selection.js';
 import { registerRenderDepsRoutes } from './render-deps.js';
 import { registerExportRoutes } from './export.js';
+import { registerVisualDiffRoutes } from './visual-diff.js';
 import { HugHeights } from './hug-heights.js';
 import { registerCodeExportRoutes } from './code-export.js';
 import { VIEWER_DIST_DIR, peekDocument, registerViewerRoutes } from './viewer.js';
@@ -608,7 +609,8 @@ export function buildServer({
         // setelah restart.
         await store.commit(slug, committed.doc, { ...committed.entry, ...authorOf(session) });
         docs.set(slug, committed.doc);
-        agentSteps.record(session, committed.doc.id, doc.rev, committed.doc.rev, committed.inverse, label);
+        // Hook tulis agen tunggal: langkah undo (spec-agent-undo) + dasar visual_diff (spec-agent-visual-diff).
+        agentSteps.onAgentWrite(session, committed.doc.id, doc.rev, committed.doc.rev, committed.inverse, label);
         checks.record(committed.doc.id, doc.rev, committed.doc.rev, ran.boards);
         hugs.record(after, ran.measures, doc.rev);
         result = { docId: committed.doc.id, rev: committed.doc.rev, created: committed.created };
@@ -853,6 +855,7 @@ export function buildServer({
   registerSelectionRoutes(app, { docs, store, sessions, selections, focus, activity, render, assertIcons });
   registerRenderDepsRoutes(app, { fonts, icons });
   registerExportRoutes(app, { docs, store, render, icons });
+  registerVisualDiffRoutes(app, { docs, store, render, activeDoc, assertIcons });
   registerCodeExportRoutes(app, { docs, sessions, icons });
   registerConnectionRoutes(app, {
     host: config.host,

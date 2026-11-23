@@ -14,13 +14,15 @@ import { iconRefs } from '@lakar/render';
 import { LakarError, SESSION_HEADER, findBoard, resolveDocument, type DocOp, type HistoryEntry, type LakarDocument } from '@lakar/schema';
 import { z } from 'zod';
 import { VIEWER_CLIENT } from './events.js';
-import { NO_ACTIVE_DOC_HINT, authorOf, type Session, type Sessions } from './sessions.js';
+import { NO_ACTIVE_DOC_HINT, authorOf, noteWrite, type Session, type Sessions } from './sessions.js';
 import type { DocStore } from './store.js';
 
 /** Jumlah langkah yang diingat per sesi per dokumen (langkah tertua dibuang). */
 export const AGENT_UNDO_MAX = 50;
 
 export type UndoDir = 'undo' | 'redo';
+/** Jenis tulis agen untuk `onAgentWrite`: langkah baru (execute, paste, kelak fix_check) atau commit undo/redo. */
+export type AgentWriteKind = 'step' | UndoDir;
 
 /** Satu langkah di tumpukan: op yang dijalankan saat langkah ini diambil, dan label riwayat langkah asal. */
 type Step = { ops: DocOp[]; description: string };
@@ -41,16 +43,34 @@ export class AgentSteps {
   }
 
   /**
-   * Catat commit langkah baru sesi (execute/paste) dari `baseRev` ke `rev`. Redo selalu dikosongkan. Ada rev lain di
-   * antara langkah sebelumnya dan langkah ini (`baseRev !== head`) → rantai putus, langkah lama tidak bisa di-undo
-   * lagi tanpa ikut membatalkan perubahan orang lain, jadi dibuang. Invers kosong (commit tanpa efek) tidak menjadi
+   * Hook tulis agen tunggal (spec-agent-visual-diff X1). Setiap commit atas nama sesi agen memanggil ini: execute,
+   * paste agen, undo/redo agen, dan kelak `fix_check` (#33). Dua pelacak dijaga sinkron di satu tempat:
+   * - dasar `visual_diff` (`session.bases`): `baseRev` = rev sebelum tulis ini, untuk semua jenis;
+   * - tumpukan undo: hanya `kind:'step'` (route undo/redo mengelola tumpukannya sendiri per commit).
+   * `inverse` = op invers commit (kosong untuk undo/redo), `label` = label riwayat langkah.
+   */
+  onAgentWrite(session: Session, docId: string, baseRev: number, rev: number, inverse: DocOp[], label: string, kind: AgentWriteKind = 'step'): void {
+    noteWrite(session, docId, baseRev);
+    if (kind === 'step') this.#record(session, docId, baseRev, rev, inverse, label);
+  }
+
+  /** Buang tumpukan sesi pada dokumen `docId` (rantai tidak bisa dipulihkan lagi). */
+  drop(session: Session, docId: string): void {
+    this.#by.get(session)?.delete(docId);
+  }
+
+  /**
+   * Catat commit langkah baru sesi dari `baseRev` ke `rev`. Redo selalu dikosongkan. Ada rev lain di antara langkah
+   * sebelumnya dan langkah ini (`baseRev !== head`) → rantai putus: tumpukan lama dibuang seluruhnya (langkah lama tidak
+   * bisa di-undo tanpa ikut membatalkan perubahan orang lain). Invers kosong (commit tanpa efek) tidak menjadi
    * langkah, tetapi `head` tetap maju.
    */
-  record(session: Session, docId: string, baseRev: number, rev: number, inverse: DocOp[], description: string): void {
+  #record(session: Session, docId: string, baseRev: number, rev: number, inverse: DocOp[], description: string): void {
     let perDoc = this.#by.get(session);
     if (!perDoc) this.#by.set(session, (perDoc = new Map()));
     const prev = perDoc.get(docId);
-    const undo = prev && prev.head === baseRev ? prev.undo : [];
+    if (prev && prev.head !== baseRev) perDoc.delete(docId);
+    const undo = perDoc.get(docId)?.undo ?? [];
     if (inverse.length) undo.push({ ops: inverse, description });
     if (undo.length > AGENT_UNDO_MAX) undo.splice(0, undo.length - AGENT_UNDO_MAX);
     perDoc.set(docId, { head: rev, undo, redo: [] });
@@ -115,6 +135,8 @@ export function registerAgentUndoRoutes(app: FastifyInstance, { docs, store, doc
         if (current.rev !== ds.head) {
           const { who, entry } = await laterAuthor(store, slug, ds.head);
           const what = entry ? ` (rev ${entry.rev}, "${entry.description}")` : '';
+          // Rantai putus permanen: tumpukan dibuang supaya panggilan berikutnya jujur NOT_FOUND (review 31-1).
+          steps.drop(session, current.id);
           throw new LakarError('CONFLICT', `${dir} ditolak: ${who} mengedit dokumen ${slug} sesudah langkah terakhir sesi ini${what}; dokumen kini rev ${current.rev}`, {
             hint: `agen tidak pernah membatalkan edit pengguna atau sesi lain; ${FIX_FORWARD}`,
           });
@@ -125,24 +147,29 @@ export function registerAgentUndoRoutes(app: FastifyInstance, { docs, store, doc
         const done: { description: string; rev: number }[] = [];
         const boards = new Set<string>();
         let doc = current;
-        // Satu commit per langkah (satu rev, satu entri riwayat), semuanya di bawah satu kunci dokumen.
-        for (let i = 0; i < n; i++) {
-          const step = stack[stack.length - 1]!;
-          const committed = await transact(doc, { sessionId: session.id, description: `${Verb}: ${step.description}` }, (tx) => applyOps(tx, step.ops));
-          if (committed.entry === null) throw new Error(`${dir}: op langkah tidak berefek`);
-          const before = resolveDocument(doc);
-          const after = resolveDocument(committed.doc);
-          const touched = touchedBoards(before, after);
-          for (const id of touched) for (const r of iconRefs(findBoard(after, id)!)) icons.canonical(r.lib, r.icon);
-          await store.commit(slug, committed.doc, { ...committed.entry, ...authorOf(session) });
-          docs.set(slug, committed.doc);
-          // Tumpukan diperbarui per commit: gagal di langkah berikutnya tidak membuat rantai tidak sinkron.
-          stack.pop();
-          ds[other].push({ ops: committed.inverse, description: step.description });
-          ds.head = committed.doc.rev;
-          for (const b of touched) boards.add(b);
-          done.push({ description: step.description, rev: committed.doc.rev });
-          doc = committed.doc;
+        // Satu commit per langkah (satu rev, satu entri riwayat), semuanya di bawah satu kunci dokumen. Seluruh panggilan
+        // (juga bila gagal di tengah) dicatat sekali lewat hook tulis agen: dasar visual_diff = rev sebelum undo/redo ini.
+        try {
+          for (let i = 0; i < n; i++) {
+            const step = stack[stack.length - 1]!;
+            const committed = await transact(doc, { sessionId: session.id, description: `${Verb}: ${step.description}` }, (tx) => applyOps(tx, step.ops));
+            if (committed.entry === null) throw new Error(`${dir}: op langkah tidak berefek`);
+            const before = resolveDocument(doc);
+            const after = resolveDocument(committed.doc);
+            const touched = touchedBoards(before, after);
+            for (const id of touched) for (const r of iconRefs(findBoard(after, id)!)) icons.canonical(r.lib, r.icon);
+            await store.commit(slug, committed.doc, { ...committed.entry, ...authorOf(session) });
+            docs.set(slug, committed.doc);
+            // Tumpukan diperbarui per commit: gagal di langkah berikutnya tidak membuat rantai tidak sinkron.
+            stack.pop();
+            ds[other].push({ ops: committed.inverse, description: step.description });
+            ds.head = committed.doc.rev;
+            for (const b of touched) boards.add(b);
+            done.push({ description: step.description, rev: committed.doc.rev });
+            doc = committed.doc;
+          }
+        } finally {
+          if (doc.rev !== current.rev) steps.onAgentWrite(session, current.id, current.rev, doc.rev, [], Verb, dir);
         }
         return {
           docId: doc.id,

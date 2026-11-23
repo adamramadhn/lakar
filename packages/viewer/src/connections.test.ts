@@ -33,6 +33,7 @@ describe('snippet harness', () => {
   it('daftar tool MCP memuat list_documents dan paste', () => {
     expect(MCP_TOOLS).toContain('list_documents');
     expect(MCP_TOOLS).toContain('paste');
+    expect(MCP_TOOLS).toContain('visual_diff');
   });
 
   it('semua harness punya id unik', () => {

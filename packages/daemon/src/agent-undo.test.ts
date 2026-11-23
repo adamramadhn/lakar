@@ -123,10 +123,11 @@ describe('undo/redo agen', () => {
       expect(r.json().error.message).toContain(`rev ${edit.rev}, "Edited in app"`);
       expect(r.json().error.hint).toContain('perbaiki maju lewat execute');
       expect(await t.doc('user')).toEqual(before);
-      // Tetap ditolak sesudah pengguna meng-undo edit-nya sendiri (rev baru juga milik pengguna).
+      // CONFLICT membuang tumpukan sesi di dokumen itu (review 31-1): sesudah pengguna meng-undo edit-nya sendiri pun
+      // langkah lama tidak hidup lagi → NOT_FOUND jujur, bukan CONFLICT berulang.
       const own = await t.post('/viewer/docs/user/ops', { ops: edit.inverse, description: 'Undo Rename' });
       expect(own.statusCode).toBe(200);
-      expect((await t.step('undo', s)).statusCode).toBe(409);
+      expect((await t.step('undo', s)).json().error.code).toBe('NOT_FOUND');
 
       // Redo: undo agen, lalu edit pengguna → redo ditolak.
       const s2 = await t.session('user');
@@ -172,8 +173,8 @@ describe('undo/redo agen', () => {
       const ub = await t.step('undo', b);
       expect(ub.statusCode).toBe(200);
       expect(await t.boards('two')).toEqual(['Mobile', 'Extra 1']);
-      // Undo agen B juga rev sesi lain bagi A.
-      expect((await t.step('undo', a)).statusCode).toBe(409);
+      // CONFLICT pertama membuang tumpukan A (review 31-1): undo A berikutnya NOT_FOUND, bukan langkah yang hidup lagi.
+      expect((await t.step('undo', a)).json().error.code).toBe('NOT_FOUND');
     } finally {
       await t.app.close();
     }
@@ -248,21 +249,60 @@ describe('undo/redo agen', () => {
   });
 });
 
+describe('hook tulis agen: dasar visual_diff ikut undo/redo (spec-agent-visual-diff X1)', () => {
+  it('sesudah undo, visual_diff {} membandingkan dengan rev sebelum undo (bukan sebelum langkah yang di-undo)', async () => {
+    const t = await server();
+    try {
+      await t.create('Vd');
+      const s = await t.session('vd');
+      const r1 = await t.execute(s);
+      const r2 = await t.execute(s);
+      const diff = async () => (await t.post('/viewer/visual-diff', {}, { 'x-lakar-session': s })).json().data;
+      expect(await diff()).toMatchObject({ base: 'lastWrite', fromRev: r1, toRev: r2 });
+      const u = (await t.step('undo', s)).json().data;
+      expect(await diff()).toMatchObject({ base: 'lastWrite', fromRev: r2, toRev: u.rev });
+      const r = (await t.step('redo', s)).json().data;
+      expect(await diff()).toMatchObject({ fromRev: u.rev, toRev: r.rev });
+      // undo beberapa langkah sekaligus = satu tulis: dasar = rev sebelum panggilan.
+      const before = r.rev;
+      const multi = (await t.step('undo', s, { steps: 2 })).json().data;
+      expect(await diff()).toMatchObject({ fromRev: before, toRev: multi.rev });
+      expect((await t.post('/viewer/visual-diff', { since: 'session' }, { 'x-lakar-session': s })).json().data.fromRev).toBe(r1 - 1);
+    } finally {
+      await t.app.close();
+    }
+  });
+});
+
 describe('AgentSteps', () => {
   const session = () => ({ id: 's', createdAt: '', executes: 0, keep: {}, failed: new Map(), log: [] }) as Session;
   const op = (id: string) => [{ op: 'remove', id }] as never[];
   it('rantai putus membuang langkah lama; invers kosong memajukan head tanpa langkah; batas AGENT_UNDO_MAX', () => {
     const steps = new AgentSteps();
     const s = session();
-    steps.record(s, 'D', 0, 1, op('a'), 'a');
-    steps.record(s, 'D', 1, 2, [], 'noop');
-    steps.record(s, 'D', 2, 3, op('b'), 'b');
+    steps.onAgentWrite(s, 'D', 0, 1, op('a'), 'a');
+    steps.onAgentWrite(s, 'D', 1, 2, [], 'noop');
+    steps.onAgentWrite(s, 'D', 2, 3, op('b'), 'b');
     expect(steps.of(s, 'D')).toMatchObject({ head: 3, undo: [{ description: 'a' }, { description: 'b' }], redo: [] });
-    steps.record(s, 'D', 5, 6, op('c'), 'c');
+    steps.onAgentWrite(s, 'D', 5, 6, op('c'), 'c');
     expect(steps.of(s, 'D')).toMatchObject({ head: 6, undo: [{ description: 'c' }] });
     expect(steps.of(session(), 'D')).toBeUndefined();
-    for (let i = 0; i < AGENT_UNDO_MAX + 5; i++) steps.record(s, 'E', i, i + 1, op(`n${i}`), `n${i}`);
+    for (let i = 0; i < AGENT_UNDO_MAX + 5; i++) steps.onAgentWrite(s, 'E', i, i + 1, op(`n${i}`), `n${i}`);
     expect(steps.of(s, 'E')!.undo).toHaveLength(AGENT_UNDO_MAX);
     expect(steps.of(s, 'E')!.undo[0]!.description).toBe('n5');
+  });
+
+  it('onAgentWrite: semua jenis memajukan dasar visual_diff; hanya step yang masuk tumpukan; rantai putus membuang redo; drop', () => {
+    const steps = new AgentSteps();
+    const s = session();
+    steps.onAgentWrite(s, 'D', 3, 4, op('a'), 'a');
+    steps.onAgentWrite(s, 'D', 4, 5, [], 'Undo', 'undo');
+    expect(s.bases!.get('D')).toEqual({ first: 3, last: 4 });
+    expect(steps.of(s, 'D')).toMatchObject({ head: 4, undo: [{ description: 'a' }] });
+    steps.of(s, 'D')!.redo.push({ ops: op('x'), description: 'x' } as never);
+    steps.onAgentWrite(s, 'D', 9, 10, op('b'), 'b');
+    expect(steps.of(s, 'D')).toMatchObject({ head: 10, undo: [{ description: 'b' }], redo: [] });
+    steps.drop(s, 'D');
+    expect(steps.of(s, 'D')).toBeUndefined();
   });
 });

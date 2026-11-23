@@ -2,9 +2,9 @@
 
 ## Langkah
 
-1. `screenshot` tiap board, lalu `screenshot({nodeId, scale:2})` satu area terpadat (tabel, daftar berbadge, kartu KPI, hero bertumpuk; ID dari `created`/`keep`).
-2. Jawab enam pertanyaan dari kedua gambar: `ok` atau `node: sebelum → sesudah · alasan` (`gap 10 → 12 · skala`), tanpa prosa.
-3. Satu execute perbaikan: semua temuan + sisa warning `check`.
+1. `screenshot` tiap board, lalu `screenshot({nodeId, scale:2})` satu area terpadat (tabel, daftar berbadge, kartu KPI; ID dari `created`/`keep`).
+2. Jawab enam pertanyaan dari dua gambar: `ok` atau `node: sebelum → sesudah · alasan`, tanpa prosa.
+3. Satu execute perbaikan: semua temuan + sisa warning `check`; `visual_diff`: hanya area temuan berubah.
 
 ## Enam pertanyaan
 
