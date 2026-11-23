@@ -3,7 +3,7 @@ title: 'Desain UI adopsi open-pencil di lakar-ui.pen'
 type: feature
 ticket: '1'
 created: '2026-11-23'
-status: in-review
+status: built
 baseline_revision: '01390e5ca062fc1b6f6020cd6fcdeb84bc80037e'
 route: oneshot
 route_source: auto
@@ -15,7 +15,14 @@ review_loop_iteration: 0
 followup_review_recommended: false
 context: ['{project-root}/design/README.md']
 warnings: []
-deferred: []
+deferred:
+  - summary: >-
+      Tabel Struktur dokumen di design/README.md belum mencantumkan section 05 sampai 10.
+    evidence: |-
+      Tabel hanya memuat 00 sampai 04 sebelum story ini; section 05 sampai 10 ditambahkan story lain tanpa memperbarui tabel. Bukan disebabkan story 8.1.
+    location: >-
+      design/README.md:29
+    severity: low
 ---
 
 <intent-contract>
@@ -49,6 +56,38 @@ Catatan implementasi (2026-11-23):
 - Tab Pencil lama untuk `design/lakar-ui.pen` di checkout utama masih memegang salinan basi. Tab itu harus ditutup atau dimuat ulang tanpa disimpan.
 - Section 11 = `PciUW`, berisi 15 layar dark dan 15 light, plus sheet komponen. Id node tercatat di `design/README.md`.
 - File yang diubah: `design/lakar-ui.pen`, `design/README.md`, dan plan ini.
+
+## Review Triage Log
+
+### 2026-11-23 — Review pass
+- verdicts: high 0, medium 0, low 4, false 2, maybe-false 0
+
+| # | Temuan | Verdict | Route | Bukti / tindakan |
+|---|---|---|---|---|
+| 1 | Tabel Struktur dokumen melompat dari 04 ke 11 | low | defer | Sudah begitu sebelum story ini (05 sampai 10 tidak tercatat). Dicatat di `deferred`. |
+| 2 | Catatan plan (menu “…” tunggal untuk DTCG) tidak sama dengan README (tombol Import dan Export) | low | reject | Perbaikannya mengedit plan build ini. README dan desain adalah acuan; lihat catatan di Auto Run Result. |
+| 3 | Catatan plan menyebut banner “ready to restart”, README menyebut banner terpasang setelah restart | low | reject | Sama seperti #2, plan yang basi. Desain menampilkan banner tersedia (sebelum install) dan banner terpasang (setelah restart), sesuai tiket “tersedia/terpasang”. |
+| 4 | Shortcut bisa bentrok | low | patch | Ctrl+Shift+C tidak dipakai di viewer (dicek di `editActions.ts`, `Canvas.tsx`, `Viewer.tsx`). Shift+1 sudah berarti Fit (`Canvas.tsx:818`) dan konsisten. Ctrl+Shift+I bentrok dengan DevTools browser, jadi shortcut Import from URL dihapus dari desain dan README. |
+| 5 | Banner tersedia tidak bisa dilacak ke id layar | low | patch | README kini menyebut layar `jfKUD` / `d0bqc`. |
+| 6 | Klaim id node dan diff hanya-tambah tidak terverifikasi | false | reject | Sudah dicek: `git diff --stat` baseline..HEAD = 94039 penambahan, 0 hapus. Jumlah node section 00 sampai 10 sama dengan baseline, dan id dibaca langsung lewat MCP Pencil. |
+| 7 | `n9SeH` disebut satu menu padahal itemnya ada di tiga menu | low | patch | Kalimat README diperjelas: frame contoh berisi item untuk tiga menu. |
+| 8 | Campuran istilah Inggris “not supported” di prosa | false | reject | Itu label UI yang dikutip (teks UI berbahasa Inggris menurut AGENTS.md). |
+
+## Auto Run Result
+
+- Ringkasan: section `11 · Editor ergonomics & import` (`PciUW`) ditambahkan ke `design/lakar-ui.pen`. Isinya 15 layar desktop dark dan 15 light untuk story 8.5 sampai 8.10, plus sheet komponen (Distance Label, Smart Guide, Toast Copy as PNG, item menu entry point). Semua layar memakai komponen dan token yang sudah ada. Desain disetujui atas delegasi Fatmuh (terima jadi, 2026-11-23).
+- Acuan untuk story berikutnya adalah `design/README.md` dan desain. Kalau catatan keputusan awal di plan ini berbeda (menu DTCG, banner), ikuti README.
+- File:
+  - `design/lakar-ui.pen`: section 11 baru, hanya penambahan.
+  - `design/README.md`: baris tabel struktur dan bagian Section 11 (layar, id node, keputusan).
+  - plan ini.
+- Review: 3 patch (low), 1 defer, 4 ditolak (alasan di Review Triage Log). `followup_review_recommended: false`, karena tidak ada patch high atau medium.
+- Verifikasi:
+  - Screenshot Pencil setiap layar dan sheet komponen; tidak ada node terpotong atau meluap secara visual.
+  - `ctx.problems` di dokumen yang aktif hanya berisi handle seleksi yang sengaja menonjol, node yang dinonaktifkan, dan selisih float yang diwarisi dari layar dasar.
+  - Pasangan light memakai `theme.mode = light`.
+  - Jumlah node section 00 sampai 10 sama dengan baseline, dan diff terhadap baseline hanya berupa penambahan.
+- Risiko sisa: tab Pencil yang terbuka untuk `design/lakar-ui.pen` di checkout utama masih memegang salinan basi di memori. Jangan simpan dari tab itu; tutup atau muat ulang dulu.
 
 ## Verification
 

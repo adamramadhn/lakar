@@ -117,7 +117,7 @@ Section `PciUW`, header `hJxuz`. Baris Components `LxflA` (sheet dark `FK0fs`, s
 | Settings — Updates · Check failed | `OcqWK` | `FeNAU` | 8.10 |
 | Recents — Update installed banner | `dTNIK` | `jhWA9` | 8.10 |
 
-Komponen baru (sheet `FK0fs`): **Distance Label** `c55e6` dan **Smart Guide** `eEhES` (reusable), Toast "Copied as PNG" `k1XdpR` dan "Couldn't copy as PNG" `O7bwE` (instance Toast), serta menu entry point `n9SeH` (Import from URL…, Copy as PNG, Zoom to selection).
+Komponen baru (sheet `FK0fs`): **Distance Label** `c55e6` dan **Smart Guide** `eEhES` (reusable), Toast "Copied as PNG" `k1XdpR` dan "Couldn't copy as PNG" `O7bwE` (instance Toast), serta frame contoh `n9SeH` berisi item Menu Item baru yang dipakai di tiga menu berbeda: Import from URL… (menu “+” Layers dan context menu canvas), Copy as PNG (context menu layer), dan Zoom to selection (menu zoom).
 
 Keputusan desain:
 
@@ -126,7 +126,7 @@ Keputusan desain:
 - **Zoom:** indikator zoom di View Controls membuka menu Zoom in (Ctrl +), Zoom out (Ctrl −), Zoom to 100% (Shift+0), Zoom to fit (Shift+1), Zoom to selection (Shift+2), dan toggle Snap to layers.
 - **Wrap:** grup Auto layout mendapat baris Segmented "No wrap / Wrap". Saat Wrap aktif, Gap menjadi jarak antar kolom dan Field "Row gap" muncul di sebelahnya. Padding pindah ke baris sendiri. Di canvas, penanda "Row gap 14" tampil di antara dua baris.
 - **Copy as PNG** ada di context menu layer (Ctrl+Shift+C), di bawah Duplicate dan bersebelahan dengan Copy as CSS. Hasilnya berupa Toast: berhasil (2x, ukuran piksel) atau gagal (Try again / Dismiss).
-- **Import from URL** dibuka dari menu "+" di Layers dan context menu canvas (Ctrl+Shift+I). Dialog punya tiga state:
+- **Import from URL** dibuka dari menu "+" di Layers dan context menu canvas, tanpa shortcut (Ctrl+Shift+I dipakai DevTools di browser). Dialog punya tiga state:
   - Form: alamat, preset lebar Desktop 1440 / Tablet 768 / Mobile 375, tempat board baru, dan catatan bahwa skrip tidak dijalankan.
   - Importing: langkah Fetched → Rendering → Converting dengan progress bar.
   - Error: alamat privat ditolak (field `danger`), plus daftar error lain: timeout 15 s, lebih dari 5 MB, bukan http(s).
@@ -138,7 +138,7 @@ Keputusan desain:
   - Kartu versi punya tiga state: Up to date (Check for updates), Update available (Release notes, Install and restart, catatan rilis, progres unduh), dan Check failed (Try again, garis tepi `danger`).
   - Toggle: cek otomatis, dan pasang saat keluar.
   - Info About: versi, channel, dan tanda tangan.
-  - Banner update tersedia (`accent-soft`) tampil di atas jendela. Banner terpasang ("Lakar was updated to 0.1.6", What's new, Dismiss) tampil di Recents setelah restart. Keduanya memakai pola Offline Banner.
+  - Banner update tersedia (`accent-soft`) tampil di atas jendela, digambar di layar `Settings — Updates · Update available` (`jfKUD` / `d0bqc`). Banner terpasang ("Lakar was updated to 0.1.6", What's new, Dismiss) tampil di Recents setelah restart. Keduanya memakai pola Offline Banner.
 
 Catatan audit: `ctx.problems` di layar baru hanya berisi handle seleksi yang sengaja menonjol keluar dari frame Selection, node yang dinonaktifkan, dan selisih pembulatan float pada kartu "Feature Spatial design" yang diwarisi dari layar dasar.
 
