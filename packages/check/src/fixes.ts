@@ -207,4 +207,6 @@ export const AUTOFIX: Readonly<Record<G0RuleId, 'safe' | 'suggestion' | 'mixed' 
   'LC-31': 'none',
   'LC-32': 'none',
   'LC-33': 'none',
+  'LC-34': 'none',
+  'LC-35': 'suggestion',
 };

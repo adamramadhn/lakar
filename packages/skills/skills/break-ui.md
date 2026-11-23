@@ -16,7 +16,7 @@ Opsional, di langkah review atau atas permintaan ("uji data terburuk", "cari edg
 
 1. **Peta.** `find({type:'text', within:board})` lalu catat teks yang berasal dari data: nama, email, peran, angka, hitungan, tanggal, label badge dan tombol, isi daftar (panjang daftar juga nilai).
 2. **Salinan.** Satu execute: `const s=get(board), p=place(s.width,s.height,{near:board})`, lalu `duplicate(board,{name:'<nama> · Kasus terburuk', x:p.x, y:p.y})`. Isi teks salinan lewat `update(id,{content})` (cari node lewat `find({name, within:salinan})`). Daftar: satu salinan lagi untuk **Kosong** (butir dihapus, keadaan kosong tampil) bila daftar bisa kosong, dan **Satu** (satu butir, hitungan tepat 1).
-3. **Pecahkan.** Baca `check` respons (LC-02a/b/c, LC-03, LC-11, LC-31 = pecah; `LC-12` tinggi pas di salinan bukan temuan, tinggi salinan sengaja sama dengan sumber), lalu `screenshot` salinan + zoom `scale:2` di baris terpadat.
+3. **Pecahkan.** Baca `check` respons (LC-02a/b/c, LC-03, LC-11, LC-31, LC-34, LC-35 = pecah; `LC-12` tinggi pas di salinan bukan temuan, tinggi salinan sengaja sama dengan sumber), lalu `screenshot` salinan + zoom `scale:2` di baris terpadat.
 4. **Lapor dan berhenti.** Tabel di bawah. Board salinan tetap ada sebagai uji regresi sampai pengguna memintanya dihapus.
 5. **Perbaiki bila diminta** ("perbaiki semua", "perbaiki 1, 3"): ubah board sumber, ulangi perbaikan yang sama di salinan, pastikan keduanya bersih.
 

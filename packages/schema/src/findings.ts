@@ -45,6 +45,8 @@ export const G0_RULES = {
   'LC-31': { level: 'error', gate: true, title: 'konten terpotong rata di tepi bawah' },
   'LC-32': { level: 'warning', gate: false, title: 'instance tidak lagi cocok dengan masternya (override, prop, slot, atau bind basi)' },
   'LC-33': { level: 'warning', gate: false, title: 'skeleton belum terisi' },
+  'LC-34': { level: 'warning', gate: false, title: 'saudara tumpang tindih tanpa sengaja' },
+  'LC-35': { level: 'warning', gate: false, title: 'teks keluar dari frame induknya' },
 } as const satisfies Record<string, { level: FindingLevel; gate: boolean; title: string }>;
 
 /**

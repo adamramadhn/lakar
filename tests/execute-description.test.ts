@@ -32,6 +32,10 @@ describe('deskripsi tool execute', () => {
     for (const s of ['LC-02c non-teks', 'min(8, padding/2)', 'LC-31', 'baris terakhir daftar/tabel']) expect(LAYOUT_CHECK_DESCRIPTION).toContain(s);
   });
 
+  it('layout_check menyebut LC-34 (saudara tumpang tindih tanpa sengaja) dan LC-35 (teks keluar dari frame induk)', () => {
+    for (const s of ['LC-34 saudara konten tumpang tindih tanpa sengaja', 'irisan [x,y,w,h]', 'LC-35 teks keluar > 1px dari frame induk', 'saran Wrap text']) expect(LAYOUT_CHECK_DESCRIPTION).toContain(s);
+  });
+
   it('layout_check menyebut LC-03, LC-06, LC-07, LC-08, LC-09, LC-10 (tipografi dan spacing)', () => {
     for (const s of ['LC-03 teks', 'LC-06 paragraf', 'LC-07 gap/padding', 'LC-08 ukuran', 'LC-09 > 2 keluarga', 'LC-10 target sentuh < 44×44']) expect(LAYOUT_CHECK_DESCRIPTION).toContain(s);
   });
