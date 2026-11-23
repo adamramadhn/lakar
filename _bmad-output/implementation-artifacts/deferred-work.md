@@ -230,6 +230,12 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-board-height-fit.md`
   summary: LC-12 landing tidak menandai wrapper bertinggi angka tetap yang lebih tinggi dari isinya, karena tak bisa dibedakan dari seksi setinggi penuh (hero 900 pada board 900).
   evidence: Review spec-board-height-fit. Usul: konvensi nama `Halaman` untuk wrapper atau tinggi hug di atas.
+- source_spec: `_bmad-output/implementation-artifacts/spec-viewer-collapsible-panels.md`
+  summary: Saat sidebar dibuka lewat tombol, toolbar kanvas dan grup Theme/Export baru di-FLIP sesudah panel selesai slide masuk (240ms + 240ms), jadi tidak bergerak bersama panel.
+  evidence: Kolom grid sengaja dibuka saat panel mendarat supaya kanvas di-resize sekali tanpa area kosong; perlu feel-check di perangkat sebelum memindahkan resize ke awal expand.
+- source_spec: `_bmad-output/implementation-artifacts/spec-viewer-collapsible-panels.md`
+  summary: Kompensasi kamera saat tepi kiri kanvas bergeser (lipat/buka sidebar kiri) belum punya tes otomatis.
+  evidence: jsdom tidak punya layout dan `ResizeObserver` di-stub di harness DOM; perlu tes Playwright/smoke atau ekstrak ke helper murni.
 - source_spec: `_bmad-output/implementation-artifacts/spec-progressive-live-build.md`
   summary: Prelude skill core (±1.500 karakter) diulang di setiap execute; landing per seksi kini 7–9 execute, jadi biaya token keluaran dan waktu tulis LLM naik.
   evidence: `keep` hanya menyimpan nilai, bukan fungsi. Usul: daemon menyimpan prelude terakhir per sesi (mis. `execute({code, prelude:'keep'})` aditif) atau helper prelude bawaan sandbox; butuh keputusan AD-4 dan tes contoh skill.

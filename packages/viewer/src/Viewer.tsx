@@ -20,6 +20,8 @@
 // Responsif (aplikasi 9): tablet (≤1100px) → panel kiri jadi laci di atas kanvas (tombol "Layers" + scrim); mobile
 // (<768px) → top bar viewer (back, nama file + halaman yang membuka laci, History) dan panel kanan jadi bottom sheet
 // (BottomSheet.tsx). Di desktop elemen tambahan disembunyikan CSS; hanya state tata letak yang ditambah di sini.
+// Sidebar yang bisa dilipat (spec-viewer-collapsible-panels): tombol di kanvas (kiri atas; kanan atas sebelum
+// Theme/Export), Ctrl/⌘+\ = keduanya, Ctrl/⌘+Alt+[ / ] = satu sisi; state dan gerak di SidebarToggle.tsx.
 // Paritas desain: header file (nama + chevron menu file, keterangan "Updated … by …" dari History), tab
 // Layers/Assets, toast rollback saat execute agen gagal, pill "Last synced …" saat offline, chip "Following agent"
 // di mobile, dan bagian "Parent layout" di Inspect (properti induk dari dokumen).
@@ -60,7 +62,9 @@ import { PasteToast, type PasteToastState } from './PasteToast';
 import { canUndoPaste, clipboardPaste, pasteTarget } from './paste';
 import { activityHub, editChange, goneReason, harnessLabel, revChange, sessionsForSlug, slugAppeared, whoOf, type StreamEvent } from './activity';
 import { ActivityPanel } from './ActivityPanel';
-import { BottomSheet } from './BottomSheet';
+import { BottomSheet, MOBILE_QUERY } from './BottomSheet';
+import { SidebarToggle, useSidebars } from './SidebarToggle';
+import { sidebarShortcut } from './sidebars';
 import { AddLayerButton, IconPicker, Toast, type ToastState } from './AddLayer';
 import { api, ApiError, errorText, OfflineError, type FontFamily, type HistoryEntry, type InspectResult, type LayoutCheck } from './api';
 import { Canvas, type CanvasMarker, type CanvasPreview, type Focus, type Highlight, type InsertPoint } from './Canvas';
@@ -317,6 +321,24 @@ export function Viewer({ slug }: { slug: string }) {
   /** Tata letak tablet/mobile: laci Layers/Pages terbuka, state bottom sheet (mobile). */
   const [layersOpen, setLayersOpen] = useState(false);
   const [sheet, setSheet] = useState<SheetState>('half');
+  /** Sidebar dilipat (spec-viewer-collapsible-panels): desktop kiri + kanan, tablet kanan (kiri = laci). */
+  const viewerRef = useRef<HTMLDivElement>(null);
+  const sidebars = useSidebars(viewerRef);
+  const toggleSidebar = sidebars.toggle;
+  // Ctrl/⌘+\ = keduanya, Ctrl/⌘+Alt+[ / ] = kiri / kanan; instan (aksi keyboard tidak dianimasikan). Tidak saat
+  // mengetik atau dialog/menu terbuka. Mobile: panel kanan adalah bottom sheet, jadi tidak berlaku. Tablet: kiri = laci.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const s = sidebarShortcut(e);
+      if (!s || typingTarget(e) || document.querySelector('.modal-scrim, .menu-layer') || matchMedia(MOBILE_QUERY).matches) return;
+      e.preventDefault();
+      if (e.repeat) return;
+      if (s === 'left' && matchMedia(DRAWER_QUERY).matches) setLayersOpen((v) => !v);
+      else toggleSidebar(s, true);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [toggleSidebar]);
   /** Tab panel kiri (desain "Panel Tabs": Layers | Assets). */
   const [leftTab, setLeftTab] = useState<'layers' | 'assets'>('layers');
   /** Pencarian komponen di tab Assets (desain C2xbUQ "Search components"). */
@@ -1417,7 +1439,7 @@ export function Viewer({ slug }: { slug: string }) {
   };
 
   return (
-    <div className={`viewer sheet-${sheet}${layersOpen ? ' layers-open' : ''}`}>
+    <div ref={viewerRef} className={`viewer sheet-${sheet}${layersOpen ? ' layers-open' : ''}${sidebars.className}`}>
       <header className="viewer-topbar">
         <a className="viewer-topbar-btn" href="#/" aria-label="Back to Dashboard">
           <Icon name="chevronLeft" size={18} />
@@ -1611,8 +1633,6 @@ export function Viewer({ slug }: { slug: string }) {
         focus={focus && boards.some((b) => b.id === focus.boardId) ? focus : undefined}
         onFocused={onFocused}
         highlight={highlight}
-        summary={summary}
-        checksLoading={checks?.state === 'loading'}
         onSelect={select}
         selection={selection}
         onSelectIds={selectIds}
@@ -1621,6 +1641,7 @@ export function Viewer({ slug }: { slug: string }) {
         onPathEdit={setPathEdit}
         shareBadge={shareBadge}
         actions={<ThemeButton open={themeOpen} onToggle={() => setThemeOpen((o) => !o)} />}
+        leadingActions={<SidebarToggle side="right" collapsed={sidebars.collapsed.right} onToggle={() => toggleSidebar('right')} />}
         canUndo={editable && undoDepth.undo > 0}
         canRedo={editable && undoDepth.redo > 0}
         onUndo={undo}
@@ -1631,7 +1652,6 @@ export function Viewer({ slug }: { slug: string }) {
         components={latestComponents}
         pastedTag={pasteToast?.report.kind === 'html' && pasteToast.nodeId ? { id: pasteToast.nodeId, label: pasteToast.layer } : undefined}
         onDropComponent={(id, at) => latestComponents && insertInstance(id, dropTarget(latestComponents, id, sceneRef.current?.() ?? [], at))}
-        onOpenChecks={() => openTab('checks')}
         onExportCode={setCodeExport}
         preview={canvasPreview}
         editable={editable}
@@ -1645,6 +1665,7 @@ export function Viewer({ slug }: { slug: string }) {
         }}
         overlay={
           <>
+            <SidebarToggle side="left" collapsed={sidebars.collapsed.left} onToggle={() => toggleSidebar('left')} />
             {themeOpen && !preview && (
               <ThemePanel doc={latestDoc} rev={latestDoc.rev} editable={editable} onCommit={commitOps} onClose={closeTheme} onImportCss={() => setCssImportOpen(true)} importOpen={cssImportOpen} />
             )}

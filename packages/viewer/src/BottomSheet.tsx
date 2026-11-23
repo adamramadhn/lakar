@@ -30,7 +30,7 @@ export function BottomSheet<T extends string>({
   tabs: readonly SheetTab<T>[];
   tab: T;
   onTab: (t: T) => void;
-  /** Ringkasan layout_check untuk hitungan mini di strip tab (mobile). */
+  /** Ringkasan layout_check: badge di tab Checks (desktop/tablet) dan hitungan mini di strip tab (mobile). */
   summary: FindingSummary | undefined;
   onChecks: () => void;
   children: ReactNode;
@@ -118,11 +118,25 @@ export function BottomSheet<T extends string>({
           suppressClick.current = false;
         }}
       >
-        {tabs.map((t) => (
-          <button key={t.id} type="button" role="tab" aria-selected={tab === t.id} className={`panel-tab tab-${t.id}${tab === t.id ? ' active' : ''}`} onClick={() => onTab(t.id)}>
-            {t.label}
-          </button>
-        ))}
+        {tabs.map((t) => {
+          // Badge jumlah temuan di tab Checks (desktop/tablet; pengganti pill layout_check di kanvas). Mobile memakai
+          // ringkasan `.sheet-checks` di strip, jadi badge disembunyikan CSS di sana.
+          const found = t.id === 'checks' && summary ? summary.error + summary.warning : 0;
+          return (
+            <button
+              key={t.id}
+              type="button"
+              role="tab"
+              aria-selected={tab === t.id}
+              className={`panel-tab tab-${t.id}${tab === t.id ? ' active' : ''}`}
+              title={found && summary ? `${summary.error} errors, ${summary.warning} warnings` : undefined}
+              onClick={() => onTab(t.id)}
+            >
+              {t.label}
+              {found > 0 && summary && <span className={`tab-badge ${summary.error > 0 ? 'danger' : 'warning'}`}>{found}</span>}
+            </button>
+          );
+        })}
         {summary && (
           <button type="button" className="sheet-checks" aria-label={`Checks: ${summary.error} errors, ${summary.warning} warnings`} onClick={onChecks}>
             <span className="count">

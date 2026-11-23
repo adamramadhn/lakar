@@ -113,6 +113,10 @@ const ICONS = {
   panelRight: [['rect', 3, 3, 18, 18, 2], ['path', 'M15 3v18']],
   panelBottom: [['rect', 3, 3, 18, 18, 2], ['path', 'M3 15h18']],
   panelLeft: [['rect', 3, 3, 18, 18, 2], ['path', 'M9 3v18']],
+  panelLeftClose: [['rect', 3, 3, 18, 18, 2], ['path', 'M9 3v18'], ['path', 'm16 15-3-3 3-3']],
+  panelLeftOpen: [['rect', 3, 3, 18, 18, 2], ['path', 'M9 3v18'], ['path', 'm14 9 3 3-3 3']],
+  panelRightClose: [['rect', 3, 3, 18, 18, 2], ['path', 'M15 3v18'], ['path', 'm8 9 3 3-3 3']],
+  panelRightOpen: [['rect', 3, 3, 18, 18, 2], ['path', 'M15 3v18'], ['path', 'm10 15-3-3 3-3']],
   scan: [['path', 'M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2']],
   // Aksi edit (story 6, desain "Context menu" / "Align & distribute"): lucide group, ungroup, bring-to-front,
   // send-to-back, align-*, align-*-space-around.
