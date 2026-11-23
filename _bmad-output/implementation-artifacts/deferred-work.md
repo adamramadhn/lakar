@@ -183,15 +183,18 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-kode-5-export-ui.md`
   summary: Wiring komponen dialog Export code, popover Copy tokens, dan dialog Import CSS variables tanpa tes otomatis.
   evidence: Viewer belum punya harness tes komponen/DOM (pra-ada). Logika murni dites (`codeExport.test.ts`, `cssImport.test.ts`, `zip.test.ts`, `tests/code-export.test.ts`); UI diverifikasi smoke msedge.
+  partial: 2026-11-23 di `spec-viewer-dom-harness.md`. Dialog Export code dites di `CodeExportDialog.dom.test.tsx` (target, TypeScript, Copy file, Download .zip, Esc). Sisa: popover Copy tokens dan dialog Import CSS variables.
 - source_spec: `_bmad-output/implementation-artifacts/spec-kode-5-export-ui.md`
   summary: Instance yang override-nya tidak bisa dinyatakan sebagai prop diekspor sebagai salinan inline (statis) master, bertentangan dengan AD-16 "master bukan salinan statis".
   evidence: Review c5 (intent). Fallback inline story 3 (warning `instance-inlined`); di fixture landing InsLDxB2 (override fill + stroke inside pada akar) di-inline sehingga ubah padding master juga mengubah berkas utama (tests/code-export.test.ts). Usul: override akar seperti stroke `::after` sebagai kelas pemakai, atau props className/style per elemen dalam.
 - source_spec: `_bmad-output/implementation-artifacts/spec-vektor-4-html-import.md`
   summary: Wiring viewer paste HTML (Ctrl+V text/html → body `kind:'html'`, report langsung terbuka, Pasted Tag) tanpa tes otomatis.
   evidence: Review v4 (vgap). Hanya `clipboardPaste` dan teks report yang dites murni; `Viewer.tsx` `pasteContent`, `PasteToast`, dan `pastedTag` diverifikasi smoke msedge (pola sama dengan wiring SVG story 3; viewer belum punya harness DOM). Usul: helper murni `pasteBody(pick, parentId)` di `paste.ts` dengan kasus di `paste.test.ts`.
+  resolved: 2026-11-23 di `spec-viewer-dom-harness.md`. `Viewer.paste.dom.test.tsx` menguji Ctrl+V HTML (body `kind:'html'` + parent frame terpilih, Paste Report langsung terbuka, node baru terpilih, Pasted Tag), SVG (toast Undo/Details), tanpa seleksi, dan teks biasa.
 - source_spec: `_bmad-output/implementation-artifacts/spec-vektor-5-pen-tool.md`
   summary: Wiring Pen tool dan mode edit titik di canvas (routing pointer, keyboard capture, pratinjau DOM, seleksi path baru, grup Point panel Design) tanpa tes otomatis; satu rev per gestur dan Ctrl+Z lewat tumpukan undo jendela hanya diverifikasi smoke msedge.
   evidence: Review v5 (vgap, blind, intent). Viewer belum punya harness tes komponen/DOM (pra-ada, sama dengan story 3–4 dan kode-5). Keputusan op (update/remove/no-op), `pathEditable`, dan koordinat panel sudah murni dan dites (`pathEdit.test.ts`); kontrak route dites `tests/vector-edit.test.ts`. Usul: harness jsdom/RTL untuk `usePathTools` (Esc mempertahankan seleksi, Delete tidak menghapus node, Enter < 2 titik tanpa request, pratinjau dipulihkan saat commit gagal) dan `Canvas` (tap Pen tidak ke `onInsert`, seleksi node baru).
+  partial: 2026-11-23 di `spec-viewer-dom-harness.md`. `Canvas.dom.test.tsx` menguji Esc (seleksi tetap), Delete (titik terakhir, bukan node), Enter < 2 titik tanpa request, Enter 2 titik = satu commit `add` path, dan tap Pen tidak ke `onInsert`. Sisa: mode edit titik (pratinjau dipulihkan saat commit gagal, grup Point panel Design), seleksi path baru di Viewer, satu rev per gestur dan Ctrl+Z.
 - source_plan: none
   summary: Tinggi board landing mengikuti isi: aturan cek baru untuk ruang kosong di bawah isi board, dan skill `landing` mengambil tinggi akhir dari `bounds` execute alih-alih menebak angka.
   evidence: Dipisah dari `spec-agent-open-doc.md` (2026-11-23, pilihan Fatmuh: kerjakan sesudahnya). Landing `landing-kopi-lereng` menyisakan 24 px kosong di bawah footer (board 4074, isi 4050) karena tinggi board hanya angka tetap dan `landing.md` menyuruh `update(keep.board, {height:…})` dengan angka tebakan.
@@ -218,6 +221,7 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-canvas-agent-effects.md`
   summary: Efek canvas (fade-in, label Generating, exit cursor, entri baris Activity) tanpa tes DOM/komponen; hanya logika murni yang dites.
   evidence: Viewer belum punya harness tes DOM (pra-ada); agentFx.ts dan wiring Canvas/ActivityPanel hanya diperiksa lewat inspeksi dan build.
+  resolved: 2026-11-23 di `spec-viewer-dom-harness.md`. `Canvas.dom.test.tsx` (fade-in sesudah buka, tidak saat buka/reconnect/reduced motion, label Generating, exit cursor), `ActivityPanel.dom.test.tsx` dan `Viewer.activity.dom.test.tsx` (entri baris). Tes menemukan bug entri baris Activity (panel kosong, snapshot reconnect), diperbaiki di spec yang sama.
 - source_spec: `_bmad-output/implementation-artifacts/spec-board-height-fit.md`
   summary: Tinggi board landing yang benar-benar mengikuti isi (`height:'hug'` pada board) belum ada; tinggi board selalu angka dan board selalu memotong isi.
   evidence: Butuh perubahan skema (v8 + migrasi), renderer, resize viewer, dan codegen. Usul: `height:'hug'` hanya untuk `screen:'landing'`, diukur saat render. Sampai itu ada, LC-12 melaporkan tinggi pas.

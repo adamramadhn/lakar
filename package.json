@@ -8,7 +8,7 @@
   },
   "scripts": {
     "build": "node scripts/assert-node.mjs && tsc -b && pnpm --filter @lakar/viewer build",
-    "test": "node scripts/assert-node.mjs && tsc -p tsconfig.test.json && vitest run",
+    "test": "node scripts/assert-node.mjs && tsc -p tsconfig.test.json && tsc -p packages/viewer/tsconfig.test.json && vitest run",
     "clean": "tsc -b --clean",
     "lakard": "node packages/daemon/dist/main.js",
     "install-browser": "bash scripts/install-browser.sh",
