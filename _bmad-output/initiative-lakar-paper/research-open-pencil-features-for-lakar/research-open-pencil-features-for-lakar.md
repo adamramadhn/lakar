@@ -9,8 +9,9 @@ preset: 'standard'
 validation: 'normal'
 created: '2026-11-23'
 updated: '2026-11-23'
-claims_verified: 6
-claims_unverified: 3
+claims_verified: 17
+claims_unverified: 12
+deepened: '2026-11-23 (inventaris lengkap, open-pencil 1814dcb)'
 ---
 
 # Riset kompetitif: fitur dan MCP open-pencil untuk Lakar
@@ -18,6 +19,18 @@ claims_unverified: 3
 **Keputusan yang dilayani:** fitur dan tool MCP open-pencil mana yang masuk backlog Lakar, diberi label adopsi, pertimbangkan, atau lewati.
 
 ## Ringkasan eksekutif
+
+> **Pembaruan deepen 2026-11-23.** Deepen menambah inventaris lengkap 348 item (bagian 4). Butir Adopsi 1–3 run pertama dan Grid sudah dibangun di Lakar (lihat bagian 6), sehingga loop inti agen Lakar kini setara open-pencil. Skill open-pencil tidak berisi panduan estetika [58]; skill Lakar punya panduan itu (konteks keputusan, bukan temuan riset). Adopsi berikutnya kecil-kecil:
+> - anotasi tool MCP [42];
+> - `layout_check` untuk tumpang-tindih dan teks meluap [43];
+> - aturan skill pakai ulang komponen dan verifikasi mode [44][45];
+> - snapping dan pengukur jarak di viewer [46][59];
+> - flex wrap;
+> - impor dari URL [50];
+> - token DTCG [52];
+> - updater desktop [53].
+
+### Riwayat: ringkasan run pertama (sebelum deepen)
 
 Ada tiga hal yang benar-benar menaikkan kualitas desain agen di open-pencil. Ketiganya belum dimiliki Lakar. **Adopsi:**
 
@@ -115,41 +128,115 @@ open-pencil mendeklarasikan sekitar 115 tool di core, ditambah tool siklus dokum
   5. Default editor yang membingungkan AI, misalnya teks auto-height [40].
 - **Traksi.** Sekitar 10 ribu bintang dalam 9 bulan, tetapi satu maintainer menulis 3.456 commit dari 87 kontributor [41].
 
-## Wawasan lintas dimensi
+## 4. Inventaris lengkap
+
+*Deepen 2026-11-23.* Sumbernya open-pencil `master` `1814dcb`, dua commit lebih baru dari run pertama, ditambah `gh`. Setiap item dicatat satu baris, dengan bukti `path:line` dari kedua repo. Tabel lengkap ada di [inventaris-lengkap.md](inventaris-lengkap.md) (348 baris). Kolom status Lakar berasal dari kode Lakar `main` `e41ff57` sebagai konteks keputusan, bukan temuan riset.
+
+| Irisan | Baris | Ada | Sebagian | Belum | Lain | Adopsi | Pertimbangkan | Lewati |
+|---|---|---|---|---|---|---|---|---|
+| A. Tool MCP dan lapisan MCP | 142 | 52 | 46 | 42 | 2 | 2 | 36 | 104 |
+| B. Skill | 97 | 41 | 30 | 23 | 3 | 7 | 21 | 69 |
+| C. Mesin dan editor | 67 | 14 | 22 | 27 | 4 | 5 | 27 | 19 |
+| D. Format dan otomasi | 42 | 4 | 12 | 22 | 4 | 5 | 16 | 21 |
+| **Total** | **348** | **111** | **110** | **114** | **13** | **19** | **100** | **213** |
+
+"Lain" = `beda` (pendekatan berbeda: eksekusi tool dan renderer) atau `belum dicek`. Di irisan C, 16 baris yang sudah setara sengaja dibiarkan tanpa label.
+
+**A. Tool MCP.** Registry open-pencil berisi 109 tool (25 inti + 84 tambahan). Tiga di antaranya disembunyikan dari MCP, dan server MCP menambah 12–13 tool miliknya sendiri [57].
+- **Loop inti agen sudah setara.** Lakar punya diff visual berbasis rev, undo per sesi, `fix_check` yang memisahkan perbaikan aman dari saran, dan batch edit dengan rollback. Di open-pencil, padanannya `diff_pixels`, `undo`/`redo` dan `lint_fix` [1][3][4].
+- **Undo Lakar lebih bersih.** Undo di open-pencil mengenali langkah agen dari label "Agent:" yang dipakai semua otomasi (MCP dan CLI), jadi tidak per sesi [60], dan menolak bila langkah teratas milik pengguna [3]. Bug-nya juga masih terbuka: edit pengguna yang dibuat saat edit agen menunggu ikut masuk ke langkah undo agen (#883) [61].
+- **Arsitektur eksekusinya berbeda.** Server MCP open-pencil tidak menjalankan tool sendiri. Setiap panggilan diteruskan ke aplikasi yang sedang terbuka dan gagal dengan `APP_NOT_CONNECTED` bila tidak ada aplikasi yang terhubung dalam 10 detik [54]. Bug WebView macet di bawah edit MCP masih terbuka (#975, dilaporkan di v0.15.1) [55]. `lakard` menjalankan tool tanpa aplikasi.
+- **Dua celah yang murah ditutup:**
+  - anotasi `readOnlyHint`/`destructiveHint` di setiap tool. open-pencil menurunkannya dari efek tool, sedangkan 19 tool Lakar tidak punya anotasi sama sekali [42];
+  - deteksi tumpang-tindih antar-saudara dan teks yang meluap dari frame (`analyze_overlaps`). Ini perluasan LC-02a/LC-20 Lakar [43].
+
+**B. Skill.** Skill open-pencil terdiri dari satu `SKILL.md` dan satu reference yang dihasilkan otomatis. Isinya manual API ditambah aturan kebenaran layout. **Tidak ada panduan estetika** (arketipe, daftar slop, pertanyaan kritik) [58]. Skill Lakar punya panduan itu, jadi untuk kualitas desain Lakar unggul (inferensi dari konteks keputusan). Celah Lakar ada di aturan kebenaran yang sempit:
+- pakai ulang komponen lokal sebelum membuat ulang, dan ubah isi instance lewat properti, bukan override [44]. Helper prelude Lakar justru membuat salinan yang tidak terhubung;
+- setelah mode tema berganti, cek geometri, bukan hanya warna, karena layout me-resolve variabel di mode saat layer dibuat [45];
+- stress test juga mencakup edit master komponen dan mode tema [45];
+- `between` tidak bisa menciptakan ruang di wadah hug, sizing `fill` harus diteruskan lewat setiap wadah perantara, dan selisih ukuran tidak boleh ditambal dengan tinggi tebakan, clipping, atau saudara yang diposisikan manual [45].
+
+**C. Mesin dan editor.** Celah termurah ada di ergonomi editor. Snapping dengan smart guide (`computeSnap`), pengukur jarak Alt+hover, zoom 100% dan zoom ke seleksi, serta sebagian shortcut standar belum ada di viewer Lakar [46][59]. Semuanya bisa diimplementasikan di viewer tanpa mengubah skema. Flex wrap belum ada di skema Lakar. Fitur ini dipakai agen untuk daftar tag dan grid kartu, dan memetakan 1:1 ke `flex-wrap`, tetapi butuh `schemaVersion` baru.
+
+Celah model yang cocok dengan semantik CSS Lakar:
+- rich text per karakter [48];
+- formula variabel yang diekspor sebagai `calc()` (hanya formula angka) [49];
+- kondisi mode yang diekspor sebagai CSS: `prefers-*`, lebar viewport/kontainer, atribut data [49].
+
+Behaviours (16 jenis kontrol dengan enam state) tetap pembeda terbesar open-pencil [16][47]. Prototyping tidak ada di open-pencil, hanya di roadmap, jadi bukan celah. Matriks kompatibilitas Figma mereka bertanggal 2026-10-27 dan sudah ketinggalan dari kode di setidaknya satu tempat (tool Scale). Sekitar selusin baris C hanya bersandar pada dokumen itu.
+
+**D. Format dan otomasi.** open-pencil mendaftarkan 13 adapter IO: `.fig` baca/tulis, `.pen` baca saja, draw.io, Mermaid, PNG/JPG/WebP, SVG, PDF, PPTX, JSX, Tailwind JSX, dan HTML [56]. Lakar mengekspor PNG 1×/2× dan kode React+Tailwind/CSS.
+
+Paste HTML Lakar sudah setara impor HTML mereka: halaman Chromium terisolasi dengan JS dan jaringan dimatikan. Yang belum ada:
+- **Impor dari URL.** Rilis v0.17.0 (2026-11-22) [50].
+- **Token DTCG.** Rilis v0.16.0 (2026-10-14) [52]. Lakar sudah punya CSS variables dan tema Tailwind.
+- **Updater otomatis desktop.** open-pencil menerbitkan `latest.json` bertanda tangan [53].
+- **Copy as PNG.**
+
+Ekspor PDF dinilai berbeda oleh dua irisan. A melabelinya Lewati karena alasan MCP; D melabelinya Adopsi karena Lakar sudah merender dengan Chromium, sehingga jalur print-to-PDF tampak murah, meski belum diverifikasi. PDF open-pencil memakai backend PDF Skia dengan font tertanam yang bisa dicari [51]. Chat AI bawaan, Cloud, kolaborasi P2P, `.fig`/Kiwi, dan eval scripting tidak cocok untuk Lakar: alat lokal satu pengguna yang digerakkan agen eksternal lewat MCP.
+
+## 5. Wawasan lintas dimensi
 
 - **Mereka paling banyak berinvestasi di fidelitas Figma dan Cloud, tetapi pengguna paling banyak mengeluhkan koneksi dan stabilitas agen.** Celah ini terbuka untuk Lakar: agen yang selalu terhubung, tidak membekukan app, dan undo yang tidak tercampur.
 - **Mereka memecah kompatibilitas di setiap rilis minor** [19]. Agen yang menyimpan ID atau nama tool akan rusak. AD-4 Lakar (route, tool, dan input lama tetap berlaku) adalah keunggulan yang bisa dikomunikasikan.
 - **Arah agen mereka (loop render→compare, lint dengan autofix, diff yang bisa ditinjau) masih berupa rencana atau hanya tersedia di chat bawaan** [2][23]. Lakar bisa lebih dulu menyediakannya untuk agen eksternal lewat MCP.
 
-## Rekomendasi
+- **Deepen 2026-11-23: celahnya bergeser dari loop agen ke editor dan model.** Lakar sudah setara di tool verifikasi dan undo [1][3][4]; open-pencil masih punya bug kepemilikan undo [61]. Sisa celah ada di ergonomi editor untuk manusia [46][59] dan fitur model (rich text, formula, kondisi mode, wrap) [48][49]. Pembeda Lakar adalah kualitas hasil [58] dan keandalan eksekusi tanpa aplikasi. Tool open-pencil sebaliknya bergantung pada aplikasi yang terhubung [54] dan masih punya bug WebView macet [55].
 
-Kolom "Lakar sekarang" berasal dari pembacaan kode Lakar per `221b668` sebagai konteks keputusan, bukan sebagai temuan riset.
+## 6. Rekomendasi
+
+*Diperbarui pada deepen 2026-11-23.* Kolom "Lakar sekarang" berasal dari pembacaan kode Lakar `main` `e41ff57` sebagai konteks keputusan, bukan temuan riset. Run pertama membaca `221b668`.
+
+**Sudah ada di Lakar.** Rekomendasi dari run pertama yang kini sudah dibangun:
+
+| # | Kandidat (run pertama) | Lakar sekarang | Dasar |
+|---|---|---|---|
+| 1 | Diff visual sebelum/sesudah | Ada: diff visual berbasis rev di `packages/mcp` | high [1] |
+| 2 | Undo milik agen lewat MCP | Ada: undo per sesi, lebih sempit dari open-pencil | high [3][60][61] |
+| 3 | Autofix untuk temuan `layout_check` | Ada: `fix_check` (perbaikan aman dan saran) | high [4] |
+| 10 | CSS Grid di skema | Ada: grid auto layout | high [28] |
+
+**Backlog.** Nomor di kolom # adalah ID stabil kandidat (1–13 dari run pertama, 14 ke atas dari deepen), bukan urutan prioritas. Urutan baris di tabel ini yang menunjukkan prioritas.
 
 | # | Kandidat | Label | Lakar sekarang | Dasar keyakinan |
 |---|---|---|---|---|
-| 1 | Tool `diff` visual (sebelum/sesudah per board atau node: overlay, rasio, wilayah) + langkah "compare" di skill `review` | **Adopsi** | `screenshot` saja; diff piksel hanya ada di harness tes render | high [1][2] |
-| 2 | `undo`/`redo` untuk agen lewat MCP yang menolak membatalkan edit pengguna | **Adopsi** | Undo hanya di viewer (op invers, AD-8) | high [3] |
-| 3 | Autofix untuk temuan `layout_check`: perbaikan aman otomatis, saran sebagai opsi | **Adopsi** | Hanya hint | high [4] |
-| 4 | Komentar di layer + status (Draft/Review/Ready) sebagai kanal review agen ↔ pengguna | Pertimbangkan | Tidak ada | high [6][35] |
-| 5 | `arrange`: rapikan node dan board yang tumpang-tindih | Pertimbangkan | `place()` menghindari tabrakan hanya untuk board baru | high [7] |
-| 6 | Impor dari URL (perluasan `paste` HTML) | Pertimbangkan | Ada paste HTML/SVG; URL belum | high [8] |
-| 7 | Deteksi kandidat komponen (`analyze_clusters`) | Pertimbangkan | Tidak ada | high [10] |
-| 8 | Anotasi `readOnlyHint`/`destructiveHint` di tool MCP | Pertimbangkan (murah) | Tidak ada | high [11] |
-| 9 | Impor/ekspor token DTCG; mode dengan kondisi `prefers-*`/`@media` | Pertimbangkan | Token + mode tema + CSS variables | high [9][32] |
-| 10 | CSS Grid di skema | Pertimbangkan | Flex saja | high [28] |
+| 14 | Anotasi `readOnlyHint`/`destructiveHint` di semua tool MCP (turunan dari efek tool) | **Adopsi** (naik dari #8) | 19 tool tanpa anotasi | high [42]. Manfaat belum terbukti: belum dicek apakah Claude Code atau Codex menyetujui otomatis berdasarkan anotasi ini |
+| 15 | `layout_check` menangkap tumpang-tindih antar-saudara dan teks yang meluap dari frame | **Adopsi** | Sebagian: LC-02a (terpotong), LC-20 (zona bawah) | high [43] |
+| 16 | Aturan skill: pakai ulang komponen sebelum membuat ulang; ubah instance lewat properti | **Adopsi** | Belum ada aturan pakai ulang; prelude membuat salinan tak terhubung | high [44] |
+| 17 | Aturan verifikasi skill: geometri setelah ganti mode, stress test edit master dan mode, `between` di wadah hug, `fill` lewat wadah perantara, larangan menambal sizing | **Adopsi** | Sebagian, tersebar di `layout`, `review`, `break-ui` | medium [45] (satu sumber, dibaca peneliti) |
+| 18 | Ergonomi viewer: snapping + smart guide, ukur jarak Alt+hover, zoom 100%/ke seleksi, sebagian shortcut standar | **Adopsi** | Belum ada snapping atau pengukur | high [46]; medium [59] untuk ukur jarak, zoom, shortcut (dokumen) |
+| 19 | Flex wrap di skema (`flex-wrap` + `row-gap`) | **Adopsi** | Belum; butuh `schemaVersion` dan migrasi | medium (inventaris C, tidak di-spot-check) |
+| 6 | Impor halaman dari URL, dengan kebijakan jaringan eksplisit | **Adopsi** (naik) | Paste HTML ada; jaringan sengaja diblokir | high [50] |
+| 9 | Impor/ekspor token DTCG | **Adopsi** (naik) | Token bertipe + mode + CSS variables/Tailwind | high [52] |
+| 20 | Updater otomatis desktop (Tauri updater, rilis bertanda tangan) | **Adopsi** | Belum ada plugin updater | medium [53] (tidak di-spot-check) |
+| 21 | Copy as PNG | **Adopsi** (murah) | Copy as JSON; ekspor PNG ada | medium (inventaris D) |
+| 22 | Ekspor PDF | Pertimbangkan | Belum | disputed antar-irisan; murah lewat Chromium belum diverifikasi [51] |
+| 4 | Komentar di layer + balas/selesaikan sebagai antrean kerja agen | Pertimbangkan (tinggi) | Belum ada | high [6][35] |
+| 23 | Rich text per karakter (gaya per rentang) | Pertimbangkan (tinggi) | Belum; butuh perubahan skema | medium [48] |
+| 12 | Behaviours (komponen jadi kontrol hidup dengan state) | Pertimbangkan (besar) (naik dari Lewati) | Komponen, instance, props, dan slot sudah ada; behaviours belum | high [16] |
+| 24 | Formula variabel (angka → `calc()`) dan kondisi mode → CSS | Pertimbangkan | Mode tema ada; formula dan kondisi belum | medium [49] |
+| 25 | Tool halaman untuk agen; mode tema per frame | Pertimbangkan | Sebagian | medium (inventaris A) |
+| 5 | `arrange`: rapikan node yang tumpang-tindih | Pertimbangkan | Sebagian | high [7] |
+| 7 | Deteksi kandidat komponen (`analyze_clusters`) | Pertimbangkan | Belum | high [10] |
+| 26 | Ekspor SVG | Pertimbangkan | Belum; mahal untuk renderer HTML/CSS | medium (inventaris D) |
 | 11 | Kursor per subagen | Pertimbangkan | Kursor per sesi | high [26] |
-| 12 | Behaviours / prototyping | Lewati (sekarang) | — | high [16] |
-| 13 | `.fig` baca/tulis, Cloud, P2P multiplayer, board FigJam, Mermaid/draw.io | Lewati | — | high [12][13][14][15] |
+| 13 | `.fig`, Cloud, multiplayer P2P, board FigJam/Mermaid/draw.io, chat AI bawaan, eval scripting, renderer CanvasKit | Lewati | - | high [12][13][14][15][56] |
+| 27 | Prototyping | Lewati | - | high (open-pencil sendiri belum punya; hanya roadmap) |
 
-Tiket bisa diambil dari butir 1–3. Ketiganya cocok sebagai satu epic "loop verifikasi agen" di `initiative-lakar-paper`, dengan spec BMAD masing-masing.
+Butir 14–17 dan 21 adalah perubahan kecil yang bisa langsung jadi story. Butir 18–19 cocok sebagai satu epic "ergonomi editor". Butir 6, 9, dan 20 masing-masing satu story, ditambah keputusan kebijakan jaringan untuk butir 6.
 
-## Pertanyaan terbuka
+## 7. Pertanyaan terbuka
 
-- **Daftar aturan lint dan ambangnya.** Isi `packages/core/src/lint/rules/*` belum dibaca, padahal dibutuhkan untuk memetakan butir 3 ke aturan LC Lakar. Cukup satu putaran Deepen.
-- **Cara open-pencil memutuskan bahwa langkah teratas adalah milik pengguna** (kode undo di sisi aplikasi). Dibutuhkan untuk desain butir 2.
-- **Keluhan nyata pengguna yang belum tertangkap.** Discord proyek dan ulasan pihak ketiga belum dibaca utuh.
+Dua pertanyaan run pertama sudah terjawab oleh deepen: daftar aturan lint [4] dan kepemilikan undo [3][60] (lihat bagian 4.A).
 
-## Lampiran sumber
+Masih terbuka:
+- **Apakah Claude Code dan Codex memakai `readOnlyHint`** untuk menyetujui otomatis? Ini menentukan manfaat butir 14. Cara menjawabnya: baca dokumentasi kedua harness atau uji langsung.
+- **Biaya ekspor PDF lewat Chromium** (butir 22). Ini butuh spike kecil di `lakard`.
+- **Kebijakan jaringan untuk impor URL** (butir 6). Importer Lakar sengaja memblokir jaringan, dan open-pencil desktop menjalankan skrip halaman di jendela privat tersembunyi. Keputusan ini milik arsitektur, bukan riset.
+- **Baris yang belum terverifikasi.** Sekitar selusin baris irisan C hanya bersandar pada matriks kompatibilitas Figma bertanggal 2026-10-27. Ada juga 11 baris `belum dicek` di sisi Lakar. Keduanya bisa ditutup dengan satu putaran deepen terarah.
+- **Keluhan pengguna di luar GitHub.** Discord dan ulasan pihak ketiga masih belum dibaca.
+
+## 8. Lampiran sumber
 
 Semua sumber repo berasal dari clone `open-pencil/open-pencil` @ `68f8cad`. Clone ini shallow, jadi tanggal file adalah tanggal HEAD, bukan tanggal perubahan terakhir. Semua diakses 2026-11-23. Rincian per klaim ada di `digests/`.
 
@@ -197,21 +284,54 @@ Semua sumber repo berasal dari clone `open-pencil/open-pencil` @ `68f8cad`. Clon
 | [40] | Default editor yang membingungkan AI (#941) | [GitHub issue #941](https://github.com/open-pencil/open-pencil/issues/941) | 2026-10-07 | 2026-11-23 | medium |
 | [41] | Traksi dan kontributor | [GitHub repo stats](https://github.com/open-pencil/open-pencil) | 2026-11-23 | 2026-11-23 | high |
 
-## Peta kedaluwarsa
+Sumber [42]–[61] dari deepen 2026-11-23: clone `open-pencil/open-pencil` @ `1814dcb` (shallow) dan `gh`, diakses 2026-11-23.
+
+| # | Klaim | Penerbit | Tgl terbit | Diakses | Keyakinan |
+|---|---|---|---|---|---|
+| [42] | Anotasi readOnlyHint/destructiveHint dari efek tool | [open-pencil repo · mcp/tool/registration.ts](https://github.com/open-pencil/open-pencil/blob/1814dcb/packages/mcp/src/tool/registration.ts#L103-L108) | 2026-11-23 | 2026-11-23 | high |
+| [43] | analyze_overlaps: konten menutupi footer, teks meluap, saudara tumpang-tindih | [open-pencil repo · analyze/overlaps](https://github.com/open-pencil/open-pencil/blob/1814dcb/packages/core/src/tools/analyze/overlaps/index.ts#L333-L338) | 2026-11-23 | 2026-11-23 | high |
+| [44] | Skill: pakai ulang komponen; ubah instance lewat properti | [open-pencil repo · design-authoring.md](https://github.com/open-pencil/open-pencil/blob/1814dcb/skills/open-pencil/references/design-authoring.md#L55-L56) | 2026-11-23 | 2026-11-23 | high |
+| [45] | Skill: aturan between/fill (L12-13), larangan menambal sizing (L57), geometri setelah ganti mode (L46), stress test (L80) | [open-pencil repo · design-authoring.md](https://github.com/open-pencil/open-pencil/blob/1814dcb/skills/open-pencil/references/design-authoring.md#L12-L80) | 2026-11-23 | 2026-11-23 | medium |
+| [46] | Snapping (computeSnap), smart guide, rulers | [open-pencil repo · scene-graph/snap.ts](https://github.com/open-pencil/open-pencil/blob/1814dcb/packages/scene-graph/src/snap.ts#L28) | 2026-11-23 | 2026-11-23 | high |
+| [47] | Behaviours: daftar jenis kontrol | [open-pencil repo · behaviours/kinds.ts](https://github.com/open-pencil/open-pencil/blob/1814dcb/packages/scene-graph/src/behaviours/kinds.ts#L3-L34) | 2026-11-23 | 2026-11-23 | high |
+| [48] | Rich text: style runs per karakter | [open-pencil repo · text/style-runs.ts](https://github.com/open-pencil/open-pencil/blob/1814dcb/packages/core/src/text/style-runs.ts#L7) | 2026-11-23 | 2026-11-23 | medium |
+| [49] | Formula variabel dan kondisi mode → CSS | [open-pencil docs · variables.md](https://github.com/open-pencil/open-pencil/blob/1814dcb/packages/docs/user-guide/variables.md#L33-L62) | 2026-11-23 | 2026-11-23 | medium |
+| [50] | Open from URL (v0.17.0) | [open-pencil · GitHub release v0.17.0](https://github.com/open-pencil/open-pencil/releases/tag/v0.17.0) | 2026-11-22 | 2026-11-23 | high |
+| [51] | Ekspor PDF dengan backend PDF Skia (v0.17.0) | [open-pencil · GitHub release v0.17.0](https://github.com/open-pencil/open-pencil/releases/tag/v0.17.0) | 2026-11-22 | 2026-11-23 | high |
+| [52] | Impor/ekspor token W3C DTCG (v0.16.0) | [open-pencil · GitHub release v0.16.0](https://github.com/open-pencil/open-pencil/releases/tag/v0.16.0) | 2026-10-14 | 2026-11-23 | high |
+| [53] | Updater desktop dengan latest.json bertanda tangan | [open-pencil repo · desktop/tauri.conf.json](https://github.com/open-pencil/open-pencil/blob/1814dcb/desktop/tauri.conf.json#L112-L117) | 2026-11-23 | 2026-11-23 | medium |
+| [54] | Server MCP meneruskan tool ke aplikasi; APP_NOT_CONNECTED setelah 10 s | [open-pencil repo · mcp/server.ts](https://github.com/open-pencil/open-pencil/blob/1814dcb/packages/mcp/src/server.ts#L116-L119) | 2026-11-23 | 2026-11-23 | medium |
+| [55] | Bug terbuka: WebView macet di bawah edit MCP (#975) | [GitHub issue #975](https://github.com/open-pencil/open-pencil/issues/975) | 2026-10-08 | 2026-11-23 | high |
+| [56] | 13 adapter IO (fig, pen, drawio, mermaid, png, jpg, webp, svg, pdf, pptx, jsx, tailwind-jsx, html) | [open-pencil repo · core/io/formats.ts](https://github.com/open-pencil/open-pencil/blob/1814dcb/packages/core/src/io/formats.ts#L425-L439) | 2026-11-23 | 2026-11-23 | medium |
+| [57] | Registry 109 tool (25 inti + 84 tambahan); 3 disembunyikan dari MCP | [open-pencil repo · tools/registry](https://github.com/open-pencil/open-pencil/blob/1814dcb/packages/core/src/tools/registry/index.ts#L10) | 2026-11-23 | 2026-11-23 | medium |
+| [58] | Skill tanpa panduan estetika (dibaca utuh) | [open-pencil repo · skills/open-pencil](https://github.com/open-pencil/open-pencil/blob/1814dcb/skills/open-pencil/SKILL.md) | 2026-11-23 | 2026-11-23 | medium |
+| [59] | Ukur jarak Alt+hover; zoom 100%/fit/seleksi; shortcut zoom | [open-pencil docs · figma-compatibility.md](https://github.com/open-pencil/open-pencil/blob/1814dcb/packages/docs/reference/figma-compatibility.md#L19-L56) | 2026-10-27 | 2026-11-23 | medium |
+| [60] | Label undo "Agent:" untuk semua langkah otomasi (MCP, CLI) | [open-pencil repo · automation/execution/editor.ts](https://github.com/open-pencil/open-pencil/blob/1814dcb/src/app/automation/execution/editor.ts#L10-L19) | 2026-11-23 | 2026-11-23 | high |
+| [61] | Bug terbuka: edit pengguna masuk ke langkah undo agen (#883) | [GitHub issue #883](https://github.com/open-pencil/open-pencil/issues/883) | 2026-10-04 | 2026-11-23 | high |
+
+## 9. Peta kedaluwarsa
 
 Dihasilkan oleh `recon_kit.py staleness`. Jendela kedaluwarsa: fitur 3 bulan, arah pengembangan 6 bulan, suara pengguna 12 bulan.
 
 | Klaim | Kelas | Terbit | Cek ulang |
 |---|---|---|---|
 | [3] Undo khusus agen | fitur | 2026-10-10 | 2027-01-10 |
+| [52] Token DTCG (v0.16.0) | fitur | 2026-10-14 | 2027-01-14 |
+| [50] Open from URL (v0.17.0) | fitur | 2026-11-22 | 2027-02-22 |
+| [51] Ekspor PDF Skia (v0.17.0) | fitur | 2026-11-22 | 2027-02-22 |
 | [1] diff_pixels/apply_patch | fitur | 2026-11-23 | 2027-02-23 |
 | [4] lint_fix | fitur | 2026-11-23 | 2027-02-23 |
 | [16] Behaviours | fitur | 2026-11-23 | 2027-02-23 |
+| [42] Anotasi tool MCP | fitur | 2026-11-23 | 2027-02-23 |
+| [43] analyze_overlaps | fitur | 2026-11-23 | 2027-02-23 |
+| [44] Aturan skill pakai ulang komponen | fitur | 2026-11-23 | 2027-02-23 |
+| [46] Snapping (computeSnap) | fitur | 2026-11-23 | 2027-02-23 |
 | [17] Keluhan koneksi agen | suara pengguna | 2026-04-30 | 2027-04-30 |
 | [2] Loop agen di roadmap | arah | 2026-11-22 | 2027-05-22 |
 | [13] Investasi Cloud | arah | 2026-11-22 | 2027-05-22 |
 | [19] Breaking change tiap minor | arah | 2026-11-22 | 2027-05-22 |
 | [18] Bug stabilitas MCP | suara pengguna | 2026-10-04 | 2027-10-04 |
+| [55] Bug terbuka #975 dan #883 | suara pengguna | 2026-10-04 | 2027-10-04 |
 
 Cek ulang paling awal jatuh pada **2027-01-10**. Saat itu jalankan Refresh pada folder ini.
 
@@ -219,3 +339,4 @@ Catatan metode:
 - Klaim berstatus verified dibaca ulang langsung oleh lead di sumber primernya (kode/dokumen open-pencil atau `gh`). Sumbernya tetap satu penerbit, yaitu proyek itu sendiri.
 - Tiga klaim lain tetap bersumber tunggal: [13], [18], [19].
 - Red team tidak dijalankan.
+- Deepen 2026-11-23: klaim [42]–[44], [46], [47], [50]–[52], dan [55] dibaca ulang lead langsung di kode open-pencil atau lewat `gh` (verified, tetap satu penerbit). Klaim [45], [48], [49], [53], [54], [56]–[58] bersumber tunggal dari digest (unverified). Satu catatan digest D dibatalkan saat spot-check: menu Copy as di `DesignPanel.tsx` yang hanya menawarkan JSON ternyata disengaja (`DesignPanel.tsx:122`: CSS/Tailwind per node digantikan dialog Export code, JSON dipertahankan untuk debug). [59]–[61] ditambahkan setelah cek sitasi semantik (48 tempat: 40 didukung, 8 sebagian, 1 tidak); [60] dan [61] dibaca ulang lead.

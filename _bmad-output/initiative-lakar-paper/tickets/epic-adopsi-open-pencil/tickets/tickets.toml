@@ -1,0 +1,113 @@
+# Story epic adopsi open-pencil, urut build (dipecah 2026-11-23 atas delegasi Fatmuh: "terima jadi").
+# Acuan: research-open-pencil-features-for-lakar bagian 6. UI mengikuti design/lakar-ui.pen (C6).
+
+[[entry]]
+id = 1
+type = "story"
+title = "Desain UI adopsi open-pencil di lakar-ui.pen"
+description = "Menambah desain (dark dan light) untuk: smart guide snapping dan overlay pengukur jarak Alt+hover di canvas; menu/kontrol zoom 100% dan zoom ke seleksi; kontrol Wrap (dan gap baris) di bagian auto layout panel Design; item Copy as PNG; dialog impor halaman dari URL (alamat, preset lebar Desktop/Tablet/Mobile, progres, error); aksi Import/Export DTCG di panel Theme; bagian Updates di Settings dan banner update tersedia/terpasang."
+verify = "Semua layar dan state di atas ada di lakar-ui.pen dalam versi dark dan light, memakai komponen dan token yang sudah ada, dan tercatat di design/README.md."
+covers = ["R1", "R3", "R5", "R6"]
+after = []
+hitl = true
+risk = "low"
+notes = ["Persetujuan desain didelegasikan Fatmuh (terima jadi, 2026-11-23)."]
+
+[[entry]]
+id = 2
+type = "story"
+title = "Anotasi readOnlyHint dan destructiveHint di semua tool MCP"
+description = "Setiap tool server MCP Lakar (packages/mcp) mendapat anotasi MCP yang diturunkan dari efeknya: tool baca (status, inspect, screenshot, list_*, get_*, read_skill, layout_check tanpa fix, dan sejenisnya) readOnlyHint true; tool tulis readOnlyHint false, dan destructiveHint true hanya bila bisa menghapus atau menimpa isi pengguna. Pemetaan efek ditulis sekali di satu tempat sehingga tool baru wajib menyatakannya."
+verify = "Tes server MCP memeriksa bahwa daftar tool (tools/list) memuat anotasi untuk setiap tool dan nilainya sesuai tabel efek; menambah tool tanpa efek membuat tes gagal; nama, input, dan output tool lama tidak berubah."
+covers = ["R2"]
+after = []
+hitl = false
+risk = "low"
+
+[[entry]]
+id = 3
+type = "story"
+title = "layout_check melaporkan saudara tumpang-tindih dan teks yang meluap"
+description = "Aturan LC baru di packages/check: (a) dua node saudara di wadah flow atau absolut yang bertumpuk tanpa sengaja (di luar overlay, badge, dan pola layer yang sah) dan (b) teks yang bounds terukurnya keluar dari frame induknya. Memperluas LC-02a dan LC-20; temuan punya ID aturan, level, bounds, dan hint perbaikan; bila ada perbaikan aman, fix_check bisa menerapkannya."
+verify = "Fixture yang melanggar menghasilkan temuan dengan ID aturan baru; kelima golden A–E dan korpus dokumen tetap 0 error; tes check dan fix_check hijau."
+covers = ["R2"]
+after = []
+hitl = false
+risk = "medium"
+
+[[entry]]
+id = 4
+type = "story"
+title = "Aturan skill: pakai ulang komponen dan verifikasi layout"
+description = "Menambah ke packages/skills (core/layout/review/break-ui/selection sesuai tempatnya): pakai ulang komponen lokal sebelum membuat ulang dan ubah isi instance lewat props, bukan override; setelah ganti mode tema cek geometri, bukan hanya warna; stress test juga mencakup edit master dan mode tema; between tidak menciptakan ruang di wadah hug; sizing fill diteruskan lewat setiap wadah perantara; jangan menambal selisih ukuran dengan tinggi tebakan, clipping, atau saudara yang diposisikan manual. Teks ditulis sendiri (C1)."
+verify = "Tes ukuran dan tes contoh skill tetap hijau (batas tidak naik); setiap aturan baru tercantum di skill yang tepat; contoh kode yang ditambahkan lolos tes terhadap API execute."
+covers = ["R2"]
+after = []
+hitl = false
+risk = "low"
+
+[[entry]]
+id = 5
+type = "story"
+title = "Snapping, smart guide, pengukur jarak, dan zoom di viewer"
+description = "Sesuai desain story 1: saat menggeser atau mengubah ukuran, node menempel ke tepi dan tengah saudara serta board dengan smart guide; Alt+hover menampilkan jarak dari seleksi ke layer yang di-hover; zoom 100% dan zoom ke seleksi lewat menu dan shortcut (Shift+0, Shift+2 atau padanan yang dipilih spec). Logika snap dan ukur murni dan dites; tanpa perubahan skema."
+verify = "Tes unit logika snap dan ukur; tes DOM viewer untuk guide dan overlay jarak; menggeser node mendekati tepi saudara menempel dan menampilkan guide; nilai yang di-commit bulat sesuai aturan snap."
+covers = ["R1"]
+after = [1]
+hitl = false
+risk = "medium"
+
+[[entry]]
+id = 6
+type = "story"
+title = "Flex wrap di skema, render, codegen, dan panel Design"
+description = "Frame mendapat properti wrap (dan gap baris) di schemaVersion baru dengan migrasi; render dan css.ts memetakannya ke flex-wrap dan row-gap; codegen mengekspornya; panel Design punya kontrol Wrap sesuai desain story 1; skill api menyebutnya. Dokumen lama tidak berubah tampilan."
+verify = "Tes migrasi korpus (tampilan tidak berubah); fixture wrap merender sama di render daemon dan ekspor kode (uji paritas); kontrol Wrap mengubah dokumen lewat op dan bisa di-undo."
+covers = ["R1", "R5"]
+after = [1]
+hitl = false
+risk = "medium"
+
+[[entry]]
+id = 7
+type = "story"
+title = "Copy as PNG"
+description = "Sesuai desain story 1: item Copy as PNG untuk node terpilih menyalin PNG (2x) ke clipboard, memakai route ekspor PNG yang sudah ada; di aplikasi desktop dan browser."
+verify = "Tes DOM: item tersedia saat ada seleksi dan memanggil ekspor PNG lalu clipboard; ekspor gagal menampilkan pesan error yang sudah ada."
+covers = ["R5"]
+after = [1]
+hitl = false
+risk = "low"
+
+[[entry]]
+id = 8
+type = "story"
+title = "Impor halaman web dari URL"
+description = "Daemon mengambil halaman http(s) atas permintaan eksplisit sesuai kebijakan jaringan epic (anti-SSRF, tanpa skrip, batas waktu dan ukuran) lalu meneruskannya ke importer HTML yang ada dengan lebar preset; tool MCP baru atau field opsional baru untuk agen (tool lama tidak berubah); dialog impor URL di viewer sesuai desain story 1."
+verify = "Tes daemon: URL valid menghasilkan layer; loopback/IP privat/skema lain ditolak dengan error jelas; timeout dan ukuran dibatasi; tes DOM dialog; paste HTML biasa tetap tanpa jaringan."
+covers = ["R6"]
+after = [1]
+hitl = false
+risk = "high"
+
+[[entry]]
+id = 9
+type = "story"
+title = "Impor dan ekspor token W3C DTCG"
+description = "Codegen mengekspor token Lakar (bertipe, dengan mode tema) ke JSON DTCG, dan parser mengimpor JSON DTCG menjadi token Lakar; aksi Import/Export DTCG di panel Theme sesuai desain story 1; agen mendapat akses lewat tool baru atau opsi opsional pada tool ekspor yang ada."
+verify = "Round-trip token korpus lewat DTCG menghasilkan token yang sama; fixture DTCG dengan mode dan alias terimpor benar; tipe yang tidak didukung dilaporkan, bukan dibuang diam-diam; tes DOM aksi panel Theme."
+covers = ["R3", "R5"]
+after = [1]
+hitl = false
+risk = "medium"
+
+[[entry]]
+id = 10
+type = "story"
+title = "Updater otomatis aplikasi desktop"
+description = "apps/desktop memakai plugin updater Tauri v2 dengan endpoint latest.json GitHub Release; release.yml menandatangani artefak dan menerbitkan latest.json; kunci tanda tangan disiapkan sesuai keputusan epic; UI Settings → Updates dan banner update sesuai desain story 1."
+verify = "cargo clippy -D warnings dan cargo test hijau; workflow release (dry run di branch) menghasilkan artefak .sig dan latest.json yang valid; UI cek update menangani tersedia/tidak tersedia/gagal; tanpa kunci di repo atau log."
+covers = ["R1"]
+after = [1]
+hitl = false
+risk = "medium"
