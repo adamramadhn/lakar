@@ -1,7 +1,8 @@
 // Kehadiran agen di kanvas (aplikasi 5, desain bagian 04): turunan murni dari stream aktivitas per sesi Live —
 // lokasi kursor (board + node), state working/idle, dan node yang baru diubah execute (sorotan "Just changed").
 // Target execute yang masih berjalan tidak ditebak dari kode: kursor tetap di lokasi terakhir dengan state working.
-import { callEndMs, callTitle, harnessColor, harnessLabel, type ActivityCall, type SessionView } from './activity.js';
+import { callEndMs, callTitle, harnessLabel, whoOf, type ActivityCall, type SessionView } from './activity.js';
+import { assignAgentColors, type AgentColor, type FadePlan } from './agentEffects.js';
 import type { NodeInfo } from './format.js';
 
 /** `[x, y, w, h]` relatif board. */
@@ -18,7 +19,8 @@ export type AgentPresence = {
   session: string;
   /** Nama harness (Claude Code, Codex, …). */
   label: string;
-  color: 'agent' | 'codex';
+  /** Warna sesi (palet `AGENT_COLORS`, unik per sesi selama palet cukup). */
+  color: AgentColor;
   /** Ada call running pada dokumen ini. */
   working: boolean;
   /** Baris aksi saat working: `"{tool} · {judul call}"`. */
@@ -87,6 +89,8 @@ export function callLocation(c: ActivityCall, index: Index): Location | undefine
 export function agentPresence(views: readonly SessionView[], index: Index, now: number): AgentPresence[] {
   const out: AgentPresence[] = [];
   const nameOf = (id: string) => index.get(id)?.name;
+  // Warna dibagi antar-sesi Live saja: sesi lama yang sudah idle tidak mengambil warna harness sesi baru.
+  const colors = assignAgentColors(views.filter((v) => v.live).map((v) => ({ id: v.session.id, createdAt: v.session.createdAt, who: whoOf(v.session) })));
   for (const v of views) {
     if (!v.live) continue;
     let loc: Location | undefined;
@@ -98,8 +102,8 @@ export function agentPresence(views: readonly SessionView[], index: Index, now: 
     const running = v.calls.find((c) => c.status === 'running');
     const p: AgentPresence = {
       session: v.session.id,
-      label: harnessLabel(v.session.client),
-      color: harnessColor(v.session.client),
+      label: harnessLabel(whoOf(v.session)),
+      color: colors.get(v.session.id) ?? 'agent',
       working: running !== undefined,
       ...(running ? { action: `${running.tool} · ${callTitle(running, nameOf)}` } : {}),
       ...loc,
@@ -138,7 +142,7 @@ export type LayerMark = 'agent' | 'created' | 'changed';
 const RANK: Record<LayerMark, number> = { agent: 3, created: 2, changed: 1 };
 
 /** Tanda baris: warna dan kunci dari sesi yang menang (kunci = `changedKey` untuk created/changed). */
-export type LayerMarkInfo = { mark: LayerMark; color: 'agent' | 'codex'; key?: string };
+export type LayerMarkInfo = { mark: LayerMark; color: AgentColor; key?: string };
 
 /** State baris Layers: node lokasi saat working → agent; node/board baru → created; node berubah lain → changed. */
 export function layerMarks(presence: readonly AgentPresence[]): Map<string, LayerMarkInfo> {
@@ -152,6 +156,21 @@ export function layerMarks(presence: readonly AgentPresence[]): Map<string, Laye
     if (p.working) put(p.nodeId ?? p.boardId, 'agent', p);
     for (const c of p.changed) put(c.id, c.created ? 'created' : 'changed', p);
     for (const id of p.createdBoards) put(id, 'created', p);
+  }
+  return out;
+}
+
+/**
+ * Rencana fade-in node baru (spec-canvas-agent-effects): execute selesai terbaru tiap sesi yang membuat node dan
+ * punya rev. Tanpa indeks dokumen: event tiba sebelum dokumen termuat ulang, jadi node baru belum ada di indeks.
+ * Lama/baru disaring `FadeQueue` (hanya execute yang selesai sesudah canvas dibuka).
+ */
+export function fadePlans(views: readonly SessionView[]): FadePlan[] {
+  const out: FadePlan[] = [];
+  for (const v of views) {
+    const exec = v.calls.find((c) => c.tool === 'execute' && c.status !== 'running');
+    if (!exec || !finished(exec) || !exec.created?.length || typeof exec.rev !== 'number') continue;
+    out.push({ key: exec.callId, rev: exec.rev, endMs: callEndMs(exec), ids: exec.created });
   }
   return out;
 }

@@ -1,6 +1,6 @@
 // Badge "Live" Dashboard (desain 01 "File Card" / "List Row": badge Live + subjudul "Claude Code is editing…") dan
 // daftar "Connected agents" Settings → Connections. Turunan murni dari stream aktivitas (activity.ts); tanpa React.
-import { harnessColor, harnessLabel, isLive, VIEWER_CLIENT, type ActivityState } from './activity.js';
+import { harnessColor, harnessLabel, isLive, VIEWER_CLIENT, whoOf, type ActivityState } from './activity.js';
 
 export type LiveDoc = { label: string; color: 'agent' | 'codex'; running: boolean };
 
@@ -18,7 +18,7 @@ export function liveDocs(state: ActivityState, now: number): Map<string, LiveDoc
     const at = last ? Date.parse(last.startedAt) : 0;
     const prev = out.get(slug);
     if (prev && ((prev.running && !running) || (prev.running === running && prev.at >= at))) continue;
-    out.set(slug, { label: harnessLabel(session.client), color: harnessColor(session.client), running, at });
+    out.set(slug, { label: harnessLabel(whoOf(session)), color: harnessColor(whoOf(session)), running, at });
   }
   return new Map([...out].map(([slug, { label, color, running }]) => [slug, { label, color, running }]));
 }
@@ -33,8 +33,8 @@ export function agentRows(state: ActivityState, now: number): AgentRow[] {
     const calls = state.calls.filter((c) => c.session === s.id);
     rows.push({
       id: s.id,
-      label: harnessLabel(s.client),
-      color: harnessColor(s.client),
+      label: harnessLabel(whoOf(s)),
+      color: harnessColor(whoOf(s)),
       live: isLive(calls, now),
       executes: s.executes,
       ...(s.activeSlug ? { activeSlug: s.activeSlug } : {}),

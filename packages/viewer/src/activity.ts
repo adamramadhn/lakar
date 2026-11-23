@@ -13,12 +13,15 @@ export const LIVE_WINDOW_MS = 60_000;
 /** Call yang diingat reducer (semua sesi). */
 export const CALLS_MAX = 300;
 
-export type ActivitySession = { id: string; client?: string; activeSlug?: string; createdAt: string; lastAt?: string; executes: number };
+/** `agent` = harness di balik klien MCP (`x-lakar-agent`, mis. `claude-code`); lihat `whoOf`. */
+export type ActivitySession = { id: string; client?: string; agent?: string; activeSlug?: string; createdAt: string; lastAt?: string; executes: number };
 export type CallStatus = 'running' | 'done' | 'warning' | 'error';
 export type ActivityCall = {
   callId: string;
   session: string;
   client?: string;
+  /** Harness agen sesi (spec-canvas-agent-effects). */
+  agent?: string;
   tool: string;
   slug?: string;
   description?: string;
@@ -107,6 +110,7 @@ function applyEvent(state: ActivityState, event: StreamEvent): ActivityState {
   const session: ActivitySession = {
     ...(prev ?? { id: call.session, createdAt: call.startedAt, executes: 0 }),
     ...(call.client ? { client: call.client } : {}),
+    ...(call.agent ? { agent: call.agent } : {}),
     lastAt: prev?.lastAt && prev.lastAt > at ? prev.lastAt : at,
   };
   if (call.status !== 'running' && call.tool === 'open_doc' && call.slug) session.activeSlug = call.slug;
@@ -272,12 +276,23 @@ export function slugAppeared(event: StreamEvent, slug: string): boolean {
 
 // ---- Label ----
 
-/** Nama harness dari pola client: `claude` → Claude Code, `codex` → Codex, `lakar-mcp` → MCP agent. */
+/**
+ * Identitas yang ditampilkan untuk sesi/call: harness agen (`agent`, dari clientInfo MCP) bila ada, selain itu klien
+ * (`lakar-mcp`, `lakar-viewer`). Masukan untuk `harnessLabel`/`harnessColor`.
+ */
+export const whoOf = (x: { client?: string | undefined; agent?: string | undefined } | undefined): string | undefined => x?.agent ?? x?.client;
+
+/**
+ * Nama harness dari pola client/agent: `claude` → Claude Code, `codex` → Codex, `gemini` → Gemini CLI, `cursor` →
+ * Cursor, `lakar-mcp` → MCP agent; lainnya apa adanya.
+ */
 export function harnessLabel(client: string | undefined): string {
   if (!client) return 'Agent';
   const c = client.toLowerCase();
   if (c.includes('claude')) return 'Claude Code';
   if (c.includes('codex')) return 'Codex';
+  if (c.includes('gemini')) return 'Gemini CLI';
+  if (c.includes('cursor')) return 'Cursor';
   if (c === 'lakar-mcp') return 'MCP agent';
   // Kelola file dari aplikasi (New file, Duplicate) mencatat riwayat atas nama viewer.
   if (c === 'lakar-viewer') return 'You';

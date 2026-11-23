@@ -7549,3 +7549,136 @@ button.panel-tab:hover {
   min-width: 0;
   gap: 6px;
 }
+
+/* ---- Efek canvas saat agen bekerja (spec-canvas-agent-effects, desain bagian 04 "Agents at work") ----
+   Warna per sesi agen (agentEffects.ts AGENT_COLORS), label "✦ Generating", board scan, reveal/exit kursor, baris
+   Activity baru. Hanya opacity/transform/filter yang dianimasikan. */
+.agent-outline.violet,
+.agent-node-outline.violet,
+.agent-cursor.violet,
+.layer-row.violet,
+.change-tag.violet,
+.agent-node-outline.violet .change-tag,
+.agent-generating.violet {
+  --who: var(--agent-violet);
+}
+.agent-outline.emerald,
+.agent-node-outline.emerald,
+.agent-cursor.emerald,
+.layer-row.emerald,
+.change-tag.emerald,
+.agent-node-outline.emerald .change-tag,
+.agent-generating.emerald {
+  --who: var(--agent-emerald);
+}
+.agent-outline.pink,
+.agent-node-outline.pink,
+.agent-cursor.pink,
+.layer-row.pink,
+.change-tag.pink,
+.agent-node-outline.pink .change-tag,
+.agent-generating.pink {
+  --who: var(--agent-pink);
+}
+/* Board yang sedang dikerjakan: border solid 2px warna agen (menggantikan denyut putus-putus) + scan. */
+.agent-outline.working {
+  overflow: hidden;
+  border-style: solid;
+  animation: none;
+}
+.agent-scan {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent 0%, transparent 70%, color-mix(in srgb, var(--who) 14%, transparent) 99%, color-mix(in srgb, var(--who) 70%, transparent) 99.5%, transparent 100%);
+  transform: translateX(-100%);
+  animation: agent-scan 3s linear infinite;
+  will-change: transform;
+}
+@keyframes agent-scan {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
+/* Label "✦ Generating · nama" di atas board (menggantikan label board). */
+.agent-generating {
+  --who: var(--agent);
+  position: absolute;
+  z-index: 1;
+  overflow: hidden;
+  padding: 3px 7px;
+  border-radius: 4px;
+  background: var(--who);
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  pointer-events: none;
+  animation: agent-generating-in 150ms ease-out;
+}
+.board-label.generating {
+  visibility: hidden;
+}
+.agent-generating.codex {
+  --who: var(--codex);
+}
+@keyframes agent-generating-in {
+  from {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+}
+/* Kursor: reveal/exit scale 0.5 ↔ 1 + opacity dari ujung pointer, 180ms cubic-bezier(.33,1,.68,1). */
+.agent-cursor-body {
+  transform-origin: 0 0;
+  animation: agent-cursor-in 180ms cubic-bezier(0.33, 1, 0.68, 1) both;
+}
+.agent-cursor.exiting .agent-cursor-body {
+  animation: agent-cursor-out 180ms cubic-bezier(0.33, 1, 0.68, 1) both;
+}
+@keyframes agent-cursor-in {
+  from {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+}
+@keyframes agent-cursor-out {
+  to {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+}
+/* Baris Activity baru: terminal-chunk-in (Paper) — opacity, blur 2px → 0, naik 4px, 600ms. */
+.tool-call.chunk-in {
+  animation: terminal-chunk-in 600ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+@keyframes terminal-chunk-in {
+  from {
+    opacity: 0;
+    filter: blur(2px);
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    filter: blur(0);
+    transform: translateY(0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .agent-scan,
+  .agent-generating,
+  .agent-cursor-body,
+  .tool-call.chunk-in {
+    animation: none;
+  }
+  .agent-scan {
+    display: none;
+  }
+  .agent-cursor.exiting {
+    display: none;
+  }
+}

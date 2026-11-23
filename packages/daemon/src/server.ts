@@ -42,7 +42,7 @@ import { INSPECT_DEPTH_DEFAULT, INSPECT_DEPTH_MAX, WIP_PREFIX, boundsMap, inspec
 import { readPngSize } from './png.js';
 import { NO_ACTIVE_DOC_HINT, Sessions, UnknownSessionError, logExecute, recallFailed, rememberFailed } from './sessions.js';
 import { DocStore } from './store.js';
-import { ActivityBus, registerActivityHooks } from './events.js';
+import { ActivityBus, agentOf, registerActivityHooks } from './events.js';
 import { registerConnectionRoutes } from './connections.js';
 import { FILES_LOCK, freeSlugFor, registerFileRoutes, slugClaimed, slugify } from './files.js';
 import { FocusStore, registerFocusRoutes } from './focus.js';
@@ -361,7 +361,7 @@ export function buildServer({
         { hint: VERSION_HINT },
       );
     }
-    return ok(reply, { sessionId: sessions.create(body?.client).id, version: LAKAR_VERSION, schemaVersion: SCHEMA_VERSION });
+    return ok(reply, { sessionId: sessions.create(body?.client, agentOf(req.headers)).id, version: LAKAR_VERSION, schemaVersion: SCHEMA_VERSION });
   });
 
   /** Target respons tulis: dokumen yang benar-benar diubah (pin sesi), supaya agen tahu di mana ia bekerja. */

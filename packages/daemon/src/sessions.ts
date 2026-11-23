@@ -41,6 +41,8 @@ export type Session = {
   executes: number;
   /** Klien yang membuat sesi (mis. `lakar-mcp`), bila dikirim. */
   client?: string;
+  /** Harness agen di balik klien (MCP `clientInfo.name`, mis. `claude-code`), dari header `x-lakar-agent`. */
+  agent?: string;
   /** `keep` snippet; diganti hanya oleh execute sukses. */
   keep: Record<string, unknown>;
   /** editId → snippet gagal (urutan sisip = urutan LRU). */
@@ -91,8 +93,8 @@ export function logExecute(session: Session, entry: ExecuteLogEntry): void {
 
 export class Sessions {
   readonly #map = new Map<string, Session>();
-  create(client?: string): Session {
-    const s: Session = { id: randomUUID(), createdAt: new Date().toISOString(), executes: 0, keep: {}, failed: new Map(), log: [], ...(client ? { client } : {}) };
+  create(client?: string, agent?: string): Session {
+    const s: Session = { id: randomUUID(), createdAt: new Date().toISOString(), executes: 0, keep: {}, failed: new Map(), log: [], ...(client ? { client } : {}), ...(agent ? { agent } : {}) };
     this.#map.set(s.id, s);
     return s;
   }

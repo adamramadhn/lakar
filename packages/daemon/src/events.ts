@@ -27,6 +27,22 @@ export function originOf(headers: Record<string, string | string[] | undefined>)
   return typeof v === 'string' && ORIGIN_PATTERN.test(v) ? v : undefined;
 }
 
+/**
+ * Header harness agen pada `POST /sessions` (spec-canvas-agent-effects): `clientInfo.name` MCP (mis. `claude-code`,
+ * `codex-mcp-client`). Header, bukan field body: daemon lama mengabaikan header tak dikenal, sedangkan `SessionBody`
+ * `.strict()` menolak field baru.
+ */
+export const AGENT_HEADER = 'x-lakar-agent';
+const AGENT_PATTERN = /^[!-~](?:[ -~]{0,62}[!-~])?$/;
+
+/** Nama harness dari header `x-lakar-agent` (ASCII tampak, ≤ 64); tidak ada/tidak valid → undefined. */
+export function agentOf(headers: Record<string, string | string[] | undefined>): string | undefined {
+  const v = headers[AGENT_HEADER];
+  if (typeof v !== 'string') return undefined;
+  const t = v.trim();
+  return AGENT_PATTERN.test(t) ? t : undefined;
+}
+
 /** Route POST lama → nama tool MCP. */
 export const TOOL_ROUTES: Readonly<Record<string, string>> = {
   '/docs/open': 'open_doc',
@@ -51,6 +67,8 @@ export type ActivitySession = {
   /** Id publik (8 karakter). */
   id: string;
   client?: string;
+  /** Harness agen (`x-lakar-agent`), mis. `claude-code`; viewer memakainya untuk nama dan warna kursor. */
+  agent?: string;
   activeSlug?: string;
   createdAt: string;
   lastAt?: string;
@@ -67,6 +85,8 @@ export type ActivityCall = {
   /** Id sesi publik. */
   session: string;
   client?: string;
+  /** Harness agen sesi (lihat `ActivitySession.agent`). */
+  agent?: string;
   tool: string;
   slug?: string;
   /** Label execute (3–8 kata). */
@@ -244,6 +264,7 @@ export class ActivityBus {
 export const sessionSnapshot = (s: Session): ActivitySession => ({
   id: publicSessionId(s.id),
   ...(s.client ? { client: s.client } : {}),
+  ...(s.agent ? { agent: s.agent } : {}),
   ...(s.activeSlug ? { activeSlug: s.activeSlug } : {}),
   createdAt: s.createdAt,
   ...(s.lastAt ? { lastAt: s.lastAt } : {}),
@@ -435,6 +456,7 @@ export function registerActivityHooks(app: FastifyInstance, { sessions, bus, hea
       callId: `${callPrefix}-${++nextCall}`,
       session: publicSessionId(session.id),
       ...(session.client ? { client: session.client } : {}),
+      ...(session.agent ? { agent: session.agent } : {}),
       tool,
       ...(slug ? { slug } : {}),
       ...(description ? { description } : {}),

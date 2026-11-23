@@ -28,21 +28,40 @@ export class VersionMismatchError extends Error {
 
 export type SessionInfo = { sessionId: string; version?: string; schemaVersion?: number };
 
+/** Harness agen di balik server MCP (`clientInfo` dari initialize), mis. `{name: 'claude-code', version: '2.1.0'}`. */
+export type AgentInfo = { name: string; version?: string };
+/** Header harness agen saat membuat sesi (sama dengan `AGENT_HEADER` di daemon events.ts). */
+export const AGENT_HEADER = 'x-lakar-agent';
+
+/** Nilai header aman: hanya ASCII tampak + spasi, dipangkas, maks 64 karakter; kosong → undefined. */
+export function agentHeader(info: AgentInfo | undefined): string | undefined {
+  const v = info?.name
+    ?.replace(/[^ -~]/g, '')
+    .trim()
+    .slice(0, 64)
+    .trim();
+  return v || undefined;
+}
+
+export type DaemonClientOptions = { agent?: () => AgentInfo | undefined };
+
 export class DaemonClient {
   readonly url: string;
   /** Promise sesi dibagi semua pemanggil paralel; direset bila gagal atau 401. */
   #sessionPromise: Promise<string> | undefined;
+  readonly #agent: (() => AgentInfo | undefined) | undefined;
 
-  constructor(url: string) {
+  constructor(url: string, options: DaemonClientOptions = {}) {
     this.url = url.replace(/\/+$/, '');
+    this.#agent = options.agent;
   }
 
-  async #request<T>(path: string, body: unknown, session?: string, method: 'POST' | 'GET' = 'POST'): Promise<{ status: number; result: ApiResult<T> }> {
+  async #request<T>(path: string, body: unknown, session?: string, method: 'POST' | 'GET' = 'POST', extra: Record<string, string> = {}): Promise<{ status: number; result: ApiResult<T> }> {
     let res: Response;
     try {
       res = await fetch(`${this.url}${path}`, {
         method,
-        headers: method === 'POST' ? { 'content-type': 'application/json', ...(session ? { [SESSION_HEADER]: session } : {}) } : {},
+        headers: method === 'POST' ? { 'content-type': 'application/json', ...(session ? { [SESSION_HEADER]: session } : {}), ...extra } : {},
         ...(method === 'POST' ? { body: JSON.stringify(body ?? {}) } : {}),
         signal: AbortSignal.timeout(60_000),
       });
@@ -86,7 +105,20 @@ export class DaemonClient {
   #session(): Promise<string> {
     if (!this.#sessionPromise) {
       const p = (async () => {
-        const { result } = await this.#request<SessionInfo>('/sessions', { client: CLIENT_NAME, version: LAKAR_VERSION, schemaVersion: SCHEMA_VERSION });
+        // Harness agen (clientInfo MCP) sebagai header: dipakai viewer untuk nama dan warna kursor agen.
+        let agent: string | undefined;
+        try {
+          agent = agentHeader(this.#agent?.());
+        } catch {
+          agent = undefined;
+        }
+        const { result } = await this.#request<SessionInfo>(
+          '/sessions',
+          { client: CLIENT_NAME, version: LAKAR_VERSION, schemaVersion: SCHEMA_VERSION },
+          undefined,
+          'POST',
+          agent ? { [AGENT_HEADER]: agent } : {},
+        );
         if (!result.ok) {
           if (result.error.code === 'VERSION_MISMATCH') throw new VersionMismatchError(result.error);
           throw new Error(`gagal membuat sesi: ${result.error.message}`);
