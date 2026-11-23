@@ -73,17 +73,39 @@ describe('fix aman', () => {
     expect(f.suggestions).toBeUndefined();
   });
 
-  it('LC-30: rentang ber-tanda hubung → en dash, "..." → "…"; teks mono hanya rentang', () => {
+  it('LC-30: rentang tanpa spasi → en dash dan "..." → "…" (fix aman); rentang berspasi hanya saran (review 33-3)', () => {
     const t = text('Buka 09.00 - 10.00, 5-10 menit. Memuat...', [16, 16, 300, 20]);
     const f = one(check({ children: [t] }), 'LC-30');
-    expect(f.fix).toEqual({ label: 'Fix punctuation', ops: [{ op: 'update', id: t.id, patch: { content: 'Buka 09.00–10.00, 5–10 menit. Memuat…' } }] });
+    expect(f.fix).toEqual({ label: 'Fix punctuation', ops: [{ op: 'update', id: t.id, patch: { content: 'Buka 09.00 - 10.00, 5–10 menit. Memuat…' } }] });
+    expect(f.suggestions).toEqual([{ label: 'Use en dash in ranges', ops: [{ op: 'update', id: t.id, patch: { content: 'Buka 09.00–10.00, 5–10 menit. Memuat…' } }] }]);
+    // `x = 10 - 5` (pengurangan) tidak pernah fix aman.
+    const minus = text('Hasil 10 - 5', [16, 40, 300, 20]);
+    const m = one(check({ children: [minus] }), 'LC-30');
+    expect(m.fix).toBeUndefined();
+    expect(m.suggestions![0]!.ops[0]).toMatchObject({ patch: { content: 'Hasil 10–5' } });
+    // Teks mono (kode): tanpa fix aman, rentang hanya saran, "..." tetap.
+    const code = text('x = arr[1-2] ...', [16, 64, 300, 20], { family: 'JetBrains Mono' });
+    const c = one(check({ children: [code] }), 'LC-30');
+    expect(c.fix).toBeUndefined();
+    expect(c.suggestions![0]!.ops[0]).toMatchObject({ patch: { content: 'x = arr[1–2] ...' } });
     expect(punctuated('run(a, ...) 1-2', false)).toBe('run(a, ...) 1–2');
+    expect(punctuated('a 1 - 2 dan 3-4', true, false)).toBe('a 1 - 2 dan 3–4');
     // Tanggal, telepon, kode tidak disentuh.
     expect(punctuated('2026-11-18 · 0812-3456-7890 · 3-5 hari', true)).toBe('2026-11-18 · 0812-3456-7890 · 3–5 hari');
   });
 
   const seksi = (name: string, y: number, h: number) => frame(name, [0, y, 1440, h], [], solid);
   const halaman = (end: number) => frame('Halaman', [0, 0, 1440, end], [seksi('Seksi / Hero', 0, 900), seksi('Footer', 900, end - 900)], { width: 'fill' });
+
+  it('LC-12 landing: node absolut terlihat yang melewati tinggi pas → hanya saran (review 33-2)', () => {
+    const badge = rect('Overlay / Lencana', [1300, 4040, 80, 30], { position: 'absolute', x: 1300, y: 4040, ...solid });
+    const f = one(check({ name: 'Landing', screen: 'landing', width: 1440, height: 4074, children: [halaman(4050), badge] }), 'LC-12');
+    expect(f.fix).toBeUndefined();
+    expect(f.suggestions).toEqual([{ label: 'Fit height to 4050', ops: [{ op: 'update', id: f.nodeId, patch: { height: 4050 } }] }]);
+    // Node absolut di dalam tinggi pas tidak menghalangi fix aman.
+    const inside = rect('Overlay / Lencana', [1300, 100, 80, 30], { position: 'absolute', x: 1300, y: 100, ...solid });
+    expect(one(check({ name: 'Landing', screen: 'landing', width: 1440, height: 4074, children: [halaman(4050), inside] }), 'LC-12').fix).toBeDefined();
+  });
 
   it('LC-12 landing selesai: tinggi pas = fix aman; [WIP] dan board hug tanpa fix', () => {
     const spec: Spec = { name: 'Landing', screen: 'landing', width: 1440, height: 4074, children: [halaman(4050)] };
@@ -244,19 +266,21 @@ describe('staleFixes', () => {
   };
   const item = (ops: PlannedFix['ops']): PlannedFix => ({ rule: 'LC-29', nodeId: 'Txt00001', nodeName: 'A', kind: 'fix', label: 'x', ops });
 
-  it('dokumen sama → semua segar; properti lain berubah → segar; properti target berubah/hilang → stale', () => {
+  it('dokumen sama → segar; perubahan apa pun di board target (bukan hanya properti yang di-patch) → stale; board lain → segar (review 33-1)', () => {
     const base = docWith({ weight: 300 });
     const fix = item([{ op: 'update', id: 'Txt00001', patch: { weight: 400 } }]);
     expect(staleFixes([fix], base, base).stale).toEqual([]);
-    expect(staleFixes([fix], base, docWith({ weight: 300, content: 'B' })).fresh).toEqual([fix]);
-    const s = staleFixes([fix], base, docWith({ weight: 200 }));
+    // Properti lain di board yang sama (mis. seksi baru, size) → stale: fix dihitung dari tata letak board.
+    const s = staleFixes([fix], base, docWith({ weight: 300, content: 'B' }));
     expect(s.fresh).toEqual([]);
-    expect(s.stale[0]).toMatchObject({ reason: 'stale', detail: 'target Txt00001 changed since the check' });
-    const gone = docOf([{ children: [] }]).doc;
-    expect(staleFixes([fix], base, gone).stale).toHaveLength(1);
-    // remove: seluruh node dibandingkan.
+    expect(s.stale[0]).toMatchObject({ reason: 'stale', detail: 'board of Txt00001 changed since the check' });
     const rm = item([{ op: 'remove', id: 'Rct00001' }]);
-    expect(staleFixes([rm], base, docWith({ weight: 200 })).fresh).toEqual([rm]);
+    expect(staleFixes([rm], base, docWith({ weight: 200 })).stale).toHaveLength(1);
+    // Target hilang → stale.
+    expect(staleFixes([fix], base, docOf([{ children: [] }]).doc).stale).toHaveLength(1);
+    // Board lain berubah (board baru ditambah) → board target tetap sama → segar.
+    const other = { ...base, pages: [{ ...base.pages[0]!, children: [...base.pages[0]!.children, { ...base.pages[0]!.children[0]!, id: 'Brd00002', children: [] }] }] } as ResolvedDocument;
+    expect(staleFixes([fix, rm], base, other).fresh).toEqual([fix, rm]);
   });
 });
 

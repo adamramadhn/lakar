@@ -49,6 +49,11 @@ export type Session = {
   /** editId → snippet gagal (urutan sisip = urutan LRU). */
   failed: Map<string, FailedSnippet>;
   log: ExecuteLogEntry[];
+  /**
+   * Rev dasar visual_diff per id dokumen (stabil saat rename): `first` = rev sebelum tulis pertama sesi ini,
+   * `last` = rev sebelum tulis terakhirnya (execute atau paste agen). Belum ada tulis → tidak ada entri.
+   */
+  bases?: Map<string, { first: number; last: number }>;
 };
 
 const ALNUM = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
@@ -98,6 +103,13 @@ export function setActiveDoc(session: Pick<Session, 'activeSlug' | 'keep'>, slug
     session.keep = keep;
   }
   session.activeSlug = slug;
+}
+
+/** Catat tulis agen di dokumen `docId` yang berangkat dari rev `fromRev` (bahan default visual_diff). */
+export function noteWrite(session: Pick<Session, 'bases'>, docId: string, fromRev: number): void {
+  session.bases ??= new Map();
+  const prev = session.bases.get(docId);
+  session.bases.set(docId, { first: prev?.first ?? fromRev, last: fromRev });
 }
 
 export function logExecute(session: Session, entry: ExecuteLogEntry): void {

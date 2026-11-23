@@ -169,6 +169,7 @@ describe('label', () => {
     expect(callTitle({ ...base, tool: 'execute', description: 'tambah hero' })).toBe('tambah hero');
     expect(callTitle({ ...base, tool: 'inspect', target: 'N1' }, (id) => (id === 'N1' ? 'Headline' : undefined))).toBe('Inspect Headline');
     expect(callTitle({ ...base, tool: 'layout_check' })).toBe('Check all boards');
+    expect(callTitle({ ...base, tool: 'visual_diff', target: 'B1' }, () => 'Home')).toBe('Compare versions of Home');
     expect(callTitle({ ...base, tool: 'read_skill', target: 'webapp' })).toBe('Load webapp skill');
     expect(callTitle({ ...base, tool: 'get_selection' })).toBe('Read selection');
     expect(callTitle({ ...base, tool: 'list_documents' })).toBe('List documents');

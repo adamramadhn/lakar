@@ -38,6 +38,7 @@
     "@lakar/schema": "workspace:*",
     "@lakar/skills": "workspace:*",
     "fastify": "5.12.8",
+    "pixelmatch": "8.0.0",
     "playwright-core": "1.65.1",
     "zod": "4.6.7"
   },

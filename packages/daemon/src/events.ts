@@ -56,12 +56,15 @@ export const TOOL_ROUTES: Readonly<Record<string, string>> = {
   '/export': 'export',
   '/skills/read': 'read_skill',
   '/layout-check': 'layout_check',
+  '/viewer/visual-diff': 'visual_diff',
   '/icons/search': 'icon_search',
   '/photos/search': 'photo_search',
   '/viewer/selection': 'get_selection',
   '/viewer/export-code': 'export_code',
   '/viewer/paste': 'paste',
   '/viewer/documents': 'list_documents',
+  '/viewer/undo': 'undo',
+  '/viewer/redo': 'redo',
   '/viewer/fix-check': 'fix_check',
 };
 
@@ -308,6 +311,7 @@ function targetOf(tool: string, body: Record<string, unknown> | undefined): stri
     case 'inspect':
       return str(body.id);
     case 'screenshot':
+    case 'visual_diff':
       return str(body.boardId) ?? str(body.nodeId);
     case 'export':
     case 'export_code':
@@ -357,6 +361,18 @@ function finish(call: ActivityCall, statusCode: number, json: unknown): Activity
       if (rects) out.bounds = rects;
       const summary = asSummary(check?.summary);
       if (summary) out.summary = summary;
+      break;
+    }
+    case 'undo':
+    case 'redo': {
+      // spec-agent-undo: judul baris = label riwayat langkah ("Undo: …"), board tersentuh untuk muat ulang viewer.
+      const steps = Array.isArray(data.undone) ? data.undone : Array.isArray(data.redone) ? data.redone : [];
+      const verb = call.tool === 'undo' ? 'Undo' : 'Redo';
+      const first = str(obj(steps[0])?.description);
+      if (steps.length === 1 && first) out.description = `${verb}: ${first}`;
+      else if (steps.length > 1) out.description = `${verb} ${steps.length} steps`;
+      const boards = ids(data.boards);
+      if (boards) out.boards = boards;
       break;
     }
     case 'layout_check':

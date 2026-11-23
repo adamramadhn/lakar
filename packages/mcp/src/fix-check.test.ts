@@ -67,7 +67,7 @@ describe('fix_check (MCP)', () => {
     expect(Object.keys((tool.inputSchema as any).properties).sort()).toEqual(['boardId', 'codes', 'dryRun', 'suggestions']);
     expect((tool.inputSchema as any).required ?? []).toEqual([]);
     expect(tool.description).toBe(FIX_CHECK_DESCRIPTION);
-    expect(FIX_CHECK_DESCRIPTION).toContain('satu rev (satu langkah undo)');
+    expect(FIX_CHECK_DESCRIPTION).toContain('satu rev (satu langkah undo');
     expect(FIX_CHECK_DESCRIPTION).toMatch(/stale.*token.*conflict.*invalid/);
     expect(SERVER_INSTRUCTIONS).toContain('fix_check');
   });

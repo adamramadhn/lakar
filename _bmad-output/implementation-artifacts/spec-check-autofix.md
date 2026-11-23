@@ -64,7 +64,7 @@ context:
 | LC-09 > 2 keluarga font | ≤ 2 keluarga | tidak | none | — |
 | LC-10 target sentuh | ≥ 44×44 | ya (ukuran terukur) | suggestion | frame: `minWidth/minHeight 44` pada sumbu yang kurang (bar/tab bisa berubah tinggi, jadi bukan safe) |
 | LC-11 tumpang tindih | — | tidak | none | — |
-| LC-12 board | tinggi pas `update(board,{height:N})`, ukuran layar, place | ya | **mixed** | **safe**: tinggi pas landing selesai (non-hug, non-`[WIP] `). Saran: tinggi pas mobile + node absolut di bawah isi ikut naik; ukuran ke expectedSize/layar (hug: tanpa tinggi); tabrakan → geser ke kanan semua board (+80) |
+| LC-12 board | tinggi pas `update(board,{height:N})`, ukuran layar, place | ya | **mixed** | **safe**: tinggi pas landing selesai (non-hug, non-`[WIP] `) bila tidak ada node absolut terlihat yang melewati tinggi baru (ada → saran, review 33-2). Saran: tinggi pas mobile + node absolut di bawah isi ikut naik; ukuran ke expectedSize/layar (hug: tanpa tinggi); tabrakan → geser ke kanan semua board (+80) |
 | LC-13 nama default | nama bermakna | tidak | none | penamaan butuh konteks |
 | LC-14 absolut di flex | jadikan flow atau Overlay / | ya | suggestion | 1) rename `Overlay / <nama>` (tampilan tetap), 2) `{position:null,x:null,y:null}` |
 | LC-15 > 1 pustaka ikon | satu pustaka | tidak | none | — |
@@ -82,25 +82,26 @@ context:
 | LC-27 > 6 ukuran huruf | satukan peran | tidak | none | — |
 | LC-28 baris > 80 karakter | persempit lebar | ya (perkiraan) | suggestion | `maxWidth` (lebar angka → `width`) = size × 37,5 dibulatkan 8 (16px → 600) |
 | LC-29 bobot tipis kecil | ≥ 400 | ya | **safe** | `{weight:400}` |
-| LC-30 tanda baca | en dash rentang, … | ya | **safe** | semua rentang angka ber-tanda hubung → `–` tanpa spasi; `...` → `…` (bukan teks mono) |
+| LC-30 tanda baca | en dash rentang, … | ya | **mixed** | **safe**: rentang angka tanpa spasi (`09.00-17.00`) → `–`, `...` → `…`, hanya teks non-mono. Saran: rentang berspasi (`10 - 5` bisa pengurangan) dan teks mono (kode) — review 33-3 |
 | LC-31 rata tepi bawah | padding bawah ≥ 64 | tidak | none | — |
 | LC-32 instance basi | reset override / sunting master | tidak | none | ditunda (lihat deferred) |
 | LC-33 skeleton tersisa | Build atau remove | tidak | none | isi seksi = pekerjaan agen |
 | FONT_MISSING (kode error render, bukan temuan) | daftarkan font / ganti karakter | tidak | none | — |
 
-Ringkas: 36 aturan → 2 safe (LC-29, LC-30), 1 mixed (LC-12: safe untuk tinggi pas landing), 13 suggestion, 20 none; FONT_MISSING none.
+Ringkas: 36 aturan → 1 safe (LC-29), 2 mixed (LC-12: tinggi pas landing tanpa node absolut terpotong; LC-30: rentang tanpa spasi + elipsis di teks non-mono), 13 suggestion, 20 none; FONT_MISSING none.
 
 ## I/O & Edge-Case Matrix
 
 | Scenario | Input / State | Expected Output / Behavior | Error Handling |
 |----------|--------------|---------------------------|----------------|
-| Default | `fix_check {}` | Semua fix aman semua board → satu rev, satu entri riwayat `Apply check fixes`; `applied` (kind `fix`), `remaining` (temuan lama tersisa, dibatasi seperti layout_check), `newFindings` | — |
+| Default | `fix_check {}` | Semua fix aman semua board → satu rev, satu entri riwayat `Apply check fixes`, satu langkah undo agen (hook `AgentSteps.onAgentWrite`); `applied` (kind `fix`), `remaining` (temuan lama tersisa, dibatasi seperti layout_check), `newFindings` | — |
+| Undo / visual_diff | `fix_check` lalu `undo` / `visual_diff {}` | undo membatalkan semua fix sekaligus; dasar visual_diff = rev sebelum fix_check. dryRun tidak dicatat | undo ditolak bila ada edit lain sesudahnya (aturan undo agen) |
 | Tanpa fix aman | hanya saran/none | `applied:[]`, tanpa commit, rev tetap | — |
 | Saran | `{suggestions:true}` | + saran pertama temuan tanpa fix aman (kind `suggestion`) | — |
 | Filter | `{codes:['LC-30'], boardId}` | Hanya aturan/board itu | kode tak dikenal → SCHEMA_INVALID; board tak ada → NOT_FOUND |
 | dryRun | `{dryRun:true}` | Fix diterapkan di salinan, render + check ulang, tanpa commit (rev, file, riwayat tetap) | — |
 | Bentrok | dua fix menyentuh properti sama / update node yang dihapus | Fix pertama (urutan temuan: error dulu) menang; sisanya `skipped` `conflict` | — |
-| Basi | dokumen berubah antara check dan kunci (tulis lain saat render) | Fix yang target/propertinya berubah → `skipped` `stale`; yang lain tetap diterapkan | — |
+| Basi | dokumen berubah antara check dan kunci (tulis lain saat render) | Setiap fix yang targetnya ada di board yang berubah (JSON ter-resolve, termasuk token) atau hilang → `skipped` `stale`; fix di board lain tetap diterapkan | — |
 | Token | properti yang di-patch tersimpan `{$token}` | `skipped` `token` (ubah token atau bind) | — |
 | Ditolak core | op fix gagal validasi | `skipped` `invalid` (kode + pesan); sisanya tetap satu transaksi | — |
 | Isi instance | temuan pada `I/…` | update komposit = override instance; master tidak disentuh | — |
@@ -118,7 +119,7 @@ Ringkas: 36 aturan → 2 safe (LC-29, LC-30), 1 mixed (LC-12: safe untuk tinggi 
 - `packages/check/src/rules.ts` -- `finding(…, extra)`; data fix di LC-01a/b, 03, 05, 06, 07, 08, 10, 12, 14, 21, 23, 25, 28, 29, 30; `punctuated`.
 - `packages/check/src/index.ts` -- `checkBoard({cap})` (false = tanpa batas per aturan); ekspor.
 - `packages/daemon/src/check.ts` -- `runCheck(…, {cap})`, `byBoard`.
-- `packages/daemon/src/fix-check.ts` -- route `POST /viewer/fix-check`, `tokenBoundKey`.
+- `packages/daemon/src/fix-check.ts` -- route `POST /viewer/fix-check`, `tokenBoundKey`; check ulang hanya board yang berubah; hook `agentSteps.onAgentWrite` sesudah commit.
 - `packages/daemon/src/server.ts` -- registrasi route (1 baris + import).
 - `packages/daemon/src/events.ts` -- `TOOL_ROUTES['/viewer/fix-check'] = 'fix_check'` (Activity + muat ulang viewer lewat rev).
 - `packages/mcp/src/fix-check.ts` -- deskripsi, `formatFixCheck`, `registerFixCheckTool`; `server.ts` import + satu pemanggilan + satu kalimat SERVER_INSTRUCTIONS.
@@ -150,4 +151,14 @@ Ringkas: 36 aturan → 2 safe (LC-29, LC-30), 1 mixed (LC-12: safe untuk tinggi 
 - Diperbaiki: saran ukuran teks tanpa line-height → LC-08 baru (smoke); kini selalu line-height token.
 - Diperbaiki: ringkasan board saat tidak ada yang diterapkan memakai hitungan tanpa batas → dihitung ulang dari temuan terbatas.
 - Diterima: saran yang menumbuhkan isi bisa memicu LC-02a di board bertinggi angka; dilaporkan di `newFindings`, agen memutuskan (deferred).
-- Diterima: komentar kepala `server.ts` masih menyebut 15 tool (spec paralel juga menambah tool; dibereskan saat gabung).
+- Diterima → dibereskan saat merge #31/#32: komentar kepala `server.ts` kini 19 tool.
+
+### Review independen PR #33 (sesudah merge #31 undo agen dan #32 visual_diff)
+
+- **Merge:** `TOOL_ROUTES` memuat `/viewer/fix-check` bersama undo/redo/visual-diff; `finish()` menjaga kasus undo/redo + `layout_check`/`fix_check`; viewer `MCP_TOOLS`/`callTitle` memuat semua kasus; tes daftar tool MCP 19 nama.
+- **X1 (high) → diperbaiki:** fix_check memanggil hook tulis agen tunggal `AgentSteps.onAgentWrite(session, docId, rev sebelum, rev baru, committed.inverse, 'Apply check fixes')` sesudah commit (tidak pada dryRun). `undo` membatalkan fix_check; `visual_diff {}` sesudah fix_check berdasar rev sebelum fix_check. Tes di `fix-check.test.ts`.
+- **33-1 (medium) → diperbaiki:** cek basi per board, bukan per properti: rev berubah sejak check → setiap fix yang targetnya di board yang berubah (`staleFixes`, JSON board ter-resolve) atau hilang = `stale`. Tes: seksi ditambah selama render → LC-29/LC-30 stale, tanpa commit; board lain berubah → fix tetap.
+- **33-2 (medium) → diperbaiki:** tinggi pas LC-12 landing jadi saran (bukan fix aman) bila node absolut terlihat (atau di dalam node absolut) melewati tinggi baru. Tes check.
+- **33-3 (medium) → diperbaiki:** LC-30 fix aman hanya untuk rentang angka tanpa spasi dan elipsis di teks non-mono; rentang berspasi (`10 - 5`) dan teks mono = saran. LC-30 kini `mixed`. Tes check.
+- **33-4 (low) → diperbaiki:** di bawah kunci hanya board yang berubah sejak check (atau semua board bila fix mengubah board itu sendiri, karena tabrakan LC-12) yang dirender ulang; board lain memakai hasil check awal. Tes menghitung render.
+- **Panduan gabungan:** SERVER_INSTRUCTIONS satu alur: check di respons execute → fix_check → perbaikan editId/update → screenshot + zoom → execute perbaikan → visual_diff → export; undo untuk langkah sendiri (execute/paste/fix_check), lalu kalimat opsional. review.md langkah 3: `fix_check` → execute perbaikan → `visual_diff`; dibayar pemangkasan di pertanyaan 2/5 dan daftar slop (1480 → 1477 karakter).

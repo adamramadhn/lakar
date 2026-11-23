@@ -317,6 +317,8 @@ export function callTitle(c: ActivityCall, nameOf: (id: string) => string | unde
       return t ? `Inspect ${t}` : 'Inspect node';
     case 'screenshot':
       return t ? `Screenshot ${t}` : 'Screenshot first board';
+    case 'visual_diff':
+      return t ? `Compare versions of ${t}` : 'Compare versions of first board';
     case 'export':
       return t ? `Export ${t}` : 'Export first board';
     case 'export_code':
@@ -335,6 +337,11 @@ export function callTitle(c: ActivityCall, nameOf: (id: string) => string | unde
       return 'Read selection';
     case 'paste':
       return 'Paste layers';
+    // spec-agent-undo: daemon mengisi `description` dari label riwayat ("Undo: …") saat call selesai.
+    case 'undo':
+      return c.description ?? 'Undo agent step';
+    case 'redo':
+      return c.description ?? 'Redo agent step';
     case 'fix_check':
       return t ? `Fix check findings in ${t}` : 'Fix check findings';
     case 'read_skill':

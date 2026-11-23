@@ -5,7 +5,7 @@
 // transaksi (satu rev, satu entri riwayat = satu langkah undo) → render + check ulang board yang dicek → commit
 // (kecuali `dryRun`). Error render → tidak di-commit (seperti execute).
 import type { FastifyInstance } from 'fastify';
-import { capWarnings, findingKey, planFixes, sortFindings, staleFixes, type PlannedFix, type SkippedFix } from '@lakar/check';
+import { capWarnings, findingKey, planFixes, sortFindings, staleFixes, touchedBoards, type PlannedFix, type SkippedFix } from '@lakar/check';
 import { applyOps, transact, type DocumentLocks } from '@lakar/core';
 import type { RenderPort } from '@lakar/ports';
 import { iconRefs } from '@lakar/render';
@@ -23,6 +23,7 @@ import {
 } from '@lakar/schema';
 import { z } from 'zod';
 import { runCheck, type BoardCheck } from './check.js';
+import type { AgentSteps } from './agent-undo.js';
 import type { CheckLedger } from './checks.js';
 import { notFound } from './errors.js';
 import type { HugHeights } from './hug-heights.js';
@@ -52,6 +53,8 @@ export type FixCheckRoutesOptions = {
   render: RenderPort<ResolvedDocument>;
   hugs: HugHeights;
   checks: CheckLedger;
+  /** Hook tulis agen (undo agen + dasar visual_diff). */
+  agentSteps: AgentSteps;
   icons: { canonical(lib: string, icon: string): unknown };
 };
 
@@ -73,7 +76,7 @@ function capped(byBoard: ReadonlyMap<string, Finding[]>): { findings: Finding[];
 }
 
 export function registerFixCheckRoutes(app: FastifyInstance, opts: FixCheckRoutesOptions): void {
-  const { docs, store, docLocks, sessions, render, hugs, checks, icons } = opts;
+  const { docs, store, docLocks, sessions, render, hugs, checks, agentSteps, icons } = opts;
 
   app.post('/viewer/fix-check', async (req, reply) => {
     const session = sessions.require(req.headers[SESSION_HEADER]);
@@ -132,19 +135,33 @@ export function registerFixCheckRoutes(app: FastifyInstance, opts: FixCheckRoute
       }
       const committed = await transact(current, { sessionId: session.id, description: FIX_CHECK_DESCRIPTION }, (tx) => applyOps(tx, applied.flatMap((it) => it.ops)));
       const after = resolveDocument(committed.doc);
-      // Board bisa hilang (mustahil lewat update/remove node anak, tetapi dijaga): hanya yang masih ada dicek.
-      const recheck = boardIds.filter((id) => findBoard(after, id));
-      const ran = await runCheck(render, after, recheck, hugs.known(currentResolved));
+      // Review 33-4: kunci dipegang selama render, jadi hanya board yang berubah sejak check (fix ini atau tulis lain)
+      // dirender ulang; board lain memakai hasil check awal. Fix pada board itu sendiri (posisi/ukuran, LC-12) mengubah
+      // tabrakan board lain → semua board dicek ulang. Board yang hilang (dijaga) dilewati.
+      const live = boardIds.filter((id) => findBoard(after, id));
+      const changed = new Set(touchedBoards(baseResolved, after));
+      const boardLevel = applied.some((it) => it.ops.some((op) => 'id' in op && findBoard(after, op.id) !== undefined));
+      const recheck = boardLevel ? live : live.filter((id) => changed.has(id));
+      const ran = recheck.length ? await runCheck(render, after, recheck, hugs.known(currentResolved)) : undefined;
+      const shownBefore = capped(before.byBoard);
+      const reusedSummaries = boardSummaries(before.boards, shownBefore.boards);
+      const boards = live.map((id) => ran?.boards.find((b) => b.id === id) ?? reusedSummaries.find((b) => b.id === id)!);
+      const findings = sortFindings(live.flatMap((id) => ran?.byBoard.get(id) ?? shownBefore.boards.get(id) ?? []));
       const old = new Set(before.findings.map(findingKey));
-      const remaining = ran.findings.filter((f) => old.has(findingKey(f)));
-      const newFindings = ran.findings.filter((f) => !old.has(findingKey(f)));
+      const remaining = findings.filter((f) => old.has(findingKey(f)));
+      const newFindings = findings.filter((f) => !old.has(findingKey(f)));
       if (!dryRun) {
         await store.commit(slug, committed.doc, { ...committed.entry!, ...authorOf(session) });
         docs.set(slug, committed.doc);
-        checks.record(committed.doc.id, current.rev, committed.doc.rev, ran.boards);
-        hugs.record(after, ran.measures, current.rev);
+        if (ran) {
+          checks.record(committed.doc.id, current.rev, committed.doc.rev, ran.boards);
+          hugs.record(after, ran.measures, current.rev);
+        }
+        // Hook tulis agen tunggal (spec-agent-visual-diff X1): fix_check = satu langkah undo agen, dan dasar
+        // visual_diff {} = rev sebelum fix_check.
+        agentSteps.onAgentWrite(session, committed.doc.id, current.rev, committed.doc.rev, committed.inverse, FIX_CHECK_DESCRIPTION);
       }
-      return { rev: dryRun ? current.rev : committed.doc.rev, applied, skipped, boards: ran.boards, remaining, newFindings };
+      return { rev: dryRun ? current.rev : committed.doc.rev, applied, skipped, boards, remaining, newFindings };
     });
 
     const all = [...out.remaining, ...out.newFindings];

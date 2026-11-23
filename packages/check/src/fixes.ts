@@ -117,27 +117,34 @@ export function planFixes(findings: readonly Finding[], opts: PlanOptions = {}):
 
 type AnyNode = { id: string; children?: readonly AnyNode[] } & Record<string, unknown>;
 
-/** Indeks node ter-resolve (board + keturunan, termasuk isi instance beralamat komposit) per ID. */
-export function resolvedIndex(doc: ResolvedDocument): Map<string, AnyNode> {
-  const out = new Map<string, AnyNode>();
-  const walk = (n: AnyNode) => {
-    if (!out.has(n.id)) out.set(n.id, n);
-    for (const c of n.children ?? []) walk(c);
-  };
-  for (const p of doc.pages) for (const b of p.children) walk(b as unknown as AnyNode);
+/** Indeks node ter-resolve (board + keturunan, termasuk isi instance beralamat komposit) per ID → ID board-nya. */
+export function resolvedIndex(doc: ResolvedDocument): Map<string, { node: AnyNode; boardId: string }> {
+  const out = new Map<string, { node: AnyNode; boardId: string }>();
+  for (const p of doc.pages) {
+    for (const b of p.children) {
+      const walk = (n: AnyNode) => {
+        if (!out.has(n.id)) out.set(n.id, { node: n, boardId: b.id });
+        for (const c of n.children ?? []) walk(c);
+      };
+      walk(b as unknown as AnyNode);
+    }
+  }
   return out;
 }
 
-const same = (a: unknown, b: unknown): boolean => JSON.stringify(a) === JSON.stringify(b);
-
 /**
- * Fix basi: target salah satu op tidak ada lagi di `current`, atau properti yang di-patch (remove: seluruh node)
- * berbeda antara dokumen saat check (`base`) dan sekarang. Dokumen sama (rev sama) → tidak ada yang basi.
+ * Fix basi (review 33-1). Fix dihitung dari tata letak SELURUH board (tinggi pas LC-12 dari semua seksi, LC-29 dari
+ * size, LC-30 dari family), bukan hanya properti yang di-patch. Jadi bila dokumen berubah sejak check, setiap fix yang
+ * targetnya ada di board yang berubah (JSON ter-resolve berbeda, termasuk perubahan token) atau sudah tidak ada →
+ * `stale`. Board lain tetap segar. Dokumen sama (rev sama) → tidak ada yang basi.
  */
 export function staleFixes(items: readonly PlannedFix[], base: ResolvedDocument, current: ResolvedDocument): { fresh: PlannedFix[]; stale: SkippedFix[] } {
   if (base === current) return { fresh: [...items], stale: [] };
   const before = resolvedIndex(base);
   const now = resolvedIndex(current);
+  const boardJson = (doc: ResolvedDocument) => new Map(doc.pages.flatMap((p) => p.children).map((b) => [b.id, JSON.stringify(b)]));
+  const oldBoards = boardJson(base);
+  const newBoards = boardJson(current);
   const fresh: PlannedFix[] = [];
   const stale: SkippedFix[] = [];
   for (const it of items) {
@@ -146,11 +153,10 @@ export function staleFixes(items: readonly PlannedFix[], base: ResolvedDocument,
       if (!t) return true;
       const a = before.get(t.id);
       const b = now.get(t.id);
-      if (!a || !b || a.type !== b.type) return true;
-      if (t.keys === '*') return !same(a, b);
-      return t.keys.some((k) => !same(a[k], b[k]));
+      if (!a || !b || a.boardId !== b.boardId) return true;
+      return oldBoards.get(a.boardId) !== newBoards.get(a.boardId);
     });
-    if (bad) stale.push({ ...it, reason: 'stale', detail: `target ${touches(bad)?.id ?? '?'} changed since the check` });
+    if (bad) stale.push({ ...it, reason: 'stale', detail: `board of ${touches(bad)?.id ?? '?'} changed since the check` });
     else fresh.push(it);
   }
   return { fresh, stale };
@@ -197,7 +203,7 @@ export const AUTOFIX: Readonly<Record<G0RuleId, 'safe' | 'suggestion' | 'mixed' 
   'LC-27': 'none',
   'LC-28': 'suggestion',
   'LC-29': 'safe',
-  'LC-30': 'safe',
+  'LC-30': 'mixed',
   'LC-31': 'none',
   'LC-32': 'none',
   'LC-33': 'none',

@@ -83,6 +83,14 @@ describe('skill: api.md dihasilkan dari api.ts', () => {
   });
 });
 
+describe('skill: review memakai visual_diff (spec-agent-visual-diff)', () => {
+  it('langkah execute perbaikan diikuti visual_diff; tetap dalam batas review', () => {
+    const step = read('review').split(/\r?\n/).find((l) => l.startsWith('3. '))!;
+    expect(step).toContain('`visual_diff`');
+    expect(estimateTokens(read('review'))).toBeLessThanOrEqual(LIMITS.review.total);
+  });
+});
+
 describe('skill: struktur', () => {
   it.each(SKILL_NAMES)('%s.md diawali judul, semua blok berpagar js atau text', (name) => {
     const md = read(name);

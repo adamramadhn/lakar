@@ -380,7 +380,16 @@ export function lc12(ctx: BoardContext, doc: ResolvedDocument, heights?: Readonl
         const fit = Math.round(end);
         details.push(`tinggi ${num(h)}, isi berakhir ${num(Math.round(h - end))} px di atas tepi bawah: tinggi pas = ${fit}`);
         expected.push(`tinggi ${fit} = bawah seksi terakhir (sisa ≤ ${LANDING_SLACK_MAX} px; padding bawah wadah dihitung isi): update(board, {height:${fit}})`);
-        fix = patchFix(`Fit height to ${fit}`, b.id, { height: fit });
+        // Review 33-2: stackBottom hanya menghitung anak flow. Node absolut (atau di dalam node absolut) yang terlihat
+        // dan melewati `fit` akan terpotong → tinggi pas hanya saran, bukan fix aman.
+        const fitFix = patchFix(`Fit height to ${fit}`, b.id, { height: fit });
+        const cropsAbsolute = ctx.nodes.some((n) => {
+          if (n.position !== 'absolute' && !ancestors(ctx, n).some((a) => a.type !== 'board' && a.position === 'absolute')) return false;
+          const r = ctx.bounds.get(n.id);
+          return !!r && area(r) > 0 && visibleRect(ctx, n) !== undefined && bottom(r) > fit + TOLERANCE;
+        });
+        if (cropsAbsolute) suggestions.push(fitFix);
+        else fix = fitFix;
       }
     }
   }
@@ -1803,9 +1812,12 @@ export const RANGE_HYPHEN = new RegExp(String.raw`(?<![\p{L}\d.,:/#+-])${NUM} ?-
 
 const RANGE_HYPHEN_ALL = new RegExp(RANGE_HYPHEN.source, 'gu');
 
-/** Fix LC-30: semua rentang angka ber-tanda hubung → en dash tanpa spasi; "..." → "…" (bukan teks mono). */
-export function punctuated(content: string, ellipsis: boolean): string {
-  const ranged = content.replace(RANGE_HYPHEN_ALL, (m) => m.replace(/ ?- ?/, '–'));
+/**
+ * Perbaikan LC-30: rentang angka ber-tanda hubung → en dash tanpa spasi; "..." → "…" bila `ellipsis`. `spaced:false`
+ * (fix aman, review 33-3) hanya mengganti rentang tanpa spasi (`09.00-17.00`); `a - b` berspasi bisa pengurangan.
+ */
+export function punctuated(content: string, ellipsis: boolean, spaced = true): string {
+  const ranged = content.replace(RANGE_HYPHEN_ALL, (m) => (spaced || !/ /.test(m) ? m.replace(/ ?- ?/, '–') : m));
   return ellipsis ? ranged.replace(/\.\.\./g, '…') : ranged;
 }
 
@@ -1818,10 +1830,14 @@ export function lc30(ctx: BoardContext): Finding[] {
     const m = RANGE_HYPHEN.exec(t.content);
     if (m) issues.push(`tanda hubung di rentang ${JSON.stringify(m[0])} (pakai "–")`);
     if (issues.length) {
-      const content = punctuated(t.content, !/mono/i.test(t.family ?? ''));
+      // Review 33-3: teks mono (kode) tidak pernah dapat fix aman; rentang berspasi (`10 - 5`) hanya saran.
+      const mono = /mono/i.test(t.family ?? '');
+      const safe = mono ? t.content : punctuated(t.content, true, false);
+      const full = punctuated(t.content, !mono);
       out.push(
         finding('LC-30', 'warning', t, `${issues.join('; ')} di ${quote(t.content)}`, 'en dash untuk rentang (09.00–10.00), karakter … untuk elipsis', {
-          fix: content !== t.content ? patchFix('Fix punctuation', t.id, { content }) : undefined,
+          fix: safe !== t.content ? patchFix('Fix punctuation', t.id, { content: safe }) : undefined,
+          suggestions: [full !== safe ? patchFix('Use en dash in ranges', t.id, { content: full }) : undefined],
         }),
       );
     }

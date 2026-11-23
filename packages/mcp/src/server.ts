@@ -1,6 +1,7 @@
-// Server MCP Lakar: 15 tool (AD-11 + photo_search + get_selection + export_code + paste + list_documents) → HTTP lakard:
-// status, read_skill, open_doc, list_documents, list_boards, execute, inspect, layout_check, screenshot, export,
-// export_code, icon_search, photo_search, get_selection, paste.
+// Server MCP Lakar: 19 tool (AD-11 + photo_search + get_selection + export_code + paste + list_documents + undo + redo
+// + visual_diff + fix_check) → HTTP lakard: status, read_skill, open_doc, list_documents, list_boards, execute, inspect,
+// layout_check, screenshot, export, export_code, icon_search, photo_search, get_selection, paste, undo, redo, visual_diff,
+// fix_check.
 import { McpServer, type CallToolResult } from '@modelcontextprotocol/server';
 import { z } from 'zod';
 import {
@@ -177,9 +178,10 @@ export const SERVER_INSTRUCTIONS =
   "sebagai placeholder Skel (skeleton), lalu satu blok kecil per execute (navbar, teks hero, visual hero, header seksi, satu baris kartu) yang mengisi placeholder di tempat lewat Build, " +
   "untuk landing dan webapp (board landing height:'hug' mengikuti isi, jangan isi atau naikkan tingginya; [WIP] sampai execute penutup); satu board utuh untuk mobile; " +
   'helper prelude skill core sudah bawaan di setiap execute: jangan ditulis ulang, palet arketipe sekali per dokumen lewat Palette(c, font); ' +
-  'baca check di respons execute, perbaiki dengan editId/edits atau update, akhiri dengan satu screenshot board + satu screenshot zoom (nodeId, scale 2) ' +
-  'area terpadat (skill review), satu execute perbaikan, lalu export PNG. ' +
-  'Fix aman temuan check: fix_check (satu rev); saran dinilai sendiri. ' +
+  'baca check di respons execute; fix aman temuan check: fix_check (satu rev, saran dinilai sendiri); perbaiki sisanya dengan editId/edits atau update; ' +
+  'akhiri dengan satu screenshot board + satu screenshot zoom (nodeId, scale 2) area terpadat (skill review), satu execute perbaikan, ' +
+  'visual_diff untuk memastikan hanya area yang dimaksud berubah, lalu export PNG. ' +
+  'Langkah sendiri yang salah (execute/paste/fix_check): undo {steps?} (redo mengulang); ditolak bila ada edit lain sesudahnya, maka perbaiki maju lewat execute. ' +
   'Opsional: read_skill break-ui bila diminta uji data terburuk/edge case; variants bila diminta beberapa variasi/alternatif.';
 
 /** Deskripsi tool `list_boards`. */
@@ -364,6 +366,17 @@ export const LIST_DOCUMENTS_DESCRIPTION =
   'open = tampil di jendela aplikasi; focused = dokumen yang terakhir difokuskan pengguna (dipakai open_doc tanpa slug); active = dokumen kerja sesi ini. ' +
   'Pakai slug untuk open_doc {slug} bila pengguna menyebut file tertentu.';
 
+/** Deskripsi tool `visual_diff` (spec-agent-visual-diff). */
+export const VISUAL_DIFF_DESCRIPTION =
+  'Bandingkan render board/node dokumen aktif di dua rev (snapshot History) untuk memastikan edit hanya mengubah area yang dimaksud. ' +
+  "Tanpa fromRev → rev sebelum tulis terakhir sesi ini (execute/paste) di dokumen ini (base lastWrite); since 'session' → sebelum tulis pertama sesi (sessionStart); " +
+  'sesi belum menulis → rev sebelumnya (previousRev). toRev default rev kini. Kirim boardId ATAU nodeId (default board pertama); nodeId → hanya bounds node (gabungan kedua rev). ' +
+  'Mengembalikan gambar overlay (piksel berubah merah di atas "sesudah" yang dipudarkan, wilayah berbingkai biru) lalu JSON ' +
+  '{boardId, nodeId?, fromRev, toRev, base, area:[x,y,w,h], size:{from,to}, sizeDelta?, missing?, changedPixels, changedRatio, regions:[{bounds:[x,y,w,h], pixels, nodes:[{id, name, state?}]}], regionsTruncated?}. ' +
+  'Koordinat board; ukuran beda (board hug) disejajarkan kiri-atas dan selisihnya dihitung berubah; antialiasing diabaikan; board > 4 MP dibandingkan pada skala turun (scale), overlay maks 4096 px per sisi (overlayScale). ' +
+  'regions[].nodes = node paling spesifik yang bersinggungan (state added/removed): node di luar rencana edit berarti ikut berubah. ' +
+  "Rev tanpa snapshot atau board/node tidak ada di kedua rev → NOT_FOUND; board/node hanya ada di satu rev → missing 'from'|'to'.";
+
 export function createLakarMcpServer(daemonUrl: string): McpServer {
   const server = new McpServer({ name: SERVER_NAME, version: SERVER_VERSION }, { instructions: SERVER_INSTRUCTIONS });
   // clientInfo harness (Claude Code, Codex, …) baru ada sesudah initialize; sesi daemon dibuat malas pada tool pertama.
@@ -490,6 +503,25 @@ export function createLakarMcpServer(daemonUrl: string): McpServer {
     () => guarded(async () => asText(await client.call('/viewer/documents', {}))),
   );
 
+  // undo/redo agen (spec-agent-undo): hanya langkah execute/paste sesi ini; edit pengguna/agen lain sesudahnya → ditolak.
+  for (const dir of ['undo', 'redo'] as const) {
+    server.registerTool(
+      dir,
+      {
+        description:
+          dir === 'undo'
+            ? 'Batalkan langkah terakhir SESI INI di dokumen aktif (satu langkah = satu execute/paste yang meng-commit; default 1, steps maks 50). ' +
+              'Setiap undo menjadi rev baru di riwayat ("Undo: <description>") dan tampil live di aplikasi. Tidak pernah membatalkan edit pengguna atau agen lain: ' +
+              'ada rev lain sesudah langkah sesi ini → CONFLICT (inspect lalu perbaiki maju lewat execute). Tidak ada langkah (sesi baru, daemon restart, dokumen lain) → NOT_FOUND. ' +
+              'Mengembalikan {docId, slug, rev, undone:[{description, rev}], boards, available:{undo, redo}, target}.'
+            : 'Ulangi langkah yang baru di-undo sesi ini (default 1). Hanya bila tidak ada rev lain sesudah undo; execute/paste baru mengosongkan redo. ' +
+              'Penolakan sama dengan undo (CONFLICT/NOT_FOUND). Mengembalikan {docId, slug, rev, redone:[{description, rev}], boards, available:{undo, redo}, target}.',
+        inputSchema: z.object({ steps: z.number().int().optional().describe('jumlah langkah 1–50 (default 1)') }),
+      },
+      ({ steps }) => guarded(async () => asText(await client.call(`/viewer/${dir}`, steps !== undefined ? { steps } : {}))),
+    );
+  }
+
   server.registerTool(
     'execute',
     {
@@ -601,6 +633,29 @@ export function createLakarMcpServer(daemonUrl: string): McpServer {
       inputSchema: z.object({ slug: z.string().optional().describe('slug dokumen; kosongkan untuk dokumen aktif sesi (atau dokumen dengan seleksi terakhir)') }),
     },
     ({ slug }) => guarded(async () => asText(await client.call('/viewer/selection', slug !== undefined ? { slug } : {}))),
+  );
+
+  server.registerTool(
+    'visual_diff',
+    {
+      description: VISUAL_DIFF_DESCRIPTION,
+      inputSchema: z.object({
+        boardId: z.string().optional().describe('ID board; kosongkan untuk board pertama'),
+        nodeId: z.string().optional().describe('ID node: bandingkan hanya bounds node ini (bukan bersama boardId)'),
+        fromRev: z.number().int().optional().describe('rev "sebelum"; kosongkan untuk rev sebelum tulis terakhir sesi ini'),
+        toRev: z.number().int().optional().describe('rev "sesudah" (default rev kini)'),
+        since: z.enum(['last', 'session']).optional().describe("tanpa fromRev: 'last' (default) = sebelum tulis terakhir sesi, 'session' = sebelum tulis pertama sesi"),
+      }),
+    },
+    (args) =>
+      guarded(async () => {
+        const body = Object.fromEntries(Object.entries(args).filter(([, v]) => v !== undefined));
+        const r = await client.call<{ png: string } & Record<string, unknown>>('/viewer/visual-diff', body);
+        return asResult(r, ({ png, ...meta }) => [
+          { type: 'image', data: png, mimeType: 'image/png' },
+          { type: 'text', text: JSON.stringify(meta) },
+        ]);
+      }),
   );
 
   server.registerTool(

@@ -8,11 +8,11 @@ import { formatError, type DaemonClient } from './client.js';
 /** Deskripsi tool `fix_check`. */
 export const FIX_CHECK_DESCRIPTION =
   'Terapkan perbaikan otomatis temuan layout_check di dokumen aktif (tanpa boardId = semua board). ' +
-  'Default hanya fix aman (deterministik, menjaga maksud): LC-12 tinggi pas board landing selesai, LC-29 bobot 400, LC-30 tanda baca (… dan en dash). ' +
+  'Default hanya fix aman (deterministik, menjaga maksud): LC-12 tinggi pas board landing selesai (tanpa node absolut yang terpotong), LC-29 bobot 400, LC-30 … dan en dash rentang tanpa spasi (bukan teks mono). ' +
   'suggestions:true juga menerapkan saran pertama temuan tanpa fix aman (ukuran/line-height ke skala tipe, spacing ke token, wrap teks, target sentuh 44, ' +
   'hapus spacer, radius konsentris, lebar baris, ukuran/posisi board, tandai Overlay, hapus emoji/glyph): butuh penilaian, periksa hasilnya. ' +
   'codes = batasi aturan (mis. ["LC-30"]); dryRun:true = terapkan di salinan + check tanpa commit. ' +
-  'Semua fix = satu rev (satu langkah undo). Dilewati (skipped): target berubah sejak check (stale), properti terikat token (token), ' +
+  'Semua fix = satu rev (satu langkah undo: undo membatalkannya; visual_diff {} membandingkan dengan rev sebelumnya). Dilewati (skipped): board target berubah sejak check (stale), properti terikat token (token), ' +
   'bentrok dengan fix lain (conflict), ditolak op core (invalid). Board dirender dan dicek ulang. ' +
   'Mengembalikan {docId, slug, rev, dryRun, boards, summary, applied:[{rule, nodeId, nodeName, kind: fix|suggestion, label, ops}], skipped:[{…, reason, detail}], ' +
   'remaining:[temuan tersisa], newFindings:[temuan baru akibat fix]}; ditampilkan sebagai baris ringkas. ' +

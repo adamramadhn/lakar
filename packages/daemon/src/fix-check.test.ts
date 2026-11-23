@@ -12,12 +12,15 @@ const baseConfig = { ...loadConfig({}), unsplashKeyFile: '/nonexistent/lakar-tes
 
 /** Kait sekali pakai yang berjalan di dalam `measure` berikutnya (mensimulasikan tulis lain selama render fix_check). */
 let onMeasure: (() => Promise<void>) | undefined;
+const PNG_1x1 = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64');
+let measured: string[] = [];
 const fakeRender = {
-  screenshot: async () => new Uint8Array(),
+  screenshot: async () => new Uint8Array(PNG_1x1),
   measure: async (doc: any, boardId: string) => {
     const hook = onMeasure;
     onMeasure = undefined;
     if (hook) await hook();
+    measured.push(boardId);
     const b = doc.pages.flatMap((p: any) => p.children).find((x: any) => x.id === boardId);
     return { width: b.width, height: b.height, nodes: [], texts: [] };
   },
@@ -120,20 +123,79 @@ describe('POST /viewer/fix-check', () => {
     }
   });
 
-  it('target berubah sejak check (tulis lain selama render) → fix itu stale, sisanya tetap diterapkan', async () => {
+  it('board target berubah sejak check (seksi ditambah selama render) → semua fix board itu stale, tanpa commit (review 33-1)', async () => {
     const s = await setup();
     try {
       onMeasure = async () => {
-        const w = (await s.post('/execute', { code: `update('${s.ids.thin}', {weight: 200})`, description: 'ubah bobot di tengah jalan' }, s.sid)).json();
+        const w = (await s.post('/execute', { code: `add('${s.ids.b}',{type:'text',name:'Seksi baru',content:'Halo',size:14,color:'#101828'})`, description: 'tambah seksi di tengah jalan' }, s.sid)).json();
         expect(w.ok).toBe(true);
       };
       const r = (await s.post('/viewer/fix-check', {}, s.sid)).json();
-      expect(r.data.skipped).toEqual([expect.objectContaining({ rule: 'LC-29', nodeId: s.ids.thin, reason: 'stale' })]);
-      expect(r.data.applied.map((a: any) => a.rule)).toEqual(['LC-30']);
-      expect(r.data.rev).toBe(3);
-      expect((await s.node(s.ids.thin)).weight).toBe(200);
+      expect(r.data.skipped.map((x: any) => [x.rule, x.reason])).toEqual([
+        ['LC-29', 'stale'],
+        ['LC-30', 'stale'],
+      ]);
+      expect(r.data.applied).toEqual([]);
+      expect(r.data.rev).toBe(2);
+      expect((await s.node(s.ids.thin)).weight).toBe(300);
     } finally {
       onMeasure = undefined;
+      await s.app.close();
+    }
+  });
+
+  it('tulis lain di board lain → fix tetap segar; check ulang hanya board yang berubah (review 33-4)', async () => {
+    const s = await setup();
+    try {
+      const other = (await s.post('/execute', { code: `add(null,{type:'board',name:'Lain',x:2000,y:0,width:390,height:844,screen:'mobile'})`, description: 'board kedua tanpa temuan' }, s.sid)).json();
+      expect(other.ok).toBe(true);
+      onMeasure = async () => {
+        const w = (await s.post('/execute', { code: `update('${other.data.created[0].id}', {name:'Lain 2'})`, description: 'ganti nama board lain' }, s.sid)).json();
+        expect(w.ok).toBe(true);
+      };
+      measured = [];
+      const r = (await s.post('/viewer/fix-check', {}, s.sid)).json();
+      expect(r.data.applied.map((a: any) => a.rule)).toEqual(['LC-29', 'LC-30']);
+      expect(r.data.rev).toBe(4);
+      // Check awal: 2 board; execute di kait: board Lain; check ulang di bawah kunci: board fix + board Lain (berubah sejak check).
+      const recheck = measured.slice(-2).sort();
+      expect(recheck).toEqual([s.ids.b, other.data.created[0].id].sort());
+      expect(r.data.boards.map((b: any) => b.id)).toEqual([s.ids.b, other.data.created[0].id]);
+      // Tanpa tulis lain: hanya board fix yang dirender ulang.
+      const again = await setup();
+      try {
+        await again.post('/execute', { code: `add(null,{type:'board',name:'Lain',x:2000,y:0,width:390,height:844,screen:'mobile'})`, description: 'board kedua tanpa temuan' }, again.sid);
+        measured = [];
+        const r2 = (await again.post('/viewer/fix-check', {}, again.sid)).json();
+        expect(r2.data.rev).toBe(3);
+        expect(measured.slice(2)).toEqual([again.ids.b]);
+        expect(r2.data.boards).toHaveLength(2);
+      } finally {
+        await again.app.close();
+      }
+    } finally {
+      onMeasure = undefined;
+      await s.app.close();
+    }
+  });
+
+  it('hook tulis agen: undo membatalkan fix_check; visual_diff {} sesudah fix_check berdasar rev sebelum fix_check (X1)', async () => {
+    const s = await setup();
+    try {
+      const r = (await s.post('/viewer/fix-check', {}, s.sid)).json();
+      expect(r.data.rev).toBe(2);
+      const diff = (await s.post('/viewer/visual-diff', {}, s.sid)).json();
+      expect(diff.data).toMatchObject({ base: 'lastWrite', fromRev: 1, toRev: 2 });
+      const u = (await s.post('/viewer/undo', {}, s.sid)).json();
+      expect(u.ok, JSON.stringify(u)).toBe(true);
+      expect(u.data.rev).toBe(3);
+      expect(u.data.undone[0].description).toBe('Apply check fixes');
+      expect((await s.node(s.ids.thin)).weight).toBe(300);
+      expect((await s.node(s.ids.hours)).content).toBe('Buka 09.00-10.00');
+      // dryRun bukan tulis: tidak menjadi langkah undo dan tidak menggeser dasar visual_diff.
+      await s.post('/viewer/fix-check', { dryRun: true }, s.sid);
+      expect((await s.post('/viewer/visual-diff', {}, s.sid)).json().data).toMatchObject({ fromRev: 2, toRev: 3 });
+    } finally {
       await s.app.close();
     }
   });
