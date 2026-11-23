@@ -60,13 +60,31 @@ describe('helper bawaan sandbox', () => {
     const { r } = await run(`${OLD_PRELUDE}\n${BOARD} const t=T(b,'Judul','Halo','h1'); const btn=Btn(b,'Ok'); [get(t),get(btn),get(children(btn)[0].id)]`);
     const [t, btn, label] = ok(r).value as Record<string, unknown>[];
     expect(t).toMatchObject({ family: 'Manrope', size: 40, color: '#F5F6F8' });
-    // Btn bawaan memanggil T dan C milik snippet (identifier bebas → deklarasi leksikal snippet).
+    // Btn bawaan memakai C/FONT/TY milik snippet (identifier bebas → deklarasi leksikal snippet).
     expect(label).toMatchObject({ name: 'Label', family: 'Manrope', color: '#0B0C0F' });
     expect(btn).toMatchObject({ fills: [{ type: 'solid', color: '#2DD4BF' }] });
   });
 
   it('AD-4: prelude lama dengan var/function dan Object.assign juga sah', async () => {
     ok((await run("var C={acc:'#000000'}; function fill(c){return [{type:'solid',color:c}]} Object.assign(C,{t1:'#111111'}); C.t1")).r);
+  });
+
+  it('Palette menulis palet utuh dari nilai bawaan (tidak menumpuk di atas palet sebelumnya) dan menyimpannya di keep', async () => {
+    const first = ok((await run("Palette({bg:'#0B0C0F',acc:'#2DD4BF'},{h:'Manrope'}); 1")).r);
+    expect(first.keep).toMatchObject({ C: { bg: '#0B0C0F', acc: '#2DD4BF', t1: DEFAULT_C.t1 }, FONT: { h: 'Manrope', b: DEFAULT_FONT.b } });
+    // Palet kedua hanya mengubah sub: bg/acc kembali ke bawaan, bukan sisa palet pertama.
+    const second = ok((await run("Palette({sub:'#F3F6F5'}); [C.bg,C.acc,C.sub,FONT.h]", first.keep)).r);
+    expect(second.value).toEqual([DEFAULT_C.bg, DEFAULT_C.acc, '#F3F6F5', DEFAULT_FONT.h]);
+    expect(second.keep).toMatchObject({ C: { bg: DEFAULT_C.bg, sub: '#F3F6F5' }, FONT: { h: DEFAULT_FONT.h } });
+    // Data bawaan tidak ikut termutasi lintas panggilan (data array disalin).
+    expect(ok((await run("Palette({}); C.data.push('#000000'); 1")).r).keep).toMatchObject({ C: { data: DEFAULT_C.data } });
+    expect(ok((await run('C.data.length')).r).value).toBe(3);
+  });
+
+  it('helper memanggil sesamanya lewat nama internal: const line/fill/Row/T/I di snippet tidak merusak Btn/Badge', async () => {
+    const { r } = await run(`const line=5; const fill='x'; const Row=null; const T=0; const I=undefined; const F=1;
+${BOARD} const btn=Btn(b,'Ok','secondary'); Badge(b,'Baru','success','check'); get(btn)`);
+    expect(ok(r).value).toMatchObject({ name: 'Button / Ok', stroke: { color: DEFAULT_C.line2, width: 1 }, fills: [{ type: 'solid', color: DEFAULT_C.bg }] });
   });
 
   it('ReferenceError menyebut helper bawaan di hint', async () => {
@@ -89,6 +107,7 @@ describe('helper skeleton', () => {
 
   it('Build pada node tanpa prefiks hanya menerapkan patch', async () => {
     const { r } = await run(`${BOARD} const s=F(b,'Seksi / FAQ',{minHeight:200}); Build(s,{gap:8}); Build(F(b,'Tanpa minHeight'),{gap:4}); get(s)`);
-    expect(ok(r).value).toMatchObject({ name: 'Seksi / FAQ', gap: 8 });
+    // Frame biasa mempertahankan minHeight milik desainer (hanya placeholder yang dilepas).
+    expect(ok(r).value).toMatchObject({ name: 'Seksi / FAQ', gap: 8, minHeight: 200 });
   });
 });

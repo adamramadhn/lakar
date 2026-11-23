@@ -2,7 +2,7 @@
 
 Board lebar 390 (`screen:'mobile'`), tinggi 844 atau lebih; anak board tersusun kolom (tanpa `layout`).
 
-Mode gelap (Malam): `Object.assign(C,{bg,sub:surface,line,line2,t1,t2,t3` dari netral gelap`, acc` varian gelap`, tint, field:raised, deep, on:'#0B0C0F', ok:'#4ADE80', warn:'#FBBF24', bad:'#F87171', acc2, data})`; kartu = surface.
+Mode gelap (Malam): `Palette({bg,sub:surface,line,line2,t1,t2,t3` dari netral gelap`, acc` varian gelap`, tint, field:raised, deep, on:'#0B0C0F', ok:'#4ADE80', warn:'#FBBF24', bad:'#F87171', acc2, data})`; kartu = surface.
 
 ## Tinggi dan zona bawah (hitung sekali, saat merencanakan)
 
@@ -30,7 +30,7 @@ Execute 1 = satu board lengkap dengan H (sekecil satu seksi landing; isi parsial
 Beranda aplikasi kursus bahasa, arketipe Ramah (langkah khas: ring target mingguan bersegmen per keterampilan yang langsung tersambung ke tombol lanjutkan unit; daftar memperlihatkan keadaan):
 
 ```js
-Object.assign(C,{acc:'#4F46E5',tint:'#4F46E514',field:'#EEF0FE',deep:'#312E81',acc2:'#A16207',data:['#4F46E5','#8B93F8','#A16207']}); Object.assign(FONT,{h:'DM Sans',b:'DM Sans',m:'DM Mono'});
+Palette({acc:'#4F46E5',tint:'#4F46E514',field:'#EEF0FE',deep:'#312E81',acc2:'#A16207',data:['#4F46E5','#8B93F8','#A16207']},{h:'DM Sans',b:'DM Sans',m:'DM Mono'});
 const H=1146; // 54 status bar + Konten (isi berakhir y 1024) + 24 + tab bar 98
 const p=place(390,H);
 const b=add(null,{type:'board',name:'[WIP] Tutur / Beranda · mobile · Ramah',x:p.x,y:p.y,width:390,height:H,screen:'mobile',fills:fill(C.bg)});

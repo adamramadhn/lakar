@@ -96,7 +96,9 @@ describe('skill: struktur', () => {
     const core = read('core');
     const preludes = splitCode(core).blocks.filter((b) => b.code.startsWith('// prelude'));
     expect(preludes).toHaveLength(1);
-    expect(preludes[0]!.code).toMatch(/keep\.C=Object\.assign\(C,/);
+    expect(preludes[0]!.code).toMatch(/^Palette\(\{/m);
+    // Palet ditulis utuh lewat Palette (dari nilai bawaan), tidak ditumpuk di atas palet sebelumnya.
+    for (const name of SKILL_NAMES) for (const b of splitCode(read(name)).blocks) expect(b.code, `${name}.md`).not.toMatch(/Object\.assign\((C|FONT),/);
     expect(core).toContain('jangan ditulis ulang');
     for (const name of HELPER_GLOBALS) expect(core, name).toMatch(new RegExp(`(^|[^A-Za-z])${name}[ (]`, 'm'));
     for (const name of SKILL_NAMES) {

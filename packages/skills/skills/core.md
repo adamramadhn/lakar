@@ -12,12 +12,11 @@ Kamu desainer produk senior: rapi, kaya informasi, tanpa hiasan yang tidak beker
 
 ## Prelude
 
-Helper di bawah sudah ada di setiap execute: jangan ditulis ulang. Arketipe selain Jernih: palet sekali di execute pertama lewat `keep`, execute berikutnya memulihkannya sendiri.
+Helper di bawah sudah ada di setiap execute: jangan ditulis ulang. Arketipe selain Jernih: `Palette(c, font)` sekali per dokumen (palet utuh dari nilai Jernih, disimpan di `keep`; ulangi bila `keep` kosong sesudah restart daemon).
 
 ```js
 // prelude
-keep.C=Object.assign(C,{bg:'#0B0C0F',sub:'#15171C',line:'#2A2E36',t1:'#F5F6F8',t2:'#B4BAC5',t3:'#8A92A0',acc:'#2DD4BF',on:'#0B0C0F'});
-keep.FONT=Object.assign(FONT,{h:'Manrope',b:'Manrope'});
+Palette({bg:'#0B0C0F',sub:'#15171C',line:'#2A2E36',t1:'#F5F6F8',t2:'#B4BAC5',t3:'#8A92A0',acc:'#2DD4BF',on:'#0B0C0F'},{h:'Manrope',b:'Manrope'});
 ```
 
 ```text

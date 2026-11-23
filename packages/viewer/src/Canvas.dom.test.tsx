@@ -424,6 +424,22 @@ describe('Canvas — Follow berirama untuk banyak execute kecil (spec-skeleton-l
     expect(boardTop()).toBe('0px');
   });
 
+  it('pengguna menggeser kamera selama Follow agen menunggu jeda: target itu dibuang, kamera tetap milik pengguna', async () => {
+    viewport(800, 600);
+    const onFocused = vi.fn();
+    const { rerender } = renderUi(<Canvas {...baseProps({ boards: tall, onFocused })} />);
+    // Geser pertama (di luar layar) → memulai jeda FOLLOW_SETTLE_MS.
+    rerender(<Canvas {...baseProps({ boards: tall, onFocused, focus: { boardId: BOARD, nonce: 21, agent: true, rect: [0, 1200, 400, 300] } })} />);
+    await waitFor(() => expect(onFocused).toHaveBeenCalledWith(21));
+    // Target kedua tiba < 1,2 dtk sesudahnya → menunggu; pengguna menggulir kanvas.
+    rerender(<Canvas {...baseProps({ boards: tall, onFocused, focus: { boardId: BOARD, nonce: 22, agent: true, rect: [0, 1900, 400, 80] } })} />);
+    fireEvent.wheel(document.querySelector('section.canvas')!, { deltaY: 40 });
+    const top = boardTop();
+    await waitFor(() => expect(onFocused).toHaveBeenCalledWith(22), { timeout: 3000 });
+    await new Promise((r) => setTimeout(r, 650));
+    expect(boardTop()).toBe(top);
+  });
+
   it('fokus pilihan pengguna (bukan agen) tetap memusatkan board yang tidak terlihat utuh', async () => {
     viewport(800, 600);
     reducedMotion(true);

@@ -51,7 +51,7 @@ Btn(act,'Coba sampel','primary',{height:40,padding:[0,16]});
 Teks hero di bidang merek (langkah khas: mockup jadwal utuh di bawah teks hero; baris berkeadaan):
 
 ```js
-// minHeight tetap sampai visual hero masuk; efek hanya bila diminta, selain itu fill(C.field)
+// minHeight 876 = tinggi Crop / Kontur, sengaja tetap; efek hanya bila diminta, selain itu fill(C.field)
 const hero=Build(keep.s.hero,{minHeight:876,padding:[96,80],gap:64,align:'center',clip:true,fills:[...fill(C.field),
  {type:'mesh',columns:3,rows:2,colors:['#CDE8E4',C.field,'#F4E7C8',C.field,C.field,'#D3EBE7']},{type:'noise',opacity:0.05,seed:11}]});
 // 16 kontur, merunduk di tengah (zona teks)

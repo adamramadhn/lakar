@@ -1,6 +1,7 @@
 // Sesi (AD-17): POST /sessions → sessionId, dikirim di header X-Lakar-Session.
 // Per sesi daemon menyimpan `keep` snippet, snippet gagal (editId, LRU), dan log panggilan execute.
 import { randomBytes, randomUUID } from 'node:crypto';
+import { PALETTE_KEEP_KEYS } from '@lakar/exec';
 import { LakarError, type ErrorCode, type FindingSummary } from '@lakar/schema';
 
 /** Jumlah snippet gagal yang diingat per sesi (LRU). */
@@ -83,6 +84,20 @@ export function recallFailed(session: Session, editId: string): FailedSnippet | 
     session.failed.set(editId, hit);
   }
   return hit;
+}
+
+/**
+ * Jadikan `slug` dokumen aktif sesi (open_doc). Pindah ke dokumen lain menghapus palet helper bawaan
+ * (`keep.C`/`keep.FONT`, spec-skeleton-live-build) supaya palet dokumen sebelumnya tidak bocor; isi `keep` lain
+ * (milik agen) tetap. Membuka ulang dokumen yang sama tidak mengubah apa pun.
+ */
+export function setActiveDoc(session: Pick<Session, 'activeSlug' | 'keep'>, slug: string): void {
+  if (session.activeSlug !== slug) {
+    const keep = { ...session.keep };
+    for (const k of PALETTE_KEEP_KEYS) delete keep[k];
+    session.keep = keep;
+  }
+  session.activeSlug = slug;
 }
 
 export function logExecute(session: Session, entry: ExecuteLogEntry): void {

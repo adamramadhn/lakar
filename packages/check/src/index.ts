@@ -148,7 +148,9 @@ export function checkBoard({
   const board = findBoard(doc, boardId);
   if (!board) return [];
   // Placeholder skeleton tidak dinilai aturan mana pun selain LC-33 (spec-skeleton-live-build).
-  const ctx = boardContext(withoutSkeletons(board), measure);
+  const full = boardContext(board, measure);
+  const pruned = withoutSkeletons(board);
+  const ctx = pruned === board ? full : boardContext(pruned, measure);
   const clipped = lc02a(ctx);
   const cut = new Set(clipped.map((f) => f.nodeId));
   // Teks yang sudah error LC-02a/LC-02b tidak dilaporkan lagi sebagai warning LC-03.
@@ -171,7 +173,8 @@ export function checkBoard({
     ...lc09(ctx),
     ...lc10(ctx),
     ...lc11(ctx),
-    ...lc12(ctx, doc, heights),
+    // Ukuran/tinggi pas board menghitung placeholder: ruang yang dipesan skeleton bukan ruang kosong.
+    ...lc12(full, doc, heights),
     ...lc13(ctx),
     ...lc14(ctx),
     ...lc15(ctx),
@@ -193,7 +196,7 @@ export function checkBoard({
     // Mockup yang elemennya sudah terpotong clip (LC-02a) tidak dilaporkan lagi.
     ...lc31(ctx, cut),
     ...lc32(doc, boardId),
-    ...lc33(boardContext(board, measure)),
+    ...lc33(full),
   ];
   return capWarnings(sortFindings(all, ctx.order));
 }

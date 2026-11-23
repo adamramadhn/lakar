@@ -2111,6 +2111,15 @@ describe('skeleton (spec-skeleton-live-build): placeholder tidak dinilai, LC-33 
     expect(summarizeFindings(f).gate).toBe(0);
   });
 
+  it('board landing tinggi tetap tanpa [WIP] dengan placeholder tersisa: LC-12 tinggi pas menghitung placeholder (bukan hanya navbar)', () => {
+    const fixed: BoardSpec = { name: 'Biji Pagi / Beranda · landing · Jernih', screen: 'landing', width: 1440, height: 1072, children: [frame('Halaman', [0, 0, 1440, 1072], [nav(), skel('Menu', 72, 1000)], { width: 'fill' })] };
+    const f = runAll(fixed);
+    expect(only(f, 'LC-12')).toEqual([]);
+    expect(only(f, 'LC-33')).toHaveLength(1);
+    // Ruang kosong sungguhan di bawah placeholder tetap dilaporkan dengan tinggi pas yang memuat placeholder.
+    const slack = only(runAll({ ...fixed, height: 1400 }), 'LC-12');
+    expect(slack[0]?.detail).toContain('tinggi pas = 1072');
+  });
   it('placeholder terisi (nama tanpa prefiks) dinilai seperti biasa', () => {
     const filled = frame('Seksi / Menu', [0, 0, 1440, 400], [text('kecil', [80, 80, 40, 10], { size: 9, color: '#101828' })], { width: 'fill' });
     expect(rules(run(landing('B · landing', [page([filled])])))).toContain('LC-05');

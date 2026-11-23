@@ -40,7 +40,7 @@ import type { DaemonConfig } from './config.js';
 import { FontRegistry } from './fonts.js';
 import { INSPECT_DEPTH_DEFAULT, INSPECT_DEPTH_MAX, WIP_PREFIX, boundsMap, inspectFit, locateNode } from './inspect.js';
 import { readPngSize } from './png.js';
-import { NO_ACTIVE_DOC_HINT, Sessions, UnknownSessionError, authorOf, logExecute, recallFailed, rememberFailed } from './sessions.js';
+import { NO_ACTIVE_DOC_HINT, Sessions, UnknownSessionError, authorOf, logExecute, recallFailed, rememberFailed, setActiveDoc } from './sessions.js';
 import { DocStore } from './store.js';
 import { ActivityBus, agentOf, registerActivityHooks } from './events.js';
 import { registerConnectionRoutes } from './connections.js';
@@ -432,7 +432,7 @@ export function buildServer({
       else result = { ...(await createFresh(body.name?.trim() || DEFAULT_DOC_NAME)), created: true, source: 'created' };
     }
     const { doc, slug, created, source } = result;
-    session.activeSlug = slug;
+    setActiveDoc(session, slug);
     const open = viewerOpen();
     // Dokumen baru dari open_doc tanpa slug: muncul di Dashboard jendela mana pun dan dibuka sebagai tab.
     // open_doc {slug} tetap tanpa event seperti dulu.

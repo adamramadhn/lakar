@@ -175,7 +175,7 @@ export const SERVER_INSTRUCTIONS =
   'Lalu rencana singkat, dan langsung bangun bertahap supaya pengguna melihat canvas tumbuh live: execute pertama = board + semua seksi/area rencana ' +
   "sebagai placeholder Skel (skeleton), lalu satu blok kecil per execute (navbar, teks hero, visual hero, header seksi, satu baris kartu) yang mengisi placeholder di tempat lewat Build, " +
   "untuk landing dan webapp (board landing height:'hug' mengikuti isi, jangan isi atau naikkan tingginya; [WIP] sampai execute penutup); satu board utuh untuk mobile; " +
-  'helper prelude skill core sudah bawaan di setiap execute: jangan ditulis ulang, palet arketipe disimpan sekali di keep.C/keep.FONT; ' +
+  'helper prelude skill core sudah bawaan di setiap execute: jangan ditulis ulang, palet arketipe sekali per dokumen lewat Palette(c, font); ' +
   'baca check di respons execute, perbaiki dengan editId/edits atau update, akhiri dengan satu screenshot board + satu screenshot zoom (nodeId, scale 2) ' +
   'area terpadat (skill review), satu execute perbaikan, lalu export PNG. ' +
   'Opsional: read_skill break-ui bila diminta uji data terburuk/edge case; variants bila diminta beberapa variasi/alternatif.';
@@ -286,8 +286,8 @@ export const EXECUTE_DESCRIPTION =
   "photo('<ref>') → {assetId, width, height, credit, license, creator, sourcePageUrl} foto stok untuk ref dari tool photo_search; tulis ref sebagai literal string " +
   "(daemon mengimpornya sekali sebelum snippet berjalan; ref dari variabel → NOT_FOUND), pakai di fills [{type:'image', assetId:p.assetId, fit:'cover'}]; credit untuk ringkasan akhir, bukan node UI kecuali diminta. " +
   'keep: objek JSON per sesi yang bertahan antar-execute bila sukses (mis. keep.hero = add(...); lalu get(keep.hero)). ' +
-  "Helper desain bawaan (prelude skill core, sudah ada di setiap snippet; deklarasi ulang tetap sah): C/FONT (palet; dipulihkan dari keep.C/keep.FONT), R, TY, HEAD, fill, line, F, Row, T, I, Btn, Badge, " +
-  "Skel(parent, nama, minHeight) placeholder '[Skeleton] nama', Build(id, patch) isi placeholder di tempat (lepas prefiks + minHeight). " +
+  "Helper desain bawaan (prelude skill core, sudah ada di setiap snippet; deklarasi ulang tetap sah): C/FONT (palet; dipulihkan dari keep.C/keep.FONT, dihapus saat open_doc pindah dokumen), Palette(c, font) palet utuh dari nilai bawaan + simpan di keep, R, TY, HEAD, fill, line, F, Row, T, I, Btn, Badge, " +
+  "Skel(parent, nama, minHeight) placeholder '[Skeleton] nama', Build(id, patch) isi placeholder di tempat (placeholder: lepas prefiks + minHeight). " +
   'console.log(...) → data.logs. Nilai ekspresi terakhir → data.value (JSON; dipotong di 32 KB dengan valueTruncated). ' +
   "Katalog node v1 (tertutup): board (parent null) {type:'board', name, x, y, width, height (angka | 'hug' = ikut isi), screen:'landing'|'app'|'mobile', expectedSize?:{width,height}, fills?}; " +
   "frame {layout?:'none'|'row'|'column', gap? (boleh negatif), padding?: n|[v,h]|[t,r,b,l], align?:'start'|'center'|'end'|'stretch', justify?:'start'|'center'|'end'|'space-between', clip?, scrollY?}; " +

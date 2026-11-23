@@ -71,6 +71,7 @@ context:
 ## Code Map
 
 - `packages/exec/src/helpers.ts` -- baru: `HELPERS_JS`, `HELPER_GLOBALS`, `DEFAULT_C`, `DEFAULT_FONT`; helper `Skel`/`Build`.
+- `packages/daemon/src/sessions.ts` -- `setActiveDoc`: `open_doc` ke dokumen lain menghapus palet `keep.C`/`keep.FONT` (dipakai `server.ts` route `/docs/open`).
 - `packages/exec/src/index.ts` -- `runSnippet` mengevaluasi `HELPERS_JS` (berkas `lakar-helpers.js`) sesudah prelude sandbox; hint ReferenceError menyebut helper bawaan.
 - `packages/schema/src/findings.ts` -- `SKELETON_PREFIX`, `isSkeletonName`, aturan `LC-33`.
 - `packages/check/src/tree.ts` -- `withoutSkeletons(board)`; `rules.ts` -- `skeletonIds`, `lc33`; `index.ts` -- `checkBoard` menilai board tanpa placeholder + LC-33 dari board utuh.
@@ -114,13 +115,15 @@ context:
 - **Viewer:** gaya placeholder = satu `<style data-lakar-skeleton>` di shadow root board, ditulis ulang setiap mount (pola gaya edit teks di `canvasEdit.tsx`); placeholder sendiri tidak diberi cat di dokumen. Sapuan hanya saat host ber-atribut `data-generating` (board berlabel Generating), supaya skeleton yang tertinggal tidak tampak "memuat" selamanya.
 - **Follow berirama:** wilayah blok dianggap terlihat bila bagian terlihat ≥ min(tinggi, 40% viewport) dan ≥ min(lebar, 80% viewport); execute tanpa node baru hanya menggeser bila board sama sekali tidak tampak; geseran berjarak ≥ 1,2 dtk, target di antaranya digabung (terbaru menang) lewat timer di efek Follow.
 - **Ambang pengingat:** mobile/app tetap mulai ke-4; landing 10 → 26 (skeleton + navbar + 2 blok hero + ±6 seksi × 2–3 blok + footer + penutup ≈ 20–25).
-- **Anggaran skill (estimateTokens, CRLF lokal / LF):** sebelum core 2512/2482, landing 3004/2966 (muat 9513/9389), mobile 2768 (9277), webapp 2890 (9399). Sesudah core 2244/2217, landing 3140/3097 prosa 1061/1045 (muat 9375/9249), mobile 2762 (muat 8997/8883), webapp 2862 prosa 936 (muat 9097/8982). Prelude bawaan membebaskan ±270 token di core; contoh landing 8 blok dibayar dari situ.
+- **Anggaran skill (estimateTokens, CRLF lokal / LF):** sebelum core 2512/2482, landing 3004/2966 (muat 9513/9389), mobile 2768 (9277), webapp 2890 (9399). Sesudah core 2244/2217, landing 3140/3097 prosa 1061/1045 (muat 9375/9249), mobile 2762 (muat 8997/8883), webapp 2862 prosa 936 (muat 9097/8982). Sesudah review pass 2 (CRLF): core 2245, landing 3143 (muat 9379), mobile 2750 (muat 8986), webapp 2848 (muat 9084). Prelude bawaan membebaskan ±270 token di core; contoh landing 8 blok dibayar dari situ.
 
 ## Plan Change Log
 
 - Nama helper isi: `Fill` (brief) → `Build`, supaya tidak tertukar dengan helper cat `fill(c)`.
 - Ditambah sesudah tes contoh skill: `withoutSkeletons` juga melewati wadah yang hanya berisi placeholder; `minHeight` hero di contoh landing.
 - Ditambah sesudah tes codegen: penanda `[Skeleton] ` dibuang dari identifier kode.
+- Review PR #29 (pass 2): palet per dokumen (daemon `setActiveDoc` menghapus `keep.C`/`keep.FONT` saat `open_doc` pindah dokumen) dan helper baru `Palette(c, font)` yang menulis palet utuh dari nilai bawaan; idiom `keep.C=Object.assign(C,{…})` di skill diganti `Palette`. Baris matriks "Palet sesi" kini berarti palet per dokumen aktif sesi.
+- Review PR #29: `Build` hanya melepas `minHeight` dari placeholder; helper saling memanggil lewat closure (hanya `C`/`FONT`/`TY`/`HEAD` identifier bebas); LC-12 dinilai pada board utuh (placeholder dihitung); header/`source` codegen tanpa penanda; Follow agen yang menunggu dibatalkan oleh gestur kamera pengguna.
 
 ## Review Triage Log
 
@@ -138,6 +141,20 @@ context:
 | 8 | api.md (dibangkitkan dari api.ts) belum memuat helper bawaan | low | defer | deferred-work; core.md + `EXECUTE_DESCRIPTION` sumber agen |
 | 9 | Aturan Follow longgar (board sebagian terlihat → diam) juga mengenai fokus pilihan pengguna (klik temuan/Layers) | medium | patch | `Focus.agent`; hanya Follow agen yang berirama; tes DOM fokus pengguna |
 | 10 | `Build` pada frame tanpa `minHeight` | low | ditolak | `update(…,{minHeight:null})` sah; tes `helpers.test.ts` |
+
+**Pass 2 (review independen PR #29, sesi induk; check claude-review CI gagal karena galat layanan):** medium 2, low 6 + nit, semua patch.
+
+| # | Temuan | Verdict | Rute | Bukti |
+|---|---|---|---|---|
+| R1 | Palet bocor lintas dokumen dalam satu sesi (`keep` per sesi, `open_doc` tidak meresetnya); contoh webapp menumpuk palet parsial; restart daemon diam-diam kembali ke Jernih | medium | patch | `sessions.ts` `setActiveDoc` (dipakai route `/docs/open`) menghapus `keep.C`/`keep.FONT` saat pindah dokumen; `Palette(c, font)` menulis palet utuh dari nilai bawaan; core/webapp/mobile/variants memakai `Palette`; core.md meminta `Palette` diulang bila `keep` kosong sesudah restart (`keep.board`/`keep.s` juga hilang, jadi agen sudah harus memulihkan konteks). Tes: `sessions-palette.test.ts`, `helpers.test.ts` (Palette tidak menumpuk, `data` tidak termutasi), `skills.test.ts` (tanpa `Object.assign(C`) |
+| R2 | `Build` selalu melepas `minHeight`, termasuk frame biasa | medium | patch | Hanya bila nama berprefiks `[Skeleton] `; tes menegaskan `minHeight:200` tetap |
+| R3 | LC-12 board landing tetap tanpa `[WIP] ` dengan placeholder tersisa menyarankan tinggi ±72 (`withoutSkeletons`) | low | patch | LC-12 dinilai pada konteks board utuh; tes check (tanpa LC-12 palsu; ruang kosong sungguhan → tinggi pas memuat placeholder) |
+| R4 | mobile.md memakai `Object.assign(C,…)` tanpa keep | low | patch | `Palette({…},{…})` (muat mobile 8986) |
+| R5 | `minHeight:876` hero tidak pernah dilepas | low | patch | Komentar diganti: 876 = tinggi `Crop / Kontur`, sengaja tetap (melepasnya memotong kontur bila isi hero lebih pendek, LC-02a) |
+| R6 | Header dan `source` codegen memuat nama mentah `[Skeleton] ` | low | patch | `layerName` di `names.ts` dipakai `words`, `headerOf`, `source`; tes ekspor node placeholder sendiri (`SeksiMenu.tsx`, header `"Seksi / Menu"`) |
+| R7 | Timer Follow berirama (≤ 1,2 dtk) menimpa pan/zoom pengguna | low | patch | `takeOver` (wheel, zoom, pointerdown) mencatat gestur; fokus agen yang menunggu dibuang bila ada gestur sesudah mulai menunggu; tes DOM (gagal bila pembatalan dimatikan) |
+| R8 | Helper bawaan mencari `line`/`fill`/`Row`/`T`/`I` sebagai identifier bebas → `const line=…` merusak `Btn` | low | patch | Helper saling memanggil lewat closure; `C`/`FONT`/`TY`/`HEAD` tetap bebas (prelude lama tetap memakai palet/skala snippet, AD-4); tes QuickJS |
+| R9 | Nit: dua import di satu baris `tree.ts:2` | nit | patch | Dipisah |
 
 ## Design Notes
 

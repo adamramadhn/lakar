@@ -47,4 +47,13 @@ describe('skeleton tidak dikirim keluar viewer', () => {
     if (target === 'react-css') expect(all).toContain('.seksiMenu {');
     expect(all).toMatch(/640/); // minHeight tetap (perkiraan tinggi), tanpa cat
   });
+
+  it.each(['react-tailwind', 'react-css'] as const)('codegen %s dari node placeholder sendiri: header, nama komponen, dan berkas tanpa penanda', async (target) => {
+    const { doc, skel } = await skeletonDoc();
+    const out = generateCode(doc, { nodeId: skel, target });
+    expect(out.files.map((f) => f.path)).toContain('SeksiMenu.tsx');
+    const main = out.files.find((f) => f.path === 'SeksiMenu.tsx')!.contents;
+    expect(main.split('\n')[0]).toContain('from "Seksi / Menu"');
+    expect(out.files.map((f) => `${f.path}\n${f.contents}`).join('\n')).not.toMatch(SKELETON_STYLE);
+  });
 });

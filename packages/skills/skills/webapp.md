@@ -26,7 +26,7 @@ Bertahap (live): execute 1 = board + sidebar + header + `Skel` untuk KPI dan bar
 Dasbor operasional jaringan laundry kiloan, arketipe Padat (langkah khas: KPI utama di bidang gelap merek dengan sparkline, volume harian bertumpuk per layanan; tabel memperlihatkan keadaan):
 
 ```js
-keep.C=Object.assign(C,{sub:'#F3F6F5',field:'#E3F1EF',acc2:'#7C3AED',data:['#0F766E','#5EB8AE','#7C3AED']}); keep.FONT=Object.assign(FONT,{h:'Inter',b:'Inter',m:'IBM Plex Mono'});
+Palette({sub:'#F3F6F5',field:'#E3F1EF',acc2:'#7C3AED',data:['#0F766E','#5EB8AE','#7C3AED']},{h:'Inter',b:'Inter',m:'IBM Plex Mono'});
 const p=place(1440,900);
 const b=add(null,{type:'board',name:'[WIP] Lipat / Ringkasan · app · Padat',x:p.x,y:p.y,width:1440,height:900,screen:'app',fills:fill(C.sub)});
 keep.board=b;

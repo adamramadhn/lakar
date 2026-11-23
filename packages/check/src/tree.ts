@@ -1,5 +1,6 @@
 // Penelusuran pohon board (urutan dokumen) untuk aturan check. Murni.
-import type { ResolvedBoardNode as BoardNode, ResolvedChildNode as ChildNode, ResolvedFrameNode as FrameNode } from '@lakar/schema';import type { BoardMeasure, NodeBounds, TextMeasure } from '@lakar/ports';
+import type { ResolvedBoardNode as BoardNode, ResolvedChildNode as ChildNode, ResolvedFrameNode as FrameNode } from '@lakar/schema';
+import type { BoardMeasure, NodeBounds, TextMeasure } from '@lakar/ports';
 import { isSkeletonName } from '@lakar/schema';
 
 export type Container = BoardNode | FrameNode;

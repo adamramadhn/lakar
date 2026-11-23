@@ -648,6 +648,12 @@ export function Canvas({
     anim.current = undefined;
   }, []);
   useEffect(() => stopAnim, [stopAnim]);
+  /** Saat terakhir pengguna menggerakkan kamera (wheel, zoom, pointer): Follow agen yang masih menunggu dibatalkan. */
+  const userCamAt = useRef(-Infinity);
+  const takeOver = useCallback(() => {
+    stopAnim();
+    userCamAt.current = performance.now();
+  }, [stopAnim]);
 
   useLayoutEffect(() => {
     const el = ref.current;
@@ -691,6 +697,8 @@ export function Canvas({
   // execute tanpa node baru tidak melompat ke board yang sudah tampak, dan geseran berjarak ≥ FOLLOW_SETTLE_MS (target
   // yang tiba di antaranya digabung: yang terbaru menang).
   const lastPanAt = useRef<number | undefined>(undefined);
+  /** Fokus agen yang sedang menunggu jeda Follow: nonce + saat mulai menunggu. */
+  const waiting = useRef<{ nonce: number; since: number } | undefined>(undefined);
   const [followTick, setFollowTick] = useState(0);
   useEffect(() => {
     if (!focus || !fitted || size.w <= 0) return;
@@ -707,11 +715,20 @@ export function Canvas({
       onFocused?.(focus.nonce);
       return;
     }
+    // Pengguna menggerakkan kamera selama Follow agen menunggu: target itu dibuang (kamera milik pengguna).
+    const w = waiting.current;
+    if (paced && w && w.nonce === focus.nonce && userCamAt.current > w.since) {
+      waiting.current = undefined;
+      onFocused?.(focus.nonce);
+      return;
+    }
     const wait = !paced || reducedMotion() ? 0 : followWait(lastPanAt.current, performance.now());
     if (wait > 0) {
+      if (waiting.current?.nonce !== focus.nonce) waiting.current = { nonce: focus.nonce, since: performance.now() };
       const t = setTimeout(() => setFollowTick((n) => n + 1), wait);
       return () => clearTimeout(t);
     }
+    waiting.current = undefined;
     onFocused?.(focus.nonce);
     lastPanAt.current = performance.now();
     const to = region ? followCamera(region, from, size.w, size.h, { min: ZOOM_MIN, max: ZOOM_MAX }) : focusCamera(b, from, size.w, size.h);
@@ -731,7 +748,7 @@ export function Canvas({
   }, [focus, fitted, size, boards, onFocused, stopAnim, followTick]);
 
   const zoomAt = useCallback((factor: number, sx: number, sy: number) => {
-    stopAnim();
+    takeOver();
     setCam((c) => {
       const z = clampZoom(c.z * factor);
       const k = z / c.z;
@@ -751,7 +768,7 @@ export function Canvas({
         return;
       }
       e.preventDefault();
-      stopAnim();
+      takeOver();
       const r = el.getBoundingClientRect();
       // deltaMode: 0 piksel, 1 baris (Firefox), 2 halaman.
       const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? el.clientHeight : 1;
@@ -762,7 +779,7 @@ export function Canvas({
     };
     el.addEventListener('wheel', onWheel, { passive: false });
     return () => el.removeEventListener('wheel', onWheel);
-  }, [zoomAt, stopAnim]);
+  }, [zoomAt, takeOver]);
 
   useEffect(() => {
     const typing = (e: KeyboardEvent) => {
@@ -832,7 +849,7 @@ export function Canvas({
     if (e.nativeEvent.composedPath().some((n) => n instanceof HTMLElement && n.isContentEditable)) return;
     const touch = e.pointerType === 'touch';
     if (e.button !== 0 && e.button !== 1) return;
-    stopAnim();
+    takeOver();
     e.currentTarget.setPointerCapture(e.pointerId);
     if (touch) {
       touches.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
