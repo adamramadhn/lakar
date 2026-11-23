@@ -70,6 +70,7 @@
   --danger-soft: #dc262614;
   --warning: #ca8a04;
   --success: #16a34a;
+  --success-soft: #16a34a1f;
 
   --font-ui: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, 'SFMono-Regular', Consolas, monospace;
@@ -106,4 +107,5 @@
   --danger-soft: #f871711f;
   --warning: #eab308;
   --success: #22c55e;
+  --success-soft: #22c55e26;
 }

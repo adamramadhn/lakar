@@ -48,6 +48,7 @@ jobs:
       # Signing opsional: hanya aktif bila secret ada (lihat apps/desktop/README.md).
       HAS_APPLE_CERT: ${{ secrets.APPLE_CERTIFICATE != '' }}
       HAS_WINDOWS_CERT: ${{ secrets.WINDOWS_CERTIFICATE != '' }}
+      HAS_UPDATER_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY != '' }}
     steps:
       - uses: actions/checkout@v6
 
@@ -134,20 +135,25 @@ jobs:
           Remove-Item $pfx
           "LAKAR_WINDOWS_THUMBPRINT=$($cert.Thumbprint)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
-      # Satu file --config gabungan (versi dari tag + thumbprint signing Windows) agar tidak bergantung pada
-      # perilaku beberapa --config.
+      # Satu file --config gabungan (versi dari tag + thumbprint signing Windows + artefak updater bila kunci ada)
+      # agar tidak bergantung pada perilaku beberapa --config. Build lokal tanpa kunci tetap tanpa artefak updater.
       - name: Compose Tauri CI config
         run: |
           node -e '
             const c = {};
             if (process.env.LAKAR_APP_VERSION) c.version = process.env.LAKAR_APP_VERSION;
             if (process.env.LAKAR_WINDOWS_THUMBPRINT) c.bundle = { windows: { certificateThumbprint: process.env.LAKAR_WINDOWS_THUMBPRINT, digestAlgorithm: "sha256", timestampUrl: "http://timestamp.digicert.com" } };
+            if (process.env.HAS_UPDATER_KEY === "true") (c.bundle ??= {}).createUpdaterArtifacts = true;
             require("fs").writeFileSync("apps/desktop/src-tauri/ci-config.json", JSON.stringify(c, null, 2));
             console.log(JSON.stringify(c));
           '
 
+      # Kunci updater hanya dipakai saat createUpdaterArtifacts aktif; tanpa secret tidak ada penandatanganan.
       - name: Build installers
         working-directory: apps/desktop
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: pnpm tauri build --ci --target ${{ matrix.target }} --bundles ${{ matrix.bundles }} --config src-tauri/ci-config.json
 
       # Installer rilis terakhir sebagai titik awal uji upgrade (opsional: belum ada rilis / gagal unduh → lewati).
@@ -179,7 +185,9 @@ jobs:
           mkdir -p "$out"
           bundle="apps/desktop/src-tauri/target/${{ matrix.target }}/release/bundle"
           # Nama file Tauri sudah memuat arsitektur (mis. Lakar_0.1.0_aarch64.dmg, Lakar_0.1.0_x64-setup.exe).
-          find "$bundle" -maxdepth 2 -type f \( -name '*.msi' -o -name '*-setup.exe' -o -name '*.dmg' -o -name '*.AppImage' -o -name '*.deb' \) -print -exec cp {} "$out/" \;
+          # `*.sig` dan `*.app.tar.gz` adalah artefak updater (bila createUpdaterArtifacts aktif): sig dibaca
+          # job latest-json; `.app.tar.gz` adalah paket update macOS yang diunggah ke Release.
+          find "$bundle" -maxdepth 2 -type f \( -name '*.msi' -o -name '*-setup.exe' -o -name '*.dmg' -o -name '*.AppImage' -o -name '*.deb' -o -name '*.sig' -o -name '*.app.tar.gz' \) -print -exec cp {} "$out/" \;
           ls -la "$out"
           test -n "$(ls -A "$out")"
 
@@ -189,14 +197,59 @@ jobs:
           path: dist-installers/${{ matrix.name }}/*
           if-no-files-found: error
 
+  # Manifest updater statis (endpoint plugins.updater.endpoints → releases/latest/download/latest.json).
+  # Jalan untuk semua trigger supaya artefaknya bisa diverifikasi di dry run; dilewati dengan warning bila
+  # build tidak menghasilkan sig (TAURI_SIGNING_PRIVATE_KEY tidak diatur).
+  latest-json:
+    name: latest.json
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Check updater signatures
+        id: sigs
+        run: |
+          n="$(find dist -name '*.sig' | wc -l)"
+          echo "count=$n" >> "$GITHUB_OUTPUT"
+          if [ "$n" -eq 0 ]; then
+            echo "::warning::No updater signatures — TAURI_SIGNING_PRIVATE_KEY not set; skipping latest.json"
+          fi
+
+      - name: Build latest.json
+        if: steps.sigs.outputs.count != '0'
+        run: |
+          # Versi dari tag bila x.y.z, selain itu versi di tauri.conf.json; tag rilis = ref, fallback v<versi>
+          # untuk dry run (URL platform hanya benar di rilis bertanda nyata).
+          version="${GITHUB_REF_NAME#v}"
+          if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            version="$(node -p "require('./apps/desktop/src-tauri/tauri.conf.json').version")"
+          fi
+          tag="$GITHUB_REF_NAME"
+          if [[ "$tag" != v* ]]; then tag="v$version"; fi
+          node apps/desktop/scripts/make-latest-json.mjs --dir dist --version "$version" --tag "$tag" --repo "$GITHUB_REPOSITORY"
+
+      - uses: actions/upload-artifact@v4
+        if: steps.sigs.outputs.count != '0'
+        with:
+          name: lakar-latest-json
+          path: dist/latest.json
+          if-no-files-found: error
+
   publish:
     name: publish release
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: build
+    needs: [build, latest-json]
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
+      # Semua artefak (installer + sig + latest.json bila ada) digabung; ikut SHA256SUMS dan unggahan rilis.
       - uses: actions/download-artifact@v4
         with:
           path: installers

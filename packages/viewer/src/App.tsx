@@ -18,6 +18,7 @@ import { NewFileDialog } from './NewFileDialog';
 import { OfflineBanner } from './OfflineBanner';
 import { applyFileEvent, closeTab, onOpenInNewTab, onRequestCloseTab, openTab, pruneTabs, readTabs, serializeTabs, TABS_KEY } from './tabs';
 import { TitleBar } from './TitleBar';
+import { initUpdates } from './updates';
 import { dropViewState, moveViewState } from './viewState';
 import { Viewer } from './Viewer';
 
@@ -86,8 +87,11 @@ export function App() {
     );
   }, []);
 
+  // Updater aplikasi desktop: sekali per mount (cek + unduh latar bila kebijakan auto). No-op di browser.
+  useEffect(() => initUpdates(), []);
+
   useEffect(() => {
-    const titles: Record<Route['name'], string> = { recents: 'Lakar', files: 'Files · Lakar', archive: 'Archive · Lakar', settings: 'Settings · Lakar', connections: 'Connections · Lakar', viewer: 'Lakar' };
+    const titles: Record<Route['name'], string> = { recents: 'Lakar', files: 'Files · Lakar', archive: 'Archive · Lakar', settings: 'Settings · Lakar', connections: 'Connections · Lakar', updates: 'Updates · Lakar', viewer: 'Lakar' };
     // Halaman folder (`#/files/<id>`): Dashboard mengganti judul dengan nama folder setelah folder dimuat.
     document.title = route.name === 'viewer' ? `${route.slug} · Lakar` : titles[route.name];
   }, [route]);

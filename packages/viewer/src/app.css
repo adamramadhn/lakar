@@ -284,6 +284,54 @@ code {
   font-size: 12px;
 }
 
+/* ---- Banner update (desain Section 11 `vQY8e` ready / `mOkHY` updated; pola Offline Banner) ---- */
+.update-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  margin-bottom: 24px;
+  border-radius: 10px;
+  border: 1px solid var(--accent);
+  background: var(--accent-soft);
+}
+.update-banner.success {
+  border-color: var(--success);
+  background: var(--success-soft);
+}
+.update-icon {
+  flex: none;
+  color: var(--accent);
+}
+.update-banner.success .update-icon {
+  color: var(--success);
+}
+.update-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+.update-text strong {
+  font-weight: 600;
+}
+.update-text span {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+/* Catatan rilis di Settings → Updates (section "What's new in x.y"). */
+.update-notes {
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  font-size: 13px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
+
 /* ---- Skeleton / spinner ---- */
 .skeleton {
   width: 100%;
@@ -3667,6 +3715,9 @@ button.panel-tab:hover {
 .status-pill.error {
   color: var(--danger);
 }
+.status-pill.info {
+  color: var(--accent);
+}
 .status-pill.ok::before {
   content: '';
   width: 6px;
@@ -4302,6 +4353,9 @@ button.panel-tab:hover {
   .offline-command {
     order: 3;
     width: 100%;
+  }
+  .update-banner {
+    flex-wrap: wrap;
   }
 }
 /* Dashboard mobile (desain "Mobile — List/Grid — …", 375): "+" ikon 34×34, list tanpa header, baris 74px dengan
