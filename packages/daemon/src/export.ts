@@ -9,14 +9,17 @@ import { iconRefs } from '@lakar/render';
 import { LakarError, SLUG_PATTERN, findBoard, resolveDocument, type IconGlyph, type LakarDocument, type ResolvedDocument } from '@lakar/schema';
 import { z } from 'zod';
 import { notFound } from './errors.js';
+import { locateNode } from './inspect.js';
 import { readPngSize } from './png.js';
 import { parseRevParam, readRevision, slugify } from './files.js';
 import type { DocStore } from './store.js';
 import { peekDocument } from './viewer.js';
 
-const ExportBody = z.object({ boardId: z.string().min(1), scale: z.union([z.literal(1), z.literal(2)]) }).strict();
+const ExportBody = z
+  .object({ boardId: z.string().min(1), scale: z.union([z.literal(1), z.literal(2)]), nodeId: z.string().min(1).optional() })
+  .strict();
 const RevShotBody = z.object({ boardId: z.string().min(1) }).strict();
-const EXPORT_HINT = 'kirim {boardId, scale}: boardId dari dokumen, scale 1 atau 2';
+const EXPORT_HINT = 'kirim {boardId, scale}: boardId dari dokumen, scale 1 atau 2; nodeId opsional = node di dalam board itu';
 
 export type ExportRoutesOptions = {
   docs: Map<string, LakarDocument>;
@@ -41,19 +44,25 @@ export function registerExportRoutes(app: FastifyInstance, { docs, store, render
     if (!r.success) {
       throw new LakarError('SCHEMA_INVALID', r.error.issues.map((i) => `${i.path.join('.') || 'body'}: ${i.message}`).join('; '), { hint: EXPORT_HINT });
     }
-    const { boardId, scale } = r.data;
+    const { boardId, scale, nodeId } = r.data;
     const stored = docs.get(slug) ?? (await peekDocument(store, slug));
     if (!stored) throw notFound(`dokumen ${slug} tidak ada`, 'pakai slug dari GET /viewer/docs');
     const doc = resolveDocument(stored);
     const board = findBoard(doc, boardId);
     if (!board) throw notFound(`board ${boardId} tidak ada di dokumen ${slug}`, 'pilih board lain');
+    // Copy as PNG (story 8.7): nodeId opsional = satu node tersimpan di dalam board (locateNode di dokumen
+    // tersimpan hanya me-resolve id tersimpan, bukan alamat komposit `a/b` isi instance). Node board lain → 404.
+    const hit = nodeId === undefined ? undefined : locateNode(stored, nodeId);
+    if (nodeId !== undefined && (!hit || hit.board.id !== board.id)) {
+      throw notFound(`node ${nodeId} tidak ada di board ${boardId} dokumen ${slug}`, 'pilih node di dalam board itu');
+    }
     // AD-9: ikon yang tidak dikenal katalog → ICON_UNKNOWN sebelum render.
     for (const ref of iconRefs(board)) icons.canonical(ref.lib, ref.icon);
-    const png = await render.screenshot(doc, board.id, { scale });
+    const png = await render.screenshot(doc, board.id, { scale, ...(hit && hit.node.id !== board.id ? { nodeId: hit.node.id } : {}) });
     return reply
       .code(200)
       .header('content-type', 'image/png')
-      .header('content-disposition', `attachment; filename="${exportFileName(slug, board, scale)}"`)
+      .header('content-disposition', `attachment; filename="${exportFileName(slug, hit?.node ?? board, scale)}"`)
       .header('cache-control', 'no-store')
       .send(Buffer.from(png));
   });

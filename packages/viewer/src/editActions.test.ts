@@ -202,6 +202,27 @@ describe('actionState', () => {
   });
 });
 
+describe('copy-png', () => {
+  it('aktif tepat satu node tersimpan (board boleh); nonaktif seleksi kosong, jamak, atau alamat komposit', () => {
+    expect(actionState(scene(), ['A'])['copy-png']).toBe(true);
+    expect(actionState(scene(), ['B1'])['copy-png']).toBe(true);
+    expect(actionState(scene(), [])['copy-png']).toBe(false);
+    expect(actionState(scene(), ['A', 'C'])['copy-png']).toBe(false);
+    expect(actionState(componentScene(), ['I/T'])['copy-png']).toBe(false);
+    // Bukan op dokumen: plan selalu undefined (Viewer mengekspor PNG + menulis clipboard sendiri).
+    expect(planAction('copy-png', scene(), ['A'])).toBeUndefined();
+    expect(planAction('copy-png', scene(), ['B1'])).toBeUndefined();
+  });
+  it('Ctrl/⌘+Shift+C → copy-png; Ctrl/⌘+C tanpa shift bukan shortcut aksi', () => {
+    const k = (key: string, o: Partial<{ ctrlKey: boolean; metaKey: boolean; altKey: boolean; shiftKey: boolean }> = {}) =>
+      shortcutAction({ key, code: '', ctrlKey: false, metaKey: false, altKey: false, shiftKey: false, ...o });
+    expect(k('C', { ctrlKey: true, shiftKey: true })).toEqual({ action: 'copy-png' });
+    expect(k('c', { metaKey: true, shiftKey: true })).toEqual({ action: 'copy-png' });
+    expect(k('c', { ctrlKey: true })).toBeUndefined();
+    expect(k('c', { ctrlKey: true, altKey: true })).toBeUndefined();
+  });
+});
+
 describe('nudge, pilih semua, teks', () => {
   it('nudge hanya node absolut', () => {
     expect(nudgeOps([{ id: 'A', name: 'A', absolute: true, x: 20, y: 30 }, { id: 'R1', name: 'R1', absolute: false, x: 0, y: 0 }], 10, -1)).toEqual({
