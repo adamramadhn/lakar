@@ -111,6 +111,7 @@ deferred: []
 - `updates.ts` sengaja meng-inline accessor `desktopInvoke` (4 baris) alih-alih mengimpor `./theme` tanpa ekstensi — gagal typecheck `tsconfig.test.json` (nodenext).
 - Verifikasi lokal subagent: `pnpm build` hijau; `pnpm test` typecheck + semua tes baru hijau (60 kegagalan baseline Windows yang sudah diketahui, bukan di berkas sentuhan). `cargo clippy`/`test` tak bisa lokal (tanpa MSVC link.exe) — acuan CI desktop-check.yml.
 - Keputusan: `windows-x86_64` → `-setup.exe` (bukan msi) di latest.json; `.msi.sig`/`.deb.sig` tetap terunggah tapi tak masuk latest.json.
+- Dry run 45212440588 menemukan bug nyata: artefak updater macOS `Lakar.app.tar.gz{,.sig}` tidak membawa versi/arch → kedua leg darwin saling menimpa saat merge dan tak terpetakan di make-latest-json (job gagal eksplisit, seperti dirancang). Fix: langkah Collect installers menamai ulang `Product_<versi>_<aarch64|x64>.app.tar.gz{,.sig}` (pola nama dmg); README diperbarui.
 
 ## Plan Change Log
 
