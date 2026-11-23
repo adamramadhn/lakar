@@ -60,6 +60,8 @@ describe('Viewer — paste', () => {
     const report = await screen.findByRole('region', { name: 'Paste report' });
     expect(within(report).getByText('Not imported (1)')).toBeInTheDocument();
     await waitFor(() => expect(layer(PASTED.id)).toHaveAttribute('aria-selected', 'true'));
+    // Pasted Tag (desain rkIyP) di bawah node baru selama terpilih.
+    expect(await screen.findByText('Pasted · Pricing')).toBeInTheDocument();
   });
 
   it('SVG: toast dengan Undo paste dan Details (tanpa kind di body)', async () => {

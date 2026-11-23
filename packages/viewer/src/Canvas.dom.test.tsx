@@ -3,7 +3,7 @@
 // benar-benar di-mount oleh @lakar/render ke shadow root.
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import type { ComponentProps } from 'react';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, onTestFinished, vi } from 'vitest';
 import type { FadePlan } from './agentEffects';
 import { Canvas } from './Canvas';
 import type { AgentPresence } from './presence';
@@ -92,6 +92,15 @@ describe('Canvas — label Generating', () => {
     expect(document.querySelector(`[data-board-label="${BOARD}"]`)).not.toHaveClass('generating');
   });
 
+  it('kursor agen yang hilang dari presence keluar dengan animasi lalu dilepas', async () => {
+    const { rerender } = renderUi(<Canvas {...baseProps({ presence: [presence(true)] })} />);
+    expect(document.querySelector('.agent-cursor')).not.toHaveClass('exiting');
+    expect(screen.getByText('Claude Code')).toBeInTheDocument();
+    rerender(<Canvas {...baseProps({ presence: [] })} />);
+    expect(document.querySelector('.agent-cursor')).toHaveClass('exiting');
+    await waitFor(() => expect(document.querySelector('.agent-cursor')).toBeNull());
+  });
+
   it('pratinjau versi lama: label Generating tidak tampil', () => {
     const preview = { rev: 1, label: 'Version 1', canRestore: true, onBack: vi.fn(), onRestore: vi.fn() };
     renderUi(<Canvas {...baseProps({ presence: [presence(true)], preview })} />);
@@ -110,8 +119,8 @@ describe('Canvas — Pen tool', () => {
     // Pendengar keydown di luar canvas (mis. shortcut hapus node Viewer): tidak boleh menerima tombol Pen.
     const outside = vi.fn();
     window.addEventListener('keydown', outside);
-    const cleanup = () => window.removeEventListener('keydown', outside);
-    return { ...view, onSelect, onSelectIds, onInsert, onCommit, onCommitCreate, outside, cleanup };
+    onTestFinished(() => window.removeEventListener('keydown', outside));
+    return { ...view, onSelect, onSelectIds, onInsert, onCommit, onCommitCreate, outside };
   }
   const pen = () => screen.getByRole('button', { name: 'Pen (P)' });
   /** Klik di (x, y) halaman (kamera 0,0,1, kanvas di 0,0 jsdom). */
@@ -134,7 +143,6 @@ describe('Canvas — Pen tool', () => {
     expect(t.onInsert).not.toHaveBeenCalled();
     expect(t.onCommitCreate).not.toHaveBeenCalled();
     expect(t.outside).not.toHaveBeenCalled();
-    t.cleanup();
   });
 
   it('Delete saat menggambar membuang titik terakhir, bukan node terpilih', async () => {
@@ -152,7 +160,6 @@ describe('Canvas — Pen tool', () => {
     await t.user.keyboard('{Enter}');
     expect(t.onCommitCreate).not.toHaveBeenCalled();
     expect(pen()).toHaveAttribute('aria-pressed', 'false');
-    t.cleanup();
   });
 
   it('Enter dengan < 2 titik tidak mengirim request; dengan 2 titik satu commit add path di board', async () => {
@@ -172,6 +179,5 @@ describe('Canvas — Pen tool', () => {
     expect(t.onCommitCreate).toHaveBeenCalledTimes(1);
     expect(t.onCommitCreate).toHaveBeenCalledWith([expect.objectContaining({ op: 'add', parentId: BOARD, ref: 'pen', node: expect.objectContaining({ type: 'path' }) })], 'Draw path');
     expect(t.outside).not.toHaveBeenCalled();
-    t.cleanup();
   });
 });
