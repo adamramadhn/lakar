@@ -3,16 +3,16 @@ title: 'Instal konfigurasi MCP Lakar ke harness otomatis'
 type: feature
 ticket: '12'
 created: '2026-11-23'
-status: in-progress
+status: done
 baseline_revision: 'bdd59dc12c69f4009be3b726dc91acc22f89fa3e'
 route: full
 route_source: auto
 risk: medium
-review: ''
-review_source: ''
-lenses_ran: []
+review: quick
+review_source: pinned
+lenses_ran: [quick]
 review_loop_iteration: 0
-followup_review_recommended: false
+followup_review_recommended: true
 context: ['{project-root}/design/README.md']
 warnings: [oversized]
 deferred: []
@@ -113,6 +113,20 @@ Keputusan yang dicatat (delegasi Fatmuh "terima jadi", 2026-11-23): (1) deteksi 
 
 ## Review Triage Log
 
+### 2026-11-23 — Review pass (quick)
+- verdicts: 10 findings — high 0, medium 3, low 7, false 0, maybe-false 0
+- findings:
+  - `[medium]` `[patch]` `stripCodexLakar` merapikan baris kosong di seluruh config.toml — Regex `\n{3,}` + trim global menulis ulang byte di luar blok lakar; diperbaiki jadi hanya merapikan sambungan tempat blok dibuang.
+  - `[medium]` `[patch]` File config + `.bak` ditulis mode 0644 walau aslinya 0600 — `writeFileAtomic` chmod 644; config harness bisa berisi OAuth/key. Diperbaiki: mode file asli dipertahankan di config + `.bak`; file baru 0600.
+  - `[medium]` `[patch]` `.bak` tidak byte-identik untuk file non-UTF-8 — backup ditulis dari string hasil decode; jalur TOML tak mem-parse jadi byte rusak tertulis. Diperbaiki: `.bak` ditulis dari byte mentah; decode fatal → `failed`.
+  - `[low]` `[patch]` Entri TOML lakar bentuk quoted/dotted tak terdeteksi — `[mcp_servers."lakar"]` / `mcp_servers.lakar.command=…` lolos scan+strip lalu append menghasilkan TOML invalid. Diperbaiki: header quoted ikut dikenali; bentuk dotted → `failed` dengan pesan manual.
+  - `[low]` `[patch]` Menu More terbuka bergeser ~56px — offset `b.right - 176` padahal `.menu` min-width 232. Diperbaiki: `x = b.right - 232`.
+  - `[low]` `[reject]` `.settings-about` tak punya aturan CSS — class hanya hook semantik; daftar tampil benar tanpa aturan; tidak ada cacat visual.
+  - `[low]` `[patch]` CSS mati `.settings-info`/`.settings-row` + `.conn-tools`/`.conn-tool` tak direferensikan lagi — dihapus langsung (`.settings-path`/`.settings-unavailable` tetap dipakai).
+  - `[low]` `[patch]` `defaultDeps().reveal` mengabaikan `platform` terinjeksi — memakai `process.platform`; default reveal kini memakai `d.platform` hasil merge.
+  - `[low]` `[patch]` Undo tak bisa memulihkan install ke file yang belum ada — tanpa `.bak` respons `restored:false` padahal state pra-instal = file tak ada. Diperbaiki: bila `.bak` tak ada tapi file berisi entri lakar → file dihapus, `restored:true`.
+  - `[low]` `[reject]` `configPath` dievaluasi ulang dari env per request — env berubah di tengah sesi jarang dan hasilnya hanya `restored:false` (bukan korupsi); pelacakan path menambah state yang tak sebanding.
+
 ## Design Notes
 
 Entry per format (untuk `preview` di dialog Confirm dan merge):
@@ -126,3 +140,31 @@ Entry per format (untuk `preview` di dialog Confirm dan merge):
 **Commands:**
 - `pnpm build` — expected: tsc + viewer build bersih
 - `pnpm test` dengan `LAKAR_C7_ALLOW_MISSING_SOURCES=1` — expected: tidak ada kegagalan baru vs baseline Windows (~49–55 fails dikenal); `harnesses.test.ts`, `connections.dom.test.tsx`, `connections.test.ts` hijau
+
+## Auto Run Result
+
+**Ringkasan.** Daemon mendapat modul `harnesses.ts` (deteksi + route `/viewer/connections/harnesses*` untuk scan/install/uninstall/revert/reveal) yang menulis entri MCP `lakar` ke config Claude Code (JSON), Codex (TOML text-surgery), Pi (JSON), dan OpenCode (JSON/JSONC) dengan backup `.bak` byte-identik, mode file dipertahankan, dan atomic write; kegagalan bisnis kembali `state:'failed'` di amplop 200. Viewer mengganti "Add an agent" menjadi "Install in an agent" (baris per harness dengan 5 state, Rescan, dialog Confirm berisi path + "Adds N lines" + preview, dialog Manual setup berisi Setup Card lama, toast sukses dengan Undo). Blok About revisi diterapkan di Settings → General; aksi sidebar "Connect an agent" kini link ke Connections.
+
+**File berubah** (15 file, +2234/−149):
+- `packages/daemon/src/harnesses.ts` — modul baru: deteksi per harness, parser/merger JSON+TOML+JSONC, route scan/install/uninstall/revert/reveal, `.bak` byte-identik dari byte mentah, mode 0600 file baru / mode asli dipertahankan.
+- `packages/daemon/src/harnesses.test.ts` — 31 tes matriks I/O spec (1 skip POSIX-only di Windows).
+- `packages/daemon/src/assets.ts` — `writeFileAtomic` menerima parameter `mode` opsional (default 644, kompatibel).
+- `packages/daemon/src/server.ts`, `index.ts` — registrasi `registerHarnessRoutes` + opsi `harnessDeps` terinjeksi; ekspor tipe/route.
+- `packages/viewer/src/api.ts` — tipe `HarnessInfo`/hasil + method install/uninstall/revert/reveal; `DaemonStatus` bertambah field `node`.
+- `packages/viewer/src/harnesses.ts` — metadata harness + snippet manual per format.
+- `packages/viewer/src/Connections.tsx` — section "Install in an agent" lengkap (state, dialog Confirm/Manual, More menu, toast Undo).
+- `packages/viewer/src/connections.dom.test.tsx` — 6 tes DOM alur install/undo/menu/dialog.
+- `packages/viewer/src/connections.test.ts` — pembaruan snippet manual.
+- `packages/viewer/src/app.css` — style install/dialog/toast/About; CSS mati dihapus.
+- `packages/viewer/src/SettingsGeneral.tsx` — blok About revisi (Version/Channel/Daemon/Data folder + Copy build info + dialog lisensi).
+- `packages/viewer/src/Dashboard.tsx` — aksi sidebar jadi link ke Connections.
+- `_bmad-output/implementation-artifacts/spec-mcp-harness-install.md` — spec BMAD.
+- File plan ini.
+
+**Review (quick, 1 pass):** 10 temuan — high 0, medium 3, low 7, false 0. Dipatch: 8 (3 medium: normalisasi whitespace TOML lintas-batas, mode file turun ke 0644, `.bak` non-UTF-8; 5 low: header/dotted TOML, offset menu, CSS mati, `reveal` mengabaikan platform terinjeksi, Undo tanpa `.bak`). Direject: 2 low (`settings-about` hanya hook semantik tanpa cacat visual; evaluasi ulang `configPath` dari env jarang & hasilnya `restored:false` yang jinak). Subagen implementasi tak bisa dilanjutkan → patch diterapkan langsung.
+
+**Follow-up review:** `true` — 3 entry medium dipatch di jalur tulis file-safety; risiko belum teruji: interaksi mode/backup dengan config symlink atau folder tersinkron (OneDrive/dotted ACL Windows) belum tercakup tes.
+
+**Verifikasi.** `pnpm build` hijau (tsc + vite). Fokus pasca-patch: `vitest run harnesses.test.ts connections.test.ts connections.dom.test.tsx` → 44 lulus, 1 skip (tes mode POSIX). `pnpm test` penuh sebelum patch: 2923 lulus / 53 gagal — semua kategori baseline Windows dikenal (SIGTERM/SIGKILL, izin key foto, CRLF, URL `d:`, timing render/bench); tidak ada kegagalan di file yang disentuh. Suite penuh pasca-patch: 2927 lulus / 58 gagal — delta vs pra-patch hanya `judge-c7` (+3, artefak `set` tanpa quote meninggalkan spasi di nilai env; lulus saat diulang dengan `set "LAKAR_C7_ALLOW_MISSING_SOURCES=1"`) dan −2 file flaky yang kini hijau (`index.test.ts` level-file, `paste-html.test.ts`); gagal efektif 55 — dalam rentang baseline, nol kegagalan baru dari perubahan.
+
+**Risiko residual.** Deteksi marker-dir/env tanpa cek binary PATH (keputusan terdokumentasi); entri TOML bentuk dotted-key sengaja digagalkan ke manual; baseline gagal Windows (~53) belum di-root-cause; `.pen` tidak diubah (Pencil MCP offline).

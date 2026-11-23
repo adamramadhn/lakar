@@ -26,12 +26,12 @@ export async function readAsset(dataDir: string, hash: string): Promise<{ type: 
   return type ? { type, body } : undefined;
 }
 
-/** Tulis file secara atomik (tmp di direktori yang sama + rename), mode 644. */
-export async function writeFileAtomic(path: string, data: Uint8Array | string): Promise<void> {
+/** Tulis file secara atomik (tmp di direktori yang sama + rename), mode default 644. */
+export async function writeFileAtomic(path: string, data: Uint8Array | string, mode = 0o644): Promise<void> {
   const tmp = `${path}.${randomBytes(4).toString('hex')}.tmp`;
   try {
-    await writeFile(tmp, data, { mode: 0o644 });
-    await chmod(tmp, 0o644);
+    await writeFile(tmp, data, { mode });
+    await chmod(tmp, mode);
     await rename(tmp, path);
   } catch (e) {
     await rm(tmp, { force: true }).catch(() => {});

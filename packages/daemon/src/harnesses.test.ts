@@ -4,7 +4,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { existsSync } from 'node:fs';
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { registerHarnessRoutes, stripJsonComments } from './harnesses.js';
@@ -240,6 +240,73 @@ describe('POST …/install', () => {
     await t.app.close();
   });
 
+  it('codex: baris kosong berturut di section lain dipertahankan byte-per-byte', async () => {
+    const t = await setup();
+    const dir = join(t.home, '.codex');
+    await mkdir(dir, { recursive: true });
+    const file = join(dir, 'config.toml');
+    const old = '[model]\nx = 1\n\n\n\n[other]\ny = 2\n';
+    await writeFile(file, old);
+    await t.act('codex', 'install');
+    expect((await readFile(file, 'utf8')).startsWith('[model]\nx = 1\n\n\n\n[other]\ny = 2\n')).toBe(true);
+    await t.app.close();
+  });
+
+  it('codex: header [mcp_servers."lakar"] quoted diganti; dotted-key → failed manual', async () => {
+    const t = await setup();
+    const dir = join(t.home, '.codex');
+    await mkdir(dir, { recursive: true });
+    const file = join(dir, 'config.toml');
+    await writeFile(file, '[mcp_servers."lakar"]\ncommand = "old"\n\n[model]\nx = 1\n');
+    await t.act('codex', 'install');
+    const now = await readFile(file, 'utf8');
+    expect(now.match(/mcp_servers\s*\.\s*["']?lakar["']?\]/g)).toHaveLength(1);
+    expect(now).toContain('[mcp_servers.lakar]');
+    await t.app.close();
+
+    // Bentuk dotted-key tidak bisa digabung blok → failed, file tidak disentuh.
+    const t2 = await setup();
+    const dir2 = join(t2.home, '.codex');
+    await mkdir(dir2, { recursive: true });
+    const file2 = join(dir2, 'config.toml');
+    const old2 = 'mcp_servers.lakar.command = "old"\n\n[model]\nx = 1\n';
+    await writeFile(file2, old2);
+    expect(await row(t2, 'codex')).toMatchObject({ installed: true, matches: false });
+    const r = await t2.act('codex', 'install');
+    expect(r.json().data.state).toBe('failed');
+    expect(r.json().data.message).toContain('dotted-key');
+    expect(await readFile(file2, 'utf8')).toBe(old2);
+    expect(existsSync(`${file2}.bak`)).toBe(false);
+    await t2.app.close();
+  });
+
+  it('file config bukan UTF-8 → failed; byte asli utuh dan tanpa .bak', async () => {
+    const t = await setup();
+    const dir = join(t.home, '.codex');
+    await mkdir(dir, { recursive: true });
+    const file = join(dir, 'config.toml');
+    const bad = Buffer.from([0xff, 0xfe, 0x5b, 0x61, 0x5d]);
+    await writeFile(file, bad);
+    const r = await t.act('codex', 'install');
+    expect(r.json().data.state).toBe('failed');
+    expect(r.json().data.message).toContain('UTF-8');
+    expect(await readFile(file)).toEqual(bad);
+    expect(existsSync(`${file}.bak`)).toBe(false);
+    await t.app.close();
+  });
+
+  it.skipIf(process.platform === 'win32')('mode file asli (0600) dipertahankan di config + .bak', async () => {
+    const t = await setup();
+    const file = join(t.home, '.claude.json');
+    await writeFile(file, '{"oauth":{"tok":1}}');
+    await chmod(file, 0o600);
+    const r = await t.act('claude-code', 'install');
+    expect(r.json().data.state).toBe('installed');
+    expect((await stat(file)).mode & 0o777).toBe(0o600);
+    expect((await stat(`${file}.bak`)).mode & 0o777).toBe(0o600);
+    await t.app.close();
+  });
+
   it('entry MCP tidak ditemukan → failed "entry MCP tidak ditemukan"', async () => {
     const t = await setup({}, 'win32', join(root, 'tidak-ada.js'));
     await mkdir(join(t.home, '.claude'));
@@ -301,6 +368,42 @@ describe('POST …/uninstall dan revert', () => {
     const t2 = await setup();
     expect((await t2.act('claude-code', 'revert')).json().data).toEqual({ id: 'claude-code', restored: false });
     await t2.app.close();
+  });
+
+  it('revert tanpa .bak: file buatan install (hanya lakar) dihapus → restored:true', async () => {
+    const t = await setup();
+    await mkdir(join(t.home, '.claude'));
+    await t.act('claude-code', 'install');
+    const file = join(t.home, '.claude.json');
+    expect(existsSync(`${file}.bak`)).toBe(false);
+    const r = await t.act('claude-code', 'revert');
+    expect(r.json().data).toEqual({ id: 'claude-code', restored: true });
+    expect(existsSync(file)).toBe(false);
+    await t.app.close();
+  });
+
+  it('revert tanpa .bak: file dengan isi selain lakar dibiarkan → restored:false', async () => {
+    const t = await setup();
+    const file = join(t.home, '.claude.json');
+    const old = JSON.stringify({ keep: 1, mcpServers: { lakar: MCP, lain: {} } });
+    await writeFile(file, old);
+    expect((await t.act('claude-code', 'revert')).json().data).toEqual({ id: 'claude-code', restored: false });
+    expect(await readFile(file, 'utf8')).toBe(old);
+    await t.app.close();
+  });
+
+  it('codex dotted-key → uninstall failed; entri tidak disentuh', async () => {
+    const t = await setup();
+    const dir = join(t.home, '.codex');
+    await mkdir(dir, { recursive: true });
+    const file = join(dir, 'config.toml');
+    const old = 'mcp_servers.lakar.command = "x"\n\n[model]\nx = 1\n';
+    await writeFile(file, old);
+    const r = await t.act('codex', 'uninstall');
+    expect(r.json().data.state).toBe('failed');
+    expect(await readFile(file, 'utf8')).toBe(old);
+    expect(existsSync(`${file}.bak`)).toBe(false);
+    await t.app.close();
   });
 });
 

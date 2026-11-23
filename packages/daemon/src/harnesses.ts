@@ -8,7 +8,7 @@
 // untuk non-GET. Log hanya `lakard: <aksi> <id> → <state>` — tidak pernah path absolut, isi file, atau nilai env.
 import { spawn } from 'node:child_process';
 import { existsSync, statSync } from 'node:fs';
-import { mkdir, readFile } from 'node:fs/promises';
+import { mkdir, readFile, rm, stat } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import type { FastifyInstance, FastifyReply } from 'fastify';
@@ -133,26 +133,40 @@ const codexBlock = (mcp: McpServerConfig): string =>
 
 // ---- Bantu TOML (text surgery, section lain utuh byte-per-byte) ----
 
-/** Header tabel `[mcp_servers.lakar]` atau sub-tabelnya (`[mcp_servers.lakar.env]` dst.), komentar ditoleransi. */
-const LAKAR_TABLE_HEADER = /^\s*\[\s*mcp_servers\.lakar(?:\s*\]|\s*\.[^\]]*\])\s*(?:#.*)?$/;
+/** Header tabel `[mcp_servers.lakar]` (segmen `lakar` boleh di-quote) atau sub-tabelnya, komentar ditoleransi. */
+const LAKAR_TABLE_HEADER = /^\s*\[\s*mcp_servers\s*\.\s*["']?lakar["']?(?:\s*\]|\s*\.[^\]]*\])\s*(?:#.*)?$/;
+/** Bentuk dotted-key `mcp_servers.lakar.<key> = …` — tidak bisa distrip/ditimpa blok; gagalkan manual. */
+const DOTTED_LAKAR = /^\s*mcp_servers\s*\.\s*["']?lakar["']?\s*\./m;
 /** Header tabel TOML mana pun sampai akhir baris (penanda akhir blok), termasuk array-of-tables `[[x]]`. */
 const TABLE_HEADER = /^\s*\[+\s*[A-Za-z0-9_.'" -]+\s*\]+\s*(?:#.*)?$/;
 
-/** Buang semua blok `[mcp_servers.lakar(.…)]` (header sampai header tabel berikut / EOF). */
+/**
+ * Buang semua blok `[mcp_servers.lakar(.…)]` (header sampai header tabel berikut / EOF).
+ * Konten di luar blok utuh byte-per-byte — baris kosong hanya dirapikan di sambungan blok yang dibuang.
+ */
 function stripCodexLakar(text: string): string {
   const out: string[] = [];
   let skip = false;
+  let removed = false;
   for (const line of text.split('\n')) {
     if (LAKAR_TABLE_HEADER.test(line)) {
+      removed = true;
       skip = true;
+      // Baris kosong yang menempel blok ikut dibuang; bila blok di tengah, satu baris kosong
+      // disisipkan kembali saat header tabel berikut ditemui.
+      while (out.length && out[out.length - 1] === '') out.pop();
       continue;
     }
-    if (skip && TABLE_HEADER.test(line)) skip = false;
+    if (skip && TABLE_HEADER.test(line)) {
+      skip = false;
+      if (out.length) out.push('');
+    }
     if (!skip) out.push(line);
   }
-  // Rapikan: maks satu baris kosong berturut, tanpa baris kosong di awal/akhir.
-  const joined = out.join('\n').replace(/\n{3,}/g, '\n\n');
-  return joined.trim() === '' ? '' : `${joined.replace(/^\n+/, '').replace(/\n+$/, '')}\n`;
+  if (!removed) return text;
+  const joined = out.join('\n');
+  if (joined.trim() === '') return '';
+  return joined.endsWith('\n') ? joined : `${joined}\n`;
 }
 
 /** Gabung blok `lakar` baru ke config.toml: blok lama diganti (bukan dobel), section lain utuh. */
@@ -166,7 +180,8 @@ function mergeCodexToml(text: string | undefined, mcp: McpServerConfig): { ok: t
 function scanCodexToml(text: string, mcp: McpServerConfig | null): { installed: boolean; matches: boolean } {
   const lines = text.split('\n');
   const start = lines.findIndex((l) => LAKAR_TABLE_HEADER.test(l));
-  if (start === -1) return { installed: false, matches: false };
+  // Bentuk dotted-key dianggap terpasang (ada entri lakar) tapi tidak bisa dibanding/ditulis otomatis.
+  if (start === -1) return DOTTED_LAKAR.test(text) ? { installed: true, matches: false } : { installed: false, matches: false };
   const end = lines.findIndex((l, i) => i > start && TABLE_HEADER.test(l));
   const block = lines.slice(start, end === -1 ? undefined : end).join('\n');
   if (!mcp) return { installed: true, matches: false };
@@ -254,6 +269,19 @@ function stripObject(obj: Record<string, unknown>, jsonc: boolean): boolean {
   if (!servers || !('lakar' in servers)) return false;
   delete servers.lakar;
   return true;
+}
+
+/** `obj` hanya berisi entri `lakar` (file yang memang dibuat install; aman dihapus saat revert tanpa `.bak`). */
+function containsOnlyLakar(obj: Record<string, unknown>, jsonc: boolean): boolean {
+  if (Object.keys(obj).length !== 1) return false;
+  if (jsonc) {
+    const mcp = asObject(obj.mcp);
+    if (!mcp || Object.keys(mcp).length !== 1) return false;
+    const servers = asObject(mcp.servers);
+    return !!servers && Object.keys(servers).length === 1 && 'lakar' in servers;
+  }
+  const servers = asObject(obj.mcpServers);
+  return !!servers && Object.keys(servers).length === 1 && 'lakar' in servers;
 }
 
 /** `installed`/`matches` entri `lakar` di objek yang sudah diparse. */
@@ -344,6 +372,8 @@ const unknownHarness = (id: string) =>
 
 export function registerHarnessRoutes(app: FastifyInstance, { host, port, mcpEntry, mcpNode, nodePath = process.execPath, deps, log = (m) => console.warn(m) }: HarnessRoutesOptions): void {
   const d: HarnessDeps = { ...defaultDeps(), ...deps };
+  // reveal default memakai platform hasil merge supaya injeksi `platform` saja tetap konsisten.
+  if (!deps?.reveal) d.reveal = (file) => osReveal(file, d.platform);
   /** Entri MCP kini (sama dengan `GET /viewer/connections`), null bila entry tidak ditemukan. */
   const mcpConfig = (): McpServerConfig | null => {
     const addr = app.server.address();
@@ -418,6 +448,37 @@ export function registerHarnessRoutes(app: FastifyInstance, { host, port, mcpEnt
   };
 
   /**
+   * Baca file config: byte mentah (untuk `.bak` byte-identik), teks UTF-8, dan mode aslinya
+   * (dipertahankan saat tulis — config bisa berisi OAuth/key; file baru dibuat 0600).
+   */
+  type ConfigFile = { raw: Uint8Array; text: string; mode: number };
+  const readConfigFile = async (file: string): Promise<ConfigFile | 'absent' | 'unreadable' | 'not-utf8'> => {
+    let raw: Uint8Array;
+    try {
+      raw = await readFile(file);
+    } catch (e) {
+      return isEnoent(e) ? 'absent' : 'unreadable';
+    }
+    let text: string;
+    try {
+      text = new TextDecoder('utf-8', { fatal: true }).decode(raw);
+    } catch {
+      return 'not-utf8';
+    }
+    let mode = 0o600;
+    try {
+      const m = (await stat(file)).mode & 0o777;
+      if (m) mode = m;
+    } catch {
+      // mode tidak terbaca: pakai default 0600
+    }
+    return { raw, text, mode };
+  };
+
+  /** Pesan gagal untuk entri lakar bentuk dotted-key TOML (tidak bisa digabung/dihapus blok). */
+  const dottedLakarFailed = (id: string): HarnessResult => ({ id, state: 'failed', message: 'entri lakar memakai bentuk dotted-key; sunting manual di file config' });
+
+  /**
    * Pasang entri `lakar` ke file config `h`: deteksi → entry MCP → baca+merge → backup `.bak` → tulis atomik.
    * Kegagalan bisnis kembali `state:'failed'` (200, bukan throw) supaya baris Failed terisi pesannya.
    */
@@ -426,15 +487,15 @@ export function registerHarnessRoutes(app: FastifyInstance, { host, port, mcpEnt
     if (!h.detected(d, file)) return { id: h.id, state: 'failed', message: 'harness tidak terdeteksi di komputer ini' };
     const mcp = mcpConfig();
     if (!mcp) return { id: h.id, state: 'failed', message: 'entry MCP tidak ditemukan (jalankan build atau set LAKAR_MCP_ENTRY)' };
-    let text: string | undefined;
-    try {
-      text = await readFile(file, 'utf8');
-    } catch (e) {
-      if (!isEnoent(e)) return { id: h.id, state: 'failed', message: 'file config tidak bisa dibaca' };
-    }
+    const read = await readConfigFile(file);
+    if (read === 'unreadable') return { id: h.id, state: 'failed', message: 'file config tidak bisa dibaca' };
+    if (read === 'not-utf8') return { id: h.id, state: 'failed', message: 'file config bukan teks UTF-8' };
+    const text = read === 'absent' ? undefined : read.text;
+    const mode = read === 'absent' ? 0o600 : read.mode;
     const entry = h.format === 'jsonc' ? opencodeEntry(mcp) : jsonEntry(mcp);
     let out: string;
     if (h.format === 'toml') {
+      if (text !== undefined && DOTTED_LAKAR.test(text)) return dottedLakarFailed(h.id);
       out = mergeCodexToml(text, mcp).out;
     } else {
       const obj = text === undefined ? {} : parseObject(text, h.format === 'jsonc');
@@ -445,11 +506,11 @@ export function registerHarnessRoutes(app: FastifyInstance, { host, port, mcpEnt
       // Direktori config mungkin belum ada (marker/env-override menandai terdeteksi, file belum ditulis).
       await mkdir(dirname(file), { recursive: true });
       let backup: string | undefined;
-      if (text !== undefined) {
+      if (read !== 'absent') {
         backup = `${file}.bak`;
-        await writeFileAtomic(backup, text);
+        await writeFileAtomic(backup, read.raw, read.mode);
       }
-      await writeFileAtomic(file, out);
+      await writeFileAtomic(file, out, mode);
       return { id: h.id, state: 'installed', ...(backup ? { backup } : {}) };
     } catch (e) {
       return { id: h.id, state: 'failed', message: `gagal menulis file config: ${errorMessage(e)}` };
@@ -460,15 +521,14 @@ export function registerHarnessRoutes(app: FastifyInstance, { host, port, mcpEnt
   const uninstall = async (h: HarnessDef): Promise<HarnessResult> => {
     const file = h.configPath(d);
     if (!h.detected(d, file)) return { id: h.id, state: 'failed', message: 'harness tidak terdeteksi di komputer ini' };
-    let text: string;
-    try {
-      text = await readFile(file, 'utf8');
-    } catch (e) {
-      if (isEnoent(e)) return { id: h.id, state: 'not-installed' };
-      return { id: h.id, state: 'failed', message: 'file config tidak bisa dibaca' };
-    }
+    const read = await readConfigFile(file);
+    if (read === 'absent') return { id: h.id, state: 'not-installed' };
+    if (read === 'unreadable') return { id: h.id, state: 'failed', message: 'file config tidak bisa dibaca' };
+    if (read === 'not-utf8') return { id: h.id, state: 'failed', message: 'file config bukan teks UTF-8' };
+    const { text } = read;
     let out: string;
     if (h.format === 'toml') {
+      if (DOTTED_LAKAR.test(text)) return dottedLakarFailed(h.id);
       if (!text.split('\n').some((l) => LAKAR_TABLE_HEADER.test(l))) return { id: h.id, state: 'not-installed' };
       out = stripCodexLakar(text);
     } else {
@@ -479,8 +539,8 @@ export function registerHarnessRoutes(app: FastifyInstance, { host, port, mcpEnt
     }
     try {
       const backup = `${file}.bak`;
-      await writeFileAtomic(backup, text);
-      await writeFileAtomic(file, out);
+      await writeFileAtomic(backup, read.raw, read.mode);
+      await writeFileAtomic(file, out, read.mode);
       return { id: h.id, state: 'not-installed', backup };
     } catch (e) {
       return { id: h.id, state: 'failed', message: `gagal menulis file config: ${errorMessage(e)}` };
@@ -503,19 +563,51 @@ export function registerHarnessRoutes(app: FastifyInstance, { host, port, mcpEnt
     return reply.code(200).send({ ok: true, data: result });
   });
 
-  /** Pulihkan `<file>.bak` ke path aslinya (atomik). `.bak` tidak ada → `restored:false`. */
+  /**
+   * Pulihkan `<file>.bak` ke path aslinya (atomik, mode ikut `.bak`). Tanpa `.bak` — install membuat file baru
+   * lewat marker/env-override — file dihapus bila isinya memang hanya entri lakar; selain itu `restored:false`.
+   */
   app.post<{ Params: { id: string } }>('/viewer/connections/harnesses/:id/revert', async (req, reply) => {
     const h = defOr400(req.params.id, reply);
     if (h === undefined) return reply;
     if (h === 'other') return reply.code(200).send({ ok: true, data: { id: OTHER.id, restored: false } satisfies HarnessRevertResult });
     const file = h.configPath(d);
+    const bak = `${file}.bak`;
     let restored = false;
     try {
-      const backup = await readFile(`${file}.bak`);
-      await writeFileAtomic(file, backup);
+      const backup = await readFile(bak);
+      let mode = 0o600;
+      try {
+        const m = (await stat(bak)).mode & 0o777;
+        if (m) mode = m;
+      } catch {
+        // mode .bak tidak terbaca: pakai default 0600
+      }
+      await writeFileAtomic(file, backup, mode);
       restored = true;
-    } catch {
-      // .bak tidak ada atau gagal dipulihkan: tidak ada yang berubah
+    } catch (e) {
+      if (isEnoent(e)) {
+        // .bak tidak ada: pulihkan state "file belum ada" hanya bila file memang buatan install (hanya lakar).
+        const read = await readConfigFile(file);
+        if (typeof read === 'object') {
+          const onlyLakar =
+            h.format === 'toml'
+              ? read.text.split('\n').some((l) => LAKAR_TABLE_HEADER.test(l)) && stripCodexLakar(read.text).trim() === ''
+              : (() => {
+                  const obj = parseObject(read.text, h.format === 'jsonc');
+                  return !!obj && containsOnlyLakar(obj, h.format === 'jsonc');
+                })();
+          if (onlyLakar) {
+            try {
+              await rm(file);
+              restored = true;
+            } catch {
+              // gagal menghapus: restored tetap false
+            }
+          }
+        }
+      }
+      // kegagalan lain (restore gagal, dsb.): tidak ada yang berubah
     }
     log(`lakard: revert ${h.id} → ${restored ? 'restored' : 'nothing'}`);
     return reply.code(200).send({ ok: true, data: { id: h.id, restored } satisfies HarnessRevertResult });

@@ -402,7 +402,7 @@ function InstallAgents({ mcp, url }: { mcp: McpServerConfig | null | undefined; 
             aria-haspopup="menu"
             onClick={(e) => {
               const b = e.currentTarget.getBoundingClientRect();
-              setMenuAt({ id: r.id, x: b.right - 176, y: b.bottom + 4 });
+              setMenuAt({ id: r.id, x: b.right - 232, y: b.bottom + 4 });
             }}
           >
             <Icon name="ellipsis" size={16} />

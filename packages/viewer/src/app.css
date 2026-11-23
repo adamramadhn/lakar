@@ -3784,20 +3784,6 @@ button.panel-tab:hover {
   color: var(--text-secondary);
   font-size: 12px;
 }
-.conn-tools {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-.conn-tool {
-  padding: 4px 10px;
-  border-radius: 6px;
-  border: 1px solid var(--border);
-  background: var(--surface);
-  color: var(--text-secondary);
-  font-size: 12px;
-}
-
 /* ---- Install in an agent (desain section 11, story 8.11): baris harness + 5 state ---- */
 .conn-section-head {
   display: flex;
@@ -5806,39 +5792,6 @@ button.panel-tab:hover {
 .theme-preview.system .tp-block:last-child {
   background: #363636;
 }
-.settings-info {
-  display: flex;
-  flex-direction: column;
-  margin: 0;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--surface);
-}
-.settings-row {
-  display: grid;
-  grid-template-columns: 110px minmax(0, 1fr);
-  align-items: center;
-  gap: 12px;
-  min-height: 44px;
-  padding: 8px 14px;
-}
-.settings-row + .settings-row {
-  border-top: 1px solid var(--border);
-}
-.settings-row dt {
-  color: var(--text-secondary);
-}
-.settings-row dd {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-width: 0;
-  margin: 0;
-  font-size: 12px;
-}
-.settings-row dd .skeleton.line {
-  width: 50%;
-}
 .settings-path {
   flex: 1;
   min-width: 0;
@@ -5885,10 +5838,6 @@ button.panel-tab:hover {
   }
   .theme-options {
     gap: 10px;
-  }
-  .settings-row {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 4px;
   }
 }
 
