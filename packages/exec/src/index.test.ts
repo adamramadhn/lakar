@@ -204,7 +204,7 @@ describe('@lakar/exec', () => {
     it('view dipakai ulang di update/add → SCHEMA_INVALID + hint hanya-baca', async () => {
       const e = errRun(await runSnippet(`${SETUP}; update(k, {...get(t)})`, txFor()));
       expect(e.code).toBe('SCHEMA_INVALID');
-      expect(e.hint).toMatch(/parentId\/path\/childIds hanya-baca/);
+      expect(e.hint).toMatch(/parentId\/path\/childIds\/measuredHeight hanya-baca/);
       const e2 = errRun(await runSnippet(`${SETUP}; add(b, {type:'frame', name:'X', children:[]})`, txFor()));
       expect(e2.hint).toMatch(/satu per satu/);
     });
@@ -243,7 +243,28 @@ describe('@lakar/exec', () => {
       }
     });
 
-    it.each(['place(0, 10)', "place('a', 10)", 'place(10)', 'place(10, 10, {gap:-1})', 'place(10, 10, {dekat:1})'])('%s → SCHEMA_INVALID', async (code) => {
+    // spec-board-hug-height: h 'hug' untuk board baru; board hug yang ada memakai tinggi terukur (`boardHeights`).
+    it("h 'hug': board baru tanpa tinggi; board hug yang ada = tinggi terukur, belum terukur = 0", async () => {
+      expect(await place("place(1440, 'hug')")).toEqual({ x: 0, y: 0 });
+      const { r, c } = await commitRun("keep.l = add(null, {type:'board', name:'Landing', x:0, y:0, width:1440, height:'hug', screen:'landing'}); add(null, {type:'board', name:'Kanan', x:1520, y:0, width:390, height:844, screen:'mobile'})");
+      const l = r.keep.l as string;
+      const below = (heights?: Map<string, number>) => runSnippet(`place(1440, 'hug', {near: '${l}'})`, txFor(c.doc), heights ? { boardHeights: heights } : {});
+      expect(okRun(await below(new Map([[l, 3000]]))).value).toEqual({ x: 0, y: 3080 });
+      expect(okRun(await below()).value).toEqual({ x: 0, y: 80 });
+    });
+
+    it("get/find/children board hug: height tetap 'hug' + measuredHeight terukur (hanya-baca); belum terukur → tanpa measuredHeight", async () => {
+      const { r, c } = await commitRun("keep.l = add(null, {type:'board', name:'Landing', x:0, y:0, width:1440, height:'hug', screen:'landing'})");
+      const l = r.keep.l as string;
+      const view = okRun(await runSnippet(`[get('${l}'), find({type:'board'})[0].measuredHeight, children(null)[0].measuredHeight]`, txFor(c.doc), { boardHeights: new Map([[l, 4050]]) })).value as any[];
+      expect(view[0]).toMatchObject({ height: 'hug', measuredHeight: 4050 });
+      expect(view.slice(1)).toEqual([4050, 4050]);
+      expect((okRun(await runSnippet(`get('${l}')`, txFor(c.doc))).value as any).measuredHeight).toBeUndefined();
+      const e = errRun(await runSnippet(`update('${l}', {measuredHeight: 1})`, txFor(c.doc)));
+      expect(e.code).toBe('SCHEMA_INVALID');
+    });
+
+    it.each(['place(0, 10)', "place('a', 10)", 'place(10)', "place(10, 'fill')", "place('hug', 10)", 'place(10, 10, {gap:-1})', 'place(10, 10, {dekat:1})'])('%s → SCHEMA_INVALID', async (code) => {
       expect(errRun(await runSnippet(code, txFor())).code).toBe('SCHEMA_INVALID');
     });
   });

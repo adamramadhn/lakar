@@ -89,7 +89,8 @@ export function measureBoard(host: HTMLElement, board: BoardNode, at: { x: numbe
     id: board.id,
     type: 'board',
     name: board.name,
-    box: { x: at.x, y: at.y, w: board.width, h: board.height },
+    // Tinggi dari DOM: board `height:'hug'` tidak punya angka tersimpan (board fixed: sama dengan tingginya).
+    box: { x: at.x, y: at.y, w: board.width, h: typeof board.height === 'number' ? board.height : br.height / k },
     parentId: undefined,
     absolute: true,
     x: board.x,

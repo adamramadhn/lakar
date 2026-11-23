@@ -965,6 +965,13 @@ function PointGroup({ edit, disabled }: { edit: PathEditPanel; disabled: boolean
   );
 }
 
+const SIZING_OPTIONS: { value: Sizing; label: string }[] = [
+  { value: 'fixed', label: 'Fixed' },
+  { value: 'hug', label: 'Hug' },
+  { value: 'fill', label: 'Fill' },
+];
+const BOARD_HEIGHT_SIZING: { value: Sizing; label: string }[] = SIZING_OPTIONS.slice(0, 2);
+
 function PositionGroup({ targets, ctx, bounds }: { targets: DesignTarget[]; ctx: Ctx; bounds: [number, number, number, number] | undefined }) {
   const xyEditable = targets.every(canEditXY);
   const board = targets.every((t) => t.type === 'board');
@@ -1007,15 +1014,12 @@ function PositionGroup({ targets, ctx, bounds }: { targets: DesignTarget[]; ctx:
           token={{ spec: propSpec(axis, axis === 'width' ? 'Width' : 'Height'), ctx }}
           onCommit={(v) => ctx.run((ts) => setProp(ts, axis, Math.round(Number(v) * 100) / 100), `Change ${axis}`)}
         />
-        {!board && (
+        {/* Board: hanya tinggi yang bisa Hug (v8, spec-board-hug-height); lebar board selalu angka, tanpa Fill. */}
+        {(!board || axis === 'height') && (
           <Segmented<Sizing>
             label={`${axis === 'width' ? 'Width' : 'Height'} sizing`}
             className="dp-grow"
-            options={[
-              { value: 'fixed', label: 'Fixed' },
-              { value: 'hug', label: 'Hug' },
-              { value: 'fill', label: 'Fill' },
-            ]}
+            options={board ? BOARD_HEIGHT_SIZING : SIZING_OPTIONS}
             value={mode}
             disabled={ctx.disabled}
             onPick={(m) => ctx.run((ts) => setSizing(ts, axis, m), `Change ${axis} sizing`)}

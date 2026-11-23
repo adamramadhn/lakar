@@ -31,6 +31,7 @@ import { parseDocument } from '../packages/core/src/index.ts';
 import { IconCatalog } from '../packages/icons/src/index.ts';
 import { expandInstances, resolveDocument, type IconGlyph, type LakarDocument } from '../packages/schema/src/index.ts';
 import { generateCode, iconRefs, type CodegenFile, type CodegenTarget } from '../packages/codegen/src/index.ts';
+import { boardViewport } from '../packages/render/src/index.ts';
 import {
   addAsset,
   ASSET_BASE,
@@ -249,7 +250,8 @@ async function runCase(c: Case, mutate?: (files: CodegenFile[]) => CodegenFile[]
   const ref = await renderReference(c.doc, c.nodeId, icons);
   const out = generateCode(c.doc, { nodeId: c.nodeId, target: c.target, icons, assetBase: ASSET_BASE, components: c.components });
   const files = mutate ? mutate(out.files) : out.files;
-  const exp = await renderExport(files, c.target, { width: Math.ceil(board.width), height: Math.ceil(board.height) }, c.wrapperStyle);
+  // Board hug: viewport awal sama dengan render acuan (tinggi akhir mengikuti isi).
+  const exp = await renderExport(files, c.target, boardViewport(board), c.wrapperStyle);
   return { parity: await parity(c.label, ref, exp, !mutate && !regress.dropFramePadding), warnings: out.warnings.map((w) => `${w.code} ${w.nodeId ?? '-'}`), files: out.files, ref };
 }
 

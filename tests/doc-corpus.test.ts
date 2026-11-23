@@ -307,7 +307,7 @@ describe('korpus dokumen: migrasi v5 → v6 (vektor, AD-14)', () => {
 
 describe('korpus dokumen: migrasi v6 → v7 (tag semantik, AD-1)', () => {
   it.each(corpus.filter((d) => d.version === 6).map((d): [string, CorpusDoc] => [`v${d.version}/${d.name}`, d]))('identitas: %s', (_label, d) => {
-    expect(migrateDocument(d.raw), d.path).toEqual({ ...d.raw, schemaVersion: 7 });
+    expect(migrateDocument(d.raw, { target: 7 }), d.path).toEqual({ ...d.raw, schemaVersion: 7 });
   });
 
   it.each(corpus.filter((d) => d.version < 7).map((d): [string, CorpusDoc] => [`v${d.version}/${d.name}`, d]))('%s: hasil v6 = hasil versi kini kecuali versi', (_label, d) => {
@@ -336,6 +336,41 @@ describe('korpus dokumen: migrasi v6 → v7 (tag semantik, AD-1)', () => {
       expect(thrownCode(() => {
         tx.update(id as string, patch);
         tx.commit('tag salah');
+      })).toBe('SCHEMA_INVALID');
+    }
+  });
+});
+
+describe("korpus dokumen: migrasi v7 → v8 (board height:'hug', spec-board-hug-height)", () => {
+  it.each(corpus.filter((d) => d.version === 7).map((d): [string, CorpusDoc] => [`v${d.version}/${d.name}`, d]))('identitas: %s', (_label, d) => {
+    expect(migrateDocument(d.raw), d.path).toEqual({ ...d.raw, schemaVersion: 8 });
+  });
+
+  it.each(corpus.filter((d) => d.version < 8).map((d): [string, CorpusDoc] => [`v${d.version}/${d.name}`, d]))('%s: tinggi board tetap angka setelah migrasi', (_label, d) => {
+    for (const p of parseDocument(d.raw).pages) for (const b of p.children) expect(typeof b.height, `${d.path} ${b.id}`).toBe('number');
+  });
+
+  it("fixture v8 memuat board height:'hug' (landing) di samping board bertinggi angka", () => {
+    const boards = corpus.filter((d) => d.version === 8).flatMap((d) => parseDocument(d.raw).pages.flatMap((p) => p.children));
+    expect(boards.some((b) => b.height === 'hug' && b.screen === 'landing')).toBe(true);
+    expect(boards.some((b) => typeof b.height === 'number')).toBe(true);
+  });
+
+  it("jalur mutasi core: hug ↔ angka lewat update; 'fill' dan string lain ditolak SCHEMA_INVALID", () => {
+    const doc = parseDocument(corpus.find((x) => x.version === 8)!.raw);
+    const hug = doc.pages.flatMap((p) => p.children).find((b) => b.height === 'hug')!;
+    const tx = beginTransaction(doc, { sessionId: 'tes-korpus' });
+    tx.update(hug.id, { height: 2400 });
+    const fixed = tx.commit('fixed').doc;
+    expect(byAddress(fixed).get(hug.id)).toMatchObject({ height: 2400 });
+    const back = beginTransaction(fixed, { sessionId: 'tes-korpus' });
+    back.update(hug.id, { height: 'hug' });
+    expect(byAddress(back.commit('hug').doc).get(hug.id)).toMatchObject({ height: 'hug' });
+    for (const height of ['fill', 'auto']) {
+      const bad = beginTransaction(doc, { sessionId: 'tes-korpus' });
+      expect(thrownCode(() => {
+        bad.update(hug.id, { height });
+        bad.commit('tinggi salah');
       })).toBe('SCHEMA_INVALID');
     }
   });

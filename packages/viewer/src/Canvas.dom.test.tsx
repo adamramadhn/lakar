@@ -244,6 +244,37 @@ describe('Canvas — label Generating execute pertama', () => {
   });
 });
 
+describe("Canvas — board height:'hug' (spec-board-hug-height)", () => {
+  /** Dokumen fixture dengan board `height:'hug'`. */
+  const hugDoc = () => {
+    const doc = makeDoc(1);
+    (doc.pages[0]!.children[0] as { height: unknown }).height = 'hug';
+    return doc;
+  };
+  const frameEl = () => document.querySelector<HTMLElement>(`[data-board="${BOARD}"]`)!;
+
+  it('host live bertinggi auto dan tingginya dilaporkan setelah mount; bingkai board memakai tinggi terukur dari props', async () => {
+    const onHugHeight = vi.fn();
+    const boards = [{ ...BOARDS[0]!, height: 900, hug: true as const }];
+    const { rerender } = renderUi(<Canvas {...baseProps({ doc: hugDoc(), boards, onHugHeight })} />);
+    await mounted(CARD);
+    expect(host().style.height).toBe('');
+    // jsdom tanpa layout: offsetHeight 0 (di browser = tinggi isi shadow root).
+    await waitFor(() => expect(onHugHeight).toHaveBeenCalledWith(BOARD, 0));
+    expect(frameEl().style.height).toBe('900px');
+    rerender(<Canvas {...baseProps({ doc: hugDoc(), boards: [{ ...boards[0]!, height: 640 }], onHugHeight })} />);
+    expect(frameEl().style.height).toBe('640px');
+  });
+
+  it('board bertinggi angka: host setinggi board, tanpa laporan tinggi (perilaku lama)', async () => {
+    const onHugHeight = vi.fn();
+    renderUi(<Canvas {...baseProps({ onHugHeight })} />);
+    await mounted(CARD);
+    expect(host().style.height).toBe('300px');
+    expect(onHugHeight).not.toHaveBeenCalled();
+  });
+});
+
 describe('Canvas — Pen tool', () => {
   function penCanvas() {
     const onSelect = vi.fn();

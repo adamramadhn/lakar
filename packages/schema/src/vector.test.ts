@@ -19,7 +19,7 @@ const message = (node: Record<string, unknown>) => {
 
 describe('skema v6: vektor (AD-14)', () => {
   it('SCHEMA_VERSION 7 (v6 + tag)', () => {
-    expect(SCHEMA_VERSION).toBe(7);
+    expect(SCHEMA_VERSION).toBe(8);
   });
 
   it('path dengan semua atribut bertipe dan allowlist svg valid (dokumen dan NodeInput)', () => {

@@ -218,7 +218,7 @@ add(b, {type:'rect', name:'Kartu', width:120, height:80, radius:{$token:'radius.
 
 `get(id: string): NodeView`
 
-Baca satu node sebagai salinan datar: properti tersimpan (token apa adanya) + parentId, path (nama board→node), childIds (board/frame). Melihat perubahan snippet ini. Instance dibaca tersimpan (componentId, props, overrides, slots; tanpa childIds, isi slot lewat children(instanceId)); isinya lewat alamat '<instanceId>/<idNodeMaster>' = node efektif (props/override diterapkan, id/parentId/childIds beralamat komposit).
+Baca satu node sebagai salinan datar: properti tersimpan (token apa adanya) + parentId, path (nama board→node), childIds (board/frame), measuredHeight (board height:"hug", render terakhir sebelum snippet). Melihat perubahan snippet ini. Instance dibaca tersimpan (componentId, props, overrides, slots; tanpa childIds, isi slot lewat children(instanceId)); isinya lewat alamat '<instanceId>/<idNodeMaster>' = node efektif (props/override diterapkan, id/parentId/childIds beralamat komposit).
 
 - Mengembalikan: NodeView
 - Error: SCHEMA_INVALID, NOT_FOUND
@@ -277,16 +277,16 @@ const { tokens, modes } = getTokens();
 
 ### place
 
-`place(w: number, h: number, opts?: {near?: string, gap?: number}): {x, y}`
+`place(w: number, h: number | 'hug', opts?: {near?: string, gap?: number}): {x, y}`
 
-Posisi {x, y} untuk board baru w×h yang tidak tumpang tindih board di halaman (termasuk yang dibuat di snippet ini), berjarak gap (default 80). Halaman kosong → {x:0, y:0}; tanpa near → baris atas, kiri ke kanan; near → kanan board itu, lalu di bawahnya.
+Posisi {x, y} untuk board baru w×h yang tidak tumpang tindih board di halaman (termasuk yang dibuat di snippet ini), berjarak gap (default 80). h 'hug' = board height:'hug' (hanya tepi atasnya dihitung); board hug yang ada memakai tinggi terukur render terakhir. Halaman kosong → {x:0, y:0}; tanpa near → baris atas, kiri ke kanan; near → kanan board itu, lalu di bawahnya.
 
 - Mengembalikan: {x: number, y: number}
 - Error: SCHEMA_INVALID, NOT_FOUND
 
 ```js
-const p = place(1440, 900);
-add(null, {type:'board', name:'Desktop', x:p.x, y:p.y, width:1440, height:900, screen:'landing'});
+const p = place(1440, 'hug');
+add(null, {type:'board', name:'Beranda', x:p.x, y:p.y, width:1440, height:'hug', screen:'landing'});
 ```
 
 ### iconSearch

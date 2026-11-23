@@ -622,7 +622,7 @@ describe('pembekuan putaran resmi', () => {
   });
   it('(f) schemaVersion lakard ≠ bench / (g) penyedia foto bukan unsplash → masalah', () => {
     expect(officialFreezeProblems({ ...base, lakard: { ...base.lakard!, schemaVersion: 1 } })).toEqual([`schemaVersion lakard 1 ≠ ${SCHEMA_VERSION} (bench)`]);
-    expect(SCHEMA_VERSION).toBe(7);
+    expect(SCHEMA_VERSION).toBe(8);
     const g = (photos: NonNullable<OfficialFreezeInput['lakard']>['photos']) => officialFreezeProblems({ ...base, lakard: { ...base.lakard!, photos } });
     expect(g({ provider: 'wikimedia', keyFile: 'absent', imported: 0 })[0]).toContain('penyedia foto lakard wikimedia ≠ unsplash');
     expect(g(undefined)[0]).toContain('penyedia foto lakard (tidak ada di /status) ≠ unsplash');

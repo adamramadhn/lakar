@@ -7,6 +7,7 @@ import {
   boardDecls,
   boxPaintDecls,
   childLayoutDecls,
+  hugBoardChild,
   codeBackgroundDecls,
   DEFAULT_ASSET_BASE,
   DEFAULT_FONT,
@@ -198,7 +199,7 @@ export function buildTree(doc: LakarDocument, opts: TreeOptions, warnings: Codeg
     root = el('div', camelName(b.name, 'board'), b.id, []);
     const bg = background(ctx, root, b.fills);
     root.decls = [...boardDecls(b), ...(bg.length ? bg : ([['background-color', BOARD_DEFAULT_BACKGROUND]] as CssDecl[]))];
-    root.children = childElements(ctx, b.children, 'column', 0, undefined);
+    root.children = childElements(ctx, b.children.map((c) => hugBoardChild(b, c)), 'column', 0, undefined);
   } else {
     // Akar node anak: anak flow kolom (seperti anak langsung board); posisi absolute akar diabaikan.
     root = nodeElement(ctx, unpositioned(hit.node), 'column', 0, undefined);

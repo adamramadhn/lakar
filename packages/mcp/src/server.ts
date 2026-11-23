@@ -170,7 +170,7 @@ export const SERVER_INSTRUCTIONS =
   'bangun di board terpilih, atau board kosong (ubah ukuran dan nama sesuai jenis layar), atau board baru lewat place; ' +
   'open_doc {slug} hanya bila pengguna meminta file tertentu atau file baru. ' +
   'Lalu rencana singkat, dan langsung bangun bertahap supaya pengguna melihat canvas tumbuh live: satu execute per seksi untuk landing ' +
-  '(board mulai setinggi navbar + hero lalu ditinggikan tiap seksi dari bounds; [WIP] sampai execute penutup), per area layar untuk webapp, ' +
+  "(board landing height:'hug' mengikuti isi, jangan isi atau naikkan tingginya; [WIP] sampai execute penutup), per area layar untuk webapp, " +
   'satu board utuh untuk mobile; tiap execute diawali prelude dari skill core; ' +
   'baca check di respons execute, perbaiki dengan editId/edits atau update, akhiri dengan satu screenshot board + satu screenshot zoom (nodeId, scale 2) ' +
   'area terpadat (skill review), satu execute perbaikan, lalu export PNG. ' +
@@ -178,7 +178,8 @@ export const SERVER_INSTRUCTIONS =
 
 /** Deskripsi tool `list_boards`. */
 export const LIST_BOARDS_DESCRIPTION =
-  'Daftar board dokumen aktif: {docId, slug, rev, boards:[{id, name, page, screen, x, y, width, height, expectedSize?, wip, childCount}]}. ' +
+  'Daftar board dokumen aktif: {docId, slug, rev, boards:[{id, name, page, screen, x, y, width, height, heightMode?, expectedSize?, wip, childCount}]}. ' +
+  "heightMode 'hug' = board height:'hug': height = tinggi terukur render terakhir. " +
   "wip = nama diawali '[WIP] '. Pakai id untuk screenshot, inspect, export, layout_check.";
 
 /** Deskripsi tool `inspect`. */
@@ -239,7 +240,7 @@ export const LAYOUT_CHECK_DESCRIPTION =
   `batas kontrol ${CONTROL_PREFIXES.map((p) => `'${p} …'`).join('/')} (stroke/fill, atau keturunan bercat) < ${CONTRAST_MIN.nonText}:1 terhadap latar, ` +
   `ikon tanpa label teks (di komponen tanpa teks, atau deretan ikon seperti bintang rating tanpa nilai) < ${CONTRAST_MIN.nonText}:1, ` +
   `dan warning scrim: teks di atas foto/gradien multi-hue/efek blur tanpa fill solid opacity ≥ ${String(SCRIM_MIN_ALPHA).replace('.', ',')} di antaranya; ` +
-  'LC-12 (warning) ukuran board (mobile 390×844, app 1440×900 atau 1440×1024, landing lebar 1440, atau expectedSize), tinggi pas board mobile panjang dan board landing tanpa [WIP] (ruang kosong di bawah isi > 8 px → update tinggi), dan tabrakan antarboard (pakai place). ' +
+  'LC-12 (warning) ukuran board (mobile 390×844, app 1440×900 atau 1440×1024, landing lebar 1440, atau expectedSize), tinggi pas board mobile panjang dan board landing tanpa [WIP] (ruang kosong di bawah isi > 8 px → update tinggi; board height hug tidak dinilai), dan tabrakan antarboard (pakai place). ' +
   'Warning polesan: LC-18 kartu bersarang, LC-23 celah teks ↔ badge/tombol/ikon < 8, LC-24 proporsi badge di baris, LC-25 radius tidak konsentris, ' +
   'LC-26 ruang di atas judul ≤ bawah, LC-27 > 6 ukuran huruf, LC-28 baris > 80 karakter, LC-29 bobot < 400 di < 18px, LC-30 tanda baca (... dan tanda hubung rentang). ' +
   `Warning tipografi/spacing (token DESIGN.md): LC-03 teks wrap 'fixed' ≥ 2 baris atau teks melewati kotaknya, LC-06 paragraf (≥ 2 baris, ≥ 6 kata) < ${PARAGRAPH_MIN.landing}px di landing/mobile, < ${PARAGRAPH_MIN.app}px di app, < ${PARAGRAPH_MIN_IN_CARD}px di kartu ber-cat, ` +
@@ -274,14 +275,14 @@ export const EXECUTE_DESCRIPTION =
   'getTokens() → {tokens, modes} baca token dan mode; renameToken(from, to) ganti nama token + semua ref; ' +
   'importCssVariables(css) → {tokens, modes, skipped} token bertipe dari isi file CSS variables (:root + [data-theme="dark"]); ' +
   'get(id) → NodeView; find({type?, name?: string|RegExp, within?}) → NodeView[] urutan dokumen; children(id|null) → NodeView[] anak langsung (null = board); ' +
-  'NodeView = properti tersimpan (token apa adanya) + parentId, path, childIds (hanya-baca: jangan kirim balik ke update/add); ' +
-  'place(w, h, {near?, gap?}) → {x,y} posisi board baru yang tidak tumpang tindih (gap default 80); ' +
+  "NodeView = properti tersimpan (token apa adanya) + parentId, path, childIds, measuredHeight (board height:'hug') (hanya-baca: jangan kirim balik ke update/add); " +
+  "place(w, h|'hug', {near?, gap?}) → {x,y} posisi board baru yang tidak tumpang tindih (gap default 80); " +
   "iconSearch(query, {lib?:'lucide'|'simple-icons', limit?}) → [{lib, icon, tags?, title?, aliasOf?}] cari ikon (default 10, maks 50; sama dengan tool icon_search). " +
   "photo('<ref>') → {assetId, width, height, credit, license, creator, sourcePageUrl} foto stok untuk ref dari tool photo_search; tulis ref sebagai literal string " +
   "(daemon mengimpornya sekali sebelum snippet berjalan; ref dari variabel → NOT_FOUND), pakai di fills [{type:'image', assetId:p.assetId, fit:'cover'}]; credit untuk ringkasan akhir, bukan node UI kecuali diminta. " +
   'keep: objek JSON per sesi yang bertahan antar-execute bila sukses (mis. keep.hero = add(...); lalu get(keep.hero)). ' +
   'console.log(...) → data.logs. Nilai ekspresi terakhir → data.value (JSON; dipotong di 32 KB dengan valueTruncated). ' +
-  "Katalog node v1 (tertutup): board (parent null) {type:'board', name, x, y, width, height, screen:'landing'|'app'|'mobile', expectedSize?:{width,height}, fills?}; " +
+  "Katalog node v1 (tertutup): board (parent null) {type:'board', name, x, y, width, height (angka | 'hug' = ikut isi), screen:'landing'|'app'|'mobile', expectedSize?:{width,height}, fills?}; " +
   "frame {layout?:'none'|'row'|'column', gap? (boleh negatif), padding?: n|[v,h]|[t,r,b,l], align?:'start'|'center'|'end'|'stretch', justify?:'start'|'center'|'end'|'space-between', clip?, scrollY?}; " +
   "text {content, size, family?, weight? (100–900), style?:'normal'|'italic', lineHeight? px, letterSpacing? em, align?:'left'|'center'|'right'|'justify', wrap?:'auto'|'wrap'|'fixed', numeric?:'proportional'|'tabular', color?}; " +
   "rect {}; ellipse {startDeg?, sweepDeg? (-360..360), inner? [0,1)}; path {d, viewBox:[x,y,w,h]}; icon {lib:'lucide'|'simple-icons', icon (nama kanonik, mis. 'arrow-right'), size, color?, strokeWidth?, filled?}. " +

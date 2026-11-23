@@ -761,6 +761,37 @@ describe.skipIf(!browserInstalled)('check G0 (AD-8): execute + /layout-check', (
     expect(Object.keys(u.body.data.bounds)).toEqual([r.body.data.value, judul]);
   }, 60_000);
 
+  // spec-board-hug-height: tinggi board hug = isi, diukur saat render; jalur tanpa render memakai ukuran terakhir.
+  it("board height:'hug': bounds/screenshot/list_boards = tinggi isi; tumbuh per seksi; measuredHeight dan place memakainya", async () => {
+    const sid = await newSession();
+    await call('/docs/open', { slug: 'check-hug' }, sid);
+    const seksi = (name: string, h: number) => `add(b, {type:'frame', name:'${name}', layout:'column', width:'fill', height:${h}, fills:[{type:'solid', color:'#EEEEEE'}]})`;
+    const r1 = await call(
+      '/execute',
+      { code: `const b = add(null, {type:'board', name:'Landing', x:0, y:0, width:1440, height:'hug', screen:'landing'}); keep.b = b; ${seksi('Navbar', 72)}; ${seksi('Seksi / Hero', 828)}; b`, description: 'landing hug: navbar dan hero' },
+      sid,
+    );
+    expect(r1.status, JSON.stringify(r1.body.error)).toBe(200);
+    const b = r1.body.data.value as string;
+    expect(r1.body.data.bounds[b]).toEqual([0, 0, 1440, 900]);
+    // Seksi kedua: board tumbuh tanpa angka tinggi; LC-12 tidak menilai tinggi pas board hug.
+    const r2 = await call('/execute', { code: `const b = keep.b; ${seksi('Seksi / Fitur', 600)}; get(b).measuredHeight`, description: 'landing hug: seksi fitur' }, sid);
+    expect(r2.status, JSON.stringify(r2.body.error)).toBe(200);
+    expect(r2.body.data.value).toBe(900); // ukuran render terakhir sebelum snippet ini
+    expect(r2.body.data.bounds[b]).toEqual([0, 0, 1440, 1500]);
+    expect(r2.body.data.check.findings.filter((f: { rule: string }) => f.rule === 'LC-12')).toEqual([]);
+    const boards = (await call('/boards', {}, sid)).body.data.boards as { id: string; height: number; heightMode?: string }[];
+    expect(boards.find((x) => x.id === b)).toMatchObject({ height: 1500, heightMode: 'hug' });
+    const shot = await call('/screenshot', { boardId: b }, sid);
+    expect(shot.body.data).toMatchObject({ width: 1440, height: 1500 });
+    const p = await call('/execute', { code: `place(1440, 'hug', {near: keep.b, gap: 80})`, description: 'posisi board kedua' }, sid);
+    expect(p.body.data.value).toEqual({ x: 1520, y: 0 });
+    // Tarik tinggi jadi angka = fixed (board fixed lama tetap berperilaku sama).
+    const f = await call('/execute', { code: `update(keep.b, {height: 1600})`, description: 'tinggi landing jadi fixed' }, sid);
+    expect(f.body.data.bounds[b]).toEqual([0, 0, 1440, 1600]);
+    expect(((await call('/boards', {}, sid)).body.data.boards as { id: string; heightMode?: string }[]).find((x) => x.id === b)!.heightMode).toBeUndefined();
+  }, 60_000);
+
   it('setTokens yang dipakai 2 board → kedua board dirender dan diperiksa', async () => {
     const sid = await newSession();
     await call('/docs/open', { slug: 'check-token' }, sid);

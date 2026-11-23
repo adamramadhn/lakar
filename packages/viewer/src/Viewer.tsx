@@ -69,6 +69,7 @@ import { AddLayerButton, IconPicker, Toast, type ToastState } from './AddLayer';
 import { api, ApiError, errorText, OfflineError, type FontFamily, type HistoryEntry, type InspectResult, type LayoutCheck } from './api';
 import { Canvas, type CanvasMarker, type CanvasPreview, type Focus, type Highlight, type InsertPoint } from './Canvas';
 import type { PathEditPanel } from './pathTools';
+import { measuredBoards, withHeight } from './boardHeight';
 import { failureText, imageFileProblem, insertBoardAt, insertBoardPlaced, insertIntoBoard, canvasInsertTarget, menuInsertTarget, type InsertExtra, type InsertKind, type InsertTarget } from './codegen';
 import { resolvePageIndex } from './pages';
 import { PagesPanel } from './PagesPanel';
@@ -348,6 +349,9 @@ export function Viewer({ slug }: { slug: string }) {
   const [histInfo, setHistInfo] = useState<{ count: number; top?: HistoryEntry } | undefined>(undefined);
   /** Toast rollback: execute agen pada dokumen ini gagal (perubahan tidak diterapkan). */
   const [rollback, setRollback] = useState<{ text: string; key: number } | undefined>(undefined);
+  /** Tinggi terukur board `height:'hug'` (canvas live/PNG; spec-board-hug-height). */
+  const [hugHeights, setHugHeights] = useState<ReadonlyMap<string, number>>(() => new Map());
+  const onHugHeight = useCallback((id: string, h: number) => setHugHeights((m) => withHeight(m, id, h)), []);
   /** Waktu kontak terakhir dengan lakard (muat dokumen / event): pill "Last synced …" saat offline. */
   const lastSync = useRef(Date.now());
   // Laci hanya ada di ≤1100px (sama dengan app.css): Escape menutupnya lebih dulu (fase capture) dan tidak diteruskan
@@ -1333,7 +1337,8 @@ export function Viewer({ slug }: { slug: string }) {
       }
     : undefined;
   const page = d.pages[pageIndex] ?? d.pages[0];
-  const boards = (page?.children ?? []) as unknown as (TreeNode & { x: number; y: number; width: number; height: number })[];
+  // Board hug: tinggi = ukuran terukur canvas (bingkai, seleksi, ekspor), bukan `'hug'`.
+  const boards = measuredBoards((page?.children ?? []) as unknown as (TreeNode & { x: number; y: number; width: number; height: number | 'hug' })[], hugHeights);
   const selectedInfo = selectedId ? index.get(selectedId) : undefined;
   const highlight: Highlight | undefined =
     selectedInfo && inspect?.state === 'ok' && inspect.value.node.id === selectedId && inspect.value.node.bounds
@@ -1620,6 +1625,7 @@ export function Viewer({ slug }: { slug: string }) {
         rev={d.rev}
         boardRevs={boardRevs}
         boards={boards}
+        onHugHeight={onHugHeight}
         presence={presence}
         pending={pending}
         fades={fades}

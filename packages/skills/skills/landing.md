@@ -1,6 +1,6 @@
 # Lakar: landing page
 
-Board `1440 × bebas` (`screen:'landing'`), tinggi dari `bounds`, bukan tebakan; `LC-12` "tinggi pas = N" → `update(keep.board,{height:N})`.
+Board `1440` (`screen:'landing'`, `height:'hug'`): tinggi = isi; jangan isi atau naikkan `height`.
 
 ## Struktur
 
@@ -18,7 +18,7 @@ Board `1440 × bebas` (`screen:'landing'`), tinggi dari `bounds`, bukan tebakan;
 
 ## Alur execute
 
-Satu seksi per execute: 1. Board setinggi navbar + hero + `keep.board`/`keep.page`. 2. Per seksi (footer terakhir): tinggi board = `Halaman` di `bounds` terakhir + perkiraan seksi (lebihkan), seksinya, perbaikan `check`. 3. Review → penutup: perbaikan + tinggi pas + lepas `[WIP] `.
+Satu seksi per execute: 1. Board hug + navbar + hero + `keep.board`/`keep.page`. 2. Per seksi (footer terakhir): seksinya + perbaikan `check`. 3. Review → penutup: perbaikan + lepas `[WIP] `.
 
 ## Contoh teruji
 
@@ -26,8 +26,8 @@ Execute 1, hero di bidang merek (langkah khas: mockup jadwal utuh di bawah teks 
 
 ```js
 // pakai prelude
-const p=place(1440,6000); // ruang tumbuh
-const b=add(null,{type:'board',name:'[WIP] Biji Pagi / Beranda · landing · Jernih',x:p.x,y:p.y,width:1440,height:960,screen:'landing',fills:fill(C.bg)});
+const p=place(1440,'hug');
+const b=add(null,{type:'board',name:'[WIP] Biji Pagi / Beranda · landing · Jernih',x:p.x,y:p.y,width:1440,height:'hug',screen:'landing',fills:fill(C.bg)});
 keep.board=b;
 const page=F(b,'Halaman',{width:'fill'});
 // Navbar 72
@@ -82,7 +82,6 @@ Execute 2, bento: kartu lebar (stok berpembanding + linimasa) + dua sempit (satu
 
 ```js
 // pakai prelude
-update(keep.board,{height:948+900}); // Halaman 948 + seksi
 const s=F(keep.page,'Seksi / Fitur',{width:'fill',padding:[128,80],gap:48});
 const head=F(s,'Header seksi',{width:720,gap:16});
 T(head,'Overline','CARA KERJA','overline',{color:C.acc});
@@ -115,8 +114,8 @@ for(const [ic,j,dsc,det,tone,hot] of [['flame','Profil sangrai per menu','Espres
 }
 ```
 
-Penutup: tinggi dari `bounds` (948 + 780):
+Penutup:
 
 ```js
-update(keep.board, {height:1728, name:'Biji Pagi / Beranda · landing · Jernih'});
+update(keep.board, {name:'Biji Pagi / Beranda · landing · Jernih'});
 ```

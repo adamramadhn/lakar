@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url';
 import type { Browser, Page } from 'playwright-core';
 import { SCHEMA_VERSION, type IconGlyph, type ResolvedDocument } from '@lakar/schema';
 import { chromiumInstalled, DEFAULT_BROWSERS_PATH } from '../../../tests/support/browser.ts';
-import { CHROMIUM_ARGS, type FontFaceSource, type RenderResult } from '../src/index.js';
+import { CHROMIUM_ARGS, boardViewport, type FontFaceSource, type RenderResult } from '../src/index.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 export const RENDER_DIST = join(HERE, '..', 'dist');
@@ -126,10 +126,12 @@ export async function render(
   opts: { assetBase?: string; icons?: readonly IconGlyph[]; allowGlyphs?: readonly number[] } = {},
 ): Promise<{ result: RenderResult; png: Buffer | undefined }> {
   const board = doc.pages.flatMap((pg) => pg.children).find((b) => b.id === boardId);
-  if (board) await p.setViewportSize({ width: Math.max(1, Math.ceil(board.width)), height: Math.max(1, Math.ceil(board.height)) });
+  if (board) await p.setViewportSize(boardViewport(board));
   const args = [doc, boardId, fonts, opts.assetBase ?? ASSET_BASE, opts.icons ?? ICON_GLYPHS, opts.allowGlyphs ?? []];
   const result = (await p.evaluate(`(${RENDER_IN_PAGE})(${JSON.stringify(args)})`)) as RenderResult;
   if (!result.ok) return { result, png: undefined };
+  // Board hug: viewport = tinggi terukur (sama dengan daemon).
+  if (board && board.height === 'hug') await p.setViewportSize(boardViewport({ width: board.width, height: result.measure.height }));
   const png = await p.locator(`[data-lakar-id="${boardId}"]`).screenshot({ type: 'png', scale: 'css', animations: 'disabled', caret: 'hide' });
   return { result, png };
 }

@@ -1,0 +1,93 @@
+{
+  "schemaVersion": 8,
+  "id": "CorpV8Hg",
+  "rev": 5,
+  "pages": [
+    {
+      "id": "PageHg01",
+      "name": "Page 1",
+      "children": [
+        {
+          "type": "board",
+          "id": "BrdHg001",
+          "name": "Landing",
+          "x": 0,
+          "y": 0,
+          "width": 1440,
+          "height": "hug",
+          "screen": "landing",
+          "fills": [{ "type": "solid", "color": "#FAFAF7" }],
+          "children": [
+            {
+              "type": "frame",
+              "id": "FrmHg001",
+              "name": "Navbar",
+              "layout": "row",
+              "align": "center",
+              "justify": "space-between",
+              "padding": [20, 80, 20, 80],
+              "width": "fill",
+              "height": 72,
+              "children": [
+                { "type": "text", "id": "TxtHg001", "name": "Logo", "content": "Lereng", "weight": 700, "size": 20, "lineHeight": 28, "color": "#1A1A1A" },
+                { "type": "icon", "id": "IcoHg001", "name": "Icon / lucide / search", "lib": "lucide", "icon": "search", "size": 20, "color": "#1A1A1A" }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "FrmHg002",
+              "name": "Seksi / Hero",
+              "layout": "column",
+              "gap": 16,
+              "padding": [96, 80, 96, 80],
+              "width": "fill",
+              "fills": [{ "type": "solid", "color": "#1F3D2B" }],
+              "children": [
+                { "type": "text", "id": "TxtHg002", "name": "Judul", "content": "Kopi dari lereng gunung", "weight": 700, "size": 56, "lineHeight": 64, "color": "#FFFFFF" },
+                { "type": "text", "id": "TxtHg003", "name": "Subjudul", "content": "Dipanggang tiap pekan, dikirim ke seluruh kota.", "size": 20, "lineHeight": 28, "color": "#E6EDE8", "width": 640, "wrap": "wrap" }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "FrmHg003",
+              "name": "Seksi / Fitur",
+              "layout": "row",
+              "gap": 24,
+              "padding": [80, 80, 80, 80],
+              "width": "fill",
+              "children": [
+                { "type": "rect", "id": "RctHg001", "name": "Kartu 1", "width": "fill", "height": 200, "radius": 12, "fills": [{ "type": "solid", "color": "#EDE7DA" }] },
+                { "type": "rect", "id": "RctHg002", "name": "Kartu 2", "width": "fill", "height": 200, "radius": 12, "fills": [{ "type": "solid", "color": "#EDE7DA" }] }
+              ]
+            },
+            {
+              "type": "rect",
+              "id": "RctHg003",
+              "name": "Overlay / Lencana",
+              "position": "absolute",
+              "x": 1240,
+              "y": 120,
+              "width": 120,
+              "height": 40,
+              "radius": 20,
+              "fills": [{ "type": "solid", "color": "#F2B544" }]
+            }
+          ]
+        },
+        {
+          "type": "board",
+          "id": "BrdHg002",
+          "name": "Mobile",
+          "x": 1520,
+          "y": 0,
+          "width": 390,
+          "height": 844,
+          "screen": "mobile",
+          "children": [
+            { "type": "text", "id": "TxtHg004", "name": "Judul", "content": "Lereng", "weight": 700, "size": 24, "lineHeight": 32, "color": "#1A1A1A" }
+          ]
+        }
+      ]
+    }
+  ]
+}

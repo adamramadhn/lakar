@@ -9,6 +9,7 @@ import { iconRefs } from '@lakar/render';
 import { LakarError, SLUG_PATTERN, findBoard, resolveDocument, type IconGlyph, type LakarDocument, type ResolvedDocument } from '@lakar/schema';
 import { z } from 'zod';
 import { notFound } from './errors.js';
+import { readPngSize } from './png.js';
 import { parseRevParam, readRevision, slugify } from './files.js';
 import type { DocStore } from './store.js';
 import { peekDocument } from './viewer.js';
@@ -72,6 +73,8 @@ export function registerExportRoutes(app: FastifyInstance, { docs, store, render
     if (!board) throw notFound(`board ${r.data.boardId} tidak ada di dokumen ${slug} r${rev}`, 'pilih board dari versi itu');
     for (const ref of iconRefs(board)) icons.canonical(ref.lib, ref.icon);
     const png = await render.screenshot(doc, board.id);
-    return reply.code(200).send({ ok: true, data: { boardId: board.id, width: board.width, height: board.height, mimeType: 'image/png', png: Buffer.from(png).toString('base64') } });
+    // Board hug: ukuran = hasil render (PNG skala 1 = px CSS).
+    const dims = typeof board.height === 'number' ? { width: board.width, height: board.height } : readPngSize(png);
+    return reply.code(200).send({ ok: true, data: { boardId: board.id, ...dims, mimeType: 'image/png', png: Buffer.from(png).toString('base64') } });
   });
 }

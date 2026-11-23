@@ -16,7 +16,7 @@ const mesh6 = ['#0B1020', '#123B2A', '#0B1020', '#22C55E', '#0EA5E9', '#0B1020']
 
 describe('skema v2: fill efek', () => {
   it('SCHEMA_VERSION 7 (v2 dimigrasi lewat @lakar/core)', () => {
-    expect(SCHEMA_VERSION).toBe(7);
+    expect(SCHEMA_VERSION).toBe(8);
   });
 
   it.each([

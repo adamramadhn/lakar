@@ -104,6 +104,16 @@ describe('designModel', () => {
     expect(readSizing([t('e', 'board', { width: 100 })], 'width')).toBe('fixed');
   });
 
+  it("board height:'hug' (v8): Hug ↔ Fixed; Fixed = tinggi terukur dibulatkan", () => {
+    const hug = t('b', 'board', { width: 1440, height: 'hug' }, { measured: { w: 1440, h: 4050.4 } });
+    expect(readSizing([hug], 'height')).toBe('hug');
+    expect(readSizing([hug], 'width')).toBe('fixed');
+    expect(setSizing([hug], 'height', 'fixed')).toEqual([{ op: 'update', id: 'b', patch: { height: 4050 } }]);
+    const fixed = t('c', 'board', { width: 1440, height: 4050 });
+    expect(readSizing([fixed], 'height')).toBe('fixed');
+    expect(setSizing([fixed], 'height', 'hug')).toEqual([{ op: 'update', id: 'c', patch: { height: 'hug' } }]);
+  });
+
   it('X/Y: board, absolute, anak frame none bisa diedit; anak flow tidak', () => {
     expect(canEditXY(t('a', 'board', {}))).toBe(true);
     expect(canEditXY(t('b', 'rect', { position: 'absolute' }))).toBe(true);

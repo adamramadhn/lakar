@@ -50,7 +50,7 @@ const bgOf = (d: ReturnType<typeof resolveTokens>, i: number) => (d.pages[0]!.ch
 
 describe('skema v3: token bertipe', () => {
   it('SCHEMA_VERSION 7 (v3 + grid + komponen + vektor + tag) dan urutan TOKEN_TYPES tetap', () => {
-    expect(SCHEMA_VERSION).toBe(7);
+    expect(SCHEMA_VERSION).toBe(8);
     expect(TOKEN_TYPES).toEqual(['color', 'radius', 'spacing', 'container', 'breakpoint', 'fontFamily', 'fontWeight', 'fontSize', 'lineHeight', 'letterSpacing']);
   });
 

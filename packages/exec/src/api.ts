@@ -55,6 +55,8 @@ export type NodeView = {
   path: string[];
   /** ID anak langsung (urutan dokumen); hanya pada board/frame. */
   childIds?: string[];
+  /** Board `height:'hug'`: tinggi terukur render terakhir sebelum snippet (belum terukur → tidak ada). */
+  measuredHeight?: number;
   [prop: string]: unknown;
 };
 
@@ -163,7 +165,7 @@ export interface LakarApi {
   /** Token dokumen (bentuk tersimpan) dan daftar mode tema (`[]` bila tanpa mode). */
   getTokens(): TokensView;
   /** Posisi bebas tumpang tindih untuk board baru berukuran `w`×`h`. */
-  place(w: number, h: number, opts?: PlaceOptions): Point;
+  place(w: number, h: number | 'hug', opts?: PlaceOptions): Point;
   /**
    * Cari ikon di katalog terpasang (lucide = ikon UI, simple-icons = logo brand). Urut relevansi: nama persis >
    * awalan nama/alias > token nama > tag persis > tag sebagian. Pakai `lib` + `icon` hasilnya di node icon.
@@ -190,6 +192,11 @@ export type ApiContext = {
   photos?: PhotoLibraryPort;
   /** Parser CSS variables (`importCssVariables`), disuntikkan daemon dari @lakar/render; tidak ada → EXEC_ERROR. */
   cssVariables?: CssVariablesPort;
+  /**
+   * Tinggi terukur board `height:'hug'` (render terakhir sebelum snippet; spec-board-hug-height). Dipakai `place` dan
+   * `measuredHeight` di view board. Tanpa entri (mis. board baru di snippet ini) = belum terukur.
+   */
+  boardHeights?: ReadonlyMap<string, number>;
 };
 
 /** Ukuran maksimum stylesheet `importCssVariables` (karakter). */
@@ -253,7 +260,7 @@ function requireId(fn: string, what: string, v: unknown): string {
   return v;
 }
 
-const VIEW_KEYS = ['parentId', 'path', 'childIds'] as const;
+const VIEW_KEYS = ['parentId', 'path', 'childIds', 'measuredHeight'] as const;
 
 /** Tolak field turunan NodeView (dan `children` bersarang) di argumen node/patch. */
 function rejectDerivedKeys(fn: string, obj: unknown): void {
@@ -261,7 +268,7 @@ function rejectDerivedKeys(fn: string, obj: unknown): void {
   const hit = VIEW_KEYS.filter((k) => Object.hasOwn(obj, k));
   if (hit.length) {
     throw new LakarError('SCHEMA_INVALID', `${fn}: ${hit.join('/')} hanya-baca (field turunan get/find/children), tidak bisa dikirim balik`, {
-      hint: `parentId/path/childIds hanya-baca; ambil properti yang perlu saja, mis. update(id, {gap: get(x).gap, fills: get(x).fills}); pindah parent → move(id, parentId)`,
+      hint: `parentId/path/childIds/measuredHeight hanya-baca; ambil properti yang perlu saja, mis. update(id, {gap: get(x).gap, fills: get(x).fills}); pindah parent → move(id, parentId)`,
     });
   }
   if (fn === 'add' && Object.hasOwn(obj, 'children')) {
@@ -337,11 +344,13 @@ function walk(doc: Readonly<Doc>): Entry[] {
   return out;
 }
 
-/** NodeView salinan (JSON) dari entri. */
-function toView(e: Entry): NodeView {
+/** NodeView salinan (JSON) dari entri; board `height:'hug'` yang sudah terukur mendapat `measuredHeight`. */
+function toView(e: Entry, heights?: ReadonlyMap<string, number>): NodeView {
   const { children, ...props } = e.node as AnyNode & { children?: AnyNode[] };
   const view: Record<string, unknown> = { ...props, parentId: e.parentId, path: e.path };
   if (children) view.childIds = children.map((c) => c.id);
+  const measured = e.node.type === 'board' && e.node.height === 'hug' ? heights?.get(e.node.id) : undefined;
+  if (measured !== undefined) view.measuredHeight = measured;
   return JSON.parse(JSON.stringify(view)) as NodeView;
 }
 
@@ -366,10 +375,11 @@ const FIND_KEYS = ['type', 'name', 'within'];
 const PLACE_KEYS = ['near', 'gap'];
 
 type Rect = { x: number; y: number; w: number; h: number };
-const boardRect = (n: AnyNode): Rect => {
-  const b = n as { x?: unknown; y?: unknown; width?: unknown; height?: unknown };
+/** Kotak board; `height:'hug'` = tinggi terukur (`heights`), belum terukur = 0. */
+const boardRect = (n: AnyNode, heights?: ReadonlyMap<string, number>): Rect => {
+  const b = n as { id: string; x?: unknown; y?: unknown; width?: unknown; height?: unknown };
   const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : 0);
-  return { x: num(b.x), y: num(b.y), w: num(b.width), h: num(b.height) };
+  return { x: num(b.x), y: num(b.y), w: num(b.width), h: b.height === 'hug' ? (heights?.get(b.id) ?? 0) : num(b.height) };
 };
 /** Dua kotak terlalu dekat (jarak < gap di kedua sumbu) = tumpang tindih. */
 const clash = (a: Rect, b: Rect, gap: number) => a.x < b.x + b.w + gap && b.x < a.x + a.w + gap && a.y < b.y + b.h + gap && b.y < a.y + a.h + gap;
@@ -613,7 +623,7 @@ export const API: { readonly [K in keyof LakarApi]: ApiFunction } = {
     kind: 'read',
     signature: 'get(id: string): NodeView',
     doc:
-      'Baca satu node sebagai salinan datar: properti tersimpan (token apa adanya) + parentId, path (nama board→node), childIds (board/frame). Melihat perubahan snippet ini. ' +
+      'Baca satu node sebagai salinan datar: properti tersimpan (token apa adanya) + parentId, path (nama board→node), childIds (board/frame), measuredHeight (board height:"hug", render terakhir sebelum snippet). Melihat perubahan snippet ini. ' +
       "Instance dibaca tersimpan (componentId, props, overrides, slots; tanpa childIds, isi slot lewat children(instanceId)); isinya lewat alamat '<instanceId>/<idNodeMaster>' = node efektif (props/override diterapkan, id/parentId/childIds beralamat komposit).",
     returns: 'NodeView',
     errors: ['SCHEMA_INVALID', 'NOT_FOUND'],
@@ -629,10 +639,10 @@ export const API: { readonly [K in keyof LakarApi]: ApiFunction } = {
           });
         }
         const owner = mustFind('get', doc, id.split('/')[0]!);
-        return toView({ node: hit.node as unknown as AnyNode, parentId: hit.parentId, path: [...owner.path.slice(0, -1), ...hit.names] });
+        return toView({ node: hit.node as unknown as AnyNode, parentId: hit.parentId, path: [...owner.path.slice(0, -1), ...hit.names] }, ctx.boardHeights);
       }
       const nid = requireId('get', 'id', id);
-      return toView(mustFind('get', ctx.view(), nid));
+      return toView(mustFind('get', ctx.view(), nid), ctx.boardHeights);
     },
   },
   find: {
@@ -665,7 +675,7 @@ export const API: { readonly [K in keyof LakarApi]: ApiFunction } = {
         const parents = new Map(pool.map((x) => [x.node.id, x.parentId] as const));
         pool = pool.filter((e) => e.node.id !== wid && isUnder(parents, e, wid));
       }
-      return pool.filter((e) => (q.type === undefined || e.node.type === q.type) && (q.name === undefined || e.node.name === q.name)).map(toView);
+      return pool.filter((e) => (q.type === undefined || e.node.type === q.type) && (q.name === undefined || e.node.name === q.name)).map((e) => toView(e, ctx.boardHeights));
     },
   },
   children: {
@@ -679,11 +689,11 @@ export const API: { readonly [K in keyof LakarApi]: ApiFunction } = {
       const doc = ctx.view();
       if (id === null || id === undefined) {
         const boards = new Set(doc.pages[0]!.children.map((b) => b.id));
-        return walk(doc).filter((e) => e.parentId === null && boards.has(e.node.id)).map(toView);
+        return walk(doc).filter((e) => e.parentId === null && boards.has(e.node.id)).map((e) => toView(e, ctx.boardHeights));
       }
       const nid = requireId('children', 'id', id);
       mustFind('children', doc, nid);
-      return walk(doc).filter((e) => e.parentId === nid).map(toView);
+      return walk(doc).filter((e) => e.parentId === nid).map((e) => toView(e, ctx.boardHeights));
     },
   },
   getTokens: {
@@ -709,17 +719,21 @@ export const API: { readonly [K in keyof LakarApi]: ApiFunction } = {
   },
   place: {
     kind: 'read',
-    signature: 'place(w: number, h: number, opts?: {near?: string, gap?: number}): {x, y}',
+    signature: "place(w: number, h: number | 'hug', opts?: {near?: string, gap?: number}): {x, y}",
     doc:
       'Posisi {x, y} untuk board baru w×h yang tidak tumpang tindih board di halaman (termasuk yang dibuat di snippet ini), berjarak gap (default 80). ' +
+      "h 'hug' = board height:'hug' (hanya tepi atasnya dihitung); board hug yang ada memakai tinggi terukur render terakhir. " +
       'Halaman kosong → {x:0, y:0}; tanpa near → baris atas, kiri ke kanan; near → kanan board itu, lalu di bawahnya.',
     returns: '{x: number, y: number}',
     errors: ['SCHEMA_INVALID', 'NOT_FOUND'],
-    example: "const p = place(1440, 900);\nadd(null, {type:'board', name:'Desktop', x:p.x, y:p.y, width:1440, height:900, screen:'landing'});",
+    example: "const p = place(1440, 'hug');\nadd(null, {type:'board', name:'Beranda', x:p.x, y:p.y, width:1440, height:'hug', screen:'landing'});",
     call(ctx, [w, h, opts]) {
       for (const [what, v] of [['w', w], ['h', h]] as const) {
+        if (what === 'h' && v === 'hug') continue;
         if (typeof v !== 'number' || !Number.isFinite(v) || v <= 0) {
-          throw new LakarError('SCHEMA_INVALID', `place: ${what} harus angka > 0, bukan ${show(v)}`, { hint: 'contoh: const p = place(390, 844); add(null, {type:"board", x:p.x, y:p.y, ...})' });
+          throw new LakarError('SCHEMA_INVALID', `place: ${what} harus angka > 0${what === 'h' ? " atau 'hug'" : ''}, bukan ${show(v)}`, {
+            hint: 'contoh: const p = place(390, 844); add(null, {type:"board", x:p.x, y:p.y, ...}); landing: place(1440, \'hug\')',
+          });
         }
       }
       const o = opts ?? {};
@@ -731,15 +745,16 @@ export const API: { readonly [K in keyof LakarApi]: ApiFunction } = {
         throw new LakarError('SCHEMA_INVALID', `place: gap harus angka ≥ 0, bukan ${show(gap)}`, { hint: 'hilangkan gap untuk default 80' });
       }
       const doc = ctx.view();
-      const boards = doc.pages[0]!.children.map(boardRect);
-      const size = { w: w as number, h: h as number };
+      const boards = doc.pages[0]!.children.map((b) => boardRect(b, ctx.boardHeights));
+      // Board hug baru: tingginya belum ada, jadi hanya tepi atasnya (1 px) yang dijaga dari tabrakan.
+      const size = { w: w as number, h: h === 'hug' ? 1 : (h as number) };
       if (o.near !== undefined) {
         const nid = requireId('place', 'near', o.near);
         const near = mustFind('place', doc, nid, 'board near');
         if (near.node.type !== 'board') {
           throw new LakarError('SCHEMA_INVALID', `place: near harus ID board, bukan ${near.node.type}`, { hint: 'pakai ID board (children(null) mendaftar board di halaman)' });
         }
-        const r = boardRect(near.node);
+        const r = boardRect(near.node, ctx.boardHeights);
         const right = { x: r.x + r.w + gap, y: r.y, ...size };
         if (!boards.some((b) => clash(right, b, gap))) return { x: right.x, y: right.y };
         // Di bawah board acuan; geser turun melewati board yang menghalangi.

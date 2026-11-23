@@ -30,6 +30,8 @@ export type RunOptions = {
   photos?: PhotoLibraryPort;
   /** Parser CSS variables untuk `importCssVariables` (daemon: @lakar/render). Tidak ada → EXEC_ERROR. */
   cssVariables?: CssVariablesPort;
+  /** Tinggi terukur board `height:'hug'` (render terakhir; `place`, `measuredHeight`). Tidak ada → belum terukur. */
+  boardHeights?: ReadonlyMap<string, number>;
 };
 export type RunSuccess = {
   ok: true;
@@ -244,6 +246,7 @@ export async function runSnippet(code: string, tx: Transaction, opts: RunOptions
     icons: opts.icons,
     ...(opts.photos ? { photos: opts.photos } : {}),
     ...(opts.cssVariables ? { cssVariables: opts.cssVariables } : {}),
+    ...(opts.boardHeights ? { boardHeights: opts.boardHeights } : {}),
     countOp() {
       ops++;
       if (ops > MAX_OPS) {

@@ -227,3 +227,30 @@ describe.skipIf(!browserInstalled)('render layout (Chromium, tanpa daemon)', () 
     near(at(r2.id).x - at(r1.id).x, 20 + 12); // columnGap menimpa gap di flex row
   });
 });
+
+// spec-board-hug-height: board `height:'hug'` = tinggi isi flow, diukur saat render (tanpa golden baru).
+describe.skipIf(!browserInstalled)("render board height:'hug' (Chromium)", () => {
+  beforeAll(start, 60_000);
+  afterAll(stop);
+
+  /** Tinggi PNG dari IHDR (byte 20..23). */
+  const pngHeight = (png: Buffer) => png.readUInt32BE(20);
+  const hugSize = (width: number) => ({ width, height: 'hug' }) as unknown as { width: number; height: number };
+
+  it('tinggi terukur = isi flow (seksi hug + fixed); anak absolute tidak menambah tinggi; anak fill = isinya; PNG utuh', async () => {
+    const solid = (color: string) => [{ type: 'solid', color }];
+    const nav = frame({ layout: 'row', width: 'fill', height: 72, fills: solid('#ECEFF1') }, []);
+    const hero = frame({ layout: 'column', width: 'fill', padding: [40, 20], gap: 8, fills: TINT }, [text('Judul'), text('Sub')]);
+    const fill = frame({ layout: 'column', width: 'fill', height: 'fill', fills: INNER }, [rect({ height: 30 })]);
+    const overlay = rect({ position: 'absolute', x: 10, y: 1500, width: 50, height: 50, fills: solid('#E53935') });
+    const { doc, boardId } = boardDoc([nav, hero, fill, overlay], hugSize(440));
+    const { result, png } = await render(doc, boardId, faces);
+    if (!result.ok || !png) throw new Error(JSON.stringify(result));
+    const at = (id: unknown) => result.measure.nodes.find((n) => n.id === id)!;
+    // nav 72 + hero (40 + 20 + 8 + 20 + 40 = 128) + fill (isi 30) = 230.
+    near(at(hero.id).height, 128);
+    near(at(fill.id).height, 30);
+    near(result.measure.height, 230);
+    expect(pngHeight(png)).toBe(230);
+  });
+});

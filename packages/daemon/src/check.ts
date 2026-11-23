@@ -12,7 +12,13 @@ export type CheckRun = { boards: BoardCheck[]; findings: Finding[]; measures: Ma
  * NOT_FOUND, ICON_UNKNOWN, RENDER_FAILED) dilempar apa adanya: yang pertama menurut urutan board.
  * Temuan: error lalu warning, lalu urutan dokumen (urutan hasil = urutan `boardIds`, bukan urutan selesai).
  */
-export async function runCheck(render: RenderPort<ResolvedDocument>, resolved: ResolvedDocument, boardIds: readonly string[]): Promise<CheckRun> {
+export async function runCheck(
+  render: RenderPort<ResolvedDocument>,
+  resolved: ResolvedDocument,
+  boardIds: readonly string[],
+  /** Tinggi terukur board `height:'hug'` lain (tabrakan LC-12); ukuran run ini menimpanya. */
+  heights: ReadonlyMap<string, number> = new Map(),
+): Promise<CheckRun> {
   const boards: BoardCheck[] = [];
   const findings: Finding[] = [];
   const measures = new Map<string, BoardMeasure>();
@@ -23,10 +29,12 @@ export async function runCheck(render: RenderPort<ResolvedDocument>, resolved: R
   });
   const settled = await Promise.allSettled(targets.map((t) => render.measure(resolved, t.id, { allowGlyphs: t.allowGlyphs })));
   for (const r of settled) if (r.status === 'rejected') throw r.reason;
-  targets.forEach(({ id, board }, i) => {
-    const measure = (settled[i] as PromiseFulfilledResult<BoardMeasure>).value;
-    measures.set(id, measure);
-    const list = checkBoard({ doc: resolved, boardId: id, measure });
+  targets.forEach(({ id }, i) => measures.set(id, (settled[i] as PromiseFulfilledResult<BoardMeasure>).value));
+  const known = new Map(heights);
+  for (const [id, m] of measures) known.set(id, m.height);
+  targets.forEach(({ id, board }) => {
+    const measure = measures.get(id)!;
+    const list = checkBoard({ doc: resolved, boardId: id, measure, heights: known });
     boards.push({ id, name: board.name, summary: summarizeFindings(list) });
     findings.push(...list);
   });
