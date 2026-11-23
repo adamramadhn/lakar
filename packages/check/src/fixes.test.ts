@@ -204,6 +204,27 @@ describe('saran', () => {
     ]);
   });
 
+  it('LC-35 teks meluap ke kanan dari Row transparan → saran Wrap text; planFixes hanya dengan suggestions:true', () => {
+    const t = text('Harga mulai Rp 25.000 per bulan', [16, 10, 230, 20]);
+    const fs = check({ children: [frame('Baris', [16, 10, 200, 20], [t], { layout: 'row' })] }, 0, false);
+    const f = one(fs, 'LC-35');
+    expect(f.fix).toBeUndefined();
+    expect(f.suggestions).toEqual([{ label: 'Wrap text', ops: [{ op: 'update', id: t.id, patch: { width: 'fill', wrap: 'wrap' } }] }]);
+    expect(planFixes(fs, { codes: ['LC-35'] }).planned).toEqual([]);
+    const planned = planFixes(fs, { suggestions: true, codes: ['LC-35'] }).planned;
+    expect(planned.map((p) => [p.rule, p.kind, p.nodeId])).toEqual([['LC-35', 'suggestion', t.id]]);
+    expect(planned[0]!.ops).toEqual([{ op: 'update', id: t.id, patch: { width: 'fill', wrap: 'wrap' } }]);
+  });
+
+  it('LC-35 vertikal dan LC-34: tanpa fix/saran', () => {
+    const tall = text('Dua baris', [16, 16, 100, 60]);
+    expect(one(check({ children: [frame('Kotak', [16, 16, 200, 40], [tall], { layout: 'row', height: 40 })] }), 'LC-35').suggestions).toBeUndefined();
+    const icon = { type: 'icon', id: nid(), name: 'Ikon', lib: 'lucide', icon: 'mail', size: 20, position: 'absolute', x: 160, y: 10, _r: [160, 10, 20, 20] };
+    const f = one(check({ children: [frame('Input / Email', [0, 0, 300, 40], [text('Email kamu di sini', [12, 10, 160, 20], { name: 'Placeholder' }), icon], { layout: 'row', padding: [10, 12] })] }), 'LC-34');
+    expect(f.fix).toBeUndefined();
+    expect(f.suggestions).toBeUndefined();
+  });
+
   it('LC-21 spacer kosong → saran remove', () => {
     const sp = frame('Jarak', [0, 100, 390, 24], [], { layout: 'none' });
     const f = of(check({ children: [frame('Kolom', [0, 0, 390, 300], [rect('A', [0, 0, 390, 100], solid), sp, rect('B', [0, 124, 390, 100], solid)])] }), 'LC-21').find((x) => x.nodeId === sp.id)!;
