@@ -278,3 +278,15 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-installer-locked-node.md`
   summary: Connections tidak memberi tahu pengguna Windows bahwa config MCP yang disalin sebelum v0.1.4 masih menunjuk `%LOCALAPPDATA%\Lakar\lakar-node.exe` dan akan terputus saat upgrade.
   evidence: Daemon tidak tahu config apa yang dipakai harness. Usul: catatan rilis v0.1.4 ("copy the MCP config again") atau catatan statis di Connections untuk desktop Windows.
+- source_spec: `_bmad-output/implementation-artifacts/spec-agent-visual-diff.md`
+  summary: `visual_diff {nodeId}` belum menerima ID komposit isi instance (`<instanceId>/<idNode>`); hanya ID node biasa.
+  evidence: `locateNode` hanya mencari ID biasa; bounds isi instance ada di `measure` dengan ID komposit. Usul: pakai resolver alamat yang sama dengan `get_selection`.
+- source_spec: `_bmad-output/implementation-artifacts/spec-agent-visual-diff.md`
+  summary: Overlay `visual_diff` board landing yang sangat tinggi (mis. 1440×8000) dikirim utuh pada skala 1, sehingga PNG besar dan mahal dibaca agen.
+  evidence: Sama dengan `screenshot` board penuh. Usul: field opsional `crop:'regions'` (potong ke gabungan wilayah + margin) atau skala turun otomatis di atas batas piksel.
+- source_spec: `_bmad-output/implementation-artifacts/spec-agent-visual-diff.md`
+  summary: Komentar kepala `packages/mcp/src/server.ts` masih menyebut "15 tool" dan daftar tanpa `visual_diff`.
+  evidence: Sengaja tidak disentuh karena dua spec paralel di epic "loop verifikasi agen" (undo agen, autofix layout_check) juga mengubah berkas ini. Rapikan sekali sesudah ketiganya di-merge.
+- source_spec: `_bmad-output/implementation-artifacts/spec-agent-visual-diff.md`
+  summary: Rev dasar `visual_diff` (`session.bases`) hanya di memori sesi; sesudah daemon restart default jatuh ke `previousRev`.
+  evidence: Sesi MCP baru dibuat sesudah restart (`client.ts`), jadi pin dan dasar hilang bersama. Usul: turunkan dari riwayat (`*.history.jsonl` entri `sessionId`) bila perlu lintas restart.

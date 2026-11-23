@@ -40,7 +40,7 @@ import type { DaemonConfig } from './config.js';
 import { FontRegistry } from './fonts.js';
 import { INSPECT_DEPTH_DEFAULT, INSPECT_DEPTH_MAX, WIP_PREFIX, boundsMap, inspectFit, locateNode } from './inspect.js';
 import { readPngSize } from './png.js';
-import { NO_ACTIVE_DOC_HINT, Sessions, UnknownSessionError, authorOf, logExecute, recallFailed, rememberFailed, setActiveDoc } from './sessions.js';
+import { NO_ACTIVE_DOC_HINT, Sessions, UnknownSessionError, authorOf, logExecute, noteWrite, recallFailed, rememberFailed, setActiveDoc } from './sessions.js';
 import { DocStore } from './store.js';
 import { ActivityBus, agentOf, registerActivityHooks } from './events.js';
 import { registerConnectionRoutes } from './connections.js';
@@ -52,6 +52,7 @@ import { registerPasteRoutes, type HtmlSnapshotter } from './paste.js';
 import { SelectionStore, registerSelectionRoutes } from './selection.js';
 import { registerRenderDepsRoutes } from './render-deps.js';
 import { registerExportRoutes } from './export.js';
+import { registerVisualDiffRoutes } from './visual-diff.js';
 import { HugHeights } from './hug-heights.js';
 import { registerCodeExportRoutes } from './code-export.js';
 import { VIEWER_DIST_DIR, peekDocument, registerViewerRoutes } from './viewer.js';
@@ -605,6 +606,7 @@ export function buildServer({
         // setelah restart.
         await store.commit(slug, committed.doc, { ...committed.entry, ...authorOf(session) });
         docs.set(slug, committed.doc);
+        noteWrite(session, committed.doc.id, doc.rev);
         checks.record(committed.doc.id, doc.rev, committed.doc.rev, ran.boards);
         hugs.record(after, ran.measures, doc.rev);
         result = { docId: committed.doc.id, rev: committed.doc.rev, created: committed.created };
@@ -847,6 +849,7 @@ export function buildServer({
   registerSelectionRoutes(app, { docs, store, sessions, selections, focus, activity, render, assertIcons });
   registerRenderDepsRoutes(app, { fonts, icons });
   registerExportRoutes(app, { docs, store, render, icons });
+  registerVisualDiffRoutes(app, { docs, store, render, activeDoc, assertIcons });
   registerCodeExportRoutes(app, { docs, sessions, icons });
   registerConnectionRoutes(app, {
     host: config.host,

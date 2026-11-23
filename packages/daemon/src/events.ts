@@ -56,6 +56,7 @@ export const TOOL_ROUTES: Readonly<Record<string, string>> = {
   '/export': 'export',
   '/skills/read': 'read_skill',
   '/layout-check': 'layout_check',
+  '/visual-diff': 'visual_diff',
   '/icons/search': 'icon_search',
   '/photos/search': 'photo_search',
   '/viewer/selection': 'get_selection',
@@ -307,6 +308,7 @@ function targetOf(tool: string, body: Record<string, unknown> | undefined): stri
     case 'inspect':
       return str(body.id);
     case 'screenshot':
+    case 'visual_diff':
       return str(body.boardId) ?? str(body.nodeId);
     case 'export':
     case 'export_code':

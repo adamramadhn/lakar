@@ -16,7 +16,7 @@ import { locateNode } from './inspect.js';
 import { HtmlImportError, importHtml, type FontLookup, type HtmlReport, type ImportedNode } from './paste/html.js';
 import type { HtmlSnapshot } from './paste/html-page.js';
 import { PASTE_NAME_MAX, SvgImportError, importSvg, type KeptAttr, type PasteDropped } from './paste/svg.js';
-import { NO_ACTIVE_DOC_HINT, authorOf, type Sessions } from './sessions.js';
+import { NO_ACTIVE_DOC_HINT, authorOf, noteWrite, type Sessions } from './sessions.js';
 import type { DocStore } from './store.js';
 
 export const PASTE_KINDS = ['svg', 'html'] as const;
@@ -244,6 +244,7 @@ export function registerPasteRoutes(app: FastifyInstance, opts: PasteRoutesOptio
     if (!slug) throw noDoc();
     const body = parsePasteBody(req.body);
     const r = await commitPaste(opts, slug, body, { sessionId: session.id, ...authorOf(session) }, noDoc);
+    noteWrite(session, r.doc.id, r.doc.rev - 1);
     return reply.code(200).send({
       ok: true,
       data: {

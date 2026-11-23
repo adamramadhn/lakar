@@ -178,6 +178,7 @@ export const SERVER_INSTRUCTIONS =
   'helper prelude skill core sudah bawaan di setiap execute: jangan ditulis ulang, palet arketipe sekali per dokumen lewat Palette(c, font); ' +
   'baca check di respons execute, perbaiki dengan editId/edits atau update, akhiri dengan satu screenshot board + satu screenshot zoom (nodeId, scale 2) ' +
   'area terpadat (skill review), satu execute perbaikan, lalu export PNG. ' +
+  'Sesudah execute perbaikan, visual_diff memastikan hanya area yang dimaksud berubah. ' +
   'Opsional: read_skill break-ui bila diminta uji data terburuk/edge case; variants bila diminta beberapa variasi/alternatif.';
 
 /** Deskripsi tool `list_boards`. */
@@ -361,6 +362,17 @@ export const LIST_DOCUMENTS_DESCRIPTION =
   'Daftar dokumen Lakar (bukan arsip), terbaru dulu: {documents:[{slug, name, rev, updatedAt, open, focused, active?}], focused, active?}. ' +
   'open = tampil di jendela aplikasi; focused = dokumen yang terakhir difokuskan pengguna (dipakai open_doc tanpa slug); active = dokumen kerja sesi ini. ' +
   'Pakai slug untuk open_doc {slug} bila pengguna menyebut file tertentu.';
+
+/** Deskripsi tool `visual_diff` (spec-agent-visual-diff). */
+export const VISUAL_DIFF_DESCRIPTION =
+  'Bandingkan render board/node dokumen aktif di dua rev (snapshot History) untuk memastikan edit hanya mengubah area yang dimaksud. ' +
+  "Tanpa fromRev → rev sebelum tulis terakhir sesi ini (execute/paste) di dokumen ini (base lastWrite); since 'session' → sebelum tulis pertama sesi (sessionStart); " +
+  'sesi belum menulis → rev sebelumnya (previousRev). toRev default rev kini. Kirim boardId ATAU nodeId (default board pertama); nodeId → hanya bounds node (gabungan kedua rev). ' +
+  'Mengembalikan gambar overlay (piksel berubah merah di atas "sesudah" yang dipudarkan, wilayah berbingkai biru) lalu JSON ' +
+  '{boardId, nodeId?, fromRev, toRev, base, area:[x,y,w,h], size:{from,to}, sizeDelta?, missing?, changedPixels, changedRatio, regions:[{bounds:[x,y,w,h], pixels, nodes:[{id, name, state?}]}], regionsTruncated?}. ' +
+  'Koordinat board; ukuran beda (board hug) disejajarkan kiri-atas dan selisihnya dihitung berubah; antialiasing diabaikan. ' +
+  'regions[].nodes = node paling spesifik yang bersinggungan (state added/removed): node di luar rencana edit berarti ikut berubah. ' +
+  "Rev tanpa snapshot atau board/node tidak ada di kedua rev → NOT_FOUND; board/node hanya ada di satu rev → missing 'from'|'to'.";
 
 export function createLakarMcpServer(daemonUrl: string): McpServer {
   const server = new McpServer({ name: SERVER_NAME, version: SERVER_VERSION }, { instructions: SERVER_INSTRUCTIONS });
@@ -599,6 +611,29 @@ export function createLakarMcpServer(daemonUrl: string): McpServer {
       inputSchema: z.object({ slug: z.string().optional().describe('slug dokumen; kosongkan untuk dokumen aktif sesi (atau dokumen dengan seleksi terakhir)') }),
     },
     ({ slug }) => guarded(async () => asText(await client.call('/viewer/selection', slug !== undefined ? { slug } : {}))),
+  );
+
+  server.registerTool(
+    'visual_diff',
+    {
+      description: VISUAL_DIFF_DESCRIPTION,
+      inputSchema: z.object({
+        boardId: z.string().optional().describe('ID board; kosongkan untuk board pertama'),
+        nodeId: z.string().optional().describe('ID node: bandingkan hanya bounds node ini (bukan bersama boardId)'),
+        fromRev: z.number().int().optional().describe('rev "sebelum"; kosongkan untuk rev sebelum tulis terakhir sesi ini'),
+        toRev: z.number().int().optional().describe('rev "sesudah" (default rev kini)'),
+        since: z.enum(['last', 'session']).optional().describe("tanpa fromRev: 'last' (default) = sebelum tulis terakhir sesi, 'session' = sebelum tulis pertama sesi"),
+      }),
+    },
+    (args) =>
+      guarded(async () => {
+        const body = Object.fromEntries(Object.entries(args).filter(([, v]) => v !== undefined));
+        const r = await client.call<{ png: string } & Record<string, unknown>>('/visual-diff', body);
+        return asResult(r, ({ png, ...meta }) => [
+          { type: 'image', data: png, mimeType: 'image/png' },
+          { type: 'text', text: JSON.stringify(meta) },
+        ]);
+      }),
   );
 
   server.registerTool(

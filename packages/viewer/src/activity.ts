@@ -317,6 +317,8 @@ export function callTitle(c: ActivityCall, nameOf: (id: string) => string | unde
       return t ? `Inspect ${t}` : 'Inspect node';
     case 'screenshot':
       return t ? `Screenshot ${t}` : 'Screenshot first board';
+    case 'visual_diff':
+      return t ? `Compare versions of ${t}` : 'Compare versions of first board';
     case 'export':
       return t ? `Export ${t}` : 'Export first board';
     case 'export_code':

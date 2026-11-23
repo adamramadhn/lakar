@@ -1,5 +1,6 @@
-// Dekoder PNG minimal (8-bit RGB/RGBA, non-interlaced) untuk tes dan checker tracer.
-import { inflateSync } from 'node:zlib';
+// Dekoder PNG minimal (8-bit RGB/RGBA, non-interlaced) untuk tes, checker tracer, dan visual_diff; encoder RGBA
+// minimal untuk overlay visual_diff.
+import { crc32, deflateSync, inflateSync } from 'node:zlib';
 
 export type DecodedPng = { width: number; height: number; channels: 3 | 4; pixels: Uint8Array };
 
@@ -70,4 +71,39 @@ export function countDarkPixels(img: DecodedPng, x0: number, y0: number, x1: num
     }
   }
   return n;
+}
+
+/** Piksel RGBA (4 kanal) dari PNG terdekode; RGB diberi alpha 255. */
+export function toRgba(img: DecodedPng): Uint8Array {
+  if (img.channels === 4) return img.pixels;
+  const out = new Uint8Array(img.width * img.height * 4);
+  for (let i = 0, j = 0; i < img.pixels.length; i += 3, j += 4) {
+    out[j] = img.pixels[i]!;
+    out[j + 1] = img.pixels[i + 1]!;
+    out[j + 2] = img.pixels[i + 2]!;
+    out[j + 3] = 255;
+  }
+  return out;
+}
+
+/** PNG RGBA 8-bit `width`×`height` dari piksel RGBA (filter 0 per baris). */
+export function encodePng(width: number, height: number, rgba: Uint8Array): Buffer {
+  if (rgba.length !== width * height * 4) throw new Error(`ukuran piksel ${rgba.length} ≠ ${width}×${height}×4`);
+  const chunk = (type: string, data: Buffer) => {
+    const len = Buffer.alloc(4);
+    len.writeUInt32BE(data.length);
+    const td = Buffer.concat([Buffer.from(type, 'latin1'), data]);
+    const crc = Buffer.alloc(4);
+    crc.writeUInt32BE(crc32(td));
+    return Buffer.concat([len, td, crc]);
+  };
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(width, 0);
+  ihdr.writeUInt32BE(height, 4);
+  ihdr[8] = 8;
+  ihdr[9] = 6;
+  const stride = width * 4;
+  const raw = Buffer.alloc(height * (stride + 1));
+  for (let y = 0; y < height; y++) raw.set(rgba.subarray(y * stride, (y + 1) * stride), y * (stride + 1) + 1);
+  return Buffer.concat([Buffer.from(SIG), chunk('IHDR', ihdr), chunk('IDAT', deflateSync(raw)), chunk('IEND', Buffer.alloc(0))]);
 }
