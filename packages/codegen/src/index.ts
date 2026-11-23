@@ -1,6 +1,6 @@
 // @lakar/codegen (AD-16): satu generator kode murni untuk viewer dan daemon. Dokumen tersimpan (AD-10) → komponen
 // React (TSX) dengan modul CSS atau kelas Tailwind v4, plus file token. Master menjadi komponen React tersendiri dan
-// instance menjadi pemakaiannya (story 3). Deps hanya `@lakar/schema` dan `@lakar/render` (AD-17); tanpa IO.
+// instance menjadi pemakaiannya (story 3). Deps hanya `@lakar/schema`, `@lakar/render`, dan tipe `@lakar/ports` (AD-17); tanpa IO.
 // Deterministik: input sama → byte sama.
 import { type IconGlyph, type LakarDocument } from '@lakar/schema';
 import { componentsOf, Exporter, warningsOf } from './components.js';
@@ -19,6 +19,7 @@ export { assignClassNames, emitCssModule, emitJsx, tailwindClasses, type Codegen
 export { camelName, pascalName } from './names.js';
 export { applySite, evalComponent, evalNodes, family, fullProps, normDecls, sameTree, siteDiff, type JChild, type JComponent } from './jsx.js';
 export { COMBOS_MAX } from './components.js';
+export { dtcgTokensJson, parseDtcgTokens } from './dtcg.js';
 
 export type CodegenOptions = {
   /** Id tersimpan board atau node anak (termasuk instance dan master). */

@@ -84,7 +84,7 @@ import { ChecksPanel } from './panels';
 import { DesignPanel } from './DesignPanel';
 import { ThemeButton, ThemePanel } from './ThemePanel';
 import { CodeExportDialog } from './CodeExportDialog';
-import { ImportCssDialog } from './TokensCss';
+import { ImportCssDialog, ImportDtcgDialog } from './TokensCss';
 import { effectiveMode } from './themeModel';
 import { parentLayoutOf, type DesignTarget } from './designModel';
 import { measureLiveSize } from './liveGeometry';
@@ -293,13 +293,15 @@ export function Viewer({ slug }: { slug: string }) {
   const closeTheme = useCallback(() => setThemeOpen(false), []);
   /** Dialog Export code (epic kode story 5): id node sumber; ditutup saat pratinjau versi. */
   const [codeExport, setCodeExport] = useState<string | undefined>(undefined);
-  /** Dialog Import CSS variables (panel Theme, epic kode story 5). */
+  /** Dialog Import (panel Theme): CSS variables (epic kode story 5) dan DTCG tokens (story 9). */
   const [cssImportOpen, setCssImportOpen] = useState(false);
-  // Pratinjau versi menutup kedua dialog (bukan hanya menyembunyikan), supaya tidak muncul lagi sesudah pratinjau.
+  const [dtcgImportOpen, setDtcgImportOpen] = useState(false);
+  // Pratinjau versi menutup dialog-dialog ini (bukan hanya menyembunyikan), supaya tidak muncul lagi sesudah pratinjau.
   useEffect(() => {
     if (!preview) return;
     setCodeExport(undefined);
     setCssImportOpen(false);
+    setDtcgImportOpen(false);
   }, [preview]);
   useEffect(() => {
     if (preview) setThemeOpen(false);
@@ -1667,7 +1669,7 @@ export function Viewer({ slug }: { slug: string }) {
           <>
             <SidebarToggle side="left" collapsed={sidebars.collapsed.left} onToggle={() => toggleSidebar('left')} />
             {themeOpen && !preview && (
-              <ThemePanel doc={latestDoc} rev={latestDoc.rev} editable={editable} onCommit={commitOps} onClose={closeTheme} onImportCss={() => setCssImportOpen(true)} importOpen={cssImportOpen} />
+              <ThemePanel doc={latestDoc} rev={latestDoc.rev} editable={editable} onCommit={commitOps} onClose={closeTheme} onImportCss={() => setCssImportOpen(true)} onImportDtcg={() => setDtcgImportOpen(true)} importOpen={cssImportOpen || dtcgImportOpen} />
             )}
             {undoSkipped && <UndoSkippedToast key={undoSkipped.key} toast={undoSkipped} onHistory={() => openTab('history')} onClose={closeUndoSkipped} />}
             {pasteToast && !undoSkipped && <PasteToast key={pasteToast.key} toast={pasteToast} onUndo={undoPaste} onClose={closePasteToast} />}
@@ -1746,6 +1748,18 @@ export function Viewer({ slug }: { slug: string }) {
             return (await commitOps(b.ops, b.label)) ? undefined : 'Import failed. Your tokens were not changed.';
           }}
           onClose={() => setCssImportOpen(false)}
+        />
+      )}
+      {dtcgImportOpen && !preview && (
+        <ImportDtcgDialog
+          doc={latestDoc}
+          editable={editable}
+          onImport={async (build) => {
+            const b = build(latestDoc);
+            if ('error' in b) return b.error;
+            return (await commitOps(b.ops, b.label)) ? undefined : 'Import failed. Your tokens were not changed.';
+          }}
+          onClose={() => setDtcgImportOpen(false)}
         />
       )}
       {editMenu && (

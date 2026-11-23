@@ -3,9 +3,12 @@
 // tabel token jenis aktif dengan satu kolom per mode. Setiap aksi = satu permintaan ops lewat `onCommit` Viewer
 // (History + undo per jendela, AD-7/AD-8); pembangun op di themeModel.ts (murni). Edit mengantre sampai rev commit
 // sebelumnya tampil, supaya edit cepat kedua pada token yang sama dibangun dari definisi terbaru.
-// Header: Import CSS variables dan Copy tokens as CSS (epic kode story 5, desain 09; TokensCss.tsx).
+// Header: menu Import (CSS variables, DTCG tokens) dan Export (Copy tokens as CSS, Export/Copy DTCG JSON)
+// (epic kode story 5 desain 09; impor/ekspor DTCG epic adopsi-open-pencil story 9 Section 11; TokensCss.tsx).
 import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { TOKEN_TYPES, type DocOp, type LakarDocument, type TokenType } from '@lakar/schema';
+import { dtcgTokensJson } from '@lakar/codegen';
+import { copyText } from './Connections';
 import { withHex } from './designValues';
 import { Icon } from './icons';
 import { CopyTokensPopover } from './TokensCss';
@@ -190,6 +193,7 @@ export function ThemePanel({
   onCommit,
   onClose,
   onImportCss,
+  onImportDtcg,
   importOpen = false,
 }: {
   doc: LakarDocument;
@@ -198,6 +202,7 @@ export function ThemePanel({
   onCommit: Commit;
   onClose: () => void;
   onImportCss?: (() => void) | undefined;
+  onImportDtcg?: (() => void) | undefined;
   importOpen?: boolean;
 }) {
   const head = doc as unknown as ThemeDoc;
@@ -212,6 +217,8 @@ export function ThemePanel({
   const [error, setError] = useState<string | undefined>(undefined);
   const [confirm, setConfirm] = useState<{ name: string; top: number } | undefined>(undefined);
   const [copyOpen, setCopyOpen] = useState(false);
+  const [menu, setMenu] = useState<'import' | 'export' | undefined>(undefined);
+  const [copiedDtcg, setCopiedDtcg] = useState(false);
   const root = useRef<HTMLDivElement>(null);
   const counts = useMemo(() => typeCounts(tokens), [tokens]);
   const usage = useMemo(() => usageCounts(head), [head]);
@@ -234,12 +241,13 @@ export function ThemePanel({
       if (!el || el.offsetParent === null || !(t instanceof Node) || (t !== document.body && !el.contains(t))) return;
       e.stopPropagation();
       if (confirm) setConfirm(undefined);
+      else if (menu) setMenu(undefined);
       else if (copyOpen) setCopyOpen(false);
       else onClose();
     };
     window.addEventListener('keydown', onKey, { capture: true });
     return () => window.removeEventListener('keydown', onKey, { capture: true });
-  }, [confirm, copyOpen, importOpen, onClose]);
+  }, [confirm, copyOpen, menu, importOpen, onClose]);
   // Klik di luar popover hapus menutupnya.
   useEffect(() => {
     if (!confirm) return;
@@ -249,6 +257,15 @@ export function ThemePanel({
     window.addEventListener('pointerdown', onDown);
     return () => window.removeEventListener('pointerdown', onDown);
   }, [confirm]);
+  // Klik di luar menu header menutupnya.
+  useEffect(() => {
+    if (!menu) return;
+    const onDown = (e: PointerEvent) => {
+      if (!(e.target as HTMLElement).closest('.theme-menu-wrap')) setMenu(undefined);
+    };
+    window.addEventListener('pointerdown', onDown);
+    return () => window.removeEventListener('pointerdown', onDown);
+  }, [menu]);
   // Baca-saja (offline): tutup semua edit.
   useEffect(() => {
     if (editable) return;
@@ -342,24 +359,120 @@ export function ThemePanel({
         <strong>Theme</strong>
         <span className="badge">{countLabel(tokens, modes)}</span>
         <span className="theme-spacer" />
-        {editable && onImportCss && (
-          <button type="button" className="btn small" onClick={onImportCss}>
-            <Icon name="fileDown" size={13} />
-            Import CSS variables
-          </button>
+        {editable && (onImportCss || onImportDtcg) && (
+          <span className="theme-menu-wrap">
+            <button
+              type="button"
+              className={`btn small theme-menu-btn${menu === 'import' ? ' active' : ''}`}
+              aria-expanded={menu === 'import'}
+              aria-haspopup="menu"
+              onClick={() => {
+                setCopyOpen(false);
+                setMenu((m) => (m === 'import' ? undefined : 'import'));
+              }}
+            >
+              <Icon name="fileDown" size={13} />
+              Import
+              <Icon name="chevronDown" size={11} />
+            </button>
+            {menu === 'import' && (
+              <div className="theme-menu" role="menu" aria-label="Import tokens">
+                {onImportCss && (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="theme-menu-item"
+                    onClick={() => {
+                      setMenu(undefined);
+                      onImportCss();
+                    }}
+                  >
+                    CSS variables…
+                  </button>
+                )}
+                {onImportDtcg && (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="theme-menu-item"
+                    onClick={() => {
+                      setMenu(undefined);
+                      onImportDtcg();
+                    }}
+                  >
+                    DTCG tokens (.json)…
+                  </button>
+                )}
+              </div>
+            )}
+          </span>
         )}
-        <button
-          type="button"
-          className={`btn small theme-copy-btn${copyOpen ? ' active' : ''}`}
-          aria-expanded={copyOpen}
-          aria-haspopup="dialog"
-          disabled={Object.keys(tokens).length === 0}
-          title={Object.keys(tokens).length === 0 ? 'No tokens yet' : undefined}
-          onClick={() => setCopyOpen((o) => !o)}
-        >
-          <Icon name="copy" size={13} />
-          Copy tokens as CSS
-        </button>
+        <span className="theme-menu-wrap">
+          <button
+            type="button"
+            className={`btn small theme-menu-btn${menu === 'export' || copyOpen ? ' active' : ''}`}
+            aria-expanded={menu === 'export' || copyOpen}
+            aria-haspopup="menu"
+            disabled={Object.keys(tokens).length === 0}
+            title={Object.keys(tokens).length === 0 ? 'No tokens yet' : undefined}
+            onClick={() => {
+              setCopyOpen(false);
+              setMenu((m) => (m === 'export' ? undefined : 'export'));
+            }}
+          >
+            <Icon name={copiedDtcg ? 'check' : 'download'} size={13} />
+            {copiedDtcg ? 'Copied' : 'Export'}
+            <Icon name="chevronDown" size={11} />
+          </button>
+          {menu === 'export' && (
+            <div className="theme-menu" role="menu" aria-label="Export tokens">
+              <button
+                type="button"
+                role="menuitem"
+                className="theme-menu-item theme-copy-btn"
+                onClick={() => {
+                  setMenu(undefined);
+                  setCopyOpen(true);
+                }}
+              >
+                Copy tokens as CSS
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                className="theme-menu-item"
+                onClick={() => {
+                  setMenu(undefined);
+                  const blob = new Blob([dtcgTokensJson(doc)], { type: 'application/json' });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = 'tokens.json';
+                  a.click();
+                  URL.revokeObjectURL(url);
+                }}
+              >
+                Export DTCG JSON
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                className="theme-menu-item"
+                onClick={() => {
+                  setMenu(undefined);
+                  void copyText(dtcgTokensJson(doc))
+                    .then(() => {
+                      setCopiedDtcg(true);
+                      setTimeout(() => setCopiedDtcg(false), 1500);
+                    })
+                    .catch(() => {});
+                }}
+              >
+                Copy DTCG JSON
+              </button>
+            </div>
+          )}
+        </span>
         {copyOpen && <CopyTokensPopover doc={doc} onClose={() => setCopyOpen(false)} />}
         <button type="button" className="dp-icon-btn boxed" title="Close" aria-label="Close Theme" onClick={onClose}>
           <Icon name="x" size={14} />

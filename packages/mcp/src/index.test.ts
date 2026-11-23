@@ -124,6 +124,10 @@ function fakeDaemon() {
     }
     if (req.url === '/viewer/export-code') {
       if (body.id === 'Zzzzzzzz') return send(404, { ok: false, error: { code: 'NOT_FOUND', message: 'node Zzzzzzzz tidak ada di dokumen a', hint: 'pakai ID', retryable: false } });
+      if (body.target === 'dtcg') {
+        const files = [{ path: 'tokens.json', contents: '{\n  "colors": {}\n}\n', bytes: 18 }];
+        return send(200, { ok: true, data: { docId: 'Dddddddd', slug: 'a', rev: 3, id: null, name: null, target: 'dtcg', files, warnings: [] } });
+      }
       const files = [
         { path: 'Home.tsx', contents: 'export function Home() {}\n', bytes: 26 },
         { path: 'tokens.css', contents: ':root {\n}\n', bytes: 10 },
@@ -256,6 +260,14 @@ describe('@lakar/mcp', () => {
     const wrong = await c.callTool({ name: 'export_code', arguments: { target: 'vue' } });
     expect(wrong.isError).toBe(true);
     expect(EXPORT_CODE_DESCRIPTION).toContain('react-tailwind');
+    // Target dtcg (story 9): diteruskan apa adanya; satu blok tokens.json.
+    const dtcg = await c.callTool({ name: 'export_code', arguments: { target: 'dtcg' } });
+    expect(dtcg.isError).toBeFalsy();
+    const dc = dtcg.content as { type: string; text: string }[];
+    expect(dc).toHaveLength(2);
+    expect(JSON.parse(dc[0]!.text)).toEqual({ docId: 'Dddddddd', slug: 'a', rev: 3, id: null, name: null, target: 'dtcg', files: [{ path: 'tokens.json', bytes: 18 }], warnings: [] });
+    expect(dc[1]!.text).toContain('----- tokens.json -----');
+    expect(fake.seen.filter((s) => s.path === '/viewer/export-code').at(-1)!.body).toEqual({ target: 'dtcg' });
   });
 
   it('paste → POST /viewer/paste dalam sesi; argumen diteruskan; teks JSON; error terformat', async () => {

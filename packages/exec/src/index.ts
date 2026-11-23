@@ -10,7 +10,7 @@ import {
   type QuickJSWASMModule,
 } from 'quickjs-emscripten';
 import type { Transaction } from '@lakar/core';
-import type { CssVariablesPort, IconCatalogPort, PhotoLibraryPort } from '@lakar/ports';
+import type { CssVariablesPort, DtcgPort, IconCatalogPort, PhotoLibraryPort } from '@lakar/ports';
 import { LakarError, errorMessage } from '@lakar/schema';
 import { API, DEFAULT_TIMEOUT_MS, KEEP_MAX_BYTES, LOG_MAX_BYTES, LOG_MAX_LINES, MAX_OPS, SNIPPET_GLOBALS, VALUE_MAX_BYTES, type ApiContext } from './api.js';
 import { HELPERS_JS, HELPER_GLOBALS } from './helpers.js';
@@ -32,6 +32,8 @@ export type RunOptions = {
   photos?: PhotoLibraryPort;
   /** Parser CSS variables untuk `importCssVariables` (daemon: @lakar/render). Tidak ada → EXEC_ERROR. */
   cssVariables?: CssVariablesPort;
+  /** Parser JSON W3C DTCG untuk `importDtcgTokens` (daemon: @lakar/codegen). Tidak ada → EXEC_ERROR. */
+  dtcg?: DtcgPort;
   /** Tinggi terukur board `height:'hug'` (render terakhir; `place`, `measuredHeight`). Tidak ada → belum terukur. */
   boardHeights?: ReadonlyMap<string, number>;
 };
@@ -249,6 +251,7 @@ export async function runSnippet(code: string, tx: Transaction, opts: RunOptions
     icons: opts.icons,
     ...(opts.photos ? { photos: opts.photos } : {}),
     ...(opts.cssVariables ? { cssVariables: opts.cssVariables } : {}),
+    ...(opts.dtcg ? { dtcg: opts.dtcg } : {}),
     ...(opts.boardHeights ? { boardHeights: opts.boardHeights } : {}),
     countOp() {
       ops++;

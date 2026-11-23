@@ -1,0 +1,52 @@
+{
+  "$extensions": {
+    "com.lakar": {
+      "tokenModes": ["light", "dark"]
+    }
+  },
+  "colors": {
+    "bg": {
+      "$type": "color",
+      "$value": "#ffffff",
+      "$extensions": {
+        "mode": {
+          "dark": "#0f0f0f"
+        }
+      }
+    },
+    "link": {
+      "$type": "color",
+      "$value": "{colors.bg}"
+    },
+    "ghost": {
+      "$type": "color",
+      "$value": "{colors.missing}"
+    }
+  },
+  "radius": {
+    "card": {
+      "$type": "dimension",
+      "$value": { "value": 1, "unit": "rem" },
+      "$extensions": {
+        "com.lakar": { "type": "radius" }
+      }
+    }
+  },
+  "type": {
+    "weight-strong": {
+      "$type": "fontWeight",
+      "$value": "extra-bold"
+    }
+  },
+  "effects": {
+    "card-shadow": {
+      "$type": "shadow",
+      "$value": {
+        "offsetX": "0px",
+        "offsetY": "8px",
+        "blur": "24px",
+        "color": "#00000033"
+      }
+    }
+  }
+}

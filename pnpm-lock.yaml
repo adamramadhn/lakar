@@ -230,6 +230,9 @@ importers:
 
   packages/codegen:
     dependencies:
+      '@lakar/ports':
+        specifier: workspace:*
+        version: link:../ports
       '@lakar/render':
         specifier: workspace:*
         version: link:../render

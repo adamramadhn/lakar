@@ -3,6 +3,7 @@ import Fastify, { type FastifyInstance, type FastifyReply } from 'fastify';
 import { changedNodeIds, touchedBoards, boundsOf, glyphScan } from '@lakar/check';
 import { DocumentLocks, createDocument, transact } from '@lakar/core';
 import { photoRefsInCode, runSnippet } from '@lakar/exec';
+import { parseDtcgTokens } from '@lakar/codegen';
 import { IconCatalog } from '@lakar/icons';
 import type { IconCatalogPort, RenderPort } from '@lakar/ports';
 import { iconRefs, parseCssVariables } from '@lakar/render';
@@ -76,6 +77,7 @@ const STATUS: Record<ErrorCode, number> = {
 
 /** Parser impor CSS variables (@lakar/render) untuk `importCssVariables` di execute (exec tidak bergantung pada render, AD-17). */
 const CSS_VARIABLES = { parse: parseCssVariables };
+const DTCG = { parse: parseDtcgTokens };
 
 const SVG_TAGS = new Set(['path', 'circle', 'ellipse', 'rect', 'line', 'polyline', 'polygon']);
 const xmlAttr = (v: string) => v.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
@@ -565,7 +567,7 @@ export function buildServer({
       try {
         // AD-4: error tak tertangkap di snippet → lempar di dalam body → rollback penuh oleh `transact`.
         committed = await transact(doc, { sessionId: session.id, description: label }, async (tx) => {
-          const run = await runSnippet(code, tx, { timeoutMs: config.execTimeoutMs, memoryBytes: config.execMemoryBytes, keep: session.keep, icons, photos, cssVariables: CSS_VARIABLES, boardHeights });
+          const run = await runSnippet(code, tx, { timeoutMs: config.execTimeoutMs, memoryBytes: config.execMemoryBytes, keep: session.keep, icons, photos, cssVariables: CSS_VARIABLES, dtcg: DTCG, boardHeights });
           if (!run.ok) throw run.error;
           return run;
         });

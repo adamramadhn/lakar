@@ -206,7 +206,7 @@ export const EXPORT_DESCRIPTION =
 /** Deskripsi tool `export_code` (epic kode story 5). */
 export const EXPORT_CODE_DESCRIPTION =
   'Ekspor board/node dokumen aktif menjadi kode React (generator yang sama dengan dialog Export code di viewer; berkas identik). ' +
-  "target 'react-tailwind' (default: <Nama>.tsx, components/*.tsx, tokens.css, theme.css Tailwind v4) atau 'react-css' (+ *.module.css). " +
+  "target 'react-tailwind' (default: <Nama>.tsx, components/*.tsx, tokens.css, theme.css Tailwind v4) atau 'react-css' (+ *.module.css), atau 'dtcg' (seluruh token dokumen → satu tokens.json W3C DTCG; tanpa id). " +
   'Token menjadi var(--nama) dan master komponen menjadi components/<Nama>.tsx dengan props bertipe; instance menjadi pemakaiannya. ' +
   'components:false = semua di-inline; tokens:false = tanpa tokens.css; typescript:false = .jsx tanpa tipe. ' +
   'Mengembalikan blok JSON {docId, slug, rev, id, name, target, files:[{path, bytes}], warnings} lalu satu blok teks per berkas.';
@@ -284,6 +284,7 @@ export const EXECUTE_DESCRIPTION =
   "setTokenModes(['light','dark']) mode tema, board themeMode; " +
   'getTokens() → {tokens, modes} baca token dan mode; renameToken(from, to) ganti nama token + semua ref; ' +
   'importCssVariables(css) → {tokens, modes, skipped} token bertipe dari isi file CSS variables (:root + [data-theme="dark"]); ' +
+  'importDtcgTokens(json) → {tokens, modes, skipped} token bertipe dari JSON W3C DTCG (grup bersarang = nama dipisah ".", mode di $extensions.mode, alias "{a.b}"); ' +
   'get(id) → NodeView; find({type?, name?: string|RegExp, within?}) → NodeView[] urutan dokumen; children(id|null) → NodeView[] anak langsung (null = board); ' +
   "NodeView = properti tersimpan (token apa adanya) + parentId, path, childIds, measuredHeight (board height:'hug') (hanya-baca: jangan kirim balik ke update/add); " +
   "place(w, h|'hug', {near?, gap?}) → {x,y} posisi board baru yang tidak tumpang tindih (gap default 80); " +
@@ -448,8 +449,8 @@ export function createLakarMcpServer(daemonUrl: string): McpServer {
       annotations: toolAnnotations('export_code'),
       description: EXPORT_CODE_DESCRIPTION,
       inputSchema: z.object({
-        id: z.string().optional().describe('ID board/node; kosongkan untuk board pertama'),
-        target: z.enum(['react-tailwind', 'react-css']).optional().describe("'react-tailwind' (default) atau 'react-css'"),
+        id: z.string().optional().describe('ID board/node; kosongkan untuk board pertama (diabaikan untuk target dtcg)'),
+        target: z.enum(['react-tailwind', 'react-css', 'dtcg']).optional().describe("'react-tailwind' (default), 'react-css', atau 'dtcg' (token dokumen → tokens.json W3C DTCG)"),
         components: z.boolean().optional().describe('master sebagai berkas komponen terpisah (default true)'),
         tokens: z.boolean().optional().describe('sertakan tokens.css (default true)'),
         typescript: z.boolean().optional().describe('TSX bertipe (default true); false = JSX'),

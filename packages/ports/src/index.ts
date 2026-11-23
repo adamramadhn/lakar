@@ -136,3 +136,50 @@ export type CssVariablesParseOptions = {
 export interface CssVariablesPort {
   parse(css: string, opts?: CssVariablesParseOptions): CssVariablesImport;
 }
+
+// ---------------------------------------------------------------------------
+// Token W3C DTCG (epic adopsi-open-pencil story 9)
+// ---------------------------------------------------------------------------
+
+/** Nilai token hasil impor DTCG, sudah dalam bentuk Lakar (`string|number`, mis. `"#RRGGBB"` atau `16`). */
+export type DtcgTokenValue = string | number;
+
+/** Satu token DTCG yang menjadi token bertipe Lakar. Nama token = path grup digabung `.`. */
+export type DtcgEntry = {
+  /** Path DTCG (sama dengan `token`). */
+  path: string;
+  /** Nama token, mis. `colors.accent`. */
+  token: string;
+  /** Tipe token (salah satu `TOKEN_TYPES`). */
+  type: string;
+  value: DtcgTokenValue;
+  /** Nilai per mode yang berbeda dari `value` (dari `$extensions.mode`). */
+  modes?: Record<string, DtcgTokenValue>;
+  /** Target alias mentah `{a.b}` bila `$value` adalah referensi token (kolom Alias di UI). */
+  alias?: string;
+  /** `update` = token bernama sama sudah ada di dokumen (definisinya diganti; ref tetap). */
+  status: 'new' | 'update';
+};
+
+/** Alasan token dilewati (kode stabil; `detail` = kalimat Inggris pendek untuk UI). */
+export type DtcgSkipReason = 'invalid-name' | 'invalid-mode' | 'unsupported-type' | 'unsupported-value' | 'unknown-alias';
+
+export type DtcgSkip = { source: string; reason: DtcgSkipReason; detail: string };
+
+/** Hasil parse JSON DTCG: token bertipe, rencana `tokenModes` (null = tidak berubah), dan yang dilewati. */
+export type DtcgImport = { entries: DtcgEntry[]; tokenModes: string[] | null; skipped: DtcgSkip[] };
+
+/** Keadaan dokumen yang dipakai parser: token yang ada (status `update`) dan `tokenModes`. */
+export type DtcgParseOptions = {
+  tokens?: Readonly<Record<string, { readonly type: string; readonly value?: DtcgTokenValue; readonly modes?: Readonly<Record<string, DtcgTokenValue>> }>>;
+  modes?: readonly string[];
+};
+
+/**
+ * Parser JSON W3C DTCG murni. Adaptor: `parseDtcgTokens` @lakar/codegen (di sebelah `dtcgTokensJson`, ekspor/impor
+ * memakai modul yang sama), disuntikkan daemon ke `execute` seperti `CssVariablesPort`. Input rusak (bukan JSON
+ * objek) → `LakarError` `SCHEMA_INVALID`.
+ */
+export interface DtcgPort {
+  parse(input: unknown, opts?: DtcgParseOptions): DtcgImport;
+}
