@@ -942,13 +942,19 @@ function componentMarks(
   return out;
 }
 
-/** Terapkan penyesuaian snap pada kotak `to` hasil `resizeBox`: `e`/`s` menambah sisi, `w`/`n` menggeser sisi jangkar. */
-const applyResizeSnap = (to: Box, handle: Handle, s: Snap): Box => ({
-  x: handle.includes('w') ? to.x + s.dx : to.x,
-  y: handle.includes('n') ? to.y + s.dy : to.y,
-  w: Math.max(1, to.w + (handle.includes('e') ? s.dx : 0) - (handle.includes('w') ? s.dx : 0)),
-  h: Math.max(1, to.h + (handle.includes('s') ? s.dy : 0) - (handle.includes('n') ? s.dy : 0)),
-});
+/** Terapkan penyesuaian snap pada kotak `to` hasil `resizeBox`: `e`/`s` menambah sisi, `w`/`n` menggeser
+ * sisi jangkar. `x`/`y` dihitung dari tepi jangkar (bukan delta mentah) supaya clamp `w`/`h` ≥ 1 tidak
+ * membuat tepi yang tidak digerakkan ikut melayang. */
+const applyResizeSnap = (to: Box, handle: Handle, s: Snap): Box => {
+  const w = Math.max(1, to.w + (handle.includes('e') ? s.dx : 0) - (handle.includes('w') ? s.dx : 0));
+  const h = Math.max(1, to.h + (handle.includes('s') ? s.dy : 0) - (handle.includes('n') ? s.dy : 0));
+  return {
+    x: handle.includes('w') ? to.x + to.w - w : to.x,
+    y: handle.includes('n') ? to.y + to.h - h : to.y,
+    w,
+    h,
+  };
+};
 
 /** Kotak akhir anggota resize sebagaimana di-commit (`committedBox`): tunggal = kotak handle, multi = diskalakan. */
 const memberBox = (g: { members: readonly GeoNode[]; from: Box }, n: GeoNode, to: Box): Box => committedBox(n, g.members.length === 1 ? to : scaleBox(n.box, g.from, to));

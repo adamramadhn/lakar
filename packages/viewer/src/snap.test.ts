@@ -133,19 +133,18 @@ describe('measure', () => {
     expect(my).toEqual({ axis: 'y', from: 100, to: 300, at: 120, value: 200 });
   });
 
-  it('overlap pada satu sumbu: jarak antar tepi berhadapan |maxStart−minEnd| tetap dilaporkan', () => {
+  it('overlap pada satu sumbu: irisan bukan jarak, hanya sumbu gap yang dilaporkan', () => {
     const a: Box = { x: 0, y: 0, w: 100, h: 100 };
     const b: Box = { x: 80, y: 120, w: 50, h: 50 };
-    const [mx] = measure(a, b);
-    // Irisan x 80..100 → nilai 20; y disjoint → at = tengah celah y (100..120) = 110.
-    expect(mx).toEqual({ axis: 'x', from: 80, to: 100, at: 110, value: 20 });
+    // Irisan x 80..100 dibuang; y disjoint 100..120 → dilaporkan, at = tengah irisan proyeksi x = 90.
+    expect(measure(a, b)).toEqual([{ axis: 'y', from: 100, to: 120, at: 90, value: 20 }]);
   });
 
-  it('value === 0 (tepi bersentuhan) dibuang; sumbu lain tetap dihitung', () => {
+  it('overlap di semua sumbu (atau bersentuhan): tanpa entri', () => {
     const a: Box = { x: 0, y: 0, w: 100, h: 100 };
     const b: Box = { x: 100, y: 0, w: 50, h: 50 };
-    // Sumbu x bersentuhan (value 0, dibuang); sumbu y overlap 0..50.
-    expect(measure(a, b)).toEqual([{ axis: 'y', from: 0, to: 50, at: 100, value: 50 }]);
+    // Sumbu x bersentuhan (gap false, value 0); sumbu y overlap — keduanya bukan jarak.
+    expect(measure(a, b)).toEqual([]);
   });
 });
 

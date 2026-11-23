@@ -58,12 +58,13 @@ function axisMeasure(a: Box, b: Box, axis: Axis): { from: number; to: number; at
   return { from, to, at, value: to - from, gap: i0 > i1 };
 }
 
-/** Jarak Alt+hover antar kotak `a` dan `b` per sumbu (MEASURE); entri `value === 0` dibuang. */
+/** Jarak Alt+hover antar kotak `a` dan `b` per sumbu (MEASURE); hanya sumbu disjoint (`gap`) —
+ * overlap/irisan bukan jarak, jadi tidak dilabeli (mis. tinggi yang sama tidak tampil sebagai "jarak"). */
 export function measure(a: Box, b: Box): Measure[] {
   const out: Measure[] = [];
   for (const axis of AXES) {
     const m = axisMeasure(a, b, axis);
-    if (m.value !== 0) out.push({ axis, from: m.from, to: m.to, at: m.at, value: m.value });
+    if (m.gap && m.value !== 0) out.push({ axis, from: m.from, to: m.to, at: m.at, value: m.value });
   }
   return out;
 }

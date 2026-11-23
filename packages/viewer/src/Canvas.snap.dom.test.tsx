@@ -94,6 +94,9 @@ describe('Canvas — pengukur jarak Alt+hover (desain GSpGv)', () => {
     expect(document.querySelector('.measure-hint')?.textContent).toBe('Measuring to Beta · Alt');
     const labels = [...document.querySelectorAll('.snap-label')].map((el) => el.textContent);
     expect(labels).toContain('40');
+    // Sumbu overlap (kedua board sama tinggi/sejajar) bukan jarak — label palsu "300" tidak boleh tampil.
+    expect(labels).not.toContain('300');
+    expect(labels).toHaveLength(1);
     expect(document.querySelectorAll('.snap-guide').length).toBeGreaterThan(0);
     // Alt dilepas → overlay ukur hilang.
     fireEvent.keyUp(document.body, { key: 'Alt' });

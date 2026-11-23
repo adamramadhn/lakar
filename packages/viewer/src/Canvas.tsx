@@ -838,8 +838,9 @@ export function Canvas({
         setAltHeld(true);
         return;
       }
-      // Ctrl/⌘ + =/− = zoom keyboard (menu zoom desain pSUKZ), tanpa Shift/Alt.
-      if ((e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey && (e.key === '=' || e.key === '+')) {
+      // Ctrl/⌘ + =/− = zoom keyboard (menu zoom desain pSUKZ), tanpa Alt. Shift tetap diterima di '='
+      // karena Ctrl+Shift+= (menghasilkan '+') adalah zoom-in di browser.
+      if ((e.metaKey || e.ctrlKey) && !e.altKey && (e.key === '=' || e.key === '+')) {
         e.preventDefault();
         zoomAt(1.25, size.w / 2, size.h / 2);
         return;
