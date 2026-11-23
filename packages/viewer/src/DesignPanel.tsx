@@ -1045,6 +1045,7 @@ function AutoLayoutGroup({ targets, ctx }: { targets: DesignTarget[]; ctx: Ctx }
   const layout = dir.mixed ? undefined : (dir.value as 'none' | 'row' | 'column' | 'grid');
   const grid = layout === 'grid';
   const on = layout === 'row' || layout === 'column' || grid;
+  const wrap = readField(targets, (n) => n.wrap === true);
   const padding = (
     <Field
       label="Padding"
@@ -1097,6 +1098,23 @@ function AutoLayoutGroup({ targets, ctx }: { targets: DesignTarget[]; ctx: Ctx }
           onPick={(v) => ctx.run((ts) => (v === 'grid' ? enterGrid(ts) : setLayout(ts, v === 'none' ? null : v)), 'Change layout direction')}
         />
       </div>
+      {/* Wrap (v9, desain Section 11 PU4cd/oMWUS): No wrap/Wrap + Row gap; hanya di flex, di bawah Direction. */}
+      {!grid && (on || dir.mixed) && (
+        <div className="dp-row">
+          <Segmented<'nowrap' | 'wrap'>
+            label="Wrap"
+            className="dp-grow"
+            options={[
+              { value: 'nowrap', label: 'No wrap' },
+              { value: 'wrap', label: 'Wrap' },
+            ]}
+            value={wrap.mixed ? undefined : wrap.value === true ? 'wrap' : 'nowrap'}
+            disabled={ctx.disabled}
+            onPick={(v) => ctx.run((ts) => setProp(ts, 'wrap', v === 'wrap' ? true : null), 'Change wrap')}
+          />
+          {axisGap('rowGap', 'Row gap')}
+        </div>
+      )}
       {grid && (
         <>
           <div className="dp-row">

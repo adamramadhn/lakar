@@ -343,7 +343,7 @@ describe('korpus dokumen: migrasi v6 → v7 (tag semantik, AD-1)', () => {
 
 describe("korpus dokumen: migrasi v7 → v8 (board height:'hug', spec-board-hug-height)", () => {
   it.each(corpus.filter((d) => d.version === 7).map((d): [string, CorpusDoc] => [`v${d.version}/${d.name}`, d]))('identitas: %s', (_label, d) => {
-    expect(migrateDocument(d.raw), d.path).toEqual({ ...d.raw, schemaVersion: 8 });
+    expect(migrateDocument(d.raw), d.path).toEqual({ ...d.raw, schemaVersion: SCHEMA_VERSION });
   });
 
   it.each(corpus.filter((d) => d.version < 8).map((d): [string, CorpusDoc] => [`v${d.version}/${d.name}`, d]))('%s: tinggi board tetap angka setelah migrasi', (_label, d) => {
@@ -373,6 +373,50 @@ describe("korpus dokumen: migrasi v7 → v8 (board height:'hug', spec-board-hug-
         bad.commit('tinggi salah');
       })).toBe('SCHEMA_INVALID');
     }
+  });
+});
+
+describe('korpus dokumen: migrasi v8 → v9 (frame wrap, epic adopsi-open-pencil)', () => {
+  it.each(corpus.filter((d) => d.version === 8).map((d): [string, CorpusDoc] => [`v${d.version}/${d.name}`, d]))('identitas: %s', (_label, d) => {
+    expect(migrateDocument(d.raw), d.path).toEqual({ ...d.raw, schemaVersion: SCHEMA_VERSION });
+  });
+
+  it.each(corpus.filter((d) => d.version < 9).map((d): [string, CorpusDoc] => [`v${d.version}/${d.name}`, d]))('%s: tanpa frame wrap di versi lama', (_label, d) => {
+    // Hanya frame: text sudah punya `wrap` enum (auto|wrap|fixed) jauh sebelum v9.
+    const frames = (allNodes(parseDocument(d.raw)) as Record<string, unknown>[]).filter((n) => n.type === 'frame');
+    for (const n of frames) expect(n.wrap, `${d.path} ${String(n.id)}`).toBeUndefined();
+  });
+
+  it('fixture v9 memakai wrap:true pada frame row dan column dengan gap sumbu silang', () => {
+    const frames = (corpus.filter((d) => d.version === 9).flatMap((d) => allNodes(parseDocument(d.raw))) as Record<string, unknown>[]).filter((n) => n.type === 'frame' && n.wrap === true);
+    expect(frames.some((f) => f.layout === 'row' && f.rowGap !== undefined)).toBe(true);
+    expect(frames.some((f) => f.layout === 'column' && f.columnGap !== undefined)).toBe(true);
+  });
+
+  it('jalur mutasi core: wrap boolean ↔ hapus lewat update; non-boolean dan wrap di node lain ditolak SCHEMA_INVALID', () => {
+    const doc = parseDocument(corpus.find((x) => x.version === 9)!.raw);
+    const frames = (allNodes(doc) as Record<string, unknown>[]).filter((n) => n.type === 'frame');
+    const wrapFrame = frames.find((n) => n.wrap === true)!;
+    const rect = (allNodes(doc) as Record<string, unknown>[]).find((n) => n.type === 'rect')!;
+    const tx = beginTransaction(doc, { sessionId: 'tes-korpus' });
+    tx.update(wrapFrame.id as string, { wrap: null });
+    const off = tx.commit('tanpa wrap').doc;
+    expect(byAddress(off).get(wrapFrame.id as string)!.wrap).toBeUndefined();
+    const back = beginTransaction(off, { sessionId: 'tes-korpus' });
+    back.update(wrapFrame.id as string, { wrap: true });
+    expect(byAddress(back.commit('wrap').doc).get(wrapFrame.id as string)).toMatchObject({ wrap: true });
+    for (const [id, patch] of [
+      [wrapFrame.id, { wrap: 'yes' }],
+      [wrapFrame.id, { wrap: 1 }],
+      [rect.id, { wrap: true }],
+    ] as const) {
+      const bad = beginTransaction(doc, { sessionId: 'tes-korpus' });
+      expect(thrownCode(() => {
+        bad.update(id as string, patch);
+        bad.commit('wrap salah');
+      })).toBe('SCHEMA_INVALID');
+    }
+    expect(doc).toEqual(parseDocument(corpus.find((x) => x.version === 9)!.raw));
   });
 });
 

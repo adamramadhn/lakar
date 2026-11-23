@@ -28,6 +28,8 @@ export type MigrationRegistry = Readonly<Record<number, Migration>>;
  *   dokumen v6 valid apa adanya, jadi langkahnya identitas yang menaikkan versi.
  * - 7 → 8 (spec-board-hug-height): v8 hanya membolehkan `height:'hug'` pada board; board v7 selalu bertinggi angka
  *   dan tetap angka (tidak diubah menjadi hug), jadi langkahnya identitas yang menaikkan versi.
+ * - 8 → 9 (story flex-wrap, epic adopsi-open-pencil): v9 hanya menambah `wrap?:boolean` pada frame; dokumen v8
+ *   valid apa adanya, jadi langkahnya identitas yang menaikkan versi.
  */
 export const MIGRATIONS: MigrationRegistry = Object.freeze({
   1: (d: RawDocument): RawDocument => ({ ...d, schemaVersion: 2 }),
@@ -41,6 +43,7 @@ export const MIGRATIONS: MigrationRegistry = Object.freeze({
   5: (d: RawDocument): RawDocument => ({ ...d, schemaVersion: 6 }),
   6: (d: RawDocument): RawDocument => ({ ...d, schemaVersion: 7 }),
   7: (d: RawDocument): RawDocument => ({ ...d, schemaVersion: 8 }),
+  8: (d: RawDocument): RawDocument => ({ ...d, schemaVersion: 9 }),
 });
 
 export type MigrateOptions = { migrations?: MigrationRegistry; target?: number };

@@ -10,7 +10,7 @@ const BOARD = 'Board001';
 
 function doc(children: AnyNode[], extra: AnyNode = {}, board: AnyNode = {}): LakarDocument {
   return {
-    schemaVersion: 8,
+    schemaVersion: 9,
     id: 'Doc00001',
     rev: 1,
     tokens: {
@@ -152,6 +152,24 @@ describe('generateCode: tata letak sama dengan render (css.ts)', () => {
     const d = doc([frame('Box00001', { width: 200, height: 200 }, [frame('Abs00001', { position: 'absolute', x: 10, y: 20 })])]);
     const m = declsOf(d, 'Abs00001');
     expect([...m]).toEqual(expect.arrayContaining([['position', 'absolute'], ['left', '10px'], ['top', '20px'], ['flex', '0 0 auto'], ['width', 'max-content'], ['height', 'max-content']]));
+  });
+
+  it('frame wrap:true (v9) → flex-wrap: wrap di CSS dan kelas flex-wrap di Tailwind; gap sumbu silang ikut', () => {
+    const d = doc([frame('Wrap0001', { layout: 'row', wrap: true, columnGap: 8, rowGap: 12 }, [frame('Chip0001', { width: 80, height: 28 })])]);
+    const m = declsOf(d, 'Wrap0001');
+    expect(m.get('flex-wrap')).toBe('wrap');
+    expect(m.get('column-gap')).toBe('8px');
+    expect(m.get('row-gap')).toBe('12px');
+    const css = file(generateCode(d, { nodeId: BOARD, target: 'react-css' }), 'LandingHero.module.css');
+    expect(css).toContain('flex-wrap: wrap;');
+    expect(css).toContain('row-gap: 12px;');
+    const tsx = file(generateCode(d, { nodeId: BOARD, target: 'react-tailwind' }), 'LandingHero.tsx');
+    expect(tsx).toContain('flex-wrap');
+    expect(tsx).toContain('gap-y-[12px]');
+    expect(tsx).toContain('gap-x-[8px]');
+    // Tanpa wrap / layout lain: tidak ada deklarasi flex-wrap.
+    expect(declsOf(doc([frame('Nowrap01', { layout: 'row' })]), 'Nowrap01').has('flex-wrap')).toBe(false);
+    expect(declsOf(doc([frame('WrapGrid', { layout: 'grid', wrap: true })]), 'WrapGrid').has('flex-wrap')).toBe(false);
   });
 
   it('gap negatif → margin anak flow ke-2 dst., parent tanpa gap', () => {
@@ -297,6 +315,7 @@ describe('declToTailwind dan nama', () => {
     ['display', 'flex', 'flex'],
     ['width', '120px', 'w-[120px]'],
     ['flex', '1 1 0px', 'flex-[1_1_0px]'],
+    ['flex-wrap', 'wrap', 'flex-wrap'],
     ['color', 'var(--c)', 'text-[color:var(--c)]'],
     ['font-size', 'var(--s)', 'text-[length:var(--s)]'],
     ['font-weight', '600', 'font-[600]'],

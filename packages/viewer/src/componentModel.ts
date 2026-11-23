@@ -142,7 +142,7 @@ export function componentTarget(doc: LakarDocument, info: ComponentInfo, address
 /** Properti per grup panel Design (override marker). `align` milik Auto layout (frame) dan Typography (teks). */
 export const GROUP_PROPS: Readonly<Record<Group, readonly string[]>> = {
   position: ['x', 'y', 'position', 'width', 'height', 'minWidth', 'maxWidth', 'minHeight', 'maxHeight', 'rotation', 'gridColumn', 'gridRow'],
-  autoLayout: ['layout', 'gap', 'padding', 'align', 'justify', 'gridTemplateColumns', 'gridTemplateRows', 'columnGap', 'rowGap', 'clip', 'scrollY'],
+  autoLayout: ['layout', 'gap', 'padding', 'align', 'justify', 'gridTemplateColumns', 'gridTemplateRows', 'columnGap', 'rowGap', 'wrap', 'clip', 'scrollY'],
   typography: ['content', 'family', 'weight', 'style', 'size', 'lineHeight', 'letterSpacing', 'align', 'wrap', 'numeric', 'color'],
   icon: ['lib', 'icon', 'version', 'size', 'color', 'strokeWidth', 'filled'],
   fill: ['fills', 'fillRule'],
