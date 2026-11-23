@@ -195,9 +195,30 @@
 - source_plan: none
   summary: Tinggi board landing mengikuti isi: aturan cek baru untuk ruang kosong di bawah isi board, dan skill `landing` mengambil tinggi akhir dari `bounds` execute alih-alih menebak angka.
   evidence: Dipisah dari `spec-agent-open-doc.md` (2026-11-23, pilihan Fatmuh: kerjakan sesudahnya). Landing `landing-kopi-lereng` menyisakan 24 px kosong di bawah footer (board 4074, isi 4050) karena tinggi board hanya angka tetap dan `landing.md` menyuruh `update(keep.board, {height:…})` dengan angka tebakan.
+  resolved: 2026-11-23 di `spec-board-height-fit.md` (#22). LC-12 untuk landing + skill `landing` memakai `bounds`.
 - source_plan: none
   summary: Skill desain dari Emil Kowalski untuk agen MCP Lakar: adaptasi `break-ui` (skill opsional review), ringkasan non-animasi `emil-design-eng` ke `ui`/`review`, dan `prototype` untuk alur varian; skill animasi (`animate`, `choreograph`, `review-animations`, `animation-performance`, `learn-taste`) dipasang sebagai skill pengembangan. Atribusi MIT wajib.
   evidence: Diminta Fatmuh 2026-11-23 (aiforui.dev/skills). Rincian dan kendala anggaran skill ada di `research-agent-canvas-references.md` bagian 3. Urutan kerja kedua, sesudah `spec-agent-open-doc.md`.
+  resolved: 2026-11-23 di `spec-design-skills-emil.md` (#22).
 - source_plan: none
   summary: Efek canvas saat agen bekerja: node baru fade-in (blur + translateY, stagger), label "Generating" dan border warna agen pada board, outline node yang sedang ditulis, cursor per agen dengan nama model, dan baris Activity ala `terminal-chunk-in`; opsional sapuan shimmer ala `g-scan` pen.dev.
   evidence: Diminta Fatmuh 2026-11-23 dengan acuan Paper, pen.dev, dan open-pencil. Angka dan easing ada di `research-agent-canvas-references.md` bagian 2. Wajib desain dulu di `lakar-ui.pen` section 04. Urutan kerja ketiga.
+  resolved: 2026-11-23 di `spec-canvas-agent-effects.md` (#21).
+- source_spec: `_bmad-output/implementation-artifacts/spec-canvas-agent-effects.md`
+  summary: Panel History dan kolom "Last agent" di Dashboard masih menampilkan "MCP agent" karena entri history daemon hanya mencatat `client`, belum field `agent` yang baru.
+  evidence: HistoryPanel.tsx:93 dan listColumns.ts:11 membaca `client`. Usul: field `agent` aditif pada entri history/log daemon.
+- source_spec: `_bmad-output/implementation-artifacts/spec-canvas-agent-effects.md`
+  summary: Panel Activity, badge Live, dan History masih memakai dua warna harness, sehingga warna canvas sesi Claude kedua (mis. violet) tidak sama dengan kartu Activity-nya.
+  evidence: ActivityPanel.tsx dan live.ts memakai harnessColor; hanya presence canvas dan Layers yang memakai assignAgentColors.
+- source_spec: `_bmad-output/implementation-artifacts/spec-canvas-agent-effects.md`
+  summary: Execute pertama sebuah sesi belum mendapat label "Generating" dan lokasi rencana fade karena board tujuannya baru diketahui setelah panggilan selesai.
+  evidence: agentPresence butuh lokasi panggilan sebelumnya (aturan spec-app-5: target execute yang sedang berjalan tidak ditebak).
+- source_spec: `_bmad-output/implementation-artifacts/spec-canvas-agent-effects.md`
+  summary: Efek canvas (fade-in, label Generating, exit cursor, entri baris Activity) tanpa tes DOM/komponen; hanya logika murni yang dites.
+  evidence: Viewer belum punya harness tes DOM (pra-ada); agentFx.ts dan wiring Canvas/ActivityPanel hanya diperiksa lewat inspeksi dan build.
+- source_spec: `_bmad-output/implementation-artifacts/spec-board-height-fit.md`
+  summary: Tinggi board landing yang benar-benar mengikuti isi (`height:'hug'` pada board) belum ada; tinggi board selalu angka dan board selalu memotong isi.
+  evidence: Butuh perubahan skema (v8 + migrasi), renderer, resize viewer, dan codegen. Usul: `height:'hug'` hanya untuk `screen:'landing'`, diukur saat render. Sampai itu ada, LC-12 melaporkan tinggi pas.
+- source_spec: `_bmad-output/implementation-artifacts/spec-board-height-fit.md`
+  summary: LC-12 landing tidak menandai wrapper bertinggi angka tetap yang lebih tinggi dari isinya, karena tak bisa dibedakan dari seksi setinggi penuh (hero 900 pada board 900).
+  evidence: Review spec-board-height-fit. Usul: konvensi nama `Halaman` untuk wrapper atau tinggi hug di atas.
