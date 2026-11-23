@@ -6,9 +6,10 @@ export const SLUG = 'demo';
 export const BOARD = 'Board001';
 export const CARD = 'Card0001';
 
-type Extra = { id: string; name: string; x: number; y: number; width: number; height: number };
+/** Frame tambahan; `children` = frame bersarang (mis. seksi baru berisi kartu, spec-progressive-live-build). */
+export type Extra = { id: string; name: string; x: number; y: number; width: number; height: number; children?: Extra[] };
 
-const frame = (n: Extra) => ({ type: 'frame', position: 'absolute', ...n, fills: [{ type: 'solid', color: '#0E7490' }], children: [] });
+const frame = (n: Extra): Record<string, unknown> => ({ type: 'frame', position: 'absolute', ...n, fills: [{ type: 'solid', color: '#0E7490' }], children: (n.children ?? []).map(frame) });
 
 /** Dokumen rev `rev`; `extra` = frame tambahan di board (mis. node baru dari execute agen). */
 export function makeDoc(rev = 1, extra: Extra[] = []): LakarDocument {

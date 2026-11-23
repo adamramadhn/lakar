@@ -1,6 +1,6 @@
 # Lakar: landing page
 
-Board `1440 × bebas` (`screen:'landing'`), mulai tinggi 2000–6000; tinggi akhir dari `bounds`, bukan tebakan; `LC-12` "tinggi pas = N" → `update(keep.board,{height:N})`.
+Board `1440 × bebas` (`screen:'landing'`), tinggi dari `bounds`, bukan tebakan; `LC-12` "tinggi pas = N" → `update(keep.board,{height:N})`.
 
 ## Struktur
 
@@ -18,16 +18,16 @@ Board `1440 × bebas` (`screen:'landing'`), mulai tinggi 2000–6000; tinggi akh
 
 ## Alur execute
 
-1. Board + `keep.board`/`keep.page` + navbar + hero. 2. Dua–tiga seksi (`F(keep.page, 'Seksi / …')`). 3. Seksi sisa + footer. 4. Review → execute penutup: perbaikan + tinggi board + lepas `[WIP] `.
+Satu seksi per execute: 1. Board setinggi navbar + hero + `keep.board`/`keep.page`. 2. Per seksi (footer terakhir): tinggi board = `Halaman` di `bounds` terakhir + perkiraan seksi (lebihkan), seksinya, perbaikan `check`. 3. Review → penutup: perbaikan + tinggi pas + lepas `[WIP] `.
 
 ## Contoh teruji
 
-Board, navbar, dan hero di bidang merek (langkah khas: mockup jadwal pengiriman utuh di bawah teks hero; baris memperlihatkan keadaan):
+Execute 1, hero di bidang merek (langkah khas: mockup jadwal utuh di bawah teks hero; baris berkeadaan):
 
 ```js
 // pakai prelude
-const p=place(1440,2000);
-const b=add(null,{type:'board',name:'[WIP] Biji Pagi / Beranda · landing · Jernih',x:p.x,y:p.y,width:1440,height:2000,screen:'landing',fills:fill(C.bg)});
+const p=place(1440,6000); // ruang tumbuh
+const b=add(null,{type:'board',name:'[WIP] Biji Pagi / Beranda · landing · Jernih',x:p.x,y:p.y,width:1440,height:960,screen:'landing',fills:fill(C.bg)});
 keep.board=b;
 const page=F(b,'Halaman',{width:'fill'});
 // Navbar 72
@@ -41,14 +41,14 @@ for(const l of ['Cara kerja','Asal biji','Harga']) T(links,'Link / '+l,l,'body-s
 const act=Row(nav,'Aksi',{gap:12});
 Btn(act,'Masuk','secondary',{height:40,padding:[0,16]});
 Btn(act,'Coba sampel','primary',{height:40,padding:[0,16]});
-// Efek hanya bila diminta suasana ekspresif; selain itu fill(C.field) polos
+// Efek hanya bila diminta; selain itu fill(C.field)
 const hero=F(page,'Seksi / Hero',{width:'fill',padding:[96,80],gap:64,align:'center',clip:true,fills:[...fill(C.field),
  {type:'mesh',columns:3,rows:2,colors:['#CDE8E4',C.field,'#F4E7C8',C.field,C.field,'#D3EBE7']},{type:'noise',opacity:0.05,seed:11}]});
-// 16 kontur selebar penuh, merunduk di tengah (zona teks tenang)
+// 16 kontur, merunduk di tengah (zona teks)
 const fx=F(hero,'Crop / Kontur',{position:'absolute',x:0,y:0,width:1440,height:876,layout:'none',clip:true});
 for(let i=0;i<16;i++){const y=60+i*26,k=i%5===2;
  add(fx,{type:'path',name:'Kontur / '+(i+1),d:`M0 ${y} C 420 ${y+40} 300 ${y+420} 720 ${y+430} S 1020 ${y+40} 1440 ${y}`,viewBox:[0,0,1440,756],width:1440,height:756,stroke:{color:C.acc+(k?'80':(16+i*2).toString(16).padStart(2,'0')),width:k?1.5:1,align:'center'}});}
-// Elips peredam (anak terakhir Crop, di bawah teks): memuat seluruh kotak teks hero
+// Peredam (anak terakhir Crop) memuat seluruh teks hero
 add(fx,{type:'ellipse',name:'Peredam',x:120,y:0,width:1200,height:560,blur:48,fills:fill(C.field+'E6')});
 const copy=F(hero,'Hero / Teks',{width:800,gap:24,align:'center'});
 T(copy,'Overline','LANGGANAN BIJI KOPI UNTUK KAFE','overline',{color:C.acc});
@@ -58,7 +58,7 @@ const cta=Row(copy,'CTA',{gap:12,padding:[8,0,0,0]});
 Btn(cta,'Coba sampel');
 Btn(cta,'Lihat jadwal sangrai','secondary');
 T(copy,'Penguat','Gratis ongkir untuk 3 pengiriman pertama · berhenti kapan saja','body-sm',{color:C.t3});
-// Mockup utuh: 3 baris cukup, padding bawah hero 96
+// Mockup utuh 3 baris; padding bawah 96
 const app=F(hero,'Mockup / Dasbor',{width:1040,padding:24,gap:20,radius:16,fills:fill(C.bg),stroke:line(),shadows:[{x:0,y:4,blur:16,color:'#10182814'}]});
 const top=Row(app,'Header',{width:'fill',justify:'space-between'});
 T(top,'Judul','Pengiriman minggu ini','h4');
@@ -66,11 +66,11 @@ const meta=Row(top,'Meta',{gap:8});
 Badge(meta,'36,5 kg · +4 kg vs minggu lalu','success','trending-up');
 Badge(meta,'Disangrai Jumat','accent','flame');
 const rows=F(app,'Daftar',{width:'fill'});
-// Keadaan: selesai, berikutnya (disorot), peringatan
+// selesai, berikutnya (disorot), peringatan
 for(const [n,k,q,st,tone,ic,hot] of [['Kafe Teras, Bandung','Gayo · medium','12 kg','Tiba Senin','success','circle-check',0],['Ruang Seduh, Jakarta','Kintamani · light','8 kg','Dikemas','accent','package',1],['Pojok Arang, Bogor','Toraja · medium-dark','6,5 kg','Stok 2 hari','warning','triangle-exclamation-point',0]]){
  const r=Row(rows,'Baris / '+n,{width:'fill',height:56,gap:16,padding:[0,12],radius:8,fills:fill(hot?C.tint:C.bg)});
  const w=Row(r,'Ikon',{width:32,height:32,radius:8,justify:'center',fills:fill(hot?C.acc:C.sub)}); I(w,ic,16,hot?C.on:C.t2);
- // Tiap sel = frame berisi teksnya (kolom sejajar antarbaris)
+ // sel = frame berisi teks (kolom sejajar)
  for(const [c,v,wd,o] of [['Cabang',n,'fill',{weight:500}],['Biji',k,200,{color:C.t2}],['Jumlah',q,64,{numeric:'tabular'}]]) T(F(r,'Sel / '+c,{width:wd}),c,v,'body-sm',{width:'fill',...o});
  const sc=Row(r,'Status',{width:136,justify:'end'}); Badge(sc,st,tone);
 }
@@ -78,10 +78,11 @@ keep.page=page;
 b
 ```
 
-Seksi fitur bento: satu kartu lebar berisi stok berpembanding + linimasa, dua kartu sempit (satu ditekankan), bukan tiga kartu kembar:
+Execute 2, bento: kartu lebar (stok berpembanding + linimasa) + dua sempit (satu ditekankan), bukan tiga kembar:
 
 ```js
 // pakai prelude
+update(keep.board,{height:948+900}); // Halaman 948 + seksi
 const s=F(keep.page,'Seksi / Fitur',{width:'fill',padding:[128,80],gap:48});
 const head=F(s,'Header seksi',{width:720,gap:16});
 T(head,'Overline','CARA KERJA','overline',{color:C.acc});
@@ -106,7 +107,7 @@ for(const [d,t,on] of [['Jum','Sangrai',1],['Sab','Istirahat',1],['Min','Dikemas
 const side=F(grid,'Kolom kanan',{width:400,gap:24});
 for(const [ic,j,dsc,det,tone,hot] of [['flame','Profil sangrai per menu','Espresso, filter, dan susu punya kurva sendiri.','3 profil','accent',1],['receipt','Tagihan ikut pemakaian','Bulan sepi, tagihan turun otomatis.','−6% vs Q1','success',0]]){
  const k=F(side,'Kartu / '+j,{width:'fill',padding:24,gap:12,radius:12,stroke:line(),...(hot?{shadows:[{x:0,y:4,blur:16,color:'#10182814'}]}:{})});
- const hd=Row(k,'Kepala',{width:'fill',justify:'space-between'}); // ikon + metrik
+ const hd=Row(k,'Kepala',{width:'fill',justify:'space-between'});
  const w=Row(hd,'Ikon',{width:48,height:48,radius:12,justify:'center',fills:fill(hot?C.acc:C.tint)}); I(w,ic,24,hot?C.on:C.acc);
  Badge(hd,det,tone,undefined,'md');
  T(k,'Judul',j,'h4');
@@ -114,7 +115,7 @@ for(const [ic,j,dsc,det,tone,hot] of [['flame','Profil sangrai per menu','Espres
 }
 ```
 
-Execute penutup: tinggi dari `bounds` (y 948 + 780), lepas `[WIP] `:
+Penutup: tinggi dari `bounds` (948 + 780):
 
 ```js
 update(keep.board, {height:1728, name:'Biji Pagi / Beranda · landing · Jernih'});
