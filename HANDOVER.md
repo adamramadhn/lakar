@@ -57,10 +57,25 @@ Perubahan sesudah gelombang fitur di atas:
    3. **Efek canvas saat agen bekerja** (#21, `spec-canvas-agent-effects.md`). Desainnya ada di `lakar-ui.pen` section 04, baris `GRlb7`. Isinya: identitas agen lewat header `x-lakar-agent`, warna per sesi, label "✦ Generating", fade-in node, cursor 180 ms, dan baris Activity `terminal-chunk-in`.
    4. **Tinggi board landing** (#22, `spec-board-height-fit.md`). LC-12 memberi peringatan bila ada ruang kosong di bawah isi board landing yang sudah jadi, dan skill `landing` mengambil tinggi dari `bounds`.
 
-   **Perlu uji manual Fatmuh** dengan build dari `main` (belum ada di installer `v0.1.0`):
-   - Dari sesi Claude baru, prompt "buatkan landing page menggunakan lakar" membuka tab dan membangun desain secara live.
+   5. **Identitas agen di History/Dashboard dan warna sesi yang konsisten** (#24, `spec-agent-identity-history.md`).
+   6. **Harness tes DOM viewer** (#25, `spec-viewer-dom-harness.md`). Tes ditulis sebagai `*.dom.test.tsx` (jsdom + Testing Library) dan dijalankan oleh `pnpm test` sebagai project vitest `viewer-dom`.
+   7. **Build live per seksi** (#26, `spec-progressive-live-build.md`) dan **board `height:'hug'`** (#28, `spec-board-hug-height.md`, skema v8).
+   8. **Sidebar kiri/kanan bisa di-collapse, pill `layout_check` dihapus** (#27, `spec-viewer-collapsible-panels.md`).
+   9. **Kerangka dulu, lalu satu blok per execute, plus prelude bawaan** (#29, `spec-skeleton-live-build.md`). Marker `[Skeleton] `, helper `Skel`/`Build`/`Palette`, dan LC-33.
+   10. **Installer menutup `lakar-node.exe` yang sedang berjalan** (#30, `spec-installer-locked-node.md`). Config MCP di Windows menunjuk salinan Node yang stabil.
+   11. **Epic loop verifikasi agen** (riset `research-open-pencil-features-for-lakar/`):
+       - `undo`/`redo` agen (#31, `spec-agent-undo.md`);
+       - `visual_diff` (#32, `spec-agent-visual-diff.md`);
+       - `fix_check` (#33, `spec-check-autofix.md`).
+
+       Ketiganya berbagi hook `AgentSteps.onAgentWrite`. Server MCP kini punya 19 tool.
+
+   **Rilis:** `v0.1.1` sampai `v0.1.5` terbit pada 2026-11-23. Cek `claude-review` di CI gagal di sisi layanan (`api.moccilabs.com` menolak dalam sekitar 1 detik). Sebagai gantinya, PR besar di-review lokal oleh subagen sebelum merge. Key atau kuota secret itu perlu dicek Fatmuh.
+
+   **Perlu uji manual Fatmuh** dengan installer terbaru:
+   - Dari sesi Claude baru, prompt "buatkan landing page menggunakan lakar". Kerangka seksi muncul dengan shimmer, lalu terisi per blok secara live.
    - Dua agen (Claude Code dan Codex) tampil dengan warna dan nama masing-masing.
-   - Node baru fade-in, dan efeknya tidak diputar ulang saat dokumen dibuka.
+   - Upgrade installer saat aplikasi dan sesi MCP sedang berjalan berhasil tanpa dialog error.
 1. **Uji manual `v0.1.0` oleh Fatmuh.** Pasang installer rilis, lalu cek butir Done-when yang tersisa (lihat "Sisa" di bawah).
 2. **Build `initiative-lakar-paper` selesai dan sudah di `main` (#18).** Semua 34 tiket berstatus done. Semua story dijalankan lewat `bmad-build-auto`. Spec ada di `_bmad-output/implementation-artifacts/spec-{model-dokumen,editor,agen,token,komponen,kode,vektor}-*.md`. Spine arsitektur ada di `_bmad-output/initiative-lakar-paper/tickets/epic-model-dokumen/architecture-model-dokumen/architecture-model-dokumen.md`. Skema kini v7.
    - **Model dokumen.** Korpus v1/v2, token bertipe dengan mode tema (v3), `resolveDocument` sebagai satu pintu resolusi, dan `css.ts` sebagai pemetaan CSS tunggal.
