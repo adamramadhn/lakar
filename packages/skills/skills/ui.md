@@ -13,7 +13,7 @@ Label di atas field (`label`, gap 8); `Input /` 48 radius 8; placeholder `t3`; b
 ## Kartu dan kedalaman
 
 - Kartu: padding 24 (mobile 16), radius 12, border; header boleh memuat `Badge` metrik. Isi kartu = baris atau bidang tint, bukan kartu lagi; judul seksi di luar kartu.
-- Satu strategi kedalaman per board: garis, bayangan, atau tonal. Bayangan berlapis jatuh ke bawah: cincin 1 px alpha rendah (`spread:1`) + 2–3 lapis blur makin besar, alpha makin kecil.
+- Satu kepribadian per board: radius, kepadatan, dan satu kedalaman (garis, bayangan, atau tonal); alat harian tegas, konsumen lunak. Bayangan berlapis jatuh ke bawah: cincin 1 px alpha rendah (`spread:1`) + 2–3 lapis blur makin besar, alpha makin kecil.
 - Kartu fitur: kartu → panel → fragmen produk; panel mengisi 60–65% bawah dan terpotong tepi kartu (`Crop /`).
 
 ## Tabel

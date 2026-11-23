@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
 import { renderApiMarkdown } from '../packages/exec/src/api-md.ts';
 import { IconCatalog } from '../packages/icons/src/index.ts';
 import { FontRegistry } from '../packages/daemon/src/fonts.ts';
-import { DOMAIN_SKILLS, SCREEN_SKILLS, SKILL_NAMES, SKILLS_DIR, estimateTokens, splitCode } from '../packages/skills/src/index.ts';
+import { DOMAIN_SKILLS, OPTIONAL_SKILLS, SCREEN_SKILLS, SKILL_NAMES, SKILLS_DIR, estimateTokens, splitCode } from '../packages/skills/src/index.ts';
 import { testLog } from './support/log.ts';
 
 const read = (name: string) => readFileSync(join(SKILLS_DIR, `${name}.md`), 'utf8');
@@ -16,6 +16,7 @@ const REGEN = 'regenerasi: /opt/node-26/bin/pnpm build && /opt/node-26/bin/node 
  * Batas token (DESIGN.md §Turunan): core total; delapan domain total (ui juga prosa: memuat contoh); landing/mobile/webapp
  * prosa + total. Total muat per jenis layar (core + 8 domain + 1 jenis layar) ≤ LOAD_LIMIT; lewat batas → padatkan.
  * selection (dibaca hanya saat kerja dari seleksi, di luar muat per layar): spec-agen-4-variant-flow.
+ * break-ui dan variants (opsional, di luar muat per layar): spec-design-skills-emil.
  */
 const LIMITS = {
   core: { total: 2600 },
@@ -31,6 +32,8 @@ const LIMITS = {
   mobile: { prose: 1100, total: 3000 },
   webapp: { prose: 1000, total: 3000 },
   selection: { prose: 1200, total: 2600 },
+  'break-ui': { total: 1800 },
+  variants: { total: 1000 },
 } as const;
 /** Iterasi 6 story 2.16: 11.500 → 9.600 (biaya berpikir agen); turun saja, jangan naik. */
 const LOAD_LIMIT = 9_600;
@@ -45,8 +48,15 @@ describe('skill: batas token (estimateTokens = karakter / 3.2)', () => {
     if ('prose' in lim) expect(prose, `${name}.md prosa ${prose} > ${lim.prose}`).toBeLessThanOrEqual(lim.prose);
   });
 
-  it('setiap skill domain, jenis layar, dan selection punya batas', () => {
-    expect(Object.keys(LIMITS).sort()).toEqual(['core', ...DOMAIN_SKILLS, ...SCREEN_SKILLS, 'selection'].sort());
+  it('setiap skill domain, jenis layar, selection, dan skill opsional punya batas', () => {
+    expect(Object.keys(LIMITS).sort()).toEqual(['core', ...DOMAIN_SKILLS, ...SCREEN_SKILLS, 'selection', ...OPTIONAL_SKILLS].sort());
+  });
+
+  it('skill opsional di luar muat per jenis layar, berjudul "# Lakar: <nama>"', () => {
+    for (const n of OPTIONAL_SKILLS) {
+      expect([...DOMAIN_SKILLS, ...SCREEN_SKILLS, 'core'], n).not.toContain(n);
+      expect(read(n).split(/\r?\n/)[0], n).toBe(`# Lakar: ${n}`);
+    }
   });
 
   it.each(SCREEN_SKILLS)(`muat %s: core + 8 domain + skill jenis layar ≤ ${LOAD_LIMIT}`, (screen) => {
@@ -56,8 +66,8 @@ describe('skill: batas token (estimateTokens = karakter / 3.2)', () => {
     expect(total, `muat ${screen} ${total} > ${LOAD_LIMIT}`).toBeLessThanOrEqual(LOAD_LIMIT);
   });
 
-  it('daftar skill: 15 nama, tanpa polish; domain berjudul "# Lakar: <nama>"', () => {
-    expect(SKILL_NAMES).toHaveLength(15);
+  it('daftar skill: 17 nama, tanpa polish; domain berjudul "# Lakar: <nama>"', () => {
+    expect(SKILL_NAMES).toHaveLength(17);
     expect(SKILL_NAMES).not.toContain('polish');
     for (const n of DOMAIN_SKILLS) expect(read(n).split('\n')[0], n).toBe(`# Lakar: ${n}`);
   });

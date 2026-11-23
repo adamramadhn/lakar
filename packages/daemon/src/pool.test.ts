@@ -459,7 +459,7 @@ describe.skipIf(!browserInstalled)('pool render (AD-18) + endpoint story 12, Chr
     const list = await c.call('/skills/read', {}, s);
     expect(list.body.data.skills).toEqual([
       { name: 'core', available: true },
-      ...['landing', 'mobile', 'webapp', 'layout', 'typography', 'color', 'accessibility', 'ui', 'interface', 'writing', 'review', 'icons', 'api', 'selection'].map((name) => ({ name, available: false })),
+      ...['landing', 'mobile', 'webapp', 'layout', 'typography', 'color', 'accessibility', 'ui', 'interface', 'writing', 'review', 'icons', 'api', 'selection', 'break-ui', 'variants'].map((name) => ({ name, available: false })),
     ]);
     expect((await c.call('/skills/read', { name: 'core' }, s)).body.data).toEqual({ name: 'core', content: '# Lakar core\nisi uji' });
     for (const name of ['landing', 'x']) {

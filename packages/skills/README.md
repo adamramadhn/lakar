@@ -10,6 +10,8 @@ dihasilkan dari `@lakar/exec`.
 - **Rujukan:** `icons`, `api`.
 - **Alur seleksi:** `selection` (kerja dari node yang dipilih pengguna di viewer: varian responsif, cek konsistensi); dibaca
   hanya bila permintaan merujuk seleksi, di luar muat per jenis layar.
+- **Opsional** (`OPTIONAL_SKILLS`, di luar muat per jenis layar): `break-ui` (isi salinan board dengan data terburuk, laporkan
+  yang pecah) dan `variants` (N variasi beda arah). Aturan saja, tanpa contoh teruji.
 
 Aturan muat (instruksi MCP + deskripsi `read_skill`): core + 8 domain + 1 jenis layar dibaca paralel di satu giliran; total per
 jenis layar ≤ 9.600 token (iterasi 6; dulu 11.500; lewat batas → padatkan, jangan naikkan). Setiap aturan diajarkan di tepat
@@ -20,7 +22,7 @@ satu skill; angka yang dilaporkan `check` beserta perbaikannya tidak diulang di 
 
 ## Ekspor utama
 
-- `SKILL_NAMES`, `DOMAIN_SKILLS`, `SCREEN_SKILLS`, `RETIRED_SKILLS`, `SKILLS_DIR`, `listSkills`, `readSkill`, `splitCode`,
+- `SKILL_NAMES`, `DOMAIN_SKILLS`, `SCREEN_SKILLS`, `OPTIONAL_SKILLS`, `RETIRED_SKILLS`, `SKILLS_DIR`, `listSkills`, `readSkill`, `splitCode`,
   `estimateTokens`.
 
 ## Batasan
@@ -45,6 +47,11 @@ teks skill yang dibaca agen.
   rujukan, angkanya dilaporkan `check`; kontras non-teks 1.4.11, ukuran target 2.5.5 untuk 44 px, penggunaan warna 1.4.1), dinyatakan ulang dengan kata sendiri bersama DESIGN.md
   §Ambang kontras.
 - `writing.md`: tanda slop copy dan tanda baca dari prinsip ui-skills di atas; frasa terlarang = DESIGN.md.
+
+- `break-ui.md`, `variants.md`, baris kohesi `ui.md`, format tabel dan pertanyaan "Utuh" `review.md`: adaptasi dari
+  [emilkowalski/skills](https://github.com/emilkowalski/skills) (MIT License, © 2026 Emil Kowalski), commit `64eb3de`; teks
+  lisensi dan rincian di [NOTICE.md](NOTICE.md). Kedua skill opsional itu memuat satu baris atribusi karena seluruh isinya
+  turunan; skill wajib tidak (anggaran token).
 
 Sumber lain di registry ui-skills tanpa lisensi tercantum hanya diambil prinsip umumnya, tanpa teks.
 
