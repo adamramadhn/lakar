@@ -33,6 +33,7 @@ Catatan: `lakar-ui.pen` adalah salinan snapshot dari `untitled.pen` di folder do
 | 02 · Dashboard — Pages & states | Files, Archive kosong, Recents first-run, Settings, Connections, context menu, konfirmasi delete, dialog New file, search (ada hasil / tidak ada hasil, dengan aksi New file), offline, loading. Desktop, tablet, mobile |
 | 03 · Viewer | Activity, Inspect, Checks, History, Waiting, Offline, Error, Export, Add layer (menu), New File (board kosong). Desktop 1440, tablet 1024 lanskap, mobile 375 |
 | 04 · Agent presence & motion | Storyboard 4 langkah, state baris layer, tabel spesifikasi motion, aturan reduced motion |
+| 11 · Editor ergonomics & import | Snapping dan smart guide, ukur jarak Alt, menu zoom, Wrap di Auto layout, Copy as PNG, Import from URL, impor/ekspor token DTCG, Settings → Updates dan banner update. Desktop 1440, dark dan light |
 
 Setiap layar punya versi dark dan light yang disusun sejajar atas-bawah.
 
@@ -91,6 +92,51 @@ Font: Inter untuk UI, JetBrains Mono untuk nama tool, kode, dan nilai.
 Untuk `prefers-reduced-motion`: cursor melompat langsung, skeleton diam, garis tepi solid, dan kamera tidak bergeser.
 
 Di Pencil, shimmer dan denyut berjalan live lewat shader `@time`. Gerakan berurutan (cursor meluncur, node muncul bertahap, kamera) hanya ada di prototype HTML.
+
+## Section 11 · Editor ergonomics & import
+
+Desain story 8.1 epic `epic-adopsi-open-pencil` (2026-11-23), dasar UI story 8.5–8.10. Desain disetujui atas delegasi Fatmuh (terima jadi, 2026-11-23). Versi ini menggantikan draf sebelumnya yang di-revert di `fcd2ded`.
+
+Section `ZDg9M`, header `led6I`. Pola mengikuti section 10: baris Components `AEPtu` (sheet dark `vnnM4`, sheet light `IUxUE`), lalu tiga kelompok baris, masing-masing Dark lalu Light:
+
+- Canvas & Design panel: `z3WZmU` / `jW5Wg`
+- Import & tokens: `k9fXC3` / `vpkcm`
+- Updates: `HvxCF` / `F6FTho`
+
+Semua layar desktop 1440×900. Setiap layar adalah salinan layar yang sudah ada (Editor `fdf6D`/`XZif7` di section 05, Theme `gXCqM` dan Import CSS `wvCMu` di section 07/09, Settings `GM2nq` dan Recents `QkniH` di section 01/02), jadi komponen, token, grid, dan tipografinya sama. Versi light adalah salinan versi dark dengan `theme.mode = light`.
+
+| Layar | Dark | Light | Story |
+|---|---|---|---|
+| Editor — Snap · Smart guides | `fvbjN` | `VxLKW` | 8.5 |
+| Editor — Measure distance · Alt | `GSpGv` | `yq3cH` | 8.5 |
+| Editor — Zoom menu | `pSUKZ` | `dVToz` | 8.5 |
+| Editor — Auto layout · Wrap | `PU4cd` | `oMWUS` | 8.6 |
+| Editor — Context menu · Copy as PNG | `gj8lD` | `BD9N7` | 8.7 |
+| Import from URL — Form | `d37Gbx` | `zVjj4` | 8.8 |
+| Import from URL — Progress | `cembT` | `tdesM` | 8.8 |
+| Import from URL — Error | `w28zTP` | `sG9nl` | 8.8 |
+| Theme — Import menu · DTCG | `Y2Penr` | `ShWsl` | 8.9 |
+| Theme — Import DTCG tokens · Review | `muQTg` | `It7sY` | 8.9 |
+| Settings — Updates · Up to date | `k6R96Q` | `t6B4U` | 8.10 |
+| Settings — Updates · Available | `ynWXN` | `cZjOf` | 8.10 |
+| Settings — Updates · Check failed | `b4i13` | `g5kaS` | 8.10 |
+| Recents — Update ready banner | `vQY8e` | `jfXR8` | 8.10 |
+| Recents — Updated banner | `mOkHY` | `gKj0Y` | 8.10 |
+
+Komponen baru (sheet `vnnM4`): **Smart Guide** `xUDJD` (garis 1px `danger`, ukuran diatur per instance) dan **Distance Label** `CVzUp` (label angka putih di atas `danger`). Sheet yang sama memuat contoh pemakaian komponen lama: Toast "Copied as PNG" `FLIHe` dan "Couldn't copy as PNG" `Y7G9rn` (instance Toast `r69qO`), menu Add layer `p9x1J` dengan item baru "Import from URL…", dan menu Export panel Theme `Fr1q6`.
+
+Keputusan desain:
+
+- **Snapping.** Guide dan pengukur jarak memakai `danger` supaya tidak tertukar dengan seleksi (`accent`) dan agen (`agent`). Contoh: board "Hero — Mobile" digeser, tepi atasnya menempel ke tepi atas "Hero — Desktop" (guide penuh), jarak 40 antar board ditampilkan dengan Distance Label, dan badge di bawah seleksi menunjukkan posisi bulat yang akan di-commit (`664, 64`). Panel Design ikut menampilkan X/Y/W/H board tersebut.
+- **Alt+hover.** Seleksi tetap biru, layer yang di-hover diberi Hover Outline biasa. Jarak horizontal (28) dan vertikal (26) digambar dengan Smart Guide + Distance Label. Tooltip pola "Undo" yang sudah ada dipakai untuk petunjuk "Measuring to Visual · Alt".
+- **Zoom.** Indikator zoom di View Controls menjadi tombol (latar `surface-hover`, chevron) yang membuka menu: Zoom in (Ctrl +), Zoom out (Ctrl −), Zoom to 100% (Shift 0), Zoom to fit (Shift 1), Zoom to selection (Shift 2). Shift+1 sudah berarti Fit di viewer.
+- **Wrap.** Grup Auto layout mendapat baris baru di bawah Direction: Segmented "No wrap / Wrap" dan Field "Row gap" di sebelahnya. Gap yang ada tetap menjadi jarak antar kolom. Contoh canvas: chip layanan di "Feature grid" terbungkus ke dua baris, dengan sorotan row gap dan Distance Label 8. Baris Inner shadow di grup Effects disembunyikan di layar ini supaya panel tetap muat 900px.
+- **Copy as PNG.** Item baru di context menu layer, tepat di bawah Duplicate, shortcut Ctrl+Shift+C (tidak dipakai di viewer). Hasilnya memakai Toast yang ada: berhasil (2x) atau gagal (Try again / Dismiss).
+- **Import from URL.** Dibuka dari menu Add layer (tombol "+" di Layers dan context menu canvas), tanpa shortcut. Dialog adalah salinan dialog New file: Page address, Board width (Desktop 1440 / Tablet 768 / Mobile 375), catatan batas (http(s) publik, 15 detik, 10 MB), lalu Cancel / Import page. State Progress mengunci form dan menampilkan langkah Fetched page → Rendered → Converting to layers. State Error memberi field `danger` dan pesan untuk alamat lokal/privat, dengan tombol Try again.
+- **DTCG.** Header panel Theme kini punya tombol Import dan Export (menggantikan "Import CSS variables" dan "Copy tokens as CSS", yang pindah ke dalam menu). Menu Import: CSS variables…, DTCG tokens (.json)…. Menu Export ada di sheet komponen: Copy tokens as CSS, Export DTCG JSON, Copy DTCG JSON. Dialog review DTCG adalah salinan dialog Import CSS variables: sumber JSON, pemetaan mode dari `$extensions`, tabel path DTCG/alias/tipe/nilai/status, dan token bertipe yang tidak didukung ditandai "Unsupported" serta dijelaskan di catatan, bukan dibuang diam-diam.
+- **Updates.** Halaman Settings memakai struktur Settings → General apa adanya: Settings Nav (item baru "Updates" aktif), lalu section dengan Section Intro 220px dan Section Fields, garis bawah, dan Spacer 28. Section Version memakai kartu status dari Settings → Connections (pola kartu lakard) dengan badge Up to date / Update available / Check failed dan tombol Check for updates / Download and install / Try again. State Available menambah section "What's new in 0.10.0". Section Automatic updates memakai komponen Input (mode select) "Download updates". Banner di Recents memakai pola Offline Banner: "ready to install" (`accent-soft`, What's new + Restart now) sebelum restart, dan "Updated to Lakar 0.10.0" (nada `success`, See what's new + Dismiss) setelah restart.
+
+Catatan audit: peringatan `fill_container` dari Pencil di layar baru hanya mengenai node yang dinonaktifkan (Option Custom, Inner shadow, Note) dan master Segmented Control yang sudah ada. Diff `lakar-ui.pen` terhadap `main` hanya penambahan.
 
 ## Celah teknis yang perlu diputuskan arsitektur
 
