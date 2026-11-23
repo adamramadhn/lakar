@@ -5,6 +5,8 @@
 // `slug@rev`, isinya tidak pernah berubah) dan Restore (tulis, lewat antrean yang sama).
 // Kelola halaman (aplikasi 8): tambah/rename/pindah/hapus halaman (tulis, lewat antrean yang sama).
 // Ops (editor canvas, AD-7/AD-8): POST /viewer/docs/:slug/ops = satu commit semua-atau-tidak; respons membawa op invers (undo).
+// Paste/impor (epic paste-vektor + adopsi open-pencil story 8): POST /viewer/docs/:slug/paste (SVG/HTML) dan
+// POST /viewer/docs/:slug/import-url (halaman web → board baru), keduanya satu commit + invers.
 // Layer manual (aplikasi 4): `execute` (POST /execute dari sesi viewer sendiri, kode dari codegen.ts), unggah
 // gambar (POST /viewer/assets, byte mentah), dan cari ikon (POST /icons/search).
 // Folder (aplikasi 10): GET/POST /viewer/folders*, tulis lewat antrean yang sama (memanggil pendengar `onDocsChanged`).
@@ -91,6 +93,10 @@ export type OpsResult = { slug: string; rev: number; created: { id: string; name
 export type PasteBody = { content: string; parentId: string; kind?: 'svg' | 'html'; x?: number; y?: number; name?: string; description?: string; width?: number };
 /** Hasil paste: seperti ops (`inverse` untuk undo) + node akar baru dan laporan importer. */
 export type PasteResult = OpsResult & { nodeId: string; report: PasteReport };
+/** Body impor URL (route `POST /viewer/docs/:slug/import-url`, epic adopsi open-pencil story 8). */
+export type ImportUrlBody = { url: string; pageId?: string; x?: number; y?: number; name?: string; description?: string; width?: number; screen?: 'landing' | 'app' | 'mobile' };
+/** Hasil impor URL: seperti paste + `boardId` board baru dan metadata halaman yang diambil. */
+export type ImportUrlResult = OpsResult & { nodeId: string; boardId: string; report: PasteReport; page: { url: string; finalUrl: string; title?: string } };
 /** Font terpasang (GET /viewer/fonts). */
 export type FontFamily = { family: string; weights: number[]; styles: string[] };
 export type LayoutCheck = { docId: string; rev: number; boards: unknown; summary: FindingSummary; findings: Finding[]; ranAt: number };
@@ -529,6 +535,18 @@ class ViewerClient {
   paste(slug: string, body: PasteBody): Promise<PasteResult> {
     return this.#write(
       () => request<PasteResult>('POST', `/viewer/docs/${encodeURIComponent(slug)}/paste`, body),
+      () => [slug],
+    );
+  }
+
+  /**
+   * Impor halaman web dari URL (POST /viewer/docs/:slug/import-url) sebagai board baru: daemon fetch http(s)
+   * eksplisit (anti-SSRF, 15 s/10 MB, tanpa skrip) lalu menjalankan pipeline HTML yang sama dengan paste.
+   * Respons membawa `inverse` seperti `applyOps` (undo impor) dan `report` laporan importer.
+   */
+  importUrl(slug: string, body: ImportUrlBody): Promise<ImportUrlResult> {
+    return this.#write(
+      () => request<ImportUrlResult>('POST', `/viewer/docs/${encodeURIComponent(slug)}/import-url`, body),
       () => [slug],
     );
   }
