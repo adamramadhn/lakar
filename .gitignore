@@ -5,3 +5,10 @@ coverage/
 bench/runs/
 packages/render/test/out/
 tests/.parity/
+
+# artefak non-kode: hidup di repo lakar-meta, dipasang lewat junction (scripts\link-meta.cmd)
+_bmad-output/
+_bmad/
+.claude/skills/
+.claude/worktrees/
+design/
