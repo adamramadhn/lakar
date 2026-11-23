@@ -20,7 +20,7 @@ function fakeDaemon() {
       res.end(JSON.stringify(payload));
     };
     if (req.url === '/sessions') return send(200, { ok: true, data: { sessionId: 's1', version: LAKAR_VERSION, schemaVersion: SCHEMA_VERSION } });
-    if (req.url === '/visual-diff') {
+    if (req.url === '/viewer/visual-diff') {
       if (body.fromRev === 99) return send(404, { ok: false, error: { code: 'NOT_FOUND', message: 'versi r99 dokumen a tidak punya snapshot', hint: 'versi ini dibuat sebelum snapshot tersedia', retryable: false } });
       return send(200, {
         ok: true,
@@ -76,7 +76,7 @@ describe('tool MCP visual_diff', () => {
     fake.seen.length = 0;
     const r = await c.callTool({ name: 'visual_diff', arguments: { nodeId: 'Tttttttt', since: 'session' } });
     expect(r.isError).toBeFalsy();
-    expect(fake.seen.find((x) => x.path === '/visual-diff')!.body).toEqual({ nodeId: 'Tttttttt', since: 'session' });
+    expect(fake.seen.find((x) => x.path === '/viewer/visual-diff')!.body).toEqual({ nodeId: 'Tttttttt', since: 'session' });
     const content = r.content as any[];
     expect(content[0]).toEqual({ type: 'image', data: PNG_B64, mimeType: 'image/png' });
     const meta = JSON.parse(content[1].text);
@@ -86,7 +86,7 @@ describe('tool MCP visual_diff', () => {
 
     fake.seen.length = 0;
     await c.callTool({ name: 'visual_diff', arguments: {} });
-    expect(fake.seen.find((x) => x.path === '/visual-diff')!.body).toEqual({});
+    expect(fake.seen.find((x) => x.path === '/viewer/visual-diff')!.body).toEqual({});
   });
 
   it('error daemon → isError dengan kode dan hint', async () => {

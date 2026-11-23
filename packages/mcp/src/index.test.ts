@@ -190,7 +190,7 @@ describe('@lakar/mcp', () => {
     const c = await connect(url);
     const { tools } = await c.listTools();
     expect(tools.map((t) => t.name).sort()).toEqual(
-      ['execute', 'export', 'export_code', 'get_selection', 'icon_search', 'inspect', 'layout_check', 'list_boards', 'list_documents', 'open_doc', 'paste', 'photo_search', 'read_skill', 'screenshot', 'status', 'visual_diff'].sort(),
+      ['execute', 'export', 'export_code', 'get_selection', 'icon_search', 'inspect', 'layout_check', 'list_boards', 'list_documents', 'open_doc', 'paste', 'photo_search', 'read_skill', 'redo', 'screenshot', 'status', 'undo', 'visual_diff'].sort(),
     );
     expect(SERVER_VERSION).toBe(LAKAR_VERSION);
     expect(c.getServerVersion()?.version).toBe(LAKAR_VERSION);
@@ -647,7 +647,7 @@ describe('@lakar/mcp', () => {
       const r = await c2.callTool({ name: 'execute', arguments: { code: '1' } });
       expect(r.isError).toBe(true);
       expect((r.content as any)[0].text).toContain('http://127.0.0.1:1');
-      expect((await c2.listTools()).tools).toHaveLength(16);
+      expect((await c2.listTools()).tools).toHaveLength(18);
     } finally {
       await c2.close();
       await deadTransport.close();

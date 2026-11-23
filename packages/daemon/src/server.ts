@@ -40,7 +40,7 @@ import type { DaemonConfig } from './config.js';
 import { FontRegistry } from './fonts.js';
 import { INSPECT_DEPTH_DEFAULT, INSPECT_DEPTH_MAX, WIP_PREFIX, boundsMap, inspectFit, locateNode } from './inspect.js';
 import { readPngSize } from './png.js';
-import { NO_ACTIVE_DOC_HINT, Sessions, UnknownSessionError, authorOf, logExecute, noteWrite, recallFailed, rememberFailed, setActiveDoc } from './sessions.js';
+import { NO_ACTIVE_DOC_HINT, Sessions, UnknownSessionError, authorOf, logExecute, recallFailed, rememberFailed, setActiveDoc } from './sessions.js';
 import { DocStore } from './store.js';
 import { ActivityBus, agentOf, registerActivityHooks } from './events.js';
 import { registerConnectionRoutes } from './connections.js';
@@ -48,6 +48,7 @@ import { FILES_LOCK, freeSlugFor, registerFileRoutes, slugClaimed, slugify } fro
 import { FocusStore, registerFocusRoutes } from './focus.js';
 import { registerPageRoutes } from './pages.js';
 import { registerOpsRoutes } from './ops.js';
+import { AgentSteps, registerAgentUndoRoutes } from './agent-undo.js';
 import { registerPasteRoutes, type HtmlSnapshotter } from './paste.js';
 import { SelectionStore, registerSelectionRoutes } from './selection.js';
 import { registerRenderDepsRoutes } from './render-deps.js';
@@ -246,6 +247,8 @@ export function buildServer({
   const selections = new SelectionStore();
   /** Dokumen yang tampil di tiap jendela viewer, hanya di memori. */
   const focus = new FocusStore();
+  /** Tumpukan undo/redo agen per sesi per dokumen, hanya di memori (spec-agent-undo). */
+  const agentSteps = new AgentSteps();
 
   const ok = (reply: FastifyReply, data: unknown) => reply.code(200).send({ ok: true, data });
   /** Catatan aditif: foto jarak jauh yang tampil sebagai placeholder (cache dingin + jaringan gagal). */
@@ -606,7 +609,8 @@ export function buildServer({
         // setelah restart.
         await store.commit(slug, committed.doc, { ...committed.entry, ...authorOf(session) });
         docs.set(slug, committed.doc);
-        noteWrite(session, committed.doc.id, doc.rev);
+        // Hook tulis agen tunggal: langkah undo (spec-agent-undo) + dasar visual_diff (spec-agent-visual-diff).
+        agentSteps.onAgentWrite(session, committed.doc.id, doc.rev, committed.doc.rev, committed.inverse, label);
         checks.record(committed.doc.id, doc.rev, committed.doc.rev, ran.boards);
         hugs.record(after, ran.measures, doc.rev);
         result = { docId: committed.doc.id, rev: committed.doc.rev, created: committed.created };
@@ -845,7 +849,9 @@ export function buildServer({
     ...(snapshotter ? { html: snapshotter } : {}),
     fonts: (family) => fonts.entry(family),
     dataDir: config.dataDir,
+    agentSteps,
   });
+  registerAgentUndoRoutes(app, { docs, store, docLocks, sessions, steps: agentSteps, icons });
   registerSelectionRoutes(app, { docs, store, sessions, selections, focus, activity, render, assertIcons });
   registerRenderDepsRoutes(app, { fonts, icons });
   registerExportRoutes(app, { docs, store, render, icons });
