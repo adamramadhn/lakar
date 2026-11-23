@@ -1,0 +1,9 @@
+[{"claim":"[1] diff_pixels/apply_patch","class":"features","pub_date":"2026-11-23"},
+{"claim":"[3] agent-only undo","class":"features","pub_date":"2026-10-10"},
+{"claim":"[4] lint_fix","class":"features","pub_date":"2026-11-23"},
+{"claim":"[16] behaviours","class":"features","pub_date":"2026-11-23"},
+{"claim":"[2] roadmap agent loop","class":"trajectory","pub_date":"2026-11-22"},
+{"claim":"[13] Cloud investment","class":"trajectory","pub_date":"2026-11-22"},
+{"claim":"[19] breaking changes each minor","class":"trajectory","pub_date":"2026-11-22"},
+{"claim":"[17] top complaint: agent connect","class":"sentiment","pub_date":"2026-04-30"},
+{"claim":"[18] MCP stability bugs","class":"sentiment","pub_date":"2026-10-04"}]
