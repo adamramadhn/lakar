@@ -166,13 +166,24 @@ const layout = (board: any) => {
   });
   return { width: board.width, height: typeof board.height === 'number' ? board.height : Math.max(10, y), nodes };
 };
-const findBoardIn = (doc: any, id: string) => doc.pages.flatMap((p: any) => p.children).find((b: any) => b.id === id);
+// Warna node = fill solid pertamanya bila ada (deterministik dan berbeda jelas antar-rev); selain itu hash properti
+// tanpa `id`. Hash yang memuat id acak sesekali menghasilkan dua warna di bawah ambang pixelmatch → tes flaky.
+const paint = (own: any): [number, number, number] => {
+  const hex = own.fills?.[0]?.type === 'solid' && typeof own.fills[0].color === 'string' ? /^#([0-9a-f]{6})$/i.exec(own.fills[0].color) : null;
+  if (hex) {
+    const v = parseInt(hex[1]!, 16);
+    return [(v >> 16) & 255, (v >> 8) & 255, v & 255];
+  }
+  const { id: _id, ...rest } = own;
+  return hash(JSON.stringify(rest));
+};
+const findBoardIn =(doc: any, id: string) => doc.pages.flatMap((p: any) => p.children).find((b: any) => b.id === id);
 const fakeRender = {
   screenshot: async (doc: any, boardId: string) => {
     const l = layout(findBoardIn(doc, boardId));
     const r = raster(l.width, l.height, l.nodes.map(({ n, c }: any) => {
       const { children: _k, ...own } = c;
-      return [n.x, n.y, n.width, n.height, hash(JSON.stringify(own))];
+      return [n.x, n.y, n.width, n.height, paint(own)];
     }));
     return new Uint8Array(encodePng(r.width, r.height, r.pixels));
   },
