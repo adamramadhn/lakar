@@ -139,6 +139,9 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-token-3-theme-panel.md`
   summary: Tombol "Import CSS variables" dan "Copy tokens as CSS" di header panel Theme belum ada.
   evidence: Desain dialog impor dan Copy tokens as CSS ada di bagian 09 Code (wvCMu/ngHGS, w6iQk/SpvBC) dan ticket epic kode story 5 memuatnya ("Copy tokens as CSS di panel Theme; impor CSS variables memakai parser epic token"). Usul: epic kode story 5 menambah kedua tombol di `.theme-header` ThemePanel.tsx (parser `parseCssVariables` @lakar/render + setTokenModes/setTokens lewat route ops).
+- source_spec: `_bmad-output/initiative-lakar-paper/tickets/epic-adopsi-open-pencil/tickets/story-copy-as-png-plan.md`
+  summary: Copy as PNG hanya menyalin satu node; PNG multi-layer (union seleksi jamak) belum ada.
+  evidence: Disengaja — `render.screenshot` hanya menerima satu `nodeId`; union seleksi jamak butuh kemampuan render baru. Menu menonaktifkan item saat seleksi lebih dari satu atau alamat komposit.
 - source_spec: `_bmad-output/implementation-artifacts/spec-token-3-theme-panel.md`
   summary: Panel Theme tidak bisa menghapus mode, mengubah urutan mode, atau mengganti mode default.
   evidence: Ticket story 3 hanya meminta tambah dan ubah nama mode; desain 07 tidak memuat aksi itu. Usul: menu konteks di header mode (Delete mode / Make default) dengan op setTokenModes + setTokens yang membuang/menggeser `modes` dan update themeMode board.

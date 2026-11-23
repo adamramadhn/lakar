@@ -25,8 +25,10 @@ import { liveDocs, type LiveDoc } from './live';
 import { NewFileDialog } from './NewFileDialog';
 import { Search } from './Search';
 import { SettingsGeneral, SettingsLayout } from './SettingsGeneral';
+import { SettingsUpdates } from './SettingsUpdates';
 import { openInNewTab } from './tabs';
 import { docSubtitle, Thumb } from './Thumb';
+import { UpdateBanner } from './UpdateBanner';
 
 type View = 'grid' | 'list';
 const VIEW_KEY = 'lakar.viewer.view';
@@ -48,7 +50,7 @@ function store(key: string, value: string) {
   }
 }
 
-export type DashboardPage = 'recents' | 'files' | 'archive' | 'settings' | 'connections';
+export type DashboardPage = 'recents' | 'files' | 'archive' | 'settings' | 'connections' | 'updates';
 
 /** Tombol ke halaman Connections ("Install in an agent" memasang config; salin manual ada di sana). */
 function ConnectLink({ className = '' }: { className?: string }) {
@@ -262,7 +264,7 @@ function LiveBadge({ live }: { live: LiveDoc }) {
 
 const liveSubtitle = (live: LiveDoc | undefined, d: DocSummary) => (live?.running ? `${live.label} is editing…` : live ? `${live.label} · ${relativeTime(d.updatedAt)}` : docSubtitle(d));
 
-const TITLES: Record<Exclude<DashboardPage, 'settings' | 'connections'>, string> = { recents: 'Recents', files: 'Files', archive: 'Archive' };
+const TITLES: Record<Exclude<DashboardPage, 'settings' | 'connections' | 'updates'>, string> = { recents: 'Recents', files: 'Files', archive: 'Archive' };
 const NO_FOLDERS: FolderState = { folders: [], membership: {} };
 
 /** Urut nama folder tanpa peka huruf besar (daemon sudah mengurutkan; dijaga juga di sini). */
@@ -383,7 +385,7 @@ export function Dashboard({
   const [folderError, setFolderError] = useState<string | undefined>(undefined);
   const archivedPage = page === 'archive';
   const filesPage = page === 'files';
-  const settingsPage = page === 'settings' || page === 'connections';
+  const settingsPage = page === 'settings' || page === 'connections' || page === 'updates';
 
   const load = useCallback(() => {
     setError(undefined);
@@ -754,9 +756,12 @@ export function Dashboard({
       </aside>
 
       {settingsPage ? (
-        <SettingsLayout tab={page === 'connections' ? 'connections' : 'general'}>{page === 'connections' ? <Connections /> : <SettingsGeneral />}</SettingsLayout>
+        <SettingsLayout tab={page === 'connections' ? 'connections' : page === 'updates' ? 'updates' : 'general'}>
+          {page === 'connections' ? <Connections /> : page === 'updates' ? <SettingsUpdates /> : <SettingsGeneral />}
+        </SettingsLayout>
       ) : (
         <section className={`main${filesPage ? ' files-page' : ''}${view === 'list' ? ' list-view' : ''}`}>
+          {page === 'recents' && <UpdateBanner />}
           <div className="main-header">
             {currentFolder ? <Breadcrumb name={currentFolder.name} onDropRoot={(slug) => moveTo(slug, null)} /> : <h1>{TITLES[page as keyof typeof TITLES]}</h1>}
             {currentFolder && (

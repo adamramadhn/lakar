@@ -32,6 +32,8 @@ export const TOOL_EFFECTS = {
   open_doc: 'write',
   // Hanya menambah node baru.
   paste: 'write',
+  // Menambah satu board berisi hasil impor; fetch http(s) hanya atas permintaan eksplisit (anti-SSRF di daemon).
+  import_url: 'write',
   // Menulis PNG di <dataDir>/exports/, bukan isi desain.
   export: 'write',
   // Hanya membalik langkah sesi ini; ada rev lain sesudahnya → CONFLICT, jadi edit pengguna tidak tersentuh. Yang

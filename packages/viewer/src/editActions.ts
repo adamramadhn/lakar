@@ -12,11 +12,11 @@ export type AlignAction = 'align-left' | 'align-center' | 'align-right' | 'align
 export type DistributeAction = 'distribute-h' | 'distribute-v';
 /** Aksi komponen (epic komponen story 4): jadikan seleksi master, dan detach instance. */
 export type ComponentAction = 'create-component' | 'detach';
-export type EditAction = 'group' | 'ungroup' | 'duplicate' | 'delete' | 'forward' | 'backward' | AlignAction | DistributeAction | ComponentAction;
+export type EditAction = 'group' | 'ungroup' | 'duplicate' | 'copy-png' | 'delete' | 'forward' | 'backward' | AlignAction | DistributeAction | ComponentAction;
 
 export const ALIGN_ACTIONS: readonly AlignAction[] = ['align-left', 'align-center', 'align-right', 'align-top', 'align-middle', 'align-bottom'];
 export const DISTRIBUTE_ACTIONS: readonly DistributeAction[] = ['distribute-h', 'distribute-v'];
-export const EDIT_ACTIONS: readonly EditAction[] = ['group', 'ungroup', 'duplicate', 'delete', 'forward', 'backward', ...ALIGN_ACTIONS, ...DISTRIBUTE_ACTIONS, 'create-component', 'detach'];
+export const EDIT_ACTIONS: readonly EditAction[] = ['group', 'ungroup', 'duplicate', 'copy-png', 'delete', 'forward', 'backward', ...ALIGN_ACTIONS, ...DISTRIBUTE_ACTIONS, 'create-component', 'detach'];
 
 /**
  * Plan satu aksi. `select`: seleksi sesudah sukses — `ids` langsung, atau `refs` (nama `ref` op add/duplicate yang
@@ -291,6 +291,9 @@ export function planAction(kind: EditAction, scene: readonly GeoNode[], ids: rea
   const index = indexGeo(scene);
   if (STRUCTURAL.has(kind) && topMost(index, ids).some(composite)) return undefined;
   switch (kind) {
+    case 'copy-png':
+      // Bukan op dokumen: Viewer mengekspor PNG node ke clipboard (route ekspor + navigator.clipboard).
+      return undefined;
     case 'create-component':
       return planCreateComponent(scene, index, ids);
     case 'detach':
@@ -332,6 +335,8 @@ export function actionState(scene: readonly GeoNode[], ids: readonly string[]): 
   out.group = structural && members.every((m) => m.type !== 'board' && m.parentId !== undefined && m.parentId === parent);
   out.ungroup = structural && members.some((m) => m.type === 'frame' && m.component !== 'instance' && m.parentId !== undefined && m.children.length > 0);
   out.duplicate = structural;
+  // Copy as PNG (desain 11): tepat satu node tersimpan — alamat komposit (isi instance) tidak bisa dirender daemon.
+  out['copy-png'] = members.length === 1 && !composite(members[0]!);
   out.delete = structural;
   out.forward = structural && planZOrder(scene, index, ids, 'forward') !== undefined;
   out.backward = structural && planZOrder(scene, index, ids, 'backward') !== undefined;
@@ -378,8 +383,9 @@ const DISTRIBUTE_CODES: Record<string, EditAction> = { KeyH: 'distribute-h', Key
 const ARROWS: Record<string, readonly [number, number]> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
 
 /**
- * Shortcut aksi: Delete/Backspace, Ctrl/⌘+G (Shift = ungroup), Ctrl/⌘+D, Ctrl/⌘+] / [, Alt+A/H/D/W/V/S align,
- * Alt+Shift+H/V distribute (lewat `code`, aman untuk Alt di macOS), Ctrl/⌘+A pilih semua, panah (Shift = 10px) nudge.
+ * Shortcut aksi: Delete/Backspace, Ctrl/⌘+G (Shift = ungroup), Ctrl/⌘+D, Ctrl/⌘+Shift+C (Copy as PNG),
+ * Ctrl/⌘+] / [, Alt+A/H/D/W/V/S align, Alt+Shift+H/V distribute (lewat `code`, aman untuk Alt di macOS),
+ * Ctrl/⌘+A pilih semua, panah (Shift = 10px) nudge.
  */
 export function shortcutAction(e: ShortcutKey): { action: EditAction } | { selectAll: true } | { nudge: readonly [number, number] } | undefined {
   const mod = e.ctrlKey || e.metaKey;
@@ -389,6 +395,7 @@ export function shortcutAction(e: ShortcutKey): { action: EditAction } | { selec
   if (!mod && !e.altKey && !e.shiftKey && (e.key === 'Delete' || e.key === 'Backspace')) return { action: 'delete' };
   if (mod && !e.altKey) {
     if (k === 'g') return { action: e.shiftKey ? 'ungroup' : 'group' };
+    if (k === 'c' && e.shiftKey) return { action: 'copy-png' };
     if (e.shiftKey) return undefined;
     if (k === 'd') return { action: 'duplicate' };
     if (e.code === 'BracketRight') return { action: 'forward' };

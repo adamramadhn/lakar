@@ -55,19 +55,23 @@ export type Route =
   | { name: 'archive' }
   | { name: 'settings' }
   | { name: 'connections' }
+  | { name: 'updates' }
   | { name: 'viewer'; slug: string };
 
 /** Hash halaman Settings → General. */
 export const SETTINGS_HASH = '#/settings';
 /** Hash Settings → Connections (App.tsx mengekspor ulang dari sini). */
 export const CONNECTIONS_HASH = '#/settings/connections';
+/** Hash Settings → Updates (hanya bermakna di aplikasi desktop). */
+export const UPDATES_HASH = '#/settings/updates';
 
 /**
- * `#/` Recents, `#/files`, `#/files/<id>` folder, `#/archive`, `#/settings` (= `#/settings/general`) General, `#/settings/connections`,
- * `#/d/<slug>` Viewer; selain itu Recents.
+ * `#/` Recents, `#/files`, `#/files/<id>` folder, `#/archive`, `#/settings` (= `#/settings/general`) General,
+ * `#/settings/connections`, `#/settings/updates`, `#/d/<slug>` Viewer; selain itu Recents.
  */
 export function parseRoute(hash: string): Route {
   if (/^#\/settings\/connections\/?$/.test(hash)) return { name: 'connections' };
+  if (/^#\/settings\/updates\/?$/.test(hash)) return { name: 'updates' };
   if (/^#\/settings(\/general)?\/?$/.test(hash)) return { name: 'settings' };
   if (/^#\/files\/?$/.test(hash)) return { name: 'files' };
   const f = /^#\/files\/([^/?#]+)\/?$/.exec(hash);

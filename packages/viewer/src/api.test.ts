@@ -375,6 +375,20 @@ describe('History (aplikasi 3)', () => {
     await expect(api.paste('a', { content: '<svg/>', parentId: 'Zzzzzzzz' })).rejects.toMatchObject({ code: 'NOT_FOUND', status: 404 });
   });
 
+  it('importUrl: POST /viewer/docs/:slug/import-url tanpa sesi, body apa adanya, invalidasi slug; gagal → ApiError', async () => {
+    const result = { slug: 'a', rev: 6, created: [], inverse: [{ op: 'remove', id: 'Iiiiiiii' }], refs: { import: 'Iiiiiiii', paste: 'Pppppppp' }, nodeId: 'Pppppppp', boardId: 'Iiiiiiii', report: { kind: 'html', layers: 2, scripts: 0, dropped: [] }, page: { url: 'https://example.com/', finalUrl: 'https://example.com/', title: 'Cool Site' } };
+    const calls = fakeFetch((c) =>
+      c.body?.url === 'http://127.0.0.1/' ? { status: 400, body: { ok: false, error: { code: 'SCHEMA_INVALID', message: 'alamat non-publik ditolak', hint: '' } } } : ok(result),
+    );
+    const api = await freshApi();
+    const changed = vi.fn();
+    api.onDocsChanged(changed);
+    await expect(api.importUrl('a', { url: 'https://example.com/', width: 768, screen: 'app' })).resolves.toEqual(result);
+    expect(calls.at(-1)).toMatchObject({ method: 'POST', path: '/viewer/docs/a/import-url', body: { url: 'https://example.com/', width: 768, screen: 'app' }, session: undefined });
+    expect(changed).toHaveBeenCalledOnce();
+    await expect(api.importUrl('a', { url: 'http://127.0.0.1/' })).rejects.toMatchObject({ code: 'SCHEMA_INVALID', status: 400 });
+  });
+
   it('putSelection: PUT /viewer/docs/:slug/selection tanpa sesi, tanpa invalidasi; gagal → ApiError', async () => {
     const calls = fakeFetch((c) => (c.path === '/viewer/docs/hilang/selection' ? { status: 404, body: { ok: false, error: { code: 'NOT_FOUND', message: 'dokumen hilang tidak ada', hint: '' } } } : ok({ slug: 'a', rev: 2, addresses: c.body.addresses })));
     const api = await freshApi();
@@ -420,6 +434,21 @@ describe('exportPng (aplikasi 2)', () => {
     await expect(mod.api.exportPng('my-landing', 'nope', 1)).rejects.toMatchObject({ code: 'NOT_FOUND', status: 404 });
     expect(mod.exportFileName('attachment; filename="../x.png"', 'f.png')).toBe('f.png');
     expect(mod.exportFileName(null, 'f.png')).toBe('f.png');
+  });
+
+  it('nodeId (Copy as PNG) ikut di body; tanpa nodeId body persis seperti lama', async () => {
+    const mod = await (async () => {
+      vi.resetModules();
+      return import('./api.ts');
+    })();
+    const seen: unknown[] = [];
+    vi.stubGlobal('fetch', async (_path: string, init: { body: string }) => {
+      seen.push(JSON.parse(init.body));
+      return new Response(new Uint8Array([137, 80, 78, 71]), { status: 200, headers: { 'content-type': 'image/png' } });
+    });
+    await mod.api.exportPng('my-landing', 'Bbbbbbb1', 2, 'Card0001');
+    await mod.api.exportPng('my-landing', 'Bbbbbbb1', 2);
+    expect(seen).toEqual([{ boardId: 'Bbbbbbb1', scale: 2, nodeId: 'Card0001' }, { boardId: 'Bbbbbbb1', scale: 2 }]);
   });
 });
 

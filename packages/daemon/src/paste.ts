@@ -112,7 +112,7 @@ export function pasteOps(node: ImportedNode, parent: ParentLike, at: { x?: numbe
 }
 
 /** Jumlah node pohon impor. */
-const countNodes = (n: ImportedNode): number => 1 + (n.children ?? []).reduce((a, c) => a + countNodes(c), 0);
+export const countNodes = (n: ImportedNode): number => 1 + (n.children ?? []).reduce((a, c) => a + countNodes(c), 0);
 
 /** Lebar viewport HTML default: lebar board, lebar frame angka dikurangi padding horizontal, atau 1280. */
 export function htmlViewportWidth(parent: ParentLike | undefined): number {
@@ -143,7 +143,7 @@ export type PasteRoutesOptions = {
   agentSteps?: AgentSteps;
 };
 
-type Imported = { node: ImportedNode; report: PasteReport; assets: { sha: string; bytes: Buffer }[]; size?: { width: number; height: number } };
+export type Imported = { node: ImportedNode; report: PasteReport; assets: { sha: string; bytes: Buffer }[]; size?: { width: number; height: number } };
 
 /** Parent paste di `doc`: board atau frame biasa; selain itu error yang sama untuk pra-cek dan cek di bawah kunci. */
 function pasteParent(doc: LakarDocument | undefined, slug: string, parentId: string, onMissing: () => LakarError): ParentLike {

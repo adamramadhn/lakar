@@ -252,3 +252,17 @@ describe('grid (v4)', () => {
     expect(toCss(row)).toBe('display: flex;\nflex-direction: row;\ngap: 4px;');
   });
 });
+
+describe('wrap (v9)', () => {
+  it('frame flex wrap:true → flex-wrap: wrap / kelas flex-wrap; tanpa wrap tidak ditulis', () => {
+    const row = { ...id, type: 'frame', layout: 'row', wrap: true, columnGap: 8, rowGap: 12 };
+    expect(toCss(row)).toBe('display: flex;\nflex-direction: row;\nflex-wrap: wrap;\ncolumn-gap: 8px;\nrow-gap: 12px;');
+    expect(toTailwind(row)).toBe('flex flex-row flex-wrap gap-x-[8px] gap-y-[12px]');
+    const nowrap = { ...id, type: 'frame', layout: 'column' };
+    expect(toCss(nowrap)).not.toContain('flex-wrap');
+    expect(toTailwind(nowrap)).not.toContain('flex-wrap');
+    // wrap diabaikan di grid/none (sama seperti render).
+    expect(toCss({ ...id, type: 'frame', layout: 'grid', wrap: true })).toBe('display: grid;');
+    expect(toCss({ ...id, type: 'frame', wrap: true })).toBe('');
+  });
+});

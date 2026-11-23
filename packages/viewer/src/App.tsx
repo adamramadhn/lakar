@@ -1,5 +1,6 @@
 // Kerangka aplikasi: title bar bertab (TitleBar.tsx), routing hash (`#/` Recents, `#/files`, `#/files/<id>` folder, `#/archive`, `#/settings`
-// General, `#/settings/connections` Connections, `#/d/<slug>` Viewer; lihat `parseRoute` di files.ts), banner offline.
+// General, `#/settings/connections` Connections, `#/settings/updates` Updates (hanya desktop), `#/d/<slug>` Viewer; lihat `parseRoute`
+// di files.ts), banner offline.
 // Tab dokumen (aplikasi 7): daftar slug di localStorage (`TABS_KEY`); membuka dokumen menambah/mengaktifkan tabnya,
 // Close lewat x / klik tengah / Ctrl/Cmd+W. Rename/archive/delete dari aplikasi (`api.onFileEvent`) ikut ke tab.
 // Hanya Viewer tab aktif yang ter-mount; state tampilan per dokumen disimpan di viewState.ts.
@@ -18,6 +19,7 @@ import { NewFileDialog } from './NewFileDialog';
 import { OfflineBanner } from './OfflineBanner';
 import { applyFileEvent, closeTab, onOpenInNewTab, onRequestCloseTab, openTab, pruneTabs, readTabs, serializeTabs, TABS_KEY } from './tabs';
 import { TitleBar } from './TitleBar';
+import { initUpdates } from './updates';
 import { dropViewState, moveViewState } from './viewState';
 import { Viewer } from './Viewer';
 
@@ -86,8 +88,11 @@ export function App() {
     );
   }, []);
 
+  // Updater aplikasi desktop: sekali per mount (cek + unduh latar bila kebijakan auto). No-op di browser.
+  useEffect(() => initUpdates(), []);
+
   useEffect(() => {
-    const titles: Record<Route['name'], string> = { recents: 'Lakar', files: 'Files · Lakar', archive: 'Archive · Lakar', settings: 'Settings · Lakar', connections: 'Connections · Lakar', viewer: 'Lakar' };
+    const titles: Record<Route['name'], string> = { recents: 'Lakar', files: 'Files · Lakar', archive: 'Archive · Lakar', settings: 'Settings · Lakar', connections: 'Connections · Lakar', updates: 'Updates · Lakar', viewer: 'Lakar' };
     // Halaman folder (`#/files/<id>`): Dashboard mengganti judul dengan nama folder setelah folder dimuat.
     document.title = route.name === 'viewer' ? `${route.slug} · Lakar` : titles[route.name];
   }, [route]);

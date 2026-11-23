@@ -440,7 +440,11 @@ function flexLayout(el: SnapElement, flow: readonly SnapNode[]): LayoutResult {
   const s = el.style;
   const dir = s['flex-direction'] ?? 'row';
   if (dir !== 'row' && dir !== 'column') return { fail: 'flex-direction' };
-  if ((s['flex-wrap'] ?? 'nowrap') !== 'nowrap') return { fail: 'flex-wrap' };
+  // `flex-wrap: wrap` → frame `wrap:true` (v9); `wrap-reverse` tetap di luar skema.
+  const wrap = s['flex-wrap'] ?? 'nowrap';
+  if (wrap !== 'nowrap' && wrap !== 'wrap') return { fail: 'flex-wrap' };
+  // `align-content` mengatur distribusi antarbaris dan di luar skema — hanya bermakna saat wrap (nowrap: no-op CSS).
+  if (wrap === 'wrap' && s['align-content'] !== undefined && !/^(normal|stretch)$/.test(s['align-content'])) return { fail: 'align-content' };
   const justify = justifyFromCss(s['justify-content'] ?? 'normal');
   if (!justify) return { fail: 'justify-content' };
   const align = alignFromCss(s['align-items'] ?? 'normal');
@@ -456,8 +460,12 @@ function flexLayout(el: SnapElement, flow: readonly SnapNode[]): LayoutResult {
   }
   const cb = contentBox(el);
   const gap = cssPx(dir === 'row' ? s['column-gap'] : s['row-gap']) ?? 0;
+  // Gap sumbu silang (gap antarbaris saat wrap) → rowGap/columnGap sesuai arah.
+  const crossGap = cssPx(dir === 'row' ? s['row-gap'] : s['column-gap']) ?? 0;
   const props: Record<string, unknown> = { layout: dir };
+  if (wrap === 'wrap') props.wrap = true;
   if (gap > 0) props.gap = r2(gap);
+  if (crossGap > 0) props[dir === 'row' ? 'rowGap' : 'columnGap'] = r2(crossGap);
   const pad = paddingValue(cb.pad);
   if (pad !== undefined) props.padding = pad;
   if (align !== 'stretch') props.align = align;

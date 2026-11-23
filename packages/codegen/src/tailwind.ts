@@ -6,6 +6,7 @@ const KEYWORD: Readonly<Record<string, Readonly<Record<string, string>>>> = {
   position: { absolute: 'absolute', relative: 'relative' },
   display: { flex: 'flex', grid: 'grid', block: 'block' },
   'flex-direction': { row: 'flex-row', column: 'flex-col' },
+  'flex-wrap': { wrap: 'flex-wrap', nowrap: 'flex-nowrap', 'wrap-reverse': 'flex-wrap-reverse' },
   'box-sizing': { 'border-box': 'box-border' },
   overflow: { hidden: 'overflow-hidden', visible: 'overflow-visible' },
   isolation: { isolate: 'isolate' },
