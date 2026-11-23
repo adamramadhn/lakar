@@ -46,3 +46,13 @@ Tanpa secret, build tetap jalan tanpa tanda tangan. macOS memakai tanda tangan a
 | `APPLE_SIGNING_IDENTITY` | Mis. `Developer ID Application: Nama (TEAMID)` |
 | `APPLE_ID`, `APPLE_PASSWORD`, `APPLE_TEAM_ID` | Notarisasi (app-specific password) |
 | `WINDOWS_CERTIFICATE`, `WINDOWS_CERTIFICATE_PASSWORD` | Sertifikat code signing (.pfx, base64) |
+| `TAURI_SIGNING_PRIVATE_KEY` | Kunci privat updater (isi berkas minisign). Mengaktifkan `bundle.createUpdaterArtifacts` → artefak `*.sig` + `latest.json` |
+| `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | Password kunci updater (kosongkan bila tanpa password) |
+
+## Updater otomatis
+
+Aplikasi memakai `tauri-plugin-updater` dengan endpoint statis `latest.json` di GitHub Release (`releases/latest/download/latest.json`, dikonfigurasi di `src-tauri/tauri.conf.json` `plugins.updater`). Pengguna memeriksa dan memasang update dari *Settings → Updates*; banner di Recents menawarkan restart setelah update terunduh. Pemasangan selalu meminta persetujuan — tidak ada update otomatis tanpa interaksi.
+
+- **Kunci.** Kunci privat dibuat sekali di luar repo: `pnpm tauri signer generate -w C:\Users\Fatmuh\.lakar-updater-key\lakar-updater.key` (tanpa password), lalu disimpan sebagai secret repo: `gh secret set TAURI_SIGNING_PRIVATE_KEY < lakar-updater.key` (lewat stdin — jangan pernah di-echo atau di-commit). Cadangkan berkas `.key` di tempat aman; kehilangannya berarti update ke versi baru harus ditandatangani ulang dengan kunci baru dan semua pengguna harus memasang ulang manual. Hanya pubkey (`.key.pub`) yang masuk `tauri.conf.json`.
+- **Alur rilis.** Bila `TAURI_SIGNING_PRIVATE_KEY` ada, langkah *Compose Tauri CI config* menambahkan `bundle.createUpdaterArtifacts` di overlay `ci-config.json` (bukan di `tauri.conf.json`, supaya build lokal tanpa kunci tetap jalan). Job `latest-json` menggabungkan `*.sig` dari keempat matrix build menjadi `latest.json` lewat `scripts/make-latest-json.mjs` (pemetaan: `-setup.exe` → windows-x86_64, `.app.tar.gz` → darwin-x86_64/aarch64, `.AppImage` → linux-x86_64; `.msi.sig`/`.deb.sig` tidak masuk). Job *publish* mengunggahnya ke Release bersama installer dan `*.sig`. Tanpa secret, langkah ini dilewati dengan warning dan rilis tetap terbit.
+- **UI.** Viewer adalah origin remote, jadi ia memanggil command aplikasi sendiri (`app_version`, `check_update`, `download_update`, `install_update`, `relaunch_app`) lewat `__TAURI__.core.invoke`, bukan JS plugin updater. Bytes unduhan disimpan aplikasi agar "Restart now" tidak mengunduh ulang. Di Windows `installMode: passive` memasang dan memulai ulang aplikasi sendiri.

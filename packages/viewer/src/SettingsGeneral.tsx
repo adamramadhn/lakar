@@ -1,20 +1,23 @@
-// Settings (desain 02 "Settings — Dark/Light", tablet/mobile): judul (nama tab) + sub-nav General / Connections
-// (desktop: kolom 200px di kiri; ≤768px: tab horizontal di atas). General berisi Appearance (Light / Dark / System,
-// theme.ts) dan bagian lokal dari `GET /status` (folder data, alamat server, versi). Profile, Language, Notifications
-// sengaja tidak ada (aplikasi lokal tanpa akun, UI hanya bahasa Inggris, isi Notifications belum didesain).
+// Settings (desain 02 "Settings — Dark/Light", tablet/mobile): judul (nama tab) + sub-nav General / Connections /
+// Updates (desktop: kolom 200px di kiri; ≤768px: tab horizontal di atas). General berisi Appearance (Light / Dark /
+// System, theme.ts) dan bagian lokal dari `GET /status` (folder data, alamat server, versi). Tab Updates hanya ada
+// di aplikasi desktop (updates.ts `isDesktop`). Profile, Language, Notifications sengaja tidak ada (aplikasi lokal
+// tanpa akun, UI hanya bahasa Inggris, isi Notifications belum didesain).
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { api, type DaemonStatus } from './api';
 import { CopyButton } from './Connections';
-import { CONNECTIONS_HASH, SETTINGS_HASH } from './files';
+import { CONNECTIONS_HASH, SETTINGS_HASH, UPDATES_HASH } from './files';
 import { useRetry } from './hooks';
 import { Icon, type IconName } from './icons';
 import { THEME_PREFS, useTheme, type ThemePref } from './theme';
+import { isDesktop } from './updates';
 
-export type SettingsTab = 'general' | 'connections';
+export type SettingsTab = 'general' | 'connections' | 'updates';
 
 const TABS: { id: SettingsTab; label: string; icon: IconName; href: string }[] = [
   { id: 'general', label: 'General', icon: 'settings', href: SETTINGS_HASH },
   { id: 'connections', label: 'Connections', icon: 'plug', href: CONNECTIONS_HASH },
+  { id: 'updates', label: 'Updates', icon: 'download', href: UPDATES_HASH },
 ];
 
 /** Kerangka halaman Settings: judul, sub-nav/tab, isi. */
@@ -22,12 +25,13 @@ export function SettingsLayout({ tab, children }: { tab: SettingsTab; children: 
   return (
     <section className="main settings-main">
       <div className="main-header">
-        {/* Desain: judul halaman mengikuti tab ("Settings" / "Connections"). */}
-        <h1>{tab === 'connections' ? 'Connections' : 'Settings'}</h1>
+        {/* Desain: judul halaman mengikuti tab ("Settings" / "Connections" / "Updates"). */}
+        <h1>{tab === 'general' ? 'Settings' : TABS.find((t) => t.id === tab)?.label}</h1>
       </div>
       <div className="settings-body">
         <nav className="settings-nav" aria-label="Settings">
-          {TABS.map((t) => (
+          {/* Tab Updates hanya di aplikasi desktop (browser tidak punya updater). */}
+          {TABS.filter((t) => t.id !== 'updates' || isDesktop()).map((t) => (
             <a key={t.id} href={t.href} className={`settings-nav-item${t.id === tab ? ' active' : ''}`} aria-current={t.id === tab ? 'page' : undefined}>
               <Icon name={t.icon} size={16} />
               <span>{t.label}</span>
@@ -40,7 +44,8 @@ export function SettingsLayout({ tab, children }: { tab: SettingsTab; children: 
   );
 }
 
-function SettingsSection({ title, description, children }: { title: string; description: string; children: ReactNode }) {
+/** Section Settings (desain "Section Intro" 220px + "Section Fields", garis bawah). Diekspor untuk halaman lain (Updates). */
+export function SettingsSection({ title, description, children }: { title: string; description: string; children: ReactNode }) {
   return (
     <section className="settings-section">
       <div className="settings-intro">

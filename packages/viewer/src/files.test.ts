@@ -1,7 +1,7 @@
 // Logika murni kelola file + routing hash viewer. Slugify viewer harus sama dengan daemon (sumber kebenaran).
 import { describe, expect, it } from 'vitest';
 import { slugify as daemonSlugify, withSuffix as daemonWithSuffix } from '../../daemon/src/files.ts';
-import { byEdited, byName, CONNECTIONS_HASH, docHash, docLink, fileErrorText, folderHash, folderMeta, inFolder, parseRoute, parseSort, previewSlug, searchDocs, SETTINGS_HASH, slugify, sortDocs, validSize, withSuffix, wrapIndex } from './files.ts';
+import { byEdited, byName, CONNECTIONS_HASH, docHash, docLink, fileErrorText, folderHash, folderMeta, inFolder, parseRoute, parseSort, previewSlug, searchDocs, SETTINGS_HASH, slugify, sortDocs, UPDATES_HASH, validSize, withSuffix, wrapIndex } from './files.ts';
 
 describe('slugify (pratinjau = daemon)', () => {
   const names = ['My Landing', '  Café — Menu 2  ', '--a__b--', '!!!', '', 'Ünïcödé Ñame', 'x'.repeat(80), `a${'-'.repeat(70)}b`, 'Landing 2026 / v2'];
@@ -47,6 +47,8 @@ describe('parseRoute', () => {
     ['#/archive', { name: 'archive' }],
     ['#/settings/connections', { name: 'connections' }],
     ['#/settings/connections/', { name: 'connections' }],
+    ['#/settings/updates', { name: 'updates' }],
+    ['#/settings/updates/', { name: 'updates' }],
     ['#/settings', { name: 'settings' }],
     ['#/settings/', { name: 'settings' }],
     ['#/settings/general', { name: 'settings' }],
@@ -60,6 +62,7 @@ describe('parseRoute', () => {
   it('konstanta hash Settings', () => {
     expect(parseRoute(SETTINGS_HASH)).toEqual({ name: 'settings' });
     expect(parseRoute(CONNECTIONS_HASH)).toEqual({ name: 'connections' });
+    expect(parseRoute(UPDATES_HASH)).toEqual({ name: 'updates' });
   });
   it('docHash bolak-balik', () => {
     expect(parseRoute(docHash('a-b'))).toEqual({ name: 'viewer', slug: 'a-b' });
