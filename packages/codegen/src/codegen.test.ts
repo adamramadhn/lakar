@@ -10,7 +10,7 @@ const BOARD = 'Board001';
 
 function doc(children: AnyNode[], extra: AnyNode = {}, board: AnyNode = {}): LakarDocument {
   return {
-    schemaVersion: 7,
+    schemaVersion: 8,
     id: 'Doc00001',
     rev: 1,
     tokens: {
@@ -128,6 +128,24 @@ describe('generateCode: tata letak sama dengan render (css.ts)', () => {
     expect(m.get('flex')).toBe('1 1 0px');
     expect(m.get('min-width')).toBe('0');
     expect(m.get('height')).toBe('40px');
+  });
+
+  it("board height:'hug' (v8) → height auto (tinggi mengikuti isi); board bertinggi angka tetap px", () => {
+    const hug = doc([text('Text0001', 'Halo')], {}, { height: 'hug' });
+    expect(declsOf(hug, BOARD).get('height')).toBe('auto');
+    expect(declsOf(hug, BOARD).get('width')).toBe('400px');
+    expect(declsOf(doc([text('Text0001', 'Halo')]), BOARD).get('height')).toBe('300px');
+    const css = file(generateCode(hug, { nodeId: BOARD, target: 'react-css' }), 'LandingHero.module.css');
+    expect(css).toContain('height: auto;');
+    expect(generateCode(hug, { nodeId: BOARD, target: 'react-tailwind' }).files[0]!.contents).toContain('h-[auto]');
+  });
+
+  it("anak langsung board hug ber-height:'fill' = hug (flex 0 0 auto, sama dengan render); di board fixed tetap fill", () => {
+    const kids = () => [frame('Halaman', { layout: 'column', width: 'fill', height: 'fill' }, [frame('Seksi001', { height: 40 })])];
+    const inHug = declsOf(doc(kids(), {}, { height: 'hug' }), 'Halaman');
+    expect(inHug.get('flex')).toBe('0 0 auto');
+    expect(inHug.has('min-height')).toBe(false);
+    expect(declsOf(doc(kids()), 'Halaman').get('flex')).toBe('1 1 0px');
   });
 
   it('absolute hug → left/top + max-content', () => {

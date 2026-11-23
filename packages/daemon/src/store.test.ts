@@ -124,7 +124,7 @@ describe('DocStore', () => {
     await writeFile(plain.docPath('lama'), `${JSON.stringify(v1, null, 2)}\n`, 'utf8');
     const read = await new DocStore(dir).read('lama');
     expect(read).toEqual(doc);
-    expect(read!.schemaVersion).toBe(7);
+    expect(read!.schemaVersion).toBe(8);
     expect(JSON.parse(await readFile(plain.docPath('lama'), 'utf8'))).toEqual(doc);
     expect(tmpFiles(plain.docsDir)).toEqual([]);
   });

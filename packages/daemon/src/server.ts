@@ -52,6 +52,7 @@ import { registerPasteRoutes, type HtmlSnapshotter } from './paste.js';
 import { SelectionStore, registerSelectionRoutes } from './selection.js';
 import { registerRenderDepsRoutes } from './render-deps.js';
 import { registerExportRoutes } from './export.js';
+import { HugHeights } from './hug-heights.js';
 import { registerCodeExportRoutes } from './code-export.js';
 import { VIEWER_DIST_DIR, peekDocument, registerViewerRoutes } from './viewer.js';
 
@@ -235,6 +236,8 @@ export function buildServer({
   const sessions = new Sessions();
   const activity = new ActivityBus();
   const checks = new CheckLedger();
+  /** Tinggi terukur board `height:'hug'` per dokumen (spec-board-hug-height). */
+  const hugs = new HugHeights();
   const docLocks = new DocumentLocks();
   /** Daemon pemilik tunggal (AD-1): salinan terkini per slug. */
   const docs = new Map<string, LakarDocument>();
@@ -551,11 +554,13 @@ export function buildServer({
       // Rename/archive/delete yang antre lebih dulu di kunci ini bisa melepas slug dari sesi: sama dengan cek awal.
       const doc = docs.get(slug);
       if (!doc) throw new LakarError('NO_ACTIVE_DOC', 'sesi ini belum punya dokumen aktif', { hint: NO_ACTIVE_DOC_HINT });
+      // Board `height:'hug'`: tinggi terukur rev ini untuk `place`/`measuredHeight` (render hanya bila belum tercatat).
+      const boardHeights = await hugs.ensure(render, resolveDocument(doc));
       let committed;
       try {
         // AD-4: error tak tertangkap di snippet → lempar di dalam body → rollback penuh oleh `transact`.
         committed = await transact(doc, { sessionId: session.id, description: label }, async (tx) => {
-          const run = await runSnippet(code, tx, { timeoutMs: config.execTimeoutMs, memoryBytes: config.execMemoryBytes, keep: session.keep, icons, photos, cssVariables: CSS_VARIABLES });
+          const run = await runSnippet(code, tx, { timeoutMs: config.execTimeoutMs, memoryBytes: config.execMemoryBytes, keep: session.keep, icons, photos, cssVariables: CSS_VARIABLES, boardHeights });
           if (!run.ok) throw run.error;
           return run;
         });
@@ -577,7 +582,7 @@ export function buildServer({
         let ran;
         try {
           for (const id of touched) for (const r of iconRefs(findBoard(after, id)!)) icons.canonical(r.lib, r.icon);
-          ran = await runCheck(render, after, touched);
+          ran = await runCheck(render, after, touched, boardHeights);
         } catch (e) {
           if (e instanceof LakarError) {
             throw failWith(new LakarError(e.code, e.message, { hint: [e.hint, NOT_COMMITTED].filter(Boolean).join('; '), retryable: e.retryable }), doc.rev);
@@ -601,6 +606,7 @@ export function buildServer({
         await store.commit(slug, committed.doc, { ...committed.entry, ...authorOf(session) });
         docs.set(slug, committed.doc);
         checks.record(committed.doc.id, doc.rev, committed.doc.rev, ran.boards);
+        hugs.record(after, ran.measures, doc.rev);
         result = { docId: committed.doc.id, rev: committed.doc.rev, created: committed.created };
       }
       session.keep = run.keep;
@@ -653,7 +659,8 @@ export function buildServer({
     // AD-9: ikon yang tidak dikenal katalog (mis. dokumen lama di disk) → ICON_UNKNOWN + 3 saran sebelum render.
     assertIcons(board);
     const png = await render.screenshot(doc, board.id, scaleOpt);
-    const dims = body?.scale === 2 ? readPngSize(png) : { width: board.width, height: board.height };
+    // Board hug: tinggi = hasil render (PNG skala 1 = px CSS).
+    const dims = body?.scale === 2 || typeof board.height !== 'number' ? readPngSize(png) : { width: board.width, height: board.height };
     return ok(reply, { boardId: board.id, ...dims, mimeType: 'image/png', png: Buffer.from(png).toString('base64'), ...placeholderNote(board) });
   });
 
@@ -663,6 +670,8 @@ export function buildServer({
     parse(BoardsBody, req.body ?? undefined, 'kirim {} (tanpa argumen)');
     const stored = docs.get(slug)!;
     const resolved = resolveDocument(stored);
+    // Board hug: `height` = tinggi terukur (angka, seperti board fixed) + `heightMode:'hug'`; gagal render → 0.
+    const heights = await hugs.ensure(render, resolved);
     const boards = resolved.pages.flatMap((p) =>
       p.children.map((b) => ({
         id: b.id,
@@ -672,7 +681,8 @@ export function buildServer({
         x: b.x,
         y: b.y,
         width: b.width,
-        height: b.height,
+        height: HugHeights.heightOf(b, heights) ?? 0,
+        ...(b.height === 'hug' ? { heightMode: 'hug' as const } : {}),
         ...(b.expectedSize ? { expectedSize: b.expectedSize } : {}),
         wip: b.name.startsWith(WIP_PREFIX),
         childCount: b.children.length,
@@ -693,6 +703,7 @@ export function buildServer({
     assertIcons(rBoard);
     // allowGlyphs (AD-8): teks dengan emoji/glyph ikon tetap terukur; temuannya milik layout_check.
     const measure = await render.measure(resolved, rBoard.id, { allowGlyphs: glyphScan(rBoard).allowGlyphs });
+    hugs.record(resolved, new Map([[rBoard.id, measure]]));
     const fit = inspectFit(hit.node, boundsMap(rBoard.id, measure), body.depth ?? INSPECT_DEPTH_DEFAULT);
     return ok(reply, { docId: stored.id, rev: stored.rev, boardId: rBoard.id, node: fit.node, ...(fit.truncated ? { truncated: true, depth: fit.depth } : {}) });
   });
@@ -763,8 +774,9 @@ export function buildServer({
       boardIds = [body.boardId];
     } else boardIds = doc.pages.flatMap((p) => p.children.map((b) => b.id));
     for (const id of boardIds) assertIcons(findBoard(doc, id)!);
-    const ran = await runCheck(render, doc, boardIds);
+    const ran = await runCheck(render, doc, boardIds, hugs.known(doc));
     checks.record(stored.id, stored.rev, stored.rev, ran.boards);
+    hugs.record(doc, ran.measures);
     return ok(reply, { docId: stored.id, rev: stored.rev, boards: ran.boards, summary: summarizeFindings(ran.findings), findings: ran.findings });
   });
 

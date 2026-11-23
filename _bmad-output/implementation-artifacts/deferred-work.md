@@ -226,6 +226,7 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-board-height-fit.md`
   summary: Tinggi board landing yang benar-benar mengikuti isi (`height:'hug'` pada board) belum ada; tinggi board selalu angka dan board selalu memotong isi.
   evidence: Butuh perubahan skema (v8 + migrasi), renderer, resize viewer, dan codegen. Usul: `height:'hug'` hanya untuk `screen:'landing'`, diukur saat render. Sampai itu ada, LC-12 melaporkan tinggi pas.
+  resolved: 2026-11-23 di `spec-board-hug-height.md`. Skema v8 (migrasi identitas) membolehkan `height:'hug'` pada semua board; render mengukur tingginya (`height:auto`), `bounds`/screenshot/export/`list_boards`/`measuredHeight`/`place` memakai ukuran itu, LC-12 tidak menilai tinggi pas board hug, viewer mengikuti tinggi terukur (seret handle bawah = fixed, panel Design Hug/Fixed), codegen menulis `height: auto`. Skill landing membuat board `height:'hug'` dan tidak lagi menaikkan tinggi per seksi.
 - source_spec: `_bmad-output/implementation-artifacts/spec-board-height-fit.md`
   summary: LC-12 landing tidak menandai wrapper bertinggi angka tetap yang lebih tinggi dari isinya, karena tak bisa dibedakan dari seksi setinggi penuh (hero 900 pada board 900).
   evidence: Review spec-board-height-fit. Usul: konvensi nama `Halaman` untuk wrapper atau tinggi hug di atas.
@@ -241,3 +242,12 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-progressive-live-build.md`
   summary: Canvas tetap diam selama LLM menulis snippet satu seksi; progres execute belum bisa distream lebih awal.
   evidence: QuickJS < 2 dtk; jeda ada sebelum call tiba di daemon. Event `progress` per op dari sandbox tidak membantu jeda itu; butuh streaming argumen tool dari harness (belum didukung MCP). Lihat Design Notes "Ide ditunda".
+- source_spec: `_bmad-output/implementation-artifacts/spec-board-hug-height.md`
+  summary: Board `height:'hug'` tumbuh ke bawah, tetapi `place` dan LC-12 hanya mengenal tinggi terukur saat ini; board yang diletakkan tepat di bawah board hug bisa tertabrak saat board hug bertambah seksi.
+  evidence: `place(w,'hug')` hanya menjaga tepi atas board baru. Usul: `place` tanpa `near` sudah menaruh board di baris atas (kanan), jadi risiko hanya `near` + "di bawahnya"; bila muncul, beri board hug jarak bawah tak terbatas di `place`.
+- source_spec: `_bmad-output/implementation-artifacts/spec-board-hug-height.md`
+  summary: Board hug tanpa anak flow bertinggi 0: screenshot board gagal ("tidak bisa dipotret") dan di canvas hanya labelnya yang terlihat.
+  evidence: open-pencil menahan frame hug kosong pada ukuran terakhirnya (`heldHugAxes`); Lakar tidak menyimpan ukuran terakhir. Usul: tinggi minimum render untuk board hug kosong, atau simpan tinggi terakhir di catatan daemon.
+- source_spec: `_bmad-output/implementation-artifacts/spec-board-hug-height.md`
+  summary: Skill mobile tetap memakai `H` angka; board mobile hug belum dipandu karena zona bawah (`Overlay / Tab bar` y `H-98`) absolut terhadap tinggi angka.
+  evidence: Hug untuk mobile butuh zona bawah yang menempel ke dasar (mis. `bottom` atau anak flow terakhir). Usul: spec terpisah setelah ada penempatan relatif dasar.

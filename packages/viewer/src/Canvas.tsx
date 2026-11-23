@@ -38,7 +38,8 @@ import { animateReveal } from './agentFx';
 import { pinchCamera, pointerIntent, TAP_SLOP, type Point } from './sheet';
 import type { Camera } from './viewState';
 
-export type CanvasBoard = { id: string; name: string; x: number; y: number; width: number; height: number };
+/** Board kanvas: `height` selalu angka (board `height:'hug'` = tinggi terukur, `hug: true`; boardHeight.ts). */
+export type CanvasBoard = { id: string; name: string; x: number; y: number; width: number; height: number; hug?: true | undefined };
 export type Highlight = { boardId: string; bounds?: [number, number, number, number] };
 /**
  * Permintaan Follow agent: geser kamera ke board ini (sekali per `nonce`). `rect` (relatif board) = wilayah node baru
@@ -239,22 +240,42 @@ function AgentLayer({ presence, boardById, cam }: { presence: readonly AgentPres
   );
 }
 
-function BoardImage({ slug, rev, board, previewRev }: { slug: string; rev: number; board: CanvasBoard; previewRev?: number | undefined }) {
+function BoardImage({
+  slug,
+  rev,
+  board,
+  previewRev,
+  onHugHeight,
+}: {
+  slug: string;
+  rev: number;
+  board: CanvasBoard;
+  previewRev?: number | undefined;
+  /** Board `height:'hug'`: tinggi PNG (skala 1 = px CSS) menjadi tinggi board. */
+  onHugHeight?: ((boardId: string, height: number) => void) | undefined;
+}) {
   const [state, setState] = useState<{ url?: string; error?: string }>({});
   const [attempt, setAttempt] = useState(0);
   useRetry(() => state.error && setAttempt((a) => a + 1));
+  const onHugHeightRef = useRef(onHugHeight);
+  onHugHeightRef.current = onHugHeight;
+  const hug = board.hug === true;
   useEffect(() => {
     let live = true;
     // PNG sebelumnya tetap tampil sampai yang baru tiba; hanya error lama yang dibuang.
     setState((s) => (s.url ? { url: s.url } : {}));
     (previewRev !== undefined ? api.revScreenshot(slug, previewRev, board.id) : api.screenshot(slug, rev, board.id)).then(
-      (s) => live && setState({ url: s.url }),
+      (s) => {
+        if (!live) return;
+        if (hug) onHugHeightRef.current?.(board.id, s.height);
+        setState({ url: s.url });
+      },
       (e) => live && setState({ error: errorText(e) }),
     );
     return () => {
       live = false;
     };
-  }, [slug, rev, board.id, attempt, previewRev]);
+  }, [slug, rev, board.id, attempt, previewRev, hug]);
   if (state.url) return <img src={state.url} alt={board.name} draggable={false} />;
   if (state.error) return <BoardError message={state.error} />;
   return <div className="skeleton" />;
@@ -286,14 +307,19 @@ const BoardLive = memo(function BoardLive({
   board,
   zoom,
   onMounted,
+  onHugHeight,
 }: {
   live: LiveDoc;
   board: CanvasBoard;
   zoom: number;
   /** Mount selesai (geometri seleksi/gestur diukur ulang). */
   onMounted?: ((boardId: string, host: HTMLDivElement, rev: number) => void) | undefined;
+  /** Board `height:'hug'`: tinggi isi terukur (setiap mount dan setiap ukuran host berubah). */
+  onHugHeight?: ((boardId: string, height: number) => void) | undefined;
 }) {
   const host = useRef<HTMLDivElement>(null);
+  const onHugHeightRef = useRef(onHugHeight);
+  onHugHeightRef.current = onHugHeight;
   const [state, setState] = useState<{ mounted?: boolean; error?: string; partial?: boolean }>({});
   const [attempt, setAttempt] = useState(0);
   useRetry(() => state.partial && setAttempt((a) => a + 1));
@@ -332,13 +358,25 @@ const BoardLive = memo(function BoardLive({
     };
     // Hanya isi board (tanda tangan) yang memicu mount; objek dokumen baru dengan board sama tidak.
   }, [signature, board.id, attempt]);
+  // Board hug: host bertinggi auto (isi shadow root); tingginya dilaporkan setelah mount dan setiap kali berubah.
+  const mounted = state.mounted === true;
+  useEffect(() => {
+    const el = host.current;
+    if (!board.hug || !mounted || !el) return;
+    const report = () => onHugHeightRef.current?.(board.id, el.offsetHeight);
+    report();
+    if (typeof ResizeObserver !== 'function') return;
+    const ro = new ResizeObserver(report);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [board.hug, board.id, mounted]);
   return (
     <>
       <div
         ref={host}
         className="board-live"
         data-live-board={board.id}
-        style={{ width: board.width, height: board.height, transform: `scale(${zoom})`, visibility: state.mounted && !state.error ? 'visible' : 'hidden' }}
+        style={{ width: board.width, height: board.hug ? undefined : board.height, transform: `scale(${zoom})`, visibility: state.mounted && !state.error ? 'visible' : 'hidden' }}
       />
       {state.error ? <BoardError message={state.error} /> : !state.mounted && <div className="skeleton" />}
     </>
@@ -350,6 +388,7 @@ export function Canvas({
   rev,
   boardRevs,
   boards,
+  onHugHeight,
   presence,
   pending,
   fades,
@@ -442,6 +481,8 @@ export function Canvas({
   /** Rev terakhir board berubah (default `rev`): board yang tidak tersentuh tidak dirender ulang. */
   boardRevs?: Readonly<Record<string, number>>;
   boards: CanvasBoard[];
+  /** Tinggi terukur board `height:'hug'` (DOM live atau PNG). */
+  onHugHeight?: ((boardId: string, height: number) => void) | undefined;
   /** Kehadiran agen per sesi Live (disembunyikan saat pratinjau versi). */
   presence?: readonly AgentPresence[];
   /** Sesi yang menjalankan execute pertamanya (board belum diketahui): label Generating tingkat dokumen. */
@@ -961,9 +1002,9 @@ export function Canvas({
             )}
             <div className={`board${selected ? ' selected' : ''}`} data-board={b.id} style={{ left, top, width: bw * cam.z, height: bh * cam.z }}>
               {live && boardSource(live !== undefined, preview !== undefined) === 'live' ? (
-                <BoardLive live={live} board={b} zoom={cam.z} onMounted={onBoardMounted} />
+                <BoardLive live={live} board={b} zoom={cam.z} onMounted={onBoardMounted} onHugHeight={onHugHeight} />
               ) : (
-                <BoardImage slug={slug} rev={Math.min(rev, boardRevs?.[b.id] ?? rev)} board={b} previewRev={previewRev} />
+                <BoardImage slug={slug} rev={Math.min(rev, boardRevs?.[b.id] ?? rev)} board={b} previewRev={previewRev} onHugHeight={onHugHeight} />
               )}
             </div>
           </div>

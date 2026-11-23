@@ -18,7 +18,9 @@ import { NODE_ADDRESS_PATTERN } from './selection.js';
 // dokumen v5 dimigrasi identitas (`@lakar/core` MIGRATIONS[5]).
 // v7 (epic paste-vektor story 4, AD-1) menambah `tag` semantik opsional (allowlist `HTML_TAGS`) pada frame dan text
 // untuk ekspor kode; render canvas mengabaikannya. Dokumen v6 dimigrasi identitas (`@lakar/core` MIGRATIONS[6]).
-export const SCHEMA_VERSION = 7 as const;
+// v8 (spec-board-hug-height) membolehkan `height:'hug'` pada board: tinggi board = tinggi isi flow, diukur saat render.
+// Dokumen v7 (tinggi board selalu angka) dimigrasi identitas (`@lakar/core` MIGRATIONS[7]).
+export const SCHEMA_VERSION = 8 as const;
 
 // ---------------------------------------------------------------------------
 // Primitif
@@ -432,13 +434,19 @@ export const Padding = z.union([PadValue, z.tuple([PadValue, PadValue]), z.tuple
 // Shape per tipe (input `add`: tanpa id, tanpa children). `.strict()` menolak kunci asing.
 // ---------------------------------------------------------------------------
 
+/** Tinggi board: angka (tetap) atau `'hug'` (v8): ikut isi flow, diukur saat render; tanpa isi = 0. */
+export const BoardHeight = z.union([Size, z.literal('hug')]);
+export type BoardHeight = z.infer<typeof BoardHeight>;
+/** Board ber-`height:'hug'`? (struktural: dipakai juga untuk board ter-resolve dan view). */
+export const isHugBoard = (b: { readonly height?: unknown }): boolean => b.height === 'hug';
+
 const boardShape = {
   type: z.literal('board'),
   name: Name,
   x: Px,
   y: Px,
   width: Size,
-  height: Size,
+  height: BoardHeight,
   screen: Screen,
   expectedSize: z.object({ width: Size, height: Size }).strict().optional(),
   /** Board selalu clip (AD-15); ketiadaan = true. */

@@ -309,10 +309,12 @@ describe('@lakar/mcp', () => {
     expect(ins).toBe(SERVER_INSTRUCTIONS);
     expect(ins).toContain('read_skill core + layout + typography + color + accessibility + ui + interface + writing + review + landing/mobile/webapp di giliran yang sama (paralel)');
     expect(ins).toMatch(/aplikasi desktop\/dashboard → webapp/);
-    // spec-progressive-live-build: canvas tumbuh live, satu execute per seksi landing, board tumbuh dari bounds.
+    // spec-progressive-live-build: canvas tumbuh live, satu execute per seksi landing.
     expect(ins).toContain('rencana singkat, dan langsung bangun bertahap supaya pengguna melihat canvas tumbuh live');
     expect(ins).toContain('satu execute per seksi untuk landing');
-    expect(ins).toMatch(/board mulai setinggi navbar \+ hero lalu ditinggikan tiap seksi dari bounds/);
+    // spec-board-hug-height: board landing hug, tinggi tidak ditebak atau dinaikkan.
+    expect(ins).toContain("board landing height:'hug' mengikuti isi, jangan isi atau naikkan tingginya");
+    expect(ins).not.toMatch(/ditinggikan tiap seksi/);
     expect(ins).toContain('[WIP] sampai execute penutup');
     expect(ins).not.toMatch(/2–4 untuk landing|execute besar/);
     expect(ins).toContain('screenshot zoom (nodeId, scale 2)');

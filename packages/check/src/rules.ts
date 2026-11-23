@@ -274,8 +274,20 @@ function contentBottom(ctx: BoardContext, zone: BottomZone | undefined): number 
   return last ? bottom(last.rect) : undefined;
 }
 
-export function lc12(ctx: BoardContext, doc: ResolvedDocument): Finding[] {
+/**
+ * Tinggi board untuk geometri antar-board (tabrakan LC-12): angka apa adanya; `height:'hug'` = tinggi terukur
+ * (`heights`, board yang sedang dinilai = `self`), tanpa ukuran = 0.
+ */
+export function boardHeightOf(b: { id: string; height: number | 'hug' }, heights?: ReadonlyMap<string, number>, self?: { id: string; height: number }): number {
+  if (typeof b.height === 'number') return b.height;
+  if (self && self.id === b.id) return self.height;
+  return heights?.get(b.id) ?? 0;
+}
+
+export function lc12(ctx: BoardContext, doc: ResolvedDocument, heights?: ReadonlyMap<string, number>): Finding[] {
   const b = ctx.board;
+  // `height:'hug'` (spec-board-hug-height): tinggi = isi menurut definisi, jadi sub-cek "tinggi pas" dilewati.
+  const hug = b.height === 'hug';
   const details: string[] = [];
   const expected: string[] = [];
   const w = ctx.measure.width;
@@ -299,7 +311,7 @@ export function lc12(ctx: BoardContext, doc: ResolvedDocument): Finding[] {
             ? `lebar ${d.width}, tinggi ≥ ${d.minHeight} (isi lebih panjang: satu board panjang)`
             : `lebar ${d.width} (tinggi bebas)`,
       );
-    } else if (b.screen === 'mobile' && h > d.minHeight + TOLERANCE) {
+    } else if (b.screen === 'mobile' && !hug && h > d.minHeight + TOLERANCE) {
       // Board mobile panjang: tinggi harus pas dengan isi (tanpa ruang kosong besar di atas zona bawah / tepi bawah).
       const zone = bottomZone(ctx);
       // Tanpa zona bawah: batasnya tepi atas `Home indicator` (bila ada), bukan tepi board.
@@ -312,7 +324,7 @@ export function lc12(ctx: BoardContext, doc: ResolvedDocument): Finding[] {
         details.push(`tinggi ${num(h)}, isi berakhir ${num(limit - end)} px di atas ${zone ? 'zona bawah' : homeRect ? 'Home indicator' : 'tepi bawah'}: tinggi pas = ${fit}`);
         expected.push(`tinggi ${fit} (sisa ≤ ${FIT_SLACK_MAX} px); geser zona bawah ikut tinggi baru`);
       }
-    } else if (b.screen === 'landing' && !b.name.startsWith(WIP_PREFIX)) {
+    } else if (b.screen === 'landing' && !hug && !b.name.startsWith(WIP_PREFIX)) {
       // Board landing selesai: tinggi = bawah isi (spec-board-height-fit), bukan angka tebakan.
       const end = stackBottom(ctx);
       if (end !== undefined && h - end > LANDING_SLACK_MAX + TOLERANCE) {
@@ -330,13 +342,15 @@ export function lc12(ctx: BoardContext, doc: ResolvedDocument): Finding[] {
     }
   }
   const page = doc.pages.find((p) => p.children.some((x) => x.id === b.id));
+  const self = { id: b.id, height: h };
+  const bh = boardHeightOf(b, heights, self);
   for (const o of page?.children ?? []) {
     if (o.id === b.id) continue;
     const ix = Math.min(b.x + b.width, o.x + o.width) - Math.max(b.x, o.x);
-    const iy = Math.min(b.y + b.height, o.y + o.height) - Math.max(b.y, o.y);
+    const iy = Math.min(b.y + bh, o.y + boardHeightOf(o, heights, self)) - Math.max(b.y, o.y);
     if (ix > 0 && iy > 0) {
       details.push(`bertabrakan dengan board ${o.name} (${o.id})`);
-      expected.push(`tanpa tabrakan; posisi baru lewat place(${num(b.width)}, ${num(b.height)})`);
+      expected.push(`tanpa tabrakan; posisi baru lewat place(${num(b.width)}, ${hug ? "'hug'" : num(bh)})`);
       break;
     }
   }

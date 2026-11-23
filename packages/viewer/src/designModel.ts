@@ -102,7 +102,7 @@ export const describeEdit = (label: string, n: number) => (n > 1 ? `${label} on 
 export type Sizing = 'fixed' | 'hug' | 'fill';
 export type Axis = 'width' | 'height';
 
-/** Mode sizing nilai tersimpan; ketiadaan = hug (render layout.ts: ukuran konten sendiri), kecuali board (selalu angka). */
+/** Mode sizing nilai tersimpan; ketiadaan = hug (render layout.ts: ukuran konten sendiri), kecuali board (angka, atau tinggi `'hug'` sejak v8). */
 export function sizingMode(type: string, v: unknown): Sizing {
   if (v === 'hug' || v === 'fill') return v;
   if (v === undefined && type !== 'board') return 'hug';

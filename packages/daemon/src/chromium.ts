@@ -6,7 +6,7 @@ import { readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { BoardMeasure, IconCatalogPort, MeasureOptions, RenderPort, RenderStatus, ScreenshotOptions } from '@lakar/ports';
-import { CHROMIUM_ARGS, NODE_ATTR, fontRequests, iconRefs, type FontFaceSource, type RenderResult } from '@lakar/render';
+import { CHROMIUM_ARGS, NODE_ATTR, boardViewport, fontRequests, iconRefs, type FontFaceSource, type RenderResult } from '@lakar/render';
 import { LakarError, errorMessage, findBoard, type IconGlyph, type ResolvedDocument } from '@lakar/schema';
 import { notFound } from './errors.js';
 import type { Browser, LaunchOptions, Page } from 'playwright-core';
@@ -175,7 +175,7 @@ export class ChromiumRenderer implements RenderPort<ResolvedDocument> {
     const fonts: FontFaceSource[] = board ? this.#opts.fonts.resolveFaces(fontRequests(board)) : [];
     const icons: IconGlyph[] = board ? iconRefs(board).flatMap((r) => this.#opts.icons.glyph(r.lib, r.icon) ?? []) : [];
     // Viewport = ukuran board SEBELUM mount (stabilitas layout dan golden).
-    if (board) await page.setViewportSize({ width: Math.max(1, Math.ceil(board.width)), height: Math.max(1, Math.ceil(board.height)) });
+    if (board) await page.setViewportSize(boardViewport(board));
     // Fungsi ini berjalan di halaman Chromium (lihat RENDER_PAGE_HTML), bukan di Node.
     const result: RenderResult = await page.evaluate(
       ({ doc, boardId, fonts, icons, allowGlyphs }) =>
@@ -201,6 +201,8 @@ export class ChromiumRenderer implements RenderPort<ResolvedDocument> {
         retryable: false,
       });
     }
+    // Board `height:'hug'`: viewport disamakan dengan tinggi terukur (screenshot board utuh, tanpa potongan viewport).
+    if (board && board.height === 'hug') await page.setViewportSize(boardViewport({ width: board.width, height: result.measure.height }));
     return result.measure;
   }
 

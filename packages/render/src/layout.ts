@@ -14,7 +14,7 @@ import type {
   ResolvedTextNode as TextNode,
 } from '@lakar/schema';
 import { cssFamily, textFont } from './fonts.js';
-import { boardDecls, BOARD_DEFAULT_BACKGROUND, boxPaintDecls, childLayoutDecls, frameDecls, frameLayout, radiusCss, textDecls, type ParentLayout } from './css.js';
+import { boardDecls, BOARD_DEFAULT_BACKGROUND, boxPaintDecls, childLayoutDecls, frameDecls, hugBoardChild, frameLayout, radiusCss, textDecls, type ParentLayout } from './css.js';
 import { applyDecls, applyEffects, DEFAULT_ASSET_BASE, dropShadowFilters, applyFills, strokeOverlay } from './paint.js';
 import { ellipseShape, fillLayer, pathShape, strokeSvg, type Shape } from './shape.js';
 import { iconKey, renderIconElement } from './icon.js';
@@ -31,14 +31,14 @@ type Parent = { layout: ParentLayout; scrollY: number };
 export type RenderContext = { assetBase: string; icons: ReadonlyMap<string, IconGlyph> };
 const DEFAULT_CTX: RenderContext = { assetBase: DEFAULT_ASSET_BASE, icons: new Map() };
 
-/** Mount board ke `root` (ganti isinya). Board: kolom flex dari kiri atas, ukuran fixed, selalu clip. */
+/** Mount board ke `root` (ganti isinya). Board: kolom flex dari kiri atas, ukuran fixed (atau tinggi hug), selalu clip. */
 export function mountBoardNode(board: BoardNode, root: HTMLElement, ctx: RenderContext = DEFAULT_CTX): HTMLElement {
   const d = root.ownerDocument;
   const el = d.createElement('div');
   el.setAttribute(NODE_ATTR, board.id);
   applyDecls(el.style, boardDecls(board));
-  if (!applyFills(el.style, board.fills, { assetBase: ctx.assetBase, doc: d, width: board.width, height: board.height })) el.style.background = BOARD_DEFAULT_BACKGROUND;
-  appendChildren(d, el, board.children, { layout: 'column', scrollY: 0 }, undefined, ctx);
+  if (!applyFills(el.style, board.fills, { assetBase: ctx.assetBase, doc: d, width: board.width, height: typeof board.height === 'number' ? board.height : undefined })) el.style.background = BOARD_DEFAULT_BACKGROUND;
+  appendChildren(d, el, board.children.map((c) => hugBoardChild(board, c)), { layout: 'column', scrollY: 0 }, undefined, ctx);
   root.replaceChildren(el);
   return el;
 }

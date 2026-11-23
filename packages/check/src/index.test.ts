@@ -34,7 +34,7 @@ const frame = (name: string, r: R, children: Loose[], extra: Loose = {}): Loose 
   _r: r,
 });
 
-type BoardSpec = { name?: string; x?: number; y?: number; width?: number; height?: number; screen?: 'mobile' | 'app' | 'landing'; expectedSize?: { width: number; height: number }; children: Loose[]; id?: string };
+type BoardSpec = { name?: string; x?: number; y?: number; width?: number; height?: number; screen?: 'mobile' | 'app' | 'landing'; expectedSize?: { width: number; height: number }; children: Loose[]; id?: string; /** Board `height:'hug'` (v8): `height` = tinggi terukur. */ hug?: true };
 
 /** Dokumen satu halaman dengan board-board `specs`; measure per board dari `_r` setiap node. */
 function docOf(specs: BoardSpec[], tokens?: Record<string, string | number>): { doc: ResolvedDocument; boards: string[]; measures: Map<string, BoardMeasure> } {
@@ -65,7 +65,7 @@ function docOf(specs: BoardSpec[], tokens?: Record<string, string | number>): { 
       x: s.x ?? 0,
       y: s.y ?? 0,
       width,
-      height,
+      height: s.hug ? 'hug' : height,
       screen: s.screen ?? 'mobile',
       ...(s.expectedSize ? { expectedSize: s.expectedSize } : {}),
       children,
@@ -380,6 +380,41 @@ describe('LC-12 board', () => {
     expect(f[0]!.detail).toBe('bertabrakan dengan board A (Aaaaaaaa)');
     expect(f[0]!.expected).toContain('place(390, 844)');
     expect(run([{ children: [], name: 'A' }, { children: [], name: 'B', x: 390 }], 1)).toEqual([]);
+  });
+
+  // spec-board-hug-height: board `height:'hug'` = tinggi isi menurut definisi.
+  it("landing height:'hug' dengan ruang kosong di bawah isi (tinggi terukur > bawah isi) → tanpa sub-cek tinggi pas", () => {
+    expect(only(run({ ...landing(4074, [halaman(4050)]), hug: true }), 'LC-12')).toEqual([]);
+    // Board fixed yang sama tetap dilapor (AD-4: perilaku lama tidak berubah).
+    expect(only(run(landing(4074, [halaman(4050)])), 'LC-12')).toHaveLength(1);
+  });
+
+  it("mobile height:'hug' panjang → tanpa sub-cek tinggi pas; lebar salah dan tinggi < minimum tetap dilapor", () => {
+    expect(only(run({ ...long(1320, 1000), hug: true }), 'LC-12')).toEqual([]);
+    expect(only(run({ children: [], width: 400, height: 1320, hug: true }), 'LC-12')[0]!.detail).toBe('ukuran 400×1320');
+    expect(only(run({ children: [], height: 600, hug: true }), 'LC-12')[0]!.expected).toContain('tinggi ≥ 844');
+  });
+
+  it('expectedSize pada board hug dinilai dengan tinggi terukur', () => {
+    expect(run({ children: [], screen: 'app', width: 400, height: 300, hug: true, expectedSize: { width: 400, height: 300 } })).toEqual([]);
+    expect(only(run({ children: [], screen: 'app', width: 400, height: 280, hug: true, expectedSize: { width: 400, height: 300 } }), 'LC-12')[0]!.detail).toBe('ukuran 400×280');
+  });
+
+  it('tabrakan board hug: tinggi terukur (measure sendiri, `heights` untuk board lain); tanpa ukuran = 0', () => {
+    const specs: BoardSpec[] = [
+      { children: [], name: 'Landing', id: 'Hugboar1', screen: 'landing', width: 1440, height: 3000, hug: true },
+      { children: [], name: 'Bawah', id: 'Bawahbr1', screen: 'landing', width: 1440, height: 900, y: 2000 },
+    ];
+    const { doc, measures } = docOf(specs);
+    // Board hug yang dinilai: tinggi = measure (3000) → menabrak board di y 2000; expected place(w,'hug').
+    const own = only(checkBoard({ doc, boardId: 'Hugboar1', measure: measures.get('Hugboar1')! }), 'LC-12');
+    expect(own[0]!.detail).toBe('bertabrakan dengan board Bawah (Bawahbr1)');
+    expect(own[0]!.expected).toContain("place(1440, 'hug')");
+    // Board lain: tinggi hug dari `heights`; tanpa entri = 0 (tidak menabrak).
+    const other = (heights?: Map<string, number>) => only(checkBoard({ doc, boardId: 'Bawahbr1', measure: measures.get('Bawahbr1')!, heights }), 'LC-12');
+    expect(other(new Map([['Hugboar1', 3000]]))[0]!.detail).toBe('bertabrakan dengan board Landing (Hugboar1)');
+    expect(other(new Map([['Hugboar1', 1800]]))).toEqual([]);
+    expect(other()).toEqual([]);
   });
 });
 

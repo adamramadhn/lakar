@@ -14,6 +14,7 @@ export {
   BOX_CLEARANCE_MAX,
   BOX_OVERFLOW_MIN,
   BOTTOM_BAR_MAX_GAP,
+  boardHeightOf,
   bottomZone,
   CONVENTIONS,
   DEFAULT_LAYER_NAME,
@@ -130,7 +131,18 @@ export function sortFindings(findings: readonly Finding[], order?: ReadonlyMap<s
 }
 
 /** Semua aturan yang berjalan untuk satu board (urutan stabil). Board tidak ada → []. */
-export function checkBoard({ doc, boardId, measure }: { doc: ResolvedDocument; boardId: string; measure: BoardMeasure }): Finding[] {
+export function checkBoard({
+  doc,
+  boardId,
+  measure,
+  heights,
+}: {
+  doc: ResolvedDocument;
+  boardId: string;
+  measure: BoardMeasure;
+  /** Tinggi terukur board `height:'hug'` lain di dokumen (tabrakan LC-12); tanpa entri = 0. Board ini = `measure`. */
+  heights?: ReadonlyMap<string, number> | undefined;
+}): Finding[] {
   const board = findBoard(doc, boardId);
   if (!board) return [];
   const ctx = boardContext(board, measure);
@@ -156,7 +168,7 @@ export function checkBoard({ doc, boardId, measure }: { doc: ResolvedDocument; b
     ...lc09(ctx),
     ...lc10(ctx),
     ...lc11(ctx),
-    ...lc12(ctx, doc),
+    ...lc12(ctx, doc, heights),
     ...lc13(ctx),
     ...lc14(ctx),
     ...lc15(ctx),

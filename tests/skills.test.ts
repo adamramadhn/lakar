@@ -96,16 +96,18 @@ describe('skill: struktur', () => {
     for (const name of ['landing', 'mobile', 'webapp']) expect(splitCode(read(name)).blocks.some((b) => b.code.startsWith('// pakai prelude')), name).toBe(true);
   });
 
-  it('bangun bertahap (spec-progressive-live-build): landing satu execute per seksi, board mulai setinggi hero lalu tumbuh', () => {
+  it('bangun bertahap (spec-progressive-live-build): landing satu execute per seksi; board hug tumbuh sendiri (spec-board-hug-height)', () => {
     expect(read('core')).toContain('Bangun bertahap (canvas tumbuh live): satu execute per seksi/area');
     expect(read('landing')).toContain('Satu seksi per execute');
-    const [first, second] = splitCode(read('landing')).blocks.filter((b) => b.lang === 'js');
-    // Board pertama: ruang place() untuk tumbuh, tetapi tinggi awal setinggi navbar + hero (bukan 2000–6000 kosong).
-    const height = Number(first!.code.match(/type:'board'[^\n]*?height:(\d+)/)?.[1]);
-    expect(height).toBeLessThanOrEqual(1200);
+    const blocks = splitCode(read('landing')).blocks.filter((b) => b.lang === 'js');
+    const [first] = blocks;
+    // Board landing height:'hug' lewat place(w,'hug'): tinggi tidak ditebak.
+    expect(first!.code).toMatch(/type:'board'[^\n]*?height:'hug'/);
+    expect(first!.code).toContain("place(1440,'hug')");
     expect(first!.code).toMatch(/name:'\[WIP\] /);
-    // Execute seksi berikutnya meninggikan board lebih dulu (isi baru tidak terpotong board).
-    expect(second!.code.split('\n')[1]).toMatch(/^update\(keep\.board,\{height:/);
+    // Tidak ada execute yang mengisi atau menaikkan tinggi board (rencana PR #26 "tinggi + perkiraan" dicabut).
+    for (const b of blocks) expect(b.code).not.toMatch(/update\(keep\.board,\s*\{[^}]*height/);
+    expect(read('landing')).not.toMatch(/perkiraan seksi|tinggi pas/);
     // Webapp: execute 1 sidebar + header, execute 2 isi area kerja lewat keep.main.
     expect(splitCode(read('webapp')).blocks.filter((b) => b.lang === 'js').map((b) => /keep\.main/.test(b.code))).toEqual([true, true]);
   });

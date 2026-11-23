@@ -34,6 +34,7 @@ export { IDENTITY, PathDataError, arcToCubics, flattenArcs, isIdentity, multiply
 export {
   BOARD_DEFAULT_BACKGROUND,
   boardDecls,
+  hugBoardChild,
   boxPaintDecls,
   boxShadowWithStrokeCss,
   childLayoutDecls,
@@ -142,6 +143,17 @@ export type RenderResult =
 export function findBoard(doc: LakarDocument, boardId: string): BoardNode | undefined {
   for (const p of doc.pages) for (const b of p.children) if (b.id === boardId) return b;
   return undefined;
+}
+
+/** Tinggi viewport awal board `height:'hug'` (sebelum mount; tinggi akhir = hasil ukur). */
+export const HUG_VIEWPORT_HEIGHT = 900;
+
+/**
+ * Viewport render board sebelum mount (stabilitas layout dan golden): ukuran board; board `height:'hug'` memakai
+ * `HUG_VIEWPORT_HEIGHT`, lalu pemanggil menyamakan viewport dengan tinggi terukur sebelum screenshot.
+ */
+export function boardViewport(b: { readonly width: number; readonly height: number | 'hug' }): { width: number; height: number } {
+  return { width: Math.max(1, Math.ceil(b.width)), height: Math.max(1, Math.ceil(typeof b.height === 'number' ? b.height : HUG_VIEWPORT_HEIGHT)) };
 }
 
 /**

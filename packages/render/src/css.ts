@@ -422,7 +422,8 @@ export function boardDecls(b: { readonly width?: unknown; readonly height?: unkn
     ['position', 'relative'],
     ['box-sizing', 'border-box'],
     ['width', lengthCss(b.width) ?? '0px'],
-    ['height', lengthCss(b.height) ?? '0px'],
+    // `height:'hug'` (v8): tinggi = isi flow (anak absolute tidak menambah tinggi); diukur dari DOM setelah mount.
+    ['height', b.height === 'hug' ? 'auto' : (lengthCss(b.height) ?? '0px')],
     ['overflow', 'hidden'],
     ['isolation', 'isolate'],
     ['display', 'flex'],
@@ -430,6 +431,15 @@ export function boardDecls(b: { readonly width?: unknown; readonly height?: unkn
     ['align-items', 'flex-start'],
     ['justify-content', 'flex-start'],
   ];
+}
+
+/**
+ * Anak langsung board `height:'hug'` (render dan codegen): anak flow `height:'fill'` diperlakukan hug. Board hug tidak
+ * punya tinggi untuk dibagi (siklus hug/fill); tanpa ini `flex: 1 1 0px` membuat wadah fill (mis. `Halaman`) runtuh
+ * ke 0. Board fixed dan anak absolute dikembalikan apa adanya (objek yang sama).
+ */
+export function hugBoardChild<T extends { readonly height?: unknown; readonly position?: unknown }>(board: { readonly height?: unknown }, c: T): T {
+  return board.height === 'hug' && c.height === 'fill' && c.position !== 'absolute' ? { ...c, height: 'hug' } : c;
 }
 
 /** Latar board tanpa fill. */

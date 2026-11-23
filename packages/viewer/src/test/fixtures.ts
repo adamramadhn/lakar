@@ -14,7 +14,7 @@ const frame = (n: Extra): Record<string, unknown> => ({ type: 'frame', position:
 /** Dokumen rev `rev`; `extra` = frame tambahan di board (mis. node baru dari execute agen). */
 export function makeDoc(rev = 1, extra: Extra[] = []): LakarDocument {
   return {
-    schemaVersion: 7,
+    schemaVersion: 8,
     id: 'Doc00001',
     rev,
     tokens: {},

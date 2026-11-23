@@ -6,7 +6,7 @@ import { DEFAULT_SETTINGS, exportCode, fileMeta, fileRows, filesSummary, findSto
 
 const BOARD = 'Board001';
 const doc = {
-  schemaVersion: 7,
+  schemaVersion: 8,
   id: 'Doc00001',
   rev: 7,
   tokens: { 'colors.brand': { type: 'color', value: '#0E7490' } },
