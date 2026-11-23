@@ -3,7 +3,7 @@ title: 'Anotasi readOnlyHint dan destructiveHint di semua tool MCP'
 type: feature
 ticket: '2'
 created: '2026-11-23'
-status: in-review
+status: built
 baseline_revision: '01390e5ca062fc1b6f6020cd6fcdeb84bc80037e'
 route: oneshot
 route_source: auto
@@ -67,3 +67,31 @@ Catatan:
 - `ToolAnnotations` diekspor `@modelcontextprotocol/server` 2.4.0 (`title`, `readOnlyHint`, `destructiveHint`, `idempotentHint`, `openWorldHint`); `registerTool` menerima `annotations`.
 - Bukti kompatibilitas: `tools/list` dari `dist` baseline (`01390e5`) disimpan lalu dibandingkan dengan `tools/list` sesudah perubahan tanpa `annotations` → `isDeepStrictEqual` true (nama, deskripsi, inputSchema, execution sama).
 - Kejutan: `cmd` menafsirkan `>` di `node -e` sebagai redirect; tes diperbaiki lewat tool edit.
+
+## Review Triage Log
+
+### 2026-11-23 — Review pass
+
+- verdicts: 8 findings — high 0, medium 0, low 6, false 2, maybe-false 0
+- findings:
+  - `[low]` `[patch]` Komentar kepala `annotations.ts` melebih-lebihkan jaminan typecheck (`registerTool` tetap menerima `string`; yang bertipe hanya argumen `toolAnnotations`) — komentar diperbaiki: typecheck menolak nama di luar tabel, tes `tools/list` menolak tool tanpa baris tabel atau tanpa anotasi.
+  - `[low]` `[patch]` `toHaveLength(19)` di tes pertama mengulang cek kesetaraan himpunan tabel–daftar tool — baris dihapus (jumlah 19 tetap dikunci di `index.test.ts` stdio).
+  - `[low]` `[patch]` Perbandingan anotasi lewat `JSON.stringify` peka urutan kunci — diganti `isDeepStrictEqual` dari `node:util`.
+  - `[false]` `[reject]` Monkeypatch `McpServer.prototype.registerTool` mungkin tidak berefek bila method bukan di prototype — tes lulus dengan `bare` berisi 19 tool tanpa anotasi, jadi method memang di prototype; bila tidak, asersi gagal keras, bukan diam.
+  - `[low]` `[patch]` `listTools` di tes tidak menutup `McpServer` — ditambah `await server.close()`.
+  - `[low]` `[reject]` `fix_check` destruktif statis walau `dryRun: true` hanya membaca — keterbatasan anotasi statis yang disengaja dan dicatat di plan; akibatnya hanya harness meminta izin untuk dry-run (aman); memecah tool butuh tool/input baru, lebih dari koreksi langsung.
+  - `[low]` `[patch]` Asimetri undo (`write`) vs redo (`destructive`) kurang dijelaskan di komentar tabel — komentar `undo` dan `redo` diperjelas (undo hanya menghapus node tambahan sesi ini; redo mengulang execute yang bisa menimpa node pengguna).
+  - `[false]` `[reject]` Ekspor `ToolAnnotations`, field `annotations` di `registerTool`, dan build/tes belum terverifikasi — tipe SDK 2.4.0 diperiksa (`index.d.mts` mengekspor `ToolAnnotations`; config `registerTool` punya `annotations?: ToolAnnotations`); `pnpm build` dan `vitest run packages/mcp/` lulus.
+
+## Auto Run Result
+
+- Ringkasan: 19 tool MCP Lakar kini membawa `annotations` (`readOnlyHint`, dan `destructiveHint` untuk tool tulis) yang diturunkan dari satu tabel `TOOL_EFFECTS`; 12 baca, 4 tulis tidak merusak, 3 destruktif.
+- Berkas:
+  - `packages/mcp/src/annotations.ts` — tabel efek + `toolAnnotations`.
+  - `packages/mcp/src/server.ts`, `packages/mcp/src/fix-check.ts` — `annotations: toolAnnotations(...)` di setiap registrasi.
+  - `packages/mcp/src/index.ts` — ekspor tabel dan helper.
+  - `packages/mcp/src/annotations.test.ts` — tes anotasi `tools/list`.
+- Review (quick): 5 patch low (komentar kepala, cek panjang redundan, perbandingan deep-equal, tutup server, komentar undo/redo), 0 ditunda, 3 ditolak (2 false: prototype dan ekspor SDK terverifikasi; 1 low: `fix_check` dryRun adalah keterbatasan anotasi statis yang disengaja).
+- Follow-up review: false (tidak ada patch high/medium; patched: high 0, medium 0, low 5).
+- Verifikasi: `pnpm build` lulus; `tsc -p tsconfig.test.json` lulus; `vitest run packages/mcp/` 49/49 lulus; `tools/list` sesudah perubahan tanpa `annotations` identik (`isDeepStrictEqual`) dengan `tools/list` baseline `01390e5`. `pnpm test` penuh di Windows: 74 gagal, tidak ada di `packages/mcp`; `tests/code-export.test.ts` (timeout beban) lulus saat dijalankan sendiri; `judge-c7`/`judge.test` sama dengan baseline bila `LAKAR_C7_ALLOW_MISSING_SOURCES` diset tanpa spasi (cmd `set X=1 &&` menambah spasi); sisanya kelas Windows yang dikenal (foto, render timing, release.sh, path `\`). CI Linux acuan.
+- Risiko sisa: klasifikasi adalah petunjuk (hint); bila tool lama berubah efek, tabel harus ikut diubah — tes hanya menjamin konsistensi tabel–registrasi, bukan kebenaran semantik efek.
