@@ -202,9 +202,13 @@ export function ActivityPanel({
 }) {
   const now = useNow(views.some((v) => v.running) ? 1000 : 10_000);
   // Call yang sudah ada saat panel dibuka atau tiba lewat snapshot (belum/baru tersambung) tidak dianimasikan; hanya
-  // baris yang tiba sesudahnya (termasuk baris pertama kartu sesi baru) masuk dengan `chunk-in`.
+  // baris yang tiba sesudahnya (termasuk baris pertama kartu sesi baru) masuk dengan `chunk-in`. Snapshot dikenali dari
+  // render pertama yang tersambung (saat mount atau sesudah putus): `hello` dan `connected` tiba di render yang sama.
+  // Bukan dari daftar yang kosong, supaya call pertama di panel yang dibuka kosong tetap dianimasikan.
   const old = useRef(new Set<string>());
-  if (!connected || old.current.size === 0) for (const v of views) for (const c of v.calls) old.current.add(c.callId);
+  const wasConnected = useRef(false);
+  if (!connected || !wasConnected.current) for (const v of views) for (const c of v.calls) old.current.add(c.callId);
+  wasConnected.current = connected;
   const isOld = (id: string) => old.current.has(id);
   // Warna per sesi Live, sama dengan presence canvas (`views` yang sama dari Viewer).
   const colors = useMemo(() => liveSessionColors(views), [views]);

@@ -100,6 +100,8 @@ function openStream(): FakeEventSource {
 }
 
 let seq = 0;
+/** seq event stream berikutnya (dipakai juga untuk event di `recent` snapshot hello, supaya urutannya cocok). */
+export const nextSeq = () => ++seq;
 /** Pemancar event stream di dalam `act` (state React diperbarui sebelum assert). */
 export const stream = {
   current: openStream,
@@ -108,7 +110,7 @@ export const stream = {
   },
   /** Event sesudah hello; `seq` diisi otomatis bila tidak ada. */
   event(type: 'call' | 'session' | 'change' | 'selection' | 'openTab', payload: Record<string, unknown>) {
-    const ev = { seq: ++seq, type, ...payload };
+    const ev = { seq: nextSeq(), type, ...payload };
     act(() => openStream().emit(type, ev));
   },
   /** Stream putus (onerror): hub menyambung ulang sesudah backoff. */
