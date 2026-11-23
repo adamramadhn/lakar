@@ -55,14 +55,15 @@ Catatan implementasi (2026-11-23):
 ## Review Triage Log
 
 ### 2026-11-23 — Review pass (quick, pengerjaan ulang)
-- verdicts: high 0, medium 0, low 3, false 1
+- verdicts: high 0, medium 0, low 4, false 1
 
 | # | Temuan | Verdict | Route | Bukti / tindakan |
 |---|---|---|---|---|
 | 1 | Teks detail kartu versi meluap ke bawah tombol | low | patch | Detail diubah ke `fixed-width` + `fill_container`, teks dipersingkat. Dicek ulang lewat screenshot. |
 | 2 | Grup Effects di panel Design terpotong 3px setelah baris Wrap ditambah | low | patch | Baris Inner shadow dinonaktifkan di layar Wrap. |
 | 3 | Pointer putih tidak terlihat di versi light | low | patch | Pointer di atas menu diganti `#111111` di salinan light. |
-| 4 | `ctx.problems` melaporkan chip Wrap dan baris Row Wrap "fully clipped" | false | reject | Bounds basi setelah `Replace`/`Move` di panggilan yang sama; screenshot menunjukkan semua node terlihat dan susunannya benar. |
+| 4 | `ctx.problems` melaporkan chip Wrap dan baris Row Wrap "fully clipped" | false | reject | Bounds basi setelah `Replace`/`Move` di panggilan yang sama; screenshot menunjukkan semua node terlihat dan susunannya benar. Setelah file dibuka ulang dari disk, laporan itu hilang. |
+| 5 | Badge "Unsupported" lebih lebar dari kolom Status di dialog DTCG | low | patch | Kolom Status 72 → 84, kolom path 190 → 178 (dark dan light). Setelah dibuka ulang, `ctx.problems` section 11 hanya berisi kartu "Feature Spatial design" yang diwarisi dari layar dasar `fdf6D`. |
 
 ## Auto Run Result
 
