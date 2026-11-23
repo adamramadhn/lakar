@@ -848,7 +848,12 @@ export function buildServer({
   registerRenderDepsRoutes(app, { fonts, icons });
   registerExportRoutes(app, { docs, store, render, icons });
   registerCodeExportRoutes(app, { docs, sessions, icons });
-  registerConnectionRoutes(app, { host: config.host, port: config.port, ...(config.mcpEntry ? { mcpEntry: config.mcpEntry } : {}) });
+  registerConnectionRoutes(app, {
+    host: config.host,
+    port: config.port,
+    ...(config.mcpEntry ? { mcpEntry: config.mcpEntry } : {}),
+    ...(config.mcpNode ? { mcpNode: config.mcpNode } : {}),
+  });
 
   // Pratinjau ikon untuk pemilih Icon… di viewer (aplikasi 4): glyph katalog sebagai SVG statis. Pencarian tetap lewat
   // `/icons/search`; route ini hanya menggambar hasilnya. Tag di luar daftar putih dilewati.

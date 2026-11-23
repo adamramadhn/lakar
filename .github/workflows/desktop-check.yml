@@ -47,7 +47,9 @@ jobs:
           touch binaries/lakar-node-x86_64-unknown-linux-gnu resources/sidecar/placeholder.txt
 
       - name: Check prepare-sidecar script syntax
-        run: node --check ../scripts/prepare-sidecar.mjs
+        run: |
+          node --check ../scripts/prepare-sidecar.mjs
+          node --check ../scripts/smoke-installer.mjs
 
       - name: cargo clippy
         run: cargo clippy --locked --all-targets -- -D warnings
