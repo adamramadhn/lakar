@@ -335,6 +335,11 @@ export function callTitle(c: ActivityCall, nameOf: (id: string) => string | unde
       return 'Read selection';
     case 'paste':
       return 'Paste layers';
+    // spec-agent-undo: daemon mengisi `description` dari label riwayat ("Undo: …") saat call selesai.
+    case 'undo':
+      return c.description ?? 'Undo agent step';
+    case 'redo':
+      return c.description ?? 'Redo agent step';
     case 'read_skill':
       return t ? `Load ${t} skill` : 'List skills';
     case 'icon_search':

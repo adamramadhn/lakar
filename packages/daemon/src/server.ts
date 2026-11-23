@@ -48,6 +48,7 @@ import { FILES_LOCK, freeSlugFor, registerFileRoutes, slugClaimed, slugify } fro
 import { FocusStore, registerFocusRoutes } from './focus.js';
 import { registerPageRoutes } from './pages.js';
 import { registerOpsRoutes } from './ops.js';
+import { AgentSteps, registerAgentUndoRoutes } from './agent-undo.js';
 import { registerPasteRoutes, type HtmlSnapshotter } from './paste.js';
 import { SelectionStore, registerSelectionRoutes } from './selection.js';
 import { registerRenderDepsRoutes } from './render-deps.js';
@@ -245,6 +246,8 @@ export function buildServer({
   const selections = new SelectionStore();
   /** Dokumen yang tampil di tiap jendela viewer, hanya di memori. */
   const focus = new FocusStore();
+  /** Tumpukan undo/redo agen per sesi per dokumen, hanya di memori (spec-agent-undo). */
+  const agentSteps = new AgentSteps();
 
   const ok = (reply: FastifyReply, data: unknown) => reply.code(200).send({ ok: true, data });
   /** Catatan aditif: foto jarak jauh yang tampil sebagai placeholder (cache dingin + jaringan gagal). */
@@ -605,6 +608,7 @@ export function buildServer({
         // setelah restart.
         await store.commit(slug, committed.doc, { ...committed.entry, ...authorOf(session) });
         docs.set(slug, committed.doc);
+        agentSteps.record(session, committed.doc.id, doc.rev, committed.doc.rev, committed.inverse, label);
         checks.record(committed.doc.id, doc.rev, committed.doc.rev, ran.boards);
         hugs.record(after, ran.measures, doc.rev);
         result = { docId: committed.doc.id, rev: committed.doc.rev, created: committed.created };
@@ -843,7 +847,9 @@ export function buildServer({
     ...(snapshotter ? { html: snapshotter } : {}),
     fonts: (family) => fonts.entry(family),
     dataDir: config.dataDir,
+    agentSteps,
   });
+  registerAgentUndoRoutes(app, { docs, store, docLocks, sessions, steps: agentSteps, icons });
   registerSelectionRoutes(app, { docs, store, sessions, selections, focus, activity, render, assertIcons });
   registerRenderDepsRoutes(app, { fonts, icons });
   registerExportRoutes(app, { docs, store, render, icons });

@@ -62,6 +62,8 @@ export const TOOL_ROUTES: Readonly<Record<string, string>> = {
   '/viewer/export-code': 'export_code',
   '/viewer/paste': 'paste',
   '/viewer/documents': 'list_documents',
+  '/viewer/undo': 'undo',
+  '/viewer/redo': 'redo',
 };
 
 export const publicSessionId = (id: string) => id.slice(0, 8);
@@ -355,6 +357,18 @@ function finish(call: ActivityCall, statusCode: number, json: unknown): Activity
       if (rects) out.bounds = rects;
       const summary = asSummary(check?.summary);
       if (summary) out.summary = summary;
+      break;
+    }
+    case 'undo':
+    case 'redo': {
+      // spec-agent-undo: judul baris = label riwayat langkah ("Undo: …"), board tersentuh untuk muat ulang viewer.
+      const steps = Array.isArray(data.undone) ? data.undone : Array.isArray(data.redone) ? data.redone : [];
+      const verb = call.tool === 'undo' ? 'Undo' : 'Redo';
+      const first = str(obj(steps[0])?.description);
+      if (steps.length === 1 && first) out.description = `${verb}: ${first}`;
+      else if (steps.length > 1) out.description = `${verb} ${steps.length} steps`;
+      const boards = ids(data.boards);
+      if (boards) out.boards = boards;
       break;
     }
     case 'layout_check': {

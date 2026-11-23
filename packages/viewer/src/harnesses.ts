@@ -24,6 +24,8 @@ export const MCP_TOOLS = [
   'photo_search',
   'get_selection',
   'paste',
+  'undo',
+  'redo',
 ] as const;
 
 export type Harness = { id: string; label: string; file: string; snippet: (mcp: McpServerConfig) => string };

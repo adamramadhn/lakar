@@ -178,7 +178,8 @@ export const SERVER_INSTRUCTIONS =
   'helper prelude skill core sudah bawaan di setiap execute: jangan ditulis ulang, palet arketipe sekali per dokumen lewat Palette(c, font); ' +
   'baca check di respons execute, perbaiki dengan editId/edits atau update, akhiri dengan satu screenshot board + satu screenshot zoom (nodeId, scale 2) ' +
   'area terpadat (skill review), satu execute perbaikan, lalu export PNG. ' +
-  'Opsional: read_skill break-ui bila diminta uji data terburuk/edge case; variants bila diminta beberapa variasi/alternatif.';
+  'Opsional: read_skill break-ui bila diminta uji data terburuk/edge case; variants bila diminta beberapa variasi/alternatif. ' +
+  'Langkah sendiri yang salah: undo {steps?} (redo mengulang); ditolak bila pengguna sudah mengedit sesudahnya, maka perbaiki maju lewat execute.';
 
 /** Deskripsi tool `list_boards`. */
 export const LIST_BOARDS_DESCRIPTION =
@@ -487,6 +488,25 @@ export function createLakarMcpServer(daemonUrl: string): McpServer {
     { description: LIST_DOCUMENTS_DESCRIPTION, inputSchema: z.object({}) },
     () => guarded(async () => asText(await client.call('/viewer/documents', {}))),
   );
+
+  // undo/redo agen (spec-agent-undo): hanya langkah execute/paste sesi ini; edit pengguna/agen lain sesudahnya → ditolak.
+  for (const dir of ['undo', 'redo'] as const) {
+    server.registerTool(
+      dir,
+      {
+        description:
+          dir === 'undo'
+            ? 'Batalkan langkah terakhir SESI INI di dokumen aktif (satu langkah = satu execute/paste yang meng-commit; default 1, steps maks 50). ' +
+              'Setiap undo menjadi rev baru di riwayat ("Undo: <description>") dan tampil live di aplikasi. Tidak pernah membatalkan edit pengguna atau agen lain: ' +
+              'ada rev lain sesudah langkah sesi ini → CONFLICT (inspect lalu perbaiki maju lewat execute). Tidak ada langkah (sesi baru, daemon restart, dokumen lain) → NOT_FOUND. ' +
+              'Mengembalikan {docId, slug, rev, undone:[{description, rev}], boards, available:{undo, redo}, target}.'
+            : 'Ulangi langkah yang baru di-undo sesi ini (default 1). Hanya bila tidak ada rev lain sesudah undo; execute/paste baru mengosongkan redo. ' +
+              'Penolakan sama dengan undo (CONFLICT/NOT_FOUND). Mengembalikan {docId, slug, rev, redone:[{description, rev}], boards, available:{undo, redo}, target}.',
+        inputSchema: z.object({ steps: z.number().int().optional().describe('jumlah langkah 1–50 (default 1)') }),
+      },
+      ({ steps }) => guarded(async () => asText(await client.call(`/viewer/${dir}`, steps !== undefined ? { steps } : {}))),
+    );
+  }
 
   server.registerTool(
     'execute',
