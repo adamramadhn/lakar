@@ -44,6 +44,7 @@ import { NO_ACTIVE_DOC_HINT, Sessions, UnknownSessionError, authorOf, logExecute
 import { DocStore } from './store.js';
 import { ActivityBus, agentOf, registerActivityHooks } from './events.js';
 import { registerConnectionRoutes } from './connections.js';
+import { registerHarnessRoutes, type HarnessDeps } from './harnesses.js';
 import { FILES_LOCK, freeSlugFor, registerFileRoutes, slugClaimed, slugify } from './files.js';
 import { FocusStore, registerFocusRoutes } from './focus.js';
 import { registerPageRoutes } from './pages.js';
@@ -208,6 +209,8 @@ export type BuildOptions = {
   photos?: PhotoService;
   /** Interval heartbeat SSE `/viewer/events` (default 15 dtk; untuk test). */
   activityHeartbeatMs?: number;
+  /** Dependency deteksi/IO route harness (`/viewer/connections/harnesses*`); parsial, untuk tes (home/env palsu). */
+  harnessDeps?: Partial<HarnessDeps>;
   /** Fetch halaman impor URL (default `fetchPageHtml`; untuk tes, tanpa menyentuh validasi route). */
   pageFetch?: PageFetch;
 };
@@ -236,6 +239,7 @@ export function buildServer({
   skillsDir = SKILLS_DIR,
   photos = new PhotoService({ dataDir: config.dataDir, keyFile: config.pexelsKeyFile, unsplashKeyFile: config.unsplashKeyFile, unsplashAppName: config.unsplashAppName }),
   activityHeartbeatMs,
+  harnessDeps,
   pageFetch,
 }: BuildOptions): Daemon {
   const app = Fastify({ logger: false, bodyLimit: 1024 * 1024 });
@@ -882,6 +886,14 @@ export function buildServer({
     port: config.port,
     ...(config.mcpEntry ? { mcpEntry: config.mcpEntry } : {}),
     ...(config.mcpNode ? { mcpNode: config.mcpNode } : {}),
+  });
+  // Connections → "Install in an agent" (story 8.11): deteksi + pasang entri MCP `lakar` ke config harness.
+  registerHarnessRoutes(app, {
+    host: config.host,
+    port: config.port,
+    ...(config.mcpEntry ? { mcpEntry: config.mcpEntry } : {}),
+    ...(config.mcpNode ? { mcpNode: config.mcpNode } : {}),
+    ...(harnessDeps ? { deps: harnessDeps } : {}),
   });
 
   // Pratinjau ikon untuk pemilih Icon… di viewer (aplikasi 4): glyph katalog sebagai SVG statis. Pencarian tetap lewat

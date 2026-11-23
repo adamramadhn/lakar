@@ -3894,18 +3894,169 @@ button.panel-tab:hover {
   color: var(--text-secondary);
   font-size: 12px;
 }
-.conn-tools {
+/* ---- Install in an agent (desain section 11, story 8.11): baris harness + 5 state ---- */
+.conn-section-head {
   display: flex;
-  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+.conn-section-head h2 {
+  flex: 1;
+  min-width: 0;
+}
+.conn-section-head .btn {
+  flex: none;
+}
+.conn-installs[aria-busy='true'] {
+  padding: 16px;
+}
+.conn-install {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+}
+.conn-install + .conn-install {
+  border-top: 1px solid var(--border);
+}
+.conn-install.failed {
+  background: var(--danger-soft);
+}
+.conn-install-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: var(--surface-hover);
+  color: var(--text-secondary);
+}
+.conn-install-icon.dim {
+  opacity: 0.5;
+}
+.conn-install-info {
+  flex: 1;
+  min-width: 0;
+}
+.conn-install-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+.conn-install-sub {
+  display: block;
+  margin-top: 2px;
+  color: var(--text-muted);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.conn-install-sub.danger {
+  color: var(--danger);
+}
+.conn-install-actions {
+  flex: none;
+  display: flex;
+  align-items: center;
   gap: 8px;
 }
-.conn-tool {
-  padding: 4px 10px;
-  border-radius: 6px;
-  border: 1px solid var(--border);
-  background: var(--surface);
+.conn-install-actions .btn:disabled {
+  opacity: 0.35;
+}
+.status-pill.muted {
+  color: var(--text-muted);
+}
+.status-pill.muted::before {
+  content: none;
+}
+
+/* Dialog Confirm Install: file tujuan + badge "Adds N lines" + pratinjau + catatan backup/restart. */
+.conn-confirm-file {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   color: var(--text-secondary);
   font-size: 12px;
+}
+.conn-confirm-path {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.conn-lines {
+  flex: none;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--surface-hover);
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+}
+.modal .conn-note {
+  padding: 0;
+  margin-top: 4px;
+}
+.modal .conn-code {
+  max-height: 240px;
+}
+/* Setup Card lama dipakai apa adanya di dalam dialog Manual setup — tanpa bingkai kartu ganda. */
+.modal.manual-setup .conn-code-card {
+  border: 0;
+  border-radius: 0;
+}
+
+/* ---- Settings → General · About / build info (desain "Settings · About": daftar kunci-nilai polos, tanpa kartu) ---- */
+.about-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  font-size: 13px;
+}
+.about-key {
+  width: 110px;
+  flex: none;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.about-val {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow-wrap: anywhere;
+}
+.about-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+.lic-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-height: 300px;
+  overflow-y: auto;
+}
+.lic-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+}
+.lic-list li:last-child {
+  border-bottom: 0;
+}
+.lic-list .lic-name {
+  color: var(--text-secondary);
+}
+.lic-list .lic-lic {
+  flex: none;
+  color: var(--text-muted);
 }
 
 /* ---- Sidebar yang bisa dilipat (spec-viewer-collapsible-panels, desain 03 "… collapsed" + 04 "Panel toggles") ---- */
@@ -5754,39 +5905,6 @@ button.panel-tab:hover {
 .theme-preview.system .tp-block:last-child {
   background: #363636;
 }
-.settings-info {
-  display: flex;
-  flex-direction: column;
-  margin: 0;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--surface);
-}
-.settings-row {
-  display: grid;
-  grid-template-columns: 110px minmax(0, 1fr);
-  align-items: center;
-  gap: 12px;
-  min-height: 44px;
-  padding: 8px 14px;
-}
-.settings-row + .settings-row {
-  border-top: 1px solid var(--border);
-}
-.settings-row dt {
-  color: var(--text-secondary);
-}
-.settings-row dd {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-width: 0;
-  margin: 0;
-  font-size: 12px;
-}
-.settings-row dd .skeleton.line {
-  width: 50%;
-}
 .settings-path {
   flex: 1;
   min-width: 0;
@@ -5833,10 +5951,6 @@ button.panel-tab:hover {
   }
   .theme-options {
     gap: 10px;
-  }
-  .settings-row {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 4px;
   }
 }
 

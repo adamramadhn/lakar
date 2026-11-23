@@ -1,4 +1,6 @@
-// Snippet config MCP per harness (halaman Connections): path Windows dengan backslash dan spasi tetap utuh.
+// Snippet config MCP per harness (dialog Manual setup di Connections): path Windows dengan backslash dan spasi
+// tetap utuh. Daftar harness mengikuti tabel deteksi daemon (packages/daemon/src/harnesses.ts): claude-code,
+// codex, pi, opencode, other — format snippet per format file config harness itu.
 // Bentuk config aplikasi desktop Windows: `command` = salinan Node MCP di app-data (di luar direktori instalasi,
 // agar sesi agen tidak mengunci installer), `args` = server MCP di direktori instalasi.
 import { describe, expect, it } from 'vitest';
@@ -13,7 +15,7 @@ const mcp: McpServerConfig = {
 const snippet = (id: string) => HARNESSES.find((h) => h.id === id)!.snippet(mcp);
 
 describe('snippet harness', () => {
-  it.each(['claude-code', 'gemini'])('%s: JSON → mcpServers.lakar {command, args, env} persis', (id) => {
+  it.each(['claude-code', 'pi', 'other'])('%s: JSON → mcpServers.lakar {command, args, env} persis', (id) => {
     expect(JSON.parse(snippet(id))).toEqual({ mcpServers: { lakar: { command: mcp.command, args: mcp.args, env: { LAKAR_URL: 'http://127.0.0.1:7467' } } } });
   });
 
@@ -26,8 +28,18 @@ describe('snippet harness', () => {
     ]);
   });
 
-  it('ACP: daftar server dengan env [{name, value}]', () => {
-    expect(JSON.parse(snippet('acp'))).toEqual([{ name: 'lakar', command: mcp.command, args: mcp.args, env: [{ name: 'LAKAR_URL', value: 'http://127.0.0.1:7467' }] }]);
+  it('opencode: JSON → mcp.servers.lakar {type:"local", command:[cmd,...args], environment}', () => {
+    expect(JSON.parse(snippet('opencode'))).toEqual({
+      mcp: {
+        servers: {
+          lakar: {
+            type: 'local',
+            command: [mcp.command, ...mcp.args],
+            environment: { LAKAR_URL: 'http://127.0.0.1:7467' },
+          },
+        },
+      },
+    });
   });
 
   it('daftar tool MCP memuat list_documents dan paste', () => {
@@ -36,7 +48,8 @@ describe('snippet harness', () => {
     expect(MCP_TOOLS).toContain('visual_diff');
   });
 
-  it('semua harness punya id unik', () => {
+  it('lima harness dengan id unik, diakhiri fallback manual "other"', () => {
+    expect(HARNESSES.map((h) => h.id)).toEqual(['claude-code', 'codex', 'pi', 'opencode', 'other']);
     expect(new Set(HARNESSES.map((h) => h.id)).size).toBe(HARNESSES.length);
   });
 });

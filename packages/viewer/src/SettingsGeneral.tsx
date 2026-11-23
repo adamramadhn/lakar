@@ -1,14 +1,16 @@
 // Settings (desain 02 "Settings — Dark/Light", tablet/mobile): judul (nama tab) + sub-nav General / Connections /
 // Updates (desktop: kolom 200px di kiri; ≤768px: tab horizontal di atas). General berisi Appearance (Light / Dark /
-// System, theme.ts) dan bagian lokal dari `GET /status` (folder data, alamat server, versi). Tab Updates hanya ada
-// di aplikasi desktop (updates.ts `isDesktop`). Profile, Language, Notifications sengaja tidak ada (aplikasi lokal
-// tanpa akun, UI hanya bahasa Inggris, isi Notifications belum didesain).
+// System, theme.ts) dan "About" dari `GET /status` (versi, channel, daemon, folder data + Copy build info + lisensi
+// sumber terbuka — revisi About desain "Settings · About" section 11). Tab Updates hanya ada di aplikasi desktop
+// (updates.ts `isDesktop`). Profile, Language, Notifications sengaja tidak ada (aplikasi lokal tanpa akun, UI hanya
+// bahasa Inggris, isi Notifications belum didesain).
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { api, type DaemonStatus } from './api';
-import { CopyButton } from './Connections';
+import { CopyButton, copyText } from './Connections';
 import { CONNECTIONS_HASH, SETTINGS_HASH, UPDATES_HASH } from './files';
 import { useRetry } from './hooks';
 import { Icon, type IconName } from './icons';
+import { Modal } from './NewFileDialog';
 import { THEME_PREFS, useTheme, type ThemePref } from './theme';
 import { isDesktop } from './updates';
 
@@ -92,20 +94,83 @@ function Appearance() {
 /** `undefined` = memuat, `null` = gagal / offline. */
 type StatusState = DaemonStatus | null | undefined;
 
-function LocalInfo() {
+/** Baris About: kunci muted kiri + nilai kanan (mono untuk versi/path). */
+function AboutRow({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="about-row">
+      <span className="about-key">{label}</span>
+      <span className="about-val">{children}</span>
+    </div>
+  );
+}
+
+/** Lisensi pihak ketiga utama yang dibundel (dialog "Open-source licenses"). */
+const LICENSES: [string, string][] = [
+  ['React & ReactDOM', 'MIT'],
+  ['Vite', 'MIT'],
+  ['Fastify', 'MIT'],
+  ['zod', 'MIT'],
+  ['Playwright (playwright-core)', 'Apache-2.0'],
+  ['@modelcontextprotocol/sdk', 'MIT'],
+  ['Lucide icons', 'ISC'],
+];
+
+function LicensesDialog({ onClose }: { onClose: () => void }) {
+  return (
+    <Modal label="Open-source licenses" onClose={onClose} className="small">
+      <div className="modal-text">
+        <h2>Open-source licenses</h2>
+        <p>Lakar is built on these open-source packages.</p>
+      </div>
+      <ul className="lic-list">
+        {LICENSES.map(([name, lic]) => (
+          <li key={name}>
+            <span className="lic-name">{name}</span>
+            <span className="lic-lic">{lic}</span>
+          </li>
+        ))}
+      </ul>
+      <div className="modal-buttons">
+        <button type="button" data-autofocus className="btn" onClick={onClose}>
+          Close
+        </button>
+      </div>
+    </Modal>
+  );
+}
+
+/** "About" (desain "Settings · About"): versi/channel/daemon/data folder + Copy build info + lisensi. */
+function About() {
   const [status, setStatus] = useState<StatusState>(undefined);
+  const [licenses, setLicenses] = useState(false);
+  const [copied, setCopied] = useState(false);
   const load = useCallback(() => {
     api.status().then(setStatus, () => setStatus(null));
   }, []);
   useEffect(load, [load]);
   useRetry(load);
 
+  const buildInfo = status
+    ? [`Lakar ${status.version}`, 'Channel: stable', `Daemon: lakard ${status.version}`, `Node: ${status.node ?? 'unknown'}`, `Data folder: ${status.dataDir}`].join('\n')
+    : '';
+  const copyBuild = async () => {
+    try {
+      await copyText(buildInfo);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      // clipboard tidak tersedia: biarkan tombol tanpa umpan balik
+    }
+  };
+
   const value = (v: ReactNode) => (status === undefined ? <span className="skeleton line" /> : status === null ? <span className="settings-unavailable">Unavailable</span> : v);
   return (
-    <dl className="settings-info" aria-busy={status === undefined}>
-      <div className="settings-row">
-        <dt>Data folder</dt>
-        <dd>
+    <>
+      <div className="settings-about" aria-busy={status === undefined}>
+        <AboutRow label="Version">{value(<span className="mono">{status?.version}</span>)}</AboutRow>
+        <AboutRow label="Channel">{value('stable')}</AboutRow>
+        <AboutRow label="Daemon">{value(<span className="mono">lakard {status?.version}</span>)}</AboutRow>
+        <AboutRow label="Data folder">
           {value(
             <>
               <span className="mono settings-path" title={status?.dataDir}>
@@ -114,17 +179,19 @@ function LocalInfo() {
               {status && <CopyButton text={status.dataDir} />}
             </>,
           )}
-        </dd>
+        </AboutRow>
       </div>
-      <div className="settings-row">
-        <dt>Server</dt>
-        <dd>{value(<span className="mono">{status ? `${status.host}:${status.port}` : ''}</span>)}</dd>
+      <div className="about-actions">
+        <button type="button" className="btn" disabled={!status} onClick={() => void copyBuild()}>
+          <Icon name={copied ? 'circleCheck' : 'copy'} size={15} />
+          {copied ? 'Copied' : 'Copy build info'}
+        </button>
+        <button type="button" className="btn" onClick={() => setLicenses(true)}>
+          Open-source licenses
+        </button>
       </div>
-      <div className="settings-row">
-        <dt>Version</dt>
-        <dd>{value(<span className="mono">{status ? `lakard ${status.version}` : ''}</span>)}</dd>
-      </div>
-    </dl>
+      {licenses && <LicensesDialog onClose={() => setLicenses(false)} />}
+    </>
   );
 }
 
@@ -135,8 +202,8 @@ export function SettingsGeneral() {
       <SettingsSection title="Appearance" description="Choose how the app looks. System follows your OS setting.">
         <Appearance />
       </SettingsSection>
-      <SettingsSection title="This computer" description="Lakar runs locally. Your files stay in this folder, served by lakard.">
-        <LocalInfo />
+      <SettingsSection title="About" description="Lakar runs locally. Your files stay on this computer, served by lakard.">
+        <About />
       </SettingsSection>
     </div>
   );
