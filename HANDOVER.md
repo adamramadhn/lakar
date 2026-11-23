@@ -51,13 +51,16 @@ Perubahan sesudah gelombang fitur di atas:
 
 ## Langkah berikutnya
 
-0. **Agen di canvas (prioritas, mulai di sesi baru, branch `feat/agent-open-doc`).** Urutannya:
-   1. **Agen bekerja di dokumen yang terbuka.** Spec `_bmad-output/implementation-artifacts/spec-agent-open-doc.md` sudah disetujui Fatmuh (`ready-for-dev`, rute full). Lanjutkan dengan `bmad-build` dari spec itu; workflow langsung masuk ke step implementasi.
-   2. **Skill desain dari Emil Kowalski** (MIT, aiforui.dev/skills), diadaptasi untuk MCP.
-   3. **Efek canvas saat agen bekerja** (fade-in node, label "Generating", outline, cursor per agen, shimmer). Desain dulu di `lakar-ui.pen` section 04.
-   4. **Tinggi board landing mengikuti isi.**
+0. **Agen di canvas: selesai dan sudah di `main` (2026-11-23).** Riset pendukung ada di `research-agent-canvas-references.md`. Agar `bmad-build` ter-render dengan benar, skrip `_bmad` harus versi 6.13.0-next (commit `138d7f1`).
+   1. **Agen bekerja di dokumen yang terbuka** (#20, `spec-agent-open-doc.md`). `open_doc {}` memakai dokumen yang sedang difokuskan di aplikasi, atau membuat dokumen baru dan membuka tabnya. Ada juga tool `list_documents`, dan respons tulis membawa `target`.
+   2. **Skill desain dari Emil Kowalski** (#22, `spec-design-skills-emil.md`). Skill opsional `break-ui` dan `variants`, isi non-animasi masuk ke `ui`/`review`. Lima skill animasi dipasang di `.claude/skills/`. Atribusi MIT ada di `packages/skills/NOTICE.md`.
+   3. **Efek canvas saat agen bekerja** (#21, `spec-canvas-agent-effects.md`). Desainnya ada di `lakar-ui.pen` section 04, baris `GRlb7`. Isinya: identitas agen lewat header `x-lakar-agent`, warna per sesi, label "✦ Generating", fade-in node, cursor 180 ms, dan baris Activity `terminal-chunk-in`.
+   4. **Tinggi board landing** (#22, `spec-board-height-fit.md`). LC-12 memberi peringatan bila ada ruang kosong di bawah isi board landing yang sudah jadi, dan skill `landing` mengambil tinggi dari `bounds`.
 
-   Butir 2–4 tercatat di `deferred-work.md`. Riset pendukung (open-pencil, Paper, pen.dev, skill Emil) ada di `research-agent-canvas-references.md`. Agar `bmad-build` ter-render dengan benar, skrip `_bmad` harus versi 6.13.0-next (commit `138d7f1`).
+   **Perlu uji manual Fatmuh** dengan build dari `main` (belum ada di installer `v0.1.0`):
+   - Dari sesi Claude baru, prompt "buatkan landing page menggunakan lakar" membuka tab dan membangun desain secara live.
+   - Dua agen (Claude Code dan Codex) tampil dengan warna dan nama masing-masing.
+   - Node baru fade-in, dan efeknya tidak diputar ulang saat dokumen dibuka.
 1. **Uji manual `v0.1.0` oleh Fatmuh.** Pasang installer rilis, lalu cek butir Done-when yang tersisa (lihat "Sisa" di bawah).
 2. **Build `initiative-lakar-paper` selesai dan sudah di `main` (#18).** Semua 34 tiket berstatus done. Semua story dijalankan lewat `bmad-build-auto`. Spec ada di `_bmad-output/implementation-artifacts/spec-{model-dokumen,editor,agen,token,komponen,kode,vektor}-*.md`. Spine arsitektur ada di `_bmad-output/initiative-lakar-paper/tickets/epic-model-dokumen/architecture-model-dokumen/architecture-model-dokumen.md`. Skema kini v7.
    - **Model dokumen.** Korpus v1/v2, token bertipe dengan mode tema (v3), `resolveDocument` sebagai satu pintu resolusi, dan `css.ts` sebagai pemetaan CSS tunggal.
