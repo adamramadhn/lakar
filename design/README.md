@@ -33,6 +33,7 @@ Catatan: `lakar-ui.pen` adalah salinan snapshot dari `untitled.pen` di folder do
 | 02 · Dashboard — Pages & states | Files, Archive kosong, Recents first-run, Settings, Connections, context menu, konfirmasi delete, dialog New file, search (ada hasil / tidak ada hasil, dengan aksi New file), offline, loading. Desktop, tablet, mobile |
 | 03 · Viewer | Activity, Inspect, Checks, History, Waiting, Offline, Error, Export, Add layer (menu), New File (board kosong). Desktop 1440, tablet 1024 lanskap, mobile 375 |
 | 04 · Agent presence & motion | Storyboard 4 langkah, state baris layer, tabel spesifikasi motion, aturan reduced motion |
+| 11 · Editor ergonomics & import | Smart guide, pengukur jarak Alt+hover, menu zoom, Wrap di auto layout, Copy as PNG, impor dari URL, DTCG di panel Theme, Settings → Updates dan banner update (lihat [Section 11](#section-11--editor-ergonomics--import)) |
 
 Setiap layar punya versi dark dan light yang disusun sejajar atas-bawah.
 
@@ -91,6 +92,55 @@ Font: Inter untuk UI, JetBrains Mono untuk nama tool, kode, dan nilai.
 Untuk `prefers-reduced-motion`: cursor melompat langsung, skeleton diam, garis tepi solid, dan kamera tidak bergeser.
 
 Di Pencil, shimmer dan denyut berjalan live lewat shader `@time`. Gerakan berurutan (cursor meluncur, node muncul bertahap, kamera) hanya ada di prototype HTML.
+
+## Section 11 · Editor ergonomics & import
+
+Desain story 8.1 epic `epic-adopsi-open-pencil` (2026-11-23), dasar UI story 8.5–8.10. Desain disetujui atas delegasi Fatmuh (terima jadi, 2026-11-23).
+
+Section `iYLJg`, header `mfCQ7`. Baris Components `prQlr` (sheet dark `g6Mfg`, sheet light `eeKks`), baris Dark `oolM4` (layar di `Zrkzx`), baris Light `fLgUo` (layar di `klCN3`). Semua layar desktop 1440×900. Versi light adalah salinan versi dark dengan `theme.mode = light`.
+
+| Layar | Dark | Light | Story |
+|---|---|---|---|
+| Canvas — Smart guides · Snapping | `GFDrS` | `Pv7gD` | 8.5 |
+| Canvas — Alt+hover distance | `JtQT2` | `Qyk7D` | 8.5 |
+| Canvas — Zoom menu | `j9OTVN` | `gNXNe` | 8.5 |
+| Design — Auto layout · Wrap | `UroZX` | `hs3ew` | 8.6 |
+| Canvas — Context menu · Copy as PNG | `rlBaX` | `GXHgL` | 8.7 |
+| Import from URL — Form | `bh4AW` | `hTNuW` | 8.8 |
+| Import from URL — Importing | `wrh3d` | `AUXAh` | 8.8 |
+| Import from URL — Error | `E4CtvM` | `Y5RKo` | 8.8 |
+| Theme — Import menu · DTCG | `t5wwvB` | `m8IeW` | 8.9 |
+| Theme — Export menu · DTCG | `Rsz7g` | `GDIh3` | 8.9 |
+| Theme — DTCG import report | `AXMO0` | `O01BK` | 8.9 |
+| Settings — Updates · Up to date | `ORtUr` | `BjQ0J` | 8.10 |
+| Settings — Updates · Update available | `H81KwZ` | `Zi1oA` | 8.10 |
+| Settings — Updates · Check failed | `v2Ckpl` | `Ze114` | 8.10 |
+| Recents — Update installed banner | `DZkuy` | `XNpid` | 8.10 |
+
+Komponen baru (sheet `g6Mfg`): **Distance Label** `e3Dob` dan **Smart Guide** `ighoH` (reusable), Toast "Copied as PNG" `fZ2Go` dan "Couldn't copy as PNG" `K8Mi4` (instance Toast), serta menu entry point `NKSOy` (Import from URL…, Copy as PNG, Zoom to selection).
+
+Keputusan desain:
+
+- **Smart guide dan pengukur jarak** memakai token `danger` (merah), terpisah dari seleksi `accent` dan aktivitas `agent`. Guide menandai tepi dan tengah dengan titik snap (×). Badge posisi menampilkan nilai bulat yang akan di-commit (`X 32 · Y 26`). Petunjuk di bawah canvas menyebut target snap dan "Hold Ctrl to move freely". Resize memakai guide yang sama untuk tepi yang ditarik.
+- **Alt+hover:** layer yang di-hover diberi garis tepi `danger`. Jarak dari seleksi ke layer itu tampil sebagai garis ukur dengan Distance Label, dan sisi yang tidak bertumpuk diberi garis bantu putus-putus.
+- **Zoom:** indikator zoom di View Controls membuka menu Zoom in (Ctrl +), Zoom out (Ctrl −), Zoom to 100% (Shift+0), Zoom to fit (Shift+1), Zoom to selection (Shift+2), dan toggle Snap to layers.
+- **Wrap:** grup Auto layout mendapat baris Segmented "No wrap / Wrap". Saat Wrap aktif, Gap menjadi jarak antar kolom dan Field "Row gap" muncul di sebelahnya. Padding pindah ke baris sendiri. Di canvas, penanda "Row gap 14" tampil di antara dua baris.
+- **Copy as PNG** ada di context menu layer (Ctrl+Shift+C), di bawah Duplicate dan bersebelahan dengan Copy as CSS. Hasilnya berupa Toast: berhasil (2x, ukuran piksel) atau gagal (Try again / Dismiss).
+- **Import from URL** dibuka dari menu "+" di Layers dan context menu canvas (Ctrl+Shift+I). Dialog punya tiga state:
+  - Form: alamat, preset lebar Desktop 1440 / Tablet 768 / Mobile 375, tempat board baru, dan catatan bahwa skrip tidak dijalankan.
+  - Importing: langkah Fetched → Rendering → Converting dengan progress bar.
+  - Error: alamat privat ditolak (field `danger`), plus daftar error lain: timeout 15 s, lebih dari 5 MB, bukan http(s).
+- **DTCG:** header panel Theme kini punya tombol Import dan Export, masing-masing membuka menu.
+  - Import: Import DTCG JSON…, Import CSS variables….
+  - Export: Export DTCG JSON, Copy DTCG JSON, Copy tokens as CSS.
+  - Laporan impor menampilkan jumlah new, updated, aliases, dan not supported, pemetaan mode, serta daftar token yang tidak diimpor beserta alasannya. Token tidak pernah dibuang diam-diam.
+- **Updates:** item nav Settings baru "Updates".
+  - Kartu versi punya tiga state: Up to date (Check for updates), Update available (Release notes, Install and restart, catatan rilis, progres unduh), dan Check failed (Try again, garis tepi `danger`).
+  - Toggle: cek otomatis, dan pasang saat keluar.
+  - Info About: versi, channel, dan tanda tangan.
+  - Banner update tersedia (`accent-soft`) tampil di atas jendela. Banner terpasang ("Lakar was updated to 0.1.6", What's new, Dismiss) tampil di Recents setelah restart. Keduanya memakai pola Offline Banner.
+
+Catatan audit: `ctx.problems` di layar baru hanya berisi handle seleksi yang sengaja menonjol keluar dari frame Selection, node yang dinonaktifkan, dan selisih pembulatan float pada kartu "Feature Spatial design" yang diwarisi dari layar dasar.
 
 ## Celah teknis yang perlu diputuskan arsitektur
 
