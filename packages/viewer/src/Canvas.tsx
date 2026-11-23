@@ -31,7 +31,8 @@ import { usePathTools, type PathEditPanel } from './pathTools';
 import { INSERT_KINDS, type InsertKind } from './codegen';
 import { COMPONENT_DRAG_TYPE, exitInstanceSelection, type ComponentInfo } from './componentModel';
 import { ExportButton } from './ExportPopover';
-import type { GeoNode } from './gesture';
+import { Menu, type Item } from './FileMenu';
+import { unionBox, type GeoNode } from './gesture';
 import { useOffline, useRetry } from './hooks';
 import { Icon, type IconName } from './icons';
 import type { AgentPresence, PendingAgent, Rect } from './presence';
@@ -546,6 +547,10 @@ export function Canvas({
     if (!canInsert) setTool((t) => (isDrawTool(t) ? 'select' : t));
   }, [canInsert]);
   const [spaceHeld, setSpaceHeld] = useState(false);
+  /** Alt ditahan: mode ukur jarak Alt+hover (desain bagian 11 "Measure distance", GSpGv). */
+  const [altHeld, setAltHeld] = useState(false);
+  /** Jangkar menu zoom (indikator zoom `.view-controls`, desain "Zoom menu" pSUKZ). */
+  const [zoomMenuAt, setZoomMenuAt] = useState<{ x: number; y: number } | undefined>(undefined);
   // Seleksi + gestur editor di canvas live (canvasEdit.tsx); jalur PNG (pratinjau versi) memakai klik board lama.
   const liveActive = live?.ok === true && !preview;
   const selectIds = useCallback((ids: string[]) => (onSelectIds ? onSelectIds(ids) : onSelect(ids[ids.length - 1])), [onSelectIds, onSelect]);
@@ -584,6 +589,7 @@ export function Canvas({
     pastedTag,
     onEnterPath: (id) => paths.enter(id),
     pathEditing: pathMode,
+    measuring: altHeld,
   });
   editRef.current = edit;
   // Fade-in node baru dari agen (spec-canvas-agent-effects): rencana masuk antrean (hanya execute yang selesai sesudah
@@ -756,6 +762,34 @@ export function Canvas({
     });
   }, []);
 
+  /** Zoom ke nilai `z` dengan pusat viewport tetap (menu zoom dan Shift+0, desain "Zoom menu" pSUKZ). */
+  const zoomTo = useCallback(
+    (z: number) => {
+      takeOver();
+      setCam((c) => {
+        const zz = clampZoom(z);
+        const k = zz / c.z;
+        const sx = size.w / 2;
+        const sy = size.h / 2;
+        return { z: zz, x: sx - (sx - c.x) * k, y: sy - (sy - c.y) * k };
+      });
+    },
+    [size, takeOver],
+  );
+
+  /** Zoom to selection (Shift+2 / item menu): kamera membingkai union box seleksi; zoom > 1 diizinkan (beda dari Fit). */
+  const zoomToSelection = useCallback(() => {
+    const boxes = selectionRef.current.flatMap((id) => {
+      const b = editRef.current?.nodeGeo(id)?.box;
+      return b ? [b] : [];
+    });
+    const bound = unionBox(boxes);
+    if (!bound || size.w <= 0 || size.h <= 0) return;
+    takeOver();
+    const z = clampZoom(Math.min((size.w - FIT_PAD * 2) / Math.max(1, bound.w), (size.h - FIT_PAD * 2 - 24) / Math.max(1, bound.h)));
+    setCam({ z, x: size.w / 2 - (bound.x + bound.w / 2) * z, y: size.h / 2 - (bound.y + bound.h / 2) * z + 12 });
+  }, [size, takeOver]);
+
   // Wheel: ctrl/⌘ (atau pinch) = zoom di kursor, selain itu pan. Listener non-pasif supaya halaman tidak ikut zoom.
   useEffect(() => {
     const el = ref.current;
@@ -798,6 +832,23 @@ export function Canvas({
         }
         return;
       }
+      // Alt ditahan = mode ukur jarak (desain GSpGv); preventDefault supaya fokus tidak ke menu browser.
+      if (e.key === 'Alt') {
+        e.preventDefault();
+        setAltHeld(true);
+        return;
+      }
+      // Ctrl/⌘ + =/− = zoom keyboard (menu zoom desain pSUKZ), tanpa Shift/Alt.
+      if ((e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey && (e.key === '=' || e.key === '+')) {
+        e.preventDefault();
+        zoomAt(1.25, size.w / 2, size.h / 2);
+        return;
+      }
+      if ((e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey && e.key === '-') {
+        e.preventDefault();
+        zoomAt(1 / 1.25, size.w / 2, size.h / 2);
+        return;
+      }
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       const insertKey = TOOL_KEYS[e.key.toLowerCase()];
       if (e.code === 'Space') {
@@ -816,6 +867,8 @@ export function Canvas({
         if (e.target instanceof Element && e.target.closest('button, a, [role="menuitem"]')) return;
         if (enterText.current()) e.preventDefault();
       } else if (e.key === '!' || (e.shiftKey && e.code === 'Digit1')) fit();
+      else if (e.key === ')' || (e.shiftKey && e.code === 'Digit0')) zoomTo(1);
+      else if (e.key === '@' || (e.shiftKey && e.code === 'Digit2')) zoomToSelection();
       else if (e.key === '+' || e.key === '=') zoomAt(1.25, size.w / 2, size.h / 2);
       else if (e.key === '-') zoomAt(1 / 1.25, size.w / 2, size.h / 2);
       else if (e.key === 'Escape') {
@@ -831,8 +884,17 @@ export function Canvas({
         onSelect(undefined);
       }
     };
-    const up = (e: KeyboardEvent) => e.code === 'Space' && setSpaceHeld(false);
-    const blur = () => setSpaceHeld(false);
+    const up = (e: KeyboardEvent) => {
+      if (e.code === 'Space') setSpaceHeld(false);
+      if (e.key === 'Alt') {
+        e.preventDefault();
+        setAltHeld(false);
+      }
+    };
+    const blur = () => {
+      setSpaceHeld(false);
+      setAltHeld(false);
+    };
     window.addEventListener('keydown', down);
     window.addEventListener('keyup', up);
     window.addEventListener('blur', blur);
@@ -841,7 +903,7 @@ export function Canvas({
       window.removeEventListener('keyup', up);
       window.removeEventListener('blur', blur);
     };
-  }, [fit, zoomAt, size, onSelect, selectIds, canInsert, canPen, cancelEdit]);
+  }, [fit, zoomAt, zoomTo, zoomToSelection, size, onSelect, selectIds, canInsert, canPen, cancelEdit]);
 
   const onPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
     if ((e.target as HTMLElement).closest('.canvas-overlay-ui')) return;
@@ -962,6 +1024,18 @@ export function Canvas({
   };
 
   const center = () => [size.w / 2, size.h / 2] as const;
+  // Menu zoom (desain pSUKZ): lima perintah dengan label shortcut; "Zoom to selection" nonaktif tanpa seleksi.
+  const zrun = (fn: () => void) => () => {
+    setZoomMenuAt(undefined);
+    fn();
+  };
+  const zoomItems: Item[] = [
+    { label: 'Zoom in', icon: 'plus', shortcut: isMac ? '⌘ +' : 'Ctrl +', keys: isMac ? 'Meta+=' : 'Control+=', run: zrun(() => zoomAt(1.25, ...center())) },
+    { label: 'Zoom out', icon: 'minus', shortcut: isMac ? '⌘ −' : 'Ctrl −', keys: isMac ? 'Meta+-' : 'Control+-', run: zrun(() => zoomAt(1 / 1.25, ...center())) },
+    { label: 'Zoom to 100%', icon: 'crosshair', shortcut: 'Shift 0', keys: 'Shift+Digit0', separator: true, run: zrun(() => zoomTo(1)) },
+    { label: 'Zoom to fit', icon: 'fit', shortcut: 'Shift 1', keys: 'Shift+Digit1', run: zrun(fit) },
+    { label: 'Zoom to selection', icon: 'squareDashed', shortcut: 'Shift 2', keys: 'Shift+Digit2', disabled: selection.length === 0, run: zrun(zoomToSelection) },
+  ];
   const boardById = new Map(boards.map((b) => [b.id, b]));
   const generating = generatingBoards(presence ?? []);
   const hb = highlight ? boardById.get(highlight.boardId) : undefined;
@@ -1183,7 +1257,21 @@ export function Canvas({
         <button type="button" className="tool zoom-btn" aria-label="Zoom out" title="Zoom out (-)" onClick={() => zoomAt(1 / 1.25, ...center())}>
           <Icon name="minus" />
         </button>
-        <span className="zoom-level">{Math.round(cam.z * 100)}%</span>
+        <button
+          type="button"
+          className="zoom-level"
+          title="Zoom options"
+          aria-label={`Zoom ${Math.round(cam.z * 100)}%`}
+          aria-haspopup="menu"
+          aria-expanded={zoomMenuAt !== undefined}
+          onClick={(e) => {
+            const r = e.currentTarget.getBoundingClientRect();
+            setZoomMenuAt((v) => (v ? undefined : { x: r.left, y: r.top - 8 }));
+          }}
+        >
+          {Math.round(cam.z * 100)}%
+          <Icon name="chevronDown" size={12} />
+        </button>
         <button type="button" className="tool zoom-btn" aria-label="Zoom in" title="Zoom in (+)" onClick={() => zoomAt(1.25, ...center())}>
           <Icon name="plus" />
         </button>
@@ -1202,6 +1290,12 @@ export function Canvas({
           </>
         )}
       </div>
+      {zoomMenuAt && (
+        // Menu di dalam section: `canvas-overlay-ui` supaya pointer-nya tidak memulai gestur kanvas.
+        <div className="canvas-overlay-ui">
+          <Menu x={zoomMenuAt.x} y={zoomMenuAt.y} up items={zoomItems} onClose={() => setZoomMenuAt(undefined)} />
+        </div>
+      )}
     </section>
   );
 }

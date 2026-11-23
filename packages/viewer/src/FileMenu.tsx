@@ -37,9 +37,9 @@ export const SHORTCUT = {
 /** `heading` = judul bagian di atas item; `key` = kunci React bila label bisa kembar (mis. nama layer). */
 export type Item = { label: string; key?: string; heading?: string; icon?: IconName; shortcut?: string; keys?: string; checked?: boolean; danger?: boolean; separator?: boolean; disabled?: boolean; title?: string; run: () => void };
 
-export function Menu({ x, y, items, onClose }: { x: number; y: number; items: Item[]; onClose: () => void }) {
+export function Menu({ x, y, items, onClose, up }: { x: number; y: number; items: Item[]; onClose: () => void; /** `up` = jangkar tepi bawah di `y` (menu membuka ke atas, mis. toolbar di bawah kanvas). */ up?: boolean }) {
   const ref = useRef<HTMLDivElement>(null);
-  const [pos, setPos] = useState({ left: x, top: y });
+  const [pos, setPos] = useState<{ left: number; top?: number; bottom?: number }>(() => (up ? { left: x, bottom: window.innerHeight - y } : { left: x, top: y }));
   // Menu ditutup → fokus kembali ke pemicu (tautan kartu, tombol "…") bila masih ada.
   useLayoutEffect(() => {
     const before = document.activeElement instanceof HTMLElement ? document.activeElement : null;
@@ -51,9 +51,11 @@ export function Menu({ x, y, items, onClose }: { x: number; y: number; items: It
     const el = ref.current;
     if (!el) return;
     const r = el.getBoundingClientRect();
-    setPos({ left: Math.max(8, Math.min(x, window.innerWidth - r.width - 8)), top: Math.max(8, Math.min(y, window.innerHeight - r.height - 8)) });
+    const left = Math.max(8, Math.min(x, window.innerWidth - r.width - 8));
+    // `up`: menu tumbuh ke atas dari jangkar `y`, diklem supaya tepi atasnya tetap ≥ 8px dari atas jendela.
+    setPos(up ? { left, bottom: Math.max(8, Math.min(window.innerHeight - y, window.innerHeight - r.height - 8)) } : { left, top: Math.max(8, Math.min(y, window.innerHeight - r.height - 8)) });
     (el.querySelector<HTMLElement>('[aria-checked=true]') ?? el.querySelector<HTMLElement>('.menu-item:not(:disabled)'))?.focus();
-  }, [x, y]);
+  }, [x, y, up]);
   const move = (d: number) => {
     const all = [...(ref.current?.querySelectorAll<HTMLElement>('.menu-item:not(:disabled)') ?? [])];
     const i = all.indexOf(document.activeElement as HTMLElement);

@@ -1641,14 +1641,18 @@ button.panel-tab:hover {
 .handle.se {
   top: 100%;
 }
-/* Overlay editor (story 4): hover/anggota multi-seleksi 1px, marquee, slot asal + target + bar drop reorder. */
+/* Overlay editor (story 4): hover/anggota multi-seleksi 1px, marquee, slot asal + target + bar drop reorder,
+   smart guide + label jarak + hint ukur (desain bagian 11). */
 .edit-hover,
 .edit-member,
 .edit-marquee,
 .edit-ghost-slot,
 .edit-drop-target,
 .edit-drop-bar,
-.edit-drop-hint {
+.edit-drop-hint,
+.snap-guide,
+.snap-label,
+.measure-hint {
   position: absolute;
   pointer-events: none;
 }
@@ -2439,6 +2443,32 @@ button.panel-tab:hover {
   box-shadow: 0 14px 28px #00000059;
   pointer-events: none;
 }
+/* Smart guide dan label jarak (desain bagian 11, komponen Smart Guide `xUDJD` + Distance Label `CVzUp`): warna
+   `danger` supaya tidak tertukar dengan seleksi `accent` dan agen `agent`. */
+.snap-guide {
+  background: var(--danger);
+}
+.snap-label {
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: var(--danger);
+  color: #fff;
+  font: 500 10px/1.4 var(--font-mono);
+  white-space: nowrap;
+  transform: translate(-50%, -50%);
+}
+/* Pill petunjuk Alt+hover "Measuring to <nama> · Alt" (tooltip pola "Undo"). */
+.measure-hint {
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--modal);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  font-size: 10px;
+  font-weight: 500;
+  white-space: nowrap;
+  transform: translate(-50%, -100%);
+}
 .canvas.live-edit .board-label {
   pointer-events: auto;
 }
@@ -2527,12 +2557,26 @@ button.panel-tab:hover {
   margin: 0 2px;
   background: var(--border);
 }
+/* Indikator zoom = tombol yang membuka menu zoom (desain "Zoom menu" pSUKZ): latar surface-hover + chevron. */
 .zoom-level {
-  min-width: 45px;
-  text-align: center;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 34px;
+  padding: 0 4px 0 8px;
+  border-radius: 7px;
+  background: var(--surface-hover);
+  color: var(--text-primary);
   font-size: 12px;
   font-weight: 500;
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.zoom-level:hover {
+  background: var(--border);
+}
+.zoom-level svg {
+  color: var(--text-secondary);
 }
 .mono-label {
   font-weight: 500;

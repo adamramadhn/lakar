@@ -253,3 +253,9 @@ export function sizeBadge(count: number, b: Box): string {
   const size = `${rnd(b.w)} × ${rnd(b.h)}`;
   return count > 1 ? `${count} selected · ${size}` : size;
 }
+
+/** Teks badge posisi saat move (desain bagian 11: posisi bulat yang akan di-commit, `664, 64`). */
+export function posBadge(count: number, b: Box): string {
+  const pos = `${rnd(b.x)}, ${rnd(b.y)}`;
+  return count > 1 ? `${count} selected · ${pos}` : pos;
+}

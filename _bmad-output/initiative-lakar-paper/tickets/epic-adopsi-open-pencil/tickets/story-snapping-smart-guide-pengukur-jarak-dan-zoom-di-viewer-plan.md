@@ -3,14 +3,14 @@ title: 'Snapping, smart guide, pengukur jarak, dan zoom di viewer'
 type: feature
 ticket: '5'
 created: '2026-11-23'
-status: in-progress
+status: built
 baseline_revision: '9ece3808caa82247ce5e81b7071771405b68379c'
 route: full
 route_source: auto
 risk: medium
-review: ''
-review_source: ''
-lenses_ran: []
+review: quick
+review_source: pinned
+lenses_ran: [quick]
 review_loop_iteration: 0
 followup_review_recommended: false
 context: ['{project-root}/design/README.md']
@@ -68,12 +68,12 @@ deferred: []
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `packages/viewer/src/snap.ts` — modul murni baru: `snapMove(moving, targets, tol) → {dx, dy, guides}`, `snapResize(to, handle, targets, tol) → {dx, dy, guides}` (dx/dy = penyesuaian; `Guide = {orientation:'v'|'h', at, from, to}` halaman, extent = union moving+kandidat yang cocok), `measure(a, b) → Measure[]` (`{axis:'x'|'y', from, to, at, value}`, per matrix MEASURE), `snapCandidates(moved: GeoNode[], index) → Box[]` per SNAP_TARGETS — fondasi teruji.
-- [ ] `packages/viewer/src/snap.test.ts` — tes unit seluruh baris I/O matrix (pola `gesture.test.ts`) — bukti logika.
-- [ ] `packages/viewer/src/canvasEdit.tsx` — prop `measuring`; snap di `move`/`resize`; overlay `.snap-guide` + `.snap-label` (gap) + badge posisi `x, y` saat move (`posBadge` di gesture.ts); overlay Alt+hover: `.edit-hover` tetap + `.snap-guide`/`.snap-label` ukur + pill `.measure-hint` "Measuring to {name} · Alt" — integrasi gestur.
-- [ ] `packages/viewer/src/Canvas.tsx` + `FileMenu.tsx` — `altHeld` (keydown/up/blur sebelum bail 801; `preventDefault` Alt); `measuring` ke `useCanvasEdit`; `zoom-level` → tombol (`aria-haspopup="menu"`, chevron) membuka `Menu up` berisi Zoom in `Ctrl +`, Zoom out `Ctrl −`, separator, Zoom to 100% `Shift 0`, Zoom to fit `Shift 1`, Zoom to selection `Shift 2` (disabled tanpa seleksi); `zoomTo(1)` di tengah viewport; `zoomToSelection` = fit bounds seleksi (pad FIT_PAD, `clampZoom`, zoom >1 diizinkan); keyboard Ctrl/Cmd+= & − (sebelum bail, tanpa shift/alt), Shift+Digit0, Shift+Digit2 — UI zoom.
-- [ ] `packages/viewer/src/app.css` — `.snap-guide` (1px `var(--danger)`), `.snap-label` (pill `var(--danger)`, teks putih, mono), `.measure-hint` (pola `.edit-drop-hint`), `.zoom-level` sebagai tombol (latar `surface-hover`, chevron) — visual desain.
-- [ ] `packages/viewer/src/Canvas.snap.dom.test.tsx` — tes DOM: menu zoom terbuka & item menjalankan perintah; Shift+0 → z=1; Shift+2 → kamera ke seleksi; drag board B mendekati tepi A → `.snap-guide` tampil dan `onCommit` menerima `y` bulat hasil snap; Alt+hover board lain → `.snap-label` jarak — bukti permukaan.
+- [x] `packages/viewer/src/snap.ts` — modul murni baru: `snapMove(moving, targets, tol) → {dx, dy, guides}`, `snapResize(to, handle, targets, tol) → {dx, dy, guides}` (dx/dy = penyesuaian; `Guide = {orientation:'v'|'h', at, from, to}` halaman, extent = union moving+kandidat yang cocok), `measure(a, b) → Measure[]` (`{axis:'x'|'y', from, to, at, value}`, per matrix MEASURE), `snapCandidates(moved: GeoNode[], index) → Box[]` per SNAP_TARGETS — fondasi teruji.
+- [x] `packages/viewer/src/snap.test.ts` — tes unit seluruh baris I/O matrix (pola `gesture.test.ts`) — bukti logika.
+- [x] `packages/viewer/src/canvasEdit.tsx` — prop `measuring`; snap di `move`/`resize`; overlay `.snap-guide` + `.snap-label` (gap) + badge posisi `x, y` saat move (`posBadge` di gesture.ts); overlay Alt+hover: `.edit-hover` tetap + `.snap-guide`/`.snap-label` ukur + pill `.measure-hint` "Measuring to {name} · Alt" — integrasi gestur.
+- [x] `packages/viewer/src/Canvas.tsx` + `FileMenu.tsx` — `altHeld` (keydown/up/blur sebelum bail 801; `preventDefault` Alt); `measuring` ke `useCanvasEdit`; `zoom-level` → tombol (`aria-haspopup="menu"`, chevron) membuka `Menu up` berisi Zoom in `Ctrl +`, Zoom out `Ctrl −`, separator, Zoom to 100% `Shift 0`, Zoom to fit `Shift 1`, Zoom to selection `Shift 2` (disabled tanpa seleksi); `zoomTo(1)` di tengah viewport; `zoomToSelection` = fit bounds seleksi (pad FIT_PAD, `clampZoom`, zoom >1 diizinkan); keyboard Ctrl/Cmd+= & − (sebelum bail, tanpa shift/alt), Shift+Digit0, Shift+Digit2 — UI zoom.
+- [x] `packages/viewer/src/app.css` — `.snap-guide` (1px `var(--danger)`), `.snap-label` (pill `var(--danger)`, teks putih, mono), `.measure-hint` (pola `.edit-drop-hint`), `.zoom-level` sebagai tombol (latar `surface-hover`, chevron) — visual desain.
+- [x] `packages/viewer/src/Canvas.snap.dom.test.tsx` — tes DOM: menu zoom terbuka & item menjalankan perintah; Shift+0 → z=1; Shift+2 → kamera ke seleksi; drag board B mendekati tepi A → `.snap-guide` tampil dan `onCommit` menerima `y` bulat hasil snap; Alt+hover board lain → `.snap-label` jarak — bukti permukaan.
 
 **Acceptance Criteria:**
 - Given dua board dengan selisih tepi ≤ 6px layar, when board digeser melintasi tepi itu, then tepi menempel (op `update` berisi nilai bulat posisi snap) dan garis `.snap-guide` `danger` tampil selama gestur.
@@ -83,9 +83,31 @@ deferred: []
 
 ## Implementation Notes
 
+Implementasi sesuai plan: `snap.ts` murni (`Snap` juga membawa `gaps` = label jarak kandidat disjoint yang ikut snap); toleransi `SNAP_TOLERANCE_PX / cam.z`; snap hanya menyesuaikan `d`/`to` sebelum `moveOps`/`resizeOp` sehingga nilai commit tetap lewat `rnd`. `applyResizeSnap` di canvasEdit hanya menggerakkan tepi sesuai handle. Menu zoom memakai `Menu` + prop `up` baru (jangkar `bottom`, kompatibel mundur); `aria-keyshortcuts` mengikuti `isMac`. Verifikasi Windows: `pnpm build` hijau; `pnpm test` menjalankan 170 file — `snap.test.ts` (18) dan `Canvas.snap.dom.test.tsx` (5) hijau, nol kegagalan baru di `packages/viewer` (62 kegagalan tersisa di bench/daemon/render/check/mcp adalah isu Windows yang sudah dikenal: SIGTERM, key foto, Chromium/jaringan; CI Linux acuan).
+
 ## Plan Change Log
 
 ## Review Triage Log
+
+### 2026-11-23 — Review pass (quick)
+- verdicts: 0 findings — high 0, medium 0, low 0, false 0, maybe-false 0
+- notes: Lensa quick diluncurkan sebagai subagent (2 upaya) + 1 permintaan ulang hasil; semua return kosong di lingkungan ini, jadi tidak ada temuan yang bisa ditriage. Sebagai gantinya parent memeriksa diff penuh (`op85-diff.txt`, 1126 baris) langsung: matematika snap/resize/measure di `snap.ts` cocok dengan matrix; `applyResizeSnap` hanya menggerakkan tepi handle; `altHeld` dibersihkan di keyup/blur; menu `up` di `Menu` aditif; `.zoom-level` button aman karena reset `button` global (app.css:20); tidak ada EventSource baru; op commit tetap via `moveOps`/`resizeOp` + `rnd`. Tidak ditemukan AC yang tidak terpenuhi atau aturan yang dilanggar.
+
+## Auto Run Result
+
+- Ringkasan: snapping + smart guide + label jarak saat move/resize, pengukur jarak Alt+hover, dan menu zoom (Zoom in/out, 100%, fit, selection) dengan shortcut Ctrl+=/−, Shift+0, Shift+2 — sesuai desain section 11 (layar fvbjN, GSpGv, pSUKZ).
+- File:
+  - `packages/viewer/src/snap.ts` (baru): logika murni `snapMove`/`snapResize`/`measure`/`snapCandidates`, `SNAP_TOLERANCE_PX`.
+  - `packages/viewer/src/snap.test.ts` (baru): 18 tes unit seluruh baris I/O matrix.
+  - `packages/viewer/src/canvasEdit.tsx`: prop `measuring`, snap di gestur move/resize, overlay `.snap-guide`/`.snap-label`/`.measure-hint`, badge posisi saat move.
+  - `packages/viewer/src/Canvas.tsx`: `altHeld`, shortcut zoom baru, tombol `.zoom-level` + menu zoom.
+  - `packages/viewer/src/FileMenu.tsx`: prop opsional `up` di `Menu` (kompatibel mundur).
+  - `packages/viewer/src/gesture.ts`: `posBadge`.
+  - `packages/viewer/src/app.css`: gaya `.snap-guide`, `.snap-label`, `.measure-hint`, `.zoom-level` tombol.
+  - `packages/viewer/src/Canvas.snap.dom.test.tsx` (baru): 5 tes DOM permukaan.
+- Review: lensa quick diluncurkan (subagent return kosong, tidak ada temuan); parent memverifikasi diff langsung — 0 patch, 0 defer, 0 temuan. followup_review_recommended = false.
+- Verifikasi: `pnpm build` hijau; `pnpm vitest run` kedua file baru 23/23 hijau; `pnpm test` penuh — nol kegagalan di `packages/viewer` (62 kegagalan Windows baseline di bench/daemon/render/check/mcp, di luar cakupan diff; CI Linux acuan).
+- Risiko sisa: kegagalan baseline Windows perlu konfirmasi CI hijau; lensa review tidak menghasilkan output sehingga review efektif = inspeksi parent.
 
 ## Design Notes
 
