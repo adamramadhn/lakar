@@ -1,7 +1,7 @@
-// Server MCP Lakar: 19 tool (AD-11 + photo_search + get_selection + export_code + paste + list_documents + undo + redo
-// + visual_diff + fix_check) → HTTP lakard: status, read_skill, open_doc, list_documents, list_boards, execute, inspect,
-// layout_check, screenshot, export, export_code, icon_search, photo_search, get_selection, paste, undo, redo, visual_diff,
-// fix_check.
+// Server MCP Lakar: 20 tool (AD-11 + photo_search + get_selection + export_code + paste + import_url + list_documents
+// + undo + redo + visual_diff + fix_check) → HTTP lakard: status, read_skill, open_doc, list_documents, list_boards,
+// execute, inspect, layout_check, screenshot, export, export_code, icon_search, photo_search, get_selection, paste,
+// import_url, undo, redo, visual_diff, fix_check.
 import { McpServer, type CallToolResult } from '@modelcontextprotocol/server';
 import { z } from 'zod';
 import {
@@ -231,6 +231,18 @@ export const PASTE_DESCRIPTION =
   'yang lain (filter, mask, clip-path, gradien url(), <text>, <image>, <use>, <style>, <script>, …) dibuang dan dilaporkan. Satu paste = satu rev. ' +
   'Mengembalikan {docId, slug, rev, created, nodeId, boards, report:{kind, paths, kept:[atribut], dropped:[{kind: element|attribute|value, name, count}]}}. ' +
   'SVG rusak/tanpa bentuk, HTML tanpa isi terlihat, atau parent bukan board/frame → SCHEMA_INVALID; ID tidak ada → NOT_FOUND; belum open_doc → NO_ACTIVE_DOC; daemon tanpa Chromium (HTML) → RENDER_FAILED.';
+
+/** Deskripsi tool `import_url` (epic adopsi open-pencil story 8). */
+export const IMPORT_URL_DESCRIPTION =
+  'Impor halaman web dari URL sebagai board baru berisi layer yang bisa diedit (importer HTML yang sama dengan paste kind "html"). ' +
+  'Daemon mengambil halaman sekali atas permintaan ini: hanya http(s) publik (loopback/privat/link-local ditolak, redirect ≤3 divalidasi ulang, ' +
+  'maks 15 detik dan 10 MB), JavaScript halaman tidak dijalankan, dan render tetap tanpa jaringan (gambar hanya data URI). ' +
+  'Board dibuat di halaman pageId (default halaman pertama): width = lebar board+viewport (default 1440; preset umum 1440/768/375), ' +
+  'height = tinggi konten halaman, name opsional (default <title>, lalu host), screen opsional (default dari lebar), ' +
+  'x/y opsional (default kanan board terakhir + 80), description opsional (label riwayat, default "Import page <title>"). ' +
+  'Mengembalikan {docId, slug, rev, created, nodeId, boardId, boards, report:{kind:"html", …} seperti paste, page:{url, finalUrl, title?}, target}. ' +
+  'Satu impor = satu rev (undo membatalkannya). URL salah/skema bukan http(s)/alamat non-publik/halaman bukan HTML → SCHEMA_INVALID; ' +
+  'timeout/gangguan jaringan/HTTP 5xx-429 → EXEC_ERROR retryable; dokumen belum open_doc → NO_ACTIVE_DOC; daemon tanpa Chromium → RENDER_FAILED.';
 
 /** Deskripsi tool `layout_check` (aturan gerbang G0). */
 export const LAYOUT_CHECK_DESCRIPTION =
@@ -484,6 +496,29 @@ export function createLakarMcpServer(daemonUrl: string): McpServer {
       guarded(async () => {
         const body = Object.fromEntries(Object.entries(args).filter(([, v]) => v !== undefined));
         return asText(await client.call('/viewer/paste', body));
+      }),
+  );
+
+  server.registerTool(
+    'import_url',
+    {
+      annotations: toolAnnotations('import_url'),
+      description: IMPORT_URL_DESCRIPTION,
+      inputSchema: z.object({
+        url: z.string().describe('URL halaman web publik (http/https)'),
+        pageId: z.string().optional().describe('ID halaman tujuan board baru (default halaman pertama)'),
+        width: z.number().optional().describe('lebar board+viewport px (default 1440; preset umum 1440/768/375)'),
+        name: z.string().optional().describe('nama board (default <title> halaman, lalu host)'),
+        screen: z.enum(['landing', 'app', 'mobile']).optional().describe('jenis layar board (default dari lebar)'),
+        x: z.number().optional().describe('posisi x board di halaman (default kanan board terakhir + 80)'),
+        y: z.number().optional().describe('posisi y board (default mengikuti board terakhir)'),
+        description: z.string().optional().describe('label riwayat (default "Import page <title>")'),
+      }),
+    },
+    (args) =>
+      guarded(async () => {
+        const body = Object.fromEntries(Object.entries(args).filter(([, v]) => v !== undefined));
+        return asText(await client.call('/viewer/import-url', body));
       }),
   );
 

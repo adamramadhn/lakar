@@ -7,7 +7,7 @@ import { Icon } from './icons';
 import { pasteDescription, pasteReportDescription, pasteReportItems, pasteReportText, pasteTitle, type PasteReport } from './paste';
 import { UNDO_SKIPPED_MS } from './UndoSkippedToast';
 
-export type PasteToastState = { key: number; report: PasteReport; layer: string; nodeId?: string | undefined };
+export type PasteToastState = { key: number; report: PasteReport; layer: string; nodeId?: string | undefined; /** Judul toast pengganti (impor URL: "Imported N layers from host"). */ title?: string; /** Label aksi undo pengganti ("Undo import"). */ undoLabel?: string };
 
 const IS_MAC = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
 
@@ -34,7 +34,7 @@ export function PasteToast({ toast, onUndo, onClose }: { toast: PasteToastState;
             <Icon name="clipboardCheck" size={14} />
           </span>
           <div className="undo-skipped-body">
-            <strong>{pasteTitle(report)}</strong>
+            <strong>{toast.title ?? pasteTitle(report)}</strong>
             <span className="undo-skipped-text">{pasteReportDescription(report, layer)}</span>
           </div>
           <button type="button" className="toast-close" aria-label="Close" onClick={onClose}>
@@ -60,7 +60,7 @@ export function PasteToast({ toast, onUndo, onClose }: { toast: PasteToastState;
         )}
         <div className="paste-report-actions">
           <button type="button" className="link-btn accent" onClick={undo}>
-            Undo paste
+            {toast.undoLabel ?? 'Undo paste'}
           </button>
           <button
             type="button"
@@ -86,11 +86,11 @@ export function PasteToast({ toast, onUndo, onClose }: { toast: PasteToastState;
         <Icon name="fileCode" size={14} />
       </span>
       <div className="undo-skipped-body">
-        <strong>{pasteTitle(report)}</strong>
+        <strong>{toast.title ?? pasteTitle(report)}</strong>
         <span className="undo-skipped-text">{pasteDescription(report)}</span>
         <span className="undo-skipped-actions">
           <button type="button" className="link-btn accent" onClick={undo}>
-            Undo paste
+            {toast.undoLabel ?? 'Undo paste'}
           </button>
           <button type="button" className="link-btn" onClick={() => setDetails(true)}>
             Details

@@ -60,13 +60,15 @@ import { lastAgentLabel, pruneSelection, shareBadgeText, undoSkippedFor } from '
 import { UndoSkippedToast, type UndoSkipped } from './UndoSkippedToast';
 import { PasteToast, type PasteToastState } from './PasteToast';
 import { canUndoPaste, clipboardPaste, pasteTarget } from './paste';
+import { ImportUrlDialog } from './ImportUrlDialog';
+import { importToastTitle } from './importUrl';
 import { activityHub, editChange, goneReason, harnessLabel, revChange, sessionsForSlug, slugAppeared, whoOf, type StreamEvent } from './activity';
 import { ActivityPanel } from './ActivityPanel';
 import { BottomSheet, MOBILE_QUERY } from './BottomSheet';
 import { SidebarToggle, useSidebars } from './SidebarToggle';
 import { sidebarShortcut } from './sidebars';
 import { AddLayerButton, IconPicker, Toast, type ToastState } from './AddLayer';
-import { api, ApiError, errorText, OfflineError, type FontFamily, type HistoryEntry, type InspectResult, type LayoutCheck } from './api';
+import { api, ApiError, errorText, OfflineError, type FontFamily, type HistoryEntry, type ImportUrlBody, type InspectResult, type LayoutCheck } from './api';
 import { Canvas, type CanvasMarker, type CanvasPreview, type Focus, type Highlight, type InsertPoint } from './Canvas';
 import type { PathEditPanel } from './pathTools';
 import { measuredBoards, withHeight } from './boardHeight';
@@ -300,6 +302,7 @@ export function Viewer({ slug }: { slug: string }) {
     if (!preview) return;
     setCodeExport(undefined);
     setCssImportOpen(false);
+    setImportUrlOpen(false);
   }, [preview]);
   useEffect(() => {
     if (preview) setThemeOpen(false);
@@ -984,6 +987,33 @@ export function Viewer({ slug }: { slug: string }) {
     else if (canUndoPaste(stacks.current.undo, pasteEntry.current)) stepHistory('undo');
     else setToast("Couldn't undo this paste: it was already undone or newer edits were made.");
   }, [stepHistory, setToast]);
+
+  // ---- Impor halaman dari URL (epic adopsi open-pencil story 8, desain section 11) ----
+  // Menu "+" → "Import page from URL…" membuka ImportUrlDialog; sukses = satu commit (board baru + isi),
+  // invers ke tumpukan undo jendela ini, board dipilih, toast "Imported N layers from host" + Paste Report.
+  const [importUrlOpen, setImportUrlOpen] = useState(false);
+  const [importingUrl, setImportingUrl] = useState(false);
+  const importPage = useCallback(
+    async (body: Omit<ImportUrlBody, 'pageId'>) => {
+      if (!editableRef.current) throw new Error('The document is read-only right now.');
+      if (editing.current > 0) throw new Error('Another edit is still saving. Import again in a moment.');
+      editing.current++;
+      setImportingUrl(true);
+      try {
+        const r = await api.importUrl(slug, { ...body, ...(pageId ? { pageId } : {}) });
+        setStacks(recordCommit(stacks.current, r.inverse, 'Import page', Date.now()));
+        pasteEntry.current = stacks.current.undo[stacks.current.undo.length - 1];
+        pendingSelect.current = r.boardId;
+        setSelectedId(r.boardId);
+        loadDoc(true);
+        setPasteToast({ key: Date.now(), report: r.report, layer: r.created.find((c) => c.id === r.boardId)?.name ?? 'page', nodeId: r.boardId, title: importToastTitle(r) });
+      } finally {
+        editing.current--;
+        setImportingUrl(false);
+      }
+    },
+    [slug, pageId, loadDoc, setStacks, setSelectedId],
+  );
   // Event `paste` (Ctrl/⌘+V): file SVG, teks yang diawali <svg/<?xml, lalu text/html; bukan saat mengetik atau dialog terbuka.
   useEffect(() => {
     if (!editable) return;
@@ -1639,7 +1669,7 @@ export function Viewer({ slug }: { slug: string }) {
                 </span>
               )}
             </span>
-            <AddLayerButton disabled={!editable} disabledReason={preview ? 'Not available while previewing a version' : 'lakard is offline'} hasBoard={boards.length > 0} onPick={onMenuInsert} />
+            <AddLayerButton disabled={!editable} disabledReason={preview ? 'Not available while previewing a version' : 'lakard is offline'} hasBoard={boards.length > 0} onPick={onMenuInsert} onImportUrl={() => setImportUrlOpen(true)} />
           </div>
           {boards.length === 0 ? <div className="muted-note">No layers yet</div> : <LayerTree key={page?.id} nodes={treeBoards} kinds={components?.kinds} selectedId={selectedId} selectedIds={selection} selectedPath={selectedInfo} index={index} onSelect={select} onToggle={toggleSelect} onMenu={openLayerMenu} marks={preview ? undefined : marks} />}
         </div>
@@ -1795,6 +1825,7 @@ export function Viewer({ slug }: { slug: string }) {
           onExportCode={preview ? undefined : editMenu.ids.length === 1 ? () => setCodeExport(editMenu.ids[0]) : null}
         />
       )}
+      {importUrlOpen && <ImportUrlDialog busy={importingUrl} onSubmit={importPage} onClose={() => setImportUrlOpen(false)} />}
       {fileMenu && (
         <FileMenu
           target={{ slug, x: fileMenu.x, y: fileMenu.y }}
