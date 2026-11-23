@@ -18,6 +18,7 @@ import {
   marqueeSelect,
   moveOps,
   pickTarget,
+  posBadge,
   reorderHint,
   reorderTarget,
   resizeBox,
@@ -33,6 +34,7 @@ import {
   type ReorderTarget,
 } from './gesture';
 import { normalizeEditedText, textEditPlan } from './editActions';
+import { measure, SNAP_TOLERANCE_PX, snapCandidates, snapMove, snapResize, type Guide, type Measure, type Snap } from './snap';
 import { heldStatus, rebaseNodes, rebaseReorderNode, rebaseResize } from './liveChanges';
 import { Icon } from './icons';
 import { liveElement, measureBoard, pageGeometry } from './liveGeometry';
@@ -65,9 +67,9 @@ type Base = { pointer: number; c0: Point; p0: Point; moved: boolean; mounts?: Re
 type Gesture =
   | (Base & { kind: 'press'; picked: GeoNode; ids: string[]; collapse: string | undefined })
   | (Base & { kind: 'marquee'; p: Point; picked: GeoNode | undefined; candidates: GeoNode[]; base: string[]; shift: boolean })
-  | (Base & { kind: 'move'; d: Point; nodes: GeoNode[]; saver: Saver })
+  | (Base & { kind: 'move'; d: Point; nodes: GeoNode[]; saver: Saver; snap?: Snap })
   | (Base & { kind: 'reorder'; p: Point; node: GeoNode; container: GeoNode | undefined; target: ReorderTarget | undefined; saver: Saver; ghost: HTMLElement | undefined })
-  | (Base & { kind: 'resize'; handle: Handle; members: GeoNode[]; from: Box; to: Box; saver: Saver; p?: Point });
+  | (Base & { kind: 'resize'; handle: Handle; members: GeoNode[]; from: Box; to: Box; saver: Saver; p?: Point; snap?: Snap });
 
 /**
  * Pratinjau yang ditahan sesudah commit (agen-di-canvas story 3): berlaku sampai setiap board tersentuh di-mount dari
@@ -97,6 +99,7 @@ export function useCanvasEdit({
   pastedTag,
   onEnterPath,
   pathEditing,
+  measuring,
 }: {
   /** Info komponen dokumen tersimpan terkini (epic komponen story 4): penanda master/instance, tag, breadcrumb. */
   components?: ComponentInfo | undefined;
@@ -106,6 +109,8 @@ export function useCanvasEdit({
   onEnterPath?: ((id: string) => boolean) | undefined;
   /** Mode edit titik atau pen berjalan: kotak seleksi, handle, dan hover tidak digambar (overlay milik pathTools). */
   pathEditing?: boolean | undefined;
+  /** Alt ditahan (desain bagian 11 "Measure distance"): hover node lain menggambar pengukur jarak ke seleksi. */
+  measuring?: boolean | undefined;
   section: RefObject<HTMLElement | null>;
   cam: Camera;
   boards: readonly EditBoard[];
@@ -495,18 +500,28 @@ export function useCanvasEdit({
         setGesture({ ...g, moved: true, p });
         break;
       case 'move': {
-        const d = { x: p.x - g.p0.x, y: p.y - g.p0.y };
+        let d = { x: p.x - g.p0.x, y: p.y - g.p0.y };
+        // Snapping (desain bagian 11): union box node pada posisi kandidat menempel ke saudara/parent/board.
+        const moved = unionBox(g.nodes.map((n) => ({ ...n.box, x: n.box.x + d.x, y: n.box.y + d.y })));
+        let snap: Snap | undefined;
+        if (moved) {
+          snap = snapMove(moved, snapCandidates(g.nodes, index), SNAP_TOLERANCE_PX / cam.z);
+          d = { x: d.x + snap.dx, y: d.y + snap.dy };
+        }
         previewMove(g.nodes, d, g.saver);
-        setGesture({ ...g, d });
+        setGesture({ ...g, d, snap });
         break;
       }
       case 'reorder':
         setGesture(updateReorder(g, p));
         break;
       case 'resize': {
-        const to = resizeBox(g.from, g.handle, p.x - g.p0.x, p.y - g.p0.y);
+        const raw = resizeBox(g.from, g.handle, p.x - g.p0.x, p.y - g.p0.y);
+        // Snap hanya pada tepi yang digerakkan handle (SNAP_RESIZE); dx/dy menyesuaikan tepi itu.
+        const snap = snapResize(raw, g.handle, snapCandidates(g.members, index), SNAP_TOLERANCE_PX / cam.z);
+        const to = applyResizeSnap(raw, g.handle, snap);
         previewResize(g, to, g.saver, true);
-        setGesture({ ...g, moved: true, to, p });
+        setGesture({ ...g, moved: true, to, p, snap });
         break;
       }
     }
@@ -717,13 +732,47 @@ export function useCanvasEdit({
 
   // ---- Overlay ----
   const scr = (b: Box) => ({ left: cam.x + b.x * cam.z, top: cam.y + b.y * cam.z, width: Math.max(1, b.w * cam.z), height: Math.max(1, b.h * cam.z) });
+  /** Gaya smart guide (koordinat halaman → layar): garis 1px `danger` (desain Smart Guide `xUDJD`). */
+  const guideStyle = (g: Guide): CSSProperties =>
+    g.orientation === 'v'
+      ? { left: cam.x + g.at * cam.z, top: cam.y + g.from * cam.z, width: 1, height: Math.max(1, (g.to - g.from) * cam.z) }
+      : { left: cam.x + g.from * cam.z, top: cam.y + g.at * cam.z, width: Math.max(1, (g.to - g.from) * cam.z), height: 1 };
+  /** Gaya label jarak (Distance Label `CVzUp`): pill di titik tengah segmen ukur. */
+  const measureStyle = (m: Measure): CSSProperties =>
+    m.axis === 'x'
+      ? { left: cam.x + ((m.from + m.to) / 2) * cam.z, top: cam.y + m.at * cam.z }
+      : { left: cam.x + m.at * cam.z, top: cam.y + ((m.from + m.to) / 2) * cam.z };
   const overlay: ReactNode[] = [];
   if (active && !pathEditing) {
     const reorder = gesture?.kind === 'reorder' ? gesture : undefined;
     const marquee = gesture?.kind === 'marquee' && gesture.moved ? gesture : undefined;
-    if (hover && hoverable && !gesture && !textId) {
-      const b = boxOf(hover);
-      if (b) overlay.push(<div key="hover" className="edit-hover" style={scr(b)} />);
+    const hoverBox = hover && hoverable && !gesture && !textId ? boxOf(hover) : undefined;
+    if (hoverBox) overlay.push(<div key="hover" className="edit-hover" style={scr(hoverBox)} />);
+    // Ukur jarak Alt+hover (desain GSpGv): seleksi tetap accent, target hover outline biasa, jarak danger + pill
+    // "Measuring to <nama> · Alt". Seleksi kosong atau tanpa jarak → tidak ada overlay.
+    if (hoverBox && measuring && hover) {
+      const selBox = unionBox(
+        selection.flatMap((id) => {
+          const b = boxOf(id);
+          return b ? [b] : [];
+        }),
+      );
+      if (selBox) {
+        measure(selBox, hoverBox).forEach((m, i) => {
+          overlay.push(<div key={`mg:${i}`} className="snap-guide" style={guideStyle({ orientation: m.axis === 'x' ? 'h' : 'v', at: m.at, from: m.from, to: m.to })} />);
+          overlay.push(
+            <span key={`ml:${i}`} className="snap-label" style={measureStyle(m)}>
+              {Math.round(m.value)}
+            </span>,
+          );
+        });
+        const hs = scr(hoverBox);
+        overlay.push(
+          <div key="measure-hint" className="measure-hint" style={{ left: hs.left + hs.width / 2, top: hs.top - 6 }}>
+            Measuring to {index.get(hover)?.name ?? hover} · Alt
+          </div>,
+        );
+      }
     }
     if (marquee) {
       const rect = boxFrom(marquee.p0, marquee.p);
@@ -769,7 +818,20 @@ export function useCanvasEdit({
       const tone = members.every((m) => kinds?.has(m.id)) ? 'component' : undefined;
       if (members.length > 1) for (const m of members) overlay.push(<div key={`member:${m.id}`} className={`edit-member${tone ? ' component' : ''}`} style={scr(m.b)} />);
       overlay.push(
-        <SelectionBox key="selection" style={scr(bound)} handles={canEdit && !(gesture?.kind === 'move')} label={sizeBadge(members.length, bound)} tone={tone} />,
+        // Saat move badge menunjukkan posisi bulat yang akan di-commit (desain fvbjN "664, 64").
+        <SelectionBox key="selection" style={scr(bound)} handles={canEdit && !(gesture?.kind === 'move')} label={gesture?.kind === 'move' ? posBadge(members.length, bound) : sizeBadge(members.length, bound)} tone={tone} />,
+      );
+    }
+    // Smart guide + label jarak selama gestur move/resize (desain fvbjN): warna danger supaya beda dari accent.
+    const snap = gesture && (gesture.kind === 'move' || gesture.kind === 'resize') ? gesture.snap : undefined;
+    if (snap) {
+      snap.guides.forEach((g, i) => overlay.push(<div key={`snap:${i}`} className="snap-guide" style={guideStyle(g)} />));
+      snap.gaps.forEach((m, i) =>
+        overlay.push(
+          <span key={`gap:${i}`} className="snap-label" style={measureStyle(m)}>
+            {Math.round(m.value)}
+          </span>,
+        ),
       );
     }
     if (components && !reorder && !marquee) overlay.push(...componentMarks(components, selection, index, boxOf, scr, onSelectIds));
@@ -879,6 +941,20 @@ function componentMarks(
   }
   return out;
 }
+
+/** Terapkan penyesuaian snap pada kotak `to` hasil `resizeBox`: `e`/`s` menambah sisi, `w`/`n` menggeser
+ * sisi jangkar. `x`/`y` dihitung dari tepi jangkar (bukan delta mentah) supaya clamp `w`/`h` ≥ 1 tidak
+ * membuat tepi yang tidak digerakkan ikut melayang. */
+const applyResizeSnap = (to: Box, handle: Handle, s: Snap): Box => {
+  const w = Math.max(1, to.w + (handle.includes('e') ? s.dx : 0) - (handle.includes('w') ? s.dx : 0));
+  const h = Math.max(1, to.h + (handle.includes('s') ? s.dy : 0) - (handle.includes('n') ? s.dy : 0));
+  return {
+    x: handle.includes('w') ? to.x + to.w - w : to.x,
+    y: handle.includes('n') ? to.y + to.h - h : to.y,
+    w,
+    h,
+  };
+};
 
 /** Kotak akhir anggota resize sebagaimana di-commit (`committedBox`): tunggal = kotak handle, multi = diskalakan. */
 const memberBox = (g: { members: readonly GeoNode[]; from: Box }, n: GeoNode, to: Box): Box => committedBox(n, g.members.length === 1 ? to : scaleBox(n.box, g.from, to));

@@ -188,6 +188,17 @@ jobs:
           # `*.sig` dan `*.app.tar.gz` adalah artefak updater (bila createUpdaterArtifacts aktif): sig dibaca
           # job latest-json; `.app.tar.gz` adalah paket update macOS yang diunggah ke Release.
           find "$bundle" -maxdepth 2 -type f \( -name '*.msi' -o -name '*-setup.exe' -o -name '*.dmg' -o -name '*.AppImage' -o -name '*.deb' -o -name '*.sig' -o -name '*.app.tar.gz' \) -print -exec cp {} "$out/" \;
+          # Artefak updater macOS tidak membawa versi/arch di nama (Product.app.tar.gz{,.sig}) — sematkan
+          # seperti penamaan dmg (Product_versi_arch) supaya kedua leg darwin tidak saling menimpa saat
+          # merge artifact dan agar terpetakan ke platform di latest.json.
+          for tgz in "$out"/*.app.tar.gz; do
+            [ -e "$tgz" ] || continue
+            product="$(basename "$tgz" .app.tar.gz)"
+            ver="$(node -p "require('./apps/desktop/src-tauri/tauri.conf.json').version")"
+            arch="${{ matrix.target }}"; arch="${arch%%-*}"; [ "$arch" = "x86_64" ] && arch=x64
+            mv "$tgz" "$out/${product}_${ver}_${arch}.app.tar.gz"
+            [ ! -f "$tgz.sig" ] || mv "$tgz.sig" "$out/${product}_${ver}_${arch}.app.tar.gz.sig"
+          done
           ls -la "$out"
           test -n "$(ls -A "$out")"
 

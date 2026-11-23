@@ -4,7 +4,7 @@
 // again. Item nonaktif untuk seleksi jamak, alamat komposit (isi instance), dan saat pratinjau versi.
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it, onTestFinished, vi } from 'vitest';
-import type { LakarDocument } from '@lakar/schema';
+import { SCHEMA_VERSION, type LakarDocument } from '@lakar/schema';
 import { dom, fail, renderUi } from './test/dom';
 import { BOARD, CARD, makeDoc, SLUG, type Extra } from './test/fixtures';
 import { Viewer } from './Viewer';
@@ -65,7 +65,7 @@ async function openMenu(id: string) {
 /** Dokumen dengan master Chip + satu instance; isi instance beralamat komposit `Inst0001/Rect0001`. */
 function instanceDoc(): LakarDocument {
   return {
-    schemaVersion: 8,
+    schemaVersion: SCHEMA_VERSION,
     id: 'Doc00001',
     rev: 1,
     tokens: {},
