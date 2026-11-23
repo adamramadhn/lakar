@@ -1,4 +1,5 @@
 // Bentuk temuan check (AD-8) bersama: check, daemon, mcp, dan bench memakainya. Tanpa IO.
+import type { DocOp } from './ops.js';
 
 /** `info` hanya muncul di `layout_check` (execute memuat error dan warning). */
 export type FindingLevel = 'error' | 'warning' | 'info';
@@ -57,6 +58,12 @@ export const isSkeletonName = (name: string): boolean => name.startsWith(SKELETO
 export type G0RuleId = keyof typeof G0_RULES;
 export const G0_RULE_IDS = Object.keys(G0_RULES) as G0RuleId[];
 
+/**
+ * Perbaikan terstruktur satu temuan (spec-check-autofix): op core (`update`/`remove`, dialamati ID atau alamat
+ * komposit node ter-resolve) + label singkat (Inggris, tampil di UI/hasil `fix_check`).
+ */
+export type FindingFix = { label: string; ops: DocOp[] };
+
 /** Satu temuan check (AD-8). `detail` = yang terukur, `expected` = yang seharusnya / cara memperbaiki. */
 export type Finding = {
   level: FindingLevel;
@@ -65,6 +72,10 @@ export type Finding = {
   nodeName: string;
   detail: string;
   expected: string;
+  /** Fix aman (deterministik, menjaga maksud): diterapkan `fix_check` tanpa opsi. Aditif (AD-4). */
+  fix?: FindingFix;
+  /** Saran yang butuh penilaian; `fix_check {suggestions:true}` menerapkan yang pertama. Aditif (AD-4). */
+  suggestions?: FindingFix[];
 };
 
 /**

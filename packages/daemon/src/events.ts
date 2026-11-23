@@ -62,6 +62,7 @@ export const TOOL_ROUTES: Readonly<Record<string, string>> = {
   '/viewer/export-code': 'export_code',
   '/viewer/paste': 'paste',
   '/viewer/documents': 'list_documents',
+  '/viewer/fix-check': 'fix_check',
 };
 
 export const publicSessionId = (id: string) => id.slice(0, 8);
@@ -314,6 +315,7 @@ function targetOf(tool: string, body: Record<string, unknown> | undefined): stri
     case 'paste':
       return str(body.parentId);
     case 'layout_check':
+    case 'fix_check':
       return str(body.boardId);
     case 'read_skill':
       return str(body.name);
@@ -357,7 +359,8 @@ function finish(call: ActivityCall, statusCode: number, json: unknown): Activity
       if (summary) out.summary = summary;
       break;
     }
-    case 'layout_check': {
+    case 'layout_check':
+    case 'fix_check': {
       const boards = ids(data.boards);
       if (boards) out.boards = boards;
       const summary = asSummary(data.summary);

@@ -20,6 +20,7 @@ import {
   TOUCH_MIN,
   LAKAR_VERSION, SCHEMA_VERSION, VERSION_HINT, errorMessage, findingLine, summaryText, type ApiResult, type Finding, type FindingSummary } from '@lakar/schema';
 import { DaemonClient, formatError } from './client.js';
+import { registerFixCheckTool } from './fix-check.js';
 
 export const SERVER_NAME = 'lakar';
 export const SERVER_VERSION = LAKAR_VERSION;
@@ -178,6 +179,7 @@ export const SERVER_INSTRUCTIONS =
   'helper prelude skill core sudah bawaan di setiap execute: jangan ditulis ulang, palet arketipe sekali per dokumen lewat Palette(c, font); ' +
   'baca check di respons execute, perbaiki dengan editId/edits atau update, akhiri dengan satu screenshot board + satu screenshot zoom (nodeId, scale 2) ' +
   'area terpadat (skill review), satu execute perbaikan, lalu export PNG. ' +
+  'Fix aman temuan check: fix_check (satu rev); saran dinilai sendiri. ' +
   'Opsional: read_skill break-ui bila diminta uji data terburuk/edge case; variants bila diminta beberapa variasi/alternatif.';
 
 /** Deskripsi tool `list_boards`. */
@@ -612,6 +614,9 @@ export function createLakarMcpServer(daemonUrl: string): McpServer {
         return asText(await client.call<LayoutCheckData>('/layout-check', boardId ? { boardId } : {}), formatLayoutCheck);
       }),
   );
+
+  // spec-check-autofix: fix_check (deskripsi, format, dan registrasi di fix-check.ts).
+  registerFixCheckTool(server, client);
 
   return server;
 }

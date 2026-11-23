@@ -108,6 +108,10 @@ describe('skill: struktur', () => {
     }
   });
 
+  it('review: fix_check untuk fix aman check sebelum execute perbaikan (spec-check-autofix)', () => {
+    expect(read('review')).toMatch(/`fix_check` \(fix aman `check`\), lalu satu execute perbaikan/);
+  });
+
   it('bangun bertahap: skeleton dulu lalu satu blok per execute (spec-skeleton-live-build); board hug tumbuh sendiri (spec-board-hug-height)', () => {
     expect(read('core')).toContain('execute 1 = board + semua seksi/area rencana sebagai `Skel`');
     expect(read('core')).toContain('satu blok per execute');
