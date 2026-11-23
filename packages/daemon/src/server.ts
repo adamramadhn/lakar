@@ -40,7 +40,7 @@ import type { DaemonConfig } from './config.js';
 import { FontRegistry } from './fonts.js';
 import { INSPECT_DEPTH_DEFAULT, INSPECT_DEPTH_MAX, WIP_PREFIX, boundsMap, inspectFit, locateNode } from './inspect.js';
 import { readPngSize } from './png.js';
-import { NO_ACTIVE_DOC_HINT, Sessions, UnknownSessionError, logExecute, recallFailed, rememberFailed } from './sessions.js';
+import { NO_ACTIVE_DOC_HINT, Sessions, UnknownSessionError, authorOf, logExecute, recallFailed, rememberFailed } from './sessions.js';
 import { DocStore } from './store.js';
 import { ActivityBus, agentOf, registerActivityHooks } from './events.js';
 import { registerConnectionRoutes } from './connections.js';
@@ -596,8 +596,9 @@ export function buildServer({
           checkMs: Math.round((performance.now() - t0) * 10) / 10,
           summary,
         };
-        // Klien sesi ikut dicatat (opsional) supaya "Last agent" Dashboard tetap terbaca setelah restart.
-        await store.commit(slug, committed.doc, session.client ? { ...committed.entry, client: session.client } : committed.entry);
+        // Klien dan harness sesi ikut dicatat (opsional) supaya History dan "Last agent" Dashboard tetap terbaca
+        // setelah restart.
+        await store.commit(slug, committed.doc, { ...committed.entry, ...authorOf(session) });
         docs.set(slug, committed.doc);
         checks.record(committed.doc.id, doc.rev, committed.doc.rev, ran.boards);
         result = { docId: committed.doc.id, rev: committed.doc.rev, created: committed.created };

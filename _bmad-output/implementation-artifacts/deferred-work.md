@@ -207,9 +207,11 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-canvas-agent-effects.md`
   summary: Panel History dan kolom "Last agent" di Dashboard masih menampilkan "MCP agent" karena entri history daemon hanya mencatat `client`, belum field `agent` yang baru.
   evidence: HistoryPanel.tsx:93 dan listColumns.ts:11 membaca `client`. Usul: field `agent` aditif pada entri history/log daemon.
+  resolved: 2026-11-23 di `spec-agent-identity-history.md`. Entri riwayat mencatat `agent`; `/viewer/docs` → `lastAgent`, riwayat → `agent`.
 - source_spec: `_bmad-output/implementation-artifacts/spec-canvas-agent-effects.md`
   summary: Panel Activity, badge Live, dan History masih memakai dua warna harness, sehingga warna canvas sesi Claude kedua (mis. violet) tidak sama dengan kartu Activity-nya.
   evidence: ActivityPanel.tsx dan live.ts memakai harnessColor; hanya presence canvas dan Layers yang memakai assignAgentColors.
+  resolved: 2026-11-23 di `spec-agent-identity-history.md`. Activity, badge Live, dan Connections memakai `liveSessionColors`; History sengaja tetap warna harness.
 - source_spec: `_bmad-output/implementation-artifacts/spec-canvas-agent-effects.md`
   summary: Execute pertama sebuah sesi belum mendapat label "Generating" dan lokasi rencana fade karena board tujuannya baru diketahui setelah panggilan selesai.
   evidence: agentPresence butuh lokasi panggilan sebelumnya (aturan spec-app-5: target execute yang sedang berjalan tidak ditebak).

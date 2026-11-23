@@ -9,7 +9,7 @@ import { migrateDocument, parseDocument } from '@lakar/core';
 import { LakarError, SLUG_PATTERN, errorMessage, type HistoryEntry, type LakarDocument } from '@lakar/schema';
 import type { CheckCounts, CheckLedger } from './checks.js';
 import { notFound } from './errors.js';
-import { VIEWER_CLIENT } from './events.js';
+import { VIEWER_CLIENT, isAgentName } from './events.js';
 import type { Sessions } from './sessions.js';
 import type { DocStore } from './store.js';
 
@@ -26,11 +26,13 @@ export type ViewerDocSummary = {
   createdAt?: string;
   /** Klien penulis entri riwayat terakhir (opsional; tidak diketahui untuk sesi lama yang sudah hilang). */
   lastClient?: string;
+  /** Harness agen penulis entri riwayat terakhir (opsional; entri lama, entri aplikasi, dan klien tanpa header tidak punya). */
+  lastAgent?: string;
   /** Hasil check terakhir yang mencakup semua board pada rev terkini (opsional; hanya memori daemon). */
   check?: CheckCounts;
 };
 
-type DocMeta = Pick<ViewerDocSummary, 'createdAt' | 'lastClient'>;
+type DocMeta = Pick<ViewerDocSummary, 'createdAt' | 'lastClient' | 'lastAgent'>;
 
 /** Entri riwayat untuk viewer: id sesi hanya versi publik (8 karakter), bukan kredensial penuh. */
 export type ViewerHistoryEntry = {
@@ -43,6 +45,8 @@ export type ViewerHistoryEntry = {
   session: string;
   /** Klien sesi bila sesi masih dikenal daemon (hilang setelah restart). */
   client?: string;
+  /** Harness agen penulis (mis. `claude-code`), dari entri atau sesi yang masih dikenal; opsional. */
+  agent?: string;
   /** Isi versi ini tersimpan sebagai snapshot (bisa dipratinjau, dibandingkan, dan dipulihkan). */
   snapshot?: boolean;
 };
@@ -144,13 +148,24 @@ export function historyClient(h: Pick<HistoryEntry, 'sessionId' | 'client'>, ses
   return sessions?.byId(h.sessionId)?.client ?? (h.sessionId === VIEWER_CLIENT ? VIEWER_CLIENT : undefined);
 }
 
+/**
+ * Harness agen penulis entri riwayat: `agent` yang tercatat di entri (sejak spec-agent-identity-history, divalidasi
+ * ulang karena dibaca dari disk), lalu sesi yang masih dikenal. Entri aplikasi (`lakar-viewer`) tidak punya agen.
+ */
+export function historyAgent(h: Pick<HistoryEntry, 'sessionId' | 'agent'>, sessions?: Sessions): string | undefined {
+  if (h.sessionId === VIEWER_CLIENT) return undefined;
+  if (isAgentName(h.agent)) return h.agent;
+  return sessions?.byId(h.sessionId)?.agent;
+}
+
 /** Created (entri pertama) dan Last agent (entri terakhir) dari riwayat; entri tanpa `sessionId`/`at` dilewati. */
 export function historyMeta(history: readonly HistoryEntry[], sessions?: Sessions): DocMeta {
   const valid = history.filter((h) => typeof h.sessionId === 'string' && typeof h.at === 'string');
   const first = valid[0];
   const last = valid.at(-1);
   const client = last ? historyClient(last, sessions) : undefined;
-  return { ...(first ? { createdAt: first.at } : {}), ...(client ? { lastClient: client } : {}) };
+  const agent = last ? historyAgent(last, sessions) : undefined;
+  return { ...(first ? { createdAt: first.at } : {}), ...(client ? { lastClient: client } : {}), ...(agent ? { lastAgent: agent } : {}) };
 }
 
 export function registerViewerRoutes(app: FastifyInstance, { docs, store, sessions, checks, distDir, log = (m) => console.warn(m) }: ViewerRoutesOptions): void {
@@ -237,6 +252,7 @@ export function registerViewerRoutes(app: FastifyInstance, { docs, store, sessio
       .map((h) => {
         // Entri dari aplikasi (kelola file) memakai id sesi tetap `lakar-viewer`.
         const client = historyClient(h, sessions);
+        const agent = historyAgent(h, sessions);
         return {
           rev: h.rev,
           description: h.description,
@@ -245,6 +261,7 @@ export function registerViewerRoutes(app: FastifyInstance, { docs, store, sessio
           at: h.at,
           session: h.sessionId.slice(0, 8),
           ...(client ? { client } : {}),
+          ...(agent ? { agent } : {}),
           // Opsional: hanya ditulis bila ada (bentuk entri lama tidak berubah).
           ...(snapshots.has(h.rev) ? { snapshot: true } : {}),
         };

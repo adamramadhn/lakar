@@ -58,6 +58,10 @@
   --agent-violet: #8b5cf6;
   --agent-emerald: #10b981;
   --agent-pink: #ec4899;
+  /* Latar lembut warna sesi (spec-agent-identity-history): panel Activity, badge Live. */
+  --agent-violet-soft: #8b5cf618;
+  --agent-emerald-soft: #10b98118;
+  --agent-pink-soft: #ec489918;
   /* Komponen (desain bagian 08): master/instance, terpisah dari accent pengguna dan warna agen. */
   --component: #9333ea;
   --component-soft: #9333ea1a;
@@ -93,6 +97,9 @@
   --accent-soft: #3b82f633;
   --agent-soft: #f9731626;
   --codex-soft: #0ea5e926;
+  --agent-violet-soft: #8b5cf626;
+  --agent-emerald-soft: #10b98126;
+  --agent-pink-soft: #ec489926;
   --component: #a855f7;
   --component-soft: #a855f726;
   --danger: #f87171;

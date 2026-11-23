@@ -91,6 +91,14 @@ export function logExecute(session: Session, entry: ExecuteLogEntry): void {
   if (session.log.length > SESSION_LOG_MAX) session.log.splice(0, session.log.length - SESSION_LOG_MAX);
 }
 
+/**
+ * Field penulis untuk entri riwayat sebuah sesi: `client` dan `agent` hanya bila ada (entri tanpa keduanya = bentuk
+ * lama). Dipakai execute dan paste agen supaya History/"Last agent" tetap tahu harness-nya setelah restart.
+ */
+export function authorOf(session: Pick<Session, 'client' | 'agent'>): { client?: string; agent?: string } {
+  return { ...(session.client ? { client: session.client } : {}), ...(session.agent ? { agent: session.agent } : {}) };
+}
+
 export class Sessions {
   readonly #map = new Map<string, Session>();
   create(client?: string, agent?: string): Session {

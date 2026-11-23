@@ -7580,6 +7580,43 @@ button.panel-tab:hover {
 .agent-generating.pink {
   --who: var(--agent-pink);
 }
+/* Warna sesi di panel Activity, badge Live Dashboard, dan Settings → Connections (spec-agent-identity-history):
+   sama dengan kursor canvas dan Layers. History tetap memakai warna harness (agent/codex). */
+.harness-icon.violet,
+.live-badge.violet,
+.agent-commit.violet,
+.conn-agent-icon.violet,
+.conn-agent-status.live.violet {
+  --who: var(--agent-violet);
+  --who-soft: var(--agent-violet-soft);
+}
+.harness-icon.emerald,
+.live-badge.emerald,
+.agent-commit.emerald,
+.conn-agent-icon.emerald,
+.conn-agent-status.live.emerald {
+  --who: var(--agent-emerald);
+  --who-soft: var(--agent-emerald-soft);
+}
+.harness-icon.pink,
+.live-badge.pink,
+.agent-commit.pink,
+.conn-agent-icon.pink,
+.conn-agent-status.live.pink {
+  --who: var(--agent-pink);
+  --who-soft: var(--agent-pink-soft);
+}
+.harness-icon:is(.violet, .emerald, .pink),
+.live-badge:is(.violet, .emerald, .pink) {
+  background: var(--who-soft);
+  color: var(--who);
+}
+.conn-agent-icon:is(.violet, .emerald, .pink) {
+  background: var(--who);
+}
+.conn-agent-status.live:is(.violet, .emerald, .pink) {
+  color: var(--who);
+}
 /* Board yang sedang dikerjakan: border solid 2px warna agen (menggantikan denyut putus-putus) + scan. */
 .agent-outline.working {
   overflow: hidden;

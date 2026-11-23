@@ -1,7 +1,7 @@
 // Efek canvas saat agen bekerja (spec-canvas-agent-effects, desain bagian 04 "Agents at work"). Murni, tanpa DOM:
 // warna per sesi agen, pilihan node yang di-fade-in, jadwal stagger, antrean fade per board/rev, kursor yang sedang
 // keluar, dan board yang sedang "Generating". Bagian DOM (Web Animations) ada di agentFx.ts.
-import { harnessColor } from './activity.js';
+import { harnessColor, whoOf, type SessionView } from './activity.js';
 
 /** Palet warna agen (urutan = urutan pemberian saat bertabrakan). Kelas CSS bernama sama (app.css). */
 export const AGENT_COLORS = ['agent', 'codex', 'violet', 'emerald', 'pink'] as const;
@@ -47,6 +47,19 @@ export function assignAgentColors(sessions: readonly ColorSession[]): Map<string
     out.set(s.id, color);
   }
   return out;
+}
+
+/**
+ * Warna sesi Live sebuah dokumen (`views` dari `sessionsForSlug`): satu sumber untuk kursor canvas, Layers, panel
+ * Activity, dan badge Live, supaya sesi Claude kedua violet di semua tempat. Sesi idle tidak ikut dibagi.
+ */
+export function liveSessionColors(views: readonly SessionView[]): Map<string, AgentColor> {
+  return assignAgentColors(views.filter((v) => v.live).map((v) => ({ id: v.session.id, createdAt: v.session.createdAt, who: whoOf(v.session) })));
+}
+
+/** Warna sebuah sesi: warna sesi Live bila ada, selain itu warna pilihan harness-nya (sesi idle/berakhir). */
+export function sessionColor(colors: ReadonlyMap<string, AgentColor>, session: { id: string; client?: string | undefined; agent?: string | undefined }): AgentColor {
+  return colors.get(session.id) ?? preferredColor(whoOf(session));
 }
 
 /** Maks elemen yang di-fade-in per execute (node teratas). */

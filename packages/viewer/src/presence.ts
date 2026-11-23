@@ -2,7 +2,7 @@
 // lokasi kursor (board + node), state working/idle, dan node yang baru diubah execute (sorotan "Just changed").
 // Target execute yang masih berjalan tidak ditebak dari kode: kursor tetap di lokasi terakhir dengan state working.
 import { callEndMs, callTitle, harnessLabel, whoOf, type ActivityCall, type SessionView } from './activity.js';
-import { assignAgentColors, type AgentColor, type FadePlan } from './agentEffects.js';
+import { liveSessionColors, type AgentColor, type FadePlan } from './agentEffects.js';
 import type { NodeInfo } from './format.js';
 
 /** `[x, y, w, h]` relatif board. */
@@ -90,7 +90,7 @@ export function agentPresence(views: readonly SessionView[], index: Index, now: 
   const out: AgentPresence[] = [];
   const nameOf = (id: string) => index.get(id)?.name;
   // Warna dibagi antar-sesi Live saja: sesi lama yang sudah idle tidak mengambil warna harness sesi baru.
-  const colors = assignAgentColors(views.filter((v) => v.live).map((v) => ({ id: v.session.id, createdAt: v.session.createdAt, who: whoOf(v.session) })));
+  const colors = liveSessionColors(views);
   for (const v of views) {
     if (!v.live) continue;
     let loc: Location | undefined;

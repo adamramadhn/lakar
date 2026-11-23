@@ -224,8 +224,8 @@ function Unknown({ title }: { title?: string }) {
 }
 
 /** Kolom "Last agent" (desain `List Row`): avatar huruf awal + nama harness; edit dari aplikasi = "You". */
-function LastAgent({ client }: { client: string | undefined }) {
-  const v = lastAgentView(client);
+function LastAgent({ client, agent }: { client: string | undefined; agent: string | undefined }) {
+  const v = lastAgentView(client, agent);
   return (
     <span className="list-col list-agent">
       {v ? (
@@ -702,7 +702,7 @@ export function Dashboard({
                 </span>
                 <span className="list-col">{relativeTime(d.updatedAt)}</span>
                 <span className="list-col">{d.createdAt ? relativeTime(d.createdAt) : <Unknown />}</span>
-                <LastAgent client={d.lastClient} />
+                <LastAgent client={d.lastClient} agent={d.lastAgent} />
                 <CheckStatus check={d.check} />
                 <MoreButton onClick={h.menuBelow} />
               </div>
