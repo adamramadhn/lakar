@@ -54,3 +54,10 @@ title = "Paste HTML/SVG dan edit vektor"
 description = "Fatmuh membawa potongan desain yang sudah ada dan menggambar bentuk sendiri di canvas."
 covers = ["R6", "R7"]
 after = [{ epic = 2, needs = "editor canvas dan panel properti" }]
+
+[[epic]]
+id = 8
+slug = "epic-adopsi-open-pencil"
+title = "Celah fitur dari riset open-pencil ditutup"
+description = "Butir Adopsi riset open-pencil (deepen 2026-11-23): anotasi tool MCP, aturan layout_check dan skill baru, ergonomi editor, flex wrap, Copy as PNG, impor URL, token DTCG, dan updater desktop."
+covers = ["R1", "R2", "R3", "R5", "R6"]

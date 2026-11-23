@@ -6,4 +6,12 @@
 {"claim":"[13] Cloud investment","class":"trajectory","pub_date":"2026-11-22"},
 {"claim":"[19] breaking changes each minor","class":"trajectory","pub_date":"2026-11-22"},
 {"claim":"[17] top complaint: agent connect","class":"sentiment","pub_date":"2026-04-30"},
-{"claim":"[18] MCP stability bugs","class":"sentiment","pub_date":"2026-10-04"}]
+{"claim":"[18] MCP stability bugs","class":"sentiment","pub_date":"2026-10-04"},
+{"claim":"[42] MCP tool annotations","class":"features","pub_date":"2026-11-23"},
+{"claim":"[43] analyze_overlaps","class":"features","pub_date":"2026-11-23"},
+{"claim":"[44] skill component reuse","class":"features","pub_date":"2026-11-23"},
+{"claim":"[46] snapping computeSnap","class":"features","pub_date":"2026-11-23"},
+{"claim":"[50] Open from URL v0.17.0","class":"features","pub_date":"2026-11-22"},
+{"claim":"[51] PDF export Skia v0.17.0","class":"features","pub_date":"2026-11-22"},
+{"claim":"[52] DTCG tokens v0.16.0","class":"features","pub_date":"2026-10-14"},
+{"claim":"[55] open MCP stability/undo bugs","class":"sentiment","pub_date":"2026-10-04"}]
