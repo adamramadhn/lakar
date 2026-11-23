@@ -98,6 +98,30 @@ describe('frame, board, teks, efek', () => {
     ]);
   });
 
+  it('frameDecls: wrap:true (v9) → flex-wrap hanya di row/column; none/grid diabaikan, false/absen tidak ditulis', () => {
+    expect(frameDecls({ layout: 'row', wrap: true })).toEqual([
+      ['position', 'relative'],
+      ['display', 'flex'],
+      ['flex-direction', 'row'],
+      ['flex-wrap', 'wrap'],
+    ]);
+    expect(frameDecls({ layout: 'column', wrap: true, rowGap: 8, columnGap: 12 })).toEqual([
+      ['position', 'relative'],
+      ['display', 'flex'],
+      ['flex-direction', 'column'],
+      ['flex-wrap', 'wrap'],
+      ['column-gap', '12px'],
+      ['row-gap', '8px'],
+    ]);
+    expect(frameDecls({ layout: 'row', wrap: true, rowGap: tok('space.3') })).toContainEqual(['row-gap', 'var(--space-3)']);
+    const noWrap = (d: [string, string][]) => expect(d.some(([p]) => p === 'flex-wrap')).toBe(false);
+    noWrap(frameDecls({ layout: 'row' }));
+    noWrap(frameDecls({ layout: 'row', wrap: false }));
+    noWrap(frameDecls({ layout: 'row', wrap: 'wrap' }));
+    noWrap(frameDecls({ wrap: true }));
+    noWrap(frameDecls({ layout: 'grid', wrap: true }));
+  });
+
   it('boardDecls: ukuran tetap, clip, kolom flex', () => {
     expect(boardDecls({ width: 400, height: 300 })).toContainEqual(['width', '400px']);
     expect(boardDecls({ width: 400, height: 300 })).toContainEqual(['isolation', 'isolate']);

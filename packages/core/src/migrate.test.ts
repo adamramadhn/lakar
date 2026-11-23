@@ -24,10 +24,10 @@ const chain: MigrationRegistry = {
 };
 
 describe('migrateDocument', () => {
-  it('registri resmi: 1→2 identitas, 2→3 token bertipe, 3→4 identitas (grid), 4→5 identitas (komponen), 5→6 identitas (vektor), 6→7 identitas (tag), 7→8 identitas (board hug); versi kini → apa adanya (objek yang sama)', () => {
-    expect(Object.keys(MIGRATIONS)).toEqual(['1', '2', '3', '4', '5', '6', '7']);
+  it('registri resmi: 1→2 identitas, 2→3 token bertipe, 3→4 identitas (grid), 4→5 identitas (komponen), 5→6 identitas (vektor), 6→7 identitas (tag), 7→8 identitas (board hug), 8→9 identitas (frame wrap); versi kini → apa adanya (objek yang sama)', () => {
+    expect(Object.keys(MIGRATIONS)).toEqual(['1', '2', '3', '4', '5', '6', '7', '8']);
     const doc = JSON.parse(JSON.stringify(createDocument()));
-    expect(doc.schemaVersion).toBe(8);
+    expect(doc.schemaVersion).toBe(9);
     expect(migrateDocument(doc)).toBe(doc);
   });
 
@@ -50,7 +50,7 @@ describe('migrateDocument', () => {
   });
 
   it('lebih baru dari target → VERSION_MISMATCH', () => {
-    expect(codeOf(() => migrateDocument({ schemaVersion: 9 }))).toBe('VERSION_MISMATCH');
+    expect(codeOf(() => migrateDocument({ schemaVersion: 10 }))).toBe('VERSION_MISMATCH');
     expect(codeOf(() => parseDocument({ ...createDocument(), schemaVersion: 99 }))).toBe('VERSION_MISMATCH');
   });
 
@@ -174,7 +174,7 @@ describe('migrasi 2 → 3', () => {
     const snapshot = structuredClone(v3);
     expect(MIGRATIONS[3]!(v3)).toEqual({ ...snapshot, schemaVersion: 4 });
     expect(v3).toEqual(snapshot);
-    expect(parseDocument(v3).schemaVersion).toBe(8);
+    expect(parseDocument(v3).schemaVersion).toBe(9);
   });
 
   it('langkah 4 → 5 (komponen): identitas yang hanya menaikkan versi, input tidak dimutasi', () => {
@@ -182,7 +182,7 @@ describe('migrasi 2 → 3', () => {
     const snapshot = structuredClone(v4);
     expect(MIGRATIONS[4]!(v4)).toEqual({ ...snapshot, schemaVersion: 5 });
     expect(v4).toEqual(snapshot);
-    expect(parseDocument(v4)).toEqual({ ...snapshot, schemaVersion: 8 });
+    expect(parseDocument(v4)).toEqual({ ...snapshot, schemaVersion: 9 });
   });
 
   it('langkah 5 → 6 (vektor): identitas yang hanya menaikkan versi, input tidak dimutasi', () => {
@@ -190,7 +190,7 @@ describe('migrasi 2 → 3', () => {
     const snapshot = structuredClone(v5);
     expect(MIGRATIONS[5]!(v5)).toEqual({ ...snapshot, schemaVersion: 6 });
     expect(v5).toEqual(snapshot);
-    expect(parseDocument(v5)).toEqual({ ...snapshot, schemaVersion: 8 });
+    expect(parseDocument(v5)).toEqual({ ...snapshot, schemaVersion: 9 });
   });
 
   it('langkah 6 → 7 (tag semantik): identitas yang hanya menaikkan versi, input tidak dimutasi', () => {
@@ -198,7 +198,7 @@ describe('migrasi 2 → 3', () => {
     const snapshot = structuredClone(v6);
     expect(MIGRATIONS[6]!(v6)).toEqual({ ...snapshot, schemaVersion: 7 });
     expect(v6).toEqual(snapshot);
-    expect(parseDocument(v6)).toEqual({ ...snapshot, schemaVersion: 8 });
+    expect(parseDocument(v6)).toEqual({ ...snapshot, schemaVersion: 9 });
   });
 
   it('langkah 7 → 8 (board hug): identitas; tinggi board angka tetap angka, input tidak dimutasi', () => {
@@ -209,7 +209,7 @@ describe('migrasi 2 → 3', () => {
     expect(MIGRATIONS[7]!(v7)).toEqual({ ...snapshot, schemaVersion: 8 });
     expect(v7).toEqual(snapshot);
     const doc = parseDocument(v7);
-    expect(doc.schemaVersion).toBe(8);
+    expect(doc.schemaVersion).toBe(9);
     expect(doc.pages[0]!.children[0]!.height).toBe(4050);
   });
 
@@ -219,6 +219,34 @@ describe('migrasi 2 → 3', () => {
     const pages = [{ ...base.pages[0], children: [board] }];
     expect(parseDocument({ ...base, schemaVersion: 8, pages }).pages[0]!.children[0]!.height).toBe('hug');
     expect(() => parseDocument({ ...base, schemaVersion: 8, pages: [{ ...pages[0], children: [{ ...board, height: 'fill' }] }] })).toThrow();
+  });
+
+  it('langkah 8 → 9 (frame wrap): identitas yang hanya menaikkan versi, input tidak dimutasi', () => {
+    const base = JSON.parse(JSON.stringify(createDocument()));
+    const frame = { type: 'frame', id: 'Fwrap001', name: 'F', layout: 'row', children: [] };
+    const v8 = { ...base, schemaVersion: 8, pages: [{ ...base.pages[0], children: [{ type: 'board', id: 'Bbbbbbb1', name: 'B', x: 0, y: 0, width: 100, height: 100, screen: 'app', children: [frame] }] }] };
+    const snapshot = structuredClone(v8);
+    expect(MIGRATIONS[8]!(v8)).toEqual({ ...snapshot, schemaVersion: 9 });
+    expect(v8).toEqual(snapshot);
+    const doc = parseDocument(v8);
+    expect(doc.schemaVersion).toBe(9);
+    expect((doc.pages[0]!.children[0]!.children[0] as Record<string, unknown>).wrap).toBeUndefined();
+  });
+
+  it('v9: frame menerima wrap boolean, menolak nilai non-boolean; node lain menolak wrap', () => {
+    const base = JSON.parse(JSON.stringify(createDocument()));
+    const board = { type: 'board', id: 'Bbbbbbb1', name: 'B', x: 0, y: 0, width: 100, height: 100, screen: 'app', children: [] };
+    const frame = (wrap: unknown) => ({ type: 'frame', id: 'Fwrap001', name: 'F', layout: 'row', ...(wrap !== undefined ? { wrap } : {}), children: [] });
+    const doc = (children: unknown[]) => ({ ...base, schemaVersion: 9, pages: [{ ...base.pages[0], children: [{ ...board, children }] }] });
+    for (const wrap of [true, false]) {
+      expect((parseDocument(doc([frame(wrap)])).pages[0]!.children[0]!.children[0] as { wrap?: boolean }).wrap).toBe(wrap);
+    }
+    for (const wrap of ['wrap', 1, null]) {
+      expect(codeOf(() => parseDocument(doc([frame(wrap)])))).toBe('SCHEMA_INVALID');
+    }
+    // `wrap` frame tidak ikut ke teks (teks sudah punya `wrap` enum sendiri) atau board.
+    expect(codeOf(() => parseDocument(doc([{ type: 'text', id: 'Tttttt01', name: 'T', content: 'x', size: 14, wrap: true }])))).toBe('SCHEMA_INVALID');
+    expect(codeOf(() => parseDocument({ ...base, schemaVersion: 9, pages: [{ ...base.pages[0], children: [{ ...board, wrap: true }] }] }))).toBe('SCHEMA_INVALID');
   });
 
   it('langkah 2 murni: input tidak dimutasi', () => {
