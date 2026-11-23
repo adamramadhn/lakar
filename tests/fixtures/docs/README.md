@@ -32,6 +32,7 @@ Loader bersama ada di `tests/support/doc-corpus.ts`.
 | `v6/ikon-vektor` | empat board ikon 96×96: frame multi-path stroke (`strokeLinecap`/`strokeLinejoin` round) + path fill, `fillRule:'evenodd'` dengan `svg` `stroke-opacity`/`paint-order`/`fill-opacity`, `strokeLinecap` square/butt + `strokeMiterlimit` + `strokeDasharray` + `svg` `stroke-dashoffset`/`shape-rendering`, stroke `inside`/`outside` pada path absolute berskala tak seragam |
 | `v7/html-paste` | hasil paste HTML tiga sampel `tests/fixtures/html/*.html` (kartu, navbar, grid harga): `tag` semantik pada frame (`article`, `nav`, `section`, `button`, `a`, `ul`) dan text (`h3`, `p`, `li`), frame `row`/`column`/`grid` `repeat(3, 1fr)`, `hug`/`fill`, border → stroke `inside`, gradien, gambar, path dari SVG inline |
 | `v8/landing-hug` | board landing `height:'hug'` (tinggi = isi flow: navbar 72, hero hug, seksi fitur; overlay absolute tidak menambah tinggi) di samping board mobile bertinggi angka |
+| `v9/flex-wrap` | frame `row` + `wrap:true` (chip membungkus 3 baris, `columnGap`/`rowGap`) dan frame `column` + `wrap:true` (anak membungkus ke kolom kedua, `rowGap`/`columnGap`) |
 
 SVG sumber tiga board ikon pertama ada di `tests/fixtures/svg/ikon-vektor/*.svg`; `packages/render/test/corpus.test.ts` membandingkan render board dengan render SVG sumber itu, dan render ekspor `vectorToSvg` dengan render Lakar (selisih piksel ≤ 1%).
 

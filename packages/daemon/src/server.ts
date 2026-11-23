@@ -52,6 +52,8 @@ import { registerOpsRoutes } from './ops.js';
 import { AgentSteps, registerAgentUndoRoutes } from './agent-undo.js';
 import { registerFixCheckRoutes } from './fix-check.js';
 import { registerPasteRoutes, type HtmlSnapshotter } from './paste.js';
+import { registerUrlImportRoutes } from './url-import.js';
+import type { PageFetch } from './url-fetch.js';
 import { SelectionStore, registerSelectionRoutes } from './selection.js';
 import { registerRenderDepsRoutes } from './render-deps.js';
 import { registerExportRoutes } from './export.js';
@@ -208,6 +210,8 @@ export type BuildOptions = {
   photos?: PhotoService;
   /** Interval heartbeat SSE `/viewer/events` (default 15 dtk; untuk test). */
   activityHeartbeatMs?: number;
+  /** Fetch halaman impor URL (default `fetchPageHtml`; untuk tes, tanpa menyentuh validasi route). */
+  pageFetch?: PageFetch;
 };
 
 export type Daemon = {
@@ -234,6 +238,7 @@ export function buildServer({
   skillsDir = SKILLS_DIR,
   photos = new PhotoService({ dataDir: config.dataDir, keyFile: config.pexelsKeyFile, unsplashKeyFile: config.unsplashKeyFile, unsplashAppName: config.unsplashAppName }),
   activityHeartbeatMs,
+  pageFetch,
 }: BuildOptions): Daemon {
   const app = Fastify({ logger: false, bodyLimit: 1024 * 1024 });
   const startedAt = new Date();
@@ -854,6 +859,19 @@ export function buildServer({
     fonts: (family) => fonts.entry(family),
     dataDir: config.dataDir,
     agentSteps,
+  });
+  // Impor halaman dari URL (epic adopsi open-pencil story 8): fetch anti-SSRF + snapshotter yang sama dengan paste.
+  registerUrlImportRoutes(app, {
+    docs,
+    store,
+    docLocks,
+    sessions,
+    activity,
+    ...(snapshotter ? { html: snapshotter } : {}),
+    fonts: (family) => fonts.entry(family),
+    dataDir: config.dataDir,
+    agentSteps,
+    ...(pageFetch ? { page: pageFetch } : {}),
   });
   registerAgentUndoRoutes(app, { docs, store, docLocks, sessions, steps: agentSteps, icons });
   registerSelectionRoutes(app, { docs, store, sessions, selections, focus, activity, render, assertIcons });

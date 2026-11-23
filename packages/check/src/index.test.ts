@@ -84,7 +84,7 @@ const runAll = (spec: BoardSpec | BoardSpec[], which = 0): Finding[] => {
  * Aturan G1: struktural (story 4), tipografi/spacing (story 5), konten/seksi (story 6). Fixture aturan G0 sengaja sintetis (bar absolut, rect
  * tanpa cat, nama bebas, ukuran huruf/padding bebas), jadi `run` menyaringnya; fixture G1 memakai `runAll`.
  */
-const G1_FILTERED = new Set(['LC-13', 'LC-14', 'LC-15', 'LC-16', 'LC-21', 'LC-22', 'LC-03', 'LC-06', 'LC-07', 'LC-08', 'LC-09', 'LC-10', 'LC-17', 'LC-19']);
+const G1_FILTERED = new Set(['LC-13', 'LC-14', 'LC-15', 'LC-16', 'LC-21', 'LC-22', 'LC-03', 'LC-06', 'LC-07', 'LC-08', 'LC-09', 'LC-10', 'LC-17', 'LC-19', 'LC-34', 'LC-35']);
 const run = (spec: BoardSpec | BoardSpec[], which = 0): Finding[] => runAll(spec, which).filter((f) => !G1_FILTERED.has(f.rule));
 const rules = (f: Finding[]) => f.map((x) => x.rule);
 const only = (f: Finding[], rule: string) => f.filter((x) => x.rule === rule);
@@ -1079,6 +1079,217 @@ describe('LC-11 saudara tumpang tindih sebagian', () => {
     expect(only(run(clean([ov])), 'LC-11')).toEqual([]);
     const avatars = frame('Avatar', [0, 0, 100, 40], [frame('A1', [0, 0, 40, 40], [text('AB', [10, 10, 20, 20])]), frame('A2', [28, 0, 40, 40], [text('CD', [38, 10, 20, 20])])], { layout: 'row', gap: -12 });
     expect(only(run(clean([avatars])), 'LC-11')).toEqual([]);
+  });
+});
+
+describe('LC-34 saudara tumpang tindih tanpa sengaja (warning)', () => {
+  const IMG = { fills: [{ type: 'image', assetId: 'a'.repeat(64), fit: 'cover' }] };
+  const ico = (r: R, extra: Loose = {}): Loose => ({ type: 'icon', id: nid(), name: 'Ikon', lib: 'lucide', icon: 'mail', size: r[2], position: 'absolute', x: r[0], y: r[1], ...extra, _r: r });
+  /** Input dengan teks flow `Placeholder` [12,10,160,20] dan satu saudara `k`. */
+  const input = (k: Loose, extra: Loose = {}) => {
+    const ph = text('Email kamu di sini', [12, 10, 160, 20], { name: 'Placeholder', _ink: [12, 10, 160, 20] });
+    return { ph, spec: clean([frame('Input / Email', [0, 0, 300, 40], [ph, k], { layout: 'row', padding: [10, 12], ...extra })]) };
+  };
+
+  it('positif: ikon absolut menimpa sebagian teks flow di Input / Email', () => {
+    const i = ico([160, 10, 20, 20]);
+    const { ph, spec } = input(i);
+    const all = runAll(spec);
+    const f = only(all, 'LC-34');
+    expect(f).toHaveLength(1);
+    expect(f[0]).toMatchObject({ level: 'warning', nodeId: i.id });
+    expect(f[0]!.detail).toContain('ikon tumpang tindih teks Placeholder');
+    expect(f[0]!.detail).toContain(`(${ph.id})`);
+    expect(f[0]!.detail).toContain('di Input / Email');
+    expect(f[0]!.detail).toContain('irisan [160,10,12,20]');
+    expect(f[0]!.detail).toContain('60% dari yang lebih kecil');
+    expect(f[0]!.expected).toContain('Overlay /');
+    expect(only(all, 'LC-11')).toEqual([]);
+  });
+
+  it('positif: gambar absolut menimpa sebagian grup berteks (rasio luas < 5)', () => {
+    const grup = frame('Kartu', [0, 0, 200, 100], [text('Judul kartu', [16, 16, 120, 20])], { padding: 16 });
+    const img = rect('Foto', [150, 50, 100, 100], { position: 'absolute', x: 150, y: 50, ...IMG });
+    const f = only(runAll(clean([frame('Seksi', [0, 0, 390, 200], [grup, img])])), 'LC-34');
+    expect(f).toHaveLength(1);
+    expect(f[0]).toMatchObject({ level: 'warning', nodeId: img.id });
+    expect(f[0]!.detail).toContain(`gambar tumpang tindih grup Kartu (${grup.id})`);
+    expect(f[0]!.detail).toContain('irisan [150,50,50,50]');
+  });
+
+  it('negatif: domain LC-11 (keduanya flow, keduanya berteks)', () => {
+    // Keduanya flow: ink teks menimpa ikon flow → LC-11, bukan LC-34.
+    const t = text('Judul yang terlalu panjang', [0, 0, 100, 20], { _ink: [0, 0, 150, 20] });
+    const i = { type: 'icon', id: nid(), name: 'Ikon', lib: 'lucide', icon: 'check', size: 20, _r: [120, 0, 20, 20] };
+    const flow = runAll(clean([frame('Baris', [0, 0, 200, 20], [t, i], { layout: 'row' })]));
+    expect(only(flow, 'LC-11')).toHaveLength(1);
+    expect(only(flow, 'LC-34')).toEqual([]);
+    // Keduanya berteks (absolut).
+    const a = text('Label kiri', [0, 0, 100, 20], { position: 'absolute' });
+    const b = text('Label kanan', [80, 10, 100, 20], { position: 'absolute' });
+    expect(only(runAll(clean([frame('Grafik', [0, 0, 300, 100], [a, b], { layout: 'none' })])), 'LC-34')).toEqual([]);
+  });
+
+  it('negatif: termuat penuh, lencana kecil di atas non-teks, bentuk dekoratif', () => {
+    // Ikon termuat penuh di dalam gambar (tombol putar di thumbnail).
+    const thumb = rect('Thumbnail', [0, 0, 120, 80], IMG);
+    expect(only(runAll(clean([frame('Video', [0, 0, 120, 80], [thumb, ico([50, 30, 20, 20])], { layout: 'none' })])), 'LC-34')).toEqual([]);
+    // Lencana 10×10 di tepi avatar 40×40 (luas × 5 ≤ luas avatar).
+    const avatar = rect('Avatar', [0, 0, 40, 40], IMG);
+    const dot = ico([34, -4, 10, 10]);
+    expect(only(runAll(clean([frame('Profil', [20, 20, 60, 60], [avatar, dot], { layout: 'none' })])), 'LC-34')).toEqual([]);
+    // Rect/ellipse/path tanpa gambar dan frame kosong menimpa teks: dekoratif.
+    for (const deco of [
+      rect('Blob', [150, 0, 80, 40], { position: 'absolute', x: 150, y: 0, ...solidFill('#FFE4D6') }),
+      { type: 'ellipse', id: nid(), name: 'Lingkaran', position: 'absolute', x: 150, y: 0, _r: [150, 0, 80, 40] },
+      { type: 'path', id: nid(), name: 'Garis', d: 'M0 0L10 10', position: 'absolute', x: 150, y: 0, _r: [150, 0, 80, 40] },
+      frame('Latar', [150, 0, 80, 40], [], { position: 'absolute', x: 150, y: 0 }),
+    ]) {
+      expect(only(runAll(input(deco).spec), 'LC-34'), deco.name).toEqual([]);
+    }
+  });
+
+  it('negatif: Overlay /, Crop /, rotasi, opacity 0', () => {
+    expect(only(runAll(input(ico([160, 10, 20, 20], { name: 'Overlay / Ikon' })).spec), 'LC-34')).toEqual([]);
+    expect(only(runAll(input(frame('Crop / Foto', [150, 0, 80, 40], [rect('Foto', [150, 0, 80, 40], IMG)], { position: 'absolute', x: 150, y: 0 })).spec), 'LC-34')).toEqual([]);
+    expect(only(runAll(input(ico([160, 10, 20, 20], { rotation: 45 })).spec), 'LC-34')).toEqual([]);
+    expect(only(runAll(input(ico([160, 10, 20, 20], { opacity: 0 })).spec), 'LC-34')).toEqual([]);
+  });
+
+  it('negatif: wadah gap negatif atau di dalam Overlay / / Crop / / Chart /', () => {
+    expect(only(runAll(input(ico([160, 10, 20, 20]), { gap: -8 }).spec), 'LC-34')).toEqual([]);
+    for (const name of ['Overlay / Kartu', 'Crop / Kartu', 'Chart / Penjualan']) {
+      const { spec } = input(ico([160, 10, 20, 20]));
+      const wrapped = clean([frame(name, [0, 0, 300, 40], spec.children, { layout: 'none' })]);
+      expect(only(runAll(wrapped), 'LC-34'), name).toEqual([]);
+    }
+    // Wadah (atau leluhurnya) terotasi atau opacity 0: isinya tidak dinilai.
+    for (const extra of [{ rotation: 5 }, { opacity: 0 }]) {
+      const { spec } = input(ico([160, 10, 20, 20]), extra);
+      expect(only(runAll(spec), 'LC-34'), JSON.stringify(extra)).toEqual([]);
+      const outer = clean([frame('Pembungkus', [0, 0, 300, 40], spec.children, extra)]);
+      expect(only(runAll(outer), 'LC-34'), `leluhur ${JSON.stringify(extra)}`).toEqual([]);
+    }
+  });
+
+  it('negatif: anggota zona bawah LC-20 dan chrome (Status bar, Home indicator)', () => {
+    const flowIco = (r: R) => ico(r, { position: undefined, x: undefined, y: undefined });
+    // Zona bawah: bar ber-fill absolut menempel bawah board, menimpa sebagian grup berteks.
+    const konten = frame('Konten', [0, 700, 390, 100], [text('Isi terakhir', [16, 716, 200, 20])], { padding: 16 });
+    const tab = frame('Tab bar', [0, 780, 390, 64], [flowIco([40, 790, 24, 24])], { position: 'absolute', x: 0, y: 780, layout: 'row', ...solidFill('#FFFFFF') });
+    expect(only(runAll(clean([konten, tab])), 'LC-34')).toEqual([]);
+    // Chrome di atas: Status bar / Home indicator dikecualikan; bilah biasa dengan geometri sama dilaporkan.
+    const isi = frame('Isi', [0, 20, 390, 100], [text('Judul halaman', [16, 36, 200, 20])], { padding: 16 });
+    const bar = (name: string) => frame(name, [0, 0, 390, 40], [flowIco([340, 10, 24, 24])], { position: 'absolute', x: 0, y: 0, layout: 'row' });
+    for (const name of ['Status bar', 'Home indicator']) expect(only(runAll(clean([isi, bar(name)])), 'LC-34'), name).toEqual([]);
+    expect(only(runAll(clean([isi, bar('Bilah atas')])), 'LC-34')).toHaveLength(1);
+  });
+
+  it('batas: > 3 temuan per board → 3 (cap), cap:false melihat semua', () => {
+    const rows = Array.from({ length: 5 }, (_, n) => input(ico([160, 10 + n * 50, 20, 20])).spec.children[0]!);
+    rows.forEach((r, n) => {
+      r._r = [0, n * 50, 300, 40];
+      r.children[0]._r = [12, 10 + n * 50, 160, 20];
+      r.children[0]._ink = [12, 10 + n * 50, 160, 20];
+    });
+    expect(only(runAll(clean(rows)), 'LC-34')).toHaveLength(3);
+    const { doc, boards, measures } = docOf([clean(rows)]);
+    expect(only(checkBoard({ doc, boardId: boards[0]!, measure: measures.get(boards[0]!)!, cap: false }), 'LC-34')).toHaveLength(5);
+  });
+});
+
+describe('LC-35 teks keluar dari frame induk (warning)', () => {
+  /** Teks hug [16,10,230,20] di Row transparan [16,10,200,20]: meluap 30 px ke kanan tanpa menabrak apa pun. */
+  const spill = (rowExtra: Loose = {}, textExtra: Loose = {}, wrap: (row: Loose) => Loose[] = (row) => [row]) => {
+    const t = text('Harga mulai Rp 25.000 per bulan', [16, 10, 230, 20], { _ink: [16, 10, 230, 20], _lh: 20, ...textExtra });
+    const row = frame('Baris', [16, 10, 200, 20], [t], { layout: 'row', ...rowExtra });
+    return { t, row, spec: clean(wrap(row)) };
+  };
+
+  it('positif: teks hug di Row transparan meluap 30 px ke kanan (LC-02b diam)', () => {
+    const { t, row, spec } = spill();
+    const all = runAll(spec);
+    expect(only(all, 'LC-02b')).toEqual([]);
+    const f = only(all, 'LC-35');
+    expect(f).toHaveLength(1);
+    expect(f[0]).toMatchObject({ level: 'warning', nodeId: t.id });
+    expect(f[0]!.detail).toBe(`teks "Harga mulai Rp …" keluar 30px di kanan dari frame Baris (${row.id}); teks [16,10,230,20], frame [16,10,200,20]`);
+    expect(f[0]!.expected).toContain("width:'fill'");
+    expect(f[0]!.suggestions).toEqual([{ label: 'Wrap text', ops: [{ op: 'update', id: t.id, patch: { width: 'fill', wrap: 'wrap' } }] }]);
+  });
+
+  it('positif: teks sudah fill+wrap → warning tanpa saran; induk layout none → tanpa saran', () => {
+    const none = only(runAll(spill({ layout: 'none' }).spec), 'LC-35')[0]!;
+    expect(none.suggestions).toBeUndefined();
+    // Induk non-flow: width:'fill' tidak berlaku, hint tidak menyarankannya.
+    expect(none.expected).not.toContain("width:'fill'");
+    expect(none.expected).toContain('geser teks ke dalam frame');
+    const { spec } = spill({}, { width: 'fill', wrap: 'wrap' });
+    const f = only(runAll(spec), 'LC-35');
+    expect(f).toHaveLength(1);
+    expect(f[0]!.suggestions).toBeUndefined();
+  });
+
+  it('vertikal: kotak teks lebih tinggi dari frame ber-tinggi tetap → warning tanpa saran', () => {
+    const t = text('Dua baris', [16, 16, 100, 60], { _ink: [16, 16, 100, 60], _lines: 3, _lh: 20 });
+    const box = frame('Kotak', [16, 16, 200, 40], [t], { layout: 'row', height: 40 });
+    const f = only(runAll(clean([box])), 'LC-35');
+    expect(f).toHaveLength(1);
+    expect(f[0]!.detail).toContain('20px di bawah');
+    expect(f[0]!.suggestions).toBeUndefined();
+  });
+
+  it('negatif: induk board, induk clip, leluhur Crop / / Overlay / / rotasi', () => {
+    // Induk board: teks [0,0,100,20] di dalam board tidak dinilai (tepi board = LC-02a).
+    expect(only(runAll(clean([text('Langsung di board', [0, 0, 100, 20])])), 'LC-35')).toEqual([]);
+    const cases: [string, Loose[]][] = [
+      ['clip', spill({ clip: true }).spec.children],
+      ...['Crop / Foto', 'Overlay / Bar'].map((name): [string, Loose[]] => [name, spill({}, {}, (row) => [frame(name, [0, 0, 390, 40], [row])]).spec.children]),
+      ['rotasi', spill({}, {}, (row) => [frame('Putar', [0, 0, 390, 40], [row], { rotation: 5 })]).spec.children],
+    ];
+    for (const [name, kids] of cases) expect(only(runAll(clean(kids)), 'LC-35'), name).toEqual([]);
+  });
+
+  it('negatif: sumbu vertikal di bawah Scroll / atau scrollY; sumbu horizontal tetap dinilai', () => {
+    const tall = () => text('Isi panjang', [16, 16, 100, 60], { _ink: [16, 16, 100, 60] });
+    for (const extra of [{ name: 'Scroll / Isi' }, { name: 'Isi', scrollY: 10 }]) {
+      const box = frame('Kotak', [16, 16, 200, 40], [tall()], { layout: 'row', height: 40 });
+      const sc = frame(extra.name, [0, 0, 390, 200], [box], 'scrollY' in extra ? { scrollY: extra.scrollY } : {});
+      expect(only(runAll(clean([sc])), 'LC-35'), extra.name).toEqual([]);
+    }
+    expect(only(runAll(spill({}, {}, (row) => [frame('Scroll / Isi', [0, 0, 390, 200], [row])]).spec), 'LC-35')).toHaveLength(1);
+  });
+
+  it('negatif: teks sudah LC-02b / LC-03; luapan ≤ 1 px; teks kosong atau tak terlihat', () => {
+    // LC-02b: Row ber-cat → tepi wadah tertabrak (error), LC-35 diam.
+    const painted = runAll(spill(solidFill('#F2F4F7')).spec);
+    expect(only(painted, 'LC-02b')).toHaveLength(1);
+    expect(only(painted, 'LC-35')).toEqual([]);
+    // LC-03: ink melewati kotak teks.
+    const ink = runAll(spill({}, { _ink: [16, 10, 240, 20] }).spec);
+    expect(only(ink, 'LC-03')).toHaveLength(1);
+    expect(only(ink, 'LC-35')).toEqual([]);
+    // Luapan 1 px.
+    expect(only(runAll(spill({}, { _ink: [16, 10, 201, 20] }, (row) => {
+      row.children[0]._r = [16, 10, 201, 20];
+      return [row];
+    }).spec), 'LC-35')).toEqual([]);
+    // Keturunan node LC-02a (Kartu melewati tepi board): teks yang meluap dari Row-nya tidak dilaporkan lagi.
+    const cutT = text('Harga mulai Rp 25.000', [250, 10, 90, 20], { _ink: [250, 10, 90, 20], _lh: 20 });
+    const cutRow = frame('Baris', [250, 10, 60, 20], [cutT], { layout: 'row' });
+    const cutAll = runAll(clean([frame('Kartu', [250, 0, 200, 40], [cutRow])]));
+    expect(only(cutAll, 'LC-02a').length).toBeGreaterThan(0);
+    expect(only(cutAll, 'LC-35')).toEqual([]);
+    // Teks kosong.
+    expect(only(runAll(spill({}, { content: '  ' }).spec), 'LC-35')).toEqual([]);
+    // Tak terlihat: di luar clip leluhur.
+    const hidden = frame('Jendela', [0, 0, 390, 100], [frame('Baris', [16, 200, 200, 20], [text('Tersembunyi sekali', [16, 200, 230, 20])], { layout: 'row' })], { clip: true, layout: 'none' });
+    expect(only(runAll(clean([hidden])), 'LC-35')).toEqual([]);
+  });
+
+  it('placeholder [Skeleton] tidak dinilai', () => {
+    const { spec } = spill({ name: '[Skeleton] Baris' });
+    expect(only(runAll({ ...spec, name: '[WIP] Home' }), 'LC-35')).toEqual([]);
   });
 });
 

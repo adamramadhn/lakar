@@ -1,7 +1,7 @@
-// Server MCP Lakar: 19 tool (AD-11 + photo_search + get_selection + export_code + paste + list_documents + undo + redo
-// + visual_diff + fix_check) → HTTP lakard: status, read_skill, open_doc, list_documents, list_boards, execute, inspect,
-// layout_check, screenshot, export, export_code, icon_search, photo_search, get_selection, paste, undo, redo, visual_diff,
-// fix_check.
+// Server MCP Lakar: 20 tool (AD-11 + photo_search + get_selection + export_code + paste + import_url + list_documents
+// + undo + redo + visual_diff + fix_check) → HTTP lakard: status, read_skill, open_doc, list_documents, list_boards,
+// execute, inspect, layout_check, screenshot, export, export_code, icon_search, photo_search, get_selection, paste,
+// import_url, undo, redo, visual_diff, fix_check.
 import { McpServer, type CallToolResult } from '@modelcontextprotocol/server';
 import { z } from 'zod';
 import {
@@ -232,6 +232,18 @@ export const PASTE_DESCRIPTION =
   'Mengembalikan {docId, slug, rev, created, nodeId, boards, report:{kind, paths, kept:[atribut], dropped:[{kind: element|attribute|value, name, count}]}}. ' +
   'SVG rusak/tanpa bentuk, HTML tanpa isi terlihat, atau parent bukan board/frame → SCHEMA_INVALID; ID tidak ada → NOT_FOUND; belum open_doc → NO_ACTIVE_DOC; daemon tanpa Chromium (HTML) → RENDER_FAILED.';
 
+/** Deskripsi tool `import_url` (epic adopsi open-pencil story 8). */
+export const IMPORT_URL_DESCRIPTION =
+  'Impor halaman web dari URL sebagai board baru berisi layer yang bisa diedit (importer HTML yang sama dengan paste kind "html"). ' +
+  'Daemon mengambil halaman sekali atas permintaan ini: hanya http(s) publik (loopback/privat/link-local ditolak, redirect ≤3 divalidasi ulang, ' +
+  'maks 15 detik dan 10 MB), JavaScript halaman tidak dijalankan, dan render tetap tanpa jaringan (gambar hanya data URI). ' +
+  'Board dibuat di halaman pageId (default halaman pertama): width = lebar board+viewport (default 1440; preset umum 1440/768/375), ' +
+  'height = tinggi konten halaman, name opsional (default <title>, lalu host), screen opsional (default dari lebar), ' +
+  'x/y opsional (default kanan board terakhir + 80), description opsional (label riwayat, default "Import page <title>"). ' +
+  'Mengembalikan {docId, slug, rev, created, nodeId, boardId, boards, report:{kind:"html", …} seperti paste, page:{url, finalUrl, title?}, target}. ' +
+  'Satu impor = satu rev (undo membatalkannya). URL salah/skema bukan http(s)/alamat non-publik/halaman bukan HTML → SCHEMA_INVALID; ' +
+  'timeout/gangguan jaringan/HTTP 5xx-429 → EXEC_ERROR retryable; dokumen belum open_doc → NO_ACTIVE_DOC; daemon tanpa Chromium → RENDER_FAILED.';
+
 /** Deskripsi tool `layout_check` (aturan gerbang G0). */
 export const LAYOUT_CHECK_DESCRIPTION =
   'Check gerbang G0 pada board dokumen aktif (tanpa boardId = semua board). Board dirender lalu diperiksa: ' +
@@ -251,7 +263,9 @@ export const LAYOUT_CHECK_DESCRIPTION =
   `dan warning scrim: teks di atas foto/gradien multi-hue/efek blur tanpa fill solid opacity ≥ ${String(SCRIM_MIN_ALPHA).replace('.', ',')} di antaranya; ` +
   'LC-12 (warning) ukuran board (mobile 390×844, app 1440×900 atau 1440×1024, landing lebar 1440, atau expectedSize), tinggi pas board mobile panjang dan board landing tanpa [WIP] (ruang kosong di bawah isi > 8 px → update tinggi; board height hug tidak dinilai), dan tabrakan antarboard (pakai place). ' +
   'Warning polesan: LC-18 kartu bersarang, LC-23 celah teks ↔ badge/tombol/ikon < 8, LC-24 proporsi badge di baris, LC-25 radius tidak konsentris, ' +
-  'LC-26 ruang di atas judul ≤ bawah, LC-27 > 6 ukuran huruf, LC-28 baris > 80 karakter, LC-29 bobot < 400 di < 18px, LC-30 tanda baca (... dan tanda hubung rentang). ' +
+  'LC-26 ruang di atas judul ≤ bawah, LC-27 > 6 ukuran huruf, LC-28 baris > 80 karakter, LC-29 bobot < 400 di < 18px, LC-30 tanda baca (... dan tanda hubung rentang), ' +
+  "LC-34 saudara konten tumpang tindih tanpa sengaja di luar LC-11 (ikon/gambar absolut menimpa teks atau grup; lencana kecil, bentuk dekoratif, 'Overlay / …', 'Crop / …' dan 'Chart / …' dikecualikan; detail memuat irisan [x,y,w,h]), " +
+  "LC-35 teks keluar > 1px dari frame induk tanpa clip (detail: sisi, px, bounds teks dan frame; saran Wrap text width:'fill' + wrap:'wrap'). " +
   `Warning tipografi/spacing (token DESIGN.md): LC-03 teks wrap 'fixed' ≥ 2 baris atau teks melewati kotaknya, LC-06 paragraf (≥ 2 baris, ≥ 6 kata) < ${PARAGRAPH_MIN.landing}px di landing/mobile, < ${PARAGRAPH_MIN.app}px di app, < ${PARAGRAPH_MIN_IN_CARD}px di kartu ber-cat, ` +
   `LC-07 gap/padding di luar ${[...SPACING_VALUES].sort((a, b) => a - b).join('/')} (padding bawah ${HOME_INDICATOR_INSET} sah) dan tinggi komponen di luar token atau ${COMPONENT_SIZES.join('/')}, ` +
   `LC-08 ukuran di luar skala tipe atau line-height tak cocok token (KPI / Nilai ${KPI_SIZES.join('/')} dengan line-height × ${KPI_LINE_HEIGHT_RATIO} atau token, 'Display / …' ${DISPLAY_SIZES.join('/')}; < 12px = LC-05), LC-09 > 2 keluarga font (mono tidak dihitung), LC-10 target sentuh < ${TOUCH_MIN}×${TOUCH_MIN} di board mobile. ` +
@@ -483,6 +497,29 @@ export function createLakarMcpServer(daemonUrl: string): McpServer {
       guarded(async () => {
         const body = Object.fromEntries(Object.entries(args).filter(([, v]) => v !== undefined));
         return asText(await client.call('/viewer/paste', body));
+      }),
+  );
+
+  server.registerTool(
+    'import_url',
+    {
+      annotations: toolAnnotations('import_url'),
+      description: IMPORT_URL_DESCRIPTION,
+      inputSchema: z.object({
+        url: z.string().describe('URL halaman web publik (http/https)'),
+        pageId: z.string().optional().describe('ID halaman tujuan board baru (default halaman pertama)'),
+        width: z.number().optional().describe('lebar board+viewport px (default 1440; preset umum 1440/768/375)'),
+        name: z.string().optional().describe('nama board (default <title> halaman, lalu host)'),
+        screen: z.enum(['landing', 'app', 'mobile']).optional().describe('jenis layar board (default dari lebar)'),
+        x: z.number().optional().describe('posisi x board di halaman (default kanan board terakhir + 80)'),
+        y: z.number().optional().describe('posisi y board (default mengikuti board terakhir)'),
+        description: z.string().optional().describe('label riwayat (default "Import page <title>")'),
+      }),
+    },
+    (args) =>
+      guarded(async () => {
+        const body = Object.fromEntries(Object.entries(args).filter(([, v]) => v !== undefined));
+        return asText(await client.call('/viewer/import-url', body));
       }),
   );
 

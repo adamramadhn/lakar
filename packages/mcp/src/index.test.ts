@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { Client, InMemoryTransport } from '@modelcontextprotocol/client';
 import { StdioClientTransport } from '@modelcontextprotocol/client/stdio';
 import { LAKAR_VERSION, SCHEMA_VERSION } from '@lakar/schema';
-import { EXECUTE_LANDING_REMINDER_FROM, EXPORT_CODE_DESCRIPTION, GET_SELECTION_DESCRIPTION, LIST_DOCUMENTS_DESCRIPTION, OPEN_DOC_DESCRIPTION, PACKAGE, PASTE_DESCRIPTION, PHOTO_SEARCH_DESCRIPTION, READ_SKILL_DESCRIPTION, SERVER_INSTRUCTIONS, SERVER_VERSION, createLakarMcpServer, formatStatus } from './index.js';
+import { EXECUTE_LANDING_REMINDER_FROM, EXPORT_CODE_DESCRIPTION, GET_SELECTION_DESCRIPTION, IMPORT_URL_DESCRIPTION, LIST_DOCUMENTS_DESCRIPTION, OPEN_DOC_DESCRIPTION, PACKAGE, PASTE_DESCRIPTION, PHOTO_SEARCH_DESCRIPTION, READ_SKILL_DESCRIPTION, SERVER_INSTRUCTIONS, SERVER_VERSION, createLakarMcpServer, formatStatus } from './index.js';
 import { readFile } from 'node:fs/promises';
 import { chromiumInstalled, DEFAULT_BROWSERS_PATH } from '../../../tests/support/browser.ts';
 import { testLog } from '../../../tests/support/log.ts';
@@ -138,6 +138,10 @@ function fakeDaemon() {
       if (body.parentId === 'Zzzzzzzz') return send(404, { ok: false, error: { code: 'NOT_FOUND', message: 'paste: node Zzzzzzzz tidak ada di dokumen a', hint: 'pakai ID', retryable: false } });
       return send(200, { ok: true, data: { docId: 'Dddddddd', slug: 'a', rev: 5, created: [{ id: 'Pppppppp', name: 'SVG', path: ['Home', 'SVG'] }], nodeId: 'Pppppppp', boards: ['Bbbbbbbb'], report: { kind: 'svg', paths: 1, kept: [], dropped: [] } } });
     }
+    if (req.url === '/viewer/import-url') {
+      if (body.url === 'http://127.0.0.1/') return send(400, { ok: false, error: { code: 'SCHEMA_INVALID', message: 'alamat non-publik ditolak (127.0.0.1)', hint: 'pakai URL http(s) publik', retryable: false } });
+      return send(200, { ok: true, data: { docId: 'Dddddddd', slug: 'a', rev: 6, created: [{ id: 'Iiiiiiii', name: 'Cool Site', path: ['Cool Site'] }], nodeId: 'Pppppppp', boardId: 'Iiiiiiii', boards: ['Iiiiiiii'], report: { kind: 'html', layers: 3, scripts: 0, dropped: [] }, page: { url: body.url, finalUrl: body.url, title: 'Cool Site' }, target: { slug: 'a', name: 'a', boardIds: ['Iiiiiiii'] } } });
+    }
     if (req.url === '/boards') return send(200, { ok: true, data: { docId: 'Dddddddd', slug: 'a', rev: 1, boards: [{ id: 'Bbbbbbbb', name: '[WIP] Home', wip: true }] } });
     if (req.url === '/inspect') {
       if (body.id === 'Zzzzzzzz') return send(404, { ok: false, error: { code: 'NOT_FOUND', message: 'node Zzzzzzzz tidak ada', hint: 'pakai ID', retryable: false } });
@@ -190,11 +194,11 @@ describe('@lakar/mcp', () => {
     expect(PACKAGE).toBe('@lakar/mcp');
   });
 
-  it('daftar tool lengkap (10 AD-11 + photo_search + get_selection + export_code + paste + list_documents); SERVER_VERSION = LAKAR_VERSION', async () => {
+  it('daftar tool lengkap (10 AD-11 + photo_search + get_selection + export_code + paste + import_url + list_documents); SERVER_VERSION = LAKAR_VERSION', async () => {
     const c = await connect(url);
     const { tools } = await c.listTools();
     expect(tools.map((t) => t.name).sort()).toEqual(
-      ['execute', 'export', 'export_code', 'get_selection', 'icon_search', 'inspect', 'layout_check', 'list_boards', 'list_documents', 'open_doc', 'paste', 'photo_search', 'read_skill', 'redo', 'screenshot', 'status', 'undo', 'visual_diff', 'fix_check'].sort(),
+      ['execute', 'export', 'export_code', 'get_selection', 'icon_search', 'import_url', 'inspect', 'layout_check', 'list_boards', 'list_documents', 'open_doc', 'paste', 'photo_search', 'read_skill', 'redo', 'screenshot', 'status', 'undo', 'visual_diff', 'fix_check'].sort(),
     );
     expect(SERVER_VERSION).toBe(LAKAR_VERSION);
     expect(c.getServerVersion()?.version).toBe(LAKAR_VERSION);
@@ -289,6 +293,25 @@ describe('@lakar/mcp', () => {
     await c.callTool({ name: 'paste', arguments: { content: '<nav>x</nav>', parentId: 'Bbbbbbbb', kind: 'html', width: 640 } });
     expect(fake.seen.find((s) => s.path === '/viewer/paste')!.body).toEqual({ content: '<nav>x</nav>', parentId: 'Bbbbbbbb', kind: 'html', width: 640 });
     expect(PASTE_DESCRIPTION).toContain('kind "html"');
+  });
+
+  it('import_url → POST /viewer/import-url dalam sesi; argumen diteruskan tanpa undefined; teks JSON; error terformat (epic adopsi open-pencil story 8)', async () => {
+    fake.seen.length = 0;
+    const c = await connect(url);
+    const r = await c.callTool({ name: 'import_url', arguments: { url: 'https://example.com/', width: 768, screen: 'app' } });
+    expect(r.isError).toBeFalsy();
+    expect(JSON.parse((r.content as any[])[0].text)).toMatchObject({ rev: 6, boardId: 'Iiiiiiii', nodeId: 'Pppppppp', report: { kind: 'html' }, page: { finalUrl: 'https://example.com/', title: 'Cool Site' } });
+    const call = fake.seen.find((s) => s.path === '/viewer/import-url')!;
+    expect(call.body).toEqual({ url: 'https://example.com/', width: 768, screen: 'app' });
+    expect(call.session).toMatch(/^s\d+$/);
+    const bad = await c.callTool({ name: 'import_url', arguments: { url: 'http://127.0.0.1/' } });
+    expect(bad.isError).toBe(true);
+    expect((bad.content as any[])[0].text).toContain('SCHEMA_INVALID: alamat non-publik ditolak');
+    expect(IMPORT_URL_DESCRIPTION).toContain('http(s)');
+    expect(IMPORT_URL_DESCRIPTION).toContain('NO_ACTIVE_DOC');
+    const tool = (await c.listTools()).tools.find((t) => t.name === 'import_url')!;
+    expect(Object.keys((tool.inputSchema as any).properties).sort()).toEqual(['description', 'name', 'pageId', 'screen', 'url', 'width', 'x', 'y']);
+    expect((tool.inputSchema as any).required).toEqual(['url']);
   });
 
   it('photo_search → teks JSON (tanpa data thumbnail) + maks 6 image content; argumen diteruskan; error terformat', async () => {
@@ -659,7 +682,7 @@ describe('@lakar/mcp', () => {
       const r = await c2.callTool({ name: 'execute', arguments: { code: '1' } });
       expect(r.isError).toBe(true);
       expect((r.content as any)[0].text).toContain('http://127.0.0.1:1');
-      expect((await c2.listTools()).tools).toHaveLength(19);
+      expect((await c2.listTools()).tools).toHaveLength(20);
     } finally {
       await c2.close();
       await deadTransport.close();

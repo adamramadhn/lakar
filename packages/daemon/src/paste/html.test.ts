@@ -133,7 +133,7 @@ describe('importHtml: struktur', () => {
     validates(r.node);
   });
 
-  it('jarak tidak seragam / margin anak flex / flex-wrap → layout none dengan posisi tetap, dilaporkan', () => {
+  it('jarak tidak seragam / margin anak flex / wrap-reverse → layout none dengan posisi tetap, dilaporkan', () => {
     const kids = () => [el('div', [0, 0, 50, 20], { 'background-color': 'rgb(1, 2, 3)' }), el('div', [0, 30, 50, 20], { 'background-color': 'rgb(1, 2, 3)' }), el('div', [0, 70, 50, 20], { 'background-color': 'rgb(1, 2, 3)' })];
     const r = run(snap([el('div', [0, 0, 200, 90], {}, kids())]));
     expect(r.node.layout).toBeUndefined();
@@ -143,8 +143,42 @@ describe('importHtml: struktur', () => {
     validates(r.node);
     const m = run(snap([el('div', [0, 0, 200, 20], { display: 'flex' }, [el('i', [150, 0, 50, 20], { 'margin-left': '150px', 'background-color': 'rgb(1, 2, 3)' })])]));
     expect(m.report.dropped).toEqual([{ kind: 'layout', name: 'margins', count: 1 }]);
-    const w = run(snap([el('div', [0, 0, 200, 20], { display: 'flex', 'flex-wrap': 'wrap' }, [el('i', [0, 0, 50, 20], { 'background-color': 'rgb(1, 2, 3)' })])]));
+    // `wrap-reverse` di luar skema v9: tetap gagal dan dilaporkan seperti semula.
+    const w = run(snap([el('div', [0, 0, 200, 20], { display: 'flex', 'flex-wrap': 'wrap-reverse' }, [el('i', [0, 0, 50, 20], { 'background-color': 'rgb(1, 2, 3)' })])]));
     expect(w.report.dropped).toEqual([{ kind: 'layout', name: 'flex-wrap', count: 1 }]);
+    // `align-content` non-default saat wrap: distribusi antarbaris tak terwakili → gagal dan dilaporkan.
+    const ac = run(snap([el('div', [0, 0, 200, 56], { display: 'flex', 'flex-wrap': 'wrap', 'align-content': 'space-between' }, [el('i', [0, 0, 50, 20], { 'background-color': 'rgb(1, 2, 3)' })])]));
+    expect(ac.node.layout).toBeUndefined();
+    expect(ac.report.dropped).toEqual([{ kind: 'layout', name: 'align-content', count: 1 }]);
+  });
+
+  it('flex-wrap: wrap (v9) → frame wrap:true; gap sumbu silang → rowGap (row) / columnGap (column)', () => {
+    const chip = (x: number, y: number) => el('div', [x, y, 60, 24], { 'background-color': 'rgb(1, 2, 3)' });
+    const w = run(snap([el('div', [0, 0, 200, 56], { display: 'flex', 'flex-wrap': 'wrap', 'column-gap': '8px', 'row-gap': '16px' }, [chip(0, 0), chip(68, 0), chip(0, 40)])]));
+    expect(w.node).toMatchObject({ layout: 'row', wrap: true, gap: 8, rowGap: 16 });
+    expect(w.report.dropped).toEqual([]);
+    validates(w.node);
+    const col = run(snap([el('div', [0, 0, 136, 56], { display: 'flex', 'flex-direction': 'column', 'flex-wrap': 'wrap', 'row-gap': '8px', 'column-gap': '16px' }, [chip(0, 0), chip(0, 32), chip(76, 0)])]));
+    expect(col.node).toMatchObject({ layout: 'column', wrap: true, gap: 8, columnGap: 16 });
+    expect(col.report.dropped).toEqual([]);
+    validates(col.node);
+    // nowrap + gap sumbu silang tetap diimpor (properti valid juga tanpa wrap).
+    const nw = run(snap([el('div', [0, 0, 200, 24], { display: 'flex', 'row-gap': '16px' }, [chip(0, 0)])]));
+    expect(nw.node).toMatchObject({ layout: 'row', rowGap: 16 });
+    expect(nw.node.wrap).toBeUndefined();
+    validates(nw.node);
+    // `align-content` stretch/normal = distribusi default → lolos; nowrap: `align-content` no-op CSS, diabaikan.
+    for (const v of ['normal', 'stretch']) {
+      const ok = run(snap([el('div', [0, 0, 200, 56], { display: 'flex', 'flex-wrap': 'wrap', 'align-content': v }, [chip(0, 0), chip(68, 0), chip(0, 40)])]));
+      expect(ok.node).toMatchObject({ layout: 'row', wrap: true });
+      expect(ok.report.dropped).toEqual([]);
+      validates(ok.node);
+    }
+    const nwac = run(snap([el('div', [0, 0, 200, 24], { display: 'flex', 'align-content': 'space-between' }, [chip(0, 0)])]));
+    expect(nwac.node).toMatchObject({ layout: 'row' });
+    expect(nwac.node.wrap).toBeUndefined();
+    expect(nwac.report.dropped).toEqual([]);
+    validates(nwac.node);
   });
 
   it('anak absolute di atas anak flow, x/y relatif parent; flex-grow → fill; align-self start → hug', () => {

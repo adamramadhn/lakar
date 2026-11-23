@@ -10,7 +10,7 @@ const BOARD = 'Board001';
 
 function doc(children: AnyNode[], board: AnyNode = {}): LakarDocument {
   return {
-    schemaVersion: 8,
+    schemaVersion: 9,
     id: 'Doc00001',
     rev: 1,
     tokenModes: ['light', 'dark'],

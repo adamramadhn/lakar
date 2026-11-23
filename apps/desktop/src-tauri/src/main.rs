@@ -14,6 +14,8 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
 
+mod updates;
+
 use serde::Serialize;
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
@@ -733,8 +735,20 @@ fn main() {
     let app = tauri::Builder::default()
         // Instance kedua hanya memunculkan jendela yang ada (satu daemon per data dir).
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| show_main(app)))
+        // Updater otomatis (endpoint latest.json GitHub Release; command di modul updates).
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(DaemonState::default())
-        .invoke_handler(tauri::generate_handler![daemon_state, restart_daemon, set_ui_theme])
+        .manage(updates::PendingUpdate::default())
+        .invoke_handler(tauri::generate_handler![
+            daemon_state,
+            restart_daemon,
+            set_ui_theme,
+            updates::app_version,
+            updates::check_update,
+            updates::download_update,
+            updates::install_update,
+            updates::relaunch_app
+        ])
         .setup(|app| {
             build_main_window(app.handle())?;
             build_tray(app.handle())?;
@@ -813,9 +827,16 @@ mod tests {
         let cap: serde_json::Value = serde_json::from_str(include_str!("../capabilities/viewer-window.json")).unwrap();
         assert_eq!(cap["remote"]["urls"], json!(["http://127.0.0.1:*"]));
         assert_eq!(cap["windows"], json!(["main"]));
-        // Satu-satunya command aplikasi untuk halaman remote: sinkron tema; daemon_state/restart_daemon tidak.
+        // Command aplikasi untuk halaman remote: sinkron tema + updater; daemon_state/restart_daemon tidak.
         let mut expected: Vec<&str> = WINDOW_PERMISSIONS.to_vec();
-        expected.push("allow-set-ui-theme");
+        expected.extend([
+            "allow-set-ui-theme",
+            "allow-app-version",
+            "allow-check-update",
+            "allow-download-update",
+            "allow-install-update",
+            "allow-relaunch-app",
+        ]);
         assert_eq!(cap["permissions"], json!(expected));
     }
 
@@ -833,7 +854,7 @@ mod tests {
     #[test]
     fn build_manifest_lists_every_command() {
         let build = include_str!("../build.rs");
-        for cmd in ["daemon_state", "restart_daemon", "set_ui_theme"] {
+        for cmd in ["daemon_state", "restart_daemon", "set_ui_theme", "app_version", "check_update", "download_update", "install_update", "relaunch_app"] {
             assert!(build.contains(&format!("\"{cmd}\"")), "{cmd} tidak ada di manifest build.rs");
         }
     }

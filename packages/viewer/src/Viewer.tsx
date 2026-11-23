@@ -52,7 +52,7 @@ import { instanceModel, masterModel, slotFrameInfo } from './componentProps';
 import type { ComponentEdit } from './ComponentPropsPanel';
 import { createActionQueue } from './componentQueue';
 import { indexGeo, toggleSelection, type GeoNode } from './gesture';
-import { actionState, EDIT_ACTIONS, nudgeNodes, nudgeOps, planAction, selectAllIds, selectionAfter, shortcutAction, type EditAction, type EditPlan } from './editActions';
+import { actionState, EDIT_ACTIONS, nudgeNodes, nudgeOps, planAction, selectAllIds, selectionAfter, shortcutAction, topMost, type EditAction, type EditPlan } from './editActions';
 import { EditMenu } from './EditMenu';
 import { EMPTY_STACKS, recordCommit, settleStep, takeStep, type UndoStacks } from './undoHistory';
 import { attachSelectionReporter } from './selectionSync';
@@ -60,13 +60,15 @@ import { lastAgentLabel, pruneSelection, shareBadgeText, undoSkippedFor } from '
 import { UndoSkippedToast, type UndoSkipped } from './UndoSkippedToast';
 import { PasteToast, type PasteToastState } from './PasteToast';
 import { canUndoPaste, clipboardPaste, pasteTarget } from './paste';
+import { ImportUrlDialog } from './ImportUrlDialog';
+import { importToastTitle } from './importUrl';
 import { activityHub, editChange, goneReason, harnessLabel, revChange, sessionsForSlug, slugAppeared, whoOf, type StreamEvent } from './activity';
 import { ActivityPanel } from './ActivityPanel';
 import { BottomSheet, MOBILE_QUERY } from './BottomSheet';
 import { SidebarToggle, useSidebars } from './SidebarToggle';
 import { sidebarShortcut } from './sidebars';
 import { AddLayerButton, IconPicker, Toast, type ToastState } from './AddLayer';
-import { api, ApiError, errorText, OfflineError, type FontFamily, type HistoryEntry, type InspectResult, type LayoutCheck } from './api';
+import { api, ApiError, errorText, OfflineError, type FontFamily, type HistoryEntry, type ImportUrlBody, type InspectResult, type LayoutCheck } from './api';
 import { Canvas, type CanvasMarker, type CanvasPreview, type Focus, type Highlight, type InsertPoint } from './Canvas';
 import type { PathEditPanel } from './pathTools';
 import { measuredBoards, withHeight } from './boardHeight';
@@ -302,6 +304,7 @@ export function Viewer({ slug }: { slug: string }) {
     setCodeExport(undefined);
     setCssImportOpen(false);
     setDtcgImportOpen(false);
+    setImportUrlOpen(false);
   }, [preview]);
   useEffect(() => {
     if (preview) setThemeOpen(false);
@@ -986,6 +989,33 @@ export function Viewer({ slug }: { slug: string }) {
     else if (canUndoPaste(stacks.current.undo, pasteEntry.current)) stepHistory('undo');
     else setToast("Couldn't undo this paste: it was already undone or newer edits were made.");
   }, [stepHistory, setToast]);
+
+  // ---- Impor halaman dari URL (epic adopsi open-pencil story 8, desain section 11) ----
+  // Menu "+" → "Import page from URL…" membuka ImportUrlDialog; sukses = satu commit (board baru + isi),
+  // invers ke tumpukan undo jendela ini, board dipilih, toast "Imported N layers from host" + Paste Report.
+  const [importUrlOpen, setImportUrlOpen] = useState(false);
+  const [importingUrl, setImportingUrl] = useState(false);
+  const importPage = useCallback(
+    async (body: Omit<ImportUrlBody, 'pageId'>) => {
+      if (!editableRef.current) throw new Error('The document is read-only right now.');
+      if (editing.current > 0) throw new Error('Another edit is still saving. Import again in a moment.');
+      editing.current++;
+      setImportingUrl(true);
+      try {
+        const r = await api.importUrl(slug, { ...body, ...(pageId ? { pageId } : {}) });
+        setStacks(recordCommit(stacks.current, r.inverse, 'Import page', Date.now()));
+        pasteEntry.current = stacks.current.undo[stacks.current.undo.length - 1];
+        pendingSelect.current = r.boardId;
+        setSelectedId(r.boardId);
+        loadDoc(true);
+        setPasteToast({ key: Date.now(), report: r.report, layer: r.created.find((c) => c.id === r.boardId)?.name ?? 'page', nodeId: r.boardId, title: importToastTitle(r) });
+      } finally {
+        editing.current--;
+        setImportingUrl(false);
+      }
+    },
+    [slug, pageId, loadDoc, setStacks, setSelectedId],
+  );
   // Event `paste` (Ctrl/⌘+V): file SVG, teks yang diawali <svg/<?xml, lalu text/html; bukan saat mengetik atau dialog terbuka.
   useEffect(() => {
     if (!editable) return;
@@ -1109,10 +1139,47 @@ export function Viewer({ slug }: { slug: string }) {
       }),
     [applyEdit, stepHistory, setToast],
   );
+  /**
+   * Copy as PNG (desain 11, layar gj8lD/BD9N7): satu node tersimpan terpilih diekspor sebagai PNG 2x lewat
+   * `/viewer/docs/:slug/export` lalu ditulis ke clipboard sebagai `ClipboardItem` `image/png`. Board → body tanpa
+   * `nodeId` (perilaku lama). Alamat komposit (isi instance `a/b`) diam saja — daemon tidak me-resolve-nya.
+   */
+  const copyPng = useCallback(
+    (ids: string[]) => {
+      const scene = sceneRef.current?.() ?? [];
+      const index = indexGeo(scene);
+      const members = topMost(index, ids);
+      if (members.length !== 1 || members[0]!.id.includes('/')) return;
+      const node = members[0]!;
+      let board = node;
+      while (board.parentId) {
+        const parent = index.get(board.parentId);
+        if (!parent) break;
+        board = parent;
+      }
+      const run = async () => {
+        try {
+          const { blob } = await api.exportPng(slug, board.id, 2, node.id === board.id ? undefined : node.id);
+          await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+          setToastState({ message: 'Copied as PNG', kind: 'info' });
+        } catch (e) {
+          // Detail mengikuti pola "Couldn't …: <detail>" toast undo; Try again mengulang langkah yang sama.
+          setToastState({ message: `Couldn't copy as PNG: ${errorText(e)}`, kind: 'error', action: { label: 'Try again', run: () => void run() } });
+        }
+      };
+      void run();
+    },
+    [slug],
+  );
   /** Jalankan aksi untuk `ids` (default seleksi): aksi tak berlaku → toast/diam; satu permintaan tulis sekaligus. */
   const runAction = useCallback(
     (kind: EditAction, ids?: string[]) => {
       if (!editableRef.current || editing.current > 0) return;
+      // Copy as PNG bukan op dokumen (ekspor + clipboard), jadi dicegat sebelum planAction.
+      if (kind === 'copy-png') {
+        copyPng(ids ?? selectionRef.current);
+        return;
+      }
       const plan = planAction(kind, sceneRef.current?.() ?? [], ids ?? selectionRef.current);
       if (!plan) return;
       if ('error' in plan) {
@@ -1121,7 +1188,7 @@ export function Viewer({ slug }: { slug: string }) {
       }
       void runPlan(plan, kind === 'delete');
     },
-    [runPlan, setToast],
+    [runPlan, setToast, copyPng],
   );
   // Nudge panah: Δ menumpuk selama commit berjalan; dikirim sesudah dokumen termuat pada rev commit sebelumnya, dengan
   // x/y dari dokumen tersimpan (geometri canvas baru diukur ulang sesudah board di-mount ulang).
@@ -1604,7 +1671,7 @@ export function Viewer({ slug }: { slug: string }) {
                 </span>
               )}
             </span>
-            <AddLayerButton disabled={!editable} disabledReason={preview ? 'Not available while previewing a version' : 'lakard is offline'} hasBoard={boards.length > 0} onPick={onMenuInsert} />
+            <AddLayerButton disabled={!editable} disabledReason={preview ? 'Not available while previewing a version' : 'lakard is offline'} hasBoard={boards.length > 0} onPick={onMenuInsert} onImportUrl={() => setImportUrlOpen(true)} />
           </div>
           {boards.length === 0 ? <div className="muted-note">No layers yet</div> : <LayerTree key={page?.id} nodes={treeBoards} kinds={components?.kinds} selectedId={selectedId} selectedIds={selection} selectedPath={selectedInfo} index={index} onSelect={select} onToggle={toggleSelect} onMenu={openLayerMenu} marks={preview ? undefined : marks} />}
         </div>
@@ -1772,6 +1839,7 @@ export function Viewer({ slug }: { slug: string }) {
           onExportCode={preview ? undefined : editMenu.ids.length === 1 ? () => setCodeExport(editMenu.ids[0]) : null}
         />
       )}
+      {importUrlOpen && <ImportUrlDialog busy={importingUrl} onSubmit={importPage} onClose={() => setImportUrlOpen(false)} />}
       {fileMenu && (
         <FileMenu
           target={{ slug, x: fileMenu.x, y: fileMenu.y }}

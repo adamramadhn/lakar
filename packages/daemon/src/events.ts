@@ -62,6 +62,7 @@ export const TOOL_ROUTES: Readonly<Record<string, string>> = {
   '/viewer/selection': 'get_selection',
   '/viewer/export-code': 'export_code',
   '/viewer/paste': 'paste',
+  '/viewer/import-url': 'import_url',
   '/viewer/documents': 'list_documents',
   '/viewer/undo': 'undo',
   '/viewer/redo': 'redo',
@@ -304,6 +305,17 @@ const ids = (v: unknown): string[] | undefined => {
   return out;
 };
 
+/** URL untuk target Activity: host + path saja (query, fragment, dan kredensial dibuang). */
+const urlTarget = (raw: string | undefined): string | undefined => {
+  if (!raw) return undefined;
+  try {
+    const u = new URL(raw);
+    return `${u.host}${u.pathname}`;
+  } catch {
+    return raw;
+  }
+};
+
 /** Argumen ringkas per tool dari body permintaan. */
 function targetOf(tool: string, body: Record<string, unknown> | undefined): string | undefined {
   if (!body) return undefined;
@@ -318,6 +330,9 @@ function targetOf(tool: string, body: Record<string, unknown> | undefined): stri
       return str(body.id);
     case 'paste':
       return str(body.parentId);
+    case 'import_url':
+      // Query/kredensial tidak dicatat di Activity (bisa memuat token sementara di URL bertanda tangan).
+      return urlTarget(str(body.url));
     case 'layout_check':
     case 'fix_check':
       return str(body.boardId);

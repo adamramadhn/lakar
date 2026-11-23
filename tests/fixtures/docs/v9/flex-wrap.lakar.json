@@ -1,0 +1,84 @@
+{
+  "schemaVersion": 9,
+  "id": "CorpV9Wr",
+  "rev": 3,
+  "pages": [
+    {
+      "id": "PageWr01",
+      "name": "Page 1",
+      "children": [
+        {
+          "type": "board",
+          "id": "BrdWr001",
+          "name": "Wrap",
+          "x": 0,
+          "y": 0,
+          "width": 720,
+          "height": 460,
+          "screen": "app",
+          "fills": [{ "type": "solid", "color": "#F5F5F0" }],
+          "children": [
+            {
+              "type": "frame",
+              "id": "FrmWr000",
+              "name": "Isi",
+              "layout": "column",
+              "gap": 24,
+              "padding": 24,
+              "width": "fill",
+              "height": "hug",
+              "children": [
+                { "type": "text", "id": "TxtWr001", "name": "Judul", "content": "Koleksi label", "weight": 600, "size": 18, "lineHeight": 24, "color": "#1A1A1A" },
+                {
+                  "type": "frame",
+                  "id": "FrmWr001",
+                  "name": "Daftar / Chip",
+                  "layout": "row",
+                  "wrap": true,
+                  "columnGap": 8,
+                  "rowGap": 12,
+                  "padding": 16,
+                  "width": 300,
+                  "height": "hug",
+                  "radius": 8,
+                  "fills": [{ "type": "solid", "color": "#FFFFFF" }],
+                  "children": [
+                    { "type": "rect", "id": "RctWr001", "name": "Chip 1", "width": 80, "height": 28, "radius": 14, "fills": [{ "type": "solid", "color": "#EDE7DA" }] },
+                    { "type": "rect", "id": "RctWr002", "name": "Chip 2", "width": 80, "height": 28, "radius": 14, "fills": [{ "type": "solid", "color": "#DDE7DA" }] },
+                    { "type": "rect", "id": "RctWr003", "name": "Chip 3", "width": 80, "height": 28, "radius": 14, "fills": [{ "type": "solid", "color": "#EDE7DA" }] },
+                    { "type": "rect", "id": "RctWr004", "name": "Chip 4", "width": 80, "height": 28, "radius": 14, "fills": [{ "type": "solid", "color": "#DDE7DA" }] },
+                    { "type": "rect", "id": "RctWr005", "name": "Chip 5", "width": 80, "height": 28, "radius": 14, "fills": [{ "type": "solid", "color": "#EDE7DA" }] },
+                    { "type": "rect", "id": "RctWr006", "name": "Chip 6", "width": 80, "height": 28, "radius": 14, "fills": [{ "type": "solid", "color": "#DDE7DA" }] },
+                    { "type": "rect", "id": "RctWr007", "name": "Chip 7", "width": 80, "height": 28, "radius": 14, "fills": [{ "type": "solid", "color": "#EDE7DA" }] }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "FrmWr002",
+                  "name": "Daftar / Kolom",
+                  "layout": "column",
+                  "wrap": true,
+                  "rowGap": 8,
+                  "columnGap": 12,
+                  "padding": 16,
+                  "width": "hug",
+                  "height": 200,
+                  "radius": 8,
+                  "fills": [{ "type": "solid", "color": "#FFFFFF" }],
+                  "children": [
+                    { "type": "rect", "id": "RctWr008", "name": "Baris 1", "width": 120, "height": 40, "radius": 6, "fills": [{ "type": "solid", "color": "#DCE7F5" }] },
+                    { "type": "rect", "id": "RctWr009", "name": "Baris 2", "width": 120, "height": 40, "radius": 6, "fills": [{ "type": "solid", "color": "#DCE7F5" }] },
+                    { "type": "rect", "id": "RctWr010", "name": "Baris 3", "width": 120, "height": 40, "radius": 6, "fills": [{ "type": "solid", "color": "#DCE7F5" }] },
+                    { "type": "rect", "id": "RctWr011", "name": "Baris 4", "width": 120, "height": 40, "radius": 6, "fills": [{ "type": "solid", "color": "#DCE7F5" }] },
+                    { "type": "rect", "id": "RctWr012", "name": "Baris 5", "width": 120, "height": 40, "radius": 6, "fills": [{ "type": "solid", "color": "#DCE7F5" }] },
+                    { "type": "rect", "id": "RctWr013", "name": "Baris 6", "width": 120, "height": 40, "radius": 6, "fills": [{ "type": "solid", "color": "#DCE7F5" }] }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
