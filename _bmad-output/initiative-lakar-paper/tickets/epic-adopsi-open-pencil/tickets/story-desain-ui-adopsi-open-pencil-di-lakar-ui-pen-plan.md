@@ -3,14 +3,14 @@ title: 'Desain UI adopsi open-pencil di lakar-ui.pen'
 type: feature
 ticket: '1'
 created: '2026-11-23'
-status: in-progress
+status: in-review
 baseline_revision: '01390e5ca062fc1b6f6020cd6fcdeb84bc80037e'
 route: oneshot
 route_source: auto
 risk: low
-review: ''
-review_source: ''
-lenses_ran: []
+review: quick
+review_source: pinned
+lenses_ran: [quick]
 review_loop_iteration: 0
 followup_review_recommended: false
 context: ['{project-root}/design/README.md']
@@ -42,6 +42,13 @@ Keputusan desain (atas delegasi Fatmuh):
 - Dialog impor URL dibuka dari menu "+" Add layer dan context menu canvas ("Import from URL…"). Tiga state: form (alamat, preset lebar Desktop 1440 / Tablet 768 / Mobile 375, catatan bahwa skrip tidak dijalankan), progres (langkah fetch → render → convert), dan error (alamat privat ditolak, plus timeout/ukuran sebagai teks bantuan).
 - DTCG: menu "…" di header panel Theme berisi Import DTCG JSON…, Export DTCG JSON, Copy tokens as CSS. Hasil impor memakai pola laporan (seperti Paste Report): jumlah token, mode, alias, dan daftar tipe yang tidak didukung.
 - Updates: item nav Settings baru "Updates" dengan state Up to date, Update available (unduh + catatan rilis) dan Check failed; banner update available di Settings dan banner "ready to restart" di Recents memakai pola Offline Banner.
+
+Catatan implementasi (2026-11-23):
+- Insiden: tab Pencil untuk `design/lakar-ui.pen` di checkout utama memegang salinan lama di memori (sebelum commit `25f06d1` dan `f358e57`), sehingga save pertama menghapus panel toggle, isi section 04 (skeleton build), dan perubahan lain di section 00 sampai 10. Commit WIP `b6881467be1835a4a91cffef48894742a0c2ed97` berisi versi rusak itu.
+- Perbaikan: `git show HEAD:design/lakar-ui.pen` disalin ke folder sementara, dibuka di Pencil, section 11 dibangun ulang di atasnya dengan skrip yang sama (lookup berdasarkan nama), lalu file disalin kembali ke `design/lakar-ui.pen`. Hasilnya, terhadap `baseline_revision` diff hanya berupa penambahan (94039 baris, 0 hapus). Jumlah node section 00 sampai 10 sama persis dengan baseline.
+- Tab Pencil lama untuk `design/lakar-ui.pen` di checkout utama masih memegang salinan basi. Tab itu harus ditutup atau dimuat ulang tanpa disimpan.
+- Section 11 = `PciUW`, berisi 15 layar dark dan 15 light, plus sheet komponen. Id node tercatat di `design/README.md`.
+- File yang diubah: `design/lakar-ui.pen`, `design/README.md`, dan plan ini.
 
 ## Verification
 

@@ -97,27 +97,27 @@ Di Pencil, shimmer dan denyut berjalan live lewat shader `@time`. Gerakan beruru
 
 Desain story 8.1 epic `epic-adopsi-open-pencil` (2026-11-23), dasar UI story 8.5–8.10. Desain disetujui atas delegasi Fatmuh (terima jadi, 2026-11-23).
 
-Section `iYLJg`, header `mfCQ7`. Baris Components `prQlr` (sheet dark `g6Mfg`, sheet light `eeKks`), baris Dark `oolM4` (layar di `Zrkzx`), baris Light `fLgUo` (layar di `klCN3`). Semua layar desktop 1440×900. Versi light adalah salinan versi dark dengan `theme.mode = light`.
+Section `PciUW`, header `hJxuz`. Baris Components `LxflA` (sheet dark `FK0fs`, sheet light `b0sZu`), baris Dark `o8I9K` (layar di `e1UiGo`), baris Light `G2UryN` (layar di `gC03l`). Semua layar desktop 1440×900. Versi light adalah salinan versi dark dengan `theme.mode = light`.
 
 | Layar | Dark | Light | Story |
 |---|---|---|---|
-| Canvas — Smart guides · Snapping | `GFDrS` | `Pv7gD` | 8.5 |
-| Canvas — Alt+hover distance | `JtQT2` | `Qyk7D` | 8.5 |
-| Canvas — Zoom menu | `j9OTVN` | `gNXNe` | 8.5 |
-| Design — Auto layout · Wrap | `UroZX` | `hs3ew` | 8.6 |
-| Canvas — Context menu · Copy as PNG | `rlBaX` | `GXHgL` | 8.7 |
-| Import from URL — Form | `bh4AW` | `hTNuW` | 8.8 |
-| Import from URL — Importing | `wrh3d` | `AUXAh` | 8.8 |
-| Import from URL — Error | `E4CtvM` | `Y5RKo` | 8.8 |
-| Theme — Import menu · DTCG | `t5wwvB` | `m8IeW` | 8.9 |
-| Theme — Export menu · DTCG | `Rsz7g` | `GDIh3` | 8.9 |
-| Theme — DTCG import report | `AXMO0` | `O01BK` | 8.9 |
-| Settings — Updates · Up to date | `ORtUr` | `BjQ0J` | 8.10 |
-| Settings — Updates · Update available | `H81KwZ` | `Zi1oA` | 8.10 |
-| Settings — Updates · Check failed | `v2Ckpl` | `Ze114` | 8.10 |
-| Recents — Update installed banner | `DZkuy` | `XNpid` | 8.10 |
+| Canvas — Smart guides · Snapping | `SBYW8` | `ReE4k` | 8.5 |
+| Canvas — Alt+hover distance | `AZFxg` | `zYrgV` | 8.5 |
+| Canvas — Zoom menu | `KUPWF` | `j4KxK` | 8.5 |
+| Design — Auto layout · Wrap | `EWaro` | `G3duC` | 8.6 |
+| Canvas — Context menu · Copy as PNG | `wrHbH` | `daXU5` | 8.7 |
+| Import from URL — Form | `KeVyR` | `bTuZZ` | 8.8 |
+| Import from URL — Importing | `zhcFF` | `ATWro` | 8.8 |
+| Import from URL — Error | `ehJEP` | `rHph5` | 8.8 |
+| Theme — Import menu · DTCG | `AKduP` | `OwWgd` | 8.9 |
+| Theme — Export menu · DTCG | `Rz8Rz` | `qI7OK` | 8.9 |
+| Theme — DTCG import report | `w7dATN` | `ZSPIQ` | 8.9 |
+| Settings — Updates · Up to date | `j6hWn` | `YhPDV` | 8.10 |
+| Settings — Updates · Update available | `jfKUD` | `d0bqc` | 8.10 |
+| Settings — Updates · Check failed | `OcqWK` | `FeNAU` | 8.10 |
+| Recents — Update installed banner | `dTNIK` | `jhWA9` | 8.10 |
 
-Komponen baru (sheet `g6Mfg`): **Distance Label** `e3Dob` dan **Smart Guide** `ighoH` (reusable), Toast "Copied as PNG" `fZ2Go` dan "Couldn't copy as PNG" `K8Mi4` (instance Toast), serta menu entry point `NKSOy` (Import from URL…, Copy as PNG, Zoom to selection).
+Komponen baru (sheet `FK0fs`): **Distance Label** `c55e6` dan **Smart Guide** `eEhES` (reusable), Toast "Copied as PNG" `k1XdpR` dan "Couldn't copy as PNG" `O7bwE` (instance Toast), serta menu entry point `n9SeH` (Import from URL…, Copy as PNG, Zoom to selection).
 
 Keputusan desain:
 
