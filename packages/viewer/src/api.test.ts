@@ -421,6 +421,21 @@ describe('exportPng (aplikasi 2)', () => {
     expect(mod.exportFileName('attachment; filename="../x.png"', 'f.png')).toBe('f.png');
     expect(mod.exportFileName(null, 'f.png')).toBe('f.png');
   });
+
+  it('nodeId (Copy as PNG) ikut di body; tanpa nodeId body persis seperti lama', async () => {
+    const mod = await (async () => {
+      vi.resetModules();
+      return import('./api.ts');
+    })();
+    const seen: unknown[] = [];
+    vi.stubGlobal('fetch', async (_path: string, init: { body: string }) => {
+      seen.push(JSON.parse(init.body));
+      return new Response(new Uint8Array([137, 80, 78, 71]), { status: 200, headers: { 'content-type': 'image/png' } });
+    });
+    await mod.api.exportPng('my-landing', 'Bbbbbbb1', 2, 'Card0001');
+    await mod.api.exportPng('my-landing', 'Bbbbbbb1', 2);
+    expect(seen).toEqual([{ boardId: 'Bbbbbbb1', scale: 2, nodeId: 'Card0001' }, { boardId: 'Bbbbbbb1', scale: 2 }]);
+  });
 });
 
 describe('layer manual (aplikasi 4)', () => {

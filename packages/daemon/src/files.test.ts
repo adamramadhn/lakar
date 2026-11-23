@@ -342,6 +342,42 @@ describe('POST /viewer/docs/:slug/export (aplikasi 2)', () => {
     expect(gone.statusCode).toBe(404);
   });
 
+  it('nodeId: render dipanggil dengan nodeId dan nama file dari node; node di board lain / tidak ada → 404', async () => {
+    const dataDir = await mkdtemp(join(root, 'export-node-'));
+    const { app } = buildServer({ config: { ...baseConfig, port: 0, dataDir }, render: sizedRender });
+    const post = (payload: unknown) => app.inject({ method: 'POST', url: '/viewer/docs/my-landing/export', payload: payload as object });
+    const committed = await transact(createDocument(), { sessionId: 'test', description: 'seed' }, (tx) => {
+      const b = tx.add(null, { type: 'board', name: 'Desktop', x: 0, y: 0, width: 1440, height: 900, screen: 'landing' });
+      tx.add(b, { type: 'frame', name: 'Card', position: 'absolute', x: 20, y: 30, width: 100, height: 80 });
+      tx.add(null, { type: 'board', name: 'Mobile', x: 1500, y: 0, width: 375, height: 812, screen: 'mobile' });
+    });
+    await mkdir(join(dataDir, 'docs'), { recursive: true });
+    await writeFile(join(dataDir, 'docs', 'my-landing.lakar.json'), JSON.stringify(committed.doc));
+    const boards = committed.doc.pages[0]!.children;
+    const boardId = boards[0]!.id;
+    const cardId = (boards[0]!.children ?? [])[0]!.id;
+    const otherBoardId = boards[1]!.id;
+
+    const ok = await post({ boardId, scale: 2, nodeId: cardId });
+    expect(ok.statusCode, ok.body).toBe(200);
+    expect(ok.headers['content-type']).toBe('image/png');
+    expect(ok.headers['content-disposition']).toBe('attachment; filename="my-landing-card@2x.png"');
+    expect(calls.at(-1)).toEqual({ boardId, opts: { scale: 2, nodeId: cardId } });
+
+    // Board sebagai nodeId: perilaku sama dengan tanpa nodeId (render board utuh).
+    const asBoard = await post({ boardId, scale: 1, nodeId: boardId });
+    expect(asBoard.statusCode).toBe(200);
+    expect(calls.at(-1)).toEqual({ boardId, opts: { scale: 1 } });
+    expect(asBoard.headers['content-disposition']).toBe('attachment; filename="my-landing-desktop@1x.png"');
+
+    const other = await post({ boardId, scale: 1, nodeId: otherBoardId });
+    expect(other.statusCode).toBe(404);
+    expect(other.json().error.code).toBe('NOT_FOUND');
+    const gone = await post({ boardId, scale: 1, nodeId: 'nope' });
+    expect(gone.statusCode).toBe(404);
+    expect(gone.json().error.code).toBe('NOT_FOUND');
+  });
+
   it('body tidak valid (scale 3, tanpa boardId) → 400 SCHEMA_INVALID', async () => {
     const t = await exportSetup();
     expect((await t.post('/viewer/docs/my-landing/export', { boardId: t.boardId, scale: 3 })).statusCode).toBe(400);

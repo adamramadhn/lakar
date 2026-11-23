@@ -560,15 +560,16 @@ class ViewerClient {
 
   /**
    * Export PNG board (POST /viewer/docs/:slug/export): byte PNG + nama file dari `content-disposition`.
+   * `nodeId` (Copy as PNG) = satu node tersimpan di dalam board itu; board lain/tidak ada → 404 NOT_FOUND.
    * Tanpa sesi; error tetap berbentuk AD-11 (JSON).
    */
-  async exportPng(slug: string, boardId: string, scale: 1 | 2): Promise<{ blob: Blob; filename: string }> {
+  async exportPng(slug: string, boardId: string, scale: 1 | 2, nodeId?: string): Promise<{ blob: Blob; filename: string }> {
     let res: Response;
     try {
       res = await fetch(`/viewer/docs/${encodeURIComponent(slug)}/export`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ boardId, scale }),
+        body: JSON.stringify({ boardId, scale, ...(nodeId !== undefined ? { nodeId } : {}) }),
       });
     } catch (e) {
       setOffline(true);

@@ -56,6 +56,8 @@ export class FakeDaemon {
       if (!m) continue;
       try {
         const data = await r.handler(req, m);
+        // Respons siap pakai (mis. byte PNG route ekspor) diteruskan apa adanya.
+        if (data instanceof Response) return data;
         return json({ ok: true, data: data ?? null });
       } catch (e) {
         if (e instanceof FakeFailure) return json({ ok: false, error: { code: e.code, message: e.message, hint: '' } }, e.status);

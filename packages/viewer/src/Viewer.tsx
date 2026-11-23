@@ -52,7 +52,7 @@ import { instanceModel, masterModel, slotFrameInfo } from './componentProps';
 import type { ComponentEdit } from './ComponentPropsPanel';
 import { createActionQueue } from './componentQueue';
 import { indexGeo, toggleSelection, type GeoNode } from './gesture';
-import { actionState, EDIT_ACTIONS, nudgeNodes, nudgeOps, planAction, selectAllIds, selectionAfter, shortcutAction, type EditAction, type EditPlan } from './editActions';
+import { actionState, EDIT_ACTIONS, nudgeNodes, nudgeOps, planAction, selectAllIds, selectionAfter, shortcutAction, topMost, type EditAction, type EditPlan } from './editActions';
 import { EditMenu } from './EditMenu';
 import { EMPTY_STACKS, recordCommit, settleStep, takeStep, type UndoStacks } from './undoHistory';
 import { attachSelectionReporter } from './selectionSync';
@@ -1107,10 +1107,47 @@ export function Viewer({ slug }: { slug: string }) {
       }),
     [applyEdit, stepHistory, setToast],
   );
+  /**
+   * Copy as PNG (desain 11, layar gj8lD/BD9N7): satu node tersimpan terpilih diekspor sebagai PNG 2x lewat
+   * `/viewer/docs/:slug/export` lalu ditulis ke clipboard sebagai `ClipboardItem` `image/png`. Board → body tanpa
+   * `nodeId` (perilaku lama). Alamat komposit (isi instance `a/b`) diam saja — daemon tidak me-resolve-nya.
+   */
+  const copyPng = useCallback(
+    (ids: string[]) => {
+      const scene = sceneRef.current?.() ?? [];
+      const index = indexGeo(scene);
+      const members = topMost(index, ids);
+      if (members.length !== 1 || members[0]!.id.includes('/')) return;
+      const node = members[0]!;
+      let board = node;
+      while (board.parentId) {
+        const parent = index.get(board.parentId);
+        if (!parent) break;
+        board = parent;
+      }
+      const run = async () => {
+        try {
+          const { blob } = await api.exportPng(slug, board.id, 2, node.id === board.id ? undefined : node.id);
+          await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+          setToastState({ message: 'Copied as PNG', kind: 'info' });
+        } catch (e) {
+          // Detail mengikuti pola "Couldn't …: <detail>" toast undo; Try again mengulang langkah yang sama.
+          setToastState({ message: `Couldn't copy as PNG: ${errorText(e)}`, kind: 'error', action: { label: 'Try again', run: () => void run() } });
+        }
+      };
+      void run();
+    },
+    [slug],
+  );
   /** Jalankan aksi untuk `ids` (default seleksi): aksi tak berlaku → toast/diam; satu permintaan tulis sekaligus. */
   const runAction = useCallback(
     (kind: EditAction, ids?: string[]) => {
       if (!editableRef.current || editing.current > 0) return;
+      // Copy as PNG bukan op dokumen (ekspor + clipboard), jadi dicegat sebelum planAction.
+      if (kind === 'copy-png') {
+        copyPng(ids ?? selectionRef.current);
+        return;
+      }
       const plan = planAction(kind, sceneRef.current?.() ?? [], ids ?? selectionRef.current);
       if (!plan) return;
       if ('error' in plan) {
@@ -1119,7 +1156,7 @@ export function Viewer({ slug }: { slug: string }) {
       }
       void runPlan(plan, kind === 'delete');
     },
-    [runPlan, setToast],
+    [runPlan, setToast, copyPng],
   );
   // Nudge panah: Δ menumpuk selama commit berjalan; dikirim sesudah dokumen termuat pada rev commit sebelumnya, dengan
   // x/y dari dokumen tersimpan (geometri canvas baru diukur ulang sesudah board di-mount ulang).
