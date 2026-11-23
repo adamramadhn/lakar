@@ -14,7 +14,7 @@ import { chromiumInstalled, DEFAULT_BROWSERS_PATH } from '../../../tests/support
 import { testLog } from '../../../tests/support/log.ts';
 
 /** Skill v1 (packages/skills; mcp tidak bergantung pada paket itu, hanya membaca file untuk perbandingan). */
-const SKILL_NAMES = ['core', 'landing', 'mobile', 'webapp', 'layout', 'typography', 'color', 'accessibility', 'ui', 'interface', 'writing', 'review', 'icons', 'api', 'selection'] as const;
+const SKILL_NAMES = ['core', 'landing', 'mobile', 'webapp', 'layout', 'typography', 'color', 'accessibility', 'ui', 'interface', 'writing', 'review', 'icons', 'api', 'selection', 'break-ui', 'variants'] as const;
 const readSkill = (name: string) => readFile(fileURLToPath(new URL(`../../skills/skills/${name}.md`, import.meta.url)), 'utf8');
 
 const PNG_B64 = Buffer.from('fake-png').toString('base64');
@@ -319,6 +319,10 @@ describe('@lakar/mcp', () => {
     expect(ins).toContain('open_doc {slug} hanya bila pengguna meminta file tertentu atau file baru');
     expect(ins.indexOf('read_skill core')).toBeLessThan(ins.indexOf('open_doc {}'));
     expect(ins).not.toMatch(/\bpolish\b/);
+    // spec-design-skills-emil: skill opsional disebut singkat, di luar muat wajib.
+    expect(ins).toContain('Opsional: read_skill break-ui bila diminta uji data terburuk');
+    expect(ins).toContain('variants bila diminta beberapa variasi');
+    expect(READ_SKILL_DESCRIPTION).toMatch(/opsional: break-ui .*variants/);
     expect(READ_SKILL_DESCRIPTION).toMatch(/core .*\+ delapan skill domain \(layout, typography, color, accessibility, ui, interface, writing, review\) \+ skill jenis layar \(landing, mobile, atau webapp.*giliran yang sama/);
     expect(READ_SKILL_DESCRIPTION).toMatch(/aplikasi desktop\/dashboard → webapp/);
     expect(READ_SKILL_DESCRIPTION).toContain(`Nama: ${SKILL_NAMES.join(', ')}.`);
@@ -733,7 +737,7 @@ describe.skipIf(!browserInstalled)('layout_check dengan respons lakard asli', ()
     testLog(`[mcp] layout_check:\n${text}`);
   }, 60_000);
 
-  it('read_skill terhadap lakard asli: kelima belas skill (8 domain + selection) tersedia, isi sama dengan file skill; polish NOT_FOUND', async () => {
+  it('read_skill terhadap lakard asli: ketujuh belas skill (8 domain + selection + break-ui + variants) tersedia, isi sama dengan file skill; polish NOT_FOUND', async () => {
     const c = await connect(proxyUrl);
     const list = await c.callTool({ name: 'read_skill', arguments: {} });
     expect(list.isError).toBeFalsy();

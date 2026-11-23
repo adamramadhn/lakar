@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 
 export const PACKAGE = '@lakar/skills';
 
-/** Nama skill yang dikenal (tertutup): inti, jenis layar, delapan domain desain, lalu rujukan dan alur seleksi. */
+/** Nama skill yang dikenal (tertutup): inti, jenis layar, delapan domain desain, rujukan, alur seleksi, lalu skill opsional. */
 export const SKILL_NAMES = [
   'core',
   'landing',
@@ -24,6 +24,8 @@ export const SKILL_NAMES = [
   'icons',
   'api',
   'selection',
+  'break-ui',
+  'variants',
 ] as const;
 export type SkillName = (typeof SKILL_NAMES)[number];
 
@@ -32,6 +34,9 @@ export const DOMAIN_SKILLS = ['layout', 'typography', 'color', 'accessibility', 
 
 /** Skill jenis layar. */
 export const SCREEN_SKILLS = ['landing', 'mobile', 'webapp'] as const satisfies readonly SkillName[];
+
+/** Skill opsional di luar muat per jenis layar (spec-design-skills-emil): uji data terburuk dan N variasi beda arah. */
+export const OPTIONAL_SKILLS = ['break-ui', 'variants'] as const satisfies readonly SkillName[];
 
 /** Nama skill lama yang sudah tidak ada → pesan pengganti (bukan alias; `read_skill` tetap NOT_FOUND). */
 export const RETIRED_SKILLS: Readonly<Record<string, string>> = {

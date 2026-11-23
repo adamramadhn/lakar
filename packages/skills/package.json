@@ -15,7 +15,8 @@
   "types": "./dist/index.d.ts",
   "files": [
     "dist",
-    "skills"
+    "skills",
+    "NOTICE.md"
   ],
   "scripts": {
     "test": "vitest run --root ../.. packages/skills/"

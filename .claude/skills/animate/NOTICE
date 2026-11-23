@@ -1,0 +1,4 @@
+Skill "animate" disalin apa adanya (tanpa perubahan isi) dari:
+  https://github.com/emilkowalski/skills/tree/64eb3deb9a5fbfa041faf783e0bc3fd635872e9c/skills/animate
+Copyright (c) 2026 Emil Kowalski. Dilisensikan di bawah MIT License (teks lengkap di LICENSE, direktori ini).
+Di repo Lakar dipakai agen yang membangun efek dan animasi canvas Lakar (packages/viewer).

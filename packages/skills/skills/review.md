@@ -1,16 +1,14 @@
 # Lakar: review
 
-Sekali di akhir; hanya menambah satu execute perbaikan.
-
 ## Langkah
 
 1. `screenshot` tiap board, lalu `screenshot({nodeId, scale:2})` satu area terpadat (tabel, daftar berbadge, kartu KPI, hero bertumpuk; ID dari `created`/`keep`).
-2. Jawab enam pertanyaan dari kedua gambar, singkat (`ok` atau temuan + node), tanpa prosa.
+2. Jawab enam pertanyaan dari kedua gambar: `ok` atau `node: sebelum → sesudah · alasan` (`gap 10 → 12 · skala`), tanpa prosa.
 3. Satu execute perbaikan: semua temuan + sisa warning `check`.
 
 ## Enam pertanyaan
 
-1. Utuh: ada teks terpotong, meluber, bertumpuk, atau kata yatim?
+1. Utuh: ada teks terpotong, meluber, bertumpuk, atau kata yatim? Tahan nama dan angka 2× lebih panjang?
 2. Rapi: tepi kiri sejajar, grup jelas, badge/ikon/tombol proporsional dan sejajar tengah, tanpa ruang kosong mati?
 3. Terbaca: teks kecil, teks di tint, teks di atas foto/efek?
 4. Angka: total, persen, hitungan, tanggal ↔ hari cocok lintas elemen?

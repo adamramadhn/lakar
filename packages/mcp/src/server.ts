@@ -147,9 +147,10 @@ export const READ_SKILL_DESCRIPTION =
   'Baca panduan skill Lakar (Markdown). Baca core (alur kerja, prelude helper, token, konvensi) + delapan skill domain ' +
   '(layout, typography, color, accessibility, ui, interface, writing, review) + skill jenis layar (landing, mobile, atau webapp; ' +
   'aplikasi desktop/dashboard → webapp; berisi contoh teruji) di giliran yang sama (10 panggilan paralel); icons bila ragu nama ikon; api hanya untuk referensi lengkap; ' +
-  'selection bila permintaan merujuk node yang dipilih pengguna di viewer (varian responsif, cek konsistensi). ' +
+  'selection bila permintaan merujuk node yang dipilih pengguna di viewer (varian responsif, cek konsistensi); ' +
+  'opsional: break-ui bila diminta uji data terburuk/edge case, variants bila diminta beberapa variasi/alternatif beda arah. ' +
   'Tanpa name → daftar {skills:[{name, available}]}; dengan name → isi skill. ' +
-  'Nama: core, landing, mobile, webapp, layout, typography, color, accessibility, ui, interface, writing, review, icons, api, selection. ' +
+  'Nama: core, landing, mobile, webapp, layout, typography, color, accessibility, ui, interface, writing, review, icons, api, selection, break-ui, variants. ' +
   'Nama lain atau skill yang belum tersedia → NOT_FOUND dengan daftar yang tersedia (polish sudah dipecah ke delapan skill domain).';
 
 /** Instruksi server MCP (dikirim saat initialize): urutan kerja singkat. */
@@ -162,7 +163,8 @@ export const SERVER_INSTRUCTIONS =
   'open_doc {slug} hanya bila pengguna meminta file tertentu atau file baru. ' +
   'Lalu rencana singkat, dan langsung bangun lewat sedikit execute besar (2–4 untuk landing, 1–2 untuk mobile dan webapp) yang diawali prelude dari skill core; ' +
   'baca check di respons execute, perbaiki dengan editId/edits atau update, akhiri dengan satu screenshot board + satu screenshot zoom (nodeId, scale 2) ' +
-  'area terpadat (skill review), satu execute perbaikan, lalu export PNG.';
+  'area terpadat (skill review), satu execute perbaikan, lalu export PNG. ' +
+  'Opsional: read_skill break-ui bila diminta uji data terburuk/edge case; variants bila diminta beberapa variasi/alternatif.';
 
 /** Deskripsi tool `list_boards`. */
 export const LIST_BOARDS_DESCRIPTION =
@@ -227,7 +229,7 @@ export const LAYOUT_CHECK_DESCRIPTION =
   `batas kontrol ${CONTROL_PREFIXES.map((p) => `'${p} …'`).join('/')} (stroke/fill, atau keturunan bercat) < ${CONTRAST_MIN.nonText}:1 terhadap latar, ` +
   `ikon tanpa label teks (di komponen tanpa teks, atau deretan ikon seperti bintang rating tanpa nilai) < ${CONTRAST_MIN.nonText}:1, ` +
   `dan warning scrim: teks di atas foto/gradien multi-hue/efek blur tanpa fill solid opacity ≥ ${String(SCRIM_MIN_ALPHA).replace('.', ',')} di antaranya; ` +
-  'LC-12 (warning) ukuran board (mobile 390×844, app 1440×900 atau 1440×1024, landing lebar 1440, atau expectedSize) dan tabrakan antarboard (pakai place). ' +
+  'LC-12 (warning) ukuran board (mobile 390×844, app 1440×900 atau 1440×1024, landing lebar 1440, atau expectedSize), tinggi pas board mobile panjang dan board landing tanpa [WIP] (ruang kosong di bawah isi > 8 px → update tinggi), dan tabrakan antarboard (pakai place). ' +
   'Warning polesan: LC-18 kartu bersarang, LC-23 celah teks ↔ badge/tombol/ikon < 8, LC-24 proporsi badge di baris, LC-25 radius tidak konsentris, ' +
   'LC-26 ruang di atas judul ≤ bawah, LC-27 > 6 ukuran huruf, LC-28 baris > 80 karakter, LC-29 bobot < 400 di < 18px, LC-30 tanda baca (... dan tanda hubung rentang). ' +
   `Warning tipografi/spacing (token DESIGN.md): LC-03 teks wrap 'fixed' ≥ 2 baris atau teks melewati kotaknya, LC-06 paragraf (≥ 2 baris, ≥ 6 kata) < ${PARAGRAPH_MIN.landing}px di landing/mobile, < ${PARAGRAPH_MIN.app}px di app, < ${PARAGRAPH_MIN_IN_CARD}px di kartu ber-cat, ` +
@@ -358,7 +360,7 @@ export function createLakarMcpServer(daemonUrl: string): McpServer {
     'read_skill',
     {
       description: READ_SKILL_DESCRIPTION,
-      inputSchema: z.object({ name: z.string().optional().describe('core | landing | mobile | webapp | layout | typography | color | accessibility | ui | interface | writing | review | icons | api | selection; kosongkan untuk daftar') }),
+      inputSchema: z.object({ name: z.string().optional().describe('core | landing | mobile | webapp | layout | typography | color | accessibility | ui | interface | writing | review | icons | api | selection | break-ui | variants; kosongkan untuk daftar') }),
     },
     ({ name }) =>
       guarded(async () => {

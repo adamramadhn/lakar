@@ -15,7 +15,7 @@ describe('@lakar/skills', () => {
 
   it('mengekspor nama paket dan daftar nama tertutup', () => {
     expect(PACKAGE).toBe('@lakar/skills');
-    expect(SKILL_NAMES).toEqual(['core', 'landing', 'mobile', 'webapp', 'layout', 'typography', 'color', 'accessibility', 'ui', 'interface', 'writing', 'review', 'icons', 'api', 'selection']);
+    expect(SKILL_NAMES).toEqual(['core', 'landing', 'mobile', 'webapp', 'layout', 'typography', 'color', 'accessibility', 'ui', 'interface', 'writing', 'review', 'icons', 'api', 'selection', 'break-ui', 'variants']);
     expect(DOMAIN_SKILLS).toEqual(['layout', 'typography', 'color', 'accessibility', 'ui', 'interface', 'writing', 'review']);
     expect(isSkillName('core')).toBe(true);
     expect(isSkillName('lain')).toBe(false);
