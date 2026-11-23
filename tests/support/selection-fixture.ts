@@ -3,12 +3,13 @@
 // seragam + di luar skala; satu-satunya temuan check fixture: warning LC-07 yang ikut tersalin ke varian), judul kartu ketiga berwarna literal `#0F766E` padahal judul kartu lain memakai token
 // `colors.accent`, dan isi kartu ketiga `#475569` (hampir sama dengan `#475467`). Padding kartu memuat token
 // (`spacing.card`) supaya pemangkasan padding contoh varian melewati elemen token.
+// Tinggi board 658 = bawah isi (spec-board-height-fit: LC-12 menilai ruang kosong di bawah isi board landing).
 // Dipakai packages/daemon/src/skills-examples.test.ts dan packages/mcp/src/selection-flow.test.ts.
 
 /** Snippet execute pembuat fixture (dokumen kosong). Nilai terakhir = `{board, hero, fitur, cards}`. */
 export const SELECTION_FIXTURE = `
 setTokens({'colors.accent': {type:'color', value:'#0F766E'}, 'spacing.card': {type:'spacing', value:24}});
-const b = add(null, {type:'board', name:'Kopi / Beranda', x:0, y:0, width:1440, height:900, screen:'landing', fills:[{type:'solid', color:'#FFFFFF'}]});
+const b = add(null, {type:'board', name:'Kopi / Beranda', x:0, y:0, width:1440, height:658, screen:'landing', fills:[{type:'solid', color:'#FFFFFF'}]});
 const hero = add(b, {type:'frame', name:'Seksi / Hero', layout:'column', gap:24, padding:[96,128,64,128], width:'fill'});
 add(hero, {type:'text', name:'Judul', content:'Kopi sangrai minggu ini, diantar dalam 2 hari', size:64, lineHeight:72, weight:700, color:'#101828', width:880});
 add(hero, {type:'text', name:'Deskripsi', content:'Biji dari 14 kebun di Gayo, Kintamani, dan Flores.', size:18, lineHeight:28, color:'#475467', width:720});

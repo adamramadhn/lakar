@@ -1,6 +1,6 @@
 # Lakar: landing page
 
-Board `1440 × bebas` (`screen:'landing'`), mulai tinggi 2000–6000; execute penutup set tinggi = bawah seksi terakhir dari `bounds`.
+Board `1440 × bebas` (`screen:'landing'`), mulai tinggi 2000–6000; tinggi akhir dari `bounds`, bukan tebakan; `LC-12` "tinggi pas = N" → `update(keep.board,{height:N})`.
 
 ## Struktur
 
@@ -114,7 +114,7 @@ for(const [ic,j,dsc,det,tone,hot] of [['flame','Profil sangrai per menu','Espres
 }
 ```
 
-Execute penutup: tinggi = bawah seksi terakhir dari `bounds` (y 948 + 780), lepas `[WIP] `:
+Execute penutup: tinggi dari `bounds` (y 948 + 780), lepas `[WIP] `:
 
 ```js
 update(keep.board, {height:1728, name:'Biji Pagi / Beranda · landing · Jernih'});

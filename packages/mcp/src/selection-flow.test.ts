@@ -124,7 +124,7 @@ describe.skipIf(!browserInstalled)('alur agen dari seleksi: get_selection → ex
       const sel = await agent.callTool({ name: 'get_selection', arguments: {} });
       expect(sel.isError, text(sel)).toBeFalsy();
       const selection = JSON.parse(text(sel));
-      expect(selection).toMatchObject({ slug: SLUG, addresses: [board], nodes: [{ id: board, type: 'board', name: 'Kopi / Beranda', boardId: board, bounds: [0, 0, 1440, 900] }] });
+      expect(selection).toMatchObject({ slug: SLUG, addresses: [board], nodes: [{ id: board, type: 'board', name: 'Kopi / Beranda', boardId: board, bounds: [0, 0, 1440, 658] }] });
 
       // 2. Skill selection memuat alur dan contoh teruji.
       const skill = text(await agent.callTool({ name: 'read_skill', arguments: { name: 'selection' } }));

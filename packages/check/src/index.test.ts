@@ -323,6 +323,58 @@ describe('LC-12 board', () => {
     expect(only(run(clean([frame('Scroll / Konten', [0, 0, 390, 844], [], { clip: true })])), 'LC-12')).toEqual([]);
   });
 
+  // spec-board-height-fit: tinggi board landing = bawah isi (insiden landing-kopi-lereng: board 4074, isi 4050).
+  const seksi = (name: string, y: number, h: number) => frame(name, [0, y, 1440, h], [], solidFill);
+  const landing = (H: number, kids: Loose[], name = 'Kopi / Beranda · landing · Jernih') => ({ name, screen: 'landing' as const, width: 1440, height: H, children: kids });
+  const halaman = (end: number, extra: Loose = {}, pad = 0) => frame('Halaman', [0, 0, 1440, end + pad], [seksi('Seksi / Hero', 0, 900), seksi('Footer', 900, end - 900)], { width: 'fill', ...extra });
+
+  it('landing: isi berakhir 24 px di atas tepi bawah → warning "tinggi pas = N" dengan update', () => {
+    const f = only(run(landing(4074, [halaman(4050)])), 'LC-12');
+    expect(f).toEqual([
+      {
+        level: 'warning',
+        rule: 'LC-12',
+        nodeId: expect.any(String),
+        nodeName: 'Kopi / Beranda · landing · Jernih',
+        detail: 'tinggi 4074, isi berakhir 24 px di atas tepi bawah: tinggi pas = 4050',
+        expected: 'tinggi 4050 = bawah seksi terakhir (sisa ≤ 8 px; padding bawah wadah dihitung isi): update(board, {height:4050})',
+      },
+    ]);
+    expect(summarizeFindings(f).gate).toBe(0);
+  });
+
+  it('landing: pas, sisa ≤ 8 px, [WIP] , kosong, atau expectedSize → tanpa temuan tinggi', () => {
+    expect(run(landing(4050, [halaman(4050)]))).toEqual([]);
+    expect(run(landing(4058, [halaman(4050)]))).toEqual([]);
+    expect(only(run(landing(4059, [halaman(4050)])), 'LC-12')).toHaveLength(1);
+    expect(run(landing(2000, [halaman(1400)], '[WIP] Kopi / Beranda · landing · Jernih'))).toEqual([]);
+    expect(run(landing(2000, []))).toEqual([]);
+    expect(run({ ...landing(2000, [halaman(1400)]), expectedSize: { width: 1440, height: 2000 } })).toEqual([]);
+  });
+
+  it('landing: padding bawah wadah = isi (bukan ruang kosong); wadah setinggi board dinilai dari anaknya + padding', () => {
+    // Wadah hug berpadding bawah 40: bawah wadah = bawah isi.
+    expect(run(landing(4090, [halaman(4050, { padding: [0, 0, 40, 0] }, 40)]))).toEqual([]);
+    // Wadah height:'fill' setinggi board, padding bawah 40: isi berakhir 4050 + 40.
+    const fill = frame('Halaman', [0, 0, 1440, 5000], [seksi('Seksi / Hero', 0, 900), seksi('Footer', 900, 3150)], { width: 'fill', height: 'fill', padding: [0, 0, 40, 0] });
+    expect(only(run(landing(5000, [fill])), 'LC-12')[0]!.detail).toBe('tinggi 5000, isi berakhir 910 px di atas tepi bawah: tinggi pas = 4090');
+    const pas = frame('Halaman', [0, 0, 1440, 4090], [seksi('Seksi / Hero', 0, 900), seksi('Footer', 900, 3150)], { width: 'fill', height: 'fill', padding: [0, 0, 40, 0] });
+    expect(run(landing(4090, [pas]))).toEqual([]);
+    // Frame bertinggi angka setinggi board = seksi utuh (hero 1440×900 di board 900), tanpa temuan.
+    const hero = frame('Seksi / Hero', [0, 0, 1440, 900], [rect('Isi', [80, 96, 1280, 400], solidFill)], { width: 'fill', height: 900, padding: [96, 80], ...solidFill });
+    expect(only(run(landing(900, [hero])), 'LC-12')).toEqual([]);
+    // Wadah fill yang isinya di tengah (justify center / baris align center): celah terbagi → dihitung isi, tanpa temuan.
+    const kids = () => [seksi('Seksi / Hero', 400, 900), seksi('Footer', 1300, 3150)];
+    expect(only(run(landing(5000, [frame('Halaman', [0, 0, 1440, 5000], kids(), { width: 'fill', height: 'fill', justify: 'center' })])), 'LC-12')).toEqual([]);
+    expect(only(run(landing(5000, [frame('Halaman', [0, 0, 1440, 5000], kids(), { layout: 'row', width: 'fill', height: 'fill', align: 'center' })])), 'LC-12')).toEqual([]);
+    // Seksi terakhir bertinggi tetap yang menyentuh tepi bawah (ruang bawah footer disengaja) = isi, tanpa temuan.
+    const footer = frame('Footer', [0, 900, 1440, 400], [rect('Isi', [80, 964, 1280, 120], solidFill)], { height: 400, ...solidFill });
+    expect(run(landing(1300, [frame('Halaman', [0, 0, 1440, 1300], [seksi('Seksi / Hero', 0, 900), footer], { width: 'fill' })]))).toEqual([]);
+    // Overlay absolut di bawah isi tidak dihitung isi.
+    const ov = frame('Overlay / Cookie', [0, 3990, 1440, 84], [], { position: 'absolute', ...solidFill });
+    expect(only(run(landing(4074, [halaman(4050), ov])), 'LC-12')[0]!.detail).toContain('tinggi pas = 4050');
+  });
+
   it('tabrakan dengan board lain di halaman → detail nama+ID, expected place(w,h)', () => {
     const f = run([{ children: [], name: 'A', id: 'Aaaaaaaa' }, { children: [], name: 'B', x: 200 }], 1);
     expect(f[0]!.detail).toBe('bertabrakan dengan board A (Aaaaaaaa)');

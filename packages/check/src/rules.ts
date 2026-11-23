@@ -190,6 +190,52 @@ export const SCREEN_SIZES = {
 export const FIT_SLACK_MAX = 32;
 /** Jarak isi terakhir ke zona bawah / tepi board yang dipakai untuk menghitung tinggi pas (px). */
 export const FIT_CLEARANCE = 24;
+/**
+ * Board landing (spec-board-height-fit): tinggi board = bawah isi; ruang kosong di bawah anak flow terakhir > 8 px
+ * (sesudah padding bawah wadah setinggi board) → saran tinggi pas. Board `[WIP] ` dilewati (seksi masih ditambah).
+ */
+export const LANDING_SLACK_MAX = 8;
+/** Prefiks nama board yang masih dibangun (core.md). */
+const WIP_PREFIX = '[WIP] ';
+
+/**
+ * Bawah isi board landing (px, relatif board). Mulai dari board, ambil anak flow terbawah; bila anak itu wadah setinggi
+ * board (frame `height:'fill'` yang isinya rata atas), turun ke anak flow terbawahnya dan tambahkan padding bawah wadah
+ * itu. Anak lain (hug, atau frame bertinggi angka) = isi, termasuk padding-nya. Tanpa anak flow → undefined.
+ */
+const topAligned = (f: FrameNode): boolean =>
+  f.layout === 'column' ? (f.justify ?? 'start') === 'start' : f.layout === 'row' ? f.align === undefined || f.align === 'start' || f.align === 'stretch' : false;
+
+function stackBottom(ctx: BoardContext): number | undefined {
+  const lastFlow = (c: Container): { node: ChildNode; rect: Rect } | undefined => {
+    let last: { node: ChildNode; rect: Rect } | undefined;
+    for (const k of c.children) {
+      if (!isFlowChild(c, k)) continue;
+      const r = ctx.bounds.get(k.id);
+      if (!r || area(r) <= 0) continue;
+      if (!last || bottom(r) > bottom(last.rect)) last = { node: k, rect: r };
+    }
+    return last;
+  };
+  let pad = 0;
+  let last = lastFlow(ctx.board);
+  while (last) {
+    const k = last.node;
+    // Wadah setinggi board: `height:'fill'`, atau tinggi tetap yang membentang dari atas sampai tepi bawah board.
+    // Seksi bertinggi tetap yang kebetulan menyentuh tepi bawah (footer 300) = isi, tidak dibongkar.
+    const r = last.rect;
+    // Hanya `height:'fill'` yang dianggap wadah: frame bertinggi angka (hero 900 di board 900) = seksi utuh.
+    // Wadah yang isinya tidak rata atas (kolom justify ≠ start, baris align center/end, grid) dihitung isi:
+    // celahnya terbagi, jadi bawah anak terakhir bukan bawah isi.
+    const wrapper = k.type === 'frame' && bottom(r) >= ctx.boardRect.height - TOLERANCE && k.height === 'fill' && topAligned(k);
+    if (!wrapper) return bottom(r) + pad;
+    const inner = lastFlow(k as FrameNode);
+    if (!inner) return bottom(last.rect) + pad;
+    pad += paddingOf(k as FrameNode).b;
+    last = inner;
+  }
+  return undefined;
+}
 
 const near = (a: number, b: number) => Math.abs(a - b) <= TOLERANCE;
 
@@ -265,6 +311,14 @@ export function lc12(ctx: BoardContext, doc: ResolvedDocument): Finding[] {
         const fit = Math.max(d.minHeight, Math.round(h - (limit - end) + FIT_CLEARANCE));
         details.push(`tinggi ${num(h)}, isi berakhir ${num(limit - end)} px di atas ${zone ? 'zona bawah' : homeRect ? 'Home indicator' : 'tepi bawah'}: tinggi pas = ${fit}`);
         expected.push(`tinggi ${fit} (sisa ≤ ${FIT_SLACK_MAX} px); geser zona bawah ikut tinggi baru`);
+      }
+    } else if (b.screen === 'landing' && !b.name.startsWith(WIP_PREFIX)) {
+      // Board landing selesai: tinggi = bawah isi (spec-board-height-fit), bukan angka tebakan.
+      const end = stackBottom(ctx);
+      if (end !== undefined && h - end > LANDING_SLACK_MAX + TOLERANCE) {
+        const fit = Math.round(end);
+        details.push(`tinggi ${num(h)}, isi berakhir ${num(Math.round(h - end))} px di atas tepi bawah: tinggi pas = ${fit}`);
+        expected.push(`tinggi ${fit} = bawah seksi terakhir (sisa ≤ ${LANDING_SLACK_MAX} px; padding bawah wadah dihitung isi): update(board, {height:${fit}})`);
       }
     }
   }
