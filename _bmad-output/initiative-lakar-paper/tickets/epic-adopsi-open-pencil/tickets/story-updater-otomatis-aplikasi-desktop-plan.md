@@ -84,14 +84,14 @@ deferred: []
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `apps/desktop/src-tauri/{Cargo.toml,tauri.conf.json}` — dep updater + config plugins.updater (pubkey dari key yang digenerate) — pondasi plugin
-- [ ] `apps/desktop/src-tauri/src/{main.rs,updates.rs,build.rs}` + `capabilities/viewer-window.json` + `Cargo.lock` — plugin, command, izin — sisi native
-- [ ] `apps/desktop/scripts/make-latest-json.mjs` + `tests/latest-json.test.ts` — generator latest.json — kontrak release
-- [ ] `packages/viewer/src/updates.ts` + `updates.test.ts` — store/state machine updater — logika UI
-- [ ] `packages/viewer/src/{SettingsUpdates,UpdateBanner}.tsx` + `files.ts` + `SettingsGeneral.tsx` + `Dashboard.tsx` + `App.tsx` + `app.css` + `SettingsUpdates.dom.test.tsx` — UI desain Section 11 — permukaan pengguna
-- [ ] `.github/workflows/release.yml` — signing + job latest-json + publish — distribusi
-- [ ] Generate key + `gh secret set TAURI_SIGNING_PRIVATE_KEY` + pubkey ke `tauri.conf.json`; `apps/desktop/README.md` — operasional kunci
-- [ ] Dry run: trigger `push` sementara ke branch → verifikasi artefak `.sig` + `latest.json` di run → hapus trigger
+- [x] `apps/desktop/src-tauri/{Cargo.toml,tauri.conf.json}` — dep updater + config plugins.updater (pubkey dari key yang digenerate) — pondasi plugin
+- [x] `apps/desktop/src-tauri/src/{main.rs,updates.rs,build.rs}` + `capabilities/viewer-window.json` + `Cargo.lock` — plugin, command, izin — sisi native
+- [x] `apps/desktop/scripts/make-latest-json.mjs` + `tests/latest-json.test.ts` — generator latest.json — kontrak release
+- [x] `packages/viewer/src/updates.ts` + `updates.test.ts` — store/state machine updater — logika UI
+- [x] `packages/viewer/src/{SettingsUpdates,UpdateBanner}.tsx` + `files.ts` + `SettingsGeneral.tsx` + `Dashboard.tsx` + `App.tsx` + `app.css` + `SettingsUpdates.dom.test.tsx` — UI desain Section 11 — permukaan pengguna
+- [x] `.github/workflows/release.yml` — signing + job latest-json + publish — distribusi
+- [x] Generate key + `gh secret set TAURI_SIGNING_PRIVATE_KEY` + pubkey ke `tauri.conf.json`; `apps/desktop/README.md` — operasional kunci
+- [x] Dry run: trigger `push` sementara ke branch → verifikasi artefak `.sig` + `latest.json` di run → hapus trigger
 
 **Acceptance Criteria:**
 - Given build lokal tanpa `TAURI_SIGNING_PRIVATE_KEY`, when `pnpm tauri build`, then build sukses dan tidak mencoba menandatangani.
