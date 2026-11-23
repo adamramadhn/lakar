@@ -22,6 +22,7 @@ import {
   LAKAR_VERSION, SCHEMA_VERSION, VERSION_HINT, errorMessage, findingLine, summaryText, type ApiResult, type Finding, type FindingSummary } from '@lakar/schema';
 import { DaemonClient, formatError } from './client.js';
 import { registerFixCheckTool } from './fix-check.js';
+import { toolAnnotations } from './annotations.js';
 
 export const SERVER_NAME = 'lakar';
 export const SERVER_VERSION = LAKAR_VERSION;
@@ -385,13 +386,14 @@ export function createLakarMcpServer(daemonUrl: string): McpServer {
 
   server.registerTool(
     'status',
-    { description: STATUS_DESCRIPTION, inputSchema: z.object({}) },
+    { annotations: toolAnnotations('status'), description: STATUS_DESCRIPTION, inputSchema: z.object({}) },
     () => guarded(async () => asText(await client.status<StatusData>(), formatStatus)),
   );
 
   server.registerTool(
     'read_skill',
     {
+      annotations: toolAnnotations('read_skill'),
       description: READ_SKILL_DESCRIPTION,
       inputSchema: z.object({ name: z.string().optional().describe('core | landing | mobile | webapp | layout | typography | color | accessibility | ui | interface | writing | review | icons | api | selection | break-ui | variants; kosongkan untuk daftar') }),
     },
@@ -404,13 +406,14 @@ export function createLakarMcpServer(daemonUrl: string): McpServer {
 
   server.registerTool(
     'list_boards',
-    { description: LIST_BOARDS_DESCRIPTION, inputSchema: z.object({}) },
+    { annotations: toolAnnotations('list_boards'), description: LIST_BOARDS_DESCRIPTION, inputSchema: z.object({}) },
     () => guarded(async () => asText(await client.call('/boards', {}))),
   );
 
   server.registerTool(
     'inspect',
     {
+      annotations: toolAnnotations('inspect'),
       description: INSPECT_DESCRIPTION,
       inputSchema: z.object({
         id: z.string().describe('ID board atau node'),
@@ -423,6 +426,7 @@ export function createLakarMcpServer(daemonUrl: string): McpServer {
   server.registerTool(
     'export',
     {
+      annotations: toolAnnotations('export'),
       description: EXPORT_DESCRIPTION,
       inputSchema: z.object({
         id: z.string().optional().describe('ID board/node; kosongkan untuk board pertama'),
@@ -441,6 +445,7 @@ export function createLakarMcpServer(daemonUrl: string): McpServer {
   server.registerTool(
     'export_code',
     {
+      annotations: toolAnnotations('export_code'),
       description: EXPORT_CODE_DESCRIPTION,
       inputSchema: z.object({
         id: z.string().optional().describe('ID board/node; kosongkan untuk board pertama'),
@@ -460,6 +465,7 @@ export function createLakarMcpServer(daemonUrl: string): McpServer {
   server.registerTool(
     'paste',
     {
+      annotations: toolAnnotations('paste'),
       description: PASTE_DESCRIPTION,
       inputSchema: z.object({
         content: z.string().describe('dokumen SVG utuh (<svg …>…</svg>) atau potongan HTML (kind html)'),
@@ -482,6 +488,7 @@ export function createLakarMcpServer(daemonUrl: string): McpServer {
   server.registerTool(
     'open_doc',
     {
+      annotations: toolAnnotations('open_doc'),
       description: OPEN_DOC_DESCRIPTION,
       inputSchema: z.object({
         slug: z.string().optional().describe('slug file tertentu, mis. "landing-kopi"; kosongkan untuk dokumen yang terbuka di aplikasi Lakar'),
@@ -499,7 +506,7 @@ export function createLakarMcpServer(daemonUrl: string): McpServer {
 
   server.registerTool(
     'list_documents',
-    { description: LIST_DOCUMENTS_DESCRIPTION, inputSchema: z.object({}) },
+    { annotations: toolAnnotations('list_documents'), description: LIST_DOCUMENTS_DESCRIPTION, inputSchema: z.object({}) },
     () => guarded(async () => asText(await client.call('/viewer/documents', {}))),
   );
 
@@ -508,6 +515,7 @@ export function createLakarMcpServer(daemonUrl: string): McpServer {
     server.registerTool(
       dir,
       {
+        annotations: toolAnnotations(dir),
         description:
           dir === 'undo'
             ? 'Batalkan langkah terakhir SESI INI di dokumen aktif (satu langkah = satu execute/paste yang meng-commit; default 1, steps maks 50). ' +
@@ -525,6 +533,7 @@ export function createLakarMcpServer(daemonUrl: string): McpServer {
   server.registerTool(
     'execute',
     {
+      annotations: toolAnnotations('execute'),
       description: EXECUTE_DESCRIPTION,
       inputSchema: z.object({
         code: z.string().optional().describe('snippet JavaScript (kosongkan bila memperbaiki lewat editId)'),
@@ -556,6 +565,7 @@ export function createLakarMcpServer(daemonUrl: string): McpServer {
   server.registerTool(
     'screenshot',
     {
+      annotations: toolAnnotations('screenshot'),
       description:
         'Render board dokumen aktif ke PNG (default skala 1). Tanpa argumen → board pertama di halaman pertama. ' +
         'nodeId → potret satu node saja (ukuran bounds node). Kirim boardId ATAU nodeId, bukan keduanya (SCHEMA_INVALID). ' +
@@ -583,6 +593,7 @@ export function createLakarMcpServer(daemonUrl: string): McpServer {
   server.registerTool(
     'icon_search',
     {
+      annotations: toolAnnotations('icon_search'),
       description: ICON_SEARCH_DESCRIPTION,
       inputSchema: z.object({
         query: z.string().describe('kata kunci, mis. "dumbbell", "arrow right", "github"'),
@@ -602,6 +613,7 @@ export function createLakarMcpServer(daemonUrl: string): McpServer {
   server.registerTool(
     'photo_search',
     {
+      annotations: toolAnnotations('photo_search'),
       description: PHOTO_SEARCH_DESCRIPTION,
       inputSchema: z.object({
         query: z.string().describe('kata kunci foto, mis. "kamar hotel" atau "hotel room"'),
@@ -629,6 +641,7 @@ export function createLakarMcpServer(daemonUrl: string): McpServer {
   server.registerTool(
     'get_selection',
     {
+      annotations: toolAnnotations('get_selection'),
       description: GET_SELECTION_DESCRIPTION,
       inputSchema: z.object({ slug: z.string().optional().describe('slug dokumen; kosongkan untuk dokumen aktif sesi (atau dokumen dengan seleksi terakhir)') }),
     },
@@ -638,6 +651,7 @@ export function createLakarMcpServer(daemonUrl: string): McpServer {
   server.registerTool(
     'visual_diff',
     {
+      annotations: toolAnnotations('visual_diff'),
       description: VISUAL_DIFF_DESCRIPTION,
       inputSchema: z.object({
         boardId: z.string().optional().describe('ID board; kosongkan untuk board pertama'),
@@ -661,6 +675,7 @@ export function createLakarMcpServer(daemonUrl: string): McpServer {
   server.registerTool(
     'layout_check',
     {
+      annotations: toolAnnotations('layout_check'),
       description: LAYOUT_CHECK_DESCRIPTION,
       inputSchema: z.object({ boardId: z.string().optional().describe('ID board; kosongkan untuk semua board dokumen aktif') }),
     },

@@ -4,6 +4,7 @@ import type { CallToolResult, McpServer } from '@modelcontextprotocol/server';
 import { z } from 'zod';
 import { G0_RULE_IDS, errorMessage, findingLine, summaryText, type DocOp, type Finding, type FindingSummary } from '@lakar/schema';
 import { formatError, type DaemonClient } from './client.js';
+import { toolAnnotations } from './annotations.js';
 
 /** Deskripsi tool `fix_check`. */
 export const FIX_CHECK_DESCRIPTION =
@@ -54,6 +55,7 @@ export function registerFixCheckTool(server: McpServer, client: DaemonClient): v
   server.registerTool(
     'fix_check',
     {
+      annotations: toolAnnotations('fix_check'),
       description: FIX_CHECK_DESCRIPTION,
       inputSchema: z.object({
         boardId: z.string().optional().describe('ID board; kosongkan untuk semua board dokumen aktif'),

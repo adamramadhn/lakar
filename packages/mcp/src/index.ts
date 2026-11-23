@@ -29,5 +29,6 @@ export {
   STATUS_DESCRIPTION,
   type StatusData,
 } from './server.js';
+export { TOOL_EFFECTS, toolAnnotations, type ToolEffect, type ToolName } from './annotations.js';
 export { FIX_CHECK_DESCRIPTION, FIX_CHECK_FINDING_LINES, formatFixCheck, type FixCheckData } from './fix-check.js';
 export { CLIENT_NAME, DaemonClient, DaemonUnavailableError, START_HINT, VERSION_HINT, VersionMismatchError } from './client.js';
