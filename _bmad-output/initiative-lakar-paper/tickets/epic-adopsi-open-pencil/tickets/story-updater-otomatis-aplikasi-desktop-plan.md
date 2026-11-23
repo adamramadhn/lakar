@@ -3,7 +3,7 @@ title: 'Updater otomatis aplikasi desktop'
 type: feature
 ticket: '10'
 created: '2026-11-23'
-status: in-review
+status: built
 baseline_revision: '9ece3808caa82247ce5e81b7071771405b68379c'
 route: full
 route_source: auto
@@ -143,8 +143,8 @@ deferred: []
 **Commands:**
 - `set "PATH=%TEMP%\lakar-pnpm;%LOCALAPPDATA%\nvm\v26.5.0;%PATH%" && set LAKAR_C7_ALLOW_MISSING_SOURCES=1 && pnpm build && pnpm test` — hijau, tanpa kegagalan baru vs origin/main (baseline Windows ~49–55 gagal lama).
 - `cargo clippy --locked --all-targets -- -D warnings` dan `cargo test --locked` di `apps/desktop/src-tauri` — hijau (lokal bila toolchain terpasang; acuan CI `desktop-check.yml`).
-- `node apps/desktop/scripts/make-latest-json.mjs --dir <dir-fixture-sig> --version 0.2.0 --tag v0.2.0 --repo fatmuh/lakar` — `latest.json` valid dengan 4 platform.
-- `gh workflow run release.yml --ref feat/op-8-10-desktop-updater` (via trigger push sementara) — artefak run berisi `*.sig` dan `latest.json`.
+- `node apps/desktop/scripts/make-latest-json.mjs --dir <dir-fixture-sig> --version 0.2.0 --tag v0.2.0 --repo fatmuh/lakar` — `latest.json` valid dengan 4 platform (6 tes fixture hijau).
+- `gh workflow run release.yml --ref feat/op-8-10-desktop-updater` — run 45220201942 hijau penuh: 4 leg build + `latest.json` (4 platform, URL + sig valid); `publish release` ter-skip sesuai desain pada workflow_dispatch.
 
 ## Auto Run Result
 
@@ -157,8 +157,9 @@ deferred: []
 **Verifikasi.**
 - `pnpm build` — hijau.
 - `pnpm test` (`LAKAR_C7_ALLOW_MISSING_SOURCES=1`) — 2883 lulus, 59 gagal semuanya berkas baseline Windows yang sudah dikenal (C7, bash, SIGTERM/SIGKILL, foto/API, font metrics, bench); semua berkas tes sentuhan hijau (`latest-json` 6, `updates` 15, `files` 58, `SettingsUpdates.dom` 8).
-- `cargo clippy`/`test` — tak bisa lokal (tanpa MSVC link.exe); acuan CI `desktop-check.yml` di PR.
-- `gh workflow run release.yml --ref feat/...` — run 45207658862: 3/4 leg hijau (windows, macos-arm64, linux; `.sig` + artefak installer terbukti), macos-x64 pertama kali kelaparan runner lalu di-rerun.
+- `cargo clippy -D warnings`/`cargo test` — tak bisa lokal (tanpa MSVC link.exe); hijau di CI `desktop-check.yml` PR #46 (`cargo-check` pass).
+- `gh workflow run release.yml --ref feat/...` — run 45220201942 hijau penuh: keempat leg build + job `latest-json`; artifact `lakar-latest-json` diinspeksi berisi 4 platform dengan URL rilis dan signature base64 valid (windows `-setup.exe`, darwin `x64`/`aarch64` `.app.tar.gz` hasil rename collect, linux `.AppImage`); `publish release` ter-skip sesuai desain pada workflow_dispatch. Run sebelumnya 45212440588 mengungkap collision nama `.app.tar.gz` → fix rename di Collect installers.
 - `node make-latest-json.mjs` — dites via `tests/latest-json.test.ts` (4 platform, URL, duplikat/kurang/nol-sig gagal jelas).
+- PR checks: `build-test` pass, `cargo-check` pass, `claude-review` pass (tanpa komentar).
 
-**Risiko sisa.** `cargo clippy`/`cargo test` dan build Windows NSIS installer penuh hanya tervalidasi di CI; jalur install-update nyata (bytes → NSIS passive → relaunch) belum dieksekusi end-to-end di Windows; patch `installPhase` dan pembuatan notes CI diverifikasi tes ter-scope + dry run, bukan review kedua.
+**Risiko sisa.** Jalur install-update nyata (bytes → NSIS passive → relaunch) belum dieksekusi end-to-end di Windows — perlu validasi manual rilis pertama; notes rilis di `latest.json` diverifikasi via tes unit + path best-effort CI (di dry run tag belum ada sehingga notes kosong); pemasangan update yang memerlukan interaksi pengguna di luar `installMode: passive` belum diuji pada Windows UAC.
