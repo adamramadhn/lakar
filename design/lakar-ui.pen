@@ -435445,6 +435445,253 @@
                                           ]
                                         }
                                       ]
+                                    },
+                                    {
+                                      "type": "frame",
+                                      "id": "RtudJ",
+                                      "name": "Spacer",
+                                      "width": "fill_container",
+                                      "height": 28
+                                    },
+                                    {
+                                      "type": "frame",
+                                      "id": "INZvK",
+                                      "name": "Section About",
+                                      "width": "fill_container",
+                                      "gap": 32,
+                                      "children": [
+                                        {
+                                          "type": "frame",
+                                          "id": "tMIJ3",
+                                          "name": "Section Intro",
+                                          "width": 220,
+                                          "layout": "vertical",
+                                          "gap": 4,
+                                          "children": [
+                                            {
+                                              "type": "text",
+                                              "id": "jl3gU",
+                                              "name": "About",
+                                              "fill": "$text-primary",
+                                              "content": "About",
+                                              "fontFamily": "Inter",
+                                              "fontSize": 14,
+                                              "fontWeight": "600"
+                                            },
+                                            {
+                                              "type": "text",
+                                              "id": "Bke6Z",
+                                              "name": "Description",
+                                              "fill": "$text-secondary",
+                                              "textGrowth": "fixed-width",
+                                              "width": "fill_container",
+                                              "content": "Include these details when you report a bug.",
+                                              "lineHeight": 1.5,
+                                              "fontFamily": "Inter",
+                                              "fontSize": 12,
+                                              "fontWeight": "normal"
+                                            }
+                                          ]
+                                        },
+                                        {
+                                          "type": "frame",
+                                          "id": "B31EzP",
+                                          "name": "Section Fields",
+                                          "width": "fill_container",
+                                          "layout": "vertical",
+                                          "gap": 16,
+                                          "children": [
+                                            {
+                                              "type": "frame",
+                                              "id": "k2N6y",
+                                              "name": "Info List",
+                                              "width": "fill_container",
+                                              "layout": "vertical",
+                                              "gap": 10,
+                                              "children": [
+                                                {
+                                                  "type": "frame",
+                                                  "id": "ZxuR7",
+                                                  "name": "Info Version",
+                                                  "width": "fill_container",
+                                                  "gap": 12,
+                                                  "alignItems": "center",
+                                                  "children": [
+                                                    {
+                                                      "type": "text",
+                                                      "id": "jANit",
+                                                      "name": "Key",
+                                                      "fill": "$text-secondary",
+                                                      "textGrowth": "fixed-width",
+                                                      "width": 120,
+                                                      "content": "Version",
+                                                      "fontFamily": "Inter",
+                                                      "fontSize": 12,
+                                                      "fontWeight": "normal"
+                                                    },
+                                                    {
+                                                      "type": "text",
+                                                      "id": "iupIh",
+                                                      "name": "Value",
+                                                      "fill": "$text-primary",
+                                                      "content": "0.9.0 (20b913c)",
+                                                      "fontFamily": "JetBrains Mono",
+                                                      "fontSize": 12,
+                                                      "fontWeight": "normal"
+                                                    }
+                                                  ]
+                                                },
+                                                {
+                                                  "type": "frame",
+                                                  "id": "qKQG3",
+                                                  "name": "Info Channel",
+                                                  "width": "fill_container",
+                                                  "gap": 12,
+                                                  "alignItems": "center",
+                                                  "children": [
+                                                    {
+                                                      "type": "text",
+                                                      "id": "z4C7SB",
+                                                      "name": "Key",
+                                                      "fill": "$text-secondary",
+                                                      "textGrowth": "fixed-width",
+                                                      "width": 120,
+                                                      "content": "Channel",
+                                                      "fontFamily": "Inter",
+                                                      "fontSize": 12,
+                                                      "fontWeight": "normal"
+                                                    },
+                                                    {
+                                                      "type": "text",
+                                                      "id": "z2WrMh",
+                                                      "name": "Value",
+                                                      "fill": "$text-primary",
+                                                      "content": "Stable · GitHub Releases",
+                                                      "fontFamily": "Inter",
+                                                      "fontSize": 12,
+                                                      "fontWeight": "normal"
+                                                    }
+                                                  ]
+                                                },
+                                                {
+                                                  "type": "frame",
+                                                  "id": "ckgwG",
+                                                  "name": "Info Daemon",
+                                                  "width": "fill_container",
+                                                  "gap": 12,
+                                                  "alignItems": "center",
+                                                  "children": [
+                                                    {
+                                                      "type": "text",
+                                                      "id": "ARdrS",
+                                                      "name": "Key",
+                                                      "fill": "$text-secondary",
+                                                      "textGrowth": "fixed-width",
+                                                      "width": 120,
+                                                      "content": "Daemon",
+                                                      "fontFamily": "Inter",
+                                                      "fontSize": 12,
+                                                      "fontWeight": "normal"
+                                                    },
+                                                    {
+                                                      "type": "text",
+                                                      "id": "VjBBV",
+                                                      "name": "Value",
+                                                      "fill": "$text-primary",
+                                                      "content": "lakard 0.9.0 · 127.0.0.1:7466",
+                                                      "fontFamily": "Inter",
+                                                      "fontSize": 12,
+                                                      "fontWeight": "normal"
+                                                    }
+                                                  ]
+                                                },
+                                                {
+                                                  "type": "frame",
+                                                  "id": "vYzsm",
+                                                  "name": "Info Data folder",
+                                                  "width": "fill_container",
+                                                  "gap": 12,
+                                                  "alignItems": "center",
+                                                  "children": [
+                                                    {
+                                                      "type": "text",
+                                                      "id": "oJkuS",
+                                                      "name": "Key",
+                                                      "fill": "$text-secondary",
+                                                      "textGrowth": "fixed-width",
+                                                      "width": 120,
+                                                      "content": "Data folder",
+                                                      "fontFamily": "Inter",
+                                                      "fontSize": 12,
+                                                      "fontWeight": "normal"
+                                                    },
+                                                    {
+                                                      "type": "text",
+                                                      "id": "vjZaL",
+                                                      "name": "Value",
+                                                      "fill": "$text-primary",
+                                                      "content": "~/.lakar",
+                                                      "fontFamily": "JetBrains Mono",
+                                                      "fontSize": 12,
+                                                      "fontWeight": "normal"
+                                                    }
+                                                  ]
+                                                }
+                                              ]
+                                            },
+                                            {
+                                              "type": "frame",
+                                              "id": "he6hF",
+                                              "name": "Actions",
+                                              "gap": 8,
+                                              "children": [
+                                                {
+                                                  "id": "b5gk5",
+                                                  "type": "ref",
+                                                  "ref": "hfJKv",
+                                                  "name": "Copy build info",
+                                                  "height": 32,
+                                                  "variant": {
+                                                    "kind": "secondary"
+                                                  },
+                                                  "descendants": {
+                                                    "N6QOmo": {
+                                                      "width": 14,
+                                                      "height": 14,
+                                                      "icon": "copy"
+                                                    },
+                                                    "dh9tU": {
+                                                      "content": "Copy build info",
+                                                      "fontSize": 13
+                                                    }
+                                                  }
+                                                },
+                                                {
+                                                  "id": "paewt",
+                                                  "type": "ref",
+                                                  "ref": "hfJKv",
+                                                  "name": "Licenses",
+                                                  "height": 32,
+                                                  "variant": {
+                                                    "kind": "secondary"
+                                                  },
+                                                  "descendants": {
+                                                    "N6QOmo": {
+                                                      "width": 14,
+                                                      "height": 14,
+                                                      "icon": "scale"
+                                                    },
+                                                    "dh9tU": {
+                                                      "content": "Open-source licenses",
+                                                      "fontSize": 13
+                                                    }
+                                                  }
+                                                }
+                                              ]
+                                            }
+                                          ]
+                                        }
+                                      ]
                                     }
                                   ]
                                 }
@@ -436746,6 +436993,253 @@
                                           ]
                                         }
                                       ]
+                                    },
+                                    {
+                                      "type": "frame",
+                                      "id": "UdW6v",
+                                      "name": "Spacer",
+                                      "width": "fill_container",
+                                      "height": 28
+                                    },
+                                    {
+                                      "type": "frame",
+                                      "id": "eTAPp",
+                                      "name": "Section About",
+                                      "width": "fill_container",
+                                      "gap": 32,
+                                      "children": [
+                                        {
+                                          "type": "frame",
+                                          "id": "Ilib8",
+                                          "name": "Section Intro",
+                                          "width": 220,
+                                          "layout": "vertical",
+                                          "gap": 4,
+                                          "children": [
+                                            {
+                                              "type": "text",
+                                              "id": "R0pwt",
+                                              "name": "About",
+                                              "fill": "$text-primary",
+                                              "content": "About",
+                                              "fontFamily": "Inter",
+                                              "fontSize": 14,
+                                              "fontWeight": "600"
+                                            },
+                                            {
+                                              "type": "text",
+                                              "id": "x1Jvc",
+                                              "name": "Description",
+                                              "fill": "$text-secondary",
+                                              "textGrowth": "fixed-width",
+                                              "width": "fill_container",
+                                              "content": "Include these details when you report a bug.",
+                                              "lineHeight": 1.5,
+                                              "fontFamily": "Inter",
+                                              "fontSize": 12,
+                                              "fontWeight": "normal"
+                                            }
+                                          ]
+                                        },
+                                        {
+                                          "type": "frame",
+                                          "id": "xn5lr",
+                                          "name": "Section Fields",
+                                          "width": "fill_container",
+                                          "layout": "vertical",
+                                          "gap": 16,
+                                          "children": [
+                                            {
+                                              "type": "frame",
+                                              "id": "tH3WD",
+                                              "name": "Info List",
+                                              "width": "fill_container",
+                                              "layout": "vertical",
+                                              "gap": 10,
+                                              "children": [
+                                                {
+                                                  "type": "frame",
+                                                  "id": "E2UUh",
+                                                  "name": "Info Version",
+                                                  "width": "fill_container",
+                                                  "gap": 12,
+                                                  "alignItems": "center",
+                                                  "children": [
+                                                    {
+                                                      "type": "text",
+                                                      "id": "cGZDy",
+                                                      "name": "Key",
+                                                      "fill": "$text-secondary",
+                                                      "textGrowth": "fixed-width",
+                                                      "width": 120,
+                                                      "content": "Version",
+                                                      "fontFamily": "Inter",
+                                                      "fontSize": 12,
+                                                      "fontWeight": "normal"
+                                                    },
+                                                    {
+                                                      "type": "text",
+                                                      "id": "S95HU",
+                                                      "name": "Value",
+                                                      "fill": "$text-primary",
+                                                      "content": "0.9.0 (20b913c)",
+                                                      "fontFamily": "JetBrains Mono",
+                                                      "fontSize": 12,
+                                                      "fontWeight": "normal"
+                                                    }
+                                                  ]
+                                                },
+                                                {
+                                                  "type": "frame",
+                                                  "id": "FbioB",
+                                                  "name": "Info Channel",
+                                                  "width": "fill_container",
+                                                  "gap": 12,
+                                                  "alignItems": "center",
+                                                  "children": [
+                                                    {
+                                                      "type": "text",
+                                                      "id": "axUT6",
+                                                      "name": "Key",
+                                                      "fill": "$text-secondary",
+                                                      "textGrowth": "fixed-width",
+                                                      "width": 120,
+                                                      "content": "Channel",
+                                                      "fontFamily": "Inter",
+                                                      "fontSize": 12,
+                                                      "fontWeight": "normal"
+                                                    },
+                                                    {
+                                                      "type": "text",
+                                                      "id": "A5I4dE",
+                                                      "name": "Value",
+                                                      "fill": "$text-primary",
+                                                      "content": "Stable · GitHub Releases",
+                                                      "fontFamily": "Inter",
+                                                      "fontSize": 12,
+                                                      "fontWeight": "normal"
+                                                    }
+                                                  ]
+                                                },
+                                                {
+                                                  "type": "frame",
+                                                  "id": "roIQs",
+                                                  "name": "Info Daemon",
+                                                  "width": "fill_container",
+                                                  "gap": 12,
+                                                  "alignItems": "center",
+                                                  "children": [
+                                                    {
+                                                      "type": "text",
+                                                      "id": "N8eEM",
+                                                      "name": "Key",
+                                                      "fill": "$text-secondary",
+                                                      "textGrowth": "fixed-width",
+                                                      "width": 120,
+                                                      "content": "Daemon",
+                                                      "fontFamily": "Inter",
+                                                      "fontSize": 12,
+                                                      "fontWeight": "normal"
+                                                    },
+                                                    {
+                                                      "type": "text",
+                                                      "id": "C3MTb2",
+                                                      "name": "Value",
+                                                      "fill": "$text-primary",
+                                                      "content": "lakard 0.9.0 · 127.0.0.1:7466",
+                                                      "fontFamily": "Inter",
+                                                      "fontSize": 12,
+                                                      "fontWeight": "normal"
+                                                    }
+                                                  ]
+                                                },
+                                                {
+                                                  "type": "frame",
+                                                  "id": "jNHKT",
+                                                  "name": "Info Data folder",
+                                                  "width": "fill_container",
+                                                  "gap": 12,
+                                                  "alignItems": "center",
+                                                  "children": [
+                                                    {
+                                                      "type": "text",
+                                                      "id": "T0xP4",
+                                                      "name": "Key",
+                                                      "fill": "$text-secondary",
+                                                      "textGrowth": "fixed-width",
+                                                      "width": 120,
+                                                      "content": "Data folder",
+                                                      "fontFamily": "Inter",
+                                                      "fontSize": 12,
+                                                      "fontWeight": "normal"
+                                                    },
+                                                    {
+                                                      "type": "text",
+                                                      "id": "h8ouD",
+                                                      "name": "Value",
+                                                      "fill": "$text-primary",
+                                                      "content": "~/.lakar",
+                                                      "fontFamily": "JetBrains Mono",
+                                                      "fontSize": 12,
+                                                      "fontWeight": "normal"
+                                                    }
+                                                  ]
+                                                }
+                                              ]
+                                            },
+                                            {
+                                              "type": "frame",
+                                              "id": "A2jfr",
+                                              "name": "Actions",
+                                              "gap": 8,
+                                              "children": [
+                                                {
+                                                  "id": "YgjwT",
+                                                  "type": "ref",
+                                                  "ref": "hfJKv",
+                                                  "name": "Copy build info",
+                                                  "height": 32,
+                                                  "variant": {
+                                                    "kind": "secondary"
+                                                  },
+                                                  "descendants": {
+                                                    "N6QOmo": {
+                                                      "width": 14,
+                                                      "height": 14,
+                                                      "icon": "copy"
+                                                    },
+                                                    "dh9tU": {
+                                                      "content": "Copy build info",
+                                                      "fontSize": 13
+                                                    }
+                                                  }
+                                                },
+                                                {
+                                                  "id": "HCrEC",
+                                                  "type": "ref",
+                                                  "ref": "hfJKv",
+                                                  "name": "Licenses",
+                                                  "height": 32,
+                                                  "variant": {
+                                                    "kind": "secondary"
+                                                  },
+                                                  "descendants": {
+                                                    "N6QOmo": {
+                                                      "width": 14,
+                                                      "height": 14,
+                                                      "icon": "scale"
+                                                    },
+                                                    "dh9tU": {
+                                                      "content": "Open-source licenses",
+                                                      "fontSize": 13
+                                                    }
+                                                  }
+                                                }
+                                              ]
+                                            }
+                                          ]
+                                        }
+                                      ]
                                     }
                                   ]
                                 }
@@ -437815,6 +438309,253 @@
                                                   "content": "A downloaded update installs the next time you restart Lakar."
                                                 }
                                               }
+                                            }
+                                          ]
+                                        }
+                                      ]
+                                    },
+                                    {
+                                      "type": "frame",
+                                      "id": "n0UXqz",
+                                      "name": "Spacer",
+                                      "width": "fill_container",
+                                      "height": 28
+                                    },
+                                    {
+                                      "type": "frame",
+                                      "id": "bx6cg",
+                                      "name": "Section About",
+                                      "width": "fill_container",
+                                      "gap": 32,
+                                      "children": [
+                                        {
+                                          "type": "frame",
+                                          "id": "GYtX6",
+                                          "name": "Section Intro",
+                                          "width": 220,
+                                          "layout": "vertical",
+                                          "gap": 4,
+                                          "children": [
+                                            {
+                                              "type": "text",
+                                              "id": "uBtle",
+                                              "name": "About",
+                                              "fill": "$text-primary",
+                                              "content": "About",
+                                              "fontFamily": "Inter",
+                                              "fontSize": 14,
+                                              "fontWeight": "600"
+                                            },
+                                            {
+                                              "type": "text",
+                                              "id": "i3L6yg",
+                                              "name": "Description",
+                                              "fill": "$text-secondary",
+                                              "textGrowth": "fixed-width",
+                                              "width": "fill_container",
+                                              "content": "Include these details when you report a bug.",
+                                              "lineHeight": 1.5,
+                                              "fontFamily": "Inter",
+                                              "fontSize": 12,
+                                              "fontWeight": "normal"
+                                            }
+                                          ]
+                                        },
+                                        {
+                                          "type": "frame",
+                                          "id": "ATfeT",
+                                          "name": "Section Fields",
+                                          "width": "fill_container",
+                                          "layout": "vertical",
+                                          "gap": 16,
+                                          "children": [
+                                            {
+                                              "type": "frame",
+                                              "id": "tSCgB",
+                                              "name": "Info List",
+                                              "width": "fill_container",
+                                              "layout": "vertical",
+                                              "gap": 10,
+                                              "children": [
+                                                {
+                                                  "type": "frame",
+                                                  "id": "h3SHky",
+                                                  "name": "Info Version",
+                                                  "width": "fill_container",
+                                                  "gap": 12,
+                                                  "alignItems": "center",
+                                                  "children": [
+                                                    {
+                                                      "type": "text",
+                                                      "id": "MSZJw",
+                                                      "name": "Key",
+                                                      "fill": "$text-secondary",
+                                                      "textGrowth": "fixed-width",
+                                                      "width": 120,
+                                                      "content": "Version",
+                                                      "fontFamily": "Inter",
+                                                      "fontSize": 12,
+                                                      "fontWeight": "normal"
+                                                    },
+                                                    {
+                                                      "type": "text",
+                                                      "id": "u5s8cX",
+                                                      "name": "Value",
+                                                      "fill": "$text-primary",
+                                                      "content": "0.9.0 (20b913c)",
+                                                      "fontFamily": "JetBrains Mono",
+                                                      "fontSize": 12,
+                                                      "fontWeight": "normal"
+                                                    }
+                                                  ]
+                                                },
+                                                {
+                                                  "type": "frame",
+                                                  "id": "Jz4U5",
+                                                  "name": "Info Channel",
+                                                  "width": "fill_container",
+                                                  "gap": 12,
+                                                  "alignItems": "center",
+                                                  "children": [
+                                                    {
+                                                      "type": "text",
+                                                      "id": "Qozp7",
+                                                      "name": "Key",
+                                                      "fill": "$text-secondary",
+                                                      "textGrowth": "fixed-width",
+                                                      "width": 120,
+                                                      "content": "Channel",
+                                                      "fontFamily": "Inter",
+                                                      "fontSize": 12,
+                                                      "fontWeight": "normal"
+                                                    },
+                                                    {
+                                                      "type": "text",
+                                                      "id": "GvHrH",
+                                                      "name": "Value",
+                                                      "fill": "$text-primary",
+                                                      "content": "Stable · GitHub Releases",
+                                                      "fontFamily": "Inter",
+                                                      "fontSize": 12,
+                                                      "fontWeight": "normal"
+                                                    }
+                                                  ]
+                                                },
+                                                {
+                                                  "type": "frame",
+                                                  "id": "OrZB1",
+                                                  "name": "Info Daemon",
+                                                  "width": "fill_container",
+                                                  "gap": 12,
+                                                  "alignItems": "center",
+                                                  "children": [
+                                                    {
+                                                      "type": "text",
+                                                      "id": "LxazY",
+                                                      "name": "Key",
+                                                      "fill": "$text-secondary",
+                                                      "textGrowth": "fixed-width",
+                                                      "width": 120,
+                                                      "content": "Daemon",
+                                                      "fontFamily": "Inter",
+                                                      "fontSize": 12,
+                                                      "fontWeight": "normal"
+                                                    },
+                                                    {
+                                                      "type": "text",
+                                                      "id": "mnkzB",
+                                                      "name": "Value",
+                                                      "fill": "$text-primary",
+                                                      "content": "lakard 0.9.0 · 127.0.0.1:7466",
+                                                      "fontFamily": "Inter",
+                                                      "fontSize": 12,
+                                                      "fontWeight": "normal"
+                                                    }
+                                                  ]
+                                                },
+                                                {
+                                                  "type": "frame",
+                                                  "id": "gf8Xh",
+                                                  "name": "Info Data folder",
+                                                  "width": "fill_container",
+                                                  "gap": 12,
+                                                  "alignItems": "center",
+                                                  "children": [
+                                                    {
+                                                      "type": "text",
+                                                      "id": "OLHJ2",
+                                                      "name": "Key",
+                                                      "fill": "$text-secondary",
+                                                      "textGrowth": "fixed-width",
+                                                      "width": 120,
+                                                      "content": "Data folder",
+                                                      "fontFamily": "Inter",
+                                                      "fontSize": 12,
+                                                      "fontWeight": "normal"
+                                                    },
+                                                    {
+                                                      "type": "text",
+                                                      "id": "XFdBJ",
+                                                      "name": "Value",
+                                                      "fill": "$text-primary",
+                                                      "content": "~/.lakar",
+                                                      "fontFamily": "JetBrains Mono",
+                                                      "fontSize": 12,
+                                                      "fontWeight": "normal"
+                                                    }
+                                                  ]
+                                                }
+                                              ]
+                                            },
+                                            {
+                                              "type": "frame",
+                                              "id": "V3e4b",
+                                              "name": "Actions",
+                                              "gap": 8,
+                                              "children": [
+                                                {
+                                                  "id": "KpclX",
+                                                  "type": "ref",
+                                                  "ref": "hfJKv",
+                                                  "name": "Copy build info",
+                                                  "height": 32,
+                                                  "variant": {
+                                                    "kind": "secondary"
+                                                  },
+                                                  "descendants": {
+                                                    "N6QOmo": {
+                                                      "width": 14,
+                                                      "height": 14,
+                                                      "icon": "copy"
+                                                    },
+                                                    "dh9tU": {
+                                                      "content": "Copy build info",
+                                                      "fontSize": 13
+                                                    }
+                                                  }
+                                                },
+                                                {
+                                                  "id": "i5z5HD",
+                                                  "type": "ref",
+                                                  "ref": "hfJKv",
+                                                  "name": "Licenses",
+                                                  "height": 32,
+                                                  "variant": {
+                                                    "kind": "secondary"
+                                                  },
+                                                  "descendants": {
+                                                    "N6QOmo": {
+                                                      "width": 14,
+                                                      "height": 14,
+                                                      "icon": "scale"
+                                                    },
+                                                    "dh9tU": {
+                                                      "content": "Open-source licenses",
+                                                      "fontSize": 13
+                                                    }
+                                                  }
+                                                }
+                                              ]
                                             }
                                           ]
                                         }
@@ -440812,6 +441553,253 @@
                                           ]
                                         }
                                       ]
+                                    },
+                                    {
+                                      "type": "frame",
+                                      "id": "N9Cwft",
+                                      "name": "Spacer",
+                                      "width": "fill_container",
+                                      "height": 28
+                                    },
+                                    {
+                                      "type": "frame",
+                                      "id": "EAdE9",
+                                      "name": "Section About",
+                                      "width": "fill_container",
+                                      "gap": 32,
+                                      "children": [
+                                        {
+                                          "type": "frame",
+                                          "id": "OxGNw",
+                                          "name": "Section Intro",
+                                          "width": 220,
+                                          "layout": "vertical",
+                                          "gap": 4,
+                                          "children": [
+                                            {
+                                              "type": "text",
+                                              "id": "Q1FkSE",
+                                              "name": "About",
+                                              "fill": "$text-primary",
+                                              "content": "About",
+                                              "fontFamily": "Inter",
+                                              "fontSize": 14,
+                                              "fontWeight": "600"
+                                            },
+                                            {
+                                              "type": "text",
+                                              "id": "bn7OS",
+                                              "name": "Description",
+                                              "fill": "$text-secondary",
+                                              "textGrowth": "fixed-width",
+                                              "width": "fill_container",
+                                              "content": "Include these details when you report a bug.",
+                                              "lineHeight": 1.5,
+                                              "fontFamily": "Inter",
+                                              "fontSize": 12,
+                                              "fontWeight": "normal"
+                                            }
+                                          ]
+                                        },
+                                        {
+                                          "type": "frame",
+                                          "id": "RDK12",
+                                          "name": "Section Fields",
+                                          "width": "fill_container",
+                                          "layout": "vertical",
+                                          "gap": 16,
+                                          "children": [
+                                            {
+                                              "type": "frame",
+                                              "id": "D6Luou",
+                                              "name": "Info List",
+                                              "width": "fill_container",
+                                              "layout": "vertical",
+                                              "gap": 10,
+                                              "children": [
+                                                {
+                                                  "type": "frame",
+                                                  "id": "svhtS",
+                                                  "name": "Info Version",
+                                                  "width": "fill_container",
+                                                  "gap": 12,
+                                                  "alignItems": "center",
+                                                  "children": [
+                                                    {
+                                                      "type": "text",
+                                                      "id": "eW948",
+                                                      "name": "Key",
+                                                      "fill": "$text-secondary",
+                                                      "textGrowth": "fixed-width",
+                                                      "width": 120,
+                                                      "content": "Version",
+                                                      "fontFamily": "Inter",
+                                                      "fontSize": 12,
+                                                      "fontWeight": "normal"
+                                                    },
+                                                    {
+                                                      "type": "text",
+                                                      "id": "ZvpBr",
+                                                      "name": "Value",
+                                                      "fill": "$text-primary",
+                                                      "content": "0.9.0 (20b913c)",
+                                                      "fontFamily": "JetBrains Mono",
+                                                      "fontSize": 12,
+                                                      "fontWeight": "normal"
+                                                    }
+                                                  ]
+                                                },
+                                                {
+                                                  "type": "frame",
+                                                  "id": "k2Z1Dv",
+                                                  "name": "Info Channel",
+                                                  "width": "fill_container",
+                                                  "gap": 12,
+                                                  "alignItems": "center",
+                                                  "children": [
+                                                    {
+                                                      "type": "text",
+                                                      "id": "Kl3Fy",
+                                                      "name": "Key",
+                                                      "fill": "$text-secondary",
+                                                      "textGrowth": "fixed-width",
+                                                      "width": 120,
+                                                      "content": "Channel",
+                                                      "fontFamily": "Inter",
+                                                      "fontSize": 12,
+                                                      "fontWeight": "normal"
+                                                    },
+                                                    {
+                                                      "type": "text",
+                                                      "id": "OyHXG",
+                                                      "name": "Value",
+                                                      "fill": "$text-primary",
+                                                      "content": "Stable · GitHub Releases",
+                                                      "fontFamily": "Inter",
+                                                      "fontSize": 12,
+                                                      "fontWeight": "normal"
+                                                    }
+                                                  ]
+                                                },
+                                                {
+                                                  "type": "frame",
+                                                  "id": "X4LgOE",
+                                                  "name": "Info Daemon",
+                                                  "width": "fill_container",
+                                                  "gap": 12,
+                                                  "alignItems": "center",
+                                                  "children": [
+                                                    {
+                                                      "type": "text",
+                                                      "id": "HHVZq",
+                                                      "name": "Key",
+                                                      "fill": "$text-secondary",
+                                                      "textGrowth": "fixed-width",
+                                                      "width": 120,
+                                                      "content": "Daemon",
+                                                      "fontFamily": "Inter",
+                                                      "fontSize": 12,
+                                                      "fontWeight": "normal"
+                                                    },
+                                                    {
+                                                      "type": "text",
+                                                      "id": "aAOPd",
+                                                      "name": "Value",
+                                                      "fill": "$text-primary",
+                                                      "content": "lakard 0.9.0 · 127.0.0.1:7466",
+                                                      "fontFamily": "Inter",
+                                                      "fontSize": 12,
+                                                      "fontWeight": "normal"
+                                                    }
+                                                  ]
+                                                },
+                                                {
+                                                  "type": "frame",
+                                                  "id": "RC7QQ",
+                                                  "name": "Info Data folder",
+                                                  "width": "fill_container",
+                                                  "gap": 12,
+                                                  "alignItems": "center",
+                                                  "children": [
+                                                    {
+                                                      "type": "text",
+                                                      "id": "IIvPz",
+                                                      "name": "Key",
+                                                      "fill": "$text-secondary",
+                                                      "textGrowth": "fixed-width",
+                                                      "width": 120,
+                                                      "content": "Data folder",
+                                                      "fontFamily": "Inter",
+                                                      "fontSize": 12,
+                                                      "fontWeight": "normal"
+                                                    },
+                                                    {
+                                                      "type": "text",
+                                                      "id": "YutFr",
+                                                      "name": "Value",
+                                                      "fill": "$text-primary",
+                                                      "content": "~/.lakar",
+                                                      "fontFamily": "JetBrains Mono",
+                                                      "fontSize": 12,
+                                                      "fontWeight": "normal"
+                                                    }
+                                                  ]
+                                                }
+                                              ]
+                                            },
+                                            {
+                                              "type": "frame",
+                                              "id": "IY6Hn",
+                                              "name": "Actions",
+                                              "gap": 8,
+                                              "children": [
+                                                {
+                                                  "id": "Bx5qP",
+                                                  "type": "ref",
+                                                  "ref": "hfJKv",
+                                                  "name": "Copy build info",
+                                                  "height": 32,
+                                                  "variant": {
+                                                    "kind": "secondary"
+                                                  },
+                                                  "descendants": {
+                                                    "N6QOmo": {
+                                                      "width": 14,
+                                                      "height": 14,
+                                                      "icon": "copy"
+                                                    },
+                                                    "dh9tU": {
+                                                      "content": "Copy build info",
+                                                      "fontSize": 13
+                                                    }
+                                                  }
+                                                },
+                                                {
+                                                  "id": "JapeY",
+                                                  "type": "ref",
+                                                  "ref": "hfJKv",
+                                                  "name": "Licenses",
+                                                  "height": 32,
+                                                  "variant": {
+                                                    "kind": "secondary"
+                                                  },
+                                                  "descendants": {
+                                                    "N6QOmo": {
+                                                      "width": 14,
+                                                      "height": 14,
+                                                      "icon": "scale"
+                                                    },
+                                                    "dh9tU": {
+                                                      "content": "Open-source licenses",
+                                                      "fontSize": 13
+                                                    }
+                                                  }
+                                                }
+                                              ]
+                                            }
+                                          ]
+                                        }
+                                      ]
                                     }
                                   ]
                                 }
@@ -442113,6 +443101,253 @@
                                           ]
                                         }
                                       ]
+                                    },
+                                    {
+                                      "type": "frame",
+                                      "id": "bWYUZ",
+                                      "name": "Spacer",
+                                      "width": "fill_container",
+                                      "height": 28
+                                    },
+                                    {
+                                      "type": "frame",
+                                      "id": "carg2",
+                                      "name": "Section About",
+                                      "width": "fill_container",
+                                      "gap": 32,
+                                      "children": [
+                                        {
+                                          "type": "frame",
+                                          "id": "ShX6C",
+                                          "name": "Section Intro",
+                                          "width": 220,
+                                          "layout": "vertical",
+                                          "gap": 4,
+                                          "children": [
+                                            {
+                                              "type": "text",
+                                              "id": "M6hGkH",
+                                              "name": "About",
+                                              "fill": "$text-primary",
+                                              "content": "About",
+                                              "fontFamily": "Inter",
+                                              "fontSize": 14,
+                                              "fontWeight": "600"
+                                            },
+                                            {
+                                              "type": "text",
+                                              "id": "pyPkS",
+                                              "name": "Description",
+                                              "fill": "$text-secondary",
+                                              "textGrowth": "fixed-width",
+                                              "width": "fill_container",
+                                              "content": "Include these details when you report a bug.",
+                                              "lineHeight": 1.5,
+                                              "fontFamily": "Inter",
+                                              "fontSize": 12,
+                                              "fontWeight": "normal"
+                                            }
+                                          ]
+                                        },
+                                        {
+                                          "type": "frame",
+                                          "id": "F3b8EL",
+                                          "name": "Section Fields",
+                                          "width": "fill_container",
+                                          "layout": "vertical",
+                                          "gap": 16,
+                                          "children": [
+                                            {
+                                              "type": "frame",
+                                              "id": "MZ0nF",
+                                              "name": "Info List",
+                                              "width": "fill_container",
+                                              "layout": "vertical",
+                                              "gap": 10,
+                                              "children": [
+                                                {
+                                                  "type": "frame",
+                                                  "id": "H9UpM",
+                                                  "name": "Info Version",
+                                                  "width": "fill_container",
+                                                  "gap": 12,
+                                                  "alignItems": "center",
+                                                  "children": [
+                                                    {
+                                                      "type": "text",
+                                                      "id": "vlnbD",
+                                                      "name": "Key",
+                                                      "fill": "$text-secondary",
+                                                      "textGrowth": "fixed-width",
+                                                      "width": 120,
+                                                      "content": "Version",
+                                                      "fontFamily": "Inter",
+                                                      "fontSize": 12,
+                                                      "fontWeight": "normal"
+                                                    },
+                                                    {
+                                                      "type": "text",
+                                                      "id": "sy1I5",
+                                                      "name": "Value",
+                                                      "fill": "$text-primary",
+                                                      "content": "0.9.0 (20b913c)",
+                                                      "fontFamily": "JetBrains Mono",
+                                                      "fontSize": 12,
+                                                      "fontWeight": "normal"
+                                                    }
+                                                  ]
+                                                },
+                                                {
+                                                  "type": "frame",
+                                                  "id": "twUOn",
+                                                  "name": "Info Channel",
+                                                  "width": "fill_container",
+                                                  "gap": 12,
+                                                  "alignItems": "center",
+                                                  "children": [
+                                                    {
+                                                      "type": "text",
+                                                      "id": "uWvTr",
+                                                      "name": "Key",
+                                                      "fill": "$text-secondary",
+                                                      "textGrowth": "fixed-width",
+                                                      "width": 120,
+                                                      "content": "Channel",
+                                                      "fontFamily": "Inter",
+                                                      "fontSize": 12,
+                                                      "fontWeight": "normal"
+                                                    },
+                                                    {
+                                                      "type": "text",
+                                                      "id": "W1nw2",
+                                                      "name": "Value",
+                                                      "fill": "$text-primary",
+                                                      "content": "Stable · GitHub Releases",
+                                                      "fontFamily": "Inter",
+                                                      "fontSize": 12,
+                                                      "fontWeight": "normal"
+                                                    }
+                                                  ]
+                                                },
+                                                {
+                                                  "type": "frame",
+                                                  "id": "uLbT1",
+                                                  "name": "Info Daemon",
+                                                  "width": "fill_container",
+                                                  "gap": 12,
+                                                  "alignItems": "center",
+                                                  "children": [
+                                                    {
+                                                      "type": "text",
+                                                      "id": "KSdSw",
+                                                      "name": "Key",
+                                                      "fill": "$text-secondary",
+                                                      "textGrowth": "fixed-width",
+                                                      "width": 120,
+                                                      "content": "Daemon",
+                                                      "fontFamily": "Inter",
+                                                      "fontSize": 12,
+                                                      "fontWeight": "normal"
+                                                    },
+                                                    {
+                                                      "type": "text",
+                                                      "id": "LoBSD",
+                                                      "name": "Value",
+                                                      "fill": "$text-primary",
+                                                      "content": "lakard 0.9.0 · 127.0.0.1:7466",
+                                                      "fontFamily": "Inter",
+                                                      "fontSize": 12,
+                                                      "fontWeight": "normal"
+                                                    }
+                                                  ]
+                                                },
+                                                {
+                                                  "type": "frame",
+                                                  "id": "q6V4Z",
+                                                  "name": "Info Data folder",
+                                                  "width": "fill_container",
+                                                  "gap": 12,
+                                                  "alignItems": "center",
+                                                  "children": [
+                                                    {
+                                                      "type": "text",
+                                                      "id": "ufpjL",
+                                                      "name": "Key",
+                                                      "fill": "$text-secondary",
+                                                      "textGrowth": "fixed-width",
+                                                      "width": 120,
+                                                      "content": "Data folder",
+                                                      "fontFamily": "Inter",
+                                                      "fontSize": 12,
+                                                      "fontWeight": "normal"
+                                                    },
+                                                    {
+                                                      "type": "text",
+                                                      "id": "rcGeq",
+                                                      "name": "Value",
+                                                      "fill": "$text-primary",
+                                                      "content": "~/.lakar",
+                                                      "fontFamily": "JetBrains Mono",
+                                                      "fontSize": 12,
+                                                      "fontWeight": "normal"
+                                                    }
+                                                  ]
+                                                }
+                                              ]
+                                            },
+                                            {
+                                              "type": "frame",
+                                              "id": "VdT11",
+                                              "name": "Actions",
+                                              "gap": 8,
+                                              "children": [
+                                                {
+                                                  "id": "GsR1i",
+                                                  "type": "ref",
+                                                  "ref": "hfJKv",
+                                                  "name": "Copy build info",
+                                                  "height": 32,
+                                                  "variant": {
+                                                    "kind": "secondary"
+                                                  },
+                                                  "descendants": {
+                                                    "N6QOmo": {
+                                                      "width": 14,
+                                                      "height": 14,
+                                                      "icon": "copy"
+                                                    },
+                                                    "dh9tU": {
+                                                      "content": "Copy build info",
+                                                      "fontSize": 13
+                                                    }
+                                                  }
+                                                },
+                                                {
+                                                  "id": "bUGD8",
+                                                  "type": "ref",
+                                                  "ref": "hfJKv",
+                                                  "name": "Licenses",
+                                                  "height": 32,
+                                                  "variant": {
+                                                    "kind": "secondary"
+                                                  },
+                                                  "descendants": {
+                                                    "N6QOmo": {
+                                                      "width": 14,
+                                                      "height": 14,
+                                                      "icon": "scale"
+                                                    },
+                                                    "dh9tU": {
+                                                      "content": "Open-source licenses",
+                                                      "fontSize": 13
+                                                    }
+                                                  }
+                                                }
+                                              ]
+                                            }
+                                          ]
+                                        }
+                                      ]
                                     }
                                   ]
                                 }
@@ -443182,6 +444417,253 @@
                                                   "content": "A downloaded update installs the next time you restart Lakar."
                                                 }
                                               }
+                                            }
+                                          ]
+                                        }
+                                      ]
+                                    },
+                                    {
+                                      "type": "frame",
+                                      "id": "J70B3",
+                                      "name": "Spacer",
+                                      "width": "fill_container",
+                                      "height": 28
+                                    },
+                                    {
+                                      "type": "frame",
+                                      "id": "M3GZXy",
+                                      "name": "Section About",
+                                      "width": "fill_container",
+                                      "gap": 32,
+                                      "children": [
+                                        {
+                                          "type": "frame",
+                                          "id": "ardOd",
+                                          "name": "Section Intro",
+                                          "width": 220,
+                                          "layout": "vertical",
+                                          "gap": 4,
+                                          "children": [
+                                            {
+                                              "type": "text",
+                                              "id": "M7L6f0",
+                                              "name": "About",
+                                              "fill": "$text-primary",
+                                              "content": "About",
+                                              "fontFamily": "Inter",
+                                              "fontSize": 14,
+                                              "fontWeight": "600"
+                                            },
+                                            {
+                                              "type": "text",
+                                              "id": "MgMTc",
+                                              "name": "Description",
+                                              "fill": "$text-secondary",
+                                              "textGrowth": "fixed-width",
+                                              "width": "fill_container",
+                                              "content": "Include these details when you report a bug.",
+                                              "lineHeight": 1.5,
+                                              "fontFamily": "Inter",
+                                              "fontSize": 12,
+                                              "fontWeight": "normal"
+                                            }
+                                          ]
+                                        },
+                                        {
+                                          "type": "frame",
+                                          "id": "W6sTNz",
+                                          "name": "Section Fields",
+                                          "width": "fill_container",
+                                          "layout": "vertical",
+                                          "gap": 16,
+                                          "children": [
+                                            {
+                                              "type": "frame",
+                                              "id": "ukLiV",
+                                              "name": "Info List",
+                                              "width": "fill_container",
+                                              "layout": "vertical",
+                                              "gap": 10,
+                                              "children": [
+                                                {
+                                                  "type": "frame",
+                                                  "id": "TsAP0",
+                                                  "name": "Info Version",
+                                                  "width": "fill_container",
+                                                  "gap": 12,
+                                                  "alignItems": "center",
+                                                  "children": [
+                                                    {
+                                                      "type": "text",
+                                                      "id": "uAOKm",
+                                                      "name": "Key",
+                                                      "fill": "$text-secondary",
+                                                      "textGrowth": "fixed-width",
+                                                      "width": 120,
+                                                      "content": "Version",
+                                                      "fontFamily": "Inter",
+                                                      "fontSize": 12,
+                                                      "fontWeight": "normal"
+                                                    },
+                                                    {
+                                                      "type": "text",
+                                                      "id": "EcnNN",
+                                                      "name": "Value",
+                                                      "fill": "$text-primary",
+                                                      "content": "0.9.0 (20b913c)",
+                                                      "fontFamily": "JetBrains Mono",
+                                                      "fontSize": 12,
+                                                      "fontWeight": "normal"
+                                                    }
+                                                  ]
+                                                },
+                                                {
+                                                  "type": "frame",
+                                                  "id": "D6vqCp",
+                                                  "name": "Info Channel",
+                                                  "width": "fill_container",
+                                                  "gap": 12,
+                                                  "alignItems": "center",
+                                                  "children": [
+                                                    {
+                                                      "type": "text",
+                                                      "id": "L5UKIA",
+                                                      "name": "Key",
+                                                      "fill": "$text-secondary",
+                                                      "textGrowth": "fixed-width",
+                                                      "width": 120,
+                                                      "content": "Channel",
+                                                      "fontFamily": "Inter",
+                                                      "fontSize": 12,
+                                                      "fontWeight": "normal"
+                                                    },
+                                                    {
+                                                      "type": "text",
+                                                      "id": "b8Giy",
+                                                      "name": "Value",
+                                                      "fill": "$text-primary",
+                                                      "content": "Stable · GitHub Releases",
+                                                      "fontFamily": "Inter",
+                                                      "fontSize": 12,
+                                                      "fontWeight": "normal"
+                                                    }
+                                                  ]
+                                                },
+                                                {
+                                                  "type": "frame",
+                                                  "id": "S52Ai",
+                                                  "name": "Info Daemon",
+                                                  "width": "fill_container",
+                                                  "gap": 12,
+                                                  "alignItems": "center",
+                                                  "children": [
+                                                    {
+                                                      "type": "text",
+                                                      "id": "spiQu",
+                                                      "name": "Key",
+                                                      "fill": "$text-secondary",
+                                                      "textGrowth": "fixed-width",
+                                                      "width": 120,
+                                                      "content": "Daemon",
+                                                      "fontFamily": "Inter",
+                                                      "fontSize": 12,
+                                                      "fontWeight": "normal"
+                                                    },
+                                                    {
+                                                      "type": "text",
+                                                      "id": "SG0az",
+                                                      "name": "Value",
+                                                      "fill": "$text-primary",
+                                                      "content": "lakard 0.9.0 · 127.0.0.1:7466",
+                                                      "fontFamily": "Inter",
+                                                      "fontSize": 12,
+                                                      "fontWeight": "normal"
+                                                    }
+                                                  ]
+                                                },
+                                                {
+                                                  "type": "frame",
+                                                  "id": "ayJ3q",
+                                                  "name": "Info Data folder",
+                                                  "width": "fill_container",
+                                                  "gap": 12,
+                                                  "alignItems": "center",
+                                                  "children": [
+                                                    {
+                                                      "type": "text",
+                                                      "id": "V2Pth3",
+                                                      "name": "Key",
+                                                      "fill": "$text-secondary",
+                                                      "textGrowth": "fixed-width",
+                                                      "width": 120,
+                                                      "content": "Data folder",
+                                                      "fontFamily": "Inter",
+                                                      "fontSize": 12,
+                                                      "fontWeight": "normal"
+                                                    },
+                                                    {
+                                                      "type": "text",
+                                                      "id": "VeC7k",
+                                                      "name": "Value",
+                                                      "fill": "$text-primary",
+                                                      "content": "~/.lakar",
+                                                      "fontFamily": "JetBrains Mono",
+                                                      "fontSize": 12,
+                                                      "fontWeight": "normal"
+                                                    }
+                                                  ]
+                                                }
+                                              ]
+                                            },
+                                            {
+                                              "type": "frame",
+                                              "id": "csfXe",
+                                              "name": "Actions",
+                                              "gap": 8,
+                                              "children": [
+                                                {
+                                                  "id": "T65uG6",
+                                                  "type": "ref",
+                                                  "ref": "hfJKv",
+                                                  "name": "Copy build info",
+                                                  "height": 32,
+                                                  "variant": {
+                                                    "kind": "secondary"
+                                                  },
+                                                  "descendants": {
+                                                    "N6QOmo": {
+                                                      "width": 14,
+                                                      "height": 14,
+                                                      "icon": "copy"
+                                                    },
+                                                    "dh9tU": {
+                                                      "content": "Copy build info",
+                                                      "fontSize": 13
+                                                    }
+                                                  }
+                                                },
+                                                {
+                                                  "id": "HErLd",
+                                                  "type": "ref",
+                                                  "ref": "hfJKv",
+                                                  "name": "Licenses",
+                                                  "height": 32,
+                                                  "variant": {
+                                                    "kind": "secondary"
+                                                  },
+                                                  "descendants": {
+                                                    "N6QOmo": {
+                                                      "width": 14,
+                                                      "height": 14,
+                                                      "icon": "scale"
+                                                    },
+                                                    "dh9tU": {
+                                                      "content": "Open-source licenses",
+                                                      "fontSize": 13
+                                                    }
+                                                  }
+                                                }
+                                              ]
                                             }
                                           ]
                                         }
