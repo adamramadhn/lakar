@@ -67,12 +67,16 @@ for (const { suffix, platform } of PLATFORMS) {
     url: `https://github.com/${args.repo}/releases/download/${args.tag}/${sigFile.slice(0, -'.sig'.length)}`,
   };
 }
-if (missing.length === PLATFORMS.length) fail(`tidak ada berkas .sig di ${args.dir}`);
+if (missing.length === PLATFORMS.length) fail(`tidak ada .sig artefak updater di ${args.dir} (sig non-platform seperti .msi.sig/.deb.sig tidak dihitung)`);
 if (missing.length > 0) fail(`platform updater tidak lengkap: ${missing.join('; ')}`);
 
 let notes;
 if (args['notes-file']) {
-  notes = readFileSync(args['notes-file'], 'utf8').trim();
+  try {
+    notes = readFileSync(args['notes-file'], 'utf8').trim();
+  } catch (e) {
+    fail(`--notes-file tidak bisa dibaca: ${args['notes-file']} (${e.message})`);
+  }
 }
 
 const latest = {

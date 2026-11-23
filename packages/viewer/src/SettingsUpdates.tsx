@@ -5,7 +5,7 @@
 import { useState } from 'react';
 import { Icon } from './icons';
 import { SettingsSection } from './SettingsGeneral';
-import { checkForUpdate, getUpdatePolicy, installAndRelaunch, setUpdatePolicy, useUpdateState, type UpdatePolicy, type UpdateState, type UpdateStatus } from './updates';
+import { checkForUpdate, getUpdatePolicy, installAndRelaunch, isDesktop, setUpdatePolicy, useUpdateState, type UpdatePolicy, type UpdateState, type UpdateStatus } from './updates';
 
 const PILL: Record<UpdateStatus, { label: string; cls: string }> = {
   idle: { label: 'Checking…', cls: '' },
@@ -65,12 +65,15 @@ function Action({ s }: { s: UpdateState }) {
 /** Kartu status versi: ikon + "Lakar" + badge status + versi, tombol aksi; error/progress di baris bawah. */
 function VersionCard({ s }: { s: UpdateState }) {
   const pill = PILL[s.status];
+  // Status `installing` menutup dua fase (updates.ts `installPhase`): jalur manual masih mengunduh bytes,
+  // jalur "ready" (bytes sudah ada) langsung memasang tanpa event channel.
+  const downloading = s.status === 'downloading' || (s.status === 'installing' && s.installPhase === 'download');
   const progress = (s.status === 'downloading' || s.status === 'installing') && (
     <div className="conn-render" role="status">
       <Icon name="download" size={14} />
       <span>
-        {s.status === 'downloading' ? 'Downloading update…' : 'Installing update…'}
-        {s.downloaded > 0 && ` · ${formatBytes(s.downloaded)}${s.total ? ` of ${formatBytes(s.total)}` : ''}`}
+        {downloading ? 'Downloading update…' : 'Installing update…'}
+        {downloading && s.downloaded > 0 && ` · ${formatBytes(s.downloaded)}${s.total ? ` of ${formatBytes(s.total)}` : ''}`}
       </span>
     </div>
   );
@@ -127,6 +130,8 @@ function UpdatePolicySelect() {
 
 export function SettingsUpdates() {
   const s = useUpdateState();
+  // Deep link `#/settings/updates` di browser biasa: halaman tidak bermakna tanpa IPC aplikasi → tidak dirender.
+  if (!isDesktop()) return null;
   // Catatan rilis dari update yang pending, atau dari update yang baru dipasang ("See what's new" di banner).
   const notes = s.update?.notes ?? s.justUpdated?.notes;
   const notesVersion = s.update?.notes ? s.update.version : s.justUpdated?.version;

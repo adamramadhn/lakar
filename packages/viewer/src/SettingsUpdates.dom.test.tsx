@@ -1,7 +1,7 @@
 // Settings → Updates + banner Recents (desain Section 11): tiga state kartu (Up to date / Update available /
 // Check failed), section "What's new", banner "ready to install"/"Updated to", dan penyembunyian di browser.
 // Modul updates.ts dimuat ulang per tes (vi.resetModules) supaya state singletonnya bersih.
-import { act } from '@testing-library/react';
+import { act, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { renderUi } from './test/dom';
@@ -141,11 +141,12 @@ describe('UpdateBanner (Recents)', () => {
   it('di aplikasi desktop tab Updates tampil', async () => {
     setTauri({ check_update: null });
     const { SettingsLayout } = await setup();
-    const { getByText } = renderUi(
+    const { getByRole } = renderUi(
       <SettingsLayout tab="updates">
         <div />
       </SettingsLayout>,
     );
-    expect(getByText('Updates').closest('a')?.getAttribute('href')).toBe('#/settings/updates');
+    const nav = getByRole('navigation', { name: 'Settings' });
+    expect(within(nav).getByText('Updates').closest('a')?.getAttribute('href')).toBe('#/settings/updates');
   });
 });

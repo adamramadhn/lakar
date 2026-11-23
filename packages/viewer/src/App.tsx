@@ -1,5 +1,6 @@
 // Kerangka aplikasi: title bar bertab (TitleBar.tsx), routing hash (`#/` Recents, `#/files`, `#/files/<id>` folder, `#/archive`, `#/settings`
-// General, `#/settings/connections` Connections, `#/d/<slug>` Viewer; lihat `parseRoute` di files.ts), banner offline.
+// General, `#/settings/connections` Connections, `#/settings/updates` Updates (hanya desktop), `#/d/<slug>` Viewer; lihat `parseRoute`
+// di files.ts), banner offline.
 // Tab dokumen (aplikasi 7): daftar slug di localStorage (`TABS_KEY`); membuka dokumen menambah/mengaktifkan tabnya,
 // Close lewat x / klik tengah / Ctrl/Cmd+W. Rename/archive/delete dari aplikasi (`api.onFileEvent`) ikut ke tab.
 // Hanya Viewer tab aktif yang ter-mount; state tampilan per dokumen disimpan di viewState.ts.

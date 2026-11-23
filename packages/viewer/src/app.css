@@ -2653,7 +2653,8 @@ button.panel-tab:hover {
 .export-popover .field-label {
   font-weight: 500;
 }
-.export-popover .select {
+/* Komponen select "Input": Export popover dan Settings → Updates ("Download updates"). */
+.input.select {
   width: 100%;
   font-size: 13px;
 }

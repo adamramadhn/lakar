@@ -29,6 +29,8 @@ export interface UpdateState {
   error: string | undefined;
   downloaded: number;
   total: number | undefined;
+  /** Fase saat status `installing`: `download` selama bytes mengalir (jalur manual), `install` sesudahnya / jalur bytes. */
+  installPhase: 'download' | 'install' | undefined;
   /** Versi aplikasi yang berjalan (`app_version`); undefined di browser/gagal. */
   appVersion: string | undefined;
   /** Aplikasi baru saja diperbarui (banner "Updated to Lakar x.y" sampai di-Dismiss). */
@@ -78,7 +80,7 @@ export function isDesktop(g: unknown = win()): boolean {
   return desktopInvoke(g) !== undefined;
 }
 
-let state: UpdateState = { status: 'idle', update: null, error: undefined, downloaded: 0, total: undefined, appVersion: undefined, justUpdated: undefined };
+let state: UpdateState = { status: 'idle', update: null, error: undefined, downloaded: 0, total: undefined, installPhase: undefined, appVersion: undefined, justUpdated: undefined };
 const listeners = new Set<() => void>();
 
 function set(partial: Partial<UpdateState>) {
@@ -166,9 +168,10 @@ export async function checkForUpdate(): Promise<void> {
 export async function downloadUpdate(): Promise<void> {
   const call = invoke();
   if (!call || state.status !== 'available') return;
-  const channel = newChannel(onDownloadEvent);
   set({ status: 'downloading', error: undefined, downloaded: 0, total: undefined });
   try {
+    // Channel dibuat di dalam try: konstruktor yang melempar (core.Channel tidak ada) → status `failed`.
+    const channel = newChannel(onDownloadEvent);
     await call('download_update', { onProgress: channel });
     set({ status: 'ready' });
   } catch (e) {
@@ -183,10 +186,13 @@ export async function installAndRelaunch(): Promise<void> {
   const call = invoke();
   const update = state.update;
   if (!call || !update || (state.status !== 'available' && state.status !== 'ready')) return;
-  const channel = newChannel(onDownloadEvent);
-  set({ status: 'installing', error: undefined });
+  // downloaded/total direset: jalur bytes (ready) tidak mengirim event channel, dan jalur manual dimulai dari nol
+  // — tanpa reset kartu menampilkan progress unduhan sebelumnya yang basi. `installPhase` membedakan kedua jalur
+  // untuk label kartu (download → install).
+  set({ status: 'installing', error: undefined, downloaded: 0, total: undefined, installPhase: state.status === 'available' ? 'download' : 'install' });
   rememberUpdated(update);
   try {
+    const channel = newChannel(onDownloadEvent);
     await call('install_update', { onProgress: channel });
     await call('relaunch_app');
   } catch (e) {
@@ -204,7 +210,7 @@ export function dismissUpdated(): void {
 function onDownloadEvent(e: DownloadEvent) {
   if (e.event === 'started') set({ total: e.data?.contentLength, downloaded: 0 });
   else if (e.event === 'progress') set({ downloaded: state.downloaded + (e.data?.chunkLength ?? 0) });
-  else if (e.event === 'finished') set({ downloaded: state.total ?? state.downloaded });
+  else if (e.event === 'finished') set({ downloaded: state.total ?? state.downloaded, installPhase: 'install' });
 }
 
 let inited = false;

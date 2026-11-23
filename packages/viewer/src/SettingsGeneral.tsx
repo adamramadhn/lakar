@@ -25,8 +25,8 @@ export function SettingsLayout({ tab, children }: { tab: SettingsTab; children: 
   return (
     <section className="main settings-main">
       <div className="main-header">
-        {/* Desain: judul halaman mengikuti tab ("Settings" / "Connections"). */}
-        <h1>{tab === 'connections' ? 'Connections' : 'Settings'}</h1>
+        {/* Desain: judul halaman mengikuti tab ("Settings" / "Connections" / "Updates"). */}
+        <h1>{tab === 'general' ? 'Settings' : TABS.find((t) => t.id === tab)?.label}</h1>
       </div>
       <div className="settings-body">
         <nav className="settings-nav" aria-label="Settings">

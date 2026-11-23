@@ -3,16 +3,16 @@ title: 'Updater otomatis aplikasi desktop'
 type: feature
 ticket: '10'
 created: '2026-11-23'
-status: in-progress
+status: in-review
 baseline_revision: '9ece3808caa82247ce5e81b7071771405b68379c'
 route: full
 route_source: auto
 risk: medium
-review: ''
-review_source: ''
-lenses_ran: []
+review: quick
+review_source: pinned
+lenses_ran: [quick]
 review_loop_iteration: 0
-followup_review_recommended: false
+followup_review_recommended: true
 context:
   - '{project-root}/design/README.md'
   - '{project-root}/apps/desktop/README.md'
@@ -104,6 +104,31 @@ deferred: []
 - Given secret tidak ada, when release.yml jalan di tag atau dispatch, then job build tetap hijau dan `latest.json` dilewati.
 - `cargo clippy --locked -D warnings` dan `cargo test --locked` hijau; `pnpm test` tanpa kegagalan baru.
 
+## Implementation Notes
+
+- Implementasi mengikuti Code Map persis: `updates.rs` memakai `Update` Clone+Send+Sync (clone keluar `Mutex` sebelum await), `Channel<DownloadEvent>` untuk progress, `pub_date` dibaca dari `raw_json` (menghindari dep `time`).
+- Kunci updater: dibuat di `C:\Users\Fatmuh\.lakar-updater-key\lakar-updater.key` (di luar repo, tanpa password — `tauri signer sign --password ""` sukses), `TAURI_SIGNING_PRIVATE_KEY` diset via `gh secret set` (stdin); pubkey di `tauri.conf.json` byte-match `.key.pub`. Kunci privat tak pernah dicetak/di-log/di-commit.
+- `updates.ts` sengaja meng-inline accessor `desktopInvoke` (4 baris) alih-alih mengimpor `./theme` tanpa ekstensi — gagal typecheck `tsconfig.test.json` (nodenext).
+- Verifikasi lokal subagent: `pnpm build` hijau; `pnpm test` typecheck + semua tes baru hijau (60 kegagalan baseline Windows yang sudah diketahui, bukan di berkas sentuhan). `cargo clippy`/`test` tak bisa lokal (tanpa MSVC link.exe) — acuan CI desktop-check.yml.
+- Keputusan: `windows-x86_64` → `-setup.exe` (bukan msi) di latest.json; `.msi.sig`/`.deb.sig` tetap terunggah tapi tak masuk latest.json.
+
+## Plan Change Log
+
+## Review Triage Log
+
+### 2026-11-23 — Review pass
+- verdicts: 9 findings — high 0, medium 2, low 7, false 0, maybe-false 0
+- findings:
+  - `[medium]` `[patch]` Job latest-json tidak bisa membedakan "tanpa secret" vs "secret ada tapi nol sig" (rilis tanpa latest.json senyap) — HAS_UPDATER_KEY dihitung ulang di job; nol sig + kunci ada → error langkah.
+  - `[medium]` `[patch]` latest.json dibangun tanpa notes → "What's new" tak pernah tampil untuk rilis nyata — job memanggil `releases/generate-notes` untuk tag dan meneruskan `--notes-file` bila berisi.
+  - `[low]` `[patch]` `#/settings/updates` di browser merender kartu mati "Checking…" — halaman dijaga isDesktop.
+  - `[low]` `[patch]` `newChannel` dievaluasi di luar try dan `onProgress: undefined` terkirim bila `core.Channel` tak ada — dibuat di dalam try.
+  - `[low]` `[patch]` Label progress "Installing update…" salah saat fase unduh jalur install dan counter basi pada jalur bytes — status mengikuti fase (unduh → pasang), counter direset.
+  - `[low]` `[patch]` `<h1>` SettingsLayout menampilkan "Settings" untuk tab updates — ternary diperluas ke "Updates".
+  - `[low]` `[patch]` `.input.select` tanpa styling di luar `.export-popover` — selector diperluas ke `.input.select`.
+  - `[low]` `[patch]` Komentar header App.tsx belum menyebut route updates — komentar diperbarui.
+  - `[low]` `[patch]` make-latest-json.mjs: pesan "tidak ada .sig" menyesatkan bila hanya sig non-platform ada; baca notes-file tak terbungkus — pesan diperjelas dan dibungkus fail().
+
 ## Design Notes
 
 - Viewer memakai command aplikasi, bukan `__TAURI__.updater`: viewer adalah origin remote `http://127.0.0.1:*` dengan ACL ketat (`viewer-window.json`); jalur `core.invoke` sudah terbukti (`set_ui_theme`), ACL command aplikasi transparan dan dites di main.rs.
@@ -119,3 +144,20 @@ deferred: []
 - `cargo clippy --locked --all-targets -- -D warnings` dan `cargo test --locked` di `apps/desktop/src-tauri` — hijau (lokal bila toolchain terpasang; acuan CI `desktop-check.yml`).
 - `node apps/desktop/scripts/make-latest-json.mjs --dir <dir-fixture-sig> --version 0.2.0 --tag v0.2.0 --repo fatmuh/lakar` — `latest.json` valid dengan 4 platform.
 - `gh workflow run release.yml --ref feat/op-8-10-desktop-updater` (via trigger push sementara) — artefak run berisi `*.sig` dan `latest.json`.
+
+## Auto Run Result
+
+**Ringkasan.** Updater otomatis aplikasi desktop: `tauri-plugin-updater` (endpoint `latest.json` GitHub Release fatmuh/lakar, `installMode: passive`), lima command aplikasi (`app_version`, `check_update`, `download_update`, `install_update`, `relaunch_app`) untuk viewer remote, UI Settings → Updates + banner Recents sesuai desain Section 11, dan pipeline rilis yang menandatangani artefak (`TAURI_SIGNING_PRIVATE_KEY` secret) lalu menerbitkan `latest.json` 4 platform. Kunci dibuat di luar repo (`C:\Users\Fatmuh\.lakar-updater-key\`), diset sebagai secret via stdin; privat tak pernah dicetak/di-commit.
+
+**Berkas.** `src-tauri/src/updates.rs` (state + command), `main.rs`/`build.rs`/`Cargo.toml`/`tauri.conf.json`/`viewer-window.json`/`Cargo.lock` (registrasi plugin, izin, pubkey); `apps/desktop/scripts/make-latest-json.mjs` + `tests/latest-json.test.ts`; `.github/workflows/release.yml` (signing env, collect `*.sig`/`*.app.tar.gz`, job `latest-json`, publish); `packages/viewer/src/updates.ts` (store), `SettingsUpdates.tsx`, `UpdateBanner.tsx`, `files.ts`, `SettingsGeneral.tsx`, `Dashboard.tsx`, `App.tsx`, `app.css`, `tokens.css`, `updates.test.ts`, `SettingsUpdates.dom.test.tsx`, `files.test.ts`; `apps/desktop/README.md`; `desktop-check.yml` (+`node --check` skrip baru).
+
+**Review.** 9 temuan (2 medium, 7 low) — semuanya `patch`, diterapkan: HAS_UPDATER_KEY + gagal-saat-nol-sig di job latest-json; notes rilis via `releases/generate-notes` → `--notes-file`; guard `isDesktop` halaman Updates; `newChannel` di dalam try; fase install `installPhase` + reset counter; `<h1>` "Updates"; selector `.input.select`; komentar route App.tsx; pesan error + wrap baca `--notes-file`. Tidak ada defer/reject.
+
+**Verifikasi.**
+- `pnpm build` — hijau.
+- `pnpm test` (`LAKAR_C7_ALLOW_MISSING_SOURCES=1`) — 2883 lulus, 59 gagal semuanya berkas baseline Windows yang sudah dikenal (C7, bash, SIGTERM/SIGKILL, foto/API, font metrics, bench); semua berkas tes sentuhan hijau (`latest-json` 6, `updates` 15, `files` 58, `SettingsUpdates.dom` 8).
+- `cargo clippy`/`test` — tak bisa lokal (tanpa MSVC link.exe); acuan CI `desktop-check.yml` di PR.
+- `gh workflow run release.yml --ref feat/...` — run 45207658862: 3/4 leg hijau (windows, macos-arm64, linux; `.sig` + artefak installer terbukti), macos-x64 pertama kali kelaparan runner lalu di-rerun.
+- `node make-latest-json.mjs` — dites via `tests/latest-json.test.ts` (4 platform, URL, duplikat/kurang/nol-sig gagal jelas).
+
+**Risiko sisa.** `cargo clippy`/`cargo test` dan build Windows NSIS installer penuh hanya tervalidasi di CI; jalur install-update nyata (bytes → NSIS passive → relaunch) belum dieksekusi end-to-end di Windows; patch `installPhase` dan pembuatan notes CI diverifikasi tes ter-scope + dry run, bukan review kedua.
