@@ -67,10 +67,34 @@ export type DocSummary = {
 };
 /** Status pool render (`/status` → `pool`); `lastError` mis. "Chrome atau Edge tidak ditemukan …" di aplikasi desktop. */
 export type PoolStatus = { size: number; ready: number; browserVersion?: string; lastError?: string };
-export type DaemonStatus = { version: string; host: string; port: number; dataDir: string; pool?: PoolStatus | null };
+export type DaemonStatus = { version: string; host: string; port: number; dataDir: string; node?: string; pool?: PoolStatus | null };
 /** Config server MCP stdio dari `GET /viewer/connections`; `null` bila entry MCP tidak ditemukan. */
 export type McpServerConfig = { command: string; args: string[]; env: { LAKAR_URL: string } };
 export type Connections = { url: string; mcp: McpServerConfig | null };
+/**
+ * Baris harness dari `GET /viewer/connections/harnesses` (Install in an agent): state terdeteksi/terpasang,
+ * path file config, dan pratinjau entri (`preview`, untuk dialog Confirm + badge "Adds N lines").
+ * `failed` tidak pernah muncul di GET — hanya sebagai `state` hasil POST (`HarnessResult`).
+ */
+export type HarnessState = 'installed' | 'not-installed' | 'not-found' | 'manual';
+export type HarnessFormat = 'json' | 'toml' | 'jsonc' | 'manual';
+export type HarnessInfo = {
+  id: string;
+  label: string;
+  state: HarnessState;
+  configPath: string | null;
+  detected: boolean;
+  installed: boolean;
+  matches: boolean;
+  format: HarnessFormat;
+  preview: string | null;
+  linesAdded: number;
+};
+/** Hasil `POST /viewer/connections/harnesses/:id/install|uninstall`; `message` terisi saat `state:'failed'`. */
+export type HarnessResult = { id: string; state: HarnessState | 'failed'; message?: string; backup?: string };
+/** Hasil `POST …/:id/revert` (Undo toast / pulihkan `.bak`) dan `POST …/:id/reveal` (buka file di file manager OS). */
+export type HarnessRevertResult = { id: string; restored: boolean };
+export type HarnessRevealResult = { id: string; opened: boolean };
 export type Screenshot = { boardId: string; width: number; height: number; url: string };
 export type InspectNode = Record<string, unknown> & { id: string; name: string; type?: string; bounds?: [number, number, number, number]; children?: InspectNode[]; childCount?: number };
 export type InspectResult = { docId: string; rev: number; boardId: string; node: InspectNode; truncated?: boolean };
@@ -207,6 +231,7 @@ function trim<V>(map: Map<string, V>, max: number, evicted?: (v: V) => void) {
 }
 
 const pagesPath = (slug: string, pageId?: string) => `/viewer/docs/${encodeURIComponent(slug)}/pages${pageId ? `/${encodeURIComponent(pageId)}` : ''}`;
+const harnessPath = (id: string) => `/viewer/connections/harnesses/${encodeURIComponent(id)}`;
 
 // ---- Klien ----
 
@@ -266,6 +291,33 @@ class ViewerClient {
 
   connections() {
     return request<Connections>('GET', '/viewer/connections');
+  }
+
+  /**
+   * Instalasi MCP ke harness (GET/POST `/viewer/connections/harnesses*`; "Install in an agent"). Bukan tulis
+   * dokumen, jadi tidak lewat antrean `#write` dan tidak membuang cache; kegagalan bisnis tetap 200
+   * (`state:'failed'` + `message`).
+   */
+  harnesses() {
+    return request<{ harnesses: HarnessInfo[] }>('GET', '/viewer/connections/harnesses').then((d) => d.harnesses);
+  }
+
+  installHarness(id: string): Promise<HarnessResult> {
+    return request<HarnessResult>('POST', `${harnessPath(id)}/install`);
+  }
+
+  uninstallHarness(id: string): Promise<HarnessResult> {
+    return request<HarnessResult>('POST', `${harnessPath(id)}/uninstall`);
+  }
+
+  /** Pulihkan `<file>.bak` ke file config (`restored:false` bila backup tidak ada). */
+  revertHarness(id: string): Promise<HarnessRevertResult> {
+    return request<HarnessRevertResult>('POST', `${harnessPath(id)}/revert`);
+  }
+
+  /** Buka file config harness di file manager OS (`opened:false` bila file tidak ada). */
+  revealHarness(id: string): Promise<HarnessRevealResult> {
+    return request<HarnessRevealResult>('POST', `${harnessPath(id)}/reveal`);
   }
 
   async listDocs(): Promise<DocSummary[]> {

@@ -57,5 +57,17 @@ export {
   type CallSummary,
 } from './events.js';
 export { DEFAULT_MCP_ENTRY, registerConnectionRoutes, resolveMcpEntry, resolveMcpNode, type ConnectionsInfo, type McpServerConfig } from './connections.js';
+export {
+  registerHarnessRoutes,
+  stripJsonComments,
+  type HarnessDeps,
+  type HarnessInfo,
+  type HarnessResult,
+  type HarnessResultState,
+  type HarnessRevealResult,
+  type HarnessRevertResult,
+  type HarnessRoutesOptions,
+  type HarnessState,
+} from './harnesses.js';
 export { startDaemon, type RunningDaemon, type StartOptions } from './start.js';
 export { IconCatalog } from '@lakar/icons';

@@ -16,8 +16,7 @@ import { openDoc } from './App';
 import { FileMenu, Menu, SHORTCUT, type MenuTarget } from './FileMenu';
 import { CONNECTIONS_HASH, docHash, fileErrorText, folderHash, inFolder, memberOf, parseSort, SETTINGS_HASH, SORT_KEYS, SORT_LABEL, sortDocs, type SortKey } from './files';
 import { dragSource, FolderItem, FolderMenu, FolderNameDialog, useDropTarget, type FolderMenuTarget } from './Folders';
-import { Connections, copyText } from './Connections';
-import { HARNESSES } from './harnesses';
+import { Connections } from './Connections';
 import { relativeTime } from './format';
 import { useNow, useRetry } from './hooks';
 import { Icon, type IconName } from './icons';
@@ -51,28 +50,13 @@ function store(key: string, value: string) {
 
 export type DashboardPage = 'recents' | 'files' | 'archive' | 'settings' | 'connections';
 
-/** Tombol "Copy MCP config": salin config Claude Code; entry MCP tidak ada / gagal → buka Connections. */
-function CopyMcpConfig({ className = '' }: { className?: string }) {
-  const [state, setState] = useState<'idle' | 'copied'>('idle');
-  const copy = async () => {
-    try {
-      const { mcp } = await api.connections();
-      if (!mcp) {
-        location.hash = CONNECTIONS_HASH;
-        return;
-      }
-      await copyText(HARNESSES[0]!.snippet(mcp));
-      setState('copied');
-      setTimeout(() => setState('idle'), 1500);
-    } catch {
-      location.hash = CONNECTIONS_HASH;
-    }
-  };
+/** Tombol ke halaman Connections ("Install in an agent" memasang config; salin manual ada di sana). */
+function ConnectLink({ className = '' }: { className?: string }) {
   return (
-    <button type="button" className={`btn ${className}`} onClick={copy}>
-      <Icon name={state === 'copied' ? 'circleCheck' : 'copy'} size={15} />
-      {state === 'copied' ? 'Copied' : 'Copy MCP config'}
-    </button>
+    <a className={`btn ${className}`} href={CONNECTIONS_HASH}>
+      <Icon name="plug" size={15} />
+      Connect an agent
+    </a>
   );
 }
 
@@ -96,7 +80,7 @@ function ConnectCard() {
       {!collapsed && (
         <>
           <p>Point Claude Code, Codex, or any ACP harness at Lakar's MCP server.</p>
-          <CopyMcpConfig className="connect-copy" />
+          <ConnectLink className="connect-copy" />
         </>
       )}
     </div>
@@ -129,7 +113,7 @@ const STEPS: { icon: IconName; title: string; text: string }[] = [
 function FirstRun() {
   return (
     <div className="first-run">
-      <EmptyState icon="file" title="No designs yet" action={<CopyMcpConfig />}>
+      <EmptyState icon="file" title="No designs yet" action={<ConnectLink />}>
         Ask your agent to design something. Files show up here as soon as the first change lands.
       </EmptyState>
       <section className="get-started" aria-labelledby="how-it-works">

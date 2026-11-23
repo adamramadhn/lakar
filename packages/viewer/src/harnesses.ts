@@ -1,4 +1,6 @@
-// Snippet config MCP per harness untuk halaman Connections (fungsi murni, tanpa React; diuji di connections.test.ts).
+// Snippet config MCP per harness untuk dialog "Manual setup" di halaman Connections (fungsi murni, tanpa React;
+// diuji di connections.test.ts). Daftar ini sama dengan tabel deteksi daemon (packages/daemon/src/harnesses.ts):
+// salin manual tetap ada sebagai fallback bila instalasi otomatis tidak bisa.
 // Sengaja tanpa import relatif: modul ini juga di-typecheck oleh tsconfig.test.json (nodenext).
 
 /** Config server MCP stdio dari `GET /viewer/connections` (struktur sama dengan `McpServerConfig` di api.ts). */
@@ -35,12 +37,14 @@ export type Harness = { id: string; label: string; file: string; snippet: (mcp: 
 /** String TOML (basic string, escape setara JSON untuk path Windows). */
 const toml = (s: string) => JSON.stringify(s);
 
+const jsonSnippet = (m: McpServerConfig) => JSON.stringify({ mcpServers: { lakar: { command: m.command, args: m.args, env: m.env } } }, null, 2);
+
 export const HARNESSES: Harness[] = [
   {
     id: 'claude-code',
     label: 'Claude Code',
-    file: '.mcp.json',
-    snippet: (m) => JSON.stringify({ mcpServers: { lakar: { command: m.command, args: m.args, env: m.env } } }, null, 2),
+    file: '~/.claude.json',
+    snippet: jsonSnippet,
   },
   {
     id: 'codex',
@@ -55,16 +59,22 @@ export const HARNESSES: Harness[] = [
       ].join('\n'),
   },
   {
-    id: 'gemini',
-    label: 'Gemini CLI',
-    file: '~/.gemini/settings.json',
-    snippet: (m) => JSON.stringify({ mcpServers: { lakar: { command: m.command, args: m.args, env: m.env } } }, null, 2),
+    id: 'pi',
+    label: 'Pi',
+    file: '~/.pi/agent/mcp.json',
+    snippet: jsonSnippet,
   },
   {
-    id: 'acp',
-    label: 'Other ACP',
-    file: 'mcpServers (ACP session/new)',
-    snippet: (m) => JSON.stringify([{ name: 'lakar', command: m.command, args: m.args, env: [{ name: 'LAKAR_URL', value: m.env.LAKAR_URL }] }], null, 2),
+    id: 'opencode',
+    label: 'OpenCode',
+    file: '~/.config/opencode/opencode.json',
+    snippet: (m) => JSON.stringify({ mcp: { servers: { lakar: { type: 'local', command: [m.command, ...m.args], environment: { LAKAR_URL: m.env.LAKAR_URL } } } } }, null, 2),
+  },
+  {
+    id: 'other',
+    label: 'Other MCP client',
+    file: 'mcpServers',
+    snippet: jsonSnippet,
   },
 ];
 
