@@ -81,12 +81,12 @@ export function changedBoards(before: DocLike | undefined, after: DocLike): Boar
 }
 
 /** Bentuk minimum entri untuk keterangan file (lihat `HistoryEntry` di api.ts). */
-export type MetaEntry = { at: string; client?: string };
+export type MetaEntry = { at: string; client?: string; agent?: string };
 
 /**
  * Keterangan di bawah nama file (desain "File Header"): belum ada revisi → `Opened 10s ago · no changes yet`;
  * satu revisi dari aplikasi (New file) → `Created just now · 1 board`; selain itu `Updated just now by Claude Code`.
- * `label` = nama harness dari client (`You` untuk aplikasi), `ago` = waktu relatif.
+ * `label` = nama harness dari agent/client (`You` untuk aplikasi), `ago` = waktu relatif.
  */
 export function fileMeta(
   history: { count: number; top?: MetaEntry } | undefined,
@@ -98,7 +98,8 @@ export function fileMeta(
   if (!history) return `Opened ${ago(openedAt)}`;
   const { count, top } = history;
   if (count === 0 || !top) return `Opened ${ago(openedAt)} · no changes yet`;
-  const who = top.client ? label(top.client) : 'an agent';
+  const author = top.agent ?? top.client;
+  const who = author ? label(author) : 'an agent';
   if (count === 1 && who === 'You') return `Created ${ago(top.at)} · ${boardCount} ${boardCount === 1 ? 'board' : 'boards'}`;
   return `Updated ${ago(top.at)} by ${who === 'You' ? 'you' : who}`;
 }

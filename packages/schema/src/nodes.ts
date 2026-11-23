@@ -808,6 +808,8 @@ export type HistoryEntry = {
   at: string;
   /** Klien sesi penulis (opsional; entri lama dan entri aplikasi tanpa field ini). */
   client?: string;
+  /** Harness agen sesi penulis (`x-lakar-agent`, mis. `claude-code`; opsional, sejak spec-agent-identity-history). */
+  agent?: string;
 };
 
 /** `path` = list nama dari board ke node (nama boleh memuat " / "); hanya untuk dibaca, alamat op tetap `id`. */

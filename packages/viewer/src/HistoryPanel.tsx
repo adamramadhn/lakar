@@ -6,7 +6,7 @@
 // dipratinjau (latar biru); entri lain cukup judul + meta (klik untuk pratinjau). Jam 24 jam ("14:32").
 import { useEffect, useState } from 'react';
 import type { LakarDocument } from '@lakar/schema';
-import { harnessColor, harnessLabel } from './activity';
+import { harnessColor, harnessLabel, whoOf } from './activity';
 import { api, errorText, type HistoryEntry } from './api';
 import { canRestore, changedBoards, comparePair, groupByDay, hasVersion, NO_SNAPSHOT, type BoardChange } from './history';
 import { useRetry } from './hooks';
@@ -90,8 +90,11 @@ export function HistoryPanel({
           {g.entries.map((e) => {
             const current = e.rev === top;
             const previewing = previewRev === e.rev;
-            const color = harnessColor(e.client);
-            const who = e.client ? harnessLabel(e.client) : `Session ${e.session}`;
+            // Warna harness, bukan warna sesi (assignAgentColors): entri riwayat umumnya dari sesi yang sudah
+            // berakhir, jadi warna per sesi Live tidak berlaku (spec-agent-identity-history).
+            const author = whoOf(e);
+            const color = harnessColor(author);
+            const who = author ? harnessLabel(author) : `Session ${e.session}`;
             const readable = hasVersion(e, latest);
             const restorable = canRestore(e, latest);
             const open = comparing === e.rev;
@@ -122,7 +125,7 @@ export function HistoryPanel({
                     }}
                   >
                     <div className="history-head">
-                      <span className={`history-agent ${color}`}>{(e.client ? harnessLabel(e.client) : 'A').charAt(0).toUpperCase()}</span>
+                      <span className={`history-agent ${color}`}>{(author ? harnessLabel(author) : 'A').charAt(0).toUpperCase()}</span>
                       <span className="history-who">{who}</span>
                       <span className="history-dot">·</span>
                       <span className="history-time" title={e.at}>

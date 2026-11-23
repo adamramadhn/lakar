@@ -52,7 +52,7 @@ export type Folder = { id: string; name: string; createdAt: string };
 export type FolderState = { folders: Folder[]; membership: Record<string, string> };
 /**
  * Ringkasan `GET /viewer/docs`. Field opsional (aplikasi 11, kolom List view): `createdAt` = entri riwayat pertama,
- * `lastClient` = klien penulis terakhir, `check` = hasil check terakhir yang mencakup semua board pada rev ini.
+ * `lastClient` = klien penulis terakhir, `lastAgent` = harness agennya (spec-agent-identity-history), `check` = hasil check terakhir yang mencakup semua board pada rev ini.
  */
 export type DocSummary = {
   slug: string;
@@ -62,6 +62,7 @@ export type DocSummary = {
   firstBoardId: string | null;
   createdAt?: string;
   lastClient?: string;
+  lastAgent?: string;
   check?: { error: number; warning: number };
 };
 /** Status pool render (`/status` → `pool`); `lastError` mis. "Chrome atau Edge tidak ditemukan …" di aplikasi desktop. */
@@ -73,7 +74,7 @@ export type Connections = { url: string; mcp: McpServerConfig | null };
 export type Screenshot = { boardId: string; width: number; height: number; url: string };
 export type InspectNode = Record<string, unknown> & { id: string; name: string; type?: string; bounds?: [number, number, number, number]; children?: InspectNode[]; childCount?: number };
 export type InspectResult = { docId: string; rev: number; boardId: string; node: InspectNode; truncated?: boolean };
-export type HistoryEntry = { rev: number; description: string; opsSummary: string; opCount: number; at: string; session: string; client?: string; snapshot?: boolean };
+export type HistoryEntry = { rev: number; description: string; opsSummary: string; opCount: number; at: string; session: string; client?: string; agent?: string; snapshot?: boolean };
 /** Hasil execute dari viewer (subset respons `/execute`). */
 export type ExecuteResult = { docId: string; rev: number; created: { id: string; name: string }[]; check?: { boards?: string[] } };
 export type UploadedAsset = { assetId: string; mime: string; width: number; height: number };

@@ -16,7 +16,7 @@ import { locateNode } from './inspect.js';
 import { HtmlImportError, importHtml, type FontLookup, type HtmlReport, type ImportedNode } from './paste/html.js';
 import type { HtmlSnapshot } from './paste/html-page.js';
 import { PASTE_NAME_MAX, SvgImportError, importSvg, type KeptAttr, type PasteDropped } from './paste/svg.js';
-import { NO_ACTIVE_DOC_HINT, type Sessions } from './sessions.js';
+import { NO_ACTIVE_DOC_HINT, authorOf, type Sessions } from './sessions.js';
 import type { DocStore } from './store.js';
 
 export const PASTE_KINDS = ['svg', 'html'] as const;
@@ -123,7 +123,7 @@ export function htmlViewportWidth(parent: ParentLike | undefined): number {
   return Math.min(PASTE_WIDTH_MAX, Math.max(1, parent.width - horiz));
 }
 
-type Actor = { sessionId: string; client?: string };
+type Actor = { sessionId: string; client?: string; agent?: string };
 
 export type PasteRoutesOptions = {
   docs: Map<string, LakarDocument>;
@@ -214,7 +214,7 @@ async function commitPaste(opts: PasteRoutesOptions, slug: string, body: PasteBo
     const committed = await transact(current!, { sessionId: actor.sessionId, description }, (tx) => applyOps(tx, ops));
     const entry = committed.entry!;
     const boards = touchedBoards(resolveDocument(current!), resolveDocument(committed.doc));
-    await opts.store.commit(slug, committed.doc, actor.client ? { ...entry, client: actor.client } : entry);
+    await opts.store.commit(slug, committed.doc, { ...entry, ...authorOf(actor) });
     opts.docs.set(slug, committed.doc);
     return { doc: committed.doc, created: committed.created, inverse: committed.inverse, refs: committed.value.refs, nodeId: committed.value.refs[ROOT_REF]!, boards, report: imported.report };
   });
@@ -243,7 +243,7 @@ export function registerPasteRoutes(app: FastifyInstance, opts: PasteRoutesOptio
     const slug = session.activeSlug;
     if (!slug) throw noDoc();
     const body = parsePasteBody(req.body);
-    const r = await commitPaste(opts, slug, body, { sessionId: session.id, ...(session.client ? { client: session.client } : {}) }, noDoc);
+    const r = await commitPaste(opts, slug, body, { sessionId: session.id, ...authorOf(session) }, noDoc);
     return reply.code(200).send({
       ok: true,
       data: {

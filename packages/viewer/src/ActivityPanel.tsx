@@ -3,8 +3,9 @@
 // Paritas desain: execute gagal → meta "failed · rolled back" + blok pesan error mono di bawah baris (frame
 // "Viewer — Desktop — Error"); lakard offline → badge "Disconnected" dan call yang masih berjalan ditandai
 // "interrupted · no response" (frame "… — Offline").
-import { useRef, useState } from 'react';
-import { callMeta, callTitle, harnessColor, harnessLabel, shortAgo, whoOf, type ActivityCall, type SessionView } from './activity';
+import { useMemo, useRef, useState } from 'react';
+import { callMeta, callTitle, harnessLabel, shortAgo, whoOf, type ActivityCall, type SessionView } from './activity';
+import { liveSessionColors, sessionColor, type AgentColor } from './agentEffects';
 import { relativeTime } from './format';
 import { useNow } from './hooks';
 import { Icon, type IconName } from './icons';
@@ -65,10 +66,10 @@ export function ToolCallRow({
  * Agent Commit Row (desain b53rG, bagian 06): call terbaru sesi berupa execute sukses ber-rev. Locate memilih node
  * utama (atau board) call itu di canvas. Slide-in 180ms dari atas daftar.
  */
-function AgentCommitRow({ call, meta, locate, now, nameOf, onLocate }: { call: ActivityCall; meta: string; locate: string | undefined; now: number; nameOf: (id: string) => string | undefined; onLocate?: ((id: string) => void) | undefined }) {
+function AgentCommitRow({ call, color, meta, locate, now, nameOf, onLocate }: { call: ActivityCall; color: AgentColor; meta: string; locate: string | undefined; now: number; nameOf: (id: string) => string | undefined; onLocate?: ((id: string) => void) | undefined }) {
   const at = Date.parse(call.startedAt) + (call.durationMs ?? 0);
   return (
-    <div className={`agent-commit ${harnessColor(whoOf(call))}`} title={shortAgo(at, now)}>
+    <div className={`agent-commit ${color}`} title={shortAgo(at, now)}>
       <span className="agent-commit-status">
         <Icon name="gitCommit" size={14} />
       </span>
@@ -90,6 +91,7 @@ function AgentCommitRow({ call, meta, locate, now, nameOf, onLocate }: { call: A
 
 function SessionCard({
   view,
+  color,
   now,
   nameOf,
   offline,
@@ -97,6 +99,8 @@ function SessionCard({
   isOld,
 }: {
   view: SessionView;
+  /** Warna sesi (sama dengan kursor canvas dan Layers; spec-agent-identity-history). */
+  color: AgentColor;
   now: number;
   nameOf: (id: string) => string | undefined;
   offline: boolean;
@@ -107,7 +111,6 @@ function SessionCard({
   const [open, setOpen] = useState<boolean | undefined>(undefined);
   const { session, calls, live, lastCallAt } = view;
   const expanded = open ?? live;
-  const color = harnessColor(whoOf(session));
   const callCount = calls.length;
   const commit = commitRow(calls[0]);
   // Baris konteks (desain RIpNN "Context"): agen membaca seleksi pengguna lewat get_selection.
@@ -159,7 +162,7 @@ function SessionCard({
               .slice(0, CALLS_SHOWN)
               .map((c, i) =>
                 i === 0 && commit ? (
-                  <AgentCommitRow key={`commit:${c.callId}`} call={c} meta={commit.meta} locate={commit.locate} now={now} nameOf={nameOf} onLocate={onLocate} />
+                  <AgentCommitRow key={`commit:${c.callId}`} call={c} color={color} meta={commit.meta} locate={commit.locate} now={now} nameOf={nameOf} onLocate={onLocate} />
                 ) : (
                   <ToolCallRow key={c.callId} call={c} now={now} nameOf={nameOf} offline={offline} fresh={!isOld(c.callId)} />
                 ),
@@ -203,6 +206,8 @@ export function ActivityPanel({
   const old = useRef(new Set<string>());
   if (!connected || old.current.size === 0) for (const v of views) for (const c of v.calls) old.current.add(c.callId);
   const isOld = (id: string) => old.current.has(id);
+  // Warna per sesi Live, sama dengan presence canvas (`views` yang sama dari Viewer).
+  const colors = useMemo(() => liveSessionColors(views), [views]);
   return (
     <div className="activity">
       <div className="activity-scroll">
@@ -221,7 +226,7 @@ export function ActivityPanel({
           <>
             <div className="section-label activity-label">LIVE SESSIONS</div>
             {views.map((v) => (
-              <SessionCard key={v.session.id} view={v} now={now} nameOf={nameOf} offline={offline} onLocate={onLocate} isOld={isOld} />
+              <SessionCard key={v.session.id} view={v} color={sessionColor(colors, v.session)} now={now} nameOf={nameOf} offline={offline} onLocate={onLocate} isOld={isOld} />
             ))}
           </>
         )}

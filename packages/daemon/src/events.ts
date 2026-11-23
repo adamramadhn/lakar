@@ -35,6 +35,9 @@ export function originOf(headers: Record<string, string | string[] | undefined>)
 export const AGENT_HEADER = 'x-lakar-agent';
 const AGENT_PATTERN = /^[!-~](?:[ -~]{0,62}[!-~])?$/;
 
+/** Nama harness yang sah (ASCII tampak, ≤ 64, tanpa spasi di ujung); juga dipakai saat membaca riwayat dari disk. */
+export const isAgentName = (v: unknown): v is string => typeof v === 'string' && AGENT_PATTERN.test(v);
+
 /** Nama harness dari header `x-lakar-agent` (ASCII tampak, ≤ 64); tidak ada/tidak valid → undefined. */
 export function agentOf(headers: Record<string, string | string[] | undefined>): string | undefined {
   const v = headers[AGENT_HEADER];
