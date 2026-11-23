@@ -33,7 +33,7 @@ Catatan: `lakar-ui.pen` adalah salinan snapshot dari `untitled.pen` di folder do
 | 02 · Dashboard — Pages & states | Files, Archive kosong, Recents first-run, Settings, Connections, context menu, konfirmasi delete, dialog New file, search (ada hasil / tidak ada hasil, dengan aksi New file), offline, loading. Desktop, tablet, mobile |
 | 03 · Viewer | Activity, Inspect, Checks, History, Waiting, Offline, Error, Export, Add layer (menu), New File (board kosong). Desktop 1440, tablet 1024 lanskap, mobile 375 |
 | 04 · Agent presence & motion | Storyboard 4 langkah, state baris layer, tabel spesifikasi motion, aturan reduced motion |
-| 11 · Editor ergonomics & import | Snapping dan smart guide, ukur jarak Alt, menu zoom, Wrap di Auto layout, Copy as PNG, Import from URL, impor/ekspor token DTCG, Settings → Updates dan banner update. Desktop 1440, dark dan light |
+| 11 · Editor ergonomics & import | Snapping dan smart guide, ukur jarak Alt, menu zoom, Wrap di Auto layout, Copy as PNG, Import from URL, impor/ekspor token DTCG, Settings → Updates (dengan About) dan banner update, Connections → Install in an agent (instal MCP ke harness). Desktop 1440, dark dan light |
 
 Setiap layar punya versi dark dan light yang disusun sejajar atas-bawah.
 
@@ -97,11 +97,12 @@ Di Pencil, shimmer dan denyut berjalan live lewat shader `@time`. Gerakan beruru
 
 Desain story 8.1 epic `epic-adopsi-open-pencil` (2026-11-23), dasar UI story 8.5–8.10. Desain disetujui atas delegasi Fatmuh (terima jadi, 2026-11-23). Versi ini menggantikan draf sebelumnya yang di-revert di `fcd2ded`.
 
-Section `ZDg9M`, header `led6I`. Pola mengikuti section 10: baris Components `AEPtu` (sheet dark `vnnM4`, sheet light `IUxUE`), lalu tiga kelompok baris, masing-masing Dark lalu Light:
+Section `ZDg9M`, header `led6I`. Pola mengikuti section 10: baris Components `AEPtu` (sheet dark `vnnM4`, sheet light `IUxUE`), lalu empat kelompok baris, masing-masing Dark lalu Light:
 
 - Canvas & Design panel: `z3WZmU` / `jW5Wg`
 - Import & tokens: `k9fXC3` / `vpkcm`
 - Updates: `HvxCF` / `F6FTho`
+- Connections (instal MCP ke harness, story 8.11): `pbiwF` / `Tqilj`
 
 Semua layar desktop 1440×900. Setiap layar adalah salinan layar yang sudah ada (Editor `fdf6D`/`XZif7` di section 05, Theme `gXCqM` dan Import CSS `wvCMu` di section 07/09, Settings `GM2nq` dan Recents `QkniH` di section 01/02), jadi komponen, token, grid, dan tipografinya sama. Versi light adalah salinan versi dark dengan `theme.mode = light`.
 
@@ -122,6 +123,11 @@ Semua layar desktop 1440×900. Setiap layar adalah salinan layar yang sudah ada 
 | Settings — Updates · Check failed | `b4i13` | `g5kaS` | 8.10 |
 | Recents — Update ready banner | `vQY8e` | `jfXR8` | 8.10 |
 | Recents — Updated banner | `mOkHY` | `gKj0Y` | 8.10 |
+| Connections — Install to app | `meFxT` | `tye4m` | 8.11 |
+| Connections — Install · Confirm | `v4xxGH` | `Xn16V` | 8.11 |
+| Connections — Install · Installed | `flAbo` | `f4tDsn` | 8.11 |
+| Connections — Install · Failed | `DXTX7` | `jsWwf` | 8.11 |
+| Connections — Install · Manual setup | `iwFp8` | `rU5Wm` | 8.11 |
 
 Komponen baru (sheet `vnnM4`): **Smart Guide** `xUDJD` (garis 1px `danger`, ukuran diatur per instance) dan **Distance Label** `CVzUp` (label angka putih di atas `danger`). Sheet yang sama memuat contoh pemakaian komponen lama: Toast "Copied as PNG" `FLIHe` dan "Couldn't copy as PNG" `Y7G9rn` (instance Toast `r69qO`), menu Add layer `p9x1J` dengan item baru "Import from URL…", dan menu Export panel Theme `Fr1q6`.
 
@@ -135,8 +141,19 @@ Keputusan desain:
 - **Import from URL.** Dibuka dari menu Add layer (tombol "+" di Layers dan context menu canvas), tanpa shortcut. Dialog adalah salinan dialog New file: Page address, Board width (Desktop 1440 / Tablet 768 / Mobile 375), catatan batas (http(s) publik, 15 detik, 10 MB), lalu Cancel / Import page. State Progress mengunci form dan menampilkan langkah Fetched page → Rendered → Converting to layers. State Error memberi field `danger` dan pesan untuk alamat lokal/privat, dengan tombol Try again.
 - **DTCG.** Header panel Theme kini punya tombol Import dan Export (menggantikan "Import CSS variables" dan "Copy tokens as CSS", yang pindah ke dalam menu). Menu Import: CSS variables…, DTCG tokens (.json)…. Menu Export ada di sheet komponen: Copy tokens as CSS, Export DTCG JSON, Copy DTCG JSON. Dialog review DTCG adalah salinan dialog Import CSS variables: sumber JSON, pemetaan mode dari `$extensions`, tabel path DTCG/alias/tipe/nilai/status, dan token bertipe yang tidak didukung ditandai "Unsupported" serta dijelaskan di catatan, bukan dibuang diam-diam.
 - **Updates.** Halaman Settings memakai struktur Settings → General apa adanya: Settings Nav (item baru "Updates" aktif), lalu section dengan Section Intro 220px dan Section Fields, garis bawah, dan Spacer 28. Section Version memakai kartu status dari Settings → Connections (pola kartu lakard) dengan badge Up to date / Update available / Check failed dan tombol Check for updates / Download and install / Try again. State Available menambah section "What's new in 0.10.0". Section Automatic updates memakai komponen Input (mode select) "Download updates". Banner di Recents memakai pola Offline Banner: "ready to install" (`accent-soft`, What's new + Restart now) sebelum restart, dan "Updated to Lakar 0.10.0" (nada `success`, See what's new + Dismiss) setelah restart.
+- **About (revisi story 8.11).** Ketiga layar Updates (dark dan light) mendapat section terakhir "About" (`INZvK` di `k6R96Q`; salinan di layar lain): daftar kunci-nilai Version (mono), Channel, Daemon, Data folder, lalu tombol sekunder Copy build info dan Open-source licenses. Draf About sebelumnya ditolak karena garis atas dan bawahnya berat. Aturannya sekarang: garis pemisah hairline (`$border`, 1px di sisi bawah) hanya ada di antara section, dan section terakhir di kolom tidak punya garis bawah. Tidak ada garis di atas section pertama, dan isi About tidak dibungkus kartu atau garis sendiri. Jarak antar section tetap Spacer 28 + padding bawah 28 seperti Settings → General.
+- **Install to app (story 8.11).** Layar Connections disalin dari `e7hIme`, dengan Settings Nav section 11 (ada item Updates). Kartu Connected agents tinggal Claude Code dan Codex. "Add an agent" (tab + blok kode) diganti section **Install in an agent**: kepala dengan tombol Rescan, lalu Install Card (pola kartu Agents: ikon 32, nama, pill status gaya kartu Version, detail, aksi) dengan baris Claude Code, Codex, Pi, OpenCode, dan Other MCP client. Section Tools exposed dibuang di layar ini supaya kolom muat 706px. State per baris:
+  - **Not installed:** pill abu "Not installed", path config (mono), tombol primary Install.
+  - **Installed:** pill `success` "Installed", tombol sekunder Reinstall + Icon Button More (Open config file, Remove).
+  - **Not found:** ikon redup 50%, pill "Not found" `text-muted`, hint "Install OpenCode on this computer, then Rescan.", tombol Install nonaktif (opacity 0.35).
+  - **Failed:** baris berlatar `danger-soft`, pill dan detail `danger` (pesan singkat penyebab dan "Nothing was changed."), tombol Set up manually + Try again.
+  - **Other MCP client:** tanpa pill, tombol Set up manually.
+- Alur: Install membuka dialog **Confirm** (salinan dialog Import from URL): path file, badge "Adds 4 lines", pratinjau entri (TOML untuk Codex) di Code Block, catatan backup `config.toml.bak` dan restart, lalu Cancel / Install. Berhasil → baris jadi Installed ("Added just now · restart Codex to connect") dan Toast sukses dengan aksi Undo (memulihkan backup) / Dismiss. Gagal → state Failed. Set up manually membuka dialog **Manual setup** yang memuat Setup Card lama apa adanya (tab Claude Code / Codex / Pi / OpenCode / Other, path file, tombol Copy, blok kode), jadi salin-config manual tetap ada sebagai fallback di section yang sama.
+- Path config di layar hanya ilustrasi (`~/.claude.json`, `~/.codex/config.toml`, `~/.pi/agent/mcp.json`); lokasi dan format sebenarnya ditetapkan oleh story implementasinya.
 
 Catatan audit: peringatan `fill_container` dari Pencil di layar baru hanya mengenai node yang dinonaktifkan (Option Custom, Inner shadow, Note) dan master Segmented Control yang sudah ada. Diff `lakar-ui.pen` terhadap `main` hanya penambahan.
+
+Catatan audit story 8.11: `git diff --numstat` menunjukkan sekitar 200 baris "dihapus", tetapi isinya hanya serialisasi (baris penutup array `children` yang bergeser). Hash JSON node lama (Connections `e7hIme`, Settings `GM2nq`, baris section 11 lain, section Version/Automatic updates/What's new, dialog Import from URL) identik dengan `main`.
 
 ## Celah teknis yang perlu diputuskan arsitektur
 
