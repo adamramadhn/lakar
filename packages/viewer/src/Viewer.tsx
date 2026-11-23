@@ -83,7 +83,7 @@ import { ImportCssDialog } from './TokensCss';
 import { effectiveMode } from './themeModel';
 import { parentLayoutOf, type DesignTarget } from './designModel';
 import { measureLiveSize } from './liveGeometry';
-import { agentPresence, fadePlans, layerMarks, type LayerMarkInfo } from './presence';
+import { agentPresence, fadePlans, followRect, layerMarks, pendingAgents, type LayerMarkInfo } from './presence';
 import { sheetForTab, type SheetState } from './sheet';
 import { requestCloseTab } from './tabs';
 import { getCamera, getViewState, saveCamera, saveViewState, type PanelTab } from './viewState';
@@ -584,7 +584,11 @@ export function Viewer({ slug }: { slug: string }) {
     const shown = docRef.current;
     const ch = shown ? revChange(e, slug, shown.rev) : undefined;
     if (ch) loadDoc(true, ch.boards === undefined);
-    if (followRef.current && boardsTouched.length) setFocus({ boardId: boardsTouched[0]!, nonce: e.seq });
+    // Follow → seksi baru execute itu (spec-progressive-live-build); tanpa node baru → board.
+    if (followRef.current && boardsTouched.length) {
+      const rect = c.tool === 'execute' ? followRect(c) : undefined;
+      setFocus({ boardId: boardsTouched[0]!, nonce: e.seq, ...(rect ? { rect } : {}) });
+    }
   };
   const reload = useRef(loadDoc);
   reload.current = loadDoc;
@@ -659,6 +663,8 @@ export function Viewer({ slug }: { slug: string }) {
    */
   const presence = useMemo(() => agentPresence(views, index, now), [views, index, now]);
   const marks = useMemo(() => layerMarks(presence), [presence]);
+  // Execute pertama sesi (board belum diketahui): label Generating tingkat dokumen (spec-progressive-live-build).
+  const pending = useMemo(() => pendingAgents(views, index), [views, index]);
   // Rencana fade-in node baru dari execute agen (spec-canvas-agent-effects); Canvas menyaring yang lama.
   const fades = useMemo(() => fadePlans(views), [views]);
   // Setiap sambung (ulang) stream menaikkan epoch: snapshot `hello` tidak memutar fade (Canvas hanya mencatatnya).
@@ -1593,6 +1599,7 @@ export function Viewer({ slug }: { slug: string }) {
         boardRevs={boardRevs}
         boards={boards}
         presence={presence}
+        pending={pending}
         fades={fades}
         fadeEpoch={fadeEpoch}
         focus={focus && boards.some((b) => b.id === focus.boardId) ? focus : undefined}
