@@ -58,7 +58,7 @@ import { lastAgentLabel, pruneSelection, shareBadgeText, undoSkippedFor } from '
 import { UndoSkippedToast, type UndoSkipped } from './UndoSkippedToast';
 import { PasteToast, type PasteToastState } from './PasteToast';
 import { canUndoPaste, clipboardPaste, pasteTarget } from './paste';
-import { activityHub, editChange, goneReason, harnessLabel, revChange, sessionsForSlug, slugAppeared, type StreamEvent } from './activity';
+import { activityHub, editChange, goneReason, harnessLabel, revChange, sessionsForSlug, slugAppeared, whoOf, type StreamEvent } from './activity';
 import { ActivityPanel } from './ActivityPanel';
 import { BottomSheet } from './BottomSheet';
 import { AddLayerButton, IconPicker, Toast, type ToastState } from './AddLayer';
@@ -83,7 +83,7 @@ import { ImportCssDialog } from './TokensCss';
 import { effectiveMode } from './themeModel';
 import { parentLayoutOf, type DesignTarget } from './designModel';
 import { measureLiveSize } from './liveGeometry';
-import { agentPresence, layerMarks, type LayerMarkInfo } from './presence';
+import { agentPresence, fadePlans, layerMarks, type LayerMarkInfo } from './presence';
 import { sheetForTab, type SheetState } from './sheet';
 import { requestCloseTab } from './tabs';
 import { getCamera, getViewState, saveCamera, saveViewState, type PanelTab } from './viewState';
@@ -568,7 +568,7 @@ export function Viewer({ slug }: { slug: string }) {
     const c = e.call;
     // Execute agen gagal pada dokumen ini → toast "…: execute failed, change rolled back" (snippet atomik).
     if (c.slug === slug && c.tool === 'execute' && c.status === 'error' && c.client !== 'lakar-viewer') {
-      setRollback({ text: `${harnessLabel(c.client)}: execute failed, change rolled back`, key: e.seq });
+      setRollback({ text: `${harnessLabel(whoOf(c))}: execute failed, change rolled back`, key: e.seq });
     }
     // Klien viewer sendiri disaring oleh `revChange` (satu-satunya gerbang aturan itu).
     if (c.slug !== slug || c.status === 'running' || c.status === 'error') return;
@@ -659,6 +659,14 @@ export function Viewer({ slug }: { slug: string }) {
    */
   const presence = useMemo(() => agentPresence(views, index, now), [views, index, now]);
   const marks = useMemo(() => layerMarks(presence), [presence]);
+  // Rencana fade-in node baru dari execute agen (spec-canvas-agent-effects); Canvas menyaring yang lama.
+  const fades = useMemo(() => fadePlans(views), [views]);
+  // Setiap sambung (ulang) stream menaikkan epoch: snapshot `hello` tidak memutar fade (Canvas hanya mencatatnya).
+  const fadeEpochRef = useRef({ connected: activity.connected, epoch: 0 });
+  if (activity.connected !== fadeEpochRef.current.connected) {
+    fadeEpochRef.current = { connected: activity.connected, epoch: fadeEpochRef.current.epoch + (activity.connected ? 1 : 0) };
+  }
+  const fadeEpoch = fadeEpochRef.current.epoch;
   const nameOf = useCallback((id: string) => index.get(id)?.name, [index]);
 
   const runChecks = useCallback(() => {
@@ -1585,6 +1593,8 @@ export function Viewer({ slug }: { slug: string }) {
         boardRevs={boardRevs}
         boards={boards}
         presence={presence}
+        fades={fades}
+        fadeEpoch={fadeEpoch}
         focus={focus && boards.some((b) => b.id === focus.boardId) ? focus : undefined}
         onFocused={onFocused}
         highlight={highlight}
@@ -1807,7 +1817,7 @@ function LayerTree({
     const selected = selectedIds ? selectedIds.includes(n.id) : n.id === selectedId;
     const m = marks?.get(n.id);
     const mark = m?.mark;
-    const markClass = m ? ` ${m.mark}${m.color === 'codex' ? ' codex' : ''}` : '';
+    const markClass = m ? ` ${m.mark}${m.color !== 'agent' ? ` ${m.color}` : ''}` : '';
     const kind = kinds?.get(n.id.slice(n.id.lastIndexOf('/') + 1));
     rows.push(
       <div

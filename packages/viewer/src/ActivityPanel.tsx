@@ -3,8 +3,8 @@
 // Paritas desain: execute gagal → meta "failed · rolled back" + blok pesan error mono di bawah baris (frame
 // "Viewer — Desktop — Error"); lakard offline → badge "Disconnected" dan call yang masih berjalan ditandai
 // "interrupted · no response" (frame "… — Offline").
-import { useState } from 'react';
-import { callMeta, callTitle, harnessColor, harnessLabel, shortAgo, type ActivityCall, type SessionView } from './activity';
+import { useRef, useState } from 'react';
+import { callMeta, callTitle, harnessColor, harnessLabel, shortAgo, whoOf, type ActivityCall, type SessionView } from './activity';
 import { relativeTime } from './format';
 import { useNow } from './hooks';
 import { Icon, type IconName } from './icons';
@@ -14,7 +14,20 @@ const STATUS_ICON: Record<ActivityCall['status'], IconName> = { running: 'loader
 /** Baris yang ditampilkan per sesi. */
 const CALLS_SHOWN = 50;
 
-export function ToolCallRow({ call, now, nameOf, offline = false }: { call: ActivityCall; now: number; nameOf: (id: string) => string | undefined; offline?: boolean }) {
+export function ToolCallRow({
+  call,
+  now,
+  nameOf,
+  offline = false,
+  fresh = false,
+}: {
+  call: ActivityCall;
+  now: number;
+  nameOf: (id: string) => string | undefined;
+  offline?: boolean;
+  /** Baris baru sejak panel terbuka: masuk dengan `terminal-chunk-in` (spec-canvas-agent-effects). */
+  fresh?: boolean;
+}) {
   const at = call.status === 'running' ? Date.parse(call.startedAt) : Date.parse(call.startedAt) + (call.durationMs ?? 0);
   // Offline: call yang masih berjalan tidak akan mendapat jawaban dari stream → ditampilkan terputus.
   const interrupted = offline && call.status === 'running';
@@ -24,7 +37,7 @@ export function ToolCallRow({ call, now, nameOf, offline = false }: { call: Acti
   const meta = interrupted ? 'interrupted · no response' : rolledBack ? 'failed · rolled back' : callMeta(call, now);
   return (
     <>
-      <div className={`tool-call ${status}${call.summary?.error || interrupted || rolledBack ? ' has-error' : ''}`} title={call.error ? `${call.error.code}: ${call.error.message}` : undefined}>
+      <div className={`tool-call ${status}${call.summary?.error || interrupted || rolledBack ? ' has-error' : ''}${fresh ? ' chunk-in' : ''}`} title={call.error ? `${call.error.code}: ${call.error.message}` : undefined}>
         <span className="tool-call-status">
           <Icon name={STATUS_ICON[status]} size={14} className={status === 'running' ? 'spin' : undefined} />
         </span>
@@ -55,7 +68,7 @@ export function ToolCallRow({ call, now, nameOf, offline = false }: { call: Acti
 function AgentCommitRow({ call, meta, locate, now, nameOf, onLocate }: { call: ActivityCall; meta: string; locate: string | undefined; now: number; nameOf: (id: string) => string | undefined; onLocate?: ((id: string) => void) | undefined }) {
   const at = Date.parse(call.startedAt) + (call.durationMs ?? 0);
   return (
-    <div className={`agent-commit ${harnessColor(call.client)}`} title={shortAgo(at, now)}>
+    <div className={`agent-commit ${harnessColor(whoOf(call))}`} title={shortAgo(at, now)}>
       <span className="agent-commit-status">
         <Icon name="gitCommit" size={14} />
       </span>
@@ -75,11 +88,26 @@ function AgentCommitRow({ call, meta, locate, now, nameOf, onLocate }: { call: A
   );
 }
 
-function SessionCard({ view, now, nameOf, offline, onLocate }: { view: SessionView; now: number; nameOf: (id: string) => string | undefined; offline: boolean; onLocate?: ((id: string) => void) | undefined }) {
+function SessionCard({
+  view,
+  now,
+  nameOf,
+  offline,
+  onLocate,
+  isOld,
+}: {
+  view: SessionView;
+  now: number;
+  nameOf: (id: string) => string | undefined;
+  offline: boolean;
+  onLocate?: ((id: string) => void) | undefined;
+  /** Call yang sudah ada saat panel dibuka (tanpa animasi masuk). */
+  isOld: (callId: string) => boolean;
+}) {
   const [open, setOpen] = useState<boolean | undefined>(undefined);
   const { session, calls, live, lastCallAt } = view;
   const expanded = open ?? live;
-  const color = harnessColor(session.client);
+  const color = harnessColor(whoOf(session));
   const callCount = calls.length;
   const commit = commitRow(calls[0]);
   // Baris konteks (desain RIpNN "Context"): agen membaca seleksi pengguna lewat get_selection.
@@ -99,7 +127,7 @@ function SessionCard({ view, now, nameOf, offline, onLocate }: { view: SessionVi
         </span>
         <span className="session-info">
           <span className="session-title-row">
-            <span className="session-title">{harnessLabel(session.client)}</span>
+            <span className="session-title">{harnessLabel(whoOf(session))}</span>
             {live && (
               <span className={`live-badge ${offline ? 'disconnected' : color}`}>
                 <i />
@@ -115,7 +143,7 @@ function SessionCard({ view, now, nameOf, offline, onLocate }: { view: SessionVi
         <div className="session-context">
           <Icon name="eye" size={13} />
           <span className="session-context-text">
-            {harnessLabel(session.client)} read your selection {relativeTime(Date.parse(read.startedAt) + (read.durationMs ?? 0), now)}
+            {harnessLabel(whoOf(session))} read your selection {relativeTime(Date.parse(read.startedAt) + (read.durationMs ?? 0), now)}
             {readName ? ':' : ''}
           </span>
           {readName && <strong>{readName}</strong>}
@@ -133,7 +161,7 @@ function SessionCard({ view, now, nameOf, offline, onLocate }: { view: SessionVi
                 i === 0 && commit ? (
                   <AgentCommitRow key={`commit:${c.callId}`} call={c} meta={commit.meta} locate={commit.locate} now={now} nameOf={nameOf} onLocate={onLocate} />
                 ) : (
-                  <ToolCallRow key={c.callId} call={c} now={now} nameOf={nameOf} offline={offline} />
+                  <ToolCallRow key={c.callId} call={c} now={now} nameOf={nameOf} offline={offline} fresh={!isOld(c.callId)} />
                 ),
               )
           )}
@@ -170,6 +198,11 @@ export function ActivityPanel({
   nameOf: (id: string) => string | undefined;
 }) {
   const now = useNow(views.some((v) => v.running) ? 1000 : 10_000);
+  // Call yang sudah ada saat panel dibuka atau tiba lewat snapshot (belum/baru tersambung) tidak dianimasikan; hanya
+  // baris yang tiba sesudahnya (termasuk baris pertama kartu sesi baru) masuk dengan `chunk-in`.
+  const old = useRef(new Set<string>());
+  if (!connected || old.current.size === 0) for (const v of views) for (const c of v.calls) old.current.add(c.callId);
+  const isOld = (id: string) => old.current.has(id);
   return (
     <div className="activity">
       <div className="activity-scroll">
@@ -188,7 +221,7 @@ export function ActivityPanel({
           <>
             <div className="section-label activity-label">LIVE SESSIONS</div>
             {views.map((v) => (
-              <SessionCard key={v.session.id} view={v} now={now} nameOf={nameOf} offline={offline} onLocate={onLocate} />
+              <SessionCard key={v.session.id} view={v} now={now} nameOf={nameOf} offline={offline} onLocate={onLocate} isOld={isOld} />
             ))}
           </>
         )}

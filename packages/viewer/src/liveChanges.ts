@@ -3,7 +3,7 @@
 // terbaru), pelepasan pratinjau tertahan per rev, pembersihan seleksi dari node yang dihapus, target undo yang
 // hilang (AD-8) dan teks toast "Undo skipped", serta turunan Activity (baris commit agen, seleksi dibaca agen).
 import type { DocOp } from '@lakar/schema';
-import { callEndMs, harnessLabel, type ActivityCall, type SessionView } from './activity.js';
+import { callEndMs, harnessLabel, whoOf, type ActivityCall, type SessionView } from './activity.js';
 import { resizeBox, unionBox, type Box, type GeoNode, type Handle, type Point } from './gesture.js';
 
 type GeoIndex = ReadonlyMap<string, GeoNode>;
@@ -117,7 +117,7 @@ export function lastAgentLabel(views: readonly SessionView[], since = -Infinity)
     if (!c) continue;
     const at = callEndMs(c);
     if (at < since) continue;
-    if (!best || at > best.at) best = { at, label: harnessLabel(v.session.client) };
+    if (!best || at > best.at) best = { at, label: harnessLabel(whoOf(v.session)) };
   }
   return best?.label;
 }

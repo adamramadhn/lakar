@@ -33,6 +33,8 @@ import type { GeoNode } from './gesture';
 import { useOffline, useRetry } from './hooks';
 import { Icon, type IconName } from './icons';
 import type { AgentPresence, Rect } from './presence';
+import { FadeQueue, generatingBoards, generatingText, withExiting, type FadePlan, type Shown } from './agentEffects';
+import { animateFadeIn } from './agentFx';
 import { pinchCamera, pointerIntent, TAP_SLOP, type Point } from './sheet';
 import type { Camera } from './viewState';
 
@@ -102,11 +104,14 @@ function focusCamera(b: CanvasBoard, c: Camera, w: number, h: number): Camera {
 const reducedMotion = () => typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
 /** Durasi geser kamera Follow agent (desain bagian 04: 500ms). */
 const FOLLOW_MS = 500;
-/** Durasi luncur Agent Cursor (desain bagian 04: 400ms ease-out). */
-const GLIDE_MS = 400;
+/** Durasi luncur Agent Cursor (desain bagian 04, diperbarui spec-canvas-agent-effects: 180ms easeOutCubic). */
+const GLIDE_MS = 180;
+/** Durasi reveal/exit kursor (scale 0.5 ↔ 1 + opacity; CSS `agent-cursor-in/out`). */
+const CURSOR_EXIT_MS = 180;
 
 /**
- * Posisi (koordinat dokumen) yang meluncur ke (tx, ty) dalam `GLIDE_MS` ease-out; reduced motion → lompat.
+ * Posisi (koordinat dokumen) yang meluncur ke (tx, ty) dalam `GLIDE_MS` easeOutCubic (= cubic-bezier(.33,1,.68,1));
+ * reduced motion → lompat.
  * Posisi awal = target pertama (kursor yang baru tampil tidak meluncur dari mana pun).
  */
 function useGlide(tx: number, ty: number): { x: number; y: number } {
@@ -135,10 +140,12 @@ function useGlide(tx: number, ty: number): { x: number; y: number } {
 }
 
 /** Agent Cursor (komponen desain): pointer + tag warna harness; working → spinner, nama, baris aksi mono. */
-function AgentCursor({ p, x, y, cam }: { p: AgentPresence; x: number; y: number; cam: Camera }) {
+function AgentCursor({ p, x, y, cam, exiting }: { p: AgentPresence; x: number; y: number; cam: Camera; exiting: boolean }) {
   const pos = useGlide(x, y);
   return (
-    <div className={`agent-cursor ${p.color}${p.working ? ' working' : ''}`} style={{ transform: `translate(${cam.x + pos.x * cam.z}px, ${cam.y + pos.y * cam.z}px)` }}>
+    <div className={`agent-cursor ${p.color}${p.working ? ' working' : ''}${exiting ? ' exiting' : ''}`} style={{ transform: `translate(${cam.x + pos.x * cam.z}px, ${cam.y + pos.y * cam.z}px)` }}>
+      {/* Badan kursor: reveal/exit scale 0.5 ↔ 1 dari ujung pointer (transform terpisah dari luncuran). */}
+      <div className="agent-cursor-body">
       <svg className="agent-cursor-pointer" width="16" height="18" viewBox="0 0 16 18" aria-hidden="true">
         <path d="M1 1 L1 15 L5 11.5 L8 17 L10.5 15.8 L7.6 10.4 L13 10.4 Z" />
       </svg>
@@ -153,8 +160,26 @@ function AgentCursor({ p, x, y, cam }: { p: AgentPresence; x: number; y: number;
           </div>
         )}
       </div>
+      </div>
     </div>
   );
+}
+
+/**
+ * Kursor yang tampil termasuk yang baru hilang (animasi keluar `CURSOR_EXIT_MS`); timer membuangnya sesudah selesai.
+ */
+function useExitingCursors(presence: readonly AgentPresence[]): Shown<AgentPresence>[] {
+  const prev = useRef<Shown<AgentPresence>[]>([]);
+  const [, tick] = useState(0);
+  const shown = withExiting(prev.current, presence, (p) => p.session, Date.now(), CURSOR_EXIT_MS);
+  prev.current = shown;
+  const exiting = shown.some((s) => s.goneAt !== undefined);
+  useEffect(() => {
+    if (!exiting) return;
+    const t = setTimeout(() => tick((n) => n + 1), CURSOR_EXIT_MS + 20);
+    return () => clearTimeout(t);
+  });
+  return shown;
 }
 
 /** Gaya kotak node (bounds relatif board) di layar. */
@@ -165,13 +190,17 @@ function nodeBox(b: CanvasBoard, r: Rect, cam: Camera) {
 
 /** Lapisan kehadiran agen: outline board, outline node (working / Just changed), dan kursor. */
 function AgentLayer({ presence, boardById, cam }: { presence: readonly AgentPresence[]; boardById: ReadonlyMap<string, CanvasBoard>; cam: Camera }) {
+  const cursors = useExitingCursors(presence);
   return (
     <div className="agent-layer" aria-hidden="true">
       {presence.map((p) => {
         const b = boardById.get(p.boardId);
         if (!b) return null;
         return (
-          <div key={`outline:${p.session}`} className={`agent-outline ${p.color}${p.working ? ' working' : ''}`} style={{ left: cam.x + b.x * cam.z - 4, top: cam.y + b.y * cam.z - 4, width: b.width * cam.z + 8, height: b.height * cam.z + 8 }} />
+          <div key={`outline:${p.session}`} className={`agent-outline ${p.color}${p.working ? ' working' : ''}`} style={{ left: cam.x + b.x * cam.z - 4, top: cam.y + b.y * cam.z - 4, width: b.width * cam.z + 8, height: b.height * cam.z + 8 }}>
+            {/* Board scan (desain "Generating"): pita + garis 1px menyapu kiri → kanan selama execute berjalan. */}
+            {p.working && <div className="agent-scan" />}
+          </div>
         );
       })}
       {presence.map((p) => {
@@ -196,12 +225,12 @@ function AgentLayer({ presence, boardById, cam }: { presence: readonly AgentPres
           );
         }),
       )}
-      {presence.map((p) => {
+      {cursors.map(({ key, value: p, goneAt }) => {
         const b = boardById.get(p.boardId);
         if (!b) return null;
         const x = b.x + (p.rect ? p.rect[0] + p.rect[2] / 2 : b.width / 2);
         const y = b.y + (p.rect ? p.rect[1] + p.rect[3] / 2 : b.height / 2);
-        return <AgentCursor key={`cursor:${p.session}`} p={p} x={x} y={y} cam={cam} />;
+        return <AgentCursor key={`cursor:${key}`} p={p} x={x} y={y} cam={cam} exiting={goneAt !== undefined} />;
       })}
     </div>
   );
@@ -319,6 +348,8 @@ export function Canvas({
   boardRevs,
   boards,
   presence,
+  fades,
+  fadeEpoch = 0,
   focus,
   onFocused,
   highlight,
@@ -409,6 +440,10 @@ export function Canvas({
   boards: CanvasBoard[];
   /** Kehadiran agen per sesi Live (disembunyikan saat pratinjau versi). */
   presence?: readonly AgentPresence[];
+  /** Rencana fade-in node baru dari execute agen (`fadePlans`, spec-canvas-agent-effects). */
+  fades?: readonly FadePlan[];
+  /** Naik setiap stream aktivitas tersambung ulang; rencana fade pada render itu hanya dicatat (tanpa efek). */
+  fadeEpoch?: number;
   focus?: Focus | undefined;
   onFocused?: (nonce: number) => void;
   highlight: Highlight | undefined;
@@ -491,6 +526,40 @@ export function Canvas({
     pathEditing: pathMode,
   });
   editRef.current = edit;
+  // Fade-in node baru dari agen (spec-canvas-agent-effects): rencana masuk antrean (hanya execute yang selesai sesudah
+  // canvas dibuka), lalu diputar saat board di-mount dari rev yang memuatnya. Host board terakhir diingat untuk rencana
+  // yang tiba sesudah mount.
+  const fadeQueue = useRef<FadeQueue | null>(null);
+  fadeQueue.current ??= new FadeQueue(Date.now());
+  const mountedHosts = useRef(new Map<string, { host: HTMLDivElement; rev: number }>());
+  const editMountedRef = useRef(edit.onMounted);
+  editMountedRef.current = edit.onMounted;
+  const playFade = useCallback((boardId: string, host: HTMLDivElement, rev: number) => {
+    for (const ids of fadeQueue.current!.take(boardId, rev, Date.now())) animateFadeIn(host, ids, reducedMotion());
+  }, []);
+  const onBoardMounted = useCallback(
+    (boardId: string, host: HTMLDivElement, rev: number) => {
+      editMountedRef.current?.(boardId, host, rev);
+      mountedHosts.current.set(boardId, { host, rev });
+      if (!preview) playFade(boardId, host, rev);
+    },
+    [playFade, preview],
+  );
+  // Stream tersambung ulang (`hello` membangun ulang Activity): rencana di snapshot dianggap lama, tidak diputar.
+  const lastEpoch = useRef(fadeEpoch);
+  useEffect(() => {
+    if (!fades || preview) return;
+    if (lastEpoch.current !== fadeEpoch) {
+      lastEpoch.current = fadeEpoch;
+      fadeQueue.current!.prime(fades);
+      return;
+    }
+    const now = Date.now();
+    for (const plan of fades) {
+      if (!fadeQueue.current!.offer(plan, now)) continue;
+      for (const [boardId, m] of mountedHosts.current) if (m.host.isConnected) playFade(boardId, m.host, m.rev);
+    }
+  }, [fades, fadeEpoch, preview, playFade]);
   /** Seleksi terkini untuk listener keyboard (Escape keluar dari isi instance). */
   const selectionRef = useRef(selection);
   selectionRef.current = selection;
@@ -784,6 +853,7 @@ export function Canvas({
 
   const center = () => [size.w / 2, size.h / 2] as const;
   const boardById = new Map(boards.map((b) => [b.id, b]));
+  const generating = generatingBoards(presence ?? []);
   const hb = highlight ? boardById.get(highlight.boardId) : undefined;
   const hRect =
     hb && highlight
@@ -853,17 +923,24 @@ export function Canvas({
         const top = cam.y + (ob?.y ?? b.y) * cam.z;
         const selected = highlight?.boardId === b.id && !highlight.bounds;
         // Board baru ditulis agen (story 3, desain iVbC4): label berganti tag "Just changed · Agen" selama 1.5 dtk.
-        const changedBy = preview ? undefined : presence?.find((p) => p.changedKey && p.changedBoards.includes(b.id));
+        // Board yang sedang dikerjakan agen (spec-canvas-agent-effects): label board berganti "✦ Generating · nama".
+        const genBy = preview ? undefined : generating.get(b.id);
+        const changedBy = preview || genBy ? undefined : presence?.find((p) => p.changedKey && p.changedBoards.includes(b.id));
         return (
           <div key={b.id}>
             <div
               key={changedBy ? `label:${changedBy.session}:${changedBy.changedKey}` : 'label'}
-              className={`board-label${highlight?.boardId === b.id ? ' active' : ''}${changedBy ? ' swapped' : ''}`}
+              className={`board-label${highlight?.boardId === b.id ? ' active' : ''}${changedBy ? ' swapped' : ''}${genBy ? ' generating' : ''}`}
               data-board-label={b.id}
               style={{ left, top: top - 18, maxWidth: Math.max(40, bw * cam.z) }}
             >
               {b.name}
             </div>
+            {genBy && (
+              <div key={`gen:${genBy.session}`} className={`agent-generating ${genBy.color}`} aria-hidden="true" style={{ left: left - 2, top: top - 22, maxWidth: Math.max(80, bw * cam.z + 4) }}>
+                {generatingText(b.name)}
+              </div>
+            )}
             {changedBy && (
               <div key={`tag:${changedBy.session}:${changedBy.changedKey}`} className={`change-tag board-tag ${changedBy.color}`} aria-hidden="true" style={{ left, top: top - 20 }}>
                 <Icon name="sparkles" size={10} />
@@ -872,7 +949,7 @@ export function Canvas({
             )}
             <div className={`board${selected ? ' selected' : ''}`} data-board={b.id} style={{ left, top, width: bw * cam.z, height: bh * cam.z }}>
               {live && boardSource(live !== undefined, preview !== undefined) === 'live' ? (
-                <BoardLive live={live} board={b} zoom={cam.z} onMounted={edit.onMounted} />
+                <BoardLive live={live} board={b} zoom={cam.z} onMounted={onBoardMounted} />
               ) : (
                 <BoardImage slug={slug} rev={Math.min(rev, boardRevs?.[b.id] ?? rev)} board={b} previewRev={previewRev} />
               )}
@@ -917,7 +994,7 @@ export function Canvas({
         </div>
       )}
 
-      {!preview && presence && presence.length > 0 && <AgentLayer presence={presence} boardById={boardById} cam={cam} />}
+      {!preview && presence && <AgentLayer presence={presence} boardById={boardById} cam={cam} />}
 
       {stale !== undefined && (
         <div className="stale-pill" role="status">

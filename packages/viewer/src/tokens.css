@@ -54,6 +54,10 @@
   --agent-soft: #f9731618;
   --codex: #0ea5e9;
   --codex-soft: #0ea5e918;
+  /* Warna agen tambahan (spec-canvas-agent-effects): sesi agen kedua dst. pada dokumen yang sama. */
+  --agent-violet: #8b5cf6;
+  --agent-emerald: #10b981;
+  --agent-pink: #ec4899;
   /* Komponen (desain bagian 08): master/instance, terpisah dari accent pengguna dan warna agen. */
   --component: #9333ea;
   --component-soft: #9333ea1a;

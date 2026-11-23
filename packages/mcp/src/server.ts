@@ -343,8 +343,9 @@ export const LIST_DOCUMENTS_DESCRIPTION =
   'Pakai slug untuk open_doc {slug} bila pengguna menyebut file tertentu.';
 
 export function createLakarMcpServer(daemonUrl: string): McpServer {
-  const client = new DaemonClient(daemonUrl);
   const server = new McpServer({ name: SERVER_NAME, version: SERVER_VERSION }, { instructions: SERVER_INSTRUCTIONS });
+  // clientInfo harness (Claude Code, Codex, …) baru ada sesudah initialize; sesi daemon dibuat malas pada tool pertama.
+  const client = new DaemonClient(daemonUrl, { agent: () => server.server.getClientVersion() });
   let executes = 0;
 
   server.registerTool(
