@@ -1337,6 +1337,28 @@ code {
 .layers-panel .panel-tabs {
   border-bottom: 0;
 }
+/* Badge jumlah temuan di tab Checks (desain "Panel Tab" › Badge): pengganti pill layout_check di kanvas. */
+.panel-tab .tab-badge {
+  display: inline-grid;
+  place-items: center;
+  min-width: 16px;
+  height: 16px;
+  margin-left: 6px;
+  padding: 0 5px;
+  border-radius: 8px;
+  font-size: 10px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  vertical-align: 1px;
+}
+.panel-tab .tab-badge.danger {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+.panel-tab .tab-badge.warning {
+  background: var(--surface-hover);
+  color: var(--warning);
+}
 .panel-tab {
   height: 25px;
   padding: 0 10px;
@@ -2512,23 +2534,6 @@ button.panel-tab:hover {
   font-weight: 500;
   font-variant-numeric: tabular-nums;
 }
-.checks-pill {
-  position: absolute;
-  left: 16px;
-  bottom: 20px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  height: 29px;
-  padding: 0 12px;
-  border-radius: 10px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  font-size: 12px;
-}
-.checks-pill:hover {
-  background: var(--surface-hover);
-}
 .mono-label {
   font-weight: 500;
 }
@@ -2552,22 +2557,6 @@ button.panel-tab:hover {
 }
 .dot.success {
   background: var(--success);
-}
-
-/* Canvas sempit: pill check naik supaya tidak tertutup kontrol view. */
-/* Toolbar dengan tool sisip (aplikasi 4) ~465px. Desain (desktop 860px, tablet 724px): pill dan toolbar sejajar di
-   bawah; bila toolbar di tengah akan menabrak pill, toolbar digeser ke kanan pill (x 212). Kanvas lebih sempit dari
-   itu: pill naik di atas toolbar. */
-@container (min-width: 694px) and (max-width: 940px) {
-  .canvas:has(> .checks-pill) > .view-controls {
-    left: 212px;
-    transform: none;
-  }
-}
-@container (max-width: 693px) {
-  .checks-pill {
-    bottom: 72px;
-  }
 }
 
 /* ---- Export (desain `Viewer — Desktop — Export`) ---- */
@@ -3809,6 +3798,139 @@ button.panel-tab:hover {
   font-size: 12px;
 }
 
+/* ---- Sidebar yang bisa dilipat (spec-viewer-collapsible-panels, desain 03 "… collapsed" + 04 "Panel toggles") ---- */
+/* Panel melayang (`*-float`) selama dilipat dan selama slide masuk; kolom grid-nya 0 sehingga kanvas di-resize sekali
+   per toggle, bukan per frame. Gerak hanya `transform` (tabel motion WHm4A): expand 240ms, collapse 200ms,
+   cubic-bezier(.32,.72,0,1). Transisi CSS berbalik dari posisinya bila di-toggle lagi di tengah gerak. */
+.panel-toggle {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: 0 2px 8px #0000001f;
+  color: var(--text-secondary);
+  transition:
+    background-color 150ms ease,
+    color 150ms ease,
+    transform 120ms ease-out;
+}
+@media (hover: hover) and (pointer: fine) {
+  .panel-toggle:hover {
+    background: var(--surface-hover);
+    color: var(--text-primary);
+  }
+}
+.panel-toggle:active {
+  background: var(--surface-hover);
+  border-color: var(--text-muted);
+  color: var(--text-primary);
+  transform: scale(0.96);
+}
+.panel-toggle.left {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  z-index: 7;
+}
+@media (min-width: 1101px) {
+  .viewer > .layers-panel {
+    grid-column: 1;
+    grid-row: 1;
+  }
+  .viewer > .canvas {
+    grid-column: 2;
+    grid-row: 1;
+  }
+  .viewer > .side-panel {
+    grid-column: 3;
+    grid-row: 1;
+  }
+  .viewer.left-float {
+    grid-template-columns: 0 minmax(0, 1fr) 320px;
+  }
+  .viewer.right-float {
+    grid-template-columns: 260px minmax(0, 1fr) 0;
+  }
+  .viewer.left-float.right-float {
+    grid-template-columns: 0 minmax(0, 1fr) 0;
+  }
+  .viewer {
+    position: relative;
+  }
+  .viewer.left-float > .layers-panel {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 20;
+    width: 260px;
+    transition: transform 240ms cubic-bezier(0.32, 0.72, 0, 1);
+  }
+  .viewer.left-collapsed > .layers-panel {
+    transform: translateX(-100%);
+    visibility: hidden;
+    transition:
+      transform 200ms cubic-bezier(0.32, 0.72, 0, 1),
+      visibility 0s linear 200ms;
+  }
+}
+@media (min-width: 768px) {
+  .viewer.right-float > .side-panel {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    right: 0;
+    z-index: 20;
+    width: 320px;
+    transition: transform 240ms cubic-bezier(0.32, 0.72, 0, 1);
+  }
+  .viewer.right-collapsed > .side-panel {
+    transform: translateX(100%);
+    visibility: hidden;
+    transition:
+      transform 200ms cubic-bezier(0.32, 0.72, 0, 1),
+      visibility 0s linear 200ms;
+  }
+}
+@media (min-width: 768px) and (max-width: 1100px) {
+  .viewer.right-float {
+    grid-template-columns: minmax(0, 1fr) 0;
+  }
+  .viewer.right-float > .side-panel {
+    width: 300px;
+  }
+}
+/* Shortcut keyboard dan reduced motion: instan. */
+.viewer.panels-instant > .layers-panel,
+.viewer.panels-instant > .side-panel {
+  transition: none !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  .viewer > .layers-panel,
+  .viewer > .side-panel,
+  .panel-toggle {
+    transition: none !important;
+  }
+  .panel-toggle:active {
+    transform: none;
+  }
+}
+/* Tablet: kiri = laci (tombol "Layers"); mobile: panel kanan = bottom sheet. */
+@media (max-width: 1100px) {
+  .panel-toggle.left {
+    display: none;
+  }
+}
+@media (max-width: 767.98px) {
+  .panel-toggle.right,
+  .panel-tab .tab-badge {
+    display: none;
+  }
+}
+
 /* ---- Responsif ---- */
 /* Viewer tablet/mobile (aplikasi 9, desain bagian 03 "Viewer — Tablet/Mobile — …"). Di desktop (>1100px) elemen
    tambahan ini tidak tampil, jadi tata letak tiga kolom tidak berubah. */
@@ -4036,9 +4158,6 @@ button.panel-tab:hover {
   }
   .viewer .zoom-btn,
   .viewer .zoom-level {
-    display: none;
-  }
-  .viewer .checks-pill {
     display: none;
   }
   /* Pesan Waiting di tengah area kanvas yang terlihat (di atas toolbar dan sheet). */

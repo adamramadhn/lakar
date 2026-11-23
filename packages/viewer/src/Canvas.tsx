@@ -4,8 +4,10 @@
 // Pan, zoom, Fit, seleksi, Export PNG (ExportPopover), dan tool sisip layer (aplikasi 4, di bawah). Di canvas live,
 // seleksi banyak, marquee, geser, reorder, resize, dan Undo/Redo toolbar ada di canvasEdit.tsx (editor-canvas story 4).
 // Mode pratinjau versi (History, aplikasi 3): board dari snapshot (POST revs/:rev/screenshot), banner
-// "Previewing …" dengan Back to latest / Restore this version; Export, Checks, dan outline agen disembunyikan.
+// "Previewing …" dengan Back to latest / Restore this version; Export dan outline agen disembunyikan.
 // Tool edit (batch 4) wajib nonaktif selama `preview` ada.
+// Pill ringkasan layout_check di kiri bawah sudah dihapus (spec-viewer-collapsible-panels): jumlah temuan tampil
+// sebagai badge di tab Checks. Slot `leadingActions` (toggle sidebar kanan) tetap tampil di kanan atas saat pratinjau.
 // Kehadiran agen (aplikasi 5, desain bagian 04): per sesi Live garis tepi board lokasi (putus-putus, berdenyut saat
 // working), outline node lokasi saat working, outline "Just changed" sesudah execute, dan Agent Cursor yang meluncur
 // di koordinat dokumen (pan/zoom tidak membuatnya tertinggal). Lapisan ini tidak menangkap pointer.
@@ -21,7 +23,7 @@
 // live: DOM lama tetap tampil sampai mount baru siap.
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type MutableRefObject, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
 import { findBoard } from '@lakar/render';
-import { resolveDocument, type DocOp, type FindingLevel, type FindingSummary, type LakarDocument, type ResolvedDocument } from '@lakar/schema';
+import { resolveDocument, type DocOp, type FindingLevel, type LakarDocument, type ResolvedDocument } from '@lakar/schema';
 import { boardDepKeys, boardSignature, boardSource, ensureFaces, mountLive, RenderDepsCache } from './liveBoard';
 import { api, errorText } from './api';
 import { SelectionBox, useCanvasEdit } from './canvasEdit';
@@ -353,10 +355,7 @@ export function Canvas({
   focus,
   onFocused,
   highlight,
-  summary,
-  checksLoading,
   onSelect,
-  onOpenChecks,
   onExportCode,
   preview,
   editable = false,
@@ -381,6 +380,7 @@ export function Canvas({
   onContextMenu,
   shareBadge,
   actions,
+  leadingActions,
   components,
   onDropComponent,
   pastedTag,
@@ -413,6 +413,8 @@ export function Canvas({
   shareBadge?: string | undefined;
   /** Tombol tambahan di kiri Export (kanan atas kanvas), mis. Theme (epic token-tema story 3). */
   actions?: ReactNode;
+  /** Tombol paling kiri grup kanan atas yang tetap tampil saat pratinjau versi (toggle sidebar kanan). */
+  leadingActions?: ReactNode;
   canUndo?: boolean;
   canRedo?: boolean;
   onUndo?: () => void;
@@ -447,10 +449,7 @@ export function Canvas({
   focus?: Focus | undefined;
   onFocused?: (nonce: number) => void;
   highlight: Highlight | undefined;
-  summary: FindingSummary | undefined;
-  checksLoading: boolean;
   onSelect: (id: string | undefined) => void;
-  onOpenChecks: () => void;
   /** Dialog Export code untuk board (popover Export, epic kode story 5). */
   onExportCode?: ((boardId: string) => void) | undefined;
   /** Pratinjau versi lama (History); `undefined` = versi terkini. */
@@ -589,7 +588,16 @@ export function Canvas({
   useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
-    const ro = new ResizeObserver(() => setSize({ w: el.clientWidth, h: el.clientHeight }));
+    // Tepi kiri kanvas bergeser (sidebar kiri dilipat/dibuka, spec-viewer-collapsible-panels): pan kamera digeser
+    // sebesar selisihnya sehingga board tetap diam di layar. Kanvas hanya di-resize sekali per toggle.
+    let left = el.getBoundingClientRect().left;
+    const ro = new ResizeObserver(() => {
+      const now = el.getBoundingClientRect().left;
+      const dx = left - now;
+      left = now;
+      if (Math.abs(dx) >= 0.5) setCam((c) => ({ ...c, x: c.x + dx }));
+      setSize({ w: el.clientWidth, h: el.clientHeight });
+    });
     ro.observe(el);
     setSize({ w: el.clientWidth, h: el.clientHeight });
     return () => ro.disconnect();
@@ -1013,31 +1021,15 @@ export function Canvas({
 
       {preview && <PreviewBanner preview={preview} />}
 
-      {!preview && (summary || checksLoading) && (
-        <button type="button" className="checks-pill canvas-overlay-ui" onClick={onOpenChecks}>
-          <Icon name="shieldCheck" size={15} />
-          <span className="mono-label">layout_check</span>
-          {summary ? (
-            <>
-              <span className="count">
-                <i className="dot danger" />
-                {summary.error}
-              </span>
-              <span className="count">
-                <i className="dot warning" />
-                {summary.warning}
-              </span>
-            </>
-          ) : (
-            <span className="count muted">…</span>
-          )}
-        </button>
-      )}
-
-      {!preview && (
+      {(leadingActions || !preview) && (
         <div className="canvas-actions">
-          {actions}
-          <ExportButton slug={slug} boards={boards} selectedBoardId={highlight?.boardId} onExportCode={onExportCode} />
+          {leadingActions}
+          {!preview && (
+            <>
+              {actions}
+              <ExportButton slug={slug} boards={boards} selectedBoardId={highlight?.boardId} onExportCode={onExportCode} />
+            </>
+          )}
         </div>
       )}
 
