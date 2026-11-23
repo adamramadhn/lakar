@@ -272,4 +272,9 @@
   evidence: jsdom tanpa layout/animasi nyata; perlu feel-check di perangkat atau rekaman Playwright.
 - source_spec: `_bmad-output/implementation-artifacts/spec-skeleton-live-build.md`
   summary: Label placeholder di canvas memakai font sistem/Inter tetap 13px di koordinat board (ikut zoom), tidak diskalakan terbalik seperti label board.
-  evidence: Gaya ada di shadow root board yang ditransformasi kamera. Usul: label lewat lapisan overlay canvas bila terlalu kecil saat zoom jauh.
+  evidence: Gaya ada di shadow root board yang ditransformasi kamera. Usul: label lewat lapisan overlay canvas bila terlalu kecil saat zoom jauh.- source_spec: `_bmad-output/implementation-artifacts/spec-installer-locked-node.md`
+  summary: Installer MSI belum menghentikan `lakar-node.exe` dari direktori instalasi sebelum menyalin file. Hook hanya ada di NSIS.
+  evidence: Template WiX Tauri hanya mendukung fragment dan ref. Custom action bisa dimasukkan lewat `componentGroupRefs` ke fragment berisi `CustomAction` + `InstallExecuteSequence`, tetapi MSI terpasang perMachine (Program Files) dan tidak bisa diuji lokal tanpa toolchain WiX. Windows Installer tidak gagal keras: UI menampilkan dialog FilesInUse/Restart Manager ("close applications automatically"), sedangkan mode senyap mengganti file setelah reboot. Usul: fragment `CustomAction` deferred (Impersonate="no") yang menjalankan `stop-lakar.ps1` sebelum `InstallFiles`, plus langkah msiexec di `smoke-installer.mjs`.
+- source_spec: `_bmad-output/implementation-artifacts/spec-installer-locked-node.md`
+  summary: Connections tidak memberi tahu pengguna Windows bahwa config MCP yang disalin sebelum v0.1.4 masih menunjuk `%LOCALAPPDATA%\Lakar\lakar-node.exe` dan akan terputus saat upgrade.
+  evidence: Daemon tidak tahu config apa yang dipakai harness. Usul: catatan rilis v0.1.4 ("copy the MCP config again") atau catatan statis di Connections untuk desktop Windows.

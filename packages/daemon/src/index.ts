@@ -56,6 +56,6 @@ export {
   type CallStatus,
   type CallSummary,
 } from './events.js';
-export { DEFAULT_MCP_ENTRY, registerConnectionRoutes, resolveMcpEntry, type ConnectionsInfo, type McpServerConfig } from './connections.js';
+export { DEFAULT_MCP_ENTRY, registerConnectionRoutes, resolveMcpEntry, resolveMcpNode, type ConnectionsInfo, type McpServerConfig } from './connections.js';
 export { startDaemon, type RunningDaemon, type StartOptions } from './start.js';
 export { IconCatalog } from '@lakar/icons';

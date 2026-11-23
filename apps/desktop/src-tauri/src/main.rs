@@ -31,7 +31,7 @@ const POOL_TIMEOUT: Duration = Duration::from_secs(25);
 const STOP_GRACE: Duration = Duration::from_secs(6);
 const DEFAULT_CONFIG: &str = "# Config lakard untuk Lakar desktop (TOML datar: kunci = nilai).\n\
 # Kunci yang berguna di sini: render_pages, render_timeout_ms, unsplash_key_file, unsplash_app_name.\n\
-# port, data_dir, browser_channel, viewer_dir, dan mcp_entry diatur aplikasi lewat env.\n";
+# port, data_dir, browser_channel, viewer_dir, mcp_entry, dan mcp_node diatur aplikasi lewat env.\n";
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Serialize)]
 #[serde(rename_all = "kebab-case")]
@@ -76,6 +76,8 @@ struct Paths {
     node: PathBuf,
     daemon_main: PathBuf,
     mcp_main: PathBuf,
+    /// Runtime Node untuk config MCP di luar direktori instalasi (Windows); `None` → runtime daemon.
+    mcp_node: Option<PathBuf>,
     viewer_dir: PathBuf,
     data_dir: PathBuf,
     config_file: PathBuf,
@@ -111,16 +113,21 @@ fn resolve_paths(app: &AppHandle) -> Result<Paths, String> {
         fs::write(&config_file, DEFAULT_CONFIG).map_err(|e| format!("gagal menulis {}: {e}", config_file.display()))?;
     }
     let mcp_dir = sidecar.join("mcp");
-    let (node, mcp_main) = if needs_stable_runtime(&exe) {
-        let version = app.package_info().version.to_string();
-        stable_runtime(&node, &mcp_dir, &state_dir, &version)?
+    let version = app.package_info().version.to_string();
+    let (node, mcp_main, mcp_node) = if needs_stable_runtime(&exe) {
+        let (node, mcp_main) = stable_runtime(&node, &mcp_dir, &state_dir, &version)?;
+        (node, mcp_main, None)
     } else {
-        (node, mcp_dir.join("dist").join("main.js"))
+        // Windows mengunci executable yang sedang berjalan: config MCP yang menunjuk `lakar-node.exe` di direktori
+        // instalasi membuat installer gagal menimpanya. Gagal menyalin → tetap memakai runtime instalasi.
+        let mcp_node = if cfg!(windows) { mcp_node_copy(&node, &state_dir.join("mcp"), &version).ok() } else { None };
+        (node, mcp_dir.join("dist").join("main.js"), mcp_node)
     };
     Ok(Paths {
         node,
         daemon_main: sidecar.join("daemon").join("dist").join("main.js"),
         mcp_main,
+        mcp_node,
         viewer_dir: sidecar.join("viewer"),
         data_dir,
         config_file,
@@ -175,6 +182,38 @@ fn stable_runtime(node: &Path, mcp_dir: &Path, state_dir: &Path, version: &str) 
         }
     }
     Ok((stable_node, stable_mcp.join("dist").join("main.js")))
+}
+
+/// Salin runtime Node ke `dir` (stabil lintas versi, di luar direktori instalasi) untuk `command` config MCP.
+/// Salinan diperbarui bila versi aplikasi atau ukuran biner berubah. Salinan lama yang masih dijalankan sesi agen
+/// (terkunci di Windows) diganti nama menjadi `*.old` lalu dihapus pada peluncuran berikutnya; Windows mengizinkan
+/// mengganti nama executable yang sedang berjalan, hanya menimpa/menghapusnya yang ditolak.
+fn mcp_node_copy(node: &Path, dir: &Path, version: &str) -> std::io::Result<PathBuf> {
+    let name = node.file_name().ok_or_else(|| std::io::Error::other("nama runtime Node tidak diketahui"))?;
+    let dst = dir.join(name);
+    let marker = dir.join("lakar-node.version");
+    let stamp = format!("{version} {}", fs::metadata(node)?.len());
+    fs::create_dir_all(dir)?;
+    if let Ok(entries) = fs::read_dir(dir) {
+        for entry in entries.flatten() {
+            if entry.file_name().to_string_lossy().ends_with(".old") {
+                let _ = fs::remove_file(entry.path());
+            }
+        }
+    }
+    if dst.is_file() && fs::read_to_string(&marker).is_ok_and(|m| m == stamp) {
+        return Ok(dst);
+    }
+    let _ = fs::remove_file(&marker);
+    let tmp = dir.join(format!("{}.tmp", name.to_string_lossy()));
+    fs::copy(node, &tmp)?;
+    if dst.exists() && fs::remove_file(&dst).is_err() {
+        let millis = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_millis()).unwrap_or(0);
+        fs::rename(&dst, dir.join(format!("{}.{millis}.old", name.to_string_lossy())))?;
+    }
+    fs::rename(&tmp, &dst)?;
+    fs::write(&marker, &stamp)?;
+    Ok(dst)
 }
 
 fn port_free(port: u16) -> bool {
@@ -296,9 +335,13 @@ fn start_daemon(app: &AppHandle) {
         .env("LAKAR_MCP_ENTRY", &paths.mcp_main)
         .env("LAKAR_EXIT_ON_STDIN_CLOSE", "1")
         .env_remove("NODE_OPTIONS")
+        .env_remove("LAKAR_MCP_NODE")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
+    if let Some(mcp_node) = &paths.mcp_node {
+        cmd.env("LAKAR_MCP_NODE", mcp_node);
+    }
     #[cfg(windows)]
     {
         use std::os::windows::process::CommandExt;
@@ -835,6 +878,30 @@ mod tests {
         fs::write(&file, "garbage").unwrap();
         assert_eq!(read_ui_theme(Some(&file)), UiTheme::System);
         let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn mcp_node_copy_reuses_and_refreshes() {
+        let root = std::env::temp_dir().join(format!("lakar-mcp-node-test-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(&root).unwrap();
+        let node = root.join("lakar-node.exe");
+        fs::write(&node, b"node-v1").unwrap();
+        let dir = root.join("mcp");
+        let dst = mcp_node_copy(&node, &dir, "0.1.4").unwrap();
+        assert_eq!(dst, dir.join("lakar-node.exe"));
+        assert_eq!(fs::read(&dst).unwrap(), b"node-v1");
+        // Versi + ukuran sama → salinan lama dipakai ulang (tidak disalin lagi).
+        fs::write(&dst, b"keep-me").unwrap();
+        fs::write(&node, b"node-v2").unwrap();
+        fs::write(dir.join("lakar-node.version"), format!("0.1.4 {}", b"node-v2".len())).unwrap();
+        assert_eq!(fs::read(mcp_node_copy(&node, &dir, "0.1.4").unwrap()).unwrap(), b"keep-me");
+        // Versi berubah → diganti; sisa `*.old` dibersihkan.
+        fs::write(dir.join("lakar-node.exe.1.old"), b"stale").unwrap();
+        assert_eq!(fs::read(mcp_node_copy(&node, &dir, "0.1.5").unwrap()).unwrap(), b"node-v2");
+        assert!(!dir.join("lakar-node.exe.1.old").exists());
+        assert!(!dir.join("lakar-node.exe.tmp").exists());
+        let _ = fs::remove_dir_all(&root);
     }
 
     #[test]

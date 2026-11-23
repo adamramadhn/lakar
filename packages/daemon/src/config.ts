@@ -41,6 +41,12 @@ export type DaemonConfig = {
   browserChannel?: BrowserChannel;
   /** Entry server MCP stdio (`packages/mcp/dist/main.js`) yang ditampilkan di `GET /viewer/connections`. */
   mcpEntry?: string;
+  /**
+   * Runtime Node untuk `command` config MCP di `GET /viewer/connections` (default `process.execPath`). Aplikasi
+   * desktop Windows mengisinya dengan salinan Node di luar direktori instalasi agar sesi agen tidak mengunci
+   * `lakar-node.exe` saat installer memperbarui aplikasi.
+   */
+  mcpNode?: string;
   /** File config yang dibaca (undefined bila tidak ada). */
   configPath?: string;
 };
@@ -62,6 +68,7 @@ const KEYS = {
   browser_channel: 'LAKAR_BROWSER_CHANNEL',
   viewer_dir: 'LAKAR_VIEWER_DIR',
   mcp_entry: 'LAKAR_MCP_ENTRY',
+  mcp_node: 'LAKAR_MCP_NODE',
 } as const;
 type Key = keyof typeof KEYS;
 
@@ -148,6 +155,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): DaemonConfig {
   const channel = browserChannel(pick('browser_channel'));
   const viewerDir = pick('viewer_dir')?.raw;
   const mcpEntry = pick('mcp_entry')?.raw;
+  const mcpNode = pick('mcp_node')?.raw;
   return {
     host: HOST,
     port: port ? intIn(port.name, port.raw, 0, 65535) : DEFAULT_PORT,
@@ -163,6 +171,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): DaemonConfig {
     ...(viewerDir ? { viewerDir } : {}),
     ...(channel ? { browserChannel: channel } : {}),
     ...(mcpEntry ? { mcpEntry } : {}),
+    ...(mcpNode ? { mcpNode } : {}),
     ...(configPath ? { configPath } : {}),
   };
 }

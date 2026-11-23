@@ -20,6 +20,11 @@ export type ConnectionRoutesOptions = {
   mcpEntry?: string;
   /** Runtime Node untuk `command` (default `process.execPath`, runtime daemon ini). */
   nodePath?: string;
+  /**
+   * Runtime Node khusus MCP dari config (`mcp_node` / `LAKAR_MCP_NODE`). Dipakai bila file ada; selain itu
+   * `nodePath`, agar config yang ditampilkan selalu bisa dijalankan.
+   */
+  mcpNode?: string;
   /** Hook tes. */
   exists?: (path: string) => boolean;
 };
@@ -30,12 +35,20 @@ export function resolveMcpEntry(configured: string | undefined, exists: (path: s
   return exists(entry) ? entry : null;
 }
 
-export function registerConnectionRoutes(app: FastifyInstance, { host, port, mcpEntry, nodePath = process.execPath, exists = existsSync }: ConnectionRoutesOptions): void {
+/** Runtime Node untuk `command`: `mcp_node` bila diset dan ada, selain itu runtime daemon. */
+export function resolveMcpNode(configured: string | undefined, fallback: string, exists: (path: string) => boolean = existsSync): string {
+  if (!configured) return fallback;
+  const node = resolve(configured);
+  return exists(node) ? node : fallback;
+}
+
+export function registerConnectionRoutes(app: FastifyInstance, { host, port, mcpEntry, mcpNode, nodePath = process.execPath, exists = existsSync }: ConnectionRoutesOptions): void {
   app.get('/viewer/connections', async (_req, reply) => {
     const addr = app.server.address();
     const url = `http://${host}:${addr && typeof addr === 'object' ? addr.port : port}`;
     const entry = resolveMcpEntry(mcpEntry, exists);
-    const data: ConnectionsInfo = { url, mcp: entry ? { command: nodePath, args: [entry], env: { LAKAR_URL: url } } : null };
+    const command = resolveMcpNode(mcpNode, nodePath, exists);
+    const data: ConnectionsInfo = { url, mcp: entry ? { command, args: [entry], env: { LAKAR_URL: url } } : null };
     return reply.code(200).send({ ok: true, data });
   });
 }

@@ -17,6 +17,7 @@ import {
   launchSystemBrowser,
   loadConfig,
   resolveMcpEntry,
+  resolveMcpNode,
   startDaemon,
 } from './index.js';
 
@@ -37,6 +38,7 @@ describe('config desktop', () => {
     expect(c.browserChannel).toBeUndefined();
     expect(c.viewerDir).toBeUndefined();
     expect(c.mcpEntry).toBeUndefined();
+    expect(c.mcpNode).toBeUndefined();
     expect(loadConfig({ LAKAR_BROWSER_CHANNEL: '' }).browserChannel).toBeUndefined();
   });
 
@@ -49,6 +51,14 @@ describe('config desktop', () => {
     const c = loadConfig({ LAKAR_VIEWER_DIR: '/x/viewer', LAKAR_MCP_ENTRY: '/x/mcp/main.js' });
     expect(c.viewerDir).toBe('/x/viewer');
     expect(c.mcpEntry).toBe('/x/mcp/main.js');
+  });
+
+  it('LAKAR_MCP_NODE dan mcp_node di config.toml', async () => {
+    expect(loadConfig({ LAKAR_MCP_NODE: '/x/mcp/lakar-node.exe' }).mcpNode).toBe('/x/mcp/lakar-node.exe');
+    const file = join(root, 'config-node.toml');
+    await writeFile(file, 'mcp_node = "/n"\n');
+    expect(loadConfig({ LAKAR_CONFIG: file }).mcpNode).toBe('/n');
+    expect(loadConfig({ LAKAR_CONFIG: file, LAKAR_MCP_NODE: '/m' }).mcpNode).toBe('/m');
   });
 
   it('config.toml: browser_channel, viewer_dir, mcp_entry; env menang', async () => {
@@ -178,6 +188,21 @@ describe('GET /viewer/connections', () => {
     const b = buildServer({ config: { ...baseConfig, port: 0, dataDir: join(root, 'd3'), mcpEntry: join(root, 'tidak-ada.js') }, render: noRender }).app;
     expect((await b.inject({ method: 'GET', url: '/viewer/connections' })).json().data.mcp).toBeNull();
     await b.close();
+  });
+
+  it('mcp_node diset + ada → command; tidak ada → runtime daemon', async () => {
+    const entry = join(root, 'main-node.js');
+    const node = join(root, 'lakar-node.exe');
+    await writeFile(entry, '');
+    await writeFile(node, '');
+    const a = buildServer({ config: { ...baseConfig, port: 0, dataDir: join(root, 'd5'), mcpEntry: entry, mcpNode: node }, render: noRender }).app;
+    expect((await a.inject({ method: 'GET', url: '/viewer/connections' })).json().data.mcp).toEqual({ command: node, args: [entry], env: { LAKAR_URL: 'http://127.0.0.1:0' } });
+    await a.close();
+    const b = buildServer({ config: { ...baseConfig, port: 0, dataDir: join(root, 'd6'), mcpEntry: entry, mcpNode: join(root, 'tidak-ada.exe') }, render: noRender }).app;
+    expect((await b.inject({ method: 'GET', url: '/viewer/connections' })).json().data.mcp.command).toBe(process.execPath);
+    await b.close();
+    expect(resolveMcpNode(undefined, '/daemon-node')).toBe('/daemon-node');
+    expect(resolveMcpNode('rel/node', '/daemon-node', () => true)).toBe(resolve('rel/node'));
   });
 
   it('setelah listen: url memakai port sebenarnya', async () => {
