@@ -23,10 +23,7 @@ function baseProps(over: Partial<Props> = {}): Props {
     doc,
     camera: { x: 0, y: 0, z: 1 },
     highlight: undefined,
-    summary: undefined,
-    checksLoading: false,
     onSelect: vi.fn(),
-    onOpenChecks: vi.fn(),
     ...over,
   };
 }
