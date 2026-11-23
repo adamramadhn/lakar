@@ -19,15 +19,14 @@ Semua kartu putih + garis tipis + satu aksen biru; grafik garis tipis tanpa area
 
 ## Alur execute
 
-Bertahap (live): execute 1 = board + sidebar + header (`keep.main`); execute 2 = KPI, grafik, tabel; execute 3 = semua temuan `check` + review sekaligus.
+Bertahap (live): execute 1 = board + sidebar + header + `Skel` untuk KPI dan baris bawah (`keep.s`); lalu satu blok per execute: KPI, baris bawah (`Build` di tempat); terakhir semua temuan `check` + review sekaligus.
 
 ## Contoh teruji
 
 Dasbor operasional jaringan laundry kiloan, arketipe Padat (langkah khas: KPI utama di bidang gelap merek dengan sparkline, volume harian bertumpuk per layanan; tabel memperlihatkan keadaan):
 
 ```js
-// pakai prelude
-Object.assign(C,{sub:'#F3F6F5',field:'#E3F1EF',acc2:'#7C3AED',data:['#0F766E','#5EB8AE','#7C3AED']}); Object.assign(FONT,{h:'Inter',b:'Inter',m:'IBM Plex Mono'});
+Palette({sub:'#F3F6F5',field:'#E3F1EF',acc2:'#7C3AED',data:['#0F766E','#5EB8AE','#7C3AED']},{h:'Inter',b:'Inter',m:'IBM Plex Mono'});
 const p=place(1440,900);
 const b=add(null,{type:'board',name:'[WIP] Lipat / Ringkasan · app · Padat',x:p.x,y:p.y,width:1440,height:900,screen:'app',fills:fill(C.sub)});
 keep.board=b;
@@ -50,18 +49,14 @@ const ha=Row(hd,'Aksi',{gap:12});
 const sel=Row(ha,'Input / Outlet',{height:40,gap:8,padding:[0,12],radius:8,fills:fill(C.bg),stroke:line('#7D8798')}); // batas kontrol ≥ 3:1
 I(sel,'store',16,C.t2); T(sel,'Nilai','Semua outlet','body-sm'); I(sel,'chevron-down',16,C.t2);
 Btn(ha,'Pesanan baru','primary',{height:40,padding:[0,16]});
-keep.main=main;
+keep.s={kpi:Skel(main,'KPI',140),bawah:Skel(main,'Bawah',560)};
 b
 ```
 
-Execute 2, isi area kerja:
+KPI (palet dari `keep`): satu utama di bidang gelap + sparkline, lainnya putih dengan chip delta:
 
 ```js
-// pakai prelude
-Object.assign(C,{sub:'#F3F6F5',field:'#E3F1EF',acc2:'#7C3AED',data:['#0F766E','#5EB8AE','#7C3AED']}); Object.assign(FONT,{h:'Inter',b:'Inter',m:'IBM Plex Mono'});
-const main=keep.main;
-// KPI: satu utama di bidang gelap + sparkline; lainnya putih dengan chip delta
-const kp=Row(main,'KPI',{width:'fill',gap:24,align:'stretch'});
+const kp=Build(keep.s.kpi,{layout:'row',gap:24,align:'stretch'});
 const k1=F(kp,'Kartu / Cucian diproses',{width:360,padding:24,gap:12,radius:12,fills:fill(C.deep)});
 T(k1,'Label','Cucian diproses','label',{color:'#BFE3DE'});
 const kr=Row(k1,'Nilai',{width:'fill',gap:16,justify:'space-between'});
@@ -74,8 +69,12 @@ for(const [l,v,u,d,tone,ic] of [['Pesanan masuk','73','pesanan','+11 vs kemarin'
  const r=Row(k,'Nilai',{gap:6,align:'end'}); T(r,'KPI / Nilai',v,'title-lg',{size:40,lineHeight:48,numeric:'tabular'}); T(r,'Satuan',u,'body',{color:C.t3});
  Badge(k,d,tone,ic);
 }
-// Baris bawah mengisi sisa tinggi: batang bertumpuk per layanan + tabel berkeadaan
-const bw=Row(main,'Bawah',{width:'fill',height:'fill',gap:24,align:'stretch'});
+```
+
+Baris bawah mengisi sisa tinggi: batang bertumpuk per layanan + tabel berkeadaan:
+
+```js
+const bw=Build(keep.s.bawah,{layout:'row',height:'fill',gap:24,align:'stretch'});
 const ch=F(bw,'Kartu / Volume harian',{width:'fill',padding:24,gap:20,radius:12,fills:fill(C.bg),stroke:line()});
 const chh=Row(ch,'Header',{width:'fill',justify:'space-between'});
 T(chh,'Judul','Volume 7 hari per layanan (kg)','h4');

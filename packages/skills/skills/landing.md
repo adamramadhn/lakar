@@ -18,20 +18,25 @@ Board `1440` (`screen:'landing'`, `height:'hug'`): tinggi = isi; jangan isi atau
 
 ## Alur execute
 
-Satu seksi per execute: 1. Board hug + navbar + hero + `keep.board`/`keep.page`. 2. Per seksi (footer terakhir): seksinya + perbaikan `check`. 3. Review → penutup: perbaikan + lepas `[WIP] `.
+Execute 1 = skeleton: board hug + `Halaman` + semua seksi rencana (footer terakhir) sebagai `Skel(page,nama,perkiraan tinggi)` di `keep.s`. Lalu satu blok per execute dari atas: navbar; teks hero; visual hero; header seksi; satu baris kartu; …; `Build(keep.s.x,{…})` saat blok pertama seksinya + perbaikan `check`. Penutup: review → perbaikan + lepas `[WIP] ` (sisa `[Skeleton] ` → LC-33).
 
 ## Contoh teruji
 
-Execute 1, hero di bidang merek (langkah khas: mockup jadwal utuh di bawah teks hero; baris berkeadaan):
+Skeleton (contoh dipendekkan: tiga seksi):
 
 ```js
-// pakai prelude
 const p=place(1440,'hug');
 const b=add(null,{type:'board',name:'[WIP] Biji Pagi / Beranda · landing · Jernih',x:p.x,y:p.y,width:1440,height:'hug',screen:'landing',fills:fill(C.bg)});
-keep.board=b;
 const page=F(b,'Halaman',{width:'fill'});
-// Navbar 72
-const nav=Row(page,'Navbar',{width:'fill',height:72,padding:[0,80],justify:'space-between',stroke:{...line(),sides:['bottom']}});
+keep.s={nav:Skel(page,'Navbar',72),hero:Skel(page,'Seksi / Hero',876),fitur:Skel(page,'Seksi / Fitur',760)};
+keep.board=b;
+b
+```
+
+Navbar 72:
+
+```js
+const nav=Build(keep.s.nav,{layout:'row',height:72,padding:[0,80],align:'center',justify:'space-between',stroke:{...line(),sides:['bottom']}});
 const logo=Row(nav,'Logo',{gap:12});
 const mark=Row(logo,'Logo / Tanda',{width:32,height:32,radius:8,justify:'center',fills:fill(C.acc)});
 I(mark,'coffee',20,C.on);
@@ -41,8 +46,13 @@ for(const l of ['Cara kerja','Asal biji','Harga']) T(links,'Link / '+l,l,'body-s
 const act=Row(nav,'Aksi',{gap:12});
 Btn(act,'Masuk','secondary',{height:40,padding:[0,16]});
 Btn(act,'Coba sampel','primary',{height:40,padding:[0,16]});
-// Efek hanya bila diminta; selain itu fill(C.field)
-const hero=F(page,'Seksi / Hero',{width:'fill',padding:[96,80],gap:64,align:'center',clip:true,fills:[...fill(C.field),
+```
+
+Teks hero di bidang merek (langkah khas: mockup jadwal utuh di bawah teks hero; baris berkeadaan):
+
+```js
+// minHeight 876 = tinggi Crop / Kontur, sengaja tetap; efek hanya bila diminta, selain itu fill(C.field)
+const hero=Build(keep.s.hero,{minHeight:876,padding:[96,80],gap:64,align:'center',clip:true,fills:[...fill(C.field),
  {type:'mesh',columns:3,rows:2,colors:['#CDE8E4',C.field,'#F4E7C8',C.field,C.field,'#D3EBE7']},{type:'noise',opacity:0.05,seed:11}]});
 // 16 kontur, merunduk di tengah (zona teks)
 const fx=F(hero,'Crop / Kontur',{position:'absolute',x:0,y:0,width:1440,height:876,layout:'none',clip:true});
@@ -58,8 +68,12 @@ const cta=Row(copy,'CTA',{gap:12,padding:[8,0,0,0]});
 Btn(cta,'Coba sampel');
 Btn(cta,'Lihat jadwal sangrai','secondary');
 T(copy,'Penguat','Gratis ongkir untuk 3 pengiriman pertama · berhenti kapan saja','body-sm',{color:C.t3});
-// Mockup utuh 3 baris; padding bawah 96
-const app=F(hero,'Mockup / Dasbor',{width:1040,padding:24,gap:20,radius:16,fills:fill(C.bg),stroke:line(),shadows:[{x:0,y:4,blur:16,color:'#10182814'}]});
+```
+
+Visual hero, mockup utuh 3 baris; padding bawah 96:
+
+```js
+const app=F(keep.s.hero,'Mockup / Dasbor',{width:1040,padding:24,gap:20,radius:16,fills:fill(C.bg),stroke:line(),shadows:[{x:0,y:4,blur:16,color:'#10182814'}]});
 const top=Row(app,'Header',{width:'fill',justify:'space-between'});
 T(top,'Judul','Pengiriman minggu ini','h4');
 const meta=Row(top,'Meta',{gap:8});
@@ -74,20 +88,22 @@ for(const [n,k,q,st,tone,ic,hot] of [['Kafe Teras, Bandung','Gayo · medium','12
  for(const [c,v,wd,o] of [['Cabang',n,'fill',{weight:500}],['Biji',k,200,{color:C.t2}],['Jumlah',q,64,{numeric:'tabular'}]]) T(F(r,'Sel / '+c,{width:wd}),c,v,'body-sm',{width:'fill',...o});
  const sc=Row(r,'Status',{width:136,justify:'end'}); Badge(sc,st,tone);
 }
-keep.page=page;
-b
 ```
 
-Execute 2, bento: kartu lebar (stok berpembanding + linimasa) + dua sempit (satu ditekankan), bukan tiga kembar:
+Header seksi fitur:
 
 ```js
-// pakai prelude
-const s=F(keep.page,'Seksi / Fitur',{width:'fill',padding:[128,80],gap:48});
+const s=Build(keep.s.fitur,{padding:[128,80],gap:48});
 const head=F(s,'Header seksi',{width:720,gap:16});
 T(head,'Overline','CARA KERJA','overline',{color:C.acc});
 T(head,'Judul','Dari sangrai ke rak bar dalam tiga hari','h2',{width:'fill'});
 T(head,'Deskripsi','Setiap kiriman membawa tanggal sangrai, profil, dan saran resep.','body-lg',{width:'fill',color:C.t2});
-const grid=Row(s,'Grid fitur',{width:'fill',gap:24,align:'stretch'});
+```
+
+Baris kartu bento: kartu lebar (stok berpembanding + linimasa) + dua sempit (satu ditekankan), bukan tiga kembar:
+
+```js
+const grid=Row(keep.s.fitur,'Grid fitur',{width:'fill',gap:24,align:'stretch'});
 const big=F(grid,'Kartu / Jadwal',{width:'fill',padding:32,justify:'space-between',radius:12,fills:fill(C.field)});
 const bt=F(big,'Teks',{width:'fill',gap:12});
 T(bt,'Judul','Jadwal sangrai mengikuti stok tiap cabang','h4',{width:'fill'});

@@ -239,6 +239,7 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-progressive-live-build.md`
   summary: Prelude skill core (±1.500 karakter) diulang di setiap execute; landing per seksi kini 7–9 execute, jadi biaya token keluaran dan waktu tulis LLM naik.
   evidence: `keep` hanya menyimpan nilai, bukan fungsi. Usul: daemon menyimpan prelude terakhir per sesi (mis. `execute({code, prelude:'keep'})` aditif) atau helper prelude bawaan sandbox; butuh keputusan AD-4 dan tes contoh skill.
+  resolved: 2026-11-23 di `spec-skeleton-live-build.md`. Helper prelude (C, FONT, R, TY, HEAD, fill, line, F, Row, T, I, Btn, Badge, Skel, Build) kini global bawaan sandbox exec (`packages/exec/src/helpers.ts`); palet arketipe dipulihkan dari `keep.C`/`keep.FONT`. Prelude yang dideklarasi ulang tetap sah (deklarasi leksikal snippet membayangi global). core.md hanya memuat referensi; contoh skill tidak lagi menulis prelude.
 - source_spec: `_bmad-output/implementation-artifacts/spec-progressive-live-build.md`
   summary: Board mobile belum bisa dibangun per area karena LC-12 mobile memberi "tinggi pas" pada board `[WIP] ` yang isinya belum lengkap.
   evidence: `packages/check/src/rules.ts` cabang mobile tidak melewati `[WIP] ` (landing melewatinya). Usul: lewati sub-cek tinggi pas mobile untuk `[WIP] `, lalu pecah contoh `mobile.md` menjadi dua execute.
@@ -257,3 +258,18 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-board-hug-height.md`
   summary: Skill mobile tetap memakai `H` angka; board mobile hug belum dipandu karena zona bawah (`Overlay / Tab bar` y `H-98`) absolut terhadap tinggi angka.
   evidence: Hug untuk mobile butuh zona bawah yang menempel ke dasar (mis. `bottom` atau anak flow terakhir). Usul: spec terpisah setelah ada penempatan relatif dasar.
+- source_spec: `_bmad-output/implementation-artifacts/spec-skeleton-live-build.md`
+  summary: `list_boards`/`inspect` belum melaporkan placeholder skeleton yang tersisa (jumlah `[Skeleton] `); agen baru tahu lewat LC-33 sesudah melepas `[WIP] `.
+  evidence: Placeholder hanya konvensi nama. Usul: field aditif `skeletons` per board di `/boards` (AD-4: respons hanya bertambah).
+- source_spec: `_bmad-output/implementation-artifacts/spec-skeleton-live-build.md`
+  summary: Skill mobile belum dipandu skeleton + satu blok per execute; board mobile tetap satu execute utuh.
+  evidence: LC-12 mobile tidak melewati `[WIP] ` (butir progressive-live-build di atas) dan zona bawah absolut di `H-98`. Usul: selesaikan butir LC-12 mobile dulu, lalu `Skel` untuk Header/Kartu/Seksi.
+- source_spec: `_bmad-output/implementation-artifacts/spec-skeleton-live-build.md`
+  summary: api.md (dibangkitkan dari `api.ts`) belum memuat helper prelude bawaan; referensinya hanya di core.md dan deskripsi tool execute.
+  evidence: `renderApiMarkdown` hanya membaca tabel `API` dan `API_GLOBALS` (`keep`, `console`; dites persis). Usul: bagian "Helper bawaan" dari `HELPER_GLOBALS` + regenerasi api.md.
+- source_spec: `_bmad-output/implementation-artifacts/spec-skeleton-live-build.md`
+  summary: Shimmer skeleton dan Follow berirama belum diperiksa rasa di aplikasi desktop dengan agen nyata (20+ execute kecil); angka 2,4 dtk / 1,2 dtk / 40% dipilih dari riset dan tes DOM.
+  evidence: jsdom tanpa layout/animasi nyata; perlu feel-check di perangkat atau rekaman Playwright.
+- source_spec: `_bmad-output/implementation-artifacts/spec-skeleton-live-build.md`
+  summary: Label placeholder di canvas memakai font sistem/Inter tetap 13px di koordinat board (ikut zoom), tidak diskalakan terbalik seperti label board.
+  evidence: Gaya ada di shadow root board yang ditransformasi kamera. Usul: label lewat lapisan overlay canvas bila terlalu kecil saat zoom jauh.

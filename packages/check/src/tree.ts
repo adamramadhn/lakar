@@ -1,6 +1,7 @@
 // Penelusuran pohon board (urutan dokumen) untuk aturan check. Murni.
 import type { ResolvedBoardNode as BoardNode, ResolvedChildNode as ChildNode, ResolvedFrameNode as FrameNode } from '@lakar/schema';
 import type { BoardMeasure, NodeBounds, TextMeasure } from '@lakar/ports';
+import { isSkeletonName } from '@lakar/schema';
 
 export type Container = BoardNode | FrameNode;
 export type Rect = { x: number; y: number; width: number; height: number };
@@ -61,6 +62,33 @@ export function boardContext(board: BoardNode, measure: BoardMeasure): BoardCont
     ink: new Map(measure.texts.flatMap((t) => (t.ink ? [[t.id, t.ink] as const] : []))),
     textMeasure: new Map(measure.texts.map((t) => [t.id, t])),
   };
+}
+
+/**
+ * Salinan board tanpa subtree placeholder `[Skeleton] …` (spec-skeleton-live-build): aturan check tidak menilai
+ * placeholder yang belum diisi (frame kosong ber-minHeight bukan spacer, seksi kembar, atau tinggi komponen). Board
+ * tanpa skeleton dikembalikan apa adanya. Ukuran render (`measure`) tetap: placeholder tetap memakan ruang.
+ */
+export function withoutSkeletons(board: BoardNode): BoardNode {
+  let found = false;
+  /** Anak tanpa placeholder; wadah yang isinya hanya placeholder (mis. `Halaman` di execute skeleton) ikut dilewati. */
+  const prune = <T extends Container>(p: T): T | undefined => {
+    const kids: ChildNode[] = [];
+    let dropped = false;
+    for (const c of p.children) {
+      if (isSkeletonName(c.name)) {
+        found = dropped = true;
+        continue;
+      }
+      const k = c.type === 'frame' ? prune(c) : c;
+      if (k) kids.push(k);
+      else dropped = true;
+    }
+    if (dropped && !kids.length && p.type === 'frame') return undefined;
+    return { ...p, children: kids } as T;
+  };
+  const out = prune(board);
+  return found && out ? out : board;
 }
 
 /** Leluhur `n` dari induk langsung sampai board (inklusif). */

@@ -43,7 +43,16 @@ export const G0_RULES = {
   'LC-30': { level: 'warning', gate: false, title: 'tanda baca' },
   'LC-31': { level: 'error', gate: true, title: 'konten terpotong rata di tepi bawah' },
   'LC-32': { level: 'warning', gate: false, title: 'instance tidak lagi cocok dengan masternya (override, prop, slot, atau bind basi)' },
+  'LC-33': { level: 'warning', gate: false, title: 'skeleton belum terisi' },
 } as const satisfies Record<string, { level: FindingLevel; gate: boolean; title: string }>;
+
+/**
+ * Placeholder skeleton (spec-skeleton-live-build): frame bernama `[Skeleton] …` yang dibuat agen di execute pertama
+ * untuk seksi yang belum dibangun. Konvensi nama, bukan skema: check melewatinya (kecuali LC-33), viewer memberi
+ * shimmer, render/ekspor/codegen memperlakukannya sebagai frame biasa tanpa gaya tambahan.
+ */
+export const SKELETON_PREFIX = '[Skeleton] ';
+export const isSkeletonName = (name: string): boolean => name.startsWith(SKELETON_PREFIX);
 
 export type G0RuleId = keyof typeof G0_RULES;
 export const G0_RULE_IDS = Object.keys(G0_RULES) as G0RuleId[];

@@ -10,11 +10,13 @@ import {
   G0_RULES,
   HOME_INDICATOR_INSET,
   instanceIssues,
+  isSkeletonName,
   KPI_LINE_HEIGHT_RATIO,
   KPI_SIZES,
   PARAGRAPH_MIN,
   PARAGRAPH_MIN_IN_CARD,
   SCRIM_MIN_ALPHA,
+  SKELETON_PREFIX,
   SPACING_VALUES,
   textContrastMin,
   TOUCH_MIN,
@@ -2195,6 +2197,35 @@ export function lc32(doc: ResolvedDocument, boardId: string): Finding[] {
   return instanceIssues(doc)
     .filter((i) => i.boardId === boardId)
     .map((i) => finding('LC-32', 'warning', { id: i.instanceId, name: i.instanceName }, `${i.kind} ${i.key}: ${i.detail}`, LC32_EXPECTED[i.kind]!));
+}
+
+// ---------------------------------------------------------------------------
+// LC-33 · skeleton belum terisi (spec-skeleton-live-build)
+// ---------------------------------------------------------------------------
+
+/** Id placeholder `[Skeleton] …` di board ini beserta semua keturunannya (dilewati aturan lain). */
+export function skeletonIds(ctx: BoardContext): Set<string> {
+  const out = new Set<string>();
+  for (const n of ctx.nodes) {
+    if (!isSkeletonName(n.name)) continue;
+    out.add(n.id);
+    for (const d of descendants(n)) out.add(d.id);
+  }
+  return out;
+}
+
+/**
+ * Placeholder skeleton yang tersisa di board yang sudah dinyatakan selesai (nama tanpa `[WIP] `): satu warning per
+ * placeholder teratas. Board `[WIP] ` sedang dibangun, jadi placeholder-nya sah.
+ */
+export function lc33(ctx: BoardContext): Finding[] {
+  if (ctx.board.name.startsWith(WIP_PREFIX)) return [];
+  const skel = skeletonIds(ctx);
+  return ctx.nodes
+    .filter((n) => isSkeletonName(n.name) && !ancestors(ctx, n).some((a) => skel.has(a.id)))
+    .map((n) =>
+      finding('LC-33', 'warning', n, `placeholder ${quote(n.name.slice(SKELETON_PREFIX.length))} belum diisi`, 'isi di tempat lewat Build(id,{…}) lalu tambah isinya, atau remove(id); lepas [WIP] sesudah semua skeleton terisi'),
+    );
 }
 
 // ===========================================================================

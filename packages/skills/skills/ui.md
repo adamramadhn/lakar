@@ -30,7 +30,6 @@ Header 40 (`caption` `t3` di `sub`), baris 56 (padat 44) bergaris bawah. Tiap se
 Baris daftar berkeadaan: kolom teks fill, meta `t2` di bidang tint, `Badge` sm, wadah ikon konsentris (radius 20 = 8 + padding 12); `Badge` di permukaan `C.deep` memakai arg ke-6:
 
 ```js
-// pakai prelude
 const p=place(390,334);
 const b=add(null,{type:'board',name:'Contoh / Pinjaman · mobile · Jernih',x:p.x,y:p.y,width:390,height:334,screen:'mobile',expectedSize:{width:390,height:334},fills:fill(C.bg)});
 const list=F(b,'Daftar pinjaman',{width:'fill',padding:20,gap:8});
