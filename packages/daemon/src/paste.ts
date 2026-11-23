@@ -16,7 +16,8 @@ import { locateNode } from './inspect.js';
 import { HtmlImportError, importHtml, type FontLookup, type HtmlReport, type ImportedNode } from './paste/html.js';
 import type { HtmlSnapshot } from './paste/html-page.js';
 import { PASTE_NAME_MAX, SvgImportError, importSvg, type KeptAttr, type PasteDropped } from './paste/svg.js';
-import { NO_ACTIVE_DOC_HINT, authorOf, type Sessions } from './sessions.js';
+import { NO_ACTIVE_DOC_HINT, authorOf, type Session, type Sessions } from './sessions.js';
+import type { AgentSteps } from './agent-undo.js';
 import type { DocStore } from './store.js';
 
 export const PASTE_KINDS = ['svg', 'html'] as const;
@@ -123,7 +124,8 @@ export function htmlViewportWidth(parent: ParentLike | undefined): number {
   return Math.min(PASTE_WIDTH_MAX, Math.max(1, parent.width - horiz));
 }
 
-type Actor = { sessionId: string; client?: string; agent?: string };
+/** `session` = sesi agen (paste MCP): commit-nya menjadi langkah undo agen (spec-agent-undo). */
+type Actor = { sessionId: string; client?: string; agent?: string; session?: Session };
 
 export type PasteRoutesOptions = {
   docs: Map<string, LakarDocument>;
@@ -137,6 +139,8 @@ export type PasteRoutesOptions = {
   fonts?: FontLookup;
   /** Direktori data daemon (store aset untuk gambar data URI HTML). */
   dataDir?: string;
+  /** Tumpukan undo agen (spec-agent-undo): paste sesi agen dicatat sebagai satu langkah. */
+  agentSteps?: AgentSteps;
 };
 
 type Imported = { node: ImportedNode; report: PasteReport; assets: { sha: string; bytes: Buffer }[]; size?: { width: number; height: number } };
@@ -216,6 +220,7 @@ async function commitPaste(opts: PasteRoutesOptions, slug: string, body: PasteBo
     const boards = touchedBoards(resolveDocument(current!), resolveDocument(committed.doc));
     await opts.store.commit(slug, committed.doc, { ...entry, ...authorOf(actor) });
     opts.docs.set(slug, committed.doc);
+    if (actor.session) opts.agentSteps?.record(actor.session, committed.doc.id, current!.rev, committed.doc.rev, committed.inverse, description);
     return { doc: committed.doc, created: committed.created, inverse: committed.inverse, refs: committed.value.refs, nodeId: committed.value.refs[ROOT_REF]!, boards, report: imported.report };
   });
 }
@@ -243,7 +248,7 @@ export function registerPasteRoutes(app: FastifyInstance, opts: PasteRoutesOptio
     const slug = session.activeSlug;
     if (!slug) throw noDoc();
     const body = parsePasteBody(req.body);
-    const r = await commitPaste(opts, slug, body, { sessionId: session.id, ...authorOf(session) }, noDoc);
+    const r = await commitPaste(opts, slug, body, { sessionId: session.id, ...authorOf(session), session }, noDoc);
     return reply.code(200).send({
       ok: true,
       data: {

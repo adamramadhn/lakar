@@ -278,3 +278,18 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-installer-locked-node.md`
   summary: Connections tidak memberi tahu pengguna Windows bahwa config MCP yang disalin sebelum v0.1.4 masih menunjuk `%LOCALAPPDATA%\Lakar\lakar-node.exe` dan akan terputus saat upgrade.
   evidence: Daemon tidak tahu config apa yang dipakai harness. Usul: catatan rilis v0.1.4 ("copy the MCP config again") atau catatan statis di Connections untuk desktop Windows.
+- source_spec: `_bmad-output/implementation-artifacts/spec-agent-undo.md`
+  summary: Gerbang basi undo agen berbasis rev: edit pengguna pada node lain (board lain) tetap membuat undo agen ditolak.
+  evidence: Dipilih karena sederhana dan sejalan dengan open-pencil. Usul: cek per node (node yang disentuh op invers tidak berubah sejak `head`, dibandingkan dengan snapshot), hanya bila agen sering ditolak dalam praktik.
+- source_spec: `_bmad-output/implementation-artifacts/spec-agent-undo.md`
+  summary: Tumpukan undo agen hanya di memori dan hilang saat daemon restart, sekalipun agen yang sama menyambung lagi.
+  evidence: Sesi daemon tidak tahan restart, jadi kepemilikan langkah tidak bisa dibuktikan. Usul: id sesi stabil dari klien MCP (mis. dikirim ulang saat membuat sesi) + tumpukan dari riwayat/snapshot.
+- source_spec: `_bmad-output/implementation-artifacts/spec-agent-undo.md`
+  summary: Memori tumpukan undo agen: invers execute besar dapat memuat snapshot subtree, hingga 50 langkah per sesi per dokumen, tanpa batas byte.
+  evidence: `AGENT_UNDO_MAX` hanya membatasi jumlah langkah. Usul: batas byte per sesi (buang langkah tertua) bila pemakaian memori daemon terlihat naik.
+- source_spec: `_bmad-output/implementation-artifacts/spec-agent-undo.md`
+  summary: Viewer memuat ulang semua board untuk call `undo`/`redo` agen; toast "Undo skipped" (`lastAgentLabel`) hanya menyebut pelaku execute, bukan undo/redo agen.
+  evidence: `revChange` dan `committed` di `liveChanges.ts` hanya mengenali execute/paste. Usul: perlakukan `undo`/`redo` seperti execute (board tersentuh dari `boards`, pelaku toast).
+- source_spec: `_bmad-output/implementation-artifacts/spec-agent-undo.md`
+  summary: Skill (core/review) belum menyebut `undo`/`redo`; panduan hanya ada di deskripsi tool dan satu kalimat instructions MCP. Komentar kepala `packages/mcp/src/server.ts` masih "15 tool".
+  evidence: Footprint file bersama dibatasi karena dua spec paralel di epic loop verifikasi agen. Usul: rapikan setelah ketiganya di-merge.

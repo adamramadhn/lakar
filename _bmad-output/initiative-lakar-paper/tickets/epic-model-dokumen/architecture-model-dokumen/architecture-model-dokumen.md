@@ -131,7 +131,8 @@ flowchart LR
   - Core mengembalikan op invers untuk setiap commit.
   - Tumpukan undo dan redo dipegang tiap jendela viewer, hanya untuk commit milik jendela itu. Undo dan redo dijalankan sebagai commit baru berisi op invers lewat route ops (AD-7).
   - Bila op invers gagal karena perubahan lain (misalnya node sudah dihapus agen), entri undo itu dibuang dan pengguna diberi tahu. Tidak ada undo sebagian.
-  - Agen tidak memakai tumpukan undo. Agen mengoreksi lewat `execute`.
+  - Agen tidak memakai tumpukan undo viewer. Agen mengoreksi lewat `execute`.
+    - Amandemen 2026-11-23 (`spec-agent-undo`): agen boleh membatalkan dan mengulang langkahnya sendiri lewat tool `undo`/`redo`. Tumpukannya per sesi di daemon dan memakai op invers yang sama. Daemon menolak bila ada rev lain sesudah langkah sesi itu (edit pengguna, agen lain, restore). Dalam keadaan itu agen tetap mengoreksi lewat `execute`.
   - Restore rev hanya untuk aksi History yang eksplisit, bukan untuk undo.
 
 ### AD-9 — Seleksi adalah state efemeral di daemon
