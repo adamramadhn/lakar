@@ -218,6 +218,7 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-canvas-agent-effects.md`
   summary: Execute pertama sebuah sesi belum mendapat label "Generating" dan lokasi rencana fade karena board tujuannya baru diketahui setelah panggilan selesai.
   evidence: agentPresence butuh lokasi panggilan sebelumnya (aturan spec-app-5: target execute yang sedang berjalan tidak ditebak).
+  resolved: 2026-11-23 di `spec-progressive-live-build.md`. Execute pertama → label "✦ Generating · harness" tingkat dokumen (`pendingAgents`, tanpa menebak board); di antara execute, board `[WIP] ` sesi Live tetap berlabel Generating (`building`). Rencana fade tidak butuh lokasi (`fadePlans` sudah lepas dari presence).
 - source_spec: `_bmad-output/implementation-artifacts/spec-canvas-agent-effects.md`
   summary: Efek canvas (fade-in, label Generating, exit cursor, entri baris Activity) tanpa tes DOM/komponen; hanya logika murni yang dites.
   evidence: Viewer belum punya harness tes DOM (pra-ada); agentFx.ts dan wiring Canvas/ActivityPanel hanya diperiksa lewat inspeksi dan build.
@@ -234,3 +235,15 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-viewer-collapsible-panels.md`
   summary: Kompensasi kamera saat tepi kiri kanvas bergeser (lipat/buka sidebar kiri) belum punya tes otomatis.
   evidence: jsdom tidak punya layout dan `ResizeObserver` di-stub di harness DOM; perlu tes Playwright/smoke atau ekstrak ke helper murni.
+- source_spec: `_bmad-output/implementation-artifacts/spec-progressive-live-build.md`
+  summary: Prelude skill core (±1.500 karakter) diulang di setiap execute; landing per seksi kini 7–9 execute, jadi biaya token keluaran dan waktu tulis LLM naik.
+  evidence: `keep` hanya menyimpan nilai, bukan fungsi. Usul: daemon menyimpan prelude terakhir per sesi (mis. `execute({code, prelude:'keep'})` aditif) atau helper prelude bawaan sandbox; butuh keputusan AD-4 dan tes contoh skill.
+- source_spec: `_bmad-output/implementation-artifacts/spec-progressive-live-build.md`
+  summary: Board mobile belum bisa dibangun per area karena LC-12 mobile memberi "tinggi pas" pada board `[WIP] ` yang isinya belum lengkap.
+  evidence: `packages/check/src/rules.ts` cabang mobile tidak melewati `[WIP] ` (landing melewatinya). Usul: lewati sub-cek tinggi pas mobile untuk `[WIP] `, lalu pecah contoh `mobile.md` menjadi dua execute.
+- source_spec: `_bmad-output/implementation-artifacts/spec-progressive-live-build.md`
+  summary: Desain Pencil section 04 belum memuat reveal bertahap (cangkang + unit, 600ms/12px/60ms, total ≤ 1,5 dtk) dan chip "Generating" tingkat dokumen untuk execute pertama.
+  evidence: C6 (desain dulu) dilewati karena chip memakai komponen label Generating yang sudah ada; angka gerak dicatat di Design Notes spec.
+- source_spec: `_bmad-output/implementation-artifacts/spec-progressive-live-build.md`
+  summary: Canvas tetap diam selama LLM menulis snippet satu seksi; progres execute belum bisa distream lebih awal.
+  evidence: QuickJS < 2 dtk; jeda ada sebelum call tiba di daemon. Event `progress` per op dari sandbox tidak membantu jeda itu; butuh streaming argumen tool dari harness (belum didukung MCP). Lihat Design Notes "Ide ditunda".

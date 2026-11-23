@@ -66,15 +66,23 @@ export function formatExecute(data: ExecuteData): string {
   return [JSON.stringify(rest), head, ...findingLines(check.findings, EXECUTE_FINDING_LINES)].join('\n');
 }
 
-/** Mulai ke-N ini, baris jumlah execute membawa pengingat batas skill. */
-export const EXECUTE_REMINDER_FROM = 3;
+/**
+ * Mulai ke-N ini, baris jumlah execute membawa pengingat batas skill (pada error juga). Sejak
+ * spec-progressive-live-build landing dibangun satu execute per seksi, jadi pengingat dua tingkat: mobile/app dulu,
+ * landing mulai `EXECUTE_LANDING_REMINDER_FROM`.
+ */
+export const EXECUTE_REMINDER_FROM = 4;
+/** Mulai ke-N ini pengingat juga berlaku untuk landing (navbar + hero, ±6 seksi termasuk footer, penutup). */
+export const EXECUTE_LANDING_REMINDER_FROM = 10;
 
 /** Baris jumlah execute sesi MCP ini (pengingat saja; pemanggilan tidak pernah diblokir). */
 export function executeCountLine(n: number): string {
   const head = `execute ke-${n} di sesi ini`;
   if (n < EXECUTE_REMINDER_FROM) return head;
-  if (n === EXECUTE_REMINDER_FROM) return `${head} · batas skill tercapai untuk mobile/app (3, termasuk perbaikan); landing maks 4 — lanjut screenshot/export`;
-  return `${head} · melewati batas skill (mobile/app 3, landing 4, termasuk perbaikan) — hentikan perbaikan kecil, lanjut screenshot/export`;
+  if (n < EXECUTE_LANDING_REMINDER_FROM) {
+    return `${head} · batas skill mobile (3) / app (4) termasuk perbaikan tercapai — lanjut screenshot/export; landing: lanjut satu execute per seksi`;
+  }
+  return `${head} · melewati batas skill (mobile 3, app 4, landing seksi + 1, termasuk perbaikan) — hentikan perbaikan kecil, lanjut screenshot/export`;
 }
 
 /** Tambahkan baris jumlah execute ke hasil tool: selalu pada sukses, pada error hanya bila N ≥ 3. */
@@ -161,7 +169,9 @@ export const SERVER_INSTRUCTIONS =
   'Lalu open_doc {} tanpa slug (dokumen yang terbuka di aplikasi Lakar; tidak ada → dokumen baru yang terbuka sendiri sebagai tab) dan get_selection: ' +
   'bangun di board terpilih, atau board kosong (ubah ukuran dan nama sesuai jenis layar), atau board baru lewat place; ' +
   'open_doc {slug} hanya bila pengguna meminta file tertentu atau file baru. ' +
-  'Lalu rencana singkat, dan langsung bangun lewat sedikit execute besar (2–4 untuk landing, 1–2 untuk mobile dan webapp) yang diawali prelude dari skill core; ' +
+  'Lalu rencana singkat, dan langsung bangun bertahap supaya pengguna melihat canvas tumbuh live: satu execute per seksi untuk landing ' +
+  '(board mulai setinggi navbar + hero lalu ditinggikan tiap seksi dari bounds; [WIP] sampai execute penutup), per area layar untuk webapp, ' +
+  'satu board utuh untuk mobile; tiap execute diawali prelude dari skill core; ' +
   'baca check di respons execute, perbaiki dengan editId/edits atau update, akhiri dengan satu screenshot board + satu screenshot zoom (nodeId, scale 2) ' +
   'area terpadat (skill review), satu execute perbaikan, lalu export PNG. ' +
   'Opsional: read_skill break-ui bila diminta uji data terburuk/edge case; variants bila diminta beberapa variasi/alternatif.';

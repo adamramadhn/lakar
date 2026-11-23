@@ -19,7 +19,7 @@ Semua kartu putih + garis tipis + satu aksen biru; grafik garis tipis tanpa area
 
 ## Alur execute
 
-Execute 1 = board lengkap (sidebar, header, KPI, grafik, tabel); execute 2 = semua temuan `check` + review sekaligus.
+Bertahap (live): execute 1 = board + sidebar + header (`keep.main`); execute 2 = KPI, grafik, tabel; execute 3 = semua temuan `check` + review sekaligus.
 
 ## Contoh teruji
 
@@ -50,6 +50,16 @@ const ha=Row(hd,'Aksi',{gap:12});
 const sel=Row(ha,'Input / Outlet',{height:40,gap:8,padding:[0,12],radius:8,fills:fill(C.bg),stroke:line('#7D8798')}); // batas kontrol ≥ 3:1
 I(sel,'store',16,C.t2); T(sel,'Nilai','Semua outlet','body-sm'); I(sel,'chevron-down',16,C.t2);
 Btn(ha,'Pesanan baru','primary',{height:40,padding:[0,16]});
+keep.main=main;
+b
+```
+
+Execute 2, isi area kerja:
+
+```js
+// pakai prelude
+Object.assign(C,{sub:'#F3F6F5',field:'#E3F1EF',acc2:'#7C3AED',data:['#0F766E','#5EB8AE','#7C3AED']}); Object.assign(FONT,{h:'Inter',b:'Inter',m:'IBM Plex Mono'});
+const main=keep.main;
 // KPI: satu utama di bidang gelap + sparkline; lainnya putih dengan chip delta
 const kp=Row(main,'KPI',{width:'fill',gap:24,align:'stretch'});
 const k1=F(kp,'Kartu / Cucian diproses',{width:360,padding:24,gap:12,radius:12,fills:fill(C.deep)});
@@ -89,5 +99,5 @@ for(const [n,m,kg,st,tone,bad] of [['Rina Andriani','Outlet Cempaka · 3 hari','
  T(F(r,'Sel / Berat',{width:64}),'Berat',kg+' kg','body-sm',{width:'fill',align:'right',numeric:'tabular'});
  const sc=Row(r,'Status',{width:132,justify:'end'}); Badge(sc,st,tone,'dot');
 }
-b
+keep.board
 ```

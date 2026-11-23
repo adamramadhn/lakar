@@ -34,16 +34,19 @@ import { ExportButton } from './ExportPopover';
 import type { GeoNode } from './gesture';
 import { useOffline, useRetry } from './hooks';
 import { Icon, type IconName } from './icons';
-import type { AgentPresence, Rect } from './presence';
-import { FadeQueue, generatingBoards, generatingText, withExiting, type FadePlan, type Shown } from './agentEffects';
-import { animateFadeIn } from './agentFx';
+import type { AgentPresence, PendingAgent, Rect } from './presence';
+import { FadeQueue, followCamera, generatingBoards, generatingText, regionVisible, withExiting, type FadePlan, type Shown } from './agentEffects';
+import { animateReveal } from './agentFx';
 import { pinchCamera, pointerIntent, TAP_SLOP, type Point } from './sheet';
 import type { Camera } from './viewState';
 
 export type CanvasBoard = { id: string; name: string; x: number; y: number; width: number; height: number };
 export type Highlight = { boardId: string; bounds?: [number, number, number, number] };
-/** Permintaan Follow agent: geser kamera ke board ini (sekali per `nonce`). */
-export type Focus = { boardId: string; nonce: number };
+/**
+ * Permintaan Follow agent: geser kamera ke board ini (sekali per `nonce`). `rect` (relatif board) = wilayah node baru
+ * execute itu (spec-progressive-live-build): kamera menuju seksi baru, bukan seluruh board.
+ */
+export type Focus = { boardId: string; nonce: number; rect?: Rect };
 /** Pratinjau versi lama: board dirender dari snapshot `rev`, kanvas baca-saja. */
 export type CanvasPreview = {
   rev: number;
@@ -350,6 +353,7 @@ export function Canvas({
   boardRevs,
   boards,
   presence,
+  pending,
   fades,
   fadeEpoch = 0,
   focus,
@@ -442,6 +446,8 @@ export function Canvas({
   boards: CanvasBoard[];
   /** Kehadiran agen per sesi Live (disembunyikan saat pratinjau versi). */
   presence?: readonly AgentPresence[];
+  /** Sesi yang menjalankan execute pertamanya (board belum diketahui): label Generating tingkat dokumen. */
+  pending?: readonly PendingAgent[];
   /** Rencana fade-in node baru dari execute agen (`fadePlans`, spec-canvas-agent-effects). */
   fades?: readonly FadePlan[];
   /** Naik setiap stream aktivitas tersambung ulang; rencana fade pada render itu hanya dicatat (tanpa efek). */
@@ -533,8 +539,11 @@ export function Canvas({
   const mountedHosts = useRef(new Map<string, { host: HTMLDivElement; rev: number }>());
   const editMountedRef = useRef(edit.onMounted);
   editMountedRef.current = edit.onMounted;
+  // Beberapa execute yang termuat sekaligus digabung menjadi satu reveal (urutan dokumen); reveal yang masih berjalan
+  // di board itu diselesaikan dulu (spec-progressive-live-build).
   const playFade = useCallback((boardId: string, host: HTMLDivElement, rev: number) => {
-    for (const ids of fadeQueue.current!.take(boardId, rev, Date.now())) animateFadeIn(host, ids, reducedMotion());
+    const ids = fadeQueue.current!.take(boardId, rev, Date.now()).flat();
+    if (ids.length) animateReveal(host, ids, reducedMotion());
   }, []);
   const onBoardMounted = useCallback(
     (boardId: string, host: HTMLDivElement, rev: number) => {
@@ -622,14 +631,17 @@ export function Canvas({
   }, [fitted, size, fit]);
 
   // Follow agent: geser ke board yang berubah bila belum terlihat utuh (500ms ease-out; reduced motion → langsung).
+  // Dengan `rect` (node baru execute): geser ke seksi baru itu bila belum terlihat utuh (spec-progressive-live-build).
   useEffect(() => {
     if (!focus || !fitted || size.w <= 0) return;
     const b = boards.find((x) => x.id === focus.boardId);
     if (!b) return;
     onFocused?.(focus.nonce);
     const from = camRef.current;
-    if (boardVisible(b, from, size.w, size.h)) return;
-    const to = focusCamera(b, from, size.w, size.h);
+    const r = focus.rect;
+    const region = r ? { x: b.x + r[0], y: b.y + r[1], width: Math.max(1, r[2]), height: Math.max(1, r[3]) } : undefined;
+    if (region ? regionVisible(region, from, size.w, size.h) : boardVisible(b, from, size.w, size.h)) return;
+    const to = region ? followCamera(region, from, size.w, size.h, { min: ZOOM_MIN, max: ZOOM_MAX }) : focusCamera(b, from, size.w, size.h);
     stopAnim();
     if (reducedMotion()) {
       setCam(to);
@@ -913,7 +925,7 @@ export function Canvas({
           <div className="waiting-board">
             {docEmpty ? <Icon name="loaderCircle" size={22} className="spin" /> : <Icon name="frame" size={22} />}
           </div>
-          <strong>{docEmpty ? 'Waiting for your agent' : 'This page is empty'}</strong>
+          <strong>{docEmpty ? (pending?.length ? 'Your agent is building the first board' : 'Waiting for your agent') : 'This page is empty'}</strong>
           <span>{docEmpty ? 'This file is open in lakard. Boards appear here as soon as your agent runs execute.' : 'Boards appear here as soon as your agent runs execute, or add one with the Frame tool.'}</span>
           {docEmpty && (
             <code className="waiting-hint">
@@ -1003,6 +1015,14 @@ export function Canvas({
       )}
 
       {!preview && presence && <AgentLayer presence={presence} boardById={boardById} cam={cam} />}
+      {/* Execute pertama sesi (spec-progressive-live-build): board tujuan belum diketahui, jadi label Generating
+          tampil di tingkat dokumen (atas tengah canvas), bukan ditebak pada board. */}
+      {!preview &&
+        pending?.map((p, i) => (
+          <div key={`pending:${p.session}`} className={`agent-generating doc-pending ${p.color}`} role="status" title={p.action} style={{ top: 12 + i * 26 }}>
+            {generatingText(p.label)}
+          </div>
+        ))}
 
       {stale !== undefined && (
         <div className="stale-pill" role="status">

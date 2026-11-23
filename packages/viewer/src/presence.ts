@@ -23,6 +23,11 @@ export type AgentPresence = {
   color: AgentColor;
   /** Ada call running pada dokumen ini. */
   working: boolean;
+  /**
+   * Di antara call (spec-progressive-live-build): tidak working, tetapi board lokasi masih `[WIP] ` dan dokumen ini
+   * masih dokumen aktif sesi Live. Label Generating tetap tampil selama agen menulis execute seksi berikutnya.
+   */
+  building?: boolean;
   /** Baris aksi saat working: `"{tool} · {judul call}"`. */
   action?: string;
   /** Board lokasi kursor. */
@@ -49,6 +54,14 @@ type Index = ReadonlyMap<string, NodeInfo>;
 type Location = { boardId: string; nodeId?: string; rect?: Rect };
 
 const isBoard = (index: Index, id: string) => index.get(id)?.boardId === id;
+/** Prefiks board yang masih dibangun (skill core; LC-12 landing melewatinya). */
+const WIP_PREFIX = '[WIP] ';
+const isWip = (index: Index, boardId: string) => index.get(boardId)?.name.startsWith(WIP_PREFIX) === true;
+/** Dokumen ini masih dokumen aktif sesi (sesi belum pindah ke dokumen lain lewat open_doc). */
+const stillHere = (v: SessionView) => {
+  const slug = v.calls.find((c) => c.slug !== undefined)?.slug;
+  return slug !== undefined && v.session.activeSlug === slug;
+};
 const finished = (c: ActivityCall) => c.status === 'done' || c.status === 'warning';
 
 /** Lokasi dari node `id` (harus ada di indeks); board → seluruh board. */
@@ -106,6 +119,7 @@ export function agentPresence(views: readonly SessionView[], index: Index, now: 
       color: colors.get(v.session.id) ?? 'agent',
       working: running !== undefined,
       ...(running ? { action: `${running.tool} · ${callTitle(running, nameOf)}` } : {}),
+      ...(!running && isWip(index, loc.boardId) && stillHere(v) ? { building: true } : {}),
       ...loc,
       changed: [],
       createdBoards: [],
@@ -173,4 +187,46 @@ export function fadePlans(views: readonly SessionView[]): FadePlan[] {
     out.push({ key: exec.callId, rev: exec.rev, endMs: callEndMs(exec), ids: exec.created });
   }
   return out;
+}
+
+/** Sesi Live yang menjalankan execute di dokumen ini tetapi belum punya lokasi (execute pertama sesi). */
+export type PendingAgent = { session: string; label: string; color: AgentColor; action: string };
+
+/**
+ * Execute pertama sebuah sesi (spec-progressive-live-build): board tujuannya belum diketahui sampai call selesai, dan
+ * aturan spec-app-5 melarang menebak target. Yang pasti hanya dokumennya, jadi canvas menampilkan label Generating
+ * tingkat dokumen (bukan pada board) sampai call selesai dan sesi mendapat lokasi.
+ */
+export function pendingAgents(views: readonly SessionView[], index: Index): PendingAgent[] {
+  const out: PendingAgent[] = [];
+  const colors = liveSessionColors(views);
+  const nameOf = (id: string) => index.get(id)?.name;
+  for (const v of views) {
+    if (!v.live) continue;
+    const running = v.calls.find((c) => c.status === 'running' && c.tool === 'execute');
+    if (!running || v.calls.some((c) => callLocation(c, index) !== undefined)) continue;
+    out.push({ session: v.session.id, label: harnessLabel(whoOf(v.session)), color: colors.get(v.session.id) ?? 'agent', action: callTitle(running, nameOf) });
+  }
+  return out;
+}
+
+/**
+ * Wilayah Follow dari execute selesai (spec-progressive-live-build): gabungan bounds node yang dibuat execute itu
+ * (tanpa board), relatif board. Bounds daemon (maks 60 entri) memuat node baru dalam urutan pembuatan, jadi akar seksi
+ * baru selalu ada dan gabungannya = seksi baru. Tanpa node baru (execute perbaikan) → undefined: Follow kembali ke
+ * perilaku board (geser hanya bila board tidak terlihat), supaya perbaikan kecil tidak menggeser kamera.
+ */
+export function followRect(c: Pick<ActivityCall, 'boards' | 'created' | 'bounds'>): Rect | undefined {
+  const bounds = c.bounds ?? {};
+  const boards = new Set(c.boards ?? []);
+  // Bounds relatif board masing-masing: execute yang menyentuh beberapa board tidak bisa digabung.
+  if (boards.size > 1) return undefined;
+  const ids = (c.created ?? []).filter((id) => !boards.has(id) && bounds[id] && bounds[id]![2] > 0 && bounds[id]![3] > 0);
+  if (!ids.length) return undefined;
+  const rs = ids.map((id) => bounds[id]!);
+  const x = Math.min(...rs.map((r) => r[0]));
+  const y = Math.min(...rs.map((r) => r[1]));
+  const r = Math.max(...rs.map((q) => q[0] + q[2]));
+  const b = Math.max(...rs.map((q) => q[1] + q[3]));
+  return [x, y, r - x, b - y];
 }

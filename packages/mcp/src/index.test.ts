@@ -303,13 +303,18 @@ describe('@lakar/mcp', () => {
     expect(PHOTO_SEARCH_DESCRIPTION).toContain("photo('<ref>')");
   });
 
-  it('instructions server: read_skill core + 8 domain + skill jenis layar di giliran yang sama, rencana singkat lalu sedikit execute besar, zoom review; deskripsi read_skill tanpa polish', async () => {
+  it('instructions server: read_skill core + 8 domain + skill jenis layar di giliran yang sama, rencana singkat lalu bangun bertahap per seksi, zoom review; deskripsi read_skill tanpa polish', async () => {
     const c = await connect(url);
     const ins = c.getInstructions() ?? '';
     expect(ins).toBe(SERVER_INSTRUCTIONS);
     expect(ins).toContain('read_skill core + layout + typography + color + accessibility + ui + interface + writing + review + landing/mobile/webapp di giliran yang sama (paralel)');
     expect(ins).toMatch(/aplikasi desktop\/dashboard → webapp/);
-    expect(ins).toContain('rencana singkat, dan langsung bangun lewat sedikit execute besar');
+    // spec-progressive-live-build: canvas tumbuh live, satu execute per seksi landing, board tumbuh dari bounds.
+    expect(ins).toContain('rencana singkat, dan langsung bangun bertahap supaya pengguna melihat canvas tumbuh live');
+    expect(ins).toContain('satu execute per seksi untuk landing');
+    expect(ins).toMatch(/board mulai setinggi navbar \+ hero lalu ditinggikan tiap seksi dari bounds/);
+    expect(ins).toContain('[WIP] sampai execute penutup');
+    expect(ins).not.toMatch(/2–4 untuk landing|execute besar/);
     expect(ins).toContain('screenshot zoom (nodeId, scale 2)');
     // spec-agent-open-doc: prompt singkat cukup; open_doc tanpa slug lalu get_selection; board terpilih/kosong; slug hanya bila diminta.
     expect(ins).toContain('buatkan landing page menggunakan lakar');
@@ -466,7 +471,7 @@ describe('@lakar/mcp', () => {
     expect(lines.at(-1)).toBe('execute ke-1 di sesi ini');
   });
 
-  it('jumlah execute per sesi: ke-1/2 tanpa saran, ≥ 3 pengingat batas skill (sukses dan error), tidak diblokir', async () => {
+  it('jumlah execute per sesi: ke-1..3 tanpa saran, ≥ 4 pengingat mobile/app, ≥ 10 juga landing (sukses dan error), tidak diblokir', async () => {
     fake.seen.length = 0;
     const c = await connect(url);
     const last = (r: any) => ((r.content as any).at(-1).text as string).split('\n').at(-1);
@@ -475,20 +480,23 @@ describe('@lakar/mcp', () => {
     const e2 = await c.callTool({ name: 'execute', arguments: { code: 'boom' } });
     expect(e2.isError).toBe(true);
     expect((e2.content as any)[0].text).toMatch(/\neditId: Eeeeeeee$/);
+    // spec-progressive-live-build: landing satu execute per seksi → pengingat landing baru mulai ke-10.
     const reminder = (n: number) =>
-      n === 3
-        ? 'execute ke-3 di sesi ini · batas skill tercapai untuk mobile/app (3, termasuk perbaikan); landing maks 4 — lanjut screenshot/export'
-        : `execute ke-${n} di sesi ini · melewati batas skill (mobile/app 3, landing 4, termasuk perbaikan) — hentikan perbaikan kecil, lanjut screenshot/export`;
-    const e3 = await c.callTool({ name: 'execute', arguments: { code: 'boom' } });
-    expect(e3.isError).toBe(true);
-    expect(last(e3)).toBe(reminder(3));
-    for (const n of [4, 5]) {
+      n < 10
+        ? `execute ke-${n} di sesi ini · batas skill mobile (3) / app (4) termasuk perbaikan tercapai — lanjut screenshot/export; landing: lanjut satu execute per seksi`
+        : `execute ke-${n} di sesi ini · melewati batas skill (mobile 3, app 4, landing seksi + 1, termasuk perbaikan) — hentikan perbaikan kecil, lanjut screenshot/export`;
+    const e3 = await c.callTool({ name: 'execute', arguments: { code: 'add(null,{})', description: 'seksi' } });
+    expect(last(e3)).toBe('execute ke-3 di sesi ini');
+    const e4 = await c.callTool({ name: 'execute', arguments: { code: 'boom' } });
+    expect(e4.isError).toBe(true);
+    expect(last(e4)).toBe(reminder(4));
+    for (const n of [5, 6, 7, 8, 9, 10, 11]) {
       const e = await c.callTool({ name: 'execute', arguments: { code: 'add(null,{})', description: 'board lagi' } });
       expect(e.isError).toBeFalsy();
       expect(last(e)).toBe(reminder(n));
     }
-    expect(fake.seen.filter((x) => x.path === '/execute')).toHaveLength(5);
-    expect(`${reminder(3)} ${reminder(5)}`).not.toMatch(/rubrik|juri|skor|golden/i);
+    expect(fake.seen.filter((x) => x.path === '/execute')).toHaveLength(11);
+    expect(`${reminder(4)} ${reminder(10)}`).not.toMatch(/rubrik|juri|skor|golden/i);
     // Sesi lain (instance server baru) mulai dari 1 lagi.
     expect(last(await (await connect(url)).callTool({ name: 'execute', arguments: { code: 'add(null,{})', description: 'board baru' } }))).toBe('execute ke-1 di sesi ini');
   });

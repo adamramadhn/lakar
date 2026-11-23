@@ -7779,6 +7779,18 @@ button.panel-tab:hover {
 .board-label.generating {
   visibility: hidden;
 }
+/* Execute pertama sesi (spec-progressive-live-build): label Generating tingkat dokumen, atas tengah canvas.
+   `translate` (bukan transform) supaya animasi masuk agent-generating-in tidak menimpa pemusatan. */
+.agent-generating.doc-pending {
+  left: 50%;
+  translate: -50% 0;
+  z-index: 6;
+  max-width: calc(100% - 32px);
+  padding: 4px 9px;
+  border-radius: 6px;
+  font-size: 11px;
+  line-height: 14px;
+}
 .agent-generating.codex {
   --who: var(--codex);
 }

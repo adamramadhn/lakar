@@ -23,7 +23,7 @@ Mode gelap (Malam): `Object.assign(C,{bg,sub:surface,line,line2,t1,t2,t3` dari n
 
 ## Alur execute
 
-Execute 1 = satu board lengkap dengan H; execute 2 = semua temuan `check` sekaligus; `LC-12` "tinggi pas = N" → `update(b,{height:N})` + geser zona ke N. Tanpa execute keempat.
+Execute 1 = satu board lengkap dengan H (sekecil satu seksi landing; isi parsial memicu `LC-12`); execute 2 = semua temuan `check` sekaligus; `LC-12` "tinggi pas = N" → `update(b,{height:N})` + geser zona ke N. Tanpa execute keempat.
 
 ## Contoh teruji
 
