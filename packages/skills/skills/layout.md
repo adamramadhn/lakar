@@ -23,6 +23,8 @@ Judul + isinya satu frame kelompok; kolom bergap seragam berisi kartu, judul, da
 - Row teks + badge/ikon/tombol: kolom teks `width:'fill'` (teks panjang di dalamnya juga `width:'fill'`), sisanya hug atau tetap.
 - Satu tepi kiri bersama per permukaan. Padding simetris, bawah = atas (kecuali inset home indicator 34); tombol berikon: sisi ikon 2 lebih kecil. Inset teks di wadah ber-cat ≥ 8 (kartu 12–24, pill 6).
 - Menumpuk hanya di `Overlay /`. Kartu berteks tinggi `hug`; sederet kartu satu tinggi (`align:'stretch'`); lebar isi bar = persen × lebar induk.
+- `space-between`/anak `fill` membagi sisa ruang; wadah hug tanpa sisa → beri ukuran. Rantai `fill`: tiap wadah perantara juga `fill`.
+- Ukuran meleset → perbaiki sizing wadah penyebab; jangan tinggi tebakan, `clip`, atau saudara absolut manual.
 
 ## Radius
 

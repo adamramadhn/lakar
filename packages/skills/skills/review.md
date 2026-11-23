@@ -5,6 +5,7 @@
 1. `screenshot` tiap board, lalu `screenshot({nodeId, scale:2})` satu area terpadat (tabel, daftar berbadge, kartu KPI; ID dari `created`/`keep`).
 2. Jawab enam pertanyaan dari gambar: `ok` atau `node: sebelum → sesudah · alasan`, tanpa prosa.
 3. `fix_check` (fix aman `check`), lalu satu execute perbaikan: temuan + saran yang kamu nilai; `visual_diff`: hanya area temuan berubah.
+4. Sesudah `themeMode` board diganti: `screenshot` ulang, cek geometri (bungkus, lebar, tinggi), bukan hanya warna.
 
 ## Enam pertanyaan
 

@@ -78,6 +78,7 @@ Font terpasang (weight): Inter 100–900, DM Sans 100–900, Plus Jakarta Sans 2
 - Flex di mana-mana; absolut hanya `Overlay / …`. Satu wrapper konten per board.
 - Prefiks: `Seksi /`, `Overlay /` (sengaja menumpuk), `Crop /` (sengaja memotong), `Scroll /` (area gulir), `Ekstra /`, `Image /`, `Button /`, `IconButton /`, `Input /`, `Tab /`, `Link /`, `Badge /`, `KPI / Nilai`, `Display /`.
 - Seleksi (varian responsif, cek konsistensi): `selection`; data terburuk: `break-ui`; N variasi: `variants`.
+- Kartu/baris/tombol berulang: pakai master yang ada (`find().filter(n=>n.component)`) sebagai instance, jangan bangun ulang; isi lewat `props` (`update(i,{props:{...get(i).props,…}})`), override hanya tanpa prop.
 - Teks rata kiri (tengah hanya hero/header seksi landing).
 
 ## Fakta teknis

@@ -9,6 +9,8 @@ Opsional, di langkah review atau atas permintaan ("uji data terburuk", "cari edg
 3. Satu set, banyak kegagalan. Sebar ke baris berbeda: baris 1 nama panjang, baris 2 email panjang, baris 3 nama satu huruf.
 4. Lapor dulu, perbaiki bila diminta. Sebagian temuan adalah keputusan desain (bungkus atau potong?).
 5. Hanya aksara font terpasang (Latin + diakritik). Emoji (LC-01a) dan CJK/Arab (FONT_MISSING) tidak bisa diuji: tulis "tidak diuji".
+6. Mode tema: dokumen ber-≥ 2 mode (`getTokens().modes`) → salinan (Alur 2) per mode lain, hanya `themeMode` beda; cek geometri, bukan hanya warna.
+7. Master: instance salinan ikut master sumber → nilai terburuk lewat `props` instance; perbaikan di master mengenai semua instance, cek ulang setiap board pemakainya.
 
 ## Alur
 

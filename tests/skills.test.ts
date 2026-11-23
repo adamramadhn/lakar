@@ -91,6 +91,21 @@ describe('skill: review memakai visual_diff (spec-agent-visual-diff)', () => {
   });
 });
 
+describe('skill: aturan pakai ulang komponen dan verifikasi layout (story 8.4, epic-adopsi-open-pencil)', () => {
+  it.each([
+    ['core', /pakai master yang ada[^\n]*jangan bangun ulang; isi lewat `props`[^\n]*override hanya tanpa prop/],
+    ['selection', /ubah lewat `props` instance bila ada prop terikat[^\n]*override, hanya untuk properti tanpa prop/],
+    ['layout', /`space-between`\/anak `fill` membagi sisa ruang; wadah hug tanpa sisa/],
+    ['layout', /Rantai `fill`: tiap wadah perantara juga `fill`/],
+    ['layout', /jangan tinggi tebakan, `clip`, atau saudara absolut manual/],
+    ['review', /^4\. Sesudah `themeMode` board diganti[^\n]*cek geometri[^\n]*bukan hanya warna/m],
+    ['break-ui', /^6\. Mode tema:[^\n]*salinan \(Alur 2\) per mode lain[^\n]*cek geometri, bukan hanya warna/m],
+    ['break-ui', /^7\. Master:[^\n]*`props` instance[^\n]*cek ulang setiap board pemakainya/m],
+  ] as const)('%s: %s', (name, rule) => {
+    expect(read(name)).toMatch(rule);
+  });
+});
+
 describe('skill: struktur', () => {
   it.each(SKILL_NAMES)('%s.md diawali judul, semua blok berpagar js atau text', (name) => {
     const md = read(name);
