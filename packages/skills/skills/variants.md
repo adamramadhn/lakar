@@ -12,7 +12,7 @@ Opsional, saat pengguna meminta beberapa variasi, alternatif, atau opsi ("buat 3
 
 ## Alur
 
-1. Rencana: tabel nama + sumbu (≤ 5 baris), lalu bangun. Satu execute per varian, masing-masing diawali prelude; board ke-2 dan seterusnya `place(w,h,{near:<board sebelumnya>})`, nama `<Produk> / <Bagian> · <Arah>`.
+1. Rencana: tabel nama + sumbu (≤ 5 baris), lalu bangun. Satu execute per varian (helper prelude bawaan; palet varian `Object.assign(C,{…})` di awal snippet); board ke-2 dan seterusnya `place(w,h,{near:<board sebelumnya>})`, nama `<Produk> / <Bagian> · <Arah>`.
 2. Baca `check` tiap respons; perbaikan digabung ke satu execute terakhir untuk semua varian.
 3. `screenshot` tiap board, cek ulang bahwa arahnya benar-benar beda. Varian yang ternyata menyatu dipotong dan disebut; dua arah yang jelas lebih baik daripada tiga yang dipaksakan.
 4. Laporkan lalu berhenti. Pilihan milik pengguna; jangan memilih favorit di tabel:

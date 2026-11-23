@@ -1,4 +1,5 @@
-// Angka token check (`@lakar/schema` design-tokens.ts) = prelude skill core.md (`TY`, baris "Jarak:") = frontmatter DESIGN.md.
+// Angka token check (`@lakar/schema` design-tokens.ts) = helper prelude bawaan (`TY`, Badge) dan referensinya di core.md (`TY`,
+// baris "Jarak:") = frontmatter DESIGN.md.
 import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
@@ -12,29 +13,33 @@ import {
   TOUCH_MIN,
   TYPE_SCALE,
 } from '../packages/schema/src/design-tokens.ts';
+import { beginTransaction, createDocument } from '../packages/core/src/index.ts';
+import { runSnippet } from '../packages/exec/src/index.ts';
 
 const root = (p: string) => fileURLToPath(new URL(`../${p}`, import.meta.url));
 const CORE = root('packages/skills/skills/core.md');
 const DESIGN = root('_bmad-output/initiative-lakar/ux-lakar/DESIGN.md');
+const HELPERS = root('packages/exec/src/helpers.ts');
 
 /** Nama `TY` di prelude → nama token DESIGN.md. */
 const PRELUDE_NAME: Record<string, string> = { 'title-lg': 'mobile-title-lg', title: 'mobile-title', tab: 'tab-label' };
 
-function preludeTY(): Record<string, { size: number; lineHeight: number; weight: number; letterSpacing: number }> {
-  const md = readFileSync(CORE, 'utf8');
-  const block = /```js\n\/\/ prelude\n([\s\S]*?)```/.exec(md)?.[1];
-  expect(block, 'blok prelude core.md').toBeDefined();
-  const lines = block!.split('\n');
-  const r = lines.find((l) => l.startsWith('const R='));
-  const start = lines.findIndex((l) => l.startsWith('const TY='));
-  expect(r && start >= 0, 'baris const R= dan const TY=').toBe(true);
-  // `TY` bisa berlanjut ke baris berikutnya sampai `};`.
-  let end = start;
-  while (!lines[end]!.trimEnd().endsWith('};')) end++;
-  const ty = lines.slice(start, end + 1).join('\n');
-  return new Function(`${r}\n${ty}\nreturn TY;`)() as ReturnType<typeof preludeTY>;
+/** `TY` helper bawaan sandbox (spec-skeleton-live-build: prelude core kini bawaan exec, sumber `helpers.ts`). */
+async function preludeTY(): Promise<Record<string, { size: number; lineHeight: number; weight: number; letterSpacing: number }>> {
+  const tx = beginTransaction(createDocument(), { sessionId: 't' });
+  const icons = { versions: {}, canonical: () => ({ icon: '', version: '' }), search: () => [], glyph: () => undefined } as unknown as Parameters<typeof runSnippet>[2]['icons'];
+  const r = await runSnippet('TY', tx, { icons });
+  if (!r.ok) throw r.error;
+  return r.value as Awaited<ReturnType<typeof preludeTY>>;
 }
 
+/** Referensi `TY` di core.md (`peran size/lineHeight[/weight]`, weight default 400) = helper bawaan. */
+function coreTY(): Record<string, { size: number; lineHeight: number; weight: number }> {
+  const md = readFileSync(CORE, 'utf8').replace(/\r\n/g, '\n');
+  const block = /TY peran size\/lineHeight\/weight:([\s\S]*?)\nF\(/.exec(md)?.[1];
+  expect(block, 'referensi TY core.md').toBeDefined();
+  return Object.fromEntries([...block!.matchAll(/([a-z0-9-]+) (\d+)\/(\d+)(?:\/(\d+))?/g)].map((m) => [m[1]!, { size: Number(m[2]), lineHeight: Number(m[3]), weight: Number(m[4] ?? 400) }]));
+}
 function preludeSpacing(): number[] {
   const md = readFileSync(CORE, 'utf8');
   const line = md.split('\n').find((l) => l.startsWith('- Jarak:'));
@@ -45,8 +50,9 @@ function preludeSpacing(): number[] {
 }
 
 describe('token desain = prelude core.md', () => {
-  it('TY: size/lineHeight/weight/letterSpacing sama dengan TYPE_SCALE', () => {
-    const ty = preludeTY();
+  it('TY: size/lineHeight/weight/letterSpacing sama dengan TYPE_SCALE (helper bawaan dan referensi core.md)', async () => {
+    const ty = await preludeTY();
+    expect(coreTY()).toEqual(Object.fromEntries(Object.entries(ty).map(([k, v]) => [k, { size: v.size, lineHeight: v.lineHeight, weight: v.weight }])));
     const names = Object.keys(ty).map((k) => PRELUDE_NAME[k] ?? k);
     // Semua token kecuali `data` (tidak ada di prelude).
     expect(names.sort()).toEqual(Object.keys(TYPE_SCALE).filter((k) => k !== 'data').sort());
@@ -125,8 +131,8 @@ describe.skipIf(!existsSync(DESIGN))('token desain = frontmatter DESIGN.md', () 
   });
 
   it('badge: height (md) dan height-sm = ukuran Badge prelude core.md (sm 20 / md 24, story 2.16)', () => {
-    const m = /height:sm\?(\d+):(\d+)/.exec(readFileSync(CORE, 'utf8'));
-    expect(m, 'Badge prelude height:sm?<sm>:<md>').not.toBeNull();
+    const m = /height: sm \? (\d+) : (\d+)/.exec(readFileSync(HELPERS, 'utf8'));
+    expect(m, 'Badge helper height: sm ? <sm> : <md>').not.toBeNull();
     expect(px(componentField(md, 'badge', 'height-sm')!)).toBe(Number(m![1]));
     expect(px(componentField(md, 'badge', 'height')!)).toBe(Number(m![2]));
   });

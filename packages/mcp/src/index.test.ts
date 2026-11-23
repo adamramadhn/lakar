@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { Client, InMemoryTransport } from '@modelcontextprotocol/client';
 import { StdioClientTransport } from '@modelcontextprotocol/client/stdio';
 import { LAKAR_VERSION, SCHEMA_VERSION } from '@lakar/schema';
-import { EXPORT_CODE_DESCRIPTION, GET_SELECTION_DESCRIPTION, LIST_DOCUMENTS_DESCRIPTION, OPEN_DOC_DESCRIPTION, PACKAGE, PASTE_DESCRIPTION, PHOTO_SEARCH_DESCRIPTION, READ_SKILL_DESCRIPTION, SERVER_INSTRUCTIONS, SERVER_VERSION, createLakarMcpServer, formatStatus } from './index.js';
+import { EXECUTE_LANDING_REMINDER_FROM, EXPORT_CODE_DESCRIPTION, GET_SELECTION_DESCRIPTION, LIST_DOCUMENTS_DESCRIPTION, OPEN_DOC_DESCRIPTION, PACKAGE, PASTE_DESCRIPTION, PHOTO_SEARCH_DESCRIPTION, READ_SKILL_DESCRIPTION, SERVER_INSTRUCTIONS, SERVER_VERSION, createLakarMcpServer, formatStatus } from './index.js';
 import { readFile } from 'node:fs/promises';
 import { chromiumInstalled, DEFAULT_BROWSERS_PATH } from '../../../tests/support/browser.ts';
 import { testLog } from '../../../tests/support/log.ts';
@@ -311,7 +311,11 @@ describe('@lakar/mcp', () => {
     expect(ins).toMatch(/aplikasi desktop\/dashboard → webapp/);
     // spec-progressive-live-build: canvas tumbuh live, satu execute per seksi landing.
     expect(ins).toContain('rencana singkat, dan langsung bangun bertahap supaya pengguna melihat canvas tumbuh live');
-    expect(ins).toContain('satu execute per seksi untuk landing');
+    // spec-skeleton-live-build: skeleton dulu, lalu satu blok kecil per execute; prelude bawaan (tidak ditulis ulang).
+    expect(ins).toContain('execute pertama = board + semua seksi/area rencana');
+    expect(ins).toContain('satu blok kecil per execute');
+    expect(ins).toContain('jangan ditulis ulang');
+    expect(ins).not.toMatch(/tiap execute diawali prelude/);
     // spec-board-hug-height: board landing hug, tinggi tidak ditebak atau dinaikkan.
     expect(ins).toContain("board landing height:'hug' mengikuti isi, jangan isi atau naikkan tingginya");
     expect(ins).not.toMatch(/ditinggikan tiap seksi/);
@@ -473,7 +477,7 @@ describe('@lakar/mcp', () => {
     expect(lines.at(-1)).toBe('execute ke-1 di sesi ini');
   });
 
-  it('jumlah execute per sesi: ke-1..3 tanpa saran, ≥ 4 pengingat mobile/app, ≥ 10 juga landing (sukses dan error), tidak diblokir', async () => {
+  it('jumlah execute per sesi: ke-1..3 tanpa saran, ≥ 4 pengingat mobile/app, ≥ 26 juga landing (sukses dan error), tidak diblokir', async () => {
     fake.seen.length = 0;
     const c = await connect(url);
     const last = (r: any) => ((r.content as any).at(-1).text as string).split('\n').at(-1);
@@ -482,23 +486,24 @@ describe('@lakar/mcp', () => {
     const e2 = await c.callTool({ name: 'execute', arguments: { code: 'boom' } });
     expect(e2.isError).toBe(true);
     expect((e2.content as any)[0].text).toMatch(/\neditId: Eeeeeeee$/);
-    // spec-progressive-live-build: landing satu execute per seksi → pengingat landing baru mulai ke-10.
+    // spec-skeleton-live-build: landing satu blok per execute → pengingat landing baru mulai ke-26.
     const reminder = (n: number) =>
-      n < 10
-        ? `execute ke-${n} di sesi ini · batas skill mobile (3) / app (4) termasuk perbaikan tercapai — lanjut screenshot/export; landing: lanjut satu execute per seksi`
-        : `execute ke-${n} di sesi ini · melewati batas skill (mobile 3, app 4, landing seksi + 1, termasuk perbaikan) — hentikan perbaikan kecil, lanjut screenshot/export`;
+      n < EXECUTE_LANDING_REMINDER_FROM
+        ? `execute ke-${n} di sesi ini · batas skill mobile (3) / app (4) termasuk perbaikan tercapai — lanjut screenshot/export; landing: lanjut satu blok per execute`
+        : `execute ke-${n} di sesi ini · melewati batas skill (mobile 3, app 4, landing blok + 1, termasuk perbaikan) — hentikan perbaikan kecil, lanjut screenshot/export`;
     const e3 = await c.callTool({ name: 'execute', arguments: { code: 'add(null,{})', description: 'seksi' } });
     expect(last(e3)).toBe('execute ke-3 di sesi ini');
     const e4 = await c.callTool({ name: 'execute', arguments: { code: 'boom' } });
     expect(e4.isError).toBe(true);
     expect(last(e4)).toBe(reminder(4));
-    for (const n of [5, 6, 7, 8, 9, 10, 11]) {
+    expect(EXECUTE_LANDING_REMINDER_FROM).toBe(26);
+    for (let n = 5; n <= 27; n++) {
       const e = await c.callTool({ name: 'execute', arguments: { code: 'add(null,{})', description: 'board lagi' } });
       expect(e.isError).toBeFalsy();
       expect(last(e)).toBe(reminder(n));
     }
-    expect(fake.seen.filter((x) => x.path === '/execute')).toHaveLength(11);
-    expect(`${reminder(4)} ${reminder(10)}`).not.toMatch(/rubrik|juri|skor|golden/i);
+    expect(fake.seen.filter((x) => x.path === '/execute')).toHaveLength(27);
+    expect(`${reminder(4)} ${reminder(26)}`).not.toMatch(/rubrik|juri|skor|golden/i);
     // Sesi lain (instance server baru) mulai dari 1 lagi.
     expect(last(await (await connect(url)).callTool({ name: 'execute', arguments: { code: 'add(null,{})', description: 'board baru' } }))).toBe('execute ke-1 di sesi ini');
   });

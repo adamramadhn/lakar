@@ -34,6 +34,31 @@ function nodeKids(el: Element): Element[] {
   return out;
 }
 
+const SKELETON_STYLE = 'data-lakar-skeleton';
+
+/**
+ * Pasang (atau lepas bila `css` kosong) gaya placeholder skeleton di shadow root board (spec-skeleton-live-build).
+ * Satu elemen `<style>` per host, ditimpa setiap mount; dokumen dan DOM board tidak diubah.
+ */
+export function applySkeletonStyle(host: HTMLElement, css: string): void {
+  const root = host.shadowRoot;
+  if (!root) return;
+  let style = root.querySelector<HTMLStyleElement>(`style[${SKELETON_STYLE}]`);
+  if (!css) {
+    style?.remove();
+    return;
+  }
+  if (!style) {
+    style = host.ownerDocument.createElement('style');
+    style.setAttribute(SKELETON_STYLE, '');
+    root.appendChild(style);
+  }
+  if (style.textContent !== css) style.textContent = css;
+}
+
+/** Id node yang ada di DOM board `host`. */
+export const hasNode = (host: HTMLElement, id: string): boolean => !!host.shadowRoot?.querySelector(NODE_SELECTOR(id));
+
 /** Selesaikan reveal yang masih berjalan di board `host` (elemen langsung ke keadaan akhir). */
 export function finishReveal(host: HTMLElement): void {
   for (const a of running.get(host) ?? []) {

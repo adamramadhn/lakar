@@ -30,7 +30,6 @@ Execute 1 = satu board lengkap dengan H (sekecil satu seksi landing; isi parsial
 Beranda aplikasi kursus bahasa, arketipe Ramah (langkah khas: ring target mingguan bersegmen per keterampilan yang langsung tersambung ke tombol lanjutkan unit; daftar memperlihatkan keadaan):
 
 ```js
-// pakai prelude
 Object.assign(C,{acc:'#4F46E5',tint:'#4F46E514',field:'#EEF0FE',deep:'#312E81',acc2:'#A16207',data:['#4F46E5','#8B93F8','#A16207']}); Object.assign(FONT,{h:'DM Sans',b:'DM Sans',m:'DM Mono'});
 const H=1146; // 54 status bar + Konten (isi berakhir y 1024) + 24 + tab bar 98
 const p=place(390,H);

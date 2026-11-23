@@ -195,6 +195,40 @@ export function followCamera(r: Region, c: Cam, w: number, h: number, zoom: { mi
   return { x, y, z };
 }
 
+// ---- Follow berirama untuk banyak execute kecil (spec-skeleton-live-build) ----
+
+/** Jarak minimum antar-geser kamera Follow; target yang tiba lebih cepat digabung (yang terbaru dipakai). */
+export const FOLLOW_SETTLE_MS = 1200;
+/** Bagian tinggi viewport yang cukup memperlihatkan blok tinggi (blok kecil harus terlihat utuh). */
+const FOLLOW_VISIBLE_H = 0.4;
+/** Bagian lebar viewport yang cukup untuk wilayah lebar (seksi selebar board). */
+const FOLLOW_VISIBLE_W = 0.8;
+
+/**
+ * Wilayah cukup terlihat sehingga Follow tidak perlu menggeser kamera: bagian yang terlihat (di bawah label board)
+ * ≥ min(tinggi wilayah, 40% viewport) dan ≥ min(lebar wilayah, 80% viewport). Blok kecil di seksi yang sudah
+ * terlihat → diam; blok yang terpotong tepi atau di luar layar → geser.
+ */
+export function regionInView(r: Region, c: Cam, w: number, h: number): boolean {
+  const left = c.x + r.x * c.z;
+  const top = c.y + r.y * c.z;
+  const rw = r.width * c.z;
+  const rh = r.height * c.z;
+  const visW = Math.min(left + rw, w) - Math.max(left, 0);
+  const visH = Math.min(top + rh, h) - Math.max(top, 18);
+  return visW >= Math.min(rw, w * FOLLOW_VISIBLE_W) - 1 && visH >= Math.min(rh, (h - 18) * FOLLOW_VISIBLE_H) - 1;
+}
+
+/** Board (atau wilayah) beririsan dengan viewport sama sekali. */
+export function regionTouchesView(r: Region, c: Cam, w: number, h: number): boolean {
+  const left = c.x + r.x * c.z;
+  const top = c.y + r.y * c.z;
+  return left < w && top < h && left + r.width * c.z > 0 && top + r.height * c.z > 0;
+}
+
+/** Sisa tunggu sebelum geser Follow berikutnya boleh dimulai (0 = sekarang). */
+export const followWait = (lastPanAt: number | undefined, now: number): number => (lastPanAt === undefined ? 0 : Math.max(0, lastPanAt + FOLLOW_SETTLE_MS - now));
+
 /** Rencana fade dari satu execute agen: kunci (callId), rev hasil, waktu selesai, dan id node yang dibuat. */
 export type FadePlan = { key: string; rev: number; endMs: number; ids: readonly string[] };
 

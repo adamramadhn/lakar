@@ -2082,3 +2082,37 @@ describe('LC-19 frasa terlarang', () => {
     expect(f.map((x) => x.detail)).toEqual(['frasa terlarang "pelajari lebih lanjut" (id) di "Pelajari lebih lanjut"', 'frasa terlarang "learn more" (en) di "Learn more"']);
   });
 });
+
+describe('skeleton (spec-skeleton-live-build): placeholder tidak dinilai, LC-33 di board selesai', () => {
+  const landing = (name: string, kids: Loose[]): BoardSpec => ({ name, screen: 'landing', width: 1440, height: 2000, hug: true, children: kids });
+  // Dua placeholder kosong kembar ber-minHeight (seksi mirip, spacer kosong, tinggi di luar token bila dinilai).
+  const skel = (n: string, y: number, h: number, kids: Loose[] = []) => frame(`[Skeleton] Seksi / ${n}`, [0, y, 1440, h], kids, { width: 'fill', minHeight: h });
+  const page = (kids: Loose[]) => frame('Halaman', [0, 0, 1440, 2000], kids, { width: 'fill' });
+  const nav = () => frame('Navbar', [0, 0, 1440, 72], [text('Biji Pagi', [80, 26, 100, 20], { color: '#101828', size: 16, lineHeight: 24 })], { layout: 'row', width: 'fill', height: 72, padding: [0, 80] });
+
+  it('board [WIP] dengan placeholder kosong: tanpa temuan sama sekali (semua aturan)', () => {
+    const f = runAll(landing('[WIP] Biji Pagi / Beranda · landing · Jernih', [page([nav(), skel('Hero', 72, 760), skel('Menu', 832, 640), skel('Jadwal', 1472, 640)])]));
+    expect(f).toEqual([]);
+  });
+
+  it('isi di dalam placeholder juga dilewati (mis. teks kecil yang belum dirapikan)', () => {
+    const f = runAll(landing('[WIP] B · landing', [page([skel('Hero', 0, 760, [text('kecil', [80, 80, 40, 10], { size: 9 })])])]));
+    expect(only(f, 'LC-05')).toEqual([]);
+  });
+
+  it('board tanpa [WIP] dengan placeholder tersisa → LC-33 warning per placeholder teratas, gerbang 0', () => {
+    const b = landing('Biji Pagi / Beranda · landing · Jernih', [page([nav(), skel('Menu', 72, 640, [frame('[Skeleton] Dalam', [0, 72, 1440, 100], [])]), skel('Footer', 712, 240)])]);
+    const f = only(runAll(b), 'LC-33');
+    expect(f.map((x) => [x.level, x.nodeName, x.detail])).toEqual([
+      ['warning', '[Skeleton] Seksi / Menu', 'placeholder "Seksi / Menu" belum diisi'],
+      ['warning', '[Skeleton] Seksi / Footer', 'placeholder "Seksi / Footer" belum diisi'],
+    ]);
+    expect(f[0]!.expected).toContain('Build(id');
+    expect(summarizeFindings(f).gate).toBe(0);
+  });
+
+  it('placeholder terisi (nama tanpa prefiks) dinilai seperti biasa', () => {
+    const filled = frame('Seksi / Menu', [0, 0, 1440, 400], [text('kecil', [80, 80, 40, 10], { size: 9, color: '#101828' })], { width: 'fill' });
+    expect(rules(run(landing('B · landing', [page([filled])])))).toContain('LC-05');
+  });
+});

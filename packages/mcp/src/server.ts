@@ -68,21 +68,24 @@ export function formatExecute(data: ExecuteData): string {
 
 /**
  * Mulai ke-N ini, baris jumlah execute membawa pengingat batas skill (pada error juga). Sejak
- * spec-progressive-live-build landing dibangun satu execute per seksi, jadi pengingat dua tingkat: mobile/app dulu,
- * landing mulai `EXECUTE_LANDING_REMINDER_FROM`.
+ * spec-skeleton-live-build landing dibangun skeleton dulu lalu satu blok per execute, jadi pengingat dua tingkat:
+ * mobile/app dulu, landing mulai `EXECUTE_LANDING_REMINDER_FROM`.
  */
 export const EXECUTE_REMINDER_FROM = 4;
-/** Mulai ke-N ini pengingat juga berlaku untuk landing (navbar + hero, ±6 seksi termasuk footer, penutup). */
-export const EXECUTE_LANDING_REMINDER_FROM = 10;
+/**
+ * Mulai ke-N ini pengingat juga berlaku untuk landing: skeleton + navbar + 2 blok hero + ±6 seksi × 2–3 blok (header,
+ * baris kartu) + footer + penutup ≈ 20–25 execute kecil.
+ */
+export const EXECUTE_LANDING_REMINDER_FROM = 26;
 
 /** Baris jumlah execute sesi MCP ini (pengingat saja; pemanggilan tidak pernah diblokir). */
 export function executeCountLine(n: number): string {
   const head = `execute ke-${n} di sesi ini`;
   if (n < EXECUTE_REMINDER_FROM) return head;
   if (n < EXECUTE_LANDING_REMINDER_FROM) {
-    return `${head} · batas skill mobile (3) / app (4) termasuk perbaikan tercapai — lanjut screenshot/export; landing: lanjut satu execute per seksi`;
+    return `${head} · batas skill mobile (3) / app (4) termasuk perbaikan tercapai — lanjut screenshot/export; landing: lanjut satu blok per execute`;
   }
-  return `${head} · melewati batas skill (mobile 3, app 4, landing seksi + 1, termasuk perbaikan) — hentikan perbaikan kecil, lanjut screenshot/export`;
+  return `${head} · melewati batas skill (mobile 3, app 4, landing blok + 1, termasuk perbaikan) — hentikan perbaikan kecil, lanjut screenshot/export`;
 }
 
 /** Tambahkan baris jumlah execute ke hasil tool: selalu pada sukses, pada error hanya bila N ≥ 3. */
@@ -169,9 +172,10 @@ export const SERVER_INSTRUCTIONS =
   'Lalu open_doc {} tanpa slug (dokumen yang terbuka di aplikasi Lakar; tidak ada → dokumen baru yang terbuka sendiri sebagai tab) dan get_selection: ' +
   'bangun di board terpilih, atau board kosong (ubah ukuran dan nama sesuai jenis layar), atau board baru lewat place; ' +
   'open_doc {slug} hanya bila pengguna meminta file tertentu atau file baru. ' +
-  'Lalu rencana singkat, dan langsung bangun bertahap supaya pengguna melihat canvas tumbuh live: satu execute per seksi untuk landing ' +
-  "(board landing height:'hug' mengikuti isi, jangan isi atau naikkan tingginya; [WIP] sampai execute penutup), per area layar untuk webapp, " +
-  'satu board utuh untuk mobile; tiap execute diawali prelude dari skill core; ' +
+  'Lalu rencana singkat, dan langsung bangun bertahap supaya pengguna melihat canvas tumbuh live: execute pertama = board + semua seksi/area rencana ' +
+  "sebagai placeholder Skel (skeleton), lalu satu blok kecil per execute (navbar, teks hero, visual hero, header seksi, satu baris kartu) yang mengisi placeholder di tempat lewat Build, " +
+  "untuk landing dan webapp (board landing height:'hug' mengikuti isi, jangan isi atau naikkan tingginya; [WIP] sampai execute penutup); satu board utuh untuk mobile; " +
+  'helper prelude skill core sudah bawaan di setiap execute: jangan ditulis ulang, palet arketipe disimpan sekali di keep.C/keep.FONT; ' +
   'baca check di respons execute, perbaiki dengan editId/edits atau update, akhiri dengan satu screenshot board + satu screenshot zoom (nodeId, scale 2) ' +
   'area terpadat (skill review), satu execute perbaikan, lalu export PNG. ' +
   'Opsional: read_skill break-ui bila diminta uji data terburuk/edge case; variants bila diminta beberapa variasi/alternatif.';
@@ -251,6 +255,7 @@ export const LAYOUT_CHECK_DESCRIPTION =
   "Struktural: LC-16 (error bukan gerbang) path ≤ 32×32 sebagai ikon (pakai node icon; bentuk sengaja 'Shape / …', grafik 'Chart / …'); " +
   "warning LC-14 absolut di dalam flex tanpa 'Overlay / …', LC-15 > 1 pustaka ikon UI, LC-21 radius > 3 nilai / spacer kosong / padding ganda mobile / teks langsung di baris tabel / > 1 bidang efek; " +
   'info (hanya di layout_check, tidak di execute) LC-13 nama layer default, LC-22 jumlah node Crop/Overlay/Scroll/Ekstra. ' +
+  "Placeholder '[Skeleton] …' (dan isinya) tidak dinilai aturan mana pun; LC-33 (warning) placeholder skeleton tersisa di board tanpa [WIP] (isi dengan Build(id,{…}) atau remove). " +
   'Warning dan info maks 3 per aturan per board. ' +
   'Selesai bila 0 error gerbang. Output: satu baris ringkasan lalu satu baris per temuan ' +
   "'<level>[·gerbang] · <aturan> · <nama node> (<id>) · <terukur> · <seharusnya>' (maks 60 baris). " +
@@ -281,6 +286,8 @@ export const EXECUTE_DESCRIPTION =
   "photo('<ref>') → {assetId, width, height, credit, license, creator, sourcePageUrl} foto stok untuk ref dari tool photo_search; tulis ref sebagai literal string " +
   "(daemon mengimpornya sekali sebelum snippet berjalan; ref dari variabel → NOT_FOUND), pakai di fills [{type:'image', assetId:p.assetId, fit:'cover'}]; credit untuk ringkasan akhir, bukan node UI kecuali diminta. " +
   'keep: objek JSON per sesi yang bertahan antar-execute bila sukses (mis. keep.hero = add(...); lalu get(keep.hero)). ' +
+  "Helper desain bawaan (prelude skill core, sudah ada di setiap snippet; deklarasi ulang tetap sah): C/FONT (palet; dipulihkan dari keep.C/keep.FONT), R, TY, HEAD, fill, line, F, Row, T, I, Btn, Badge, " +
+  "Skel(parent, nama, minHeight) placeholder '[Skeleton] nama', Build(id, patch) isi placeholder di tempat (lepas prefiks + minHeight). " +
   'console.log(...) → data.logs. Nilai ekspresi terakhir → data.value (JSON; dipotong di 32 KB dengan valueTruncated). ' +
   "Katalog node v1 (tertutup): board (parent null) {type:'board', name, x, y, width, height (angka | 'hug' = ikut isi), screen:'landing'|'app'|'mobile', expectedSize?:{width,height}, fills?}; " +
   "frame {layout?:'none'|'row'|'column', gap? (boleh negatif), padding?: n|[v,h]|[t,r,b,l], align?:'start'|'center'|'end'|'stretch', justify?:'start'|'center'|'end'|'space-between', clip?, scrollY?}; " +

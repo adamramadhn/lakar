@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { renderApiMarkdown } from '../packages/exec/src/api-md.ts';
+import { HELPER_GLOBALS } from '../packages/exec/src/helpers.ts';
 import { IconCatalog } from '../packages/icons/src/index.ts';
 import { FontRegistry } from '../packages/daemon/src/fonts.ts';
 import { DOMAIN_SKILLS, OPTIONAL_SKILLS, SCREEN_SKILLS, SKILL_NAMES, SKILLS_DIR, estimateTokens, splitCode } from '../packages/skills/src/index.ts';
@@ -91,25 +92,44 @@ describe('skill: struktur', () => {
     expect((md.match(/^```/gm) ?? []).length).toBe(blocks.length * 2);
   });
 
-  it('core.md punya tepat satu blok prelude (baris pertama // prelude); blok // pakai prelude ada di landing, mobile, dan webapp', () => {
-    expect(splitCode(read('core')).blocks.filter((b) => b.code.startsWith('// prelude'))).toHaveLength(1);
-    for (const name of ['landing', 'mobile', 'webapp']) expect(splitCode(read(name)).blocks.some((b) => b.code.startsWith('// pakai prelude')), name).toBe(true);
+  it('prelude bawaan sandbox (spec-skeleton-live-build): core.md satu blok // prelude (palet lewat keep), semua helper terdokumentasi, contoh tidak menulis ulang prelude', () => {
+    const core = read('core');
+    const preludes = splitCode(core).blocks.filter((b) => b.code.startsWith('// prelude'));
+    expect(preludes).toHaveLength(1);
+    expect(preludes[0]!.code).toMatch(/keep\.C=Object\.assign\(C,/);
+    expect(core).toContain('jangan ditulis ulang');
+    for (const name of HELPER_GLOBALS) expect(core, name).toMatch(new RegExp(`(^|[^A-Za-z])${name}[ (]`, 'm'));
+    for (const name of SKILL_NAMES) {
+      for (const b of splitCode(read(name)).blocks) {
+        expect(b.code, `${name}.md`).not.toMatch(/^\/\/ pakai prelude|^const (C|FONT|T|F|Row|Btn|Badge)=/m);
+      }
+    }
   });
 
-  it('bangun bertahap (spec-progressive-live-build): landing satu execute per seksi; board hug tumbuh sendiri (spec-board-hug-height)', () => {
-    expect(read('core')).toContain('Bangun bertahap (canvas tumbuh live): satu execute per seksi/area');
-    expect(read('landing')).toContain('Satu seksi per execute');
+  it('bangun bertahap: skeleton dulu lalu satu blok per execute (spec-skeleton-live-build); board hug tumbuh sendiri (spec-board-hug-height)', () => {
+    expect(read('core')).toContain('execute 1 = board + semua seksi/area rencana sebagai `Skel`');
+    expect(read('core')).toContain('satu blok per execute');
+    expect(read('landing')).toContain('Execute 1 = skeleton');
     const blocks = splitCode(read('landing')).blocks.filter((b) => b.lang === 'js');
-    const [first] = blocks;
+    const [first, ...rest] = blocks;
     // Board landing height:'hug' lewat place(w,'hug'): tinggi tidak ditebak.
     expect(first!.code).toMatch(/type:'board'[^\n]*?height:'hug'/);
     expect(first!.code).toContain("place(1440,'hug')");
     expect(first!.code).toMatch(/name:'\[WIP\] /);
+    // Execute skeleton: semua seksi sebagai Skel di keep.s, tanpa isi.
+    expect(first!.code).toMatch(/keep\.s=\{[^}]*Skel\(/);
+    expect(first!.code).not.toMatch(/\bT\(|\bBtn\(/);
+    // Blok berikutnya kecil dan mengisi placeholder di tempat (Build) atau menambah ke seksi yang sudah diisi.
+    const fills = rest.slice(0, -1);
+    expect(fills.length).toBeGreaterThanOrEqual(5);
+    for (const b of fills) expect(b.code).toMatch(/keep\.s\.\w+/);
+    for (const b of fills) expect(b.code.split('\n').length, b.code.slice(0, 60)).toBeLessThanOrEqual(40);
     // Tidak ada execute yang mengisi atau menaikkan tinggi board (rencana PR #26 "tinggi + perkiraan" dicabut).
     for (const b of blocks) expect(b.code).not.toMatch(/update\(keep\.board,\s*\{[^}]*height/);
     expect(read('landing')).not.toMatch(/perkiraan seksi|tinggi pas/);
-    // Webapp: execute 1 sidebar + header, execute 2 isi area kerja lewat keep.main.
-    expect(splitCode(read('webapp')).blocks.filter((b) => b.lang === 'js').map((b) => /keep\.main/.test(b.code))).toEqual([true, true]);
+    // Webapp: execute 1 sidebar + header + skeleton, lalu KPI dan baris bawah diisi di tempat.
+    const web = splitCode(read('webapp')).blocks.filter((b) => b.lang === 'js').map((b) => b.code);
+    expect(web.map((c) => (/Skel\(/.test(c) ? 'skel' : /Build\(keep\.s\./.test(c) ? 'build' : '-'))).toEqual(['skel', 'build', 'build']);
   });
 
   it('klaim weight font di core.md sesuai registry font terpasang', () => {

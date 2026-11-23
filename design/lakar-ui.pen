@@ -160616,7 +160616,7 @@
                           "fill": "#6B6B6B",
                           "textGrowth": "fixed-width",
                           "width": "fill_container",
-                          "content": "execute 1: board hug + every planned section as [Skeleton] frame (minHeight) · tint #1018280A, dashed 1px, label = section name · sweep 2.4s linear, translateX only, stagger 120ms top→bottom · sweep runs only while Generating",
+                          "content": "execute 1: board hug + every planned section as Skel() → [Skeleton] frame with minHeight · tint #1018280A, dashed 1px, label = section name · sweep 2.4s linear, translateX only, stagger 120ms top→bottom · sweep runs only while Generating",
                           "fontFamily": "JetBrains Mono",
                           "fontSize": 13,
                           "fontWeight": "normal"
@@ -160964,7 +160964,7 @@
                           "fill": "#6B6B6B",
                           "textGrowth": "fixed-width",
                           "width": "fill_container",
-                          "content": "same node: Fill(id) renames + drops minHeight · placeholder tint fades out 240ms cubic-bezier(.16,1,.3,1) · new blocks reveal as before (600ms, rise 12px, blur 4px, step 60ms)",
+                          "content": "same node: Build(id) renames + drops minHeight · placeholder tint fades out 240ms cubic-bezier(.16,1,.3,1) · new blocks reveal as before (600ms, rise 12px, blur 4px, step 60ms)",
                           "fontFamily": "JetBrains Mono",
                           "fontSize": 13,
                           "fontWeight": "normal"

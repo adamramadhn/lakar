@@ -1,9 +1,13 @@
 // Nama identifier kode dari nama layer (deterministik, ASCII): kelas CSS module (camelCase) dan nama komponen
 // (PascalCase). Murni.
 
-/** Kata ASCII dari nama layer: diakritik dibuang, pemisah = karakter non-alfanumerik dan batas camelCase. */
+/**
+ * Kata ASCII dari nama layer: diakritik dibuang, pemisah = karakter non-alfanumerik dan batas camelCase. Penanda
+ * placeholder `[Skeleton] ` (spec-skeleton-live-build) bukan bagian nama, jadi tidak masuk identifier kode.
+ */
 export function words(name: string): string[] {
   return name
+    .replace(/^\[Skeleton\] /, '')
     .normalize('NFKD')
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/([a-z0-9])([A-Z])/g, '$1 $2')

@@ -13,9 +13,11 @@ import type { Transaction } from '@lakar/core';
 import type { CssVariablesPort, IconCatalogPort, PhotoLibraryPort } from '@lakar/ports';
 import { LakarError, errorMessage } from '@lakar/schema';
 import { API, DEFAULT_TIMEOUT_MS, KEEP_MAX_BYTES, LOG_MAX_BYTES, LOG_MAX_LINES, MAX_OPS, SNIPPET_GLOBALS, VALUE_MAX_BYTES, type ApiContext } from './api.js';
+import { HELPERS_JS, HELPER_GLOBALS } from './helpers.js';
 
 export const PACKAGE = '@lakar/exec';
 export * from './api.js';
+export * from './helpers.js';
 
 export const DEFAULT_MEMORY_BYTES = 64 * 1024 * 1024;
 
@@ -73,6 +75,7 @@ function loadQuickJS(memoryBytes: number = DEFAULT_MEMORY_BYTES): Promise<QuickJ
 
 const SNIPPET_FILE = 'snippet.js';
 const PRELUDE_FILE = 'lakar-api.js';
+const HELPERS_FILE = 'lakar-helpers.js';
 const HOST_FIND = '__lakar_find';
 const HOST_LOG = '__lakar_log';
 
@@ -188,7 +191,7 @@ function execErrorHint(dumped: unknown): string {
   const name = typeof d.name === 'string' ? d.name : '';
   const message = typeof d.message === 'string' ? d.message : '';
   if (name === 'ReferenceError') {
-    return `global yang tersedia hanya: ${SNIPPET_GLOBALS.join(', ')} (tanpa import/require/await/fetch); ${ROLLBACK}`;
+    return `global yang tersedia hanya: ${SNIPPET_GLOBALS.join(', ')}; helper bawaan: ${HELPER_GLOBALS.join(', ')} (tanpa import/require/await/fetch); ${ROLLBACK}`;
   }
   if (name === 'TypeError' && /undefined|null/.test(message)) {
     return `nilai null/undefined: periksa ID (pakai ID dari add()/find()/children() atau created[].id) dan isi keep (hanya berisi yang disimpan execute sukses sebelumnya di sesi ini); ${ROLLBACK}`;
@@ -317,6 +320,14 @@ export async function runSnippet(code: string, tx: Transaction, opts: RunOptions
     }
     const finish = pre.value;
     try {
+      // Helper desain bawaan (prelude skill core, spec-skeleton-live-build): global biasa yang boleh dideklarasi ulang.
+      const helpers = ctx.evalCode(HELPERS_JS, HELPERS_FILE, { type: 'global', strict: true });
+      if (helpers.error) {
+        const dumped = ctx.dump(helpers.error) as unknown;
+        helpers.error.dispose();
+        throw new Error(`helper sandbox gagal: ${describeDumped(dumped)}`);
+      }
+      helpers.value.dispose();
       const result = ctx.evalCode(code, SNIPPET_FILE, { type: 'global', strict: true });
       if (result.error) {
         const dumped = ctx.dump(result.error) as unknown;

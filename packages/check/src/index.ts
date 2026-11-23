@@ -3,8 +3,8 @@
 import type { BoardMeasure } from '@lakar/ports';
 import { findBoard, type Finding, type ResolvedBoardNode as BoardNode, type ResolvedDocument } from '@lakar/schema';
 import { codePoints, graphemes, isEmojiGrapheme, leadingIconGlyph, onlyIconGlyphs } from './glyphs.js';
-import { capWarnings, lc01a, lc01b, lc02a, lc02b, lc02c, lc03, lc04, lc05, lc06, lc07, lc08, lc09, lc10, lc11, lc12, lc13, lc14, lc15, lc16, lc17, lc18, lc19, lc20, lc21, lc22, lc23, lc24, lc25, lc26, lc27, lc28, lc29, lc30, lc31, lc32 } from './rules.js';
-import { boardContext } from './tree.js';
+import { capWarnings, lc01a, lc01b, lc02a, lc02b, lc02c, lc03, lc04, lc05, lc06, lc07, lc08, lc09, lc10, lc11, lc12, lc13, lc14, lc15, lc16, lc17, lc18, lc19, lc20, lc21, lc22, lc23, lc24, lc25, lc26, lc27, lc28, lc29, lc30, lc31, lc32, lc33 } from './rules.js';
+import { boardContext, withoutSkeletons } from './tree.js';
 
 export const PACKAGE = '@lakar/check';
 
@@ -59,6 +59,8 @@ export {
   lc30,
   lc31,
   lc32,
+  lc33,
+  skeletonIds,
   FIT_SLACK_MAX,
   LANDING_SLACK_MAX,
   LINE_HEIGHT_TOL,
@@ -80,7 +82,7 @@ export {
 } from './rules.js';
 export { CONTRAST_MIN, isLargeText, LARGE_TEXT } from '@lakar/schema';
 export { changedNodeIds, touchedBoards } from './touched.js';
-export { TOLERANCE, visibleRect } from './tree.js';
+export { TOLERANCE, visibleRect, withoutSkeletons } from './tree.js';
 
 const EMPTY_MEASURE: BoardMeasure = { width: 0, height: 0, nodes: [], texts: [] };
 
@@ -110,7 +112,7 @@ export function glyphScan(board: BoardNode): { findings: Finding[]; allowGlyphs:
   return { findings: [...lc01a(ctx), ...lc01b(ctx)], allowGlyphs: [...allow].sort((a, b) => a - b) };
 }
 
-const RULE_ORDER = ['LC-01a', 'LC-01b', 'LC-02a', 'LC-02b', 'LC-02c', 'LC-03', 'LC-04', 'LC-05', 'LC-06', 'LC-07', 'LC-08', 'LC-09', 'LC-10', 'LC-11', 'LC-12', 'LC-13', 'LC-14', 'LC-15', 'LC-16', 'LC-17', 'LC-18', 'LC-19', 'LC-20', 'LC-21', 'LC-22', 'LC-23', 'LC-24', 'LC-25', 'LC-26', 'LC-27', 'LC-28', 'LC-29', 'LC-30', 'LC-31', 'LC-32'];
+const RULE_ORDER = ['LC-01a', 'LC-01b', 'LC-02a', 'LC-02b', 'LC-02c', 'LC-03', 'LC-04', 'LC-05', 'LC-06', 'LC-07', 'LC-08', 'LC-09', 'LC-10', 'LC-11', 'LC-12', 'LC-13', 'LC-14', 'LC-15', 'LC-16', 'LC-17', 'LC-18', 'LC-19', 'LC-20', 'LC-21', 'LC-22', 'LC-23', 'LC-24', 'LC-25', 'LC-26', 'LC-27', 'LC-28', 'LC-29', 'LC-30', 'LC-31', 'LC-32', 'LC-33'];
 
 const LEVEL_ORDER = { error: 0, warning: 1, info: 2 } as const;
 
@@ -145,7 +147,8 @@ export function checkBoard({
 }): Finding[] {
   const board = findBoard(doc, boardId);
   if (!board) return [];
-  const ctx = boardContext(board, measure);
+  // Placeholder skeleton tidak dinilai aturan mana pun selain LC-33 (spec-skeleton-live-build).
+  const ctx = boardContext(withoutSkeletons(board), measure);
   const clipped = lc02a(ctx);
   const cut = new Set(clipped.map((f) => f.nodeId));
   // Teks yang sudah error LC-02a/LC-02b tidak dilaporkan lagi sebagai warning LC-03.
@@ -190,6 +193,7 @@ export function checkBoard({
     // Mockup yang elemennya sudah terpotong clip (LC-02a) tidak dilaporkan lagi.
     ...lc31(ctx, cut),
     ...lc32(doc, boardId),
+    ...lc33(boardContext(board, measure)),
   ];
   return capWarnings(sortFindings(all, ctx.order));
 }

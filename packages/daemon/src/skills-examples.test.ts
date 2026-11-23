@@ -1,6 +1,6 @@
 // Setiap blok ```js di skill dijalankan terhadap daemon nyata (render + check Chromium): wajib sukses dengan
 // check 0 error / 0 gerbang / 0 warning. Satu dokumen + sesi per file (blok berurutan, `keep` terbawa);
-// blok `// pakai prelude` didahului blok prelude core.md; blok api.md masing-masing di dokumen kosong baru.
+// helper prelude bawaan sandbox (spec-skeleton-live-build), jadi blok dijalankan apa adanya; blok api.md masing-masing di dokumen kosong baru.
 // selection.md: dokumen berisi fixture seleksi (tests/support/selection-fixture.ts) dan baris `const SEL = [...]`
 // diganti id board fixture; blok `// baca saja` wajib sukses tanpa op mutasi (tanpa check, rev tetap).
 // LAKAR_SKILL_PNG_DIR=<dir> → PNG setiap board contoh ditulis ke sana untuk pemeriksaan visual.
@@ -25,7 +25,6 @@ if (!browserInstalled) {
 
 const PNG_DIR = process.env.LAKAR_SKILL_PNG_DIR;
 const PRELUDE_MARK = '// prelude';
-const USES_PRELUDE = '// pakai prelude';
 
 type Body = { ok: boolean; data?: any; error?: { code: string; message: string; hint: string; editId?: string } };
 
@@ -47,13 +46,12 @@ async function freshDoc(slug: string): Promise<string> {
 const jsBlocks = async (name: SkillName) => splitCode(await readFile(join(SKILLS_DIR, `${name}.md`), 'utf8')).blocks.filter((b) => b.lang === 'js').map((b) => b.code);
 
 /** Jalankan satu blok; kembalikan daftar masalah (kosong = lulus). */
-async function runBlock(label: string, code: string, sid: string, prelude: string): Promise<string[]> {
+async function runBlock(label: string, code: string, sid: string): Promise<string[]> {
   const isPrelude = code.startsWith(PRELUDE_MARK);
-  const full = code.startsWith(USES_PRELUDE) ? `${prelude}\n${code}` : code;
-  const r = await call('/execute', { code: full, description: 'uji contoh skill lakar' }, sid);
+  const r = await call('/execute', { code, description: 'uji contoh skill lakar' }, sid);
   if (!r.ok) return [`${label}: ${r.error!.code} ${r.error!.message} (${r.error!.hint})`];
   const check = r.data.check as { summary: { error: number; warning: number; gate: number }; findings: { level: string; rule: string; nodeName: string; detail: string }[] } | undefined;
-  // Blok prelude hanya mendefinisikan helper: sukses tanpa op mutasi (tanpa check). Blok lain wajib dicek.
+  // Blok prelude hanya mengatur palet: sukses tanpa op mutasi (tanpa check). Blok lain wajib dicek.
   if (isPrelude) return check ? [`${label}: blok prelude tidak boleh memutasi dokumen`] : [];
   if (code.startsWith(READ_ONLY_MARK)) return check ? [`${label}: blok baca saja tidak boleh memutasi dokumen`] : [];
   if (!check) return [`${label}: tidak ada check (blok tanpa op mutasi)`];
@@ -110,7 +108,6 @@ async function savePngs(slug: string, sid: string): Promise<void> {
 }
 
 describe.skipIf(!browserInstalled)('contoh skill dijalankan terhadap daemon nyata', () => {
-  let prelude = '';
 
   beforeAll(async () => {
     dataDir = await mkdtemp(join(tmpdir(), 'lakar-skills-examples-'));
@@ -127,7 +124,6 @@ describe.skipIf(!browserInstalled)('contoh skill dijalankan terhadap daemon nyat
     await d.warmed;
     const preludes = (await jsBlocks('core')).filter((c) => c.startsWith(PRELUDE_MARK));
     expect(preludes).toHaveLength(1);
-    prelude = preludes[0]!;
   }, 60_000);
 
   afterAll(async () => {
@@ -162,9 +158,9 @@ describe.skipIf(!browserInstalled)('contoh skill dijalankan terhadap daemon nyat
         const label = `${name}.md blok ${i + 1}`;
         if (name === 'api') {
           sid = await freshDoc(`skill-api-${i + 1}`);
-          problems.push(...(await runBlock(label, code, sid, prelude)));
+          problems.push(...(await runBlock(label, code, sid)));
           await savePngs(`skill-api-${i + 1}`, sid);
-        } else problems.push(...(await runBlock(label, sel ? withSelection(code, sel) : code, sid, prelude)));
+        } else problems.push(...(await runBlock(label, sel ? withSelection(code, sel) : code, sid)));
       }
       if (name !== 'api') await savePngs(`skill-${name}`, sid);
       expect(problems).toEqual([]);

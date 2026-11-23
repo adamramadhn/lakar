@@ -348,3 +348,79 @@ describe('Canvas — Pen tool', () => {
     expect(t.outside).not.toHaveBeenCalled();
   });
 });
+
+describe('Canvas — placeholder skeleton (spec-skeleton-live-build)', () => {
+  const SKEL: Extra = { id: 'Skel0001', name: '[Skeleton] Seksi / Menu', x: 0, y: 120, width: 400, height: 160 };
+  const style = () => host().shadowRoot?.querySelector('style[data-lakar-skeleton]')?.textContent ?? '';
+  const working = (on: boolean): AgentPresence => ({ session: 's1', label: 'Claude Code', color: 'agent', working: on, boardId: BOARD, changed: [], createdBoards: [], changedBoards: [] });
+
+  it('placeholder: tint + label nama seksi di shadow root; sapuan shimmer hanya saat board Generating', async () => {
+    const { rerender } = renderUi(<Canvas {...baseProps({ doc: makeDoc(2, [SKEL]), presence: [working(true)] })} />);
+    await mounted(SKEL.id);
+    await waitFor(() => expect(style()).toContain('[data-lakar-id="Skel0001"]::before'));
+    expect(style()).toContain('content:"Menu"');
+    expect(style()).toMatch(/:host\(\[data-generating\]\) \[data-lakar-id="Skel0001"\]::after\{[^}]*animation:lakar-skel-sweep 2400ms linear 0ms infinite/);
+    // Sapuan hanya transform; reduced motion mematikannya.
+    expect(style()).toMatch(/@keyframes lakar-skel-sweep\{0%\{transform:translateX\(-100%\)\}70%,100%\{transform:translateX\(100%\)\}\}/);
+    expect(style()).toMatch(/@media \(prefers-reduced-motion:reduce\)\{\[data-lakar-id="Skel0001"\]::after\{display:none/);
+    expect(host()).toHaveAttribute('data-generating');
+    rerender(<Canvas {...baseProps({ doc: makeDoc(2, [SKEL]), presence: [working(false)] })} />);
+    expect(host()).not.toHaveAttribute('data-generating');
+    // Board tanpa placeholder: tanpa gaya skeleton.
+    rerender(<Canvas {...baseProps({ doc: makeDoc(3), presence: [] })} />);
+    await waitFor(() => expect(host().shadowRoot?.querySelector('style[data-lakar-skeleton]')).toBeNull());
+  });
+
+  it('diisi di tempat (nama tanpa prefiks, id sama): tint memudar sekali 240ms; isi baru di-reveal', async () => {
+    const { rerender } = renderUi(<Canvas {...baseProps({ doc: makeDoc(2, [SKEL]), fades: [] })} />);
+    await mounted(SKEL.id);
+    const filled: Extra = { ...SKEL, name: 'Seksi / Menu', children: [{ id: 'Judu0009', name: 'Judul', x: 0, y: 0, width: 200, height: 30 }] };
+    rerender(<Canvas {...baseProps({ doc: makeDoc(3, [filled]), fades: [{ key: 'fill', rev: 3, endMs: Date.now(), ids: ['Judu0009'] }] })} />);
+    await mounted('Judu0009');
+    await waitFor(() => expect(style()).toMatch(/\[data-lakar-id="Skel0001"\]::before\{[^}]*animation:lakar-skel-out 240ms cubic-bezier\(\.16,1,\.3,1\) forwards/));
+    expect(style()).not.toContain('content:"Menu"');
+    await waitFor(() => expect(animatedIds()).toEqual(['Judu0009']));
+  });
+
+  it('membuka dokumen yang placeholdernya sudah terisi: tanpa pudar (tidak ada mount sebelumnya)', async () => {
+    renderUi(<Canvas {...baseProps({ doc: makeDoc(3, [{ ...SKEL, name: 'Seksi / Menu' }]) })} />);
+    await mounted(SKEL.id);
+    expect(host().shadowRoot?.querySelector('style[data-lakar-skeleton]')).toBeNull();
+  });
+});
+
+describe('Canvas — Follow berirama untuk banyak execute kecil (spec-skeleton-live-build)', () => {
+  function viewport(w: number, h: number) {
+    const cw = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'clientWidth');
+    const ch = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'clientHeight');
+    Object.defineProperty(HTMLElement.prototype, 'clientWidth', { configurable: true, get: () => w });
+    Object.defineProperty(HTMLElement.prototype, 'clientHeight', { configurable: true, get: () => h });
+    onTestFinished(() => {
+      if (cw) Object.defineProperty(HTMLElement.prototype, 'clientWidth', cw);
+      if (ch) Object.defineProperty(HTMLElement.prototype, 'clientHeight', ch);
+    });
+  }
+  const tall = [{ ...BOARDS[0]!, height: 2000 }];
+  const boardTop = () => document.querySelector<HTMLElement>(`[data-board="${BOARD}"]`)!.style.top;
+
+  it('blok tinggi yang sebagian besar sudah terlihat: kamera diam', async () => {
+    viewport(800, 600);
+    reducedMotion(true);
+    const onFocused = vi.fn();
+    const { rerender } = renderUi(<Canvas {...baseProps({ boards: tall, onFocused })} />);
+    // y 300–900: terlihat 300 px (≥ 40% viewport), terpotong di bawah.
+    rerender(<Canvas {...baseProps({ boards: tall, onFocused, focus: { boardId: BOARD, nonce: 9, rect: [0, 300, 400, 600] } })} />);
+    await waitFor(() => expect(onFocused).toHaveBeenCalledWith(9));
+    expect(boardTop()).toBe('0px');
+  });
+
+  it('execute tanpa node baru pada board yang sebagian terlihat: tidak melompat ke board utuh', async () => {
+    viewport(800, 600);
+    reducedMotion(true);
+    const onFocused = vi.fn();
+    const { rerender } = renderUi(<Canvas {...baseProps({ boards: tall, onFocused })} />);
+    rerender(<Canvas {...baseProps({ boards: tall, onFocused, focus: { boardId: BOARD, nonce: 10 } })} />);
+    await waitFor(() => expect(onFocused).toHaveBeenCalledWith(10));
+    expect(boardTop()).toBe('0px');
+  });
+});

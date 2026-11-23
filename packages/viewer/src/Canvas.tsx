@@ -35,8 +35,9 @@ import type { GeoNode } from './gesture';
 import { useOffline, useRetry } from './hooks';
 import { Icon, type IconName } from './icons';
 import type { AgentPresence, PendingAgent, Rect } from './presence';
-import { FadeQueue, followCamera, generatingBoards, generatingText, regionVisible, withExiting, type FadePlan, type Shown } from './agentEffects';
-import { animateReveal } from './agentFx';
+import { FadeQueue, followCamera, followWait, generatingBoards, generatingText, regionInView, regionTouchesView, regionVisible, withExiting, type FadePlan, type Shown } from './agentEffects';
+import { animateReveal, applySkeletonStyle, hasNode } from './agentFx';
+import { filledSince, skeletonCss, skeletonEntries } from './skeleton';
 import { pinchCamera, pointerIntent, TAP_SLOP, type Point } from './sheet';
 import type { Camera } from './viewState';
 
@@ -310,10 +311,13 @@ const BoardLive = memo(function BoardLive({
   zoom,
   onMounted,
   onHugHeight,
+  generating = false,
 }: {
   live: LiveDoc;
   board: CanvasBoard;
   zoom: number;
+  /** Board sedang dikerjakan agen (label Generating): placeholder skeleton bershimmer (spec-skeleton-live-build). */
+  generating?: boolean;
   /** Mount selesai (geometri seleksi/gestur diukur ulang). */
   onMounted?: ((boardId: string, host: HTMLDivElement, rev: number) => void) | undefined;
   /** Board `height:'hug'`: tinggi isi terukur (setiap mount dan setiap ukuran host berubah). */
@@ -337,6 +341,8 @@ const BoardLive = memo(function BoardLive({
   liveRef.current = live;
   const onMountedRef = useRef(onMounted);
   onMountedRef.current = onMounted;
+  /** Placeholder skeleton pada mount sebelumnya (pudar sekali saat diisi di tempat; kosong saat dokumen dibuka). */
+  const prevSkeleton = useRef<ReadonlySet<string>>(new Set());
   useEffect(() => {
     const cur = liveRef.current;
     if (!cur.ok) {
@@ -352,6 +358,9 @@ const BoardLive = memo(function BoardLive({
       await ensureFaces(el.ownerDocument, deps.fonts);
       if (!current) return;
       mountLive(el, cur.doc, board.id, deps);
+      const skel = skeletonEntries(target);
+      applySkeletonStyle(el, skeletonCss(skel, filledSince(prevSkeleton.current, skel, (id) => hasNode(el, id))));
+      prevSkeleton.current = new Set(skel.map((e) => e.id));
       setState({ mounted: true, ...(deps.complete ? {} : { partial: true }) });
       onMountedRef.current?.(board.id, el, cur.doc.rev);
     })().catch((e) => current && setState({ error: errorText(e) }));
@@ -360,6 +369,10 @@ const BoardLive = memo(function BoardLive({
     };
     // Hanya isi board (tanda tangan) yang memicu mount; objek dokumen baru dengan board sama tidak.
   }, [signature, board.id, attempt]);
+  // Sapuan shimmer placeholder hanya selama board berlabel Generating (atribut host, tanpa mount ulang).
+  useEffect(() => {
+    host.current?.toggleAttribute('data-generating', generating);
+  }, [generating]);
   // Board hug: host bertinggi auto (isi shadow root); tingginya dilaporkan setelah mount dan setiap kali berubah.
   const mounted = state.mounted === true;
   useEffect(() => {
@@ -673,15 +686,30 @@ export function Canvas({
 
   // Follow agent: geser ke board yang berubah bila belum terlihat utuh (500ms ease-out; reduced motion → langsung).
   // Dengan `rect` (node baru execute): geser ke seksi baru itu bila belum terlihat utuh (spec-progressive-live-build).
+  // Banyak execute kecil (spec-skeleton-live-build): blok di seksi yang sudah cukup terlihat tidak menggeser kamera,
+  // execute tanpa node baru tidak melompat ke board yang sudah tampak, dan geseran berjarak ≥ FOLLOW_SETTLE_MS (target
+  // yang tiba di antaranya digabung: yang terbaru menang).
+  const lastPanAt = useRef<number | undefined>(undefined);
+  const [followTick, setFollowTick] = useState(0);
   useEffect(() => {
     if (!focus || !fitted || size.w <= 0) return;
     const b = boards.find((x) => x.id === focus.boardId);
     if (!b) return;
-    onFocused?.(focus.nonce);
     const from = camRef.current;
     const r = focus.rect;
     const region = r ? { x: b.x + r[0], y: b.y + r[1], width: Math.max(1, r[2]), height: Math.max(1, r[3]) } : undefined;
-    if (region ? regionVisible(region, from, size.w, size.h) : boardVisible(b, from, size.w, size.h)) return;
+    const settled = region ? regionVisible(region, from, size.w, size.h) || regionInView(region, from, size.w, size.h) : boardVisible(b, from, size.w, size.h) || regionTouchesView(b, from, size.w, size.h);
+    if (settled) {
+      onFocused?.(focus.nonce);
+      return;
+    }
+    const wait = reducedMotion() ? 0 : followWait(lastPanAt.current, performance.now());
+    if (wait > 0) {
+      const t = setTimeout(() => setFollowTick((n) => n + 1), wait);
+      return () => clearTimeout(t);
+    }
+    onFocused?.(focus.nonce);
+    lastPanAt.current = performance.now();
     const to = region ? followCamera(region, from, size.w, size.h, { min: ZOOM_MIN, max: ZOOM_MAX }) : focusCamera(b, from, size.w, size.h);
     stopAnim();
     if (reducedMotion()) {
@@ -696,7 +724,7 @@ export function Canvas({
       anim.current = k < 1 ? requestAnimationFrame(step) : undefined;
     };
     anim.current = requestAnimationFrame(step);
-  }, [focus, fitted, size, boards, onFocused, stopAnim]);
+  }, [focus, fitted, size, boards, onFocused, stopAnim, followTick]);
 
   const zoomAt = useCallback((factor: number, sx: number, sy: number) => {
     stopAnim();
@@ -1010,7 +1038,7 @@ export function Canvas({
             )}
             <div className={`board${selected ? ' selected' : ''}`} data-board={b.id} style={{ left, top, width: bw * cam.z, height: bh * cam.z }}>
               {live && boardSource(live !== undefined, preview !== undefined) === 'live' ? (
-                <BoardLive live={live} board={b} zoom={cam.z} onMounted={onBoardMounted} onHugHeight={onHugHeight} />
+                <BoardLive live={live} board={b} zoom={cam.z} onMounted={onBoardMounted} onHugHeight={onHugHeight} generating={genBy !== undefined} />
               ) : (
                 <BoardImage slug={slug} rev={Math.min(rev, boardRevs?.[b.id] ?? rev)} board={b} previewRev={previewRev} onHugHeight={onHugHeight} />
               )}
