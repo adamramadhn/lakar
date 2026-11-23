@@ -342,6 +342,8 @@ export function callTitle(c: ActivityCall, nameOf: (id: string) => string | unde
       return c.description ?? 'Undo agent step';
     case 'redo':
       return c.description ?? 'Redo agent step';
+    case 'fix_check':
+      return t ? `Fix check findings in ${t}` : 'Fix check findings';
     case 'read_skill':
       return t ? `Load ${t} skill` : 'List skills';
     case 'icon_search':

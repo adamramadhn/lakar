@@ -305,3 +305,19 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-agent-undo.md`
   summary: Skill (core/review) belum menyebut `undo`/`redo`; panduan hanya ada di deskripsi tool dan satu kalimat instructions MCP. Komentar kepala `packages/mcp/src/server.ts` masih "15 tool".
   evidence: Footprint file bersama dibatasi karena dua spec paralel di epic loop verifikasi agen. Usul: rapikan setelah ketiganya di-merge.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-check-autofix.md`
+  summary: Tombol "Fix" per temuan (dan "Fix all safe") di tab Checks viewer belum ada.
+  evidence: UI baru wajib didesain dulu di `design/lakar-ui.pen` lewat Pencil MCP; route `/viewer/fix-check` hanya untuk sesi MCP (dokumen aktif). Usul: route ber-slug `/viewer/docs/:slug/fix-check` (guard Origin) yang mengembalikan `inverse` untuk tumpukan undo viewer, data dari field `fix`/`suggestions` yang sudah ada di temuan.
+- source_spec: `_bmad-output/implementation-artifacts/spec-check-autofix.md`
+  summary: Fix aman "bulatkan geometri subpiksel" dan "ikat warna mentah yang sama dengan token ke token" (open-pencil `lint_fix`) belum ada karena check tidak punya aturan untuk keduanya.
+  evidence: Menambah aturan mengubah output check (AD-4) dan baseline bench. Usul: aturan info baru (mis. LC-34 warna mentah = token, LC-35 geometri pecahan) dengan `fix` aman `{color:{$token}}` / angka bulat, di spec terpisah.
+- source_spec: `_bmad-output/implementation-artifacts/spec-check-autofix.md`
+  summary: Saran yang menumbuhkan isi (ukuran teks, target sentuh) pada board bertinggi angka yang sudah dipaskan memicu LC-02a; fix_check hanya melaporkannya di `newFindings`.
+  evidence: Smoke: `suggestions:true` sesudah tinggi pas 245 → LC-02a 7 px. Usul: fix_check menjalankan putaran kedua LC-12 (tinggi pas naik bila isi melewati tepi bawah board landing non-hug), atau menyarankan `height:'hug'`.
+- source_spec: `_bmad-output/implementation-artifacts/spec-check-autofix.md`
+  summary: LC-32 (instance basi) belum punya saran `resetOverride`.
+  evidence: `instanceIssues` melaporkan `key` override yatim; alamat op `resetOverride` untuk override yang node master-nya hilang perlu diverifikasi terhadap core. Usul: saran `{op:'resetOverride', id:'<instance>/<key>'}` + tes core.
+- source_spec: `_bmad-output/implementation-artifacts/spec-check-autofix.md`
+  summary: `layout_check`/`execute` tidak menandai baris temuan yang punya fix (output dibekukan AD-4); agen tahu lewat instruksi server dan skill review saja.
+  evidence: Usul: satu baris ekor aditif "n temuan punya fix aman → fix_check" di output MCP bila > 0, dengan persetujuan perubahan output.

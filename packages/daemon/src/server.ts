@@ -49,6 +49,7 @@ import { FocusStore, registerFocusRoutes } from './focus.js';
 import { registerPageRoutes } from './pages.js';
 import { registerOpsRoutes } from './ops.js';
 import { AgentSteps, registerAgentUndoRoutes } from './agent-undo.js';
+import { registerFixCheckRoutes } from './fix-check.js';
 import { registerPasteRoutes, type HtmlSnapshotter } from './paste.js';
 import { SelectionStore, registerSelectionRoutes } from './selection.js';
 import { registerRenderDepsRoutes } from './render-deps.js';
@@ -838,6 +839,7 @@ export function buildServer({
   registerFocusRoutes(app, { docs, store, focus });
   registerPageRoutes(app, { docs, store, docLocks, activity });
   registerOpsRoutes(app, { docs, store, docLocks, activity, icons });
+  registerFixCheckRoutes(app, { docs, store, docLocks, sessions, render, hugs, checks, agentSteps, icons });
   // Paste HTML (story 4): render terisolasi lewat renderer Chromium bila ada (renderer palsu tes → RENDER_FAILED).
   const snapshotter = typeof (render as Partial<HtmlSnapshotter>).snapshotHtml === 'function' ? (render as unknown as HtmlSnapshotter) : undefined;
   registerPasteRoutes(app, {

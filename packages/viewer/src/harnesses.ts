@@ -27,6 +27,7 @@ export const MCP_TOOLS = [
   'paste',
   'undo',
   'redo',
+  'fix_check',
 ] as const;
 
 export type Harness = { id: string; label: string; file: string; snippet: (mcp: McpServerConfig) => string };

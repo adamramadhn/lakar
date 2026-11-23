@@ -1,6 +1,7 @@
-// Server MCP Lakar: 15 tool (AD-11 + photo_search + get_selection + export_code + paste + list_documents) → HTTP lakard:
-// status, read_skill, open_doc, list_documents, list_boards, execute, inspect, layout_check, screenshot, export,
-// export_code, icon_search, photo_search, get_selection, paste.
+// Server MCP Lakar: 19 tool (AD-11 + photo_search + get_selection + export_code + paste + list_documents + undo + redo
+// + visual_diff + fix_check) → HTTP lakard: status, read_skill, open_doc, list_documents, list_boards, execute, inspect,
+// layout_check, screenshot, export, export_code, icon_search, photo_search, get_selection, paste, undo, redo, visual_diff,
+// fix_check.
 import { McpServer, type CallToolResult } from '@modelcontextprotocol/server';
 import { z } from 'zod';
 import {
@@ -20,6 +21,7 @@ import {
   TOUCH_MIN,
   LAKAR_VERSION, SCHEMA_VERSION, VERSION_HINT, errorMessage, findingLine, summaryText, type ApiResult, type Finding, type FindingSummary } from '@lakar/schema';
 import { DaemonClient, formatError } from './client.js';
+import { registerFixCheckTool } from './fix-check.js';
 
 export const SERVER_NAME = 'lakar';
 export const SERVER_VERSION = LAKAR_VERSION;
@@ -176,11 +178,11 @@ export const SERVER_INSTRUCTIONS =
   "sebagai placeholder Skel (skeleton), lalu satu blok kecil per execute (navbar, teks hero, visual hero, header seksi, satu baris kartu) yang mengisi placeholder di tempat lewat Build, " +
   "untuk landing dan webapp (board landing height:'hug' mengikuti isi, jangan isi atau naikkan tingginya; [WIP] sampai execute penutup); satu board utuh untuk mobile; " +
   'helper prelude skill core sudah bawaan di setiap execute: jangan ditulis ulang, palet arketipe sekali per dokumen lewat Palette(c, font); ' +
-  'baca check di respons execute, perbaiki dengan editId/edits atau update, akhiri dengan satu screenshot board + satu screenshot zoom (nodeId, scale 2) ' +
-  'area terpadat (skill review), satu execute perbaikan, lalu export PNG. ' +
-  'Sesudah execute perbaikan, visual_diff memastikan hanya area yang dimaksud berubah. ' +
-  'Opsional: read_skill break-ui bila diminta uji data terburuk/edge case; variants bila diminta beberapa variasi/alternatif. ' +
-  'Langkah sendiri yang salah: undo {steps?} (redo mengulang); ditolak bila pengguna sudah mengedit sesudahnya, maka perbaiki maju lewat execute.';
+  'baca check di respons execute; fix aman temuan check: fix_check (satu rev, saran dinilai sendiri); perbaiki sisanya dengan editId/edits atau update; ' +
+  'akhiri dengan satu screenshot board + satu screenshot zoom (nodeId, scale 2) area terpadat (skill review), satu execute perbaikan, ' +
+  'visual_diff untuk memastikan hanya area yang dimaksud berubah, lalu export PNG. ' +
+  'Langkah sendiri yang salah (execute/paste/fix_check): undo {steps?} (redo mengulang); ditolak bila ada edit lain sesudahnya, maka perbaiki maju lewat execute. ' +
+  'Opsional: read_skill break-ui bila diminta uji data terburuk/edge case; variants bila diminta beberapa variasi/alternatif.';
 
 /** Deskripsi tool `list_boards`. */
 export const LIST_BOARDS_DESCRIPTION =
@@ -667,6 +669,9 @@ export function createLakarMcpServer(daemonUrl: string): McpServer {
         return asText(await client.call<LayoutCheckData>('/layout-check', boardId ? { boardId } : {}), formatLayoutCheck);
       }),
   );
+
+  // spec-check-autofix: fix_check (deskripsi, format, dan registrasi di fix-check.ts).
+  registerFixCheckTool(server, client);
 
   return server;
 }

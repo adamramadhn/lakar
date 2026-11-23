@@ -74,6 +74,7 @@ export {
   ORPHAN_MIN_BODY,
   paddingOf,
   parseHex,
+  punctuated,
   RANGE_HYPHEN,
   SCREEN_SIZES,
   SECTION_MIN_NODES,
@@ -82,6 +83,21 @@ export {
 } from './rules.js';
 export { CONTRAST_MIN, isLargeText, LARGE_TEXT } from '@lakar/schema';
 export { changedNodeIds, touchedBoards } from './touched.js';
+export {
+  AUTOFIX,
+  findingKey,
+  mapPadding,
+  nearestOf,
+  planFixes,
+  resolvedIndex,
+  scaleLineHeight,
+  staleFixes,
+  type FixKind,
+  type FixSkipReason,
+  type PlanOptions,
+  type PlannedFix,
+  type SkippedFix,
+} from './fixes.js';
 export { TOLERANCE, visibleRect, withoutSkeletons } from './tree.js';
 
 const EMPTY_MEASURE: BoardMeasure = { width: 0, height: 0, nodes: [], texts: [] };
@@ -138,12 +154,15 @@ export function checkBoard({
   boardId,
   measure,
   heights,
+  cap = true,
 }: {
   doc: ResolvedDocument;
   boardId: string;
   measure: BoardMeasure;
   /** Tinggi terukur board `height:'hug'` lain di dokumen (tabrakan LC-12); tanpa entri = 0. Board ini = `measure`. */
   heights?: ReadonlyMap<string, number> | undefined;
+  /** false = tanpa batas 3 warning/info per aturan (fix_check menerapkan semua fix; spec-check-autofix). */
+  cap?: boolean | undefined;
 }): Finding[] {
   const board = findBoard(doc, boardId);
   if (!board) return [];
@@ -198,7 +217,8 @@ export function checkBoard({
     ...lc32(doc, boardId),
     ...lc33(full),
   ];
-  return capWarnings(sortFindings(all, ctx.order));
+  const sorted = sortFindings(all, ctx.order);
+  return cap ? capWarnings(sorted) : sorted;
 }
 
 /** `[x, y, w, h]` dibulatkan, relatif board. */

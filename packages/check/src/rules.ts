@@ -22,11 +22,13 @@ import {
   TOUCH_MIN,
   TYPE_SCALE,
   type Finding,
+  type FindingFix,
   type ResolvedDocument,
   type ResolvedFill,
   type ResolvedTextNode as TextNode,
 } from '@lakar/schema';
-import { cpLabel, codePoints, emojiIn, GLYPH_ICON, leadingIconGlyph } from './glyphs.js';
+import { cpLabel, codePoints, emojiIn, GLYPH_ICON, graphemes, isEmojiGrapheme, leadingIconGlyph, onlyIconGlyphs } from './glyphs.js';
+import { mapPadding, nearestOf, patchFix, remove, scaleLineHeight, snapComponent, snapSpacing, update } from './fixes.js';
 import {
   ancestors,
   area,
@@ -49,20 +51,35 @@ import {
 } from './tree.js';
 import type { ResolvedChildNode as ChildNode, ResolvedFrameNode as FrameNode } from '@lakar/schema';
 
-const finding = (rule: Finding['rule'], level: Finding['level'], n: { id: string; name: string }, detail: string, expected: string): Finding => ({
-  level,
-  rule,
-  nodeId: n.id,
-  nodeName: n.name,
-  detail,
-  expected,
-});
+/** Fix terstruktur opsional (spec-check-autofix): `fix` aman dan/atau `suggestions`; kosong → tanpa field. */
+type FixExtra = { fix?: FindingFix | undefined; suggestions?: (FindingFix | undefined)[] | undefined };
+
+const finding = (rule: Finding['rule'], level: Finding['level'], n: { id: string; name: string }, detail: string, expected: string, extra?: FixExtra): Finding => {
+  const out: Finding = { level, rule, nodeId: n.id, nodeName: n.name, detail, expected };
+  if (extra?.fix) out.fix = extra.fix;
+  const sugg = extra?.suggestions?.filter((x): x is FindingFix => x !== undefined);
+  if (sugg?.length) out.suggestions = sugg;
+  return out;
+};
 
 const texts = (ctx: BoardContext): TextNode[] => ctx.nodes.filter((n): n is TextNode => n.type === 'text');
 
 // ---------------------------------------------------------------------------
 // LC-01a · emoji
 // ---------------------------------------------------------------------------
+
+/** Teks tanpa emoji; spasi ganda dirapatkan, tepi dipangkas. */
+const withoutEmoji = (content: string): string =>
+  graphemes(content)
+    .filter((g) => !isEmojiGrapheme(g))
+    .join('')
+    .replace(/ {2,}/g, ' ')
+    .trim();
+/** Teks tanpa glyph ikon terdepan dan spasi sesudahnya. */
+const withoutLeadingGlyph = (content: string, grapheme: string): string => content.slice(content.indexOf(grapheme) + grapheme.length).replace(/^ +/, '');
+/** Saran ganti isi teks; isi kosong atau sama → tanpa saran. */
+const contentFix = (label: string, t: TextNode, content: string): FindingFix | undefined =>
+  content.trim() === '' || content === t.content ? undefined : patchFix(label, t.id, { content });
 
 export function lc01a(ctx: BoardContext): Finding[] {
   const out: Finding[] = [];
@@ -74,7 +91,7 @@ export function lc01a(ctx: BoardContext): Finding[] {
       .map((g) => `${JSON.stringify(g)} ${codePoints(g).map(cpLabel).join(' ')}`)
       .join(', ');
     const more = found.length > 3 ? ` (+${found.length - 3} lagi)` : '';
-    out.push(finding('LC-01a', 'error', t, `emoji ${list}${more} di ${quote(t.content)}`, 'hapus emoji; ikon pakai node icon (icon_search)'));
+    out.push(finding('LC-01a', 'error', t, `emoji ${list}${more} di ${quote(t.content)}`, 'hapus emoji; ikon pakai node icon (icon_search)', { suggestions: [contentFix('Remove emoji', t, withoutEmoji(t.content))] }));
   }
   return out;
 }
@@ -96,6 +113,7 @@ export function lc01b(ctx: BoardContext): Finding[] {
         t,
         `glyph ${JSON.stringify(String.fromCodePoint(g.codePoint))} ${cpLabel(g.codePoint)} sebagai ikon di ${quote(t.content)}`,
         `hapus glyph; pakai node icon${icon ? ` (mis. lucide ${icon})` : ''} lewat icon_search`,
+        { suggestions: [onlyIconGlyphs(t.content) ? undefined : contentFix('Remove glyph', t, withoutLeadingGlyph(t.content, g.grapheme))] },
       ),
     );
   }
@@ -168,10 +186,19 @@ export function lc02a(ctx: BoardContext): Finding[] {
 
 export const MIN_TEXT_SIZE = 12;
 
+/**
+ * Saran ukuran teks `size` + line-height token skala ukuran itu (bila ada), juga untuk teks tanpa line-height tersimpan:
+ * line-height bawaan render (≈ 1,2 × size) di luar token akan memicu LC-08 baru (smoke spec-check-autofix).
+ */
+function sizeFix(t: TextNode, size: number): FindingFix {
+  const lh = scaleLineHeight(size);
+  return patchFix(`Size ${num(size)}`, t.id, { size, ...(lh !== undefined ? { lineHeight: lh } : {}) });
+}
+
 export function lc05(ctx: BoardContext): Finding[] {
   return texts(ctx)
     .filter((t) => t.size < MIN_TEXT_SIZE && t.content.trim() !== '')
-    .map((t) => finding('LC-05', 'error', t, `size ${num(t.size)}px`, `≥ ${MIN_TEXT_SIZE}`));
+    .map((t) => finding('LC-05', 'error', t, `size ${num(t.size)}px`, `≥ ${MIN_TEXT_SIZE}`, { suggestions: [sizeFix(t, MIN_TEXT_SIZE)] }));
 }
 
 // ---------------------------------------------------------------------------
@@ -197,6 +224,8 @@ export const FIT_CLEARANCE = 24;
  * (sesudah padding bawah wadah setinggi board) → saran tinggi pas. Board `[WIP] ` dilewati (seksi masih ditambah).
  */
 export const LANDING_SLACK_MAX = 8;
+/** Jarak antarboard saran "geser" LC-12 (= gap default `place`). */
+const BOARD_GAP = 80;
 /** Prefiks nama board yang masih dibangun (core.md). */
 const WIP_PREFIX = '[WIP] ';
 
@@ -292,6 +321,16 @@ export function lc12(ctx: BoardContext, doc: ResolvedDocument, heights?: Readonl
   const hug = b.height === 'hug';
   const details: string[] = [];
   const expected: string[] = [];
+  // spec-check-autofix: tinggi pas landing = fix aman; ukuran, tinggi pas mobile, dan tabrakan = saran.
+  let fix: FindingFix | undefined;
+  const suggestions: (FindingFix | undefined)[] = [];
+  /** Saran ubah ukuran; board hug tidak diberi tinggi angka (semantik hug dijaga). */
+  const resize = (width: number, height: number | undefined): FindingFix | undefined => {
+    const patch: Record<string, unknown> = {};
+    if (!near(b.width, width)) patch.width = width;
+    if (height !== undefined && !hug && !near(h, height)) patch.height = height;
+    return Object.keys(patch).length ? patchFix(`Resize to ${num(width)}×${num(height ?? h)}`, b.id, patch) : undefined;
+  };
   const w = ctx.measure.width;
   const h = ctx.measure.height;
   const size = `${num(w)}×${num(h)}`;
@@ -300,6 +339,7 @@ export function lc12(ctx: BoardContext, doc: ResolvedDocument, heights?: Readonl
     if (!near(w, e.width) || !near(h, e.height)) {
       details.push(`ukuran ${size}`);
       expected.push(`${num(e.width)}×${num(e.height)} (expectedSize)`);
+      suggestions.push(resize(e.width, e.height));
     }
   } else {
     const d = SCREEN_SIZES[b.screen];
@@ -313,6 +353,7 @@ export function lc12(ctx: BoardContext, doc: ResolvedDocument, heights?: Readonl
             ? `lebar ${d.width}, tinggi ≥ ${d.minHeight} (isi lebih panjang: satu board panjang)`
             : `lebar ${d.width} (tinggi bebas)`,
       );
+      suggestions.push(resize(d.width, heights.length ? nearestOf(heights, h) : h < d.minHeight - TOLERANCE ? d.minHeight : undefined));
     } else if (b.screen === 'mobile' && !hug && h > d.minHeight + TOLERANCE) {
       // Board mobile panjang: tinggi harus pas dengan isi (tanpa ruang kosong besar di atas zona bawah / tepi bawah).
       const zone = bottomZone(ctx);
@@ -325,6 +366,12 @@ export function lc12(ctx: BoardContext, doc: ResolvedDocument, heights?: Readonl
         const fit = Math.max(d.minHeight, Math.round(h - (limit - end) + FIT_CLEARANCE));
         details.push(`tinggi ${num(h)}, isi berakhir ${num(limit - end)} px di atas ${zone ? 'zona bawah' : homeRect ? 'Home indicator' : 'tepi bawah'}: tinggi pas = ${fit}`);
         expected.push(`tinggi ${fit} (sisa ≤ ${FIT_SLACK_MAX} px); geser zona bawah ikut tinggi baru`);
+        // Saran: tinggi pas + anak absolut langsung board di bawah isi (zona bawah, Home indicator) ikut naik.
+        const delta = h - fit;
+        const shift = b.children
+          .filter((c) => c.position === 'absolute' && typeof c.y === 'number' && (ctx.bounds.get(c.id)?.y ?? -Infinity) >= end - TOLERANCE)
+          .map((c) => update(c.id, { y: (c.y as number) - delta }));
+        suggestions.push({ label: `Fit height to ${fit}`, ops: [update(b.id, { height: fit }), ...shift] });
       }
     } else if (b.screen === 'landing' && !hug && !b.name.startsWith(WIP_PREFIX)) {
       // Board landing selesai: tinggi = bawah isi (spec-board-height-fit), bukan angka tebakan.
@@ -333,6 +380,16 @@ export function lc12(ctx: BoardContext, doc: ResolvedDocument, heights?: Readonl
         const fit = Math.round(end);
         details.push(`tinggi ${num(h)}, isi berakhir ${num(Math.round(h - end))} px di atas tepi bawah: tinggi pas = ${fit}`);
         expected.push(`tinggi ${fit} = bawah seksi terakhir (sisa ≤ ${LANDING_SLACK_MAX} px; padding bawah wadah dihitung isi): update(board, {height:${fit}})`);
+        // Review 33-2: stackBottom hanya menghitung anak flow. Node absolut (atau di dalam node absolut) yang terlihat
+        // dan melewati `fit` akan terpotong → tinggi pas hanya saran, bukan fix aman.
+        const fitFix = patchFix(`Fit height to ${fit}`, b.id, { height: fit });
+        const cropsAbsolute = ctx.nodes.some((n) => {
+          if (n.position !== 'absolute' && !ancestors(ctx, n).some((a) => a.type !== 'board' && a.position === 'absolute')) return false;
+          const r = ctx.bounds.get(n.id);
+          return !!r && area(r) > 0 && visibleRect(ctx, n) !== undefined && bottom(r) > fit + TOLERANCE;
+        });
+        if (cropsAbsolute) suggestions.push(fitFix);
+        else fix = fitFix;
       }
     }
   }
@@ -353,11 +410,14 @@ export function lc12(ctx: BoardContext, doc: ResolvedDocument, heights?: Readonl
     if (ix > 0 && iy > 0) {
       details.push(`bertabrakan dengan board ${o.name} (${o.id})`);
       expected.push(`tanpa tabrakan; posisi baru lewat place(${num(b.width)}, ${hug ? "'hug'" : num(bh)})`);
+      // Saran: geser ke kanan semua board lain di halaman (jarak 80, seperti place tanpa near).
+      const xRight = Math.max(...(page?.children ?? []).filter((x) => x.id !== b.id).map((x) => x.x + x.width));
+      suggestions.push(patchFix('Move clear of other boards', b.id, { x: Math.round(xRight + BOARD_GAP) }));
       break;
     }
   }
   if (!details.length) return [];
-  return [finding('LC-12', 'warning', b, details.join('; '), expected.join('; '))];
+  return [finding('LC-12', 'warning', b, details.join('; '), expected.join('; '), { fix, suggestions })];
 }
 
 // ---------------------------------------------------------------------------
@@ -1502,7 +1562,9 @@ export function lc23(ctx: BoardContext): Finding[] {
         [target, other] = [a, b];
       }
       if (gap === undefined || gap >= ROW_GAP_MIN - TOLERANCE) continue;
-      out.push(finding('LC-23', 'warning', target!, `celah ${num(gap)}px ke teks ${other!.name} (${other!.id})`, `≥ ${ROW_GAP_MIN}: gap Row ≥ 8, teks width:'fill', badge/ikon hug`));
+      // Saran hanya bila gap Row sendiri < 8 (celah dari sebab lain butuh penilaian).
+      const rowGap = typeof row.gap === 'number' && row.gap >= 0 && row.gap < ROW_GAP_MIN ? patchFix(`Row gap ${ROW_GAP_MIN}`, row.id, { gap: ROW_GAP_MIN }) : undefined;
+      out.push(finding('LC-23', 'warning', target!, `celah ${num(gap)}px ke teks ${other!.name} (${other!.id})`, `≥ ${ROW_GAP_MIN}: gap Row ≥ 8, teks width:'fill', badge/ikon hug`, { suggestions: [rowGap] }));
     }
   }
   return out;
@@ -1588,6 +1650,14 @@ const CORNERS = [
   { key: 'kiri bawah', i: 3, h: 'l', v: 'b' },
 ] as const;
 
+/** Radius dengan sudut `i` diganti `v`; radius angka (semua sudut sama) tetap angka. */
+function setCorner(r: number | readonly number[] | undefined, i: number, v: number): number | number[] {
+  if (r === undefined || typeof r === 'number') return v;
+  const out = [...r];
+  out[i] = v;
+  return out;
+}
+
 export function lc25(ctx: BoardContext): Finding[] {
   const out: Finding[] = [];
   const radii = (n: { radius?: number | readonly number[] | undefined }): [number, number, number, number] => {
@@ -1629,6 +1699,12 @@ export function lc25(ctx: BoardContext): Finding[] {
             c,
             `radius ${num(Ri)} di sudut ${k.key} ${p.name} (radius ${num(Ro)}, padding ${num(pp)})`,
             inner >= 6 ? `luar = dalam + padding: radius dalam ${num(inner)} atau luar ${num(Ri + pp)}` : `luar = dalam + padding: luar ${num(Math.max(Ri, 6) + pp)} (dalam ≥ 6) atau padding lebih kecil`,
+            {
+              suggestions:
+                inner >= 6
+                  ? [patchFix(`Inner radius ${num(inner)}`, c.id, { radius: setCorner(c.radius, k.i, inner) }), patchFix(`Outer radius ${num(Ri + pp)}`, p.id, { radius: setCorner(p.radius, k.i, Ri + pp) })]
+                  : [patchFix(`Outer radius ${num(Math.max(Ri, 6) + pp)}`, p.id, { radius: setCorner(p.radius, k.i, Math.max(Ri, 6) + pp) })],
+            },
           ),
         );
         break;
@@ -1708,7 +1784,10 @@ export function lc28(ctx: BoardContext): Finding[] {
     if (lines < 2 || !nonEmpty(t)) continue;
     const avg = [...t.content.replace(/\n/g, '')].length / lines;
     if (avg <= MAX_LINE_CHARS) continue;
-    out.push(finding('LC-28', 'warning', t, `rata-rata ${Math.round(avg)} karakter per baris (${lines} baris)`, `45–75 karakter: persempit lebar teks (mis. 560–680 untuk 16px)`));
+    // Saran: ±75 karakter (lebar rata-rata glyph ≈ 0,5 em) → lebar maks size × 37,5, dibulatkan ke kelipatan 8.
+    const max = Math.round((t.size * 37.5) / 8) * 8;
+    const limit = typeof t.width === 'number' ? { width: max } : { maxWidth: max };
+    out.push(finding('LC-28', 'warning', t, `rata-rata ${Math.round(avg)} karakter per baris (${lines} baris)`, `45–75 karakter: persempit lebar teks (mis. 560–680 untuk 16px)`, { suggestions: [patchFix(`Limit width to ${max}`, t.id, limit)] }));
   }
   return out;
 }
@@ -1720,7 +1799,7 @@ export function lc28(ctx: BoardContext): Finding[] {
 export function lc29(ctx: BoardContext): Finding[] {
   return texts(ctx)
     .filter((t) => nonEmpty(t) && (t.weight ?? 400) < 400 && t.size < 18)
-    .map((t) => finding('LC-29', 'warning', t, `bobot ${t.weight} pada ${num(t.size)}px ${quote(t.content)}`, 'bobot ≥ 400 untuk teks < 18px (tipis hanya ≥ 28px)'));
+    .map((t) => finding('LC-29', 'warning', t, `bobot ${t.weight} pada ${num(t.size)}px ${quote(t.content)}`, 'bobot ≥ 400 untuk teks < 18px (tipis hanya ≥ 28px)', { fix: patchFix('Weight 400', t.id, { weight: 400 }) }));
 }
 
 // ---------------------------------------------------------------------------
@@ -1731,6 +1810,17 @@ export function lc29(ctx: BoardContext): Finding[] {
 const NUM = String.raw`\d{1,3}(?:[.,:]\d{1,3})*`;
 export const RANGE_HYPHEN = new RegExp(String.raw`(?<![\p{L}\d.,:/#+-])${NUM} ?- ?${NUM}(?![\p{L}\d/-])`, 'u');
 
+const RANGE_HYPHEN_ALL = new RegExp(RANGE_HYPHEN.source, 'gu');
+
+/**
+ * Perbaikan LC-30: rentang angka ber-tanda hubung → en dash tanpa spasi; "..." → "…" bila `ellipsis`. `spaced:false`
+ * (fix aman, review 33-3) hanya mengganti rentang tanpa spasi (`09.00-17.00`); `a - b` berspasi bisa pengurangan.
+ */
+export function punctuated(content: string, ellipsis: boolean, spaced = true): string {
+  const ranged = content.replace(RANGE_HYPHEN_ALL, (m) => (spaced || !/ /.test(m) ? m.replace(/ ?- ?/, '–') : m));
+  return ellipsis ? ranged.replace(/\.\.\./g, '…') : ranged;
+}
+
 export function lc30(ctx: BoardContext): Finding[] {
   const out: Finding[] = [];
   for (const t of texts(ctx)) {
@@ -1739,7 +1829,18 @@ export function lc30(ctx: BoardContext): Finding[] {
     if (t.content.includes('...') && !/mono/i.test(t.family ?? '')) issues.push('"..." (pakai "…")');
     const m = RANGE_HYPHEN.exec(t.content);
     if (m) issues.push(`tanda hubung di rentang ${JSON.stringify(m[0])} (pakai "–")`);
-    if (issues.length) out.push(finding('LC-30', 'warning', t, `${issues.join('; ')} di ${quote(t.content)}`, 'en dash untuk rentang (09.00–10.00), karakter … untuk elipsis'));
+    if (issues.length) {
+      // Review 33-3: teks mono (kode) tidak pernah dapat fix aman; rentang berspasi (`10 - 5`) hanya saran.
+      const mono = /mono/i.test(t.family ?? '');
+      const safe = mono ? t.content : punctuated(t.content, true, false);
+      const full = punctuated(t.content, !mono);
+      out.push(
+        finding('LC-30', 'warning', t, `${issues.join('; ')} di ${quote(t.content)}`, 'en dash untuk rentang (09.00–10.00), karakter … untuk elipsis', {
+          fix: safe !== t.content ? patchFix('Fix punctuation', t.id, { content: safe }) : undefined,
+          suggestions: [full !== safe ? patchFix('Use en dash in ranges', t.id, { content: full }) : undefined],
+        }),
+      );
+    }
   }
   return out;
 }
@@ -1772,7 +1873,8 @@ export function lc03(ctx: BoardContext, skip: ReadonlySet<string> = new Set()): 
     if (skip.has(t.id)) continue;
     const tm = ctx.textMeasure.get(t.id);
     if (t.wrap === 'fixed' && tm && tm.lines >= 2) {
-      out.push(finding('LC-03', levelOf('LC-03'), t, clip120(`wrap fixed: ${tm.lines} baris terukur di ${quote(t.content)}`), expected));
+      const width = typeof t.width === 'number' || t.width === 'fill' ? {} : { width: 'fill' };
+      out.push(finding('LC-03', levelOf('LC-03'), t, clip120(`wrap fixed: ${tm.lines} baris terukur di ${quote(t.content)}`), expected, { suggestions: [patchFix('Wrap text', t.id, { wrap: 'wrap', ...width })] }));
       continue;
     }
     const b = ctx.bounds.get(t.id);
@@ -1815,7 +1917,11 @@ export function lc06(ctx: BoardContext): Finding[] {
     const min = inCard ? PARAGRAPH_MIN_IN_CARD : PARAGRAPH_MIN[ctx.board.screen];
     if (t.size >= min) continue;
     const where = inCard ? 'di kartu' : `di board ${ctx.board.screen}`;
-    out.push(finding('LC-06', levelOf('LC-06'), t, clip120(`paragraf ${num(t.size)}px ${lines} baris ${where}: ${quote(t.content)}`), `≥ ${min}px (${tokenFor(min)}${inCard ? ' di kartu' : ''})`));
+    out.push(
+      finding('LC-06', levelOf('LC-06'), t, clip120(`paragraf ${num(t.size)}px ${lines} baris ${where}: ${quote(t.content)}`), `≥ ${min}px (${tokenFor(min)}${inCard ? ' di kartu' : ''})`, {
+        suggestions: [sizeFix(t, min)],
+      }),
+    );
   }
   return out;
 }
@@ -1827,6 +1933,20 @@ export function lc06(ctx: BoardContext): Finding[] {
 const CHROME_FRAMES = ['Status bar', 'Home indicator'];
 const LC07_EXPECTED = `token spacing ${[...SPACING_VALUES].sort((a, b) => a - b).join('/')}; komponen juga ${COMPONENT_SIZES.join('/')}`;
 const componentSizeOk = (v: number): boolean => SPACING_VALUES.has(v) || COMPONENT_SIZES.includes(v);
+
+/** Saran LC-07: gap, padding (padding bawah home indicator tetap), dan ukuran komponen ke nilai token terdekat. */
+function spacingFix(n: FrameNode): FindingFix | undefined {
+  const patch: Record<string, unknown> = {};
+  if (typeof n.gap === 'number' && n.gap >= 0 && !SPACING_VALUES.has(n.gap)) patch.gap = snapSpacing(n.gap);
+  const before = mapPadding(n.padding, (v) => v);
+  const pad = mapPadding(n.padding, (v, side) => (SPACING_VALUES.has(v) || (side === 2 && v === HOME_INDICATOR_INSET) ? v : snapSpacing(v)));
+  if (JSON.stringify(pad) !== JSON.stringify(before)) patch.padding = pad;
+  if (namedAny(n, SMALL_COMPONENTS)) {
+    if (typeof n.height === 'number' && !componentSizeOk(n.height)) patch.height = snapComponent(n.height);
+    if (namedAny(n, SQUARE_CONTROLS) && typeof n.width === 'number' && !componentSizeOk(n.width)) patch.width = snapComponent(n.width);
+  }
+  return Object.keys(patch).length ? patchFix('Snap spacing to scale', n.id, patch) : undefined;
+}
 
 export function lc07(ctx: BoardContext): Finding[] {
   const out: Finding[] = [];
@@ -1843,7 +1963,7 @@ export function lc07(ctx: BoardContext): Finding[] {
       if (typeof n.height === 'number' && !componentSizeOk(n.height)) bad.push(`height ${num(n.height)}`);
       if (namedAny(n, SQUARE_CONTROLS) && typeof n.width === 'number' && !componentSizeOk(n.width)) bad.push(`width ${num(n.width)}`);
     }
-    if (bad.length) out.push(finding('LC-07', levelOf('LC-07'), n, clip120(bad.join(', ')), LC07_EXPECTED));
+    if (bad.length) out.push(finding('LC-07', levelOf('LC-07'), n, clip120(bad.join(', ')), LC07_EXPECTED, { suggestions: [spacingFix(n)] }));
   }
   return out;
 }
@@ -1868,7 +1988,10 @@ export function lc08(ctx: BoardContext): Finding[] {
     const triple = `${num(t.size)}/${lh === undefined ? '?' : num(lh)}`;
     const kpi = named(t, 'KPI / Nilai');
     if (named(t, 'Display /')) {
-      if (!SCALE_SIZES.has(t.size) && !DISPLAY_SIZES.includes(t.size)) out.push(finding('LC-08', levelOf('LC-08'), t, `${triple} di luar skala`, `Display: skala tipe atau ${DISPLAY_SIZES.join('/')}`));
+      if (!SCALE_SIZES.has(t.size) && !DISPLAY_SIZES.includes(t.size)) {
+        const to = nearestOf([...SCALE_SIZES, ...DISPLAY_SIZES], t.size);
+        out.push(finding('LC-08', levelOf('LC-08'), t, `${triple} di luar skala`, `Display: skala tipe atau ${DISPLAY_SIZES.join('/')}`, { suggestions: [sizeFix(t, to)] }));
+      }
       continue;
     }
     const tokens = [...new Set(SCALE.filter((s) => s.size === t.size).map((s) => s.lineHeight))];
@@ -1877,16 +2000,26 @@ export function lc08(ctx: BoardContext): Finding[] {
       // KPI: size × 1,2, atau triple skala tipe berukuran sama (mis. 28/36, 32/40) juga sah.
       const want = t.size * KPI_LINE_HEIGHT_RATIO;
       if (lh !== undefined && !fits(want) && !tokens.some(fits)) {
-        out.push(finding('LC-08', levelOf('LC-08'), t, `${triple} (KPI ${[num(want), ...tokens.map(num)].map((x) => `${num(t.size)}/${x}`).join(' atau ')})`, `KPI / Nilai: line-height = size × ${KPI_LINE_HEIGHT_RATIO} atau token skala`));
+        out.push(
+          finding('LC-08', levelOf('LC-08'), t, `${triple} (KPI ${[num(want), ...tokens.map(num)].map((x) => `${num(t.size)}/${x}`).join(' atau ')})`, `KPI / Nilai: line-height = size × ${KPI_LINE_HEIGHT_RATIO} atau token skala`, {
+            suggestions: [patchFix(`Line height ${num(Math.round(want))}`, t.id, { lineHeight: Math.round(want) })],
+          }),
+        );
       }
       continue;
     }
     if (!SCALE_SIZES.has(t.size)) {
-      out.push(finding('LC-08', levelOf('LC-08'), t, `${triple} di luar skala`, kpi ? `KPI / Nilai: ${KPI_SIZES.join('/')} atau skala tipe` : expected));
+      const to = nearestOf(kpi ? KPI_SIZES : SCALE_SIZES, t.size);
+      out.push(finding('LC-08', levelOf('LC-08'), t, `${triple} di luar skala`, kpi ? `KPI / Nilai: ${KPI_SIZES.join('/')} atau skala tipe` : expected, { suggestions: [sizeFix(t, to)] }));
       continue;
     }
     if (lh !== undefined && !tokens.some(fits)) {
-      out.push(finding('LC-08', levelOf('LC-08'), t, `${triple} (token ${tokens.map((x) => `${num(t.size)}/${x}`).join(' atau ')})`, expected));
+      const lhTo = nearestOf(tokens, lh);
+      out.push(
+        finding('LC-08', levelOf('LC-08'), t, `${triple} (token ${tokens.map((x) => `${num(t.size)}/${x}`).join(' atau ')})`, expected, {
+          suggestions: [patchFix(`Line height ${num(lhTo)}`, t.id, { lineHeight: lhTo })],
+        }),
+      );
     }
   }
   return out;
@@ -1920,7 +2053,15 @@ export function lc10(ctx: BoardContext): Finding[] {
     if (!namedAny(n, TOUCH_COMPONENTS) || !visibleRect(ctx, n)) continue;
     const b = ctx.bounds.get(n.id)!;
     if (b.width >= TOUCH_MIN - TOLERANCE && b.height >= TOUCH_MIN - TOLERANCE) continue;
-    out.push(finding('LC-10', levelOf('LC-10'), n, `${num(b.width)}×${num(b.height)} < ${TOUCH_MIN}×${TOUCH_MIN}`, `target sentuh ≥ ${TOUCH_MIN}×${TOUCH_MIN}: perbesar tinggi/lebar atau padding`));
+    // Saran (frame saja): min-ukuran 44 pada sumbu yang kurang; tinggi/lebar tersimpan tidak diubah.
+    const grow: Record<string, unknown> = {};
+    if (b.width < TOUCH_MIN - TOLERANCE) grow.minWidth = TOUCH_MIN;
+    if (b.height < TOUCH_MIN - TOLERANCE) grow.minHeight = TOUCH_MIN;
+    out.push(
+      finding('LC-10', levelOf('LC-10'), n, `${num(b.width)}×${num(b.height)} < ${TOUCH_MIN}×${TOUCH_MIN}`, `target sentuh ≥ ${TOUCH_MIN}×${TOUCH_MIN}: perbesar tinggi/lebar atau padding`, {
+        suggestions: [n.type === 'frame' ? patchFix(`Grow to ${TOUCH_MIN}×${TOUCH_MIN}`, n.id, grow) : undefined],
+      }),
+    );
   }
   return out;
 }
@@ -2267,6 +2408,8 @@ export function lc14(ctx: BoardContext): Finding[] {
         n,
         clip120(`absolut di dalam ${parent.type === 'board' ? 'board' : `layout ${layout}`} ${parent.name} (${parent.id})`),
         'jadikan anak flow (gap/padding); tumpukan sengaja: nama "Overlay / …", bidang efek terpotong: "Crop / …"',
+        // Saran pertama menjaga tampilan (tandai tumpukan sengaja); kedua menjadikannya anak flow (tata letak berubah).
+        { suggestions: [patchFix('Mark as overlay', n.id, { name: `Overlay / ${n.name}` }), patchFix('Make flow child', n.id, { position: null, x: null, y: null })] },
       ),
     );
   }
@@ -2392,7 +2535,11 @@ function spacerIssue(ctx: BoardContext): Finding[] {
     // Node seukuran titik (0×0) tidak memakan ruang: bukan spacer.
     if (r && r.width <= TOLERANCE && r.height <= TOLERANCE) continue;
     const size = r ? ` ${num(r.width)}×${num(r.height)}` : '';
-    out.push(finding('LC-21', levelOf('LC-21'), n, clip120(`spacer kosong: ${n.type}${size} tanpa isi dan cat di ${parent.name} (${parent.id})`), 'hapus; jarak lewat gap/padding induk'));
+    out.push(
+      finding('LC-21', levelOf('LC-21'), n, clip120(`spacer kosong: ${n.type}${size} tanpa isi dan cat di ${parent.name} (${parent.id})`), 'hapus; jarak lewat gap/padding induk', {
+        suggestions: [{ label: 'Remove spacer', ops: [remove(n.id)] }],
+      }),
+    );
   }
   return out;
 }
@@ -2426,6 +2573,7 @@ function doublePaddingIssue(ctx: BoardContext): Finding[] {
         n,
         clip120(`padding ganda: padding ${hit.side} ${num(hit.own)} di dalam padding ${hit.side} ${num(hit.outer)} ${hit.by.name} (${hit.by.id})`),
         'satu lapis padding horizontal per layar (wadah luar); anak selebar isi tanpa padding sisi',
+        { suggestions: [patchFix('Remove inner side padding', n.id, { padding: mapPadding(n.padding, (v, side) => (side === 1 || side === 3 ? 0 : v)) })] },
       ),
     );
   }

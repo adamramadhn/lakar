@@ -5,7 +5,7 @@ import { findBoard, summarizeFindings, type Finding, type FindingSummary, type R
 import { notFound } from './errors.js';
 
 export type BoardCheck = { id: string; name: string; summary: FindingSummary };
-export type CheckRun = { boards: BoardCheck[]; findings: Finding[]; measures: Map<string, BoardMeasure> };
+export type CheckRun = { boards: BoardCheck[]; findings: Finding[]; measures: Map<string, BoardMeasure>; byBoard: Map<string, Finding[]> };
 
 /**
  * Render + check board `boardIds`; board diukur paralel di pool render (AD-18). Error render (FONT_MISSING,
@@ -18,10 +18,13 @@ export async function runCheck(
   boardIds: readonly string[],
   /** Tinggi terukur board `height:'hug'` lain (tabrakan LC-12); ukuran run ini menimpanya. */
   heights: ReadonlyMap<string, number> = new Map(),
+  /** `cap:false` = temuan tanpa batas per aturan (fix_check); default = check biasa. */
+  opts: { cap?: boolean } = {},
 ): Promise<CheckRun> {
   const boards: BoardCheck[] = [];
   const findings: Finding[] = [];
   const measures = new Map<string, BoardMeasure>();
+  const byBoard = new Map<string, Finding[]>();
   const targets = boardIds.map((id) => {
     const board = findBoard(resolved, id);
     if (!board) throw notFound(`board ${id} tidak ada`, 'pakai ID board dari created[] execute');
@@ -34,10 +37,11 @@ export async function runCheck(
   for (const [id, m] of measures) known.set(id, m.height);
   targets.forEach(({ id, board }) => {
     const measure = measures.get(id)!;
-    const list = checkBoard({ doc: resolved, boardId: id, measure, heights: known });
+    const list = checkBoard({ doc: resolved, boardId: id, measure, heights: known, cap: opts.cap ?? true });
+    byBoard.set(id, list);
     boards.push({ id, name: board.name, summary: summarizeFindings(list) });
     findings.push(...list);
   });
   // Urutan dokumen antarboard terjaga (hasil disusun menurut boardIds); sort stabil hanya memisah level.
-  return { boards, findings: sortFindings(findings), measures };
+  return { boards, findings: sortFindings(findings), measures, byBoard };
 }

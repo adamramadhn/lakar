@@ -268,7 +268,16 @@ describe('LC-12 board', () => {
   it('mobile 390×800 → warning ukuran (bukan gerbang)', () => {
     const f = run({ children: [], height: 800, name: 'Home · mobile' });
     expect(f).toEqual([
-      { level: 'warning', rule: 'LC-12', nodeId: expect.any(String), nodeName: 'Home · mobile', detail: 'ukuran 390×800', expected: 'lebar 390, tinggi ≥ 844 (isi lebih panjang: satu board panjang)' },
+      {
+        level: 'warning',
+        rule: 'LC-12',
+        nodeId: expect.any(String),
+        nodeName: 'Home · mobile',
+        detail: 'ukuran 390×800',
+        expected: 'lebar 390, tinggi ≥ 844 (isi lebih panjang: satu board panjang)',
+        // spec-check-autofix: saran ukuran (aditif).
+        suggestions: [{ label: 'Resize to 390×844', ops: [{ op: 'update', id: f[0]!.nodeId, patch: { height: 844 } }] }],
+      },
     ]);
     expect(summarizeFindings(f)).toEqual({ error: 0, warning: 1, gate: 0, info: 0 });
   });
@@ -338,6 +347,8 @@ describe('LC-12 board', () => {
         nodeName: 'Kopi / Beranda · landing · Jernih',
         detail: 'tinggi 4074, isi berakhir 24 px di atas tepi bawah: tinggi pas = 4050',
         expected: 'tinggi 4050 = bawah seksi terakhir (sisa ≤ 8 px; padding bawah wadah dihitung isi): update(board, {height:4050})',
+        // spec-check-autofix: fix aman tinggi pas (aditif).
+        fix: { label: 'Fit height to 4050', ops: [{ op: 'update', id: f[0]!.nodeId, patch: { height: 4050 } }] },
       },
     ]);
     expect(summarizeFindings(f).gate).toBe(0);
