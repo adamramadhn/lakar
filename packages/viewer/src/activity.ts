@@ -5,6 +5,8 @@
 // tidak masuk state Activity; `remoteEffect`/`editChange` memutuskan reaksinya. `activityHub` berbagi satu
 // EventSource per jendela untuk App (daftar, tab) dan Viewer (state Activity, muat ulang dokumen).
 
+import { api } from './api.js';
+
 export const VIEWER_CLIENT = 'lakar-viewer';
 /** Sesi dianggap Live bila ada call running atau call terakhir lebih baru dari ini. */
 export const LIVE_WINDOW_MS = 60_000;
@@ -55,8 +57,11 @@ export type ChangeEvent = { seq: number; type: 'change'; change: DocChange };
 /** Seleksi canvas dokumen berubah (AD-9; salinan `DocSelection` events.ts). */
 export type DocSelection = { slug: string; addresses: string[]; rev?: number; origin?: string };
 export type SelectionEvent = { seq: number; type: 'selection'; selection: DocSelection };
+/** Permintaan buka tab dokumen baru dari `open_doc` agen (salinan `DocOpenRequest` events.ts). */
+export type DocOpenRequest = { slug: string; origin?: string };
+export type OpenTabEvent = { seq: number; type: 'openTab'; openTab: DocOpenRequest };
 /** Semua event stream `/viewer/events` sesudah `hello`. */
-export type StreamEvent = ActivityEvent | ChangeEvent | SelectionEvent;
+export type StreamEvent = ActivityEvent | ChangeEvent | SelectionEvent | OpenTabEvent;
 
 // ---- Reducer ----
 
@@ -84,8 +89,8 @@ export const isDocChangeFromViewer = (c: Pick<ActivityCall, 'client' | 'tool'>) 
 function applyEvent(state: ActivityState, event: StreamEvent): ActivityState {
   if (event.seq <= state.seq) return state;
   const next: ActivityState = { ...state, seq: event.seq };
-  // Perubahan dari aplikasi dan seleksi tidak tampil di Activity.
-  if (event.type === 'change' || event.type === 'selection') return next;
+  // Perubahan dari aplikasi, seleksi, dan permintaan buka tab tidak tampil di Activity.
+  if (event.type === 'change' || event.type === 'selection' || event.type === 'openTab') return next;
   if (event.type === 'session') {
     if (isViewer(event.session.client)) return next;
     next.sessions = { ...state.sessions, [event.session.id]: { ...state.sessions[event.session.id], ...event.session } };
@@ -218,6 +223,17 @@ export function remoteEffect(change: DocChange, origin: string): RemoteEffect | 
   }
 }
 
+/**
+ * Permintaan buka tab (agen membuat dokumen baru lewat `open_doc` tanpa slug) untuk jendela `origin` → slug; tanpa
+ * origin di permintaan = jendela mana pun. Selain itu undefined.
+ */
+export function openTabRequest(event: StreamEvent, origin: string): string | undefined {
+  if (event.type !== 'openTab') return undefined;
+  const r = event.openTab;
+  if (typeof r?.slug !== 'string' || !r.slug) return undefined;
+  return r.origin === undefined || r.origin === origin ? r.slug : undefined;
+}
+
 /** Restore/kelola halaman (event call aplikasi) dari jendela lain yang selesai → daftar perlu dimuat ulang. */
 export function remoteDocCall(event: StreamEvent, origin: string): boolean {
   if (event.type !== 'call') return false;
@@ -298,6 +314,8 @@ export function callTitle(c: ActivityCall, nameOf: (id: string) => string | unde
       return c.description ?? 'Edit pages';
     case 'list_boards':
       return 'List boards';
+    case 'list_documents':
+      return 'List documents';
     case 'get_selection':
       return 'Read selection';
     case 'paste':
@@ -406,6 +424,8 @@ export function connectActivity(handlers: StreamHandlers, opts: { url?: string; 
     src.addEventListener('session', onData);
     src.addEventListener('change', onData);
     src.addEventListener('selection', onData);
+    // Bukan `open` (nama event bawaan EventSource saat tersambung).
+    src.addEventListener('openTab', onData);
     src.onerror = () => {
       if (stopped || es !== src) return;
       src.close();
@@ -428,7 +448,7 @@ export function connectActivity(handlers: StreamHandlers, opts: { url?: string; 
 // ---- Hub: satu stream per jendela ----
 
 export type HubListener = {
-  /** Setiap event sesudah `hello` (call, session, change, selection). */
+  /** Setiap event sesudah `hello` (call, session, change, selection, openTab). */
   onEvent?: (event: StreamEvent) => void;
   /** Stream tersambung lagi (event yang hilang tidak diputar ulang): muat ulang. */
   onReconnect?: () => void;
@@ -505,4 +525,8 @@ export class ActivityHub {
   }
 }
 
-export const activityHub = new ActivityHub();
+/**
+ * Hub jendela ini. Stream membawa origin jendela (`?origin=`, sama dengan header `x-lakar-origin`): daemon membuang
+ * fokus jendela ini saat stream tertutup (jendela ditutup/di-reload), dan `openTab` hanya menuju jendela yang hidup.
+ */
+export const activityHub = new ActivityHub((h) => connectActivity(h, { url: `/viewer/events?origin=${encodeURIComponent(api.origin)}` }));

@@ -196,6 +196,11 @@ describe('route seleksi', () => {
       const none = await t.getSel(sid);
       expect(none.statusCode).toBe(409);
       expect(none.json().error.code).toBe('NO_ACTIVE_DOC');
+      expect(none.json().error.hint).toContain('open_doc {}');
+      // Dokumen yang terbuka di viewer (fokus) dipakai sebelum seleksi terakhir; dilepas → kembali ke seleksi terakhir.
+      await t.inject('PUT', '/viewer/focus', { slug: a.slug }, { 'x-lakar-origin': 'winA' });
+      expect((await t.getSel(sid)).json().data).toMatchObject({ slug: a.slug, addresses: [] });
+      await t.inject('PUT', '/viewer/focus', { slug: null }, { 'x-lakar-origin': 'winA' });
       // Seleksi di dokumen b → fallback ke b.
       await t.inject('PUT', `/viewer/docs/${b.slug}/selection`, { addresses: [b.board] });
       expect((await t.getSel(sid)).json().data).toMatchObject({ slug: b.slug, addresses: [b.board], nodes: [{ id: b.board, type: 'board', bounds: [0, 0, 375, 812] }] });

@@ -8,6 +8,13 @@ const FAILED_MAX = 20;
 /** Jumlah entri log execute per sesi. */
 const SESSION_LOG_MAX = 200;
 
+/**
+ * Hint NO_ACTIVE_DOC untuk semua tool berdokumen (spec-agent-open-doc). Sesudah daemon restart klien MCP mendapat sesi
+ * baru tanpa pin: lanjutkan lewat slug dari `target` sebelumnya, bukan `open_doc {}` yang bisa mendarat di dokumen lain.
+ */
+export const NO_ACTIVE_DOC_HINT =
+  'untuk melanjutkan dokumen yang sama (mis. sesudah daemon restart) panggil open_doc {slug} dengan slug dari target respons sebelumnya; selain itu open_doc {} untuk dokumen yang terbuka di aplikasi Lakar';
+
 /** Sesi tidak ada/tidak dikenal. Ditandai struktural agar HTTP 401 tidak bergantung pada teks pesan. */
 export class UnknownSessionError extends LakarError {}
 

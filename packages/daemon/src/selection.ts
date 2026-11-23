@@ -21,6 +21,7 @@ import {
 import { z } from 'zod';
 import { originOf, type ActivityBus, type DocChange } from './events.js';
 import { boundsMap, locateNode, type BoundsTuple } from './inspect.js';
+import type { FocusStore } from './focus.js';
 import type { Sessions } from './sessions.js';
 import type { DocStore } from './store.js';
 import { peekDocument } from './viewer.js';
@@ -122,13 +123,15 @@ const PutBody = z
   .strict();
 const PUT_HINT = `kirim {addresses:[id, …]} (0–${SELECTION_MAX} alamat; [] mengosongkan seleksi)`;
 const ReadBody = z.object({ slug: z.string().optional() }).strict().optional();
-const READ_HINT = 'kirim {slug?} (kosong = dokumen aktif sesi, atau dokumen dengan seleksi terakhir)';
+const READ_HINT = 'kirim {slug?} (kosong = dokumen aktif sesi, dokumen yang terbuka di viewer, atau dokumen dengan seleksi terakhir)';
 
 export type SelectionRoutesOptions = {
   docs: Map<string, LakarDocument>;
   store: DocStore;
   sessions: Sessions;
   selections: SelectionStore;
+  /** Dokumen yang difokuskan viewer: fallback sebelum seleksi terakhir untuk sesi tanpa dokumen aktif. */
+  focus?: FocusStore;
   activity?: ActivityBus;
   render: RenderPort<ResolvedDocument>;
   /** Ikon board yang tidak dikenal katalog → ICON_UNKNOWN (seperti inspect) sebelum render. */
@@ -137,7 +140,7 @@ export type SelectionRoutesOptions = {
 
 const zodMessage = (e: z.ZodError) => e.issues.map((i) => `${i.path.join('.') || 'body'}: ${i.message}`).join('; ');
 
-export function registerSelectionRoutes(app: FastifyInstance, { docs, store, sessions, selections, activity, render, assertIcons }: SelectionRoutesOptions): void {
+export function registerSelectionRoutes(app: FastifyInstance, { docs, store, sessions, selections, focus, activity, render, assertIcons }: SelectionRoutesOptions): void {
   const checkSlug = (slug: string) => {
     if (!SLUG_PATTERN.test(slug)) {
       throw new LakarError('SCHEMA_INVALID', `slug tidak valid: ${JSON.stringify(slug)}`, {
@@ -180,10 +183,10 @@ export function registerSelectionRoutes(app: FastifyInstance, { docs, store, ses
     const session = sessions.require(req.headers[SESSION_HEADER]);
     const parsed = ReadBody.safeParse(req.body ?? undefined);
     if (!parsed.success) throw new LakarError('SCHEMA_INVALID', zodMessage(parsed.error), { hint: READ_HINT });
-    const slug = parsed.data?.slug ?? session.activeSlug ?? selections.latest();
+    const slug = parsed.data?.slug ?? session.activeSlug ?? focus?.current() ?? selections.latest();
     if (!slug) {
-      throw new LakarError('NO_ACTIVE_DOC', 'sesi ini belum punya dokumen aktif dan belum ada seleksi di viewer', {
-        hint: 'minta pengguna memilih node di viewer Lakar, atau panggil open_doc {slug} lalu get_selection lagi',
+      throw new LakarError('NO_ACTIVE_DOC', 'sesi ini belum punya dokumen aktif, tidak ada dokumen terbuka di viewer, dan belum ada seleksi', {
+        hint: 'minta pengguna membuka dokumen atau memilih node di aplikasi Lakar, atau panggil open_doc {} lalu get_selection lagi',
       });
     }
     checkSlug(slug);

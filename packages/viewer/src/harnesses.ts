@@ -12,6 +12,7 @@ export const MCP_TOOLS = [
   'status',
   'read_skill',
   'open_doc',
+  'list_documents',
   'list_boards',
   'execute',
   'inspect',
@@ -22,6 +23,7 @@ export const MCP_TOOLS = [
   'icon_search',
   'photo_search',
   'get_selection',
+  'paste',
 ] as const;
 
 export type Harness = { id: string; label: string; file: string; snippet: (mcp: McpServerConfig) => string };

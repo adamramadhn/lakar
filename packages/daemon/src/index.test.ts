@@ -187,7 +187,7 @@ describe('@lakar/daemon', () => {
       const before = await snapshot();
       const r = await call('/execute', { code: '1+1', description: 'baca saja tanpa mutasi' }, s);
       expect(r.status, JSON.stringify(r.body.error)).toBe(200);
-      expect(r.body).toEqual({ ok: true, data: { docId: expect.stringMatching(/^[A-Za-z0-9]{8}$/), rev: 1, created: [], value: 2 } });
+      expect(r.body).toEqual({ ok: true, data: { docId: expect.stringMatching(/^[A-Za-z0-9]{8}$/), rev: 1, created: [], target: { slug: expect.any(String), name: expect.any(String), boardIds: expect.any(Array) }, value: 2 } });
       expect(await snapshot()).toEqual(before);
     });
 
@@ -754,7 +754,7 @@ describe.skipIf(!browserInstalled)('check G0 (AD-8): execute + /layout-check', (
     expect(r.body.data.check).toEqual({ boards: [r.body.data.value], summary: { error: 0, warning: 0, gate: 0, info: 0 }, findings: [] });
     expect(Object.keys(r.body.data.bounds).sort()).toEqual(r.body.data.created.map((c: { id: string }) => c.id).sort());
     const ro = await call('/execute', { code: `get('${r.body.data.value}').name`, description: 'baca nama board saja' }, s);
-    expect(ro.body.data).toEqual({ docId: r.body.data.docId, rev: r.body.data.rev, created: [], value: 'Bersih' });
+    expect(ro.body.data).toEqual({ docId: r.body.data.docId, rev: r.body.data.rev, created: [], target: expect.objectContaining({ boardIds: expect.any(Array) }), value: 'Bersih' });
     // update satu node → bounds memuat board + node yang berubah
     const judul = r.body.data.created[1].id;
     const u = await call('/execute', { code: `update('${judul}', {size: 28, lineHeight: 36})`, description: 'perbesar judul board bersih' }, s);

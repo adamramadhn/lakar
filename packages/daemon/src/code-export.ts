@@ -9,7 +9,7 @@ import { ICON_LIBS, LakarError, SESSION_HEADER, type IconGlyph, type IconLib, ty
 import { z } from 'zod';
 import { notFound } from './errors.js';
 import { locateNode } from './inspect.js';
-import type { Sessions } from './sessions.js';
+import { NO_ACTIVE_DOC_HINT, type Sessions } from './sessions.js';
 
 export const CODE_TARGETS = ['react-tailwind', 'react-css'] as const;
 
@@ -51,7 +51,7 @@ export function registerCodeExportRoutes(app: FastifyInstance, { docs, sessions,
   app.post('/viewer/export-code', async (req, reply) => {
     const session = sessions.require(req.headers[SESSION_HEADER]);
     if (!session.activeSlug) {
-      throw new LakarError('NO_ACTIVE_DOC', 'sesi ini belum punya dokumen aktif', { hint: 'panggil open_doc {slug} terlebih dahulu' });
+      throw new LakarError('NO_ACTIVE_DOC', 'sesi ini belum punya dokumen aktif', { hint: NO_ACTIVE_DOC_HINT });
     }
     const slug = session.activeSlug;
     const parsed = Body.safeParse(req.body ?? {});

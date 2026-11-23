@@ -4,7 +4,7 @@ import { request } from 'node:http';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { ActivityBus, buildServer, loadConfig, type ActivityCall, type ActivityEvent } from './index.js';
+import { ActivityBus, TOOL_ROUTES, buildServer, loadConfig, type ActivityCall, type ActivityEvent } from './index.js';
 
 const baseConfig = { ...loadConfig({}), unsplashKeyFile: '/nonexistent/lakar-test/unsplash-access-key', pexelsKeyFile: '/nonexistent/lakar-test/pexels-api-key' };
 
@@ -81,6 +81,35 @@ describe('ActivityBus', () => {
     expect(bus.recent()).toEqual([]);
   });
 
+  it('openTab: hanya ke subscribeAll, tanpa ring, origin kosong dibuang; viewerCount dari attachViewer (idempoten)', () => {
+    const bus = new ActivityBus();
+    const plain: string[] = [];
+    const all: unknown[] = [];
+    bus.subscribe((e) => plain.push(e.type));
+    bus.subscribeAll((e) => all.push(e));
+    bus.openTab({ slug: 'untitled', origin: undefined });
+    bus.openTab({ slug: 'b', origin: 'winA' });
+    expect(plain).toEqual([]);
+    expect(all).toEqual([
+      { seq: 1, type: 'openTab', openTab: { slug: 'untitled' } },
+      { seq: 2, type: 'openTab', openTab: { slug: 'b', origin: 'winA' } },
+    ]);
+    expect(bus.recent()).toEqual([]);
+    expect(bus.viewerCount).toBe(0);
+    const d1 = bus.attachViewer();
+    const d2 = bus.attachViewer();
+    expect(bus.viewerCount).toBe(2);
+    d1();
+    d1();
+    expect(bus.viewerCount).toBe(1);
+    d2();
+    expect(bus.viewerCount).toBe(0);
+  });
+
+  it('TOOL_ROUTES memetakan list_documents', () => {
+    expect(TOOL_ROUTES['/viewer/documents']).toBe('list_documents');
+  });
+
   it('default ring 100', () => {
     const bus = new ActivityBus();
     for (let i = 0; i < 130; i++) bus.emit({ type: 'session', session: { id: 'x', createdAt: '', executes: 0 } });
@@ -135,7 +164,20 @@ describe('event tool call', () => {
     try {
       const sid = await a.session();
       const open = await a.post('/docs/open', { slug: 'a' }, sid);
-      expect(open.json()).toEqual({ ok: true, data: { docId: expect.any(String), slug: 'a', rev: 0, created: true } });
+      // Field lama tetap; spec-agent-open-doc hanya menambah source, target, viewerOpen (+ hint tanpa viewer).
+      expect(open.json()).toEqual({
+        ok: true,
+        data: {
+          docId: expect.any(String),
+          slug: 'a',
+          rev: 0,
+          created: true,
+          source: 'slug',
+          target: { slug: 'a', name: 'a', boardIds: [] },
+          viewerOpen: false,
+          hint: expect.any(String),
+        },
+      });
       const bad = await a.post('/execute', { code: '1' }, sid);
       expect(bad.statusCode).toBe(400);
       expect(bad.json().error.code).toBe('SCHEMA_INVALID');

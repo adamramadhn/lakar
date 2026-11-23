@@ -30,7 +30,20 @@ export const ASSET_UPLOAD_MAX = 20 * 1024 * 1024;
 export const SLUG_MAX = 64;
 
 /** Kunci global kelola file; `#` tidak valid di slug, jadi tidak bentrok dengan kunci dokumen. */
-const FILES_LOCK = '#files';
+export const FILES_LOCK = '#files';
+
+/** Slug tidak boleh dipakai file baru: ada di memori, di disk, atau milik file di arsip (Unarchive nanti tidak bentrok). */
+export async function slugClaimed(docs: ReadonlyMap<string, unknown>, store: DocStore, slug: string): Promise<boolean> {
+  return docs.has(slug) || (await store.exists(slug)) || (await store.exists(slug, true));
+}
+
+/** Slug pertama yang bebas (termasuk arsip): `base`, `base-2`, `base-3`, … Pemanggil memegang `FILES_LOCK`. */
+export async function freeSlugFor(docs: ReadonlyMap<string, unknown>, store: DocStore, base: string): Promise<string> {
+  for (let n = 1; ; n++) {
+    const slug = withSuffix(base, n);
+    if (!(await slugClaimed(docs, store, slug))) return slug;
+  }
+}
 
 /** Board awal New file per preset. Custom: lebar/tinggi 1..10000, screen `app`. */
 export const BOARD_PRESETS = {
@@ -165,15 +178,8 @@ export function registerFileRoutes(app: FastifyInstance, { docs, store, sessions
   const locked = <T>(slugs: string[], fn: () => Promise<T>): Promise<T> => docLocks.run(FILES_LOCK, () => lockSlugs(slugs, fn));
   /** Slug terpakai: ada di memori (mis. baru dibuka agen) atau di disk. */
   const taken = async (slug: string) => docs.has(slug) || (await store.exists(slug));
-  /** Slug tidak boleh dipakai file baru: terpakai, atau milik file di arsip (Unarchive nanti tidak bentrok). */
-  const claimed = async (slug: string) => (await taken(slug)) || (await store.exists(slug, true));
-  /** Slug pertama yang bebas (termasuk arsip): `base`, `base-2`, `base-3`, … */
-  const freeSlug = async (base: string): Promise<string> => {
-    for (let n = 1; ; n++) {
-      const slug = withSuffix(base, n);
-      if (!(await claimed(slug))) return slug;
-    }
-  };
+  const claimed = (slug: string) => slugClaimed(docs, store, slug);
+  const freeSlug = (base: string) => freeSlugFor(docs, store, base);
   const mustExist = async (slug: string) => {
     if (!(await taken(slug))) throw new LakarError('NOT_FOUND', `dokumen ${slug} tidak ada`, { hint: 'pakai slug dari GET /viewer/docs' });
   };

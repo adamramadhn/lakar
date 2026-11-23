@@ -141,7 +141,7 @@ export const connection = {
   },
 };
 
-async function request<T>(method: 'GET' | 'POST' | 'PUT' | 'DELETE', path: string, body?: unknown, session?: string): Promise<T> {
+async function request<T>(method: 'GET' | 'POST' | 'PUT' | 'DELETE', path: string, body?: unknown, session?: string, keepalive?: boolean): Promise<T> {
   let res: Response;
   try {
     res = await fetch(path, {
@@ -152,6 +152,8 @@ async function request<T>(method: 'GET' | 'POST' | 'PUT' | 'DELETE', path: strin
         [ORIGIN_HEADER]: ORIGIN,
       },
       ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+      // Permintaan yang harus selamat saat halaman ditutup (pagehide).
+      ...(keepalive ? { keepalive: true } : {}),
     });
   } catch (e) {
     setOffline(true);
@@ -536,6 +538,15 @@ class ViewerClient {
    */
   putSelection(slug: string, addresses: readonly string[]): Promise<{ slug: string; rev: number; addresses: string[] }> {
     return request('PUT', `/viewer/docs/${encodeURIComponent(slug)}/selection`, { addresses });
+  }
+
+  /**
+   * Laporkan dokumen yang tampil di jendela ini (PUT /viewer/focus; null = Dashboard). Hanya di memori daemon, dipakai
+   * `open_doc` tanpa slug: bukan tulis dokumen, jadi tidak lewat antrean tulis. `keepalive` untuk laporan `pagehide`
+   * (jalur cepat; jaminannya stream `/viewer/events` jendela ini yang tertutup).
+   */
+  putFocus(slug: string | null, opts: { keepalive?: boolean } = {}): Promise<{ slug: string | null; focused: string | null }> {
+    return request('PUT', '/viewer/focus', { slug }, undefined, opts.keepalive);
   }
 
   /** Hapus halaman beserta board-nya; halaman terakhir → ApiError CONFLICT. */
