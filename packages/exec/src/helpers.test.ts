@@ -88,7 +88,7 @@ describe('helper skeleton', () => {
   });
 
   it('Build pada node tanpa prefiks hanya menerapkan patch', async () => {
-    const { r } = await run(`${BOARD} const s=F(b,'Seksi / FAQ',{minHeight:200}); Build(s,{gap:8}); get(s)`);
+    const { r } = await run(`${BOARD} const s=F(b,'Seksi / FAQ',{minHeight:200}); Build(s,{gap:8}); Build(F(b,'Tanpa minHeight'),{gap:4}); get(s)`);
     expect(ok(r).value).toMatchObject({ name: 'Seksi / FAQ', gap: 8 });
   });
 });

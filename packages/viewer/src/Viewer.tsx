@@ -613,7 +613,7 @@ export function Viewer({ slug }: { slug: string }) {
     // Follow → seksi baru execute itu (spec-progressive-live-build); tanpa node baru → board.
     if (followRef.current && boardsTouched.length) {
       const rect = c.tool === 'execute' ? followRect(c) : undefined;
-      setFocus({ boardId: boardsTouched[0]!, nonce: e.seq, ...(rect ? { rect } : {}) });
+      setFocus({ boardId: boardsTouched[0]!, nonce: e.seq, agent: true, ...(rect ? { rect } : {}) });
     }
   };
   const reload = useRef(loadDoc);

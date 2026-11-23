@@ -48,7 +48,8 @@ export type Highlight = { boardId: string; bounds?: [number, number, number, num
  * Permintaan Follow agent: geser kamera ke board ini (sekali per `nonce`). `rect` (relatif board) = wilayah node baru
  * execute itu (spec-progressive-live-build): kamera menuju seksi baru, bukan seluruh board.
  */
-export type Focus = { boardId: string; nonce: number; rect?: Rect };
+/** `agent` = Follow agent (geser berirama, spec-skeleton-live-build); tanpa itu = fokus pilihan pengguna (selalu ke board). */
+export type Focus = { boardId: string; nonce: number; rect?: Rect; agent?: boolean };
 /** Pratinjau versi lama: board dirender dari snapshot `rev`, kanvas baca-saja. */
 export type CanvasPreview = {
   rev: number;
@@ -698,12 +699,15 @@ export function Canvas({
     const from = camRef.current;
     const r = focus.rect;
     const region = r ? { x: b.x + r[0], y: b.y + r[1], width: Math.max(1, r[2]), height: Math.max(1, r[3]) } : undefined;
-    const settled = region ? regionVisible(region, from, size.w, size.h) || regionInView(region, from, size.w, size.h) : boardVisible(b, from, size.w, size.h) || regionTouchesView(b, from, size.w, size.h);
+    const paced = focus.agent === true;
+    const settled = region
+      ? regionVisible(region, from, size.w, size.h) || (paced && regionInView(region, from, size.w, size.h))
+      : boardVisible(b, from, size.w, size.h) || (paced && regionTouchesView(b, from, size.w, size.h));
     if (settled) {
       onFocused?.(focus.nonce);
       return;
     }
-    const wait = reducedMotion() ? 0 : followWait(lastPanAt.current, performance.now());
+    const wait = !paced || reducedMotion() ? 0 : followWait(lastPanAt.current, performance.now());
     if (wait > 0) {
       const t = setTimeout(() => setFollowTick((n) => n + 1), wait);
       return () => clearTimeout(t);

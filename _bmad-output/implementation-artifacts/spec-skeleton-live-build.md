@@ -78,7 +78,8 @@ context:
 - `packages/viewer/src/skeleton.ts` -- baru: `skeletonEntries`, `skeletonCss`, `filledSince`, konstanta gerak.
 - `packages/viewer/src/agentFx.ts` -- `applySkeletonStyle`, `hasNode`.
 - `packages/viewer/src/agentEffects.ts` -- `regionInView`, `regionTouchesView`, `followWait`, `FOLLOW_SETTLE_MS`.
-- `packages/viewer/src/Canvas.tsx` -- `BoardLive` (gaya skeleton tiap mount, atribut `data-generating`), efek Follow berirama.
+- `packages/viewer/src/Canvas.tsx` -- `Focus.agent` (opsional), `BoardLive` (gaya skeleton tiap mount, atribut `data-generating`), efek Follow berirama (hanya fokus agen).
+- `packages/viewer/src/Viewer.tsx` -- fokus Follow dari event execute membawa `agent: true`.
 - `packages/viewer/src/panels.tsx` -- label LC-33.
 - `packages/mcp/src/server.ts` -- `SERVER_INSTRUCTIONS`, `EXECUTE_DESCRIPTION` (helper bawaan), `LAYOUT_CHECK_DESCRIPTION` (skeleton + LC-33), `EXECUTE_LANDING_REMINDER_FROM` 10 → 26; `index.ts` mengekspor konstanta pengingat.
 - `packages/skills/skills/core.md` (Prelude = referensi + palet `keep`, langkah 3), `landing.md` (alur skeleton + blok, contoh 8 blok), `webapp.md` (skeleton + 2 blok `Build`), `mobile.md`, `ui.md` (tanpa penanda `// pakai prelude`), `variants.md`.
@@ -135,6 +136,8 @@ context:
 | 6 | `get(board)`/`list_boards` belum melaporkan jumlah placeholder | low | defer | deferred-work |
 | 7 | Skeleton mobile belum dipandu (LC-12 mobile `[WIP] `) | low | defer | deferred-work |
 | 8 | api.md (dibangkitkan dari api.ts) belum memuat helper bawaan | low | defer | deferred-work; core.md + `EXECUTE_DESCRIPTION` sumber agen |
+| 9 | Aturan Follow longgar (board sebagian terlihat → diam) juga mengenai fokus pilihan pengguna (klik temuan/Layers) | medium | patch | `Focus.agent`; hanya Follow agen yang berirama; tes DOM fokus pengguna |
+| 10 | `Build` pada frame tanpa `minHeight` | low | ditolak | `update(…,{minHeight:null})` sah; tes `helpers.test.ts` |
 
 ## Design Notes
 
@@ -147,4 +150,5 @@ context:
 **Commands:**
 - `npx -y pnpm@12.21.0 build` -- sukses.
 - `npx -y pnpm@12.21.0 test` -- lihat catatan PR; kegagalan yang tersisa adalah kegagalan khas Windows yang sama dengan baseline (AGENTS.md). Contoh skill landing/webapp/mobile/core/ui di `skills-examples.test.ts` (Chromium lokal) hijau. CI Linux acuan.
-- Smoke daemon lokal (`LAKAR_BROWSER_CHANNEL=msedge`): lihat bagian Smoke di bawah.
+- `npx vitest run` (setara `pnpm test` sesudah typecheck tes): kegagalan tersisa = kegagalan khas Windows yang tercantum di AGENTS.md/brief (izin key foto Unsplash/Pexels, SIGTERM/SIGKILL, CRLF judul skill + api.md, pool.test config, render/bench Chromium, sumber C7 tanpa `LAKAR_C7_ALLOW_MISSING_SOURCES`, sha prompt latihan CRLF, `release.sh`). Snapshot bench yang ditulis ulang (hanya CRLF) dikembalikan.
+- Smoke daemon lokal (`LAKAR_BROWSER_CHANNEL=msedge LAKAR_PORT=7593`, data dir sementara): `open_doc` + 4 execute dari contoh landing (skeleton 5 placeholder, navbar, teks hero, visual hero). Check tiap execute 0/0/0. `bounds` board hug tetap `[0,0,1440,2588]` di keempat execute (skeleton memesan ruang; hero terisi 876 = perkiraan), `list_boards` `{height:2588, heightMode:'hug', wip:true}`; `inspect`: Navbar 72, Seksi / Hero 876, tiga `[Skeleton] ` tersisa. Sesudah `[WIP] ` dilepas: `layout_check` 0 error, 3 warning LC-33 (Fitur, Menu, Footer). `/app/` 200. Daemon dihentikan, data dir dihapus.

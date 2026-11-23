@@ -11,6 +11,7 @@ memori, plus permukaan API snippet (`add`, `update`, `find`, `place`, `iconSearc
 
 - `runSnippet`, `DEFAULT_TIMEOUT_MS`, `DEFAULT_MEMORY_BYTES`, `MAX_OPS`.
 - `API`, `API_GLOBALS`, `API_REFERENCE`, `SNIPPET_GLOBALS`, `renderApiMarkdown`.
+- `HELPERS_JS`, `HELPER_GLOBALS`, `DEFAULT_C`, `DEFAULT_FONT`: helper prelude skill core yang bawaan di setiap snippet (spec-skeleton-live-build), termasuk `Skel`/`Build` untuk placeholder `[Skeleton] `. Palet dipulihkan dari `keep.C`/`keep.FONT`; deklarasi ulang di snippet tetap sah (AD-4).
 
 ## Batasan
 

@@ -409,7 +409,7 @@ describe('Canvas — Follow berirama untuk banyak execute kecil (spec-skeleton-l
     const onFocused = vi.fn();
     const { rerender } = renderUi(<Canvas {...baseProps({ boards: tall, onFocused })} />);
     // y 300–900: terlihat 300 px (≥ 40% viewport), terpotong di bawah.
-    rerender(<Canvas {...baseProps({ boards: tall, onFocused, focus: { boardId: BOARD, nonce: 9, rect: [0, 300, 400, 600] } })} />);
+    rerender(<Canvas {...baseProps({ boards: tall, onFocused, focus: { boardId: BOARD, nonce: 9, agent: true, rect: [0, 300, 400, 600] } })} />);
     await waitFor(() => expect(onFocused).toHaveBeenCalledWith(9));
     expect(boardTop()).toBe('0px');
   });
@@ -419,8 +419,18 @@ describe('Canvas — Follow berirama untuk banyak execute kecil (spec-skeleton-l
     reducedMotion(true);
     const onFocused = vi.fn();
     const { rerender } = renderUi(<Canvas {...baseProps({ boards: tall, onFocused })} />);
-    rerender(<Canvas {...baseProps({ boards: tall, onFocused, focus: { boardId: BOARD, nonce: 10 } })} />);
+    rerender(<Canvas {...baseProps({ boards: tall, onFocused, focus: { boardId: BOARD, nonce: 10, agent: true } })} />);
     await waitFor(() => expect(onFocused).toHaveBeenCalledWith(10));
     expect(boardTop()).toBe('0px');
+  });
+
+  it('fokus pilihan pengguna (bukan agen) tetap memusatkan board yang tidak terlihat utuh', async () => {
+    viewport(800, 600);
+    reducedMotion(true);
+    const onFocused = vi.fn();
+    const { rerender } = renderUi(<Canvas {...baseProps({ boards: tall, onFocused })} />);
+    rerender(<Canvas {...baseProps({ boards: tall, onFocused, focus: { boardId: BOARD, nonce: 11 } })} />);
+    await waitFor(() => expect(onFocused).toHaveBeenCalledWith(11));
+    expect(boardTop()).not.toBe('0px');
   });
 });
