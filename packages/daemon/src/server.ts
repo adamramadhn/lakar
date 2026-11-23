@@ -40,11 +40,12 @@ import type { DaemonConfig } from './config.js';
 import { FontRegistry } from './fonts.js';
 import { INSPECT_DEPTH_DEFAULT, INSPECT_DEPTH_MAX, WIP_PREFIX, boundsMap, inspectFit, locateNode } from './inspect.js';
 import { readPngSize } from './png.js';
-import { Sessions, UnknownSessionError, logExecute, recallFailed, rememberFailed } from './sessions.js';
+import { NO_ACTIVE_DOC_HINT, Sessions, UnknownSessionError, logExecute, recallFailed, rememberFailed } from './sessions.js';
 import { DocStore } from './store.js';
 import { ActivityBus, registerActivityHooks } from './events.js';
 import { registerConnectionRoutes } from './connections.js';
-import { registerFileRoutes } from './files.js';
+import { FILES_LOCK, freeSlugFor, registerFileRoutes, slugClaimed, slugify } from './files.js';
+import { FocusStore, registerFocusRoutes } from './focus.js';
 import { registerPageRoutes } from './pages.js';
 import { registerOpsRoutes } from './ops.js';
 import { registerPasteRoutes, type HtmlSnapshotter } from './paste.js';
@@ -52,7 +53,7 @@ import { SelectionStore, registerSelectionRoutes } from './selection.js';
 import { registerRenderDepsRoutes } from './render-deps.js';
 import { registerExportRoutes } from './export.js';
 import { registerCodeExportRoutes } from './code-export.js';
-import { VIEWER_DIST_DIR, registerViewerRoutes } from './viewer.js';
+import { VIEWER_DIST_DIR, peekDocument, registerViewerRoutes } from './viewer.js';
 
 const STATUS: Record<ErrorCode, number> = {
   SCHEMA_INVALID: 400,
@@ -98,7 +99,16 @@ function imageAssetIds(n: unknown, out: Set<string> = new Set()): Set<string> {
 /** Board pertama di halaman pertama: default screenshot/export tanpa id. */
 const firstBoardId = (doc: { pages: readonly { children: readonly { id: string }[] }[] }): string | undefined => doc.pages[0]?.children[0]?.id;
 
-const OpenBody = z.object({ slug: z.string() });
+// Tanpa `.strict()` seperti dulu (kunci lain diabaikan). Tanpa slug = dokumen fokus viewer, atau dokumen baru.
+// `name` hanya divalidasi bila slug tidak ada: dengan slug, kunci lain diabaikan seperti dulu (AD-4).
+const OpenBody = z.union([
+  z.object({ slug: z.string() }),
+  z.object({ slug: z.undefined().optional(), name: z.string().max(200, 'name maks 200 karakter').optional() }),
+]);
+const OPEN_HINT = 'kirim {} (dokumen yang terbuka di aplikasi Lakar, atau dokumen baru), {name} (nama dokumen baru bila tidak ada yang terbuka), atau {slug} (file tertentu)';
+/** Nama dokumen baru dari `open_doc` tanpa slug dan tanpa name (sama dengan default New file di viewer). */
+export const DEFAULT_DOC_NAME = 'Untitled';
+const ListDocumentsBody = z.object({}).strict().optional();
 const ExecuteBody = z
   .object({
     code: z.string().min(1).optional(),
@@ -205,6 +215,8 @@ export type Daemon = {
   activity: ActivityBus;
   /** Seleksi canvas efemeral per dokumen (AD-9). */
   selections: SelectionStore;
+  /** Dokumen yang difokuskan tiap jendela viewer (spec-agent-open-doc). */
+  focus: FocusStore;
   startedAt: string;
 };
 
@@ -228,6 +240,8 @@ export function buildServer({
   const docs = new Map<string, LakarDocument>();
   /** Seleksi canvas per slug, hanya di memori (AD-9). */
   const selections = new SelectionStore();
+  /** Dokumen yang tampil di tiap jendela viewer, hanya di memori. */
+  const focus = new FocusStore();
 
   const ok = (reply: FastifyReply, data: unknown) => reply.code(200).send({ ok: true, data });
   /** Catatan aditif: foto jarak jauh yang tampil sebagai placeholder (cache dingin + jaringan gagal). */
@@ -259,7 +273,7 @@ export function buildServer({
 
   // Stream aktivitas viewer (Viewer B slice 2): hook di luar handler + `GET /viewer/events`. Didaftarkan
   // sebelum route supaya hook berlaku untuk semua route tool.
-  registerActivityHooks(app, { sessions, bus: activity, ...(activityHeartbeatMs !== undefined ? { heartbeatMs: activityHeartbeatMs } : {}) });
+  registerActivityHooks(app, { sessions, bus: activity, focusedSlug: () => focus.current(), onViewerGone: (o) => focus.drop(o), ...(activityHeartbeatMs !== undefined ? { heartbeatMs: activityHeartbeatMs } : {}) });
 
   // Route tulis `/viewer/*` tanpa sesi: tolak permintaan lintas situs. Browser selalu mengirim `Origin` pada POST/DELETE
   // (juga `mode:'no-cors'` tanpa preflight); origin selain daemon sendiri → 403. Tanpa Origin (CLI, tes, MCP) tetap boleh.
@@ -290,7 +304,7 @@ export function buildServer({
   const activeDoc = (header: string | string[] | undefined) => {
     const session = sessions.require(header);
     if (!session.activeSlug) {
-      throw new LakarError('NO_ACTIVE_DOC', 'sesi ini belum punya dokumen aktif', { hint: 'panggil open_doc {slug} terlebih dahulu' });
+      throw new LakarError('NO_ACTIVE_DOC', 'sesi ini belum punya dokumen aktif', { hint: NO_ACTIVE_DOC_HINT });
     }
     const slug = session.activeSlug;
     return { session, slug };
@@ -350,15 +364,15 @@ export function buildServer({
     return ok(reply, { sessionId: sessions.create(body?.client).id, version: LAKAR_VERSION, schemaVersion: SCHEMA_VERSION });
   });
 
-  app.post('/docs/open', async (req, reply) => {
-    const session = sessions.require(req.headers[SESSION_HEADER]);
-    const { slug } = parse(OpenBody, req.body, 'kirim {slug}');
-    if (!SLUG_PATTERN.test(slug)) {
-      throw new LakarError('SCHEMA_INVALID', `slug tidak valid: ${JSON.stringify(slug)}`, {
-        hint: `slug harus cocok pola ${SLUG_PATTERN.source} (huruf kecil, angka, tanda hubung; maks 64)`,
-      });
-    }
-    const result = await docLocks.run(slug, async () => {
+  /** Target respons tulis: dokumen yang benar-benar diubah (pin sesi), supaya agen tahu di mana ia bekerja. */
+  const targetOf = (slug: string, doc: LakarDocument) => ({ slug, name: slug, boardIds: doc.pages.flatMap((p) => p.children.map((b) => b.id)) });
+  /** Aplikasi Lakar tersambung (minimal satu stream `/viewer/events`). */
+  const viewerOpen = () => activity.viewerCount > 0;
+  const VIEWER_CLOSED_HINT = 'aplikasi Lakar tidak terbuka: minta pengguna membuka aplikasi Lakar untuk melihat desain secara live';
+
+  /** Buka `slug` (muat dari disk, atau buat kosong bila belum ada) di bawah kunci dokumen. */
+  const openOrCreate = (slug: string) =>
+    docLocks.run(slug, async () => {
       let doc = docs.get(slug);
       let created = false;
       if (!doc) {
@@ -370,10 +384,106 @@ export function buildServer({
         }
         docs.set(slug, doc);
       }
-      return { docId: doc.id, slug, rev: doc.rev, created };
+      return { doc, created };
     });
+
+  /** Dokumen baru dari `open_doc` tanpa slug: slug bebas (termasuk arsip) dari `name`, di bawah kunci kelola file. */
+  const createFresh = (name: string) => {
+    const base = slugify(name);
+    if (!base || !SLUG_PATTERN.test(base)) {
+      throw new LakarError('SCHEMA_INVALID', `nama ${JSON.stringify(name)} tidak menghasilkan nama file yang valid`, { hint: 'pakai huruf atau angka, mis. "My Landing" → my-landing' });
+    }
+    return docLocks.run(FILES_LOCK, async () => {
+      const slug = await freeSlugFor(docs, store, base);
+      return docLocks.run(slug, async () => {
+        if (await slugClaimed(docs, store, slug)) throw new LakarError('CONFLICT', `dokumen ${slug} baru saja dibuat`, { hint: 'coba lagi', retryable: true });
+        const doc = createDocument();
+        await store.dropOrphanHistory(slug);
+        await store.write(slug, doc);
+        docs.set(slug, doc);
+        return { slug, doc };
+      });
+    });
+  };
+
+  // open_doc: {slug} = perilaku lama (buka atau buat); tanpa slug = dokumen fokus viewer, atau dokumen baru yang
+  // dibuka viewer sebagai tab. Sesi dipaku ke dokumen itu (`activeSlug`) sampai open_doc berikutnya; pindah tab di
+  // viewer tidak memindahkan pin.
+  app.post('/docs/open', async (req, reply) => {
+    const session = sessions.require(req.headers[SESSION_HEADER]);
+    const body: { slug?: string; name?: string } = parse(OpenBody, req.body ?? {}, OPEN_HINT);
+    let result: { doc: LakarDocument; slug: string; created: boolean; source: 'slug' | 'viewer' | 'created' };
+    if (body.slug !== undefined) {
+      const slug = body.slug;
+      if (!SLUG_PATTERN.test(slug)) {
+        throw new LakarError('SCHEMA_INVALID', `slug tidak valid: ${JSON.stringify(slug)}`, {
+          hint: `slug harus cocok pola ${SLUG_PATTERN.source} (huruf kecil, angka, tanda hubung; maks 64)`,
+        });
+      }
+      result = { ...(await openOrCreate(slug)), slug, source: 'slug' };
+    } else {
+      const focused = focus.current();
+      // Dokumen fokus bisa hilang dari disk di antara laporan dan open (dihapus dari luar aplikasi): buat baru.
+      const hit = focused !== undefined && (docs.has(focused) || (await store.exists(focused))) ? focused : undefined;
+      if (hit !== undefined) result = { ...(await openOrCreate(hit)), slug: hit, source: 'viewer' };
+      else result = { ...(await createFresh(body.name?.trim() || DEFAULT_DOC_NAME)), created: true, source: 'created' };
+    }
+    const { doc, slug, created, source } = result;
     session.activeSlug = slug;
-    return ok(reply, result);
+    const open = viewerOpen();
+    // Dokumen baru dari open_doc tanpa slug: muncul di Dashboard jendela mana pun dan dibuka sebagai tab.
+    // open_doc {slug} tetap tanpa event seperti dulu.
+    if (source === 'created') activity.change({ kind: 'create', slug, rev: doc.rev });
+    if (source === 'created' && open) {
+      // Hanya jendela yang stream-nya masih terbuka; selain itu jendela mana pun.
+      const last = focus.lastOrigin();
+      const origin = last !== undefined && activity.hasViewer(last) ? last : undefined;
+      activity.openTab({ slug, ...(origin ? { origin } : {}) });
+    }
+    return ok(reply, {
+      docId: doc.id,
+      slug,
+      rev: doc.rev,
+      created,
+      source,
+      target: targetOf(slug, doc),
+      viewerOpen: open,
+      ...(open ? {} : { hint: VIEWER_CLOSED_HINT }),
+    });
+  });
+
+  // Tool MCP list_documents: dokumen aktif (bukan arsip) + status terbuka/difokuskan di viewer + pin sesi (`active`).
+  app.post('/viewer/documents', async (req, reply) => {
+    const session = sessions.require(req.headers[SESSION_HEADER]);
+    parse(ListDocumentsBody, req.body ?? undefined, 'kirim {} (tanpa argumen)');
+    const focused = focus.current();
+    const seen = new Set<string>();
+    type Entry = { slug: string; name: string; rev: number; updatedAt: string; open: boolean; focused: boolean; active?: true };
+    const documents: Entry[] = [];
+    const push = (slug: string, doc: LakarDocument, mtimeMs: number) => {
+      seen.add(slug);
+      documents.push({
+        slug,
+        name: slug,
+        rev: doc.rev,
+        updatedAt: new Date(mtimeMs).toISOString(),
+        open: focus.isOpen(slug),
+        focused: slug === focused,
+        ...(slug === session.activeSlug ? { active: true as const } : {}),
+      });
+    };
+    for (const { slug, mtimeMs } of await store.list()) {
+      try {
+        const doc = docs.get(slug) ?? (await peekDocument(store, slug));
+        if (doc) push(slug, doc, mtimeMs);
+      } catch {
+        // file rusak dilewati (sama dengan daftar viewer)
+      }
+    }
+    // Dokumen yang hanya ada di memori (file dihapus dari luar, salinan masih dipakai sesi).
+    for (const [slug, doc] of docs) if (!seen.has(slug)) push(slug, doc, Date.now());
+    documents.sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : a.updatedAt > b.updatedAt ? -1 : a.slug.localeCompare(b.slug)));
+    return ok(reply, { documents, focused: focused ?? null, ...(session.activeSlug ? { active: session.activeSlug } : {}) });
   });
 
   app.post('/execute', async (req, reply) => {
@@ -440,7 +550,7 @@ export function buildServer({
     const data = await docLocks.run(slug, async () => {
       // Rename/archive/delete yang antre lebih dulu di kunci ini bisa melepas slug dari sesi: sama dengan cek awal.
       const doc = docs.get(slug);
-      if (!doc) throw new LakarError('NO_ACTIVE_DOC', 'sesi ini belum punya dokumen aktif', { hint: 'panggil open_doc {slug} terlebih dahulu' });
+      if (!doc) throw new LakarError('NO_ACTIVE_DOC', 'sesi ini belum punya dokumen aktif', { hint: NO_ACTIVE_DOC_HINT });
       let committed;
       try {
         // AD-4: error tak tertangkap di snippet → lempar di dalam body → rollback penuh oleh `transact`.
@@ -502,6 +612,7 @@ export function buildServer({
       });
       return {
         ...result,
+        target: targetOf(slug, docs.get(slug)!),
         ...(run.value !== undefined ? { value: run.value } : {}),
         ...(run.valueTruncated ? { valueTruncated: true } : {}),
         ...(run.logs.length ? { logs: run.logs.join('\n') } : {}),
@@ -693,7 +804,19 @@ export function buildServer({
 
   // Viewer baca-saja (Viewer B slice 1): `/viewer/*` dan `/app/*`. Route lama tidak berubah.
   registerViewerRoutes(app, { docs, store, sessions, checks, distDir: config.viewerDir ?? VIEWER_DIST_DIR });
-  registerFileRoutes(app, { docs, store, sessions, docLocks, activity, dataDir: config.dataDir, onChange: (c) => selections.onFileChange(c) });
+  registerFileRoutes(app, {
+    docs,
+    store,
+    sessions,
+    docLocks,
+    activity,
+    dataDir: config.dataDir,
+    onChange: (c) => {
+      selections.onFileChange(c);
+      focus.onFileChange(c);
+    },
+  });
+  registerFocusRoutes(app, { docs, store, focus });
   registerPageRoutes(app, { docs, store, docLocks, activity });
   registerOpsRoutes(app, { docs, store, docLocks, activity, icons });
   // Paste HTML (story 4): render terisolasi lewat renderer Chromium bila ada (renderer palsu tes → RENDER_FAILED).
@@ -708,7 +831,7 @@ export function buildServer({
     fonts: (family) => fonts.entry(family),
     dataDir: config.dataDir,
   });
-  registerSelectionRoutes(app, { docs, store, sessions, selections, activity, render, assertIcons });
+  registerSelectionRoutes(app, { docs, store, sessions, selections, focus, activity, render, assertIcons });
   registerRenderDepsRoutes(app, { fonts, icons });
   registerExportRoutes(app, { docs, store, render, icons });
   registerCodeExportRoutes(app, { docs, sessions, icons });
@@ -738,5 +861,5 @@ export function buildServer({
     return reply.type(remote.type).header('cache-control', remote.placeholder ? 'no-store' : 'no-cache').send(remote.body);
   });
 
-  return { app, store, sessions, fonts, icons, photos, activity, selections, startedAt: startedAt.toISOString() };
+  return { app, store, sessions, fonts, icons, photos, activity, selections, focus, startedAt: startedAt.toISOString() };
 }

@@ -6,11 +6,14 @@
 // Sinkron antar jendela: App berlangganan `activityHub` (satu stream per jendela) dan menerapkan perubahan dari
 // jendela lain (`remoteEffect` → `api.applyRemote`): daftar dimuat ulang, tab ikut rename. Archive/delete dokumen
 // yang sedang tampil membiarkan tabnya; Viewer menampilkan pesan dan menutup tab lewat `requestCloseTab`.
+// Agen di dokumen terbuka (spec-agent-open-doc): dokumen yang tampil dilaporkan ke daemon (focusSync.ts) supaya
+// `open_doc` tanpa slug memakainya; dokumen baru dari agen (event `openTab` untuk jendela ini) dibuka sebagai tab.
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
-import { activityHub, remoteDocCall, remoteEffect } from './activity';
+import { activityHub, openTabRequest, remoteDocCall, remoteEffect } from './activity';
 import { api, connection } from './api';
 import { Dashboard } from './Dashboard';
 import { docHash, parseRoute, type Route } from './files';
+import { attachFocusReporter, windowActivate } from './focusSync';
 import { NewFileDialog } from './NewFileDialog';
 import { OfflineBanner } from './OfflineBanner';
 import { applyFileEvent, closeTab, onOpenInNewTab, onRequestCloseTab, openTab, pruneTabs, readTabs, serializeTabs, TABS_KEY } from './tabs';
@@ -132,6 +135,10 @@ export function App() {
           if (e.type === 'change') {
             const effect = remoteEffect(e.change, api.origin);
             if (effect) api.applyRemote(effect);
+          } else if (e.type === 'openTab') {
+            // Agen membuat dokumen baru: tampilkan di jendela ini (route menambah tabnya).
+            const slug = openTabRequest(e, api.origin);
+            if (slug !== undefined) location.hash = docHash(slug);
           } else if (remoteDocCall(e, api.origin)) api.notifyDocsChanged();
         },
         // Event selama putus tidak diputar ulang: muat ulang daftar.
@@ -139,6 +146,27 @@ export function App() {
       }),
     [],
   );
+
+  // Dokumen yang tampil di jendela ini → daemon (`open_doc` tanpa slug). Dashboard = null.
+  const focusReporter = useRef<ReturnType<typeof attachFocusReporter> | undefined>(undefined);
+  useEffect(() => {
+    const r = attachFocusReporter(activeRef.current ?? null, (slug, opts) => api.putFocus(slug, opts), (l) => activityHub.listen(l), windowActivate);
+    focusReporter.current = r;
+    // Jendela ditutup/dipindah ke bfcache: lepas dokumennya; kembali dari bfcache → laporkan lagi.
+    const onHide = () => r.hide();
+    const onShow = (e: PageTransitionEvent) => e.persisted && r.update(activeRef.current ?? null);
+    window.addEventListener('pagehide', onHide);
+    window.addEventListener('pageshow', onShow);
+    return () => {
+      window.removeEventListener('pagehide', onHide);
+      window.removeEventListener('pageshow', onShow);
+      r.dispose();
+      if (focusReporter.current === r) focusReporter.current = undefined;
+    };
+  }, []);
+  useEffect(() => {
+    focusReporter.current?.update(active ?? null);
+  }, [active]);
 
   // Rename/archive/delete dari aplikasi, jendela ini atau jendela lain (keputusan di `applyFileEvent`). Perubahan oleh agen lewat MCP sengaja tidak disinkronkan.
   useEffect(

@@ -16,7 +16,7 @@ import { locateNode } from './inspect.js';
 import { HtmlImportError, importHtml, type FontLookup, type HtmlReport, type ImportedNode } from './paste/html.js';
 import type { HtmlSnapshot } from './paste/html-page.js';
 import { PASTE_NAME_MAX, SvgImportError, importSvg, type KeptAttr, type PasteDropped } from './paste/svg.js';
-import type { Sessions } from './sessions.js';
+import { NO_ACTIVE_DOC_HINT, type Sessions } from './sessions.js';
 import type { DocStore } from './store.js';
 
 export const PASTE_KINDS = ['svg', 'html'] as const;
@@ -239,11 +239,24 @@ export function registerPasteRoutes(app: FastifyInstance, opts: PasteRoutesOptio
 
   app.post('/viewer/paste', { bodyLimit: PASTE_BODY_LIMIT }, async (req, reply) => {
     const session = opts.sessions.require(req.headers[SESSION_HEADER]);
-    const noDoc = () => new LakarError('NO_ACTIVE_DOC', 'sesi ini belum punya dokumen aktif', { hint: 'panggil open_doc {slug} terlebih dahulu' });
+    const noDoc = () => new LakarError('NO_ACTIVE_DOC', 'sesi ini belum punya dokumen aktif', { hint: NO_ACTIVE_DOC_HINT });
     const slug = session.activeSlug;
     if (!slug) throw noDoc();
     const body = parsePasteBody(req.body);
     const r = await commitPaste(opts, slug, body, { sessionId: session.id, ...(session.client ? { client: session.client } : {}) }, noDoc);
-    return reply.code(200).send({ ok: true, data: { docId: r.doc.id, slug, rev: r.doc.rev, created: r.created, nodeId: r.nodeId, boards: r.boards, report: r.report } });
+    return reply.code(200).send({
+      ok: true,
+      data: {
+        docId: r.doc.id,
+        slug,
+        rev: r.doc.rev,
+        created: r.created,
+        nodeId: r.nodeId,
+        boards: r.boards,
+        report: r.report,
+        // Target tulis (spec-agent-open-doc), sama dengan execute.
+        target: { slug, name: slug, boardIds: r.doc.pages.flatMap((p) => p.children.map((b) => b.id)) },
+      },
+    });
   });
 }

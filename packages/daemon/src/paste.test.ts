@@ -181,6 +181,7 @@ describe('POST /viewer/paste (tool MCP paste)', () => {
       expect(r.statusCode, r.body).toBe(200);
       const data = r.json().data;
       expect(data).toMatchObject({ slug, report: { paths: 3 }, boards: [board] });
+      expect(data.target).toEqual({ slug, name: slug, boardIds: [board] });
       expect(data.inverse).toBeUndefined();
       const v = await t.post(`/viewer/docs/${slug}/paste`, { content: ICON, parentId: board });
       const after = await t.doc(slug);

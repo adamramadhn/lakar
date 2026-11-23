@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { Client, InMemoryTransport } from '@modelcontextprotocol/client';
 import { StdioClientTransport } from '@modelcontextprotocol/client/stdio';
 import { LAKAR_VERSION, SCHEMA_VERSION } from '@lakar/schema';
-import { EXPORT_CODE_DESCRIPTION, GET_SELECTION_DESCRIPTION, PACKAGE, PASTE_DESCRIPTION, PHOTO_SEARCH_DESCRIPTION, READ_SKILL_DESCRIPTION, SERVER_INSTRUCTIONS, SERVER_VERSION, createLakarMcpServer, formatStatus } from './index.js';
+import { EXPORT_CODE_DESCRIPTION, GET_SELECTION_DESCRIPTION, LIST_DOCUMENTS_DESCRIPTION, OPEN_DOC_DESCRIPTION, PACKAGE, PASTE_DESCRIPTION, PHOTO_SEARCH_DESCRIPTION, READ_SKILL_DESCRIPTION, SERVER_INSTRUCTIONS, SERVER_VERSION, createLakarMcpServer, formatStatus } from './index.js';
 import { readFile } from 'node:fs/promises';
 import { chromiumInstalled, DEFAULT_BROWSERS_PATH } from '../../../tests/support/browser.ts';
 import { testLog } from '../../../tests/support/log.ts';
@@ -73,7 +73,15 @@ function fakeDaemon() {
       restartOnce = false;
       return send(401, { ok: false, error: { code: 'NOT_FOUND', message: 'sesi tidak dikenal', hint: '', retryable: false } });
     }
-    if (req.url === '/docs/open') return send(200, { ok: true, data: { docId: 'Dddddddd', slug: body.slug, rev: 0, created: true } });
+    if (req.url === '/docs/open') {
+      if (body.slug === undefined) {
+        return send(200, { ok: true, data: { docId: 'Dddddddd', slug: 'untitled', rev: 3, created: false, source: 'viewer', target: { slug: 'untitled', name: 'untitled', boardIds: ['Bbbbbbbb'] }, viewerOpen: true } });
+      }
+      return send(200, { ok: true, data: { docId: 'Dddddddd', slug: body.slug, rev: 0, created: true } });
+    }
+    if (req.url === '/viewer/documents') {
+      return send(200, { ok: true, data: { documents: [{ slug: 'untitled', name: 'untitled', rev: 3, updatedAt: 'x', open: true, focused: true }], focused: 'untitled' } });
+    }
     if (req.url === '/execute') {
       if (body.code === 'boom') {
         return send(422, { ok: false, error: { code: 'EXEC_ERROR', message: 'baris 1:1: error tak tertangkap', hint: 'perbaiki', retryable: false, editId: 'Eeeeeeee' } });
@@ -178,14 +186,35 @@ describe('@lakar/mcp', () => {
     expect(PACKAGE).toBe('@lakar/mcp');
   });
 
-  it('daftar tool lengkap (10 AD-11 + photo_search + get_selection + export_code + paste); SERVER_VERSION = LAKAR_VERSION', async () => {
+  it('daftar tool lengkap (10 AD-11 + photo_search + get_selection + export_code + paste + list_documents); SERVER_VERSION = LAKAR_VERSION', async () => {
     const c = await connect(url);
     const { tools } = await c.listTools();
     expect(tools.map((t) => t.name).sort()).toEqual(
-      ['execute', 'export', 'export_code', 'get_selection', 'icon_search', 'inspect', 'layout_check', 'list_boards', 'open_doc', 'paste', 'photo_search', 'read_skill', 'screenshot', 'status'].sort(),
+      ['execute', 'export', 'export_code', 'get_selection', 'icon_search', 'inspect', 'layout_check', 'list_boards', 'list_documents', 'open_doc', 'paste', 'photo_search', 'read_skill', 'screenshot', 'status'].sort(),
     );
     expect(SERVER_VERSION).toBe(LAKAR_VERSION);
     expect(c.getServerVersion()?.version).toBe(LAKAR_VERSION);
+  });
+
+  it('open_doc {slug?, name?}: tanpa argumen → body {} (dokumen viewer); name/slug diteruskan; list_documents → POST /viewer/documents', async () => {
+    fake.seen.length = 0;
+    const c = await connect(url);
+    const { tools } = await c.listTools();
+    const open = tools.find((t) => t.name === 'open_doc')!;
+    expect(Object.keys((open.inputSchema as any).properties).sort()).toEqual(['name', 'slug']);
+    expect((open.inputSchema as any).required ?? []).toEqual([]);
+    expect(open.description).toBe(OPEN_DOC_DESCRIPTION);
+    expect(OPEN_DOC_DESCRIPTION).toMatch(/Tanpa argumen → dokumen yang sedang terbuka di aplikasi Lakar/);
+    expect(OPEN_DOC_DESCRIPTION).toContain('viewerOpen');
+    const r = await c.callTool({ name: 'open_doc', arguments: {} });
+    expect(JSON.parse((r.content as any[])[0].text)).toMatchObject({ slug: 'untitled', source: 'viewer', target: { boardIds: ['Bbbbbbbb'] } });
+    await c.callTool({ name: 'open_doc', arguments: { name: 'Landing Kopi' } });
+    await c.callTool({ name: 'open_doc', arguments: { slug: 'x' } });
+    expect(fake.seen.filter((x) => x.path === '/docs/open').map((x) => x.body)).toEqual([{}, { name: 'Landing Kopi' }, { slug: 'x' }]);
+    const list = await c.callTool({ name: 'list_documents', arguments: {} });
+    expect(JSON.parse((list.content as any[])[0].text)).toMatchObject({ focused: 'untitled', documents: [{ slug: 'untitled', open: true, focused: true }] });
+    expect(fake.seen.find((x) => x.path === '/viewer/documents')!.body).toEqual({});
+    expect(LIST_DOCUMENTS_DESCRIPTION).toContain('focused');
   });
 
   it('get_selection → POST /viewer/selection dalam sesi; slug opsional diteruskan; teks JSON; error terformat', async () => {
@@ -282,6 +311,13 @@ describe('@lakar/mcp', () => {
     expect(ins).toMatch(/aplikasi desktop\/dashboard → webapp/);
     expect(ins).toContain('rencana singkat, dan langsung bangun lewat sedikit execute besar');
     expect(ins).toContain('screenshot zoom (nodeId, scale 2)');
+    // spec-agent-open-doc: prompt singkat cukup; open_doc tanpa slug lalu get_selection; board terpilih/kosong; slug hanya bila diminta.
+    expect(ins).toContain('buatkan landing page menggunakan lakar');
+    expect(ins).toContain('open_doc {} tanpa slug');
+    expect(ins).toContain('get_selection');
+    expect(ins).toMatch(/board terpilih, atau board kosong \(ubah ukuran dan nama/);
+    expect(ins).toContain('open_doc {slug} hanya bila pengguna meminta file tertentu atau file baru');
+    expect(ins.indexOf('read_skill core')).toBeLessThan(ins.indexOf('open_doc {}'));
     expect(ins).not.toMatch(/\bpolish\b/);
     expect(READ_SKILL_DESCRIPTION).toMatch(/core .*\+ delapan skill domain \(layout, typography, color, accessibility, ui, interface, writing, review\) \+ skill jenis layar \(landing, mobile, atau webapp.*giliran yang sama/);
     expect(READ_SKILL_DESCRIPTION).toMatch(/aplikasi desktop\/dashboard → webapp/);
@@ -592,7 +628,7 @@ describe('@lakar/mcp', () => {
       const r = await c2.callTool({ name: 'execute', arguments: { code: '1' } });
       expect(r.isError).toBe(true);
       expect((r.content as any)[0].text).toContain('http://127.0.0.1:1');
-      expect((await c2.listTools()).tools).toHaveLength(14);
+      expect((await c2.listTools()).tools).toHaveLength(15);
     } finally {
       await c2.close();
       await deadTransport.close();

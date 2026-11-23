@@ -51,6 +51,13 @@ Perubahan sesudah gelombang fitur di atas:
 
 ## Langkah berikutnya
 
+0. **Agen di canvas (prioritas, mulai di sesi baru, branch `feat/agent-open-doc`).** Urutannya:
+   1. **Agen bekerja di dokumen yang terbuka.** Spec `_bmad-output/implementation-artifacts/spec-agent-open-doc.md` sudah disetujui Fatmuh (`ready-for-dev`, rute full). Lanjutkan dengan `bmad-build` dari spec itu; workflow langsung masuk ke step implementasi.
+   2. **Skill desain dari Emil Kowalski** (MIT, aiforui.dev/skills), diadaptasi untuk MCP.
+   3. **Efek canvas saat agen bekerja** (fade-in node, label "Generating", outline, cursor per agen, shimmer). Desain dulu di `lakar-ui.pen` section 04.
+   4. **Tinggi board landing mengikuti isi.**
+
+   Butir 2–4 tercatat di `deferred-work.md`. Riset pendukung (open-pencil, Paper, pen.dev, skill Emil) ada di `research-agent-canvas-references.md`. Agar `bmad-build` ter-render dengan benar, skrip `_bmad` harus versi 6.13.0-next (commit `138d7f1`).
 1. **Uji manual `v0.1.0` oleh Fatmuh.** Pasang installer rilis, lalu cek butir Done-when yang tersisa (lihat "Sisa" di bawah).
 2. **Build `initiative-lakar-paper` selesai dan sudah di `main` (#18).** Semua 34 tiket berstatus done. Semua story dijalankan lewat `bmad-build-auto`. Spec ada di `_bmad-output/implementation-artifacts/spec-{model-dokumen,editor,agen,token,komponen,kode,vektor}-*.md`. Spine arsitektur ada di `_bmad-output/initiative-lakar-paper/tickets/epic-model-dokumen/architecture-model-dokumen/architecture-model-dokumen.md`. Skema kini v7.
    - **Model dokumen.** Korpus v1/v2, token bertipe dengan mode tema (v3), `resolveDocument` sebagai satu pintu resolusi, dan `css.ts` sebagai pemetaan CSS tunggal.

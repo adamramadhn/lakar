@@ -1,6 +1,6 @@
-// Server MCP Lakar: 14 tool (AD-11 + photo_search + get_selection + export_code + paste) → HTTP lakard: status,
-// read_skill, open_doc, list_boards, execute, inspect, layout_check, screenshot, export, export_code, icon_search,
-// photo_search, get_selection, paste.
+// Server MCP Lakar: 15 tool (AD-11 + photo_search + get_selection + export_code + paste + list_documents) → HTTP lakard:
+// status, read_skill, open_doc, list_documents, list_boards, execute, inspect, layout_check, screenshot, export,
+// export_code, icon_search, photo_search, get_selection, paste.
 import { McpServer, type CallToolResult } from '@modelcontextprotocol/server';
 import { z } from 'zod';
 import {
@@ -154,9 +154,13 @@ export const READ_SKILL_DESCRIPTION =
 
 /** Instruksi server MCP (dikirim saat initialize): urutan kerja singkat. */
 export const SERVER_INSTRUCTIONS =
-  'Lakar: canvas desain lewat kode. Sebelum menggambar, read_skill core + layout + typography + color + accessibility + ui + interface + writing + review ' +
+  'Lakar: canvas desain lewat kode. Prompt singkat (mis. "buatkan landing page menggunakan lakar") cukup: jalankan alur lengkap ini tanpa bertanya. ' +
+  'Sebelum menggambar, read_skill core + layout + typography + color + accessibility + ui + interface + writing + review ' +
   '+ landing/mobile/webapp di giliran yang sama (paralel); aplikasi desktop/dashboard → webapp. ' +
-  'Lalu open_doc, rencana singkat, dan langsung bangun lewat sedikit execute besar (2–4 untuk landing, 1–2 untuk mobile dan webapp) yang diawali prelude dari skill core; ' +
+  'Lalu open_doc {} tanpa slug (dokumen yang terbuka di aplikasi Lakar; tidak ada → dokumen baru yang terbuka sendiri sebagai tab) dan get_selection: ' +
+  'bangun di board terpilih, atau board kosong (ubah ukuran dan nama sesuai jenis layar), atau board baru lewat place; ' +
+  'open_doc {slug} hanya bila pengguna meminta file tertentu atau file baru. ' +
+  'Lalu rencana singkat, dan langsung bangun lewat sedikit execute besar (2–4 untuk landing, 1–2 untuk mobile dan webapp) yang diawali prelude dari skill core; ' +
   'baca check di respons execute, perbaiki dengan editId/edits atau update, akhiri dengan satu screenshot board + satu screenshot zoom (nodeId, scale 2) ' +
   'area terpadat (skill review), satu execute perbaikan, lalu export PNG.';
 
@@ -316,12 +320,27 @@ export const PHOTO_SEARCH_DESCRIPTION =
 /** Deskripsi tool `get_selection` (AD-9). */
 export const GET_SELECTION_DESCRIPTION =
   'Baca node yang sedang dipilih pengguna di canvas viewer Lakar (seleksi hidup, hanya di memori daemon; tidak ada di dokumen maupun riwayat). ' +
-  'Tanpa slug → dokumen aktif sesi; belum open_doc → dokumen yang seleksinya terakhir berubah. ' +
+  'Tanpa slug → dokumen aktif sesi; belum open_doc → dokumen yang terbuka di aplikasi, lalu dokumen yang seleksinya terakhir berubah. ' +
   'Mengembalikan {slug, rev, addresses, nodes:[{address, id, type, name, boardId, bounds?}], missing?, unmeasured?, updatedAt?}: ' +
   'addresses = urutan pilihan pengguna (ID atau alamat komposit id/id); bounds [x,y,w,h] hasil render, dibulatkan, relatif board (board = [0,0,w,h]); ' +
   'missing = alamat yang tidak ada lagi di dokumen; unmeasured = board yang gagal dirender (node tetap tercantum tanpa bounds). ' +
   'addresses kosong = pengguna belum memilih apa pun. Pakai id untuk inspect, execute (get/update), atau open_doc {slug} dulu bila slug bukan dokumen aktif. ' +
-  'Tanpa dokumen aktif dan tanpa seleksi → NO_ACTIVE_DOC. Alur varian responsif dan cek konsistensi atas seleksi: read_skill selection.';
+  'Tanpa dokumen aktif, tanpa dokumen terbuka, dan tanpa seleksi → NO_ACTIVE_DOC. Alur varian responsif dan cek konsistensi atas seleksi: read_skill selection.';
+
+/** Deskripsi tool `open_doc` (spec-agent-open-doc). */
+export const OPEN_DOC_DESCRIPTION =
+  'Pilih dokumen kerja sesi ini; dokumen dipaku sampai open_doc berikutnya (pengguna pindah tab di aplikasi tidak memindahkannya). ' +
+  'Tanpa argumen → dokumen yang sedang terbuka di aplikasi Lakar (source "viewer"); tidak ada dokumen terbuka → dokumen baru dibuat ' +
+  '(nama dari name, default "Untitled") dan aplikasi membukanya sebagai tab (source "created"). ' +
+  'slug → buka atau buat file tertentu (source "slug"); pakai hanya bila pengguna meminta file tertentu atau file baru. ' +
+  'Slug: huruf kecil/angka/tanda hubung, cocok ^[a-z0-9][a-z0-9-]{0,63}$. ' +
+  'Mengembalikan {docId, slug, rev, created, source, target:{slug, name, boardIds}, viewerOpen, hint?}; viewerOpen false = aplikasi Lakar tidak terbuka: sampaikan hint ke pengguna.';
+
+/** Deskripsi tool `list_documents` (spec-agent-open-doc). */
+export const LIST_DOCUMENTS_DESCRIPTION =
+  'Daftar dokumen Lakar (bukan arsip), terbaru dulu: {documents:[{slug, name, rev, updatedAt, open, focused, active?}], focused, active?}. ' +
+  'open = tampil di jendela aplikasi; focused = dokumen yang terakhir difokuskan pengguna (dipakai open_doc tanpa slug); active = dokumen kerja sesi ini. ' +
+  'Pakai slug untuk open_doc {slug} bila pengguna menyebut file tertentu.';
 
 export function createLakarMcpServer(daemonUrl: string): McpServer {
   const client = new DaemonClient(daemonUrl);
@@ -427,12 +446,25 @@ export function createLakarMcpServer(daemonUrl: string): McpServer {
   server.registerTool(
     'open_doc',
     {
-      description:
-        'Buka (atau buat bila belum ada) dokumen Lakar berdasarkan slug dan jadikan dokumen aktif sesi ini. ' +
-        'Slug: huruf kecil/angka/tanda hubung, cocok ^[a-z0-9][a-z0-9-]{0,63}$. Mengembalikan {docId, slug, rev, created}.',
-      inputSchema: z.object({ slug: z.string().describe('slug dokumen, mis. "landing-kopi"') }),
+      description: OPEN_DOC_DESCRIPTION,
+      inputSchema: z.object({
+        slug: z.string().optional().describe('slug file tertentu, mis. "landing-kopi"; kosongkan untuk dokumen yang terbuka di aplikasi Lakar'),
+        name: z.string().optional().describe('nama dokumen baru bila tidak ada dokumen terbuka (default "Untitled"); diabaikan bila ada'),
+      }),
     },
-    ({ slug }) => guarded(async () => asText(await client.call('/docs/open', { slug }))),
+    ({ slug, name }) =>
+      guarded(async () => {
+        const body: Record<string, unknown> = {};
+        if (slug !== undefined) body.slug = slug;
+        if (name !== undefined) body.name = name;
+        return asText(await client.call('/docs/open', body));
+      }),
+  );
+
+  server.registerTool(
+    'list_documents',
+    { description: LIST_DOCUMENTS_DESCRIPTION, inputSchema: z.object({}) },
+    () => guarded(async () => asText(await client.call('/viewer/documents', {}))),
   );
 
   server.registerTool(

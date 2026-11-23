@@ -1,6 +1,6 @@
 // Snippet config MCP per harness (halaman Connections): path Windows dengan backslash dan spasi tetap utuh.
 import { describe, expect, it } from 'vitest';
-import { HARNESSES, nonDefaultPort, type McpServerConfig } from './harnesses.ts';
+import { HARNESSES, MCP_TOOLS, nonDefaultPort, type McpServerConfig } from './harnesses.ts';
 
 const mcp: McpServerConfig = {
   command: 'C:\\Program Files\\Lakar\\lakar-node.exe',
@@ -26,6 +26,11 @@ describe('snippet harness', () => {
 
   it('ACP: daftar server dengan env [{name, value}]', () => {
     expect(JSON.parse(snippet('acp'))).toEqual([{ name: 'lakar', command: mcp.command, args: mcp.args, env: [{ name: 'LAKAR_URL', value: 'http://127.0.0.1:7467' }] }]);
+  });
+
+  it('daftar tool MCP memuat list_documents dan paste', () => {
+    expect(MCP_TOOLS).toContain('list_documents');
+    expect(MCP_TOOLS).toContain('paste');
   });
 
   it('semua harness punya id unik', () => {

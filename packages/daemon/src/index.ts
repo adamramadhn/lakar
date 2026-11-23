@@ -35,6 +35,7 @@ export { DocStore } from './store.js';
 export { ASSET_UPLOAD_MAX, BOARD_PRESETS, SLUG_MAX, registerFileRoutes, slugify, withSuffix, type FileRoutesOptions } from './files.js';
 export { FOLDER_ID_PATTERN, FOLDER_NAME_MAX, FOLDERS_FILE, FolderStore, folderName, memberOf, newFolderId, type Folder } from './folders.js';
 export { exportFileName, registerExportRoutes, type ExportRoutesOptions } from './export.js';
+export { FocusStore, registerFocusRoutes, type FocusRoutesOptions } from './focus.js';
 export { VIEWER_DIST_DIR, registerViewerRoutes, type ViewerDocSummary, type ViewerHistoryEntry } from './viewer.js';
 export {
   ACTIVITY_HEARTBEAT_MS,
@@ -49,6 +50,8 @@ export {
   type ChangeEvent,
   type ChangeKind,
   type DocChange,
+  type DocOpenRequest,
+  type OpenTabEvent,
   type ActivitySession,
   type CallStatus,
   type CallSummary,

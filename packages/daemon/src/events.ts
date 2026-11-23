@@ -42,6 +42,7 @@ export const TOOL_ROUTES: Readonly<Record<string, string>> = {
   '/viewer/selection': 'get_selection',
   '/viewer/export-code': 'export_code',
   '/viewer/paste': 'paste',
+  '/viewer/documents': 'list_documents',
 };
 
 export const publicSessionId = (id: string) => id.slice(0, 8);
@@ -116,11 +117,18 @@ export type ChangeEvent = { seq: number; type: 'change'; change: DocChange };
 export type DocSelection = { slug: string; addresses: string[]; rev?: number; origin?: string };
 export type SelectionEvent = { seq: number; type: 'selection'; selection: DocSelection };
 
+/**
+ * Permintaan "buka tab" (spec-agent-open-doc): `open_doc` tanpa slug membuat dokumen baru saat tidak ada dokumen yang
+ * difokuskan. `origin` = jendela yang terakhir melapor fokus (tanpa origin = jendela mana pun). Hanya permintaan.
+ */
+export type DocOpenRequest = { slug: string; origin?: string };
+export type OpenTabEvent = { seq: number; type: 'openTab'; openTab: DocOpenRequest };
+
 export type ActivityEvent = { seq: number; type: 'call'; call: ActivityCall } | { seq: number; type: 'session'; session: ActivitySession };
 type ActivityPayload = { type: 'call'; call: ActivityCall } | { type: 'session'; session: ActivitySession };
 
-/** Semua event bus: aktivitas (masuk ring) + perubahan aplikasi dan seleksi (tidak masuk ring). */
-export type BusEvent = ActivityEvent | ChangeEvent | SelectionEvent;
+/** Semua event bus: aktivitas (masuk ring) + perubahan aplikasi, seleksi, dan buka tab (tidak masuk ring). */
+export type BusEvent = ActivityEvent | ChangeEvent | SelectionEvent | OpenTabEvent;
 export type ActivityListener = (event: ActivityEvent) => void;
 export type BusListener = (event: BusEvent) => void;
 
@@ -135,6 +143,10 @@ export class ActivityBus {
   readonly #listeners = new Map<BusListener, { all: boolean }>();
   readonly #max: number;
   #seq = 0;
+  /** Jumlah stream viewer (`GET /viewer/events`) yang terbuka. */
+  #viewers = 0;
+  /** Stream terbuka per origin jendela (`?origin=`); origin tanpa stream tidak ada di sini. */
+  readonly #viewerOrigins = new Map<string, number>();
   constructor(max = ACTIVITY_RING_MAX) {
     this.#max = max;
   }
@@ -159,9 +171,46 @@ export class ActivityBus {
     this.#broadcast(event);
     return event;
   }
+  /** Minta viewer membuka tab dokumen (tanpa ring, hanya pelanggan `subscribeAll`). Field kosong dibuang. */
+  openTab(request: DocOpenRequest): OpenTabEvent {
+    const clean = Object.fromEntries(Object.entries(request).filter(([, v]) => v !== undefined)) as DocOpenRequest;
+    const event: OpenTabEvent = { seq: ++this.#seq, type: 'openTab', openTab: clean };
+    this.#broadcast(event);
+    return event;
+  }
+  /**
+   * Catat satu stream viewer terbuka (origin jendela bila dikirim); kembalikan fungsi penutupnya (idempoten). Penutup
+   * mengembalikan true bila itu stream terakhir origin tersebut (fokus jendela itu boleh dibuang).
+   */
+  attachViewer(origin?: string): () => boolean {
+    this.#viewers++;
+    if (origin !== undefined) this.#viewerOrigins.set(origin, (this.#viewerOrigins.get(origin) ?? 0) + 1);
+    let done = false;
+    return () => {
+      if (done) return false;
+      done = true;
+      this.#viewers--;
+      if (origin === undefined) return false;
+      const n = (this.#viewerOrigins.get(origin) ?? 1) - 1;
+      if (n > 0) {
+        this.#viewerOrigins.set(origin, n);
+        return false;
+      }
+      this.#viewerOrigins.delete(origin);
+      return true;
+    };
+  }
+  /** Jendela `origin` masih punya stream terbuka. */
+  hasViewer(origin: string): boolean {
+    return this.#viewerOrigins.has(origin);
+  }
+  /** Jumlah stream viewer yang terbuka (0 = aplikasi Lakar tidak berjalan atau belum tersambung). */
+  get viewerCount(): number {
+    return this.#viewers;
+  }
   #broadcast(event: BusEvent): void {
     for (const [l, { all }] of [...this.#listeners]) {
-      if ((event.type === 'change' || event.type === 'selection') && !all) continue;
+      if ((event.type === 'change' || event.type === 'selection' || event.type === 'openTab') && !all) continue;
       try {
         l(event);
       } catch {
@@ -177,7 +226,7 @@ export class ActivityBus {
   subscribe(l: ActivityListener): () => void {
     return this.#add(l as BusListener, false);
   }
-  /** Event aktivitas + event `change` dan `selection`. */
+  /** Event aktivitas + event `change`, `selection`, dan `openTab`. */
   subscribeAll(l: BusListener): () => void {
     return this.#add(l, true);
   }
@@ -303,6 +352,9 @@ function finish(call: ActivityCall, statusCode: number, json: unknown): Activity
     case 'list_boards':
       if (Array.isArray(data.boards)) out.nodes = data.boards.length;
       break;
+    case 'list_documents':
+      if (Array.isArray(data.documents)) out.nodes = data.documents.length;
+      break;
     case 'paste': {
       // Paste agen (epic paste-vektor story 3): node baru dan board tersentuh, seperti execute.
       const created = ids(data.created);
@@ -334,6 +386,10 @@ export type ActivityHooksOptions = {
   /** Interval heartbeat SSE (default 15 dtk). */
   heartbeatMs?: number;
   now?: () => number;
+  /** Dokumen yang difokuskan viewer: slug event `running` untuk `open_doc` tanpa slug. */
+  focusedSlug?: () => string | undefined;
+  /** Stream terakhir jendela `origin` tertutup (jendela ditutup/di-reload): fokus jendela itu dibuang. */
+  onViewerGone?: (origin: string) => void;
 };
 
 /**
@@ -341,7 +397,7 @@ export type ActivityHooksOptions = {
  * Sesi tidak dikenal di `preHandler` → tidak ada event (handler menjawab 401). Event `running` selalu
  * dipasangkan: `onSend` menutupnya dari respons, `onResponse` menutup sisa (mis. koneksi putus) sebagai error.
  */
-export function registerActivityHooks(app: FastifyInstance, { sessions, bus, heartbeatMs = ACTIVITY_HEARTBEAT_MS, now = Date.now }: ActivityHooksOptions): void {
+export function registerActivityHooks(app: FastifyInstance, { sessions, bus, heartbeatMs = ACTIVITY_HEARTBEAT_MS, now = Date.now, focusedSlug, onViewerGone }: ActivityHooksOptions): void {
   const pending = new WeakMap<FastifyRequest, Pending>();
   let nextCall = 0;
   const callPrefix = Math.random().toString(36).slice(2, 8);
@@ -371,7 +427,8 @@ export function registerActivityHooks(app: FastifyInstance, { sessions, bus, hea
       if (description === undefined && editId) description = str(session.failed.get(editId)?.description);
       description = description?.trim() || undefined;
     }
-    const slug = tool === 'open_doc' ? str(body?.slug) : session.activeSlug;
+    // open_doc tanpa slug memakai dokumen fokus viewer (bila ada); dokumen baru baru diketahui di event selesai.
+    const slug = tool === 'open_doc' ? (str(body?.slug) ?? focusedSlug?.()) : session.activeSlug;
     const target = targetOf(tool, body);
     const t0 = now();
     const call: ActivityCall = {
@@ -480,6 +537,10 @@ export function registerActivityHooks(app: FastifyInstance, { sessions, bus, hea
     };
     write('hello', hello);
     streams.add(res);
+    // Origin jendela (`?origin=`, pola sama dengan header `x-lakar-origin`): umur fokus jendela = umur stream ini.
+    const raw = (req.query as Record<string, unknown> | undefined)?.origin;
+    const origin = typeof raw === 'string' && ORIGIN_PATTERN.test(raw) ? raw : undefined;
+    const detachViewer = bus.attachViewer(origin);
     const unsubscribe = bus.subscribeAll((e) => write(e.type, e));
     const ping = setInterval(() => {
       if (!res.writableEnded) res.write(': ping\n\n');
@@ -491,6 +552,7 @@ export function registerActivityHooks(app: FastifyInstance, { sessions, bus, hea
       closed = true;
       clearInterval(ping);
       unsubscribe();
+      if (detachViewer() && origin !== undefined) onViewerGone?.(origin);
       streams.delete(res);
     };
     req.raw.on('close', cleanup);

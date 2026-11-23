@@ -84,7 +84,7 @@ describe('snapshot saat commit', () => {
       expect(t.boardCount(r2)).toBe(2);
       // Respons execute: kunci lama saja (tidak ada field snapshot baru).
       const ex = await t.post('/execute', { code: `add(null,{type:'board',name:'Z',x:9000,y:0,width:10,height:10,screen:'mobile'})`, description: 'tambah board kecil terakhir' }, s);
-      expect(Object.keys(ex.json().data).sort()).toEqual(['bounds', 'check', 'created', 'docId', 'rev', 'value']);
+      expect(Object.keys(ex.json().data).sort()).toEqual(['bounds', 'check', 'created', 'docId', 'rev', 'target', 'value']);
     } finally {
       await t.app.close();
     }
