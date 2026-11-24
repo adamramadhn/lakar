@@ -45,7 +45,7 @@ import { readPngSize } from './png.js';
 import { NO_ACTIVE_DOC_HINT, Sessions, UnknownSessionError, activePageIndex, authorOf, logExecute, recallFailed, rememberFailed, setActiveDoc } from './sessions.js';
 import { registerAgentPageRoutes } from './agent-pages.js';
 import { registerAnalyzeRoutes } from './analyze.js';
-import { registerCommentRoutes } from './comments.js';
+import { registerCommentRoutes, registerViewerCommentRoutes } from './comments.js';
 import { DocStore } from './store.js';
 import { ActivityBus, agentOf, registerActivityHooks } from './events.js';
 import { registerConnectionRoutes } from './connections.js';
@@ -938,6 +938,8 @@ export function buildServer({
   registerPageRoutes(app, { docs, store, docLocks, activity });
   registerAgentPageRoutes(app, { docs, store, docLocks, activeDoc });
   registerCommentRoutes(app, { docs, store, docLocks, activeDoc });
+  // Komentar dari aplikasi (story 9.4): penulis pengguna + event `change` untuk jendela lain.
+  registerViewerCommentRoutes(app, { docs, store, docLocks, activity });
   registerAnalyzeRoutes(app, { docs, activeDoc });
   registerOpsRoutes(app, { docs, store, docLocks, activity, icons });
   registerFixCheckRoutes(app, { docs, store, docLocks, sessions, render, hugs, checks, agentSteps, icons });

@@ -94,6 +94,8 @@ import { agentPresence, fadePlans, followRect, layerMarks, pendingAgents, type L
 import { sheetForTab, type SheetState } from './sheet';
 import { requestCloseTab } from './tabs';
 import { getCamera, getViewState, saveCamera, saveViewState, type PanelTab } from './viewState';
+import { CommentsPanel, type CanvasComments } from './comments';
+import type { CommentThread } from './api';
 
 const FOLLOW_KEY = 'lakar.viewer.followAgent';
 function readFollow(): boolean {
@@ -106,6 +108,23 @@ function readFollow(): boolean {
 function writeFollow(v: boolean) {
   try {
     localStorage.setItem(FOLLOW_KEY, v ? 'on' : 'off');
+  } catch {
+    // penyimpanan tidak tersedia
+  }
+}
+
+/** Preferensi "Show resolved" panel/pin komentar; dibagi semua dokumen di jendela ini. */
+const SHOW_RESOLVED_KEY = 'lakar.viewer.showResolvedComments';
+function readShowResolved(): boolean {
+  try {
+    return localStorage.getItem(SHOW_RESOLVED_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+function writeShowResolved(v: boolean) {
+  try {
+    localStorage.setItem(SHOW_RESOLVED_KEY, v ? '1' : '0');
   } catch {
     // penyimpanan tidak tersedia
   }
@@ -344,8 +363,17 @@ export function Viewer({ slug }: { slug: string }) {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [toggleSidebar]);
-  /** Tab panel kiri (desain "Panel Tabs": Layers | Assets). */
-  const [leftTab, setLeftTab] = useState<'layers' | 'assets'>('layers');
+  /** Tab panel kiri (desain "Panel Tabs": Layers | Assets | Comments). */
+  const [leftTab, setLeftTab] = useState<'layers' | 'assets' | 'comments'>('layers');
+  /** Komentar (story 9.4): draft pin baru di kanvas, thread yang popover-nya terbuka, dan toggle Show resolved. */
+  const [commentDraft, setCommentDraft] = useState<{ x: number; y: number; nodeId?: string; pageId?: string } | undefined>(undefined);
+  const [openThreadId, setOpenThreadId] = useState<string | undefined>(undefined);
+  const [commentBusy, setCommentBusy] = useState(false);
+  const [showResolved, setShowResolvedState] = useState(readShowResolved);
+  const setShowResolved = useCallback((v: boolean) => {
+    writeShowResolved(v);
+    setShowResolvedState(v);
+  }, []);
   /** Pencarian komponen di tab Assets (desain C2xbUQ "Search components"). */
   const [assetQuery, setAssetQuery] = useState('');
   /** Menu file dari chevron di header file. */
@@ -1501,6 +1529,96 @@ export function Viewer({ slug }: { slug: string }) {
   const boardRevs: Record<string, number> = {};
   for (const b of boards) boardRevs[b.id] = Math.min(d.rev, Math.max(baseRev, touched[b.id] ?? -1));
 
+  // ---- Komentar (story 9.4) ----
+  // Thread hidup di root dokumen (skema v10), jadi ikut termuat bersama dokumen: tulisan baru/event `change` dari
+  // jendela lain sudah memicu `loadDoc`, tidak perlu fetch list terpisah. Nama halaman/layer untuk panel diambil
+  // dari `index`/`d.pages` yang sudah ada; `nodeName`/`pageName` server dipakai sebagai fallback saja.
+  const commentThreads = (latestDoc.comments ?? []) as CommentThread[];
+  /** Satu permintaan tulis komentar: busy selama request, sukses → muat ulang (rev/event sendiri ter-filter), gagal → toast. */
+  const commentWrite = <T,>(fn: () => Promise<T>, after?: (r: T) => void) => {
+    if (commentBusy) return Promise.resolve(undefined as T); // satu tulis komentar per waktu (input sudah disabled).
+    editing.current++;
+    setCommentBusy(true);
+    return fn().then(
+      (r) => {
+        editing.current--;
+        setCommentBusy(false);
+        after?.(r);
+        loadDoc(true);
+      },
+      (e) => {
+        editing.current--;
+        setCommentBusy(false);
+        setToast(e instanceof ApiError ? failureText(e.message, e.hint) : errorText(e));
+      },
+    );
+  };
+  /** Tap tool Comment di titik halaman: buka draft (popover yang terbuka digantikan draft baru). */
+  const onCommentAt = ({ x, y, nodeId }: { x: number; y: number; nodeId?: string }) => {
+    if (commentDraft) return; // draft terbuka: jangan timpa — teks yang sedang diketik hilang.
+    setOpenThreadId(undefined);
+    setCommentDraft({ x, y, ...(nodeId !== undefined ? { nodeId } : {}), pageId: page?.id });
+  };
+  const submitComment = (text: string) => {
+    const draft = commentDraft;
+    if (!draft) return;
+    // x/y halaman selalu dikirim (juga saat nodeId): server memakai posisi tersimpan node yang parent-relatif,
+    // dan pin jatuh di koordinat salah bila geometri live tak ada (halaman lain / render mati).
+    const body: Parameters<typeof api.addComment>[1] = {
+      text,
+      x: draft.x,
+      y: draft.y,
+      ...(draft.pageId !== undefined ? { pageId: draft.pageId } : {}),
+      ...(draft.nodeId !== undefined ? { nodeId: draft.nodeId } : {}),
+    };
+    return commentWrite(
+      () => api.addComment(slug, body),
+      (r) => {
+        setCommentDraft(undefined);
+        setOpenThreadId(r.thread.id);
+      },
+    );
+  };
+  const replyComment = (threadId: string, text: string) => commentWrite(() => api.replyComment(slug, threadId, text));
+  const resolveComment = (threadId: string, resolved: boolean) =>
+    commentWrite(
+      () => api.resolveComment(slug, threadId, resolved),
+      (r) => setOpenThreadId((id) => (id === r.threadId && r.status === 'resolved' && !showResolved ? undefined : id)),
+    );
+  /** Klik thread di panel: pindah ke halamannya, buka popover, dan fokus board pemilik pin (mekanisme Focus). */
+  const openCommentThread = (t: CommentThread) => {
+    if (preview) return;
+    if (!latestDoc.pages.some((p) => p.id === t.pageId)) {
+      setToast('This page no longer exists');
+      return;
+    }
+    setCommentDraft(undefined);
+    if (t.pageId !== page?.id) setPageId(t.pageId);
+    setOpenThreadId(t.id);
+    const info = t.nodeId ? index.get(t.nodeId) : undefined;
+    const tBoards = (latestDoc.pages.find((p) => p.id === t.pageId)?.children ?? []) as unknown as { id: string; x: number; y: number; width: number | 'hug'; height: number | 'hug' }[];
+    const host = tBoards.find((b) => typeof b.width === 'number' && typeof b.height === 'number' && t.x >= b.x && t.x <= b.x + b.width && t.y >= b.y && t.y <= b.y + b.height);
+    const boardId = info?.boardId ?? host?.id;
+    if (boardId) setFocus({ boardId, nonce: Date.now() });
+  };
+  /** Props layer komentar Canvas: disembunyikan saat pratinjau versi (dokumen bukan terkini). */
+  const canvasComments: CanvasComments | undefined = preview
+    ? undefined
+    : {
+        threads: commentThreads.filter((t) => t.pageId === page?.id),
+        showResolved,
+        openId: openThreadId,
+        draft: commentDraft && commentDraft.pageId === page?.id ? commentDraft : undefined,
+        busy: commentBusy,
+        onOpen: setOpenThreadId,
+        onReply: replyComment,
+        onResolve: resolveComment,
+        onDraftSubmit: submitComment,
+        onDraftCancel: () => setCommentDraft(undefined),
+      };
+  const openCommentCount = commentThreads.reduce((n, t) => n + (t.status === 'open' ? 1 : 0), 0);
+  const pageNameOf = (id: string) => latestDoc.pages.find((p) => p.id === id)?.name;
+
   /** Pilih tab panel; sheet mobile yang collapsed terbuka ke half. */
   const openTab = (t: Tab) => {
     setTab(t);
@@ -1552,8 +1670,13 @@ export function Viewer({ slug }: { slug: string }) {
           <button type="button" role="tab" aria-selected={leftTab === 'assets'} className={`panel-tab${leftTab === 'assets' ? ' active' : ''}`} onClick={() => setLeftTab('assets')}>
             Assets
           </button>
+          <button type="button" role="tab" aria-selected={leftTab === 'comments'} className={`panel-tab${leftTab === 'comments' ? ' active' : ''}`} onClick={() => setLeftTab('comments')}>
+            Comments {openCommentCount > 0 && <span className="tab-badge">{openCommentCount}</span>}
+          </button>
         </div>
-        {leftTab === 'assets' ? (
+        {leftTab === 'comments' ? (
+          <CommentsPanel threads={commentThreads} currentPageId={page?.id ?? ''} showResolved={showResolved} onShowResolved={setShowResolved} onOpen={openCommentThread} nameOf={nameOf} pageNameOf={pageNameOf} disabled={preview !== undefined} />
+        ) : leftTab === 'assets' ? (
           <div className="layer-tree assets">
             {/* Komponen lokal (epic komponen story 4, desain C2xbUQ): klik = pilih master, + = sisip instance, drag = drop ke canvas. */}
             <div className="assets-components">
@@ -1732,6 +1855,8 @@ export function Viewer({ slug }: { slug: string }) {
           select(id);
           openTab('checks');
         }}
+        comments={canvasComments}
+        onCommentAt={onCommentAt}
         overlay={
           <>
             <SidebarToggle side="left" collapsed={sidebars.collapsed.left} onToggle={() => toggleSidebar('left')} />
