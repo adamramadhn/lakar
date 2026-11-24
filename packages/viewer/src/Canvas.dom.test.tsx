@@ -1,7 +1,7 @@
 // Canvas live (spec-canvas-agent-effects, spec-progressive-live-build, spec-vektor-5-pen-tool): wiring efek agen
 // (reveal bertahap node baru, label Generating, Follow ke seksi baru) dan Pen tool (keyboard capture, tanpa request
 // untuk path < 2 titik), diuji lewat DOM dengan board yang benar-benar di-mount oleh @lakar/render ke shadow root.
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import type { ComponentProps } from 'react';
 import { describe, expect, it, onTestFinished, vi } from 'vitest';
 import { REVEAL_MS, REVEAL_SHELL_MS, REVEAL_STEP_MS, type FadePlan } from './agentEffects';
@@ -448,5 +448,40 @@ describe('Canvas — Follow berirama untuk banyak execute kecil (spec-skeleton-l
     rerender(<Canvas {...baseProps({ boards: tall, onFocused, focus: { boardId: BOARD, nonce: 11 } })} />);
     await waitFor(() => expect(onFocused).toHaveBeenCalledWith(11));
     expect(boardTop()).not.toBe('0px');
+  });
+});
+
+describe('Canvas — preset perangkat tool Frame (spec-viewer-device-presets)', () => {
+  function frameCanvas() {
+    const onInsert = vi.fn();
+    const onFramePreset = vi.fn();
+    const view = renderUi(<Canvas {...baseProps({ editable: true, onInsert, onFramePreset })} />);
+    return { ...view, onInsert, onFramePreset };
+  }
+  const frameTool = () => screen.getByRole('button', { name: 'Frame (F)' });
+
+  it('tool Frame aktif → popover preset tampil; klik preset memanggil onFramePreset dengan nama+ukuran+screen', async () => {
+    const t = frameCanvas();
+    expect(document.querySelector('.frame-presets')).toBeNull();
+    await t.user.click(frameTool());
+    const group = screen.getByRole('group', { name: 'Frame presets' });
+    await t.user.click(within(group).getByRole('button', { name: /^iPhone 18 Pro(?! Max)/ }));
+    expect(t.onFramePreset).toHaveBeenCalledWith({ name: 'iPhone 18 Pro', width: 402, height: 874, screen: 'mobile' });
+    // Tool tetap aktif untuk sisip berikutnya; popover tetap terbuka.
+    expect(frameTool()).toHaveAttribute('aria-pressed', 'true');
+    expect(document.querySelector('.frame-presets')).not.toBeNull();
+  });
+
+  it('kembali ke Select menutup popover; tanpa onFramePreset popover tidak dirender', async () => {
+    const t = frameCanvas();
+    await t.user.click(frameTool());
+    expect(document.querySelector('.frame-presets')).not.toBeNull();
+    await t.user.keyboard('v');
+    expect(document.querySelector('.frame-presets')).toBeNull();
+
+    t.unmount();
+    renderUi(<Canvas {...baseProps({ editable: true, onInsert: vi.fn() })} />);
+    await t.user.click(screen.getByRole('button', { name: 'Frame (F)' }));
+    expect(document.querySelector('.frame-presets')).toBeNull();
   });
 });
