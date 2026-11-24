@@ -6,6 +6,7 @@
 // commit mengembalikan daftar invers yang, diterapkan sebagai transaksi baru, mengembalikan isi dokumen. Tanpa IO.
 import {
   ComponentDef,
+  Flow,
   ID_PATTERN,
   INSTANCE_KEYS,
   LakarError,
@@ -49,6 +50,7 @@ export type OpKind =
   | 'insert'
   | 'setTokens'
   | 'setTokenModes'
+  | 'setFlows'
   | 'renameToken'
   | 'setComponent'
   | 'resetOverride'
@@ -92,6 +94,11 @@ export interface Transaction {
   setTokens(map: unknown): void;
   /** Ganti daftar mode tema dokumen (elemen pertama = default); `null` menghapus `tokenModes`. Konsistensi dicek saat commit. */
   setTokenModes(modes: unknown): void;
+  /**
+   * Ganti seluruh daftar flow prototipe (v11): array `{id, name, startBoardId}` (id unik, startBoardId harus
+   * board yang ada) atau `null` untuk menghapus `flows`. Bukan patch per-flow — kirim daftar utuh.
+   */
+  setFlows(flows: unknown): void;
   /**
    * Ganti nama token `from` → `to`: definisi pindah (posisi kunci tetap) dan setiap ref `{$token: from}` di semua
    * halaman ikut berganti. `from` tidak ada → TOKEN_UNKNOWN; `to` sudah ada → CONFLICT; `from === to` tanpa efek.
@@ -279,6 +286,8 @@ function renameRefs(value: unknown, from: string, to: string): number {
 }
 
 const TOKEN_MODES_HINT = 'setTokenModes(["light","dark"]): nama mode [a-z0-9-] (maks 32), minimal satu, tanpa duplikat, elemen pertama = default; null menghapus tokenModes';
+const FLOWS_HINT =
+  'setFlows([{id:"Ab12Cd34", name:"Onboarding", startBoardId:"Ef56Gh78"}]): daftar utuh (bukan patch); id unik 8 karakter, startBoardId harus ID board yang ada; null menghapus flows';
 
 /** Satu entri `setTokens` tervalidasi: hapus, nilai datar, atau definisi bertipe lengkap. */
 type TokenPatchEntry = { name: string } & ({ kind: 'delete' } | { kind: 'flat'; value: string | number } | { kind: 'def'; def: TokenDefT });
@@ -807,6 +816,36 @@ export function beginTransaction(doc: Doc, opts: TransactionOptions): Transactio
         if (!r.success) throw new LakarError('SCHEMA_INVALID', zodToLakarError(r.error, 'setTokenModes').message, { hint: TOKEN_MODES_HINT });
         if (!sameValue(w.tokenModes, r.data)) undo(revert);
         w.tokenModes = r.data;
+      });
+    },
+
+    setFlows(raw) {
+      op('setFlows', (w, undo) => {
+        const revert: DocOp = { op: 'setFlows', flows: w.flows ? (host.structuredClone(w.flows) as unknown as Record<string, unknown>[]) : null };
+        if (raw === null) {
+          if (w.flows !== undefined) undo(revert);
+          delete w.flows;
+          return;
+        }
+        const r = Flow.array().safeParse(raw);
+        if (!r.success) throw new LakarError('SCHEMA_INVALID', zodToLakarError(r.error, 'setFlows').message, { hint: FLOWS_HINT });
+        const flows = r.data;
+        const seen = new Set<string>();
+        for (const f of flows) {
+          if (seen.has(f.id)) {
+            throw new LakarError('SCHEMA_INVALID', `setFlows: id flow ${f.id} dipakai lebih dari sekali`, { hint: FLOWS_HINT });
+          }
+          seen.add(f.id);
+        }
+        const boards = new Set(w.pages.flatMap((p) => p.children.map((b) => b.id)));
+        const dangling = flows.find((f) => !boards.has(f.startBoardId));
+        if (dangling) {
+          throw new LakarError('SCHEMA_INVALID', `setFlows: startBoardId ${dangling.startBoardId} pada flow ${dangling.id} bukan board dokumen`, {
+            hint: 'startBoardId harus ID board yang ada; board baru di permintaan yang sama sudah bisa dipakai sesudah op add-nya',
+          });
+        }
+        if (!sameValue(w.flows, flows)) undo(revert);
+        w.flows = flows;
       });
     },
 

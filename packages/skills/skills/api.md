@@ -182,6 +182,23 @@ const b = add(null, {type:'board', name:'Beranda', x:0, y:0, width:390, height:8
 update(b, {themeMode:'dark', fills:[{type:'solid', color:{$token:'colors.bg'}}]});
 ```
 
+### setFlows
+
+`setFlows(flows: {id, name, startBoardId}[] | null): void`
+
+Ganti seluruh daftar flow prototipe (titik masuk mode Present; daftar utuh, bukan patch per-flow): {id: ID 8 karakter unik, name, startBoardId: ID board yang ada — board yang dibuat op sebelumnya di snippet yang sama sudah bisa dipakai}. null menghapus flows. Interaksi antar-board dipasang lewat properti `interactions` pada node/board (lihat update).
+
+- Mengembalikan: undefined
+- Error: SCHEMA_INVALID
+
+```js
+const b = add(null, {type:'board', name:'Beranda', x:0, y:0, width:390, height:844, screen:'mobile'});
+const c = add(null, {type:'board', name:'Detail', x:480, y:0, width:390, height:844, screen:'mobile'});
+const card = add(b, {type:'frame', name:'Kartu', width:342, height:64});
+add(card, {type:'rect', name:'Tombol', width:120, height:40, interactions:[{id:'Intr0001', trigger:'tap', action:{kind:'navigate', boardId:c}, transition:{kind:'slide', direction:'left'}}]});
+setFlows([{id:'Flow0001', name:'Alur utama', startBoardId:b}]);
+```
+
 ### renameToken
 
 `renameToken(from: string, to: string): void`

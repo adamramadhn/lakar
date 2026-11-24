@@ -15,6 +15,7 @@ const OP_KEYS: Record<DocOpKind, { required: readonly string[]; optional: readon
   insert: { required: ['parentId', 'node'], optional: ['index'] },
   setTokens: { required: ['tokens'], optional: [] },
   setTokenModes: { required: ['modes'], optional: [] },
+  setFlows: { required: ['flows'], optional: [] },
   renameToken: { required: ['from', 'to'], optional: [] },
   setComponent: { required: ['id', 'component'], optional: [] },
   resetOverride: { required: ['id'], optional: ['props'] },
@@ -112,6 +113,9 @@ export function applyOps(tx: Transaction, ops: unknown): ApplyOpsResult {
           break;
         case 'setTokenModes':
           tx.setTokenModes(o.modes);
+          break;
+        case 'setFlows':
+          tx.setFlows(o.flows);
           break;
         case 'renameToken':
           tx.renameToken(o.from, o.to);

@@ -318,6 +318,7 @@ export const EXECUTE_DESCRIPTION =
   'detach(instanceId) → id node biasa, get(alamat) node efektif; hapus master men-detach instancenya; ' +
   "setTokens({'colors.primary':'#0F62FE','spacing.4':16}) merge token, null menghapus (bertipe: {type, value, modes?}); " +
   "setTokenModes(['light','dark']) mode tema, board themeMode; " +
+  "setFlows([{id, name, startBoardId}]|null) daftar flow prototipe (titik masuk Present), null menghapus; interaksi lewat update(id, {interactions:[{id, trigger:'tap', action:{kind:'navigate',boardId}|{kind:'back'}|{kind:'openLink',url}, transition?}]}); " +
   'getTokens() → {tokens, modes} baca token dan mode; renameToken(from, to) ganti nama token + semua ref; ' +
   'importCssVariables(css) → {tokens, modes, skipped} token bertipe dari isi file CSS variables (:root + [data-theme="dark"]); ' +
   'importDtcgTokens(json) → {tokens, modes, skipped} token bertipe dari JSON W3C DTCG (grup bersarang = nama dipisah ".", mode di $extensions.mode, alias "{a.b}"); ' +

@@ -22,6 +22,7 @@ import { TitleBar } from './TitleBar';
 import { initUpdates } from './updates';
 import { dropViewState, moveViewState } from './viewState';
 import { Viewer } from './Viewer';
+import { PresentView } from './PresentView';
 
 export { CONNECTIONS_HASH } from './files';
 
@@ -51,7 +52,8 @@ export function App() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [creating, setCreating] = useState<ReadonlySet<string> | undefined>(undefined);
   const offline = useSyncExternalStore(connection.subscribe, connection.isOffline);
-  const active = route.name === 'viewer' ? route.slug : undefined;
+  // Route `present` melaporkan slug-nya juga: fokus agen (`open_doc` tanpa slug) tetap menunjuk dokumen yang dipresentasikan.
+  const active = route.name === 'viewer' || route.name === 'present' ? route.slug : undefined;
   // Ref untuk pendengar event (tanpa daftar ulang tiap render).
   const tabsRef = useRef(tabs);
   tabsRef.current = tabs;
@@ -92,9 +94,9 @@ export function App() {
   useEffect(() => initUpdates(), []);
 
   useEffect(() => {
-    const titles: Record<Route['name'], string> = { recents: 'Lakar', files: 'Files · Lakar', archive: 'Archive · Lakar', settings: 'Settings · Lakar', connections: 'Connections · Lakar', updates: 'Updates · Lakar', viewer: 'Lakar' };
+    const titles: Record<Route['name'], string> = { recents: 'Lakar', files: 'Files · Lakar', archive: 'Archive · Lakar', settings: 'Settings · Lakar', connections: 'Connections · Lakar', updates: 'Updates · Lakar', viewer: 'Lakar', present: 'Lakar' };
     // Halaman folder (`#/files/<id>`): Dashboard mengganti judul dengan nama folder setelah folder dimuat.
-    document.title = route.name === 'viewer' ? `${route.slug} · Lakar` : titles[route.name];
+    document.title = route.name === 'viewer' || route.name === 'present' ? `${route.slug} · Lakar` : titles[route.name];
   }, [route]);
 
   /** Terapkan daftar tab baru; `navigate` → tampilkan `next` (Dashboard bila undefined) tanpa entri history baru. */
@@ -208,6 +210,9 @@ export function App() {
       () => {},
     );
   };
+
+  // Mode Present (spec-prototype-mode): layar penuh tanpa chrome aplikasi; Esc/✕ kembali ke dokumen.
+  if (route.name === 'present') return <PresentView slug={route.slug} flowId={route.flow} onExit={() => (location.hash = docHash(route.slug))} />;
 
   return (
     <div className="app">

@@ -1,12 +1,12 @@
 // Model murni dialog Export code: opsi → codegen, baris file, ukuran, meta, nama zip, dan pewarnaan.
 import { describe, expect, it } from 'vitest';
 import { generateCode } from '@lakar/codegen';
-import type { IconGlyph, LakarDocument } from '@lakar/schema';
+import { SCHEMA_VERSION, type IconGlyph, type LakarDocument } from '@lakar/schema';
 import { DEFAULT_SETTINGS, exportCode, fileMeta, fileRows, filesSummary, findStoredNode, formatBytes, glyphKeys, highlight, nodeKindLabel, zipName, type Tok } from './codeExport.js';
 
 const BOARD = 'Board001';
 const doc = {
-  schemaVersion: 10,
+  schemaVersion: SCHEMA_VERSION,
   id: 'Doc00001',
   rev: 7,
   tokens: { 'colors.brand': { type: 'color', value: '#0E7490' } },

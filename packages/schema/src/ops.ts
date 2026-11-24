@@ -27,6 +27,8 @@ export type DocOp =
   | { op: 'insert'; parentId: string | null; node: Props; index?: number }
   | { op: 'setTokens'; tokens: Record<string, unknown> }
   | { op: 'setTokenModes'; modes: string[] | null }
+  /** Ganti seluruh daftar flow prototipe (v11); `null` menghapus kunci `flows`. */
+  | { op: 'setFlows'; flows: Props[] | null }
   /** Ganti nama token beserta semua ref `{$token}` (epic token-tema story 2); inversnya rename balik. */
   | { op: 'renameToken'; from: string; to: string }
   /** Jadikan node master (`component` = `{props, slots}`) atau lepas status master (`null`, instance di-detach). */

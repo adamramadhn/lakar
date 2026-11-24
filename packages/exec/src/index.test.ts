@@ -118,7 +118,7 @@ async function commitRun(code: string, doc: Doc = createDocument()) {
 describe('@lakar/exec', () => {
   it('mengekspor nama paket dan permukaan API lengkap (AD-7)', () => {
     expect(PACKAGE).toBe('@lakar/exec');
-    expect(Object.keys(API)).toEqual(['add', 'update', 'replace', 'move', 'duplicate', 'remove', 'setComponent', 'resetOverride', 'detach', 'setTokens', 'setTokenModes', 'renameToken', 'importCssVariables', 'importDtcgTokens', 'get', 'find', 'children', 'getTokens', 'place', 'iconSearch', 'photo']);
+    expect(Object.keys(API)).toEqual(['add', 'update', 'replace', 'move', 'duplicate', 'remove', 'setComponent', 'resetOverride', 'detach', 'setTokens', 'setTokenModes', 'setFlows', 'renameToken', 'importCssVariables', 'importDtcgTokens', 'get', 'find', 'children', 'getTokens', 'place', 'iconSearch', 'photo']);
     for (const [name, fn] of Object.entries(API)) {
       expect(fn.signature.startsWith(`${name}(`), name).toBe(true);
       expect(fn.doc.length, name).toBeGreaterThan(20);
@@ -391,7 +391,7 @@ describe('@lakar/exec', () => {
       const ts = errRun(await runSnippet('const a = 1;\nconst b: number = 2', txFor()));
       expect(ts.message).toMatch(/^baris 2:\d+: SyntaxError/);
       const ref = errRun(await runSnippet('fetch("x")', txFor()));
-      expect(ref.hint).toContain('add, update, replace, move, duplicate, remove, setComponent, resetOverride, detach, setTokens, setTokenModes, renameToken, importCssVariables, importDtcgTokens, get, find, children, getTokens, place, iconSearch, photo, keep, console.log');
+      expect(ref.hint).toContain('add, update, replace, move, duplicate, remove, setComponent, resetOverride, detach, setTokens, setTokenModes, setFlows, renameToken, importCssVariables, importDtcgTokens, get, find, children, getTokens, place, iconSearch, photo, keep, console.log');
     });
 
     it('error host yang ditangkap snippet tidak membatalkan transaksi; e.code tersedia', async () => {

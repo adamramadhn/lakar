@@ -8539,3 +8539,292 @@ button.panel-tab:hover {
 .comments-footer .follow-info {
   margin-right: auto;
 }
+
+/* ---------------------------------------------------------------------------
+ * Prototipe (spec-prototype-mode): garis koneksi di kanvas, flag flow, panel
+ * Prototype, dan mode Present (`#/p/<slug>`).
+ * ------------------------------------------------------------------------- */
+
+/* Lapisan SVG garis koneksi: di atas board, di bawah overlay seleksi; tanpa pointer. */
+.connection-layer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+.conn-line {
+  fill: none;
+  stroke: #7c5cff;
+  stroke-width: 1.5;
+}
+.conn-arrow {
+  fill: #7c5cff;
+}
+.conn-label {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: #7c5cff;
+  color: #fff;
+  font: 500 10px var(--font-ui);
+  white-space: nowrap;
+}
+/* Bendera flow di atas label board (titik masuk Present). */
+.flow-flag {
+  position: absolute;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: #7c5cff;
+  color: #fff;
+  font: 600 10px var(--font-ui);
+  white-space: nowrap;
+}
+
+/* Panel Prototype. */
+.prototype-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+}
+.proto-head {
+  display: flex;
+}
+.proto-present {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border: 0;
+  border-radius: 6px;
+  background: #7c5cff;
+  color: #fff;
+  font: 600 12px var(--font-ui);
+  cursor: pointer;
+}
+.proto-present:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.proto-section h3 {
+  margin: 0 0 8px;
+  font: 600 11px var(--font-ui);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+}
+.proto-hint {
+  margin: 0 0 8px;
+  color: var(--text-secondary);
+  font: 400 11px var(--font-ui);
+}
+.proto-target {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 8px;
+  font: 500 12px var(--font-ui);
+  color: var(--text-primary);
+}
+.proto-flow,
+.proto-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+.proto-interaction {
+  margin-bottom: 8px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+.proto-select,
+.proto-name,
+.proto-url,
+.proto-num {
+  min-width: 0;
+  flex: 1;
+  padding: 4px 6px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg);
+  color: var(--text-primary);
+  font: 400 11px var(--font-ui);
+}
+.proto-num {
+  flex: 0 0 64px;
+}
+.proto-icon-btn {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  padding: 4px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.proto-icon-btn:hover:not(:disabled) {
+  background: var(--hover);
+  color: var(--text-primary);
+}
+.proto-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border: 1px dashed var(--border);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-secondary);
+  font: 500 11px var(--font-ui);
+  cursor: pointer;
+}
+.proto-add:hover:not(:disabled) {
+  color: var(--text-primary);
+  border-color: var(--text-secondary);
+}
+.proto-add:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* Mode Present: layar penuh gelap, board fit di tengah, bilah kontrol bawah. */
+.present {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  background: #16161a;
+}
+.present-stage {
+  position: relative;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+.present-board {
+  position: relative;
+  flex: none;
+  transform-origin: center;
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.5);
+}
+.present-host {
+  overflow: hidden;
+}
+.present-error,
+.present-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin: auto;
+  color: #d4d4d8;
+  font: 400 13px var(--font-ui);
+  text-align: center;
+}
+.present-empty button {
+  padding: 6px 14px;
+  border: 0;
+  border-radius: 6px;
+  background: #7c5cff;
+  color: #fff;
+  font: 600 12px var(--font-ui);
+  cursor: pointer;
+}
+.present-bar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: rgba(24, 24, 27, 0.9);
+}
+.present-title {
+  flex: 1;
+  overflow: hidden;
+  color: #a1a1aa;
+  font: 500 12px var(--font-ui);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.present-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #a1a1aa;
+  cursor: pointer;
+}
+.present-btn:hover,
+.present-btn.active {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fafafa;
+}
+.present-hotspot {
+  position: absolute;
+  border: 1px solid #7c5cff;
+  background: rgba(124, 92, 255, 0.12);
+  pointer-events: none;
+}
+/* Transisi masuk board (Present). Arah = arah gerak layar baru (konvensi Figma): "slide left" bergerak ke
+   kiri, jadi board masuk dari sisi kanan. */
+.present-board.enter-dissolve {
+  animation: present-dissolve both;
+}
+.present-board.enter-slide-left {
+  animation: present-slide-left both;
+}
+.present-board.enter-slide-right {
+  animation: present-slide-right both;
+}
+.present-board.enter-slide-up {
+  animation: present-slide-up both;
+}
+.present-board.enter-slide-down {
+  animation: present-slide-down both;
+}
+@keyframes present-dissolve {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes present-slide-left {
+  from {
+    translate: 100% 0;
+  }
+}
+@keyframes present-slide-right {
+  from {
+    translate: -100% 0;
+  }
+}
+@keyframes present-slide-up {
+  from {
+    translate: 0 100%;
+  }
+}
+@keyframes present-slide-down {
+  from {
+    translate: 0 -100%;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .present-board[class*='enter-'] {
+    animation: none;
+  }
+}

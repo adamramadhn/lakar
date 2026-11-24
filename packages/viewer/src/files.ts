@@ -56,7 +56,8 @@ export type Route =
   | { name: 'settings' }
   | { name: 'connections' }
   | { name: 'updates' }
-  | { name: 'viewer'; slug: string };
+  | { name: 'viewer'; slug: string }
+  | { name: 'present'; slug: string; flow?: string };
 
 /** Hash halaman Settings → General. */
 export const SETTINGS_HASH = '#/settings';
@@ -67,7 +68,8 @@ export const UPDATES_HASH = '#/settings/updates';
 
 /**
  * `#/` Recents, `#/files`, `#/files/<id>` folder, `#/archive`, `#/settings` (= `#/settings/general`) General,
- * `#/settings/connections`, `#/settings/updates`, `#/d/<slug>` Viewer; selain itu Recents.
+ * `#/settings/connections`, `#/settings/updates`, `#/d/<slug>` Viewer, `#/p/<slug>` Present (mode prototipe);
+ * selain itu Recents.
  */
 export function parseRoute(hash: string): Route {
   if (/^#\/settings\/connections\/?$/.test(hash)) return { name: 'connections' };
@@ -91,10 +93,22 @@ export function parseRoute(hash: string): Route {
       // hash rusak → dashboard
     }
   }
+  const p = /^#\/p\/([^/?#]+)\/?(?:\?(.*))?$/.exec(hash);
+  if (p) {
+    try {
+      const flow = new URLSearchParams(p[2] ?? '').get('f') ?? undefined;
+      return { name: 'present', slug: decodeURIComponent(p[1]!), ...(flow ? { flow } : {}) };
+    } catch {
+      // hash rusak → dashboard
+    }
+  }
   return { name: 'recents' };
 }
 
 export const docHash = (slug: string) => `#/d/${encodeURIComponent(slug)}`;
+
+/** Hash mode Present (`#/p/<slug>`, `?f=<flowId>` memilih flow awal; spec-prototype-mode). */
+export const presentHash = (slug: string, flowId?: string) => `#/p/${encodeURIComponent(slug)}${flowId ? `?f=${encodeURIComponent(flowId)}` : ''}`;
 
 /** Hash halaman folder (`#/files/<id>`); tanpa id → halaman Files (root). */
 export const folderHash = (id?: string | null) => (id ? `#/files/${encodeURIComponent(id)}` : '#/files');

@@ -1,0 +1,113 @@
+{
+  "schemaVersion": 11,
+  "id": "CorpV11P",
+  "rev": 3,
+  "pages": [
+    {
+      "id": "PagePrt1",
+      "name": "Page 1",
+      "children": [
+        {
+          "type": "board",
+          "id": "BrdPrt01",
+          "name": "Beranda",
+          "x": 0,
+          "y": 0,
+          "width": 390,
+          "height": 844,
+          "screen": "mobile",
+          "fills": [{ "type": "solid", "color": "#FFFFFF" }],
+          "children": [
+            {
+              "type": "frame",
+              "id": "FrmPrt01",
+              "name": "Header",
+              "layout": "column",
+              "gap": 8,
+              "padding": 24,
+              "children": [
+                { "type": "text", "id": "TxtPrt01", "name": "Judul", "content": "Selamat datang", "weight": 600, "size": 24, "lineHeight": 32, "color": "#101828" },
+                { "type": "text", "id": "TxtPrt02", "name": "Subjudul", "content": "Ketuk tombol untuk lanjut", "size": 14, "lineHeight": 20, "color": "#475467" }
+              ]
+            },
+            {
+              "type": "rect",
+              "id": "BtnPrt01",
+              "name": "Tombol lanjut",
+              "position": "absolute",
+              "x": 24,
+              "y": 748,
+              "width": 342,
+              "height": 48,
+              "radius": 12,
+              "fills": [{ "type": "solid", "color": "#2563EB" }],
+              "interactions": [
+                { "id": "ItrPrt01", "trigger": "tap", "action": { "kind": "navigate", "boardId": "BrdPrt02" }, "transition": { "kind": "slide", "direction": "left", "durationMs": 300, "easing": "ease-out" } }
+              ]
+            },
+            {
+              "type": "text",
+              "id": "TxtPrt03",
+              "name": "Label tombol",
+              "position": "absolute",
+              "x": 165,
+              "y": 762,
+              "content": "Lanjut",
+              "weight": 600,
+              "size": 15,
+              "lineHeight": 20,
+              "color": "#FFFFFF"
+            }
+          ]
+        },
+        {
+          "type": "board",
+          "id": "BrdPrt02",
+          "name": "Detail",
+          "x": 480,
+          "y": 0,
+          "width": 390,
+          "height": 844,
+          "screen": "mobile",
+          "fills": [{ "type": "solid", "color": "#F8FAFC" }],
+          "interactions": [{ "id": "ItrPrt03", "trigger": "tap", "action": { "kind": "back" } }],
+          "children": [
+            {
+              "type": "frame",
+              "id": "FrmPrt02",
+              "name": "Isi",
+              "layout": "column",
+              "gap": 12,
+              "padding": 24,
+              "children": [
+                { "type": "text", "id": "TxtPrt04", "name": "Judul detail", "content": "Detail", "weight": 600, "size": 24, "lineHeight": 32, "color": "#101828" },
+                { "type": "rect", "id": "RctPrt01", "name": "Kartu", "width": "fill", "height": 160, "radius": 16, "fills": [{ "type": "solid", "color": "#E0E7FF" }] }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "BtnPrt02",
+              "name": "Kembali",
+              "position": "absolute",
+              "x": 24,
+              "y": 748,
+              "width": 342,
+              "height": 48,
+              "layout": "row",
+              "justify": "center",
+              "align": "center",
+              "radius": 12,
+              "stroke": { "color": "#2563EB", "width": 1, "align": "inside" },
+              "interactions": [{ "id": "ItrPrt02", "trigger": "tap", "action": { "kind": "back" }, "transition": { "kind": "instant" } }],
+              "children": [{ "type": "text", "id": "TxtPrt05", "name": "Label kembali", "content": "Kembali", "weight": 600, "size": 15, "lineHeight": 20, "color": "#2563EB" }]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "flows": [
+    { "id": "FlwPrt01", "name": "Alur utama", "startBoardId": "BrdPrt01" },
+    { "id": "FlwPrt02", "name": "Dari detail", "startBoardId": "BrdPrt02" }
+  ]
+}

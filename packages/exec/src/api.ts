@@ -156,6 +156,8 @@ export interface LakarApi {
   setTokens(map: Record<string, string | number | TokenDefinition | null>): void;
   /** Daftar mode tema dokumen (elemen pertama = default); `null` menghapus. Board memilih mode lewat `themeMode`. */
   setTokenModes(modes: string[] | null): void;
+  /** Ganti seluruh daftar flow prototipe (`{id, name, startBoardId}`; daftar utuh, bukan patch); `null` menghapus `flows`. */
+  setFlows(flows: { id: string; name: string; startBoardId: string }[] | null): void;
   /** Ganti nama token beserta semua ref `{$token}` di dokumen (satu commit). */
   renameToken(from: string, to: string): void;
   /**
@@ -589,6 +591,24 @@ export const API: { readonly [K in keyof LakarApi]: ApiFunction } = {
       `${BOARD}\nupdate(b, {themeMode:'dark', fills:[{type:'solid', color:{$token:'colors.bg'}}]});`,
     call(ctx, [modes]) {
       mutation(ctx, () => ctx.tx.setTokenModes(modes));
+      return undefined;
+    },
+  },
+  setFlows: {
+    kind: 'op',
+    signature: 'setFlows(flows: {id, name, startBoardId}[] | null): void',
+    doc:
+      'Ganti seluruh daftar flow prototipe (titik masuk mode Present; daftar utuh, bukan patch per-flow): {id: ID 8 karakter unik, name, startBoardId: ID board yang ada — board yang dibuat op sebelumnya di snippet yang sama sudah bisa dipakai}. ' +
+      'null menghapus flows. Interaksi antar-board dipasang lewat properti `interactions` pada node/board (lihat update).',
+    returns: 'undefined',
+    errors: ['SCHEMA_INVALID'],
+    example:
+      `${BOARD}\nconst c = add(null, {type:'board', name:'Detail', x:480, y:0, width:390, height:844, screen:'mobile'});\n` +
+      "const card = add(b, {type:'frame', name:'Kartu', width:342, height:64});\n" +
+      "add(card, {type:'rect', name:'Tombol', width:120, height:40, interactions:[{id:'Intr0001', trigger:'tap', action:{kind:'navigate', boardId:c}, transition:{kind:'slide', direction:'left'}}]});\n" +
+      "setFlows([{id:'Flow0001', name:'Alur utama', startBoardId:b}]);",
+    call(ctx, [flows]) {
+      mutation(ctx, () => ctx.tx.setFlows(flows));
       return undefined;
     },
   },
