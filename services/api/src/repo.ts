@@ -2,6 +2,9 @@
 // `PgShareRepo` dipakai service sungguhan (dites pg.test.ts saat DATABASE_URL ada); `MemoryShareRepo`
 // untuk tes unit routes tanpa Postgres. Kedua impl menjaga kontrak yang sama: share yang di-revoke
 // atau tidak dikenal diperlakukan sama (undefined / 'missing-share').
+// `UserRepo` (spec-cloud-auth story A): akun users/identities/sessions/magic_tokens, kontrak sama
+// untuk impl Pg dan memori.
+import { randomBytes, randomUUID } from 'node:crypto';
 import type { Pool } from 'pg';
 
 /** Izin snapshot: komentar tamu dan unduhan `.lakar.json` (view selalu ada — token = izin). */
@@ -20,6 +23,8 @@ export type NewShare = {
   boards: readonly NewShareBoard[];
   /** Batas kedaluwarsa link; `null` = "Never" (tidak pernah kedaluwarsa). Diisi route (default +30 hari). */
   expiresAt: Date | null;
+  /** Pemilik akun (spec-cloud-auth); `undefined`/NULL = share era admin-key — tetap dikelola LAKAR_API_KEY. */
+  ownerId?: string;
 };
 
 /** Meta publik satu share (tanpa doc/png). `undefined` dari repo untuk token tak dikenal, revoked, atau kedaluwarsa. */
@@ -75,8 +80,12 @@ export interface ShareRepo {
   get(token: string): Promise<ShareMeta | undefined>;
   /** Seperti `get` + menaikkan `views` (hanya untuk GET meta publik; PNG/komentar tidak menghitung). */
   countView(token: string): Promise<ShareMeta | undefined>;
-  /** Semua share yang belum di-revoke, terbaru dulu (tanpa doc/png; share kedaluwarsa ikut tampil). */
-  list(): Promise<ShareMeta[]>;
+  /** Semua share yang belum di-revoke, terbaru dulu (tanpa doc/png; share kedaluwarsa ikut tampil).
+   *  `ownerId` terisi → hanya share milik user itu (tampilan session); kosong → semua (tampilan admin). */
+  list(ownerId?: string): Promise<ShareMeta[]>;
+  /** `owner_id` share yang belum di-revoke: string = user id pemilik, `null` = era admin-key (tanpa pemilik),
+   *  `undefined` = token tak dikenal/sudah revoked. Dipakai scoping PATCH/PUT/DELETE session user. */
+  ownerOf(token: string): Promise<string | null | undefined>;
   /** Terapkan `patch` pada share yang belum di-revoke (share kedaluwarsa boleh — PATCH bisa menghidupkannya lagi). */
   update(token: string, patch: SharePatch): Promise<ShareMeta | undefined>;
   /** Ganti doc+boards share yang belum di-revoke dalam satu transaksi. `false` bila revoked/tak dikenal. */
@@ -142,13 +151,14 @@ export class PgShareRepo implements ShareRepo {
     const client = await this.pool.connect();
     try {
       await client.query('BEGIN');
-      await client.query('INSERT INTO shares (token, slug, title, permissions, doc, expires_at) VALUES ($1, $2, $3, $4, $5, $6)', [
+      await client.query('INSERT INTO shares (token, slug, title, permissions, doc, expires_at, owner_id) VALUES ($1, $2, $3, $4, $5, $6, $7)', [
         share.token,
         share.slug,
         share.title,
         JSON.stringify(share.permissions),
         JSON.stringify(share.doc),
         share.expiresAt,
+        share.ownerId ?? null,
       ]);
       for (const [i, b] of share.boards.entries()) {
         await client.query('INSERT INTO share_boards (token, board_id, ord, name, x, y, w, h, png) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)', [
@@ -194,14 +204,22 @@ export class PgShareRepo implements ShareRepo {
     return toMeta(share, boards.rows);
   }
 
-  async list(): Promise<ShareMeta[]> {
-    const { rows } = await this.pool.query<ShareRow>(`SELECT ${META_COLS} FROM shares WHERE revoked_at IS NULL ORDER BY created_at DESC`);
+  async list(ownerId?: string): Promise<ShareMeta[]> {
+    const { rows } = await this.pool.query<ShareRow>(
+      `SELECT ${META_COLS} FROM shares WHERE revoked_at IS NULL${ownerId !== undefined ? ' AND owner_id = $1' : ''} ORDER BY created_at DESC`,
+      ownerId !== undefined ? [ownerId] : [],
+    );
     const out: ShareMeta[] = [];
     for (const share of rows) {
       const boards = await this.pool.query<BoardRow>('SELECT board_id, name, w, h FROM share_boards WHERE token = $1 ORDER BY ord', [share.token]);
       out.push(toMeta(share, boards.rows));
     }
     return out;
+  }
+
+  async ownerOf(token: string): Promise<string | null | undefined> {
+    const { rows } = await this.pool.query<{ owner_id: string | null }>('SELECT owner_id FROM shares WHERE token = $1 AND revoked_at IS NULL', [token]);
+    return rows[0] === undefined ? undefined : rows[0].owner_id;
   }
 
   async update(token: string, patch: SharePatch): Promise<ShareMeta | undefined> {
@@ -422,10 +440,20 @@ export class MemoryShareRepo implements ShareRepo {
     return this.metaOf(s);
   }
 
-  async list(): Promise<ShareMeta[]> {
+  async list(ownerId?: string): Promise<ShareMeta[]> {
     const out: ShareMeta[] = [];
-    for (const s of this.shares.values()) if (!s.revoked) out.push(this.metaOf(s));
+    for (const s of this.shares.values()) {
+      if (s.revoked) continue;
+      // Session user hanya melihat miliknya (owner_id NULL tidak pernah cocok dengan user id).
+      if (ownerId !== undefined && s.ownerId !== ownerId) continue;
+      out.push(this.metaOf(s));
+    }
     return out.sort((a, b) => (a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0));
+  }
+
+  async ownerOf(token: string): Promise<string | null | undefined> {
+    const s = this.live(token);
+    return s === undefined ? undefined : (s.ownerId ?? null);
   }
 
   async update(token: string, patch: SharePatch): Promise<ShareMeta | undefined> {
@@ -529,4 +557,261 @@ export class MemoryShareRepo implements ShareRepo {
   }
 
   async close(): Promise<void> {}
+}
+
+// ---------------------------------------------------------------------------
+// Repo akun (spec-cloud-auth story A): users + identities + sessions + magic_tokens.
+// Token session disimpan MENTAH (opaque 32 byte base64url — bisa di-revoke per token);
+// magic token disimpan sebagai HASH sha256 (link email sekali pakai).
+// ---------------------------------------------------------------------------
+
+/** Umur session default: 30 hari, rolling — tiap `sessionUser` yang sukses memperpanjang expires_at. */
+export const DEFAULT_SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+/** Umur magic link: 15 menit, sekali pakai. */
+export const MAGIC_TOKEN_TTL_MS = 15 * 60 * 1000;
+
+/** Akun publik: bentuk yang aman diserialkan ke klien (tanpa field internal). */
+export type User = { id: string; email: string; name: string | null; avatarUrl: string | null; createdAt: string };
+
+/** Profil hasil provider untuk upsert: `subject` = OAuth sub (google) / id (github) / email (magic). */
+export type IdentityProfile = { provider: string; subject: string; email: string; name?: string | null; avatarUrl?: string | null };
+
+export interface UserRepo {
+  findUserByIdentity(provider: string, subject: string): Promise<User | undefined>;
+  findUserByEmail(email: string): Promise<User | undefined>;
+  /** Upsert link-by-email: identity (provider,subject) sudah ada → user-nya; else cari user by email
+   *  dan tautkan identity baru; else buat user + identity. Selalu mengembalikan user. */
+  upsertUserIdentity(profile: IdentityProfile): Promise<User>;
+  /** Session opaque baru (token digenerate di sini); `ua` dicatat untuk audit tampilan perangkat. */
+  createSession(userId: string, opts?: { ua?: string }): Promise<{ token: string; expiresAt: Date }>;
+  /** User pemilik session yang masih hidup; `undefined` bila token tak dikenal/kedaluwarsa.
+   *  Rolling: sukses memperpanjang expires_at satu TTL penuh. */
+  sessionUser(token: string): Promise<User | undefined>;
+  /** Cabut session (logout). `false` bila token tak dikenal. */
+  revokeSession(token: string): Promise<boolean>;
+  /** Simpan magic token SUDAH di-hash (sha256 hex) — token mentah tidak pernah menyentuh storage. */
+  createMagicToken(email: string, hash: string, expiresAt: Date): Promise<void>;
+  /** Tandai terpakai atomik; kembalikan email bila token masih berlaku dan belum dipakai, else `undefined`. */
+  consumeMagicToken(hash: string): Promise<string | undefined>;
+}
+
+type UserRow = { id: string; email: string; name: string | null; avatar_url: string | null; created_at: Date };
+
+const toUser = (r: UserRow): User => ({ id: r.id, email: String(r.email), name: r.name, avatarUrl: r.avatar_url, createdAt: r.created_at.toISOString() });
+
+const USER_COLS = 'id, email, name, avatar_url, created_at';
+
+export class PgUserRepo implements UserRepo {
+  private readonly reaper: NodeJS.Timeout;
+
+  constructor(
+    private readonly pool: Pool,
+    private readonly opts: { sessionTtlMs?: number } = {},
+  ) {
+    // Reap session + magic token kedaluwarsa tiap jam — keduanya tidak pernah dihapus
+    // sendiri oleh query biasa, jadi tabel membesar tanpa batas. `unref` supaya timer
+    // tidak menahan proses hidup; kegagalan (mis. pool sudah end) diabaikan.
+    this.reaper = setInterval(() => {
+      void this.reap().catch(() => {});
+    }, 60 * 60 * 1000);
+    this.reaper.unref();
+  }
+
+  /** Hapus baris mati: session lewat expires_at; magic token lewat expires_at atau sudah dipakai. */
+  private async reap(): Promise<void> {
+    await this.pool.query('DELETE FROM sessions WHERE expires_at < now()');
+    await this.pool.query('DELETE FROM magic_tokens WHERE expires_at < now() OR used_at IS NOT NULL');
+  }
+
+  private ttl(): number {
+    return this.opts.sessionTtlMs ?? DEFAULT_SESSION_TTL_MS;
+  }
+
+  async findUserByIdentity(provider: string, subject: string): Promise<User | undefined> {
+    const { rows } = await this.pool.query<UserRow>(
+      `SELECT ${USER_COLS} FROM users u JOIN identities i ON i.user_id = u.id WHERE i.provider = $1 AND i.subject = $2`,
+      [provider, subject],
+    );
+    return rows[0] === undefined ? undefined : toUser(rows[0]);
+  }
+
+  async findUserByEmail(email: string): Promise<User | undefined> {
+    const { rows } = await this.pool.query<UserRow>(`SELECT ${USER_COLS} FROM users WHERE email = $1`, [email]);
+    return rows[0] === undefined ? undefined : toUser(rows[0]);
+  }
+
+  async upsertUserIdentity(profile: IdentityProfile): Promise<User> {
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN');
+      const found = await client.query<UserRow>(`SELECT ${USER_COLS} FROM users u JOIN identities i ON i.user_id = u.id WHERE i.provider = $1 AND i.subject = $2`, [
+        profile.provider,
+        profile.subject,
+      ]);
+      let row = found.rows[0];
+      if (!row) {
+        // Link-by-email (email citext → case-insensitive): ON CONFLICT menangkap balapan user baru
+        // dengan email sama; profil lama dipertahankan (COALESCE) bila provider tidak mengirim nama.
+        const ins = await client.query<UserRow>(
+          `INSERT INTO users (email, name, avatar_url) VALUES ($1, $2, $3)
+           ON CONFLICT (email) DO UPDATE SET name = COALESCE(users.name, EXCLUDED.name), avatar_url = COALESCE(users.avatar_url, EXCLUDED.avatar_url)
+           RETURNING ${USER_COLS}`,
+          [profile.email, profile.name ?? null, profile.avatarUrl ?? null],
+        );
+        row = ins.rows[0]!;
+        await client.query('INSERT INTO identities (user_id, provider, subject) VALUES ($1, $2, $3) ON CONFLICT (provider, subject) DO NOTHING', [
+          row.id,
+          profile.provider,
+          profile.subject,
+        ]);
+      }
+      await client.query('COMMIT');
+      return toUser(row);
+    } catch (e) {
+      await client.query('ROLLBACK').catch(() => {});
+      throw e;
+    } finally {
+      client.release();
+    }
+  }
+
+  async createSession(userId: string, opts?: { ua?: string }): Promise<{ token: string; expiresAt: Date }> {
+    const token = randomBytes(32).toString('base64url');
+    const expiresAt = new Date(Date.now() + this.ttl());
+    await this.pool.query('INSERT INTO sessions (token, user_id, expires_at, ua) VALUES ($1, $2, $3, $4)', [token, userId, expiresAt, opts?.ua ?? null]);
+    return { token, expiresAt };
+  }
+
+  async sessionUser(token: string): Promise<User | undefined> {
+    // Rolling expiry dalam satu UPDATE bersyarat: session mati menulis 0 baris → undefined.
+    const { rows } = await this.pool.query<{ user_id: string }>('UPDATE sessions SET expires_at = $2 WHERE token = $1 AND expires_at > now() RETURNING user_id', [
+      token,
+      new Date(Date.now() + this.ttl()),
+    ]);
+    const hit = rows[0];
+    if (!hit) return undefined;
+    const { rows: users } = await this.pool.query<UserRow>(`SELECT ${USER_COLS} FROM users WHERE id = $1`, [hit.user_id]);
+    return users[0] === undefined ? undefined : toUser(users[0]);
+  }
+
+  async revokeSession(token: string): Promise<boolean> {
+    const { rowCount } = await this.pool.query('DELETE FROM sessions WHERE token = $1', [token]);
+    return (rowCount ?? 0) > 0;
+  }
+
+  async createMagicToken(email: string, hash: string, expiresAt: Date): Promise<void> {
+    await this.pool.query('INSERT INTO magic_tokens (hash, email, expires_at) VALUES ($1, $2, $3)', [hash, email, expiresAt]);
+  }
+
+  async consumeMagicToken(hash: string): Promise<string | undefined> {
+    // UPDATE bersyarat: token terpakai/kedaluwarsa menulis 0 baris → undefined (sekali pakai, atomik).
+    const { rows } = await this.pool.query<{ email: string }>('UPDATE magic_tokens SET used_at = now() WHERE hash = $1 AND used_at IS NULL AND expires_at > now() RETURNING email', [hash]);
+    return rows[0]?.email;
+  }
+}
+
+type StoredUser = { id: string; email: string; name: string | null; avatarUrl: string | null; createdAt: string };
+type StoredSession = { userId: string; expiresAt: Date };
+type StoredMagic = { email: string; expiresAt: Date; usedAt?: Date };
+
+export class MemoryUserRepo implements UserRepo {
+  private readonly users = new Map<string, StoredUser>();
+  private readonly userIdByEmail = new Map<string, string>();
+  private readonly userIdByIdentity = new Map<string, string>();
+  private readonly sessions = new Map<string, StoredSession>();
+  private readonly magic = new Map<string, StoredMagic>();
+
+  constructor(private readonly opts: { sessionTtlMs?: number } = {}) {}
+
+  private ttl(): number {
+    return this.opts.sessionTtlMs ?? DEFAULT_SESSION_TTL_MS;
+  }
+
+  private toUser(u: StoredUser): User {
+    return { ...u };
+  }
+
+  async findUserByIdentity(provider: string, subject: string): Promise<User | undefined> {
+    const id = this.userIdByIdentity.get(`${provider} ${subject}`);
+    const u = id === undefined ? undefined : this.users.get(id);
+    return u === undefined ? undefined : this.toUser(u);
+  }
+
+  async findUserByEmail(email: string): Promise<User | undefined> {
+    // citext di Pg = case-insensitive; impl memori menormalkan ke lowercase.
+    const id = this.userIdByEmail.get(email.toLowerCase());
+    const u = id === undefined ? undefined : this.users.get(id);
+    return u === undefined ? undefined : this.toUser(u);
+  }
+
+  async upsertUserIdentity(profile: IdentityProfile): Promise<User> {
+    const key = `${profile.provider} ${profile.subject}`;
+    const existing = this.userIdByIdentity.get(key);
+    if (existing !== undefined) return this.toUser(this.users.get(existing)!);
+    const emailKey = profile.email.toLowerCase();
+    let id = this.userIdByEmail.get(emailKey);
+    if (id === undefined) {
+      id = randomUUID();
+      const user: StoredUser = { id, email: profile.email, name: profile.name ?? null, avatarUrl: profile.avatarUrl ?? null, createdAt: new Date().toISOString() };
+      this.users.set(id, user);
+      this.userIdByEmail.set(emailKey, id);
+    } else {
+      // Paritas COALESCE Pg: profil lama dipertahankan bila provider tidak mengirim nama/avatar.
+      const u = this.users.get(id)!;
+      if (u.name === null && profile.name != null) u.name = profile.name;
+      if (u.avatarUrl === null && profile.avatarUrl != null) u.avatarUrl = profile.avatarUrl;
+    }
+    this.userIdByIdentity.set(key, id);
+    return this.toUser(this.users.get(id)!);
+  }
+
+  /** Sapu malas entry mati saat insert — map tidak membesar tanpa batas (paritas reaper Pg). */
+  private sweepExpired(): void {
+    const now = Date.now();
+    for (const [t, s] of this.sessions) if (s.expiresAt.getTime() <= now) this.sessions.delete(t);
+    for (const [h, m] of this.magic) if (m.usedAt !== undefined || m.expiresAt.getTime() <= now) this.magic.delete(h);
+  }
+
+  async createSession(userId: string): Promise<{ token: string; expiresAt: Date }> {
+    const token = randomBytes(32).toString('base64url');
+    const expiresAt = new Date(Date.now() + this.ttl());
+    this.sweepExpired();
+    this.sessions.set(token, { userId, expiresAt });
+    return { token, expiresAt };
+  }
+
+  async sessionUser(token: string): Promise<User | undefined> {
+    const s = this.sessions.get(token);
+    if (!s) return undefined;
+    if (s.expiresAt.getTime() <= Date.now()) {
+      // Bersih malas — paritas reaper Pg (entry mati tidak menumpuk di map).
+      this.sessions.delete(token);
+      return undefined;
+    }
+    // Rolling expiry — paritas UPDATE Pg.
+    s.expiresAt = new Date(Date.now() + this.ttl());
+    const u = this.users.get(s.userId);
+    return u === undefined ? undefined : this.toUser(u);
+  }
+
+  async revokeSession(token: string): Promise<boolean> {
+    return this.sessions.delete(token);
+  }
+
+  async createMagicToken(email: string, hash: string, expiresAt: Date): Promise<void> {
+    this.sweepExpired();
+    this.magic.set(hash, { email, expiresAt });
+  }
+
+  async consumeMagicToken(hash: string): Promise<string | undefined> {
+    const m = this.magic.get(hash);
+    if (!m) return undefined;
+    if (m.usedAt !== undefined || m.expiresAt.getTime() <= Date.now()) {
+      // Bersih malas — paritas reaper Pg.
+      this.magic.delete(hash);
+      return undefined;
+    }
+    m.usedAt = new Date();
+    return m.email;
+  }
 }

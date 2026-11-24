@@ -3,9 +3,10 @@
 //   docker run -d -p 55432:5432 -e POSTGRES_PASSWORD=test postgres:16
 //   DATABASE_URL=postgres://postgres:test@127.0.0.1:55432/postgres pnpm vitest run services/api/src/pg.test.ts
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { createHash } from 'node:crypto';
 import { createDocument } from '@lakar/core';
 import { createPool, migrate } from './db.js';
-import { PgShareRepo, type NewShare } from './repo.js';
+import { PgShareRepo, PgUserRepo, type NewShare } from './repo.js';
 import type { Pool } from 'pg';
 
 const URL_ = process.env.DATABASE_URL;
@@ -28,15 +29,17 @@ const share = (token: string, over: Partial<NewShare> = {}): NewShare => ({
 describe.skipIf(!URL_)('PgShareRepo (Postgres nyata)', () => {
   let pool: Pool;
   let repo: PgShareRepo;
+  let users: PgUserRepo;
   beforeAll(async () => {
     pool = createPool(URL_!);
     await migrate(pool);
     repo = new PgShareRepo(pool);
+    users = new PgUserRepo(pool);
     // Bersihkan sisa run sebelumnya supaya list() deterministik.
-    await pool.query('TRUNCATE share_comments, share_boards, shares CASCADE');
+    await pool.query('TRUNCATE share_comments, share_boards, shares, sessions, magic_tokens, identities, users CASCADE');
   });
   afterAll(async () => {
-    await pool.query('TRUNCATE share_comments, share_boards, shares CASCADE').catch(() => {});
+    await pool.query('TRUNCATE share_comments, share_boards, shares, sessions, magic_tokens, identities, users CASCADE').catch(() => {});
     await repo.close();
   });
 
@@ -131,6 +134,76 @@ describe.skipIf(!URL_)('PgShareRepo (Postgres nyata)', () => {
     expect((await repo.deleteComment('tok_pg_gc', id, 'g2')).status).toBe('forbidden');
     expect((await repo.deleteComment('tok_pg_gc', id, 'g1')).status).toBe('ok');
     expect(await repo.comments('tok_pg_gc')).toHaveLength(0);
+  });
+
+  it('owner_id: create dengan pemilik, ownerOf membedakan null/unknown/revoked, list(owner) tersaring', async () => {
+    const owner = await users.upsertUserIdentity({ provider: 'email', subject: 'owner@x.y', email: 'owner@x.y' });
+    const lain = await users.upsertUserIdentity({ provider: 'email', subject: 'lain@x.y', email: 'lain@x.y' });
+    await repo.create(share('tok_pg_own', { ownerId: owner.id }));
+    await repo.create(share('tok_pg_lain', { ownerId: lain.id }));
+    await repo.create(share('tok_pg_null'));
+    expect(await repo.ownerOf('tok_pg_own')).toBe(owner.id);
+    expect(await repo.ownerOf('tok_pg_null')).toBeNull();
+    expect(await repo.ownerOf('tidak-ada')).toBeUndefined();
+    const mine = await repo.list(owner.id);
+    expect(mine.map((x) => x.token)).toEqual(['tok_pg_own']);
+    const all = await repo.list();
+    expect(all.map((x) => x.token)).toEqual(expect.arrayContaining(['tok_pg_own', 'tok_pg_lain', 'tok_pg_null']));
+    await repo.revoke('tok_pg_own');
+    expect(await repo.ownerOf('tok_pg_own')).toBeUndefined();
+  });
+});
+
+describe.skipIf(!URL_)('PgUserRepo (Postgres nyata)', () => {
+  let pool: Pool;
+  let users: PgUserRepo;
+  beforeAll(async () => {
+    pool = createPool(URL_!);
+    await migrate(pool);
+    users = new PgUserRepo(pool, { sessionTtlMs: 60_000 });
+    await pool.query('TRUNCATE sessions, magic_tokens, identities, users CASCADE');
+  });
+  afterAll(async () => {
+    await pool.query('TRUNCATE sessions, magic_tokens, identities, users CASCADE').catch(() => {});
+    await pool.end();
+  });
+
+  it('upsertUserIdentity: user baru; provider lain email sama → user sama (link-by-email, citext)', async () => {
+    const u1 = await users.upsertUserIdentity({ provider: 'google', subject: 'g-1', email: 'Link@X.Y', name: 'Satu', avatarUrl: 'https://p/1' });
+    expect(u1).toMatchObject({ email: 'Link@X.Y', name: 'Satu', avatarUrl: 'https://p/1' });
+    const u2 = await users.upsertUserIdentity({ provider: 'github', subject: '42', email: 'link@x.y' });
+    expect(u2.id).toBe(u1.id);
+    // Identity yang sama lagi → user sama; cari by identity dan by email (case-insensitive).
+    expect((await users.upsertUserIdentity({ provider: 'google', subject: 'g-1', email: 'link@x.y' })).id).toBe(u1.id);
+    expect((await users.findUserByIdentity('github', '42'))!.id).toBe(u1.id);
+    expect((await users.findUserByEmail('LINK@x.y'))!.id).toBe(u1.id);
+    expect(await users.findUserByIdentity('github', 'zzz')).toBeUndefined();
+  });
+
+  it('session: create → sessionUser (rolling expiry) → revoke; token ngawur → undefined', async () => {
+    const u = await users.upsertUserIdentity({ provider: 'email', subject: 's@x.y', email: 's@x.y' });
+    const { token, expiresAt } = await users.createSession(u.id, { ua: 'vitest' });
+    expect(token).toMatch(/^[A-Za-z0-9_-]{40,}$/);
+    expect(expiresAt.getTime()).toBeGreaterThan(Date.now());
+    const found = await users.sessionUser(token);
+    expect(found!.id).toBe(u.id);
+    // Rolling: expires_at maju setelah dipakai.
+    const { rows } = await pool.query<{ expires_at: Date }>('SELECT expires_at FROM sessions WHERE token = $1', [token]);
+    expect(rows[0]!.expires_at.getTime()).toBeGreaterThanOrEqual(expiresAt.getTime());
+    expect(await users.sessionUser('ngawur')).toBeUndefined();
+    expect(await users.revokeSession(token)).toBe(true);
+    expect(await users.sessionUser(token)).toBeUndefined();
+    expect(await users.revokeSession(token)).toBe(false);
+  });
+
+  it('magic token: consume sekali → email; kedua → undefined; kedaluwarsa → undefined', async () => {
+    const hash = (t: string) => createHash('sha256').update(t).digest('hex');
+    await users.createMagicToken('m@x.y', hash('tok-1'), new Date(Date.now() + 60_000));
+    await users.createMagicToken('exp@x.y', hash('tok-exp'), new Date(Date.now() - 1000));
+    expect(await users.consumeMagicToken(hash('tok-1'))).toBe('m@x.y');
+    expect(await users.consumeMagicToken(hash('tok-1'))).toBeUndefined();
+    expect(await users.consumeMagicToken(hash('tok-exp'))).toBeUndefined();
+    expect(await users.consumeMagicToken(hash('ngawur'))).toBeUndefined();
   });
 });
 

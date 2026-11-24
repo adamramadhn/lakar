@@ -31,7 +31,7 @@ export class ApiFail extends Error {
   }
 }
 
-const unauthorized = () => new ApiFail(401, 'UNAUTHORIZED', 'API key tidak valid atau tidak ada', { hint: 'kirim header authorization: Bearer <LAKAR_API_KEY>' });
+const unauthorized = () => new ApiFail(401, 'UNAUTHORIZED', 'kredensial tidak valid atau tidak ada', { hint: 'kirim header authorization: Bearer <session token atau LAKAR_API_KEY>' });
 const forbidden = (message: string, hint: string) => new ApiFail(403, 'FORBIDDEN', message, { hint });
 const notFound = (what: string) => new ApiFail(404, 'NOT_FOUND', `${what} tidak ada`, { hint: 'periksa URL share; share yang di-revoke tidak bisa diakses lagi' });
 const invalid = (message: string, hint: string) => new ApiFail(400, 'SCHEMA_INVALID', message, { hint });
@@ -148,32 +148,52 @@ const sendShareAsset = (reply: FastifyReply, name: string, type: string) =>
 /** Token capability: 24 byte → 32 char base64url (≥21). */
 export const newShareToken = (): string => randomBytes(24).toString('base64url');
 
+/** Identitas peminta endpoint pemilik: admin key (era LAKAR_API_KEY, kompatibel penuh) atau
+ *  session user akun (spec-cloud-auth). */
+export type Caller = { kind: 'admin' } | { kind: 'user'; userId: string };
+
 export type ShareRoutesOptions = {
   repo: ShareRepo;
-  /** API key endpoint pemilik; kosong/undefined = semua endpoint pemilik 401. */
+  /** API key endpoint pemilik; kosong/undefined = admin key tidak aktif (session masih bisa). */
   apiKey?: string;
-  /** Basis URL publik untuk field `url` (default: Host header permintaan). */
+  /** Basis URL publik untuk field `url` share (satu-satunya sumber host; tanpa ini `url`
+   *  berupa path relatif — header Host klien tidak pernah dipakai, lihat `shareUrl`). */
   publicBaseUrl?: string;
+  /** Resolver Bearer session → user (diisi bila auth aktif); tanpa ini hanya admin key yang berlaku. */
+  sessionOf?: (req: FastifyRequest) => Promise<{ id: string } | undefined>;
 };
 
-export function registerShareRoutes(app: FastifyInstance, { repo, apiKey, publicBaseUrl }: ShareRoutesOptions): void {
+export function registerShareRoutes(app: FastifyInstance, { repo, apiKey, publicBaseUrl, sessionOf }: ShareRoutesOptions): void {
   const ok = (reply: FastifyReply, data: unknown) => reply.code(200).send({ ok: true, data });
-  const requireKey = (req: FastifyRequest) => {
-    // timingSafeEqual supaya perbandingan key tidak bocor lewat waktu respons; panjang dicek dulu
-    // (timingSafeEqual melempar bila beda panjang — selisih panjang sendiri bukan rahasia).
+  /** Admin key (timingSafeEqual supaya perbandingan tidak bocor lewat waktu respons; panjang dicek
+   *  dulu — timingSafeEqual melempar bila beda panjang, selisih panjang sendiri bukan rahasia). */
+  const isAdmin = (req: FastifyRequest): boolean => {
     const expected = Buffer.from(`Bearer ${apiKey ?? ''}`, 'utf8');
     const given = Buffer.from(req.headers.authorization ?? '', 'utf8');
-    if (!apiKey || given.length !== expected.length || !timingSafeEqual(given, expected)) throw unauthorized();
+    return !!apiKey && given.length === expected.length && timingSafeEqual(given, expected);
   };
-  /** Basis URL publik: env `PUBLIC_BASE_URL` > proto `x-forwarded-proto` (satu hop proxy
-   *  tepercaya, mis. TLS terminator) + header Host. Deploy di belakang proxy umum: set
-   *  PUBLIC_BASE_URL eksplisit supaya field `url` tidak bergantung header klien. */
-  const baseOf = (req: FastifyRequest) => {
-    if (publicBaseUrl) return publicBaseUrl;
-    const fwd = req.headers['x-forwarded-proto'];
-    const proto = (typeof fwd === 'string' ? fwd.split(',')[0]!.trim() : '') === 'https' ? 'https' : 'http';
-    return `${proto}://${req.headers.host ?? 'localhost'}`;
+  /** Endpoint pemilik menerima admin key ATAU Bearer session akun (compat: key lama tetap admin). */
+  const requireIdentity = async (req: FastifyRequest): Promise<Caller> => {
+    if (isAdmin(req)) return { kind: 'admin' };
+    const user = sessionOf ? await sessionOf(req) : undefined;
+    if (user) return { kind: 'user', userId: user.id };
+    throw unauthorized();
   };
+  /** Scoping PATCH/PUT/DELETE: admin boleh semua; session user hanya share dengan owner_id = dia.
+   *  Share owner_id NULL (era admin-key) hanya bisa dikelola admin — bukan "milik semua user". */
+  const requireShareOwner = async (req: FastifyRequest, token: string): Promise<void> => {
+    const caller = await requireIdentity(req);
+    if (caller.kind === 'admin') return;
+    const owner = await repo.ownerOf(token);
+    if (owner === undefined) throw notFound(`share ${token}`);
+    if (owner !== caller.userId) throw forbidden(`share ${token} milik akun lain`, 'hanya pemilik share (atau admin key) yang boleh mengubah/menghapusnya');
+  };
+  /** Field `url` share membawa token capability di path — JANGAN pernah diturunkan dari
+   *  header Host/x-forwarded-proto klien (bisa dipalsukan; klien yang menempelkan `url`
+   *  hasil craft akan menyebarkan link phishing ber-token). Absolut hanya dari
+   *  PUBLIC_BASE_URL; tanpa itu kirim path relatif `/s/<token>` dan klien menggabungkan
+   *  host yang dia ketahui sendiri. */
+  const shareUrl = (token: string): string => (publicBaseUrl ? `${publicBaseUrl}/s/${token}` : `/s/${token}`);
   const metaOf = async (token: string) => (await repo.get(token)) ?? Promise.reject(notFound(`share ${token}`));
 
   /** guestId peminta dari header `x-lakar-guest-id` (UUID di localStorage klien) — dasar flag `mine`. */
@@ -190,7 +210,7 @@ export function registerShareRoutes(app: FastifyInstance, { repo, apiKey, public
 
   // Upload snapshot dari lakard (pemilik). Dokumen divalidasi penuh `parseDocument` sebelum disimpan.
   app.post('/api/shares', async (req, reply) => {
-    requireKey(req);
+    const caller = await requireIdentity(req);
     const body = parse(CreateShareBody, req.body, CREATE_HINT);
     // board_id ganda akan gagal PK (token, board_id) dengan 500 — tangkap duluan sebagai 400.
     const boardIds = body.boards.map((b) => b.id);
@@ -212,32 +232,34 @@ export function registerShareRoutes(app: FastifyInstance, { repo, apiKey, public
       boards: body.boards.map((b) => ({ id: b.id, name: b.name, x: b.x, y: b.y, w: b.w, h: b.h, png: pngOf(b.pngB64, b.id) })),
       // Default +30 hari; "Never" → klien mengirim expiresAt:null.
       expiresAt: body.expiresAt === undefined ? new Date(Date.now() + DEFAULT_EXPIRY_MS) : body.expiresAt === null ? null : new Date(body.expiresAt),
+      // Session user menjadi pemilik share; admin key → owner_id NULL (era workspace).
+      ownerId: caller.kind === 'user' ? caller.userId : undefined,
     });
-    return ok(reply, { token, url: `${baseOf(req)}/s/${token}` });
+    return ok(reply, { token, url: shareUrl(token) });
   });
 
-  // Daftar share aktif (pemilik).
+  // Daftar share aktif (pemilik): admin melihat semua, session user hanya miliknya.
   app.get('/api/shares', async (req, reply) => {
-    requireKey(req);
-    return ok(reply, { shares: await repo.list() });
+    const caller = await requireIdentity(req);
+    return ok(reply, { shares: await repo.list(caller.kind === 'user' ? caller.userId : undefined) });
   });
 
   // PATCH izin/kedaluwarsa (pemilik): berlaku instan tanpa re-upload; url ikut meta terbaru.
   app.patch<{ Params: { token: string } }>('/api/shares/:token', async (req, reply) => {
-    requireKey(req);
+    await requireShareOwner(req, req.params.token);
     const body = parse(PatchShareBody, req.body, PATCH_HINT);
     const meta = await repo.update(req.params.token, {
       ...(body.permissions !== undefined ? { permissions: body.permissions } : {}),
       ...(body.expiresAt !== undefined ? { expiresAt: body.expiresAt === null ? null : new Date(body.expiresAt) } : {}),
     });
     if (!meta) throw notFound(`share ${req.params.token}`);
-    return ok(reply, { ...meta, url: `${baseOf(req)}/s/${meta.token}` });
+    return ok(reply, { ...meta, url: shareUrl(meta.token) });
   });
 
   // PUT snapshot baru (pemilik, "Update snapshot"): ganti doc+PNG dalam satu transaksi, token/URL
   // dan komentar tetap. Body sama POST dengan title/slug/permissions opsional (dipertahankan).
   app.put<{ Params: { token: string } }>('/api/shares/:token', async (req, reply) => {
-    requireKey(req);
+    await requireShareOwner(req, req.params.token);
     const body = parse(RefreshShareBody, req.body, CREATE_HINT);
     const boardIds = body.boards.map((b) => b.id);
     if (new Set(boardIds).size !== boardIds.length) throw invalid('boards[].id ganda: tiap board harus punya id unik', CREATE_HINT);
@@ -256,7 +278,7 @@ export function registerShareRoutes(app: FastifyInstance, { repo, apiKey, public
       ...(body.permissions !== undefined ? { permissions: body.permissions } : {}),
     });
     if (!done) throw notFound(`share ${req.params.token}`);
-    return ok(reply, { token: req.params.token, url: `${baseOf(req)}/s/${req.params.token}` });
+    return ok(reply, { token: req.params.token, url: shareUrl(req.params.token) });
   });
 
   // Meta publik share (capability URL): judul, izin, boards + imageUrl, komentar aktif, kedaluwarsa,
@@ -354,7 +376,7 @@ export function registerShareRoutes(app: FastifyInstance, { repo, apiKey, public
 
   // Revoke (pemilik): semua GET publik share itu langsung 404.
   app.delete<{ Params: { token: string } }>('/api/shares/:token', async (req, reply) => {
-    requireKey(req);
+    await requireShareOwner(req, req.params.token);
     if (!(await repo.revoke(req.params.token))) throw notFound(`share ${req.params.token}`);
     return reply.code(204).send();
   });

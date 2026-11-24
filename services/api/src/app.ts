@@ -3,6 +3,7 @@
 import Fastify, { type FastifyInstance } from 'fastify';
 import { LakarError } from '@lakar/schema';
 import { ApiFail, registerShareRoutes, type ShareRoutesOptions } from './routes.js';
+import { registerAuthRoutes, sessionOf, type AuthDeps } from './auth.js';
 import type { ShareRepo } from './repo.js';
 
 /** Kode ErrorCode daemon → status HTTP (subset yang mungkin lewat: validasi dokumen). */
@@ -17,9 +18,12 @@ export type ApiOptions = ShareRoutesOptions & {
   /** Batas body upload share (dokumen + PNG base64 bisa beberapa MB). */
   bodyLimit?: number;
   logger?: boolean;
+  /** Deps auth (spec-cloud-auth): bila diisi, route `/api/auth/*` didaftarkan dan endpoint
+   *  pemilik shares juga menerima Bearer session di samping admin key. */
+  auth?: AuthDeps;
 };
 
-export function buildApi({ repo, apiKey, publicBaseUrl, bodyLimit = 64 * 1024 * 1024, logger = false }: ApiOptions): FastifyInstance {
+export function buildApi({ repo, apiKey, publicBaseUrl, auth, bodyLimit = 64 * 1024 * 1024, logger = false }: ApiOptions): FastifyInstance {
   const app = Fastify({ logger, bodyLimit });
 
   // Route tak dikenal tetap memakai envelope {ok:false,error} (bukan HTML/JSON default fastify).
@@ -47,10 +51,17 @@ export function buildApi({ repo, apiKey, publicBaseUrl, bodyLimit = 64 * 1024 * 
     return reply.code(500).send({ ok: false, error: { code: 'EXEC_ERROR', message: `kesalahan internal api: ${e.message ?? String(err)}`, hint: 'coba lagi; periksa log service', retryable: true } });
   });
 
-  registerShareRoutes(app, { repo, ...(apiKey ? { apiKey } : {}), ...(publicBaseUrl ? { publicBaseUrl } : {}) });
+  registerShareRoutes(app, {
+    repo,
+    ...(apiKey ? { apiKey } : {}),
+    ...(publicBaseUrl ? { publicBaseUrl } : {}),
+    ...(auth ? { sessionOf: sessionOf(auth.userRepo) } : {}),
+  });
+  if (auth) registerAuthRoutes(app, { ...auth, publicBaseUrl: auth.publicBaseUrl ?? publicBaseUrl });
   return app;
 }
 
 export type { ShareRepo };
-export { MemoryShareRepo, PgShareRepo } from './repo.js';
+export { MemoryShareRepo, MemoryUserRepo, PgShareRepo, PgUserRepo } from './repo.js';
+export { registerAuthRoutes, resendMailer, sessionOf, type AuthDeps, type FetchFn, type SendMail } from './auth.js';
 export { createPool, migrate, MIGRATIONS_DIR } from './db.js';
