@@ -10,6 +10,7 @@ import { IdAllocator, type DocumentLocks } from '@lakar/core';
 import { COMMENT_TEXT_MAX, ID_PATTERN, LakarError, SESSION_HEADER, SLUG_PATTERN, type AnyNode, type CommentAuthor, type CommentThread, type HistoryEntry, type LakarDocument } from '@lakar/schema';
 import { z } from 'zod';
 import { VIEWER_CLIENT, originOf, type ActivityBus } from './events.js';
+import type { RoomRegistry } from './rooms.js';
 import { activePageIndex, authorOf, noteWrite, type Session } from './sessions.js';
 import type { DocStore } from './store.js';
 import type { ActiveDoc } from './agent-pages.js';
@@ -20,6 +21,8 @@ export type CommentRoutesOptions = {
   store: DocStore;
   docLocks: DocumentLocks;
   activeDoc: ActiveDoc;
+  /** Room `@lakar/sync` yang digabung: dokumen aktif bisa berupa replika room. */
+  rooms?: RoomRegistry;
 };
 
 const parse = <S extends z.ZodType>(schema: S, body: unknown, hint: string): z.output<S> => {
@@ -157,10 +160,25 @@ export const filterThreads = (doc: LakarDocument, body: z.output<typeof ListBody
   return threads;
 };
 
-export function registerCommentRoutes(app: FastifyInstance, { docs, store, docLocks, activeDoc }: CommentRoutesOptions): void {
-  /** Commit pola agent-pages: kunci → clone → mutate → rev+1 + riwayat + snapshot → memori → noteWrite. */
-  const run = async <T>(slug: string, session: Session, mutate: Mutate<T>): Promise<{ slug: string; rev: number } & T> =>
-    docLocks.run(slug, async () => {
+export function registerCommentRoutes(app: FastifyInstance, { docs, store, docLocks, activeDoc, rooms }: CommentRoutesOptions): void {
+  /** Commit pola agent-pages: kunci → clone → mutate → rev+1 + riwayat + snapshot → memori → noteWrite.
+   *  Slug room: mutasi dijalankan ulang oleh `commit` pada replika TERKINI setiap kali ops dikirim
+   *  (`setComments` = replace array penuh — payload basi akan menimpa komentar peer yang mendarat
+   *  selama resync). `extra` diambil dari build terakhir yang benar-benar dikirim. */
+  const run = async <T>(slug: string, session: Session, mutate: Mutate<T>): Promise<{ slug: string; rev: number } & T> => {
+    const room = rooms?.get(slug);
+    if (room) {
+      let latest: { changed: boolean; description: string; extra: T } | undefined;
+      const r = await room.client.commit((base) => {
+        const next = structuredClone(base);
+        const m = mutate(next);
+        latest = m;
+        if (!m.changed) return null;
+        return { ops: [{ op: 'setComments', comments: (next.comments ?? null) as Record<string, unknown>[] | null }], description: m.description };
+      });
+      return { slug, rev: r.doc.rev, ...latest!.extra };
+    }
+    return docLocks.run(slug, async () => {
       const doc = docs.get(slug)!;
       const next = structuredClone(doc);
       const { changed, description, extra } = mutate(next);
@@ -172,12 +190,13 @@ export function registerCommentRoutes(app: FastifyInstance, { docs, store, docLo
       noteWrite(session, committed.id, doc.rev);
       return { slug, rev: committed.rev, ...extra };
     });
+  };
 
   // Daftar thread di dokumen aktif; filter status (open/resolved/all), pageId, kind penulis pembuka.
   app.post('/comments', async (req, reply) => {
     const { slug } = activeDoc(req.headers[SESSION_HEADER]);
     const body = parse(ListBody, req.body, 'kirim {status?, pageId?, kind?} (semua opsional)');
-    const doc = docs.get(slug)!;
+    const doc = docs.get(slug) ?? rooms?.doc(slug)!;
     const open = (doc.comments ?? []).filter((t) => t.status === 'open').length;
     return ok(reply, { docId: doc.id, slug, rev: doc.rev, total: (doc.comments ?? []).length, open, threads: filterThreads(doc, body) });
   });
@@ -221,6 +240,8 @@ export type ViewerCommentRoutesOptions = {
   docLocks: DocumentLocks;
   /** Bus aktivitas: tulis komentar sukses memancarkan `change` edit supaya jendela viewer lain memuat ulang. */
   activity?: ActivityBus;
+  /** Room `@lakar/sync` yang digabung: komentar di slug room menjadi op `setComments`. */
+  rooms?: RoomRegistry;
 };
 
 /** Thread di respons list viewer: nama halaman/layer untuk panel komentar (aditif; dokumen tersimpan tidak berubah). */
@@ -232,7 +253,7 @@ export type ViewerCommentThread = CommentThread & { pageName?: string; nodeName?
  * selalu pengguna (`authorFor(undefined)` = `{kind:'user', name:'You'}`), riwayat `lakar-viewer` seperti kelola
  * file, pageId default halaman pertama, dan event `change` edit dipancarkan manual (preHandler butuh sesi).
  */
-export function registerViewerCommentRoutes(app: FastifyInstance, { docs, store, docLocks, activity }: ViewerCommentRoutesOptions): void {
+export function registerViewerCommentRoutes(app: FastifyInstance, { docs, store, docLocks, activity, rooms }: ViewerCommentRoutesOptions): void {
   const checkSlug = (slug: string) => {
     if (!SLUG_PATTERN.test(slug)) {
       throw new LakarError('SCHEMA_INVALID', `slug tidak valid: ${JSON.stringify(slug)}`, {
@@ -244,9 +265,23 @@ export function registerViewerCommentRoutes(app: FastifyInstance, { docs, store,
   // Paritas `noteWrite` route agen: viewer tidak punya sesi, jadi basis tulis disimpan di objek bersama ini.
   const viewerWrites: Pick<Session, 'bases'> = {};
 
-  /** Commit pola `run` route agen, atas nama viewer: kunci → clone → mutate → riwayat `lakar-viewer` → memori. */
-  const run = async <T>(slug: string, mutate: Mutate<T>): Promise<{ slug: string; rev: number; changed: boolean } & T> =>
-    docLocks.run(slug, async () => {
+  /** Commit pola `run` route agen, atas nama viewer: kunci → clone → mutate → riwayat `lakar-viewer` → memori.
+   *  Slug room: mutasi dijalankan ulang oleh `commit` pada replika terkini (alasan sama dengan `run` agen:
+   *  `setComments` replace penuh tidak boleh dibangun dari clone basi). */
+  const run = async <T>(slug: string, mutate: Mutate<T>): Promise<{ slug: string; rev: number; changed: boolean } & T> => {
+    const room = rooms?.get(slug);
+    if (room) {
+      let latest: { changed: boolean; description: string; extra: T } | undefined;
+      const r = await room.client.commit((base) => {
+        const next = structuredClone(base);
+        const m = mutate(next);
+        latest = m;
+        if (!m.changed) return null;
+        return { ops: [{ op: 'setComments', comments: (next.comments ?? null) as Record<string, unknown>[] | null }], description: m.description };
+      });
+      return { slug, rev: r.doc.rev, changed: latest!.changed, ...latest!.extra };
+    }
+    return docLocks.run(slug, async () => {
       const doc = docs.get(slug) ?? (await store.read(slug));
       if (!doc) throw notFound(slug);
       const next = structuredClone(doc);
@@ -259,6 +294,7 @@ export function registerViewerCommentRoutes(app: FastifyInstance, { docs, store,
       noteWrite(viewerWrites, committed.id, doc.rev);
       return { slug, rev: committed.rev, changed: true, ...extra };
     });
+  };
 
   /** Event `change` edit untuk jendela lain hanya bila rev naik (resolve idempoten tidak memancarkan apa pun). */
   const notify = (headers: Record<string, string | string[] | undefined>, data: { slug: string; rev: number; changed: boolean }) => {
@@ -272,7 +308,7 @@ export function registerViewerCommentRoutes(app: FastifyInstance, { docs, store,
     const { slug } = req.params;
     checkSlug(slug);
     const body = parse(ListBody, req.body, 'kirim {status?, pageId?, kind?} (semua opsional)');
-    const doc = docs.get(slug) ?? (await peekDocument(store, slug));
+    const doc = docs.get(slug) ?? rooms?.doc(slug) ?? (await peekDocument(store, slug));
     if (!doc) throw notFound(slug);
     const threads: ViewerCommentThread[] = filterThreads(doc, body).map((t) => {
       const pageName = doc.pages.find((p) => p.id === t.pageId)?.name;

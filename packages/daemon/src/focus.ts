@@ -75,9 +75,11 @@ export type FocusRoutesOptions = {
   docs: ReadonlyMap<string, unknown>;
   store: DocStore;
   focus: FocusStore;
+  /** Room yang digabung: slug `room-*` adalah dokumen sah untuk difokuskan (story 5). */
+  rooms?: { has(slug: string): boolean };
 };
 
-export function registerFocusRoutes(app: FastifyInstance, { docs, store, focus }: FocusRoutesOptions): void {
+export function registerFocusRoutes(app: FastifyInstance, { docs, store, focus, rooms }: FocusRoutesOptions): void {
   app.put('/viewer/focus', async (req, reply) => {
     const parsed = PutBody.safeParse(req.body);
     if (!parsed.success) {
@@ -90,7 +92,7 @@ export function registerFocusRoutes(app: FastifyInstance, { docs, store, focus }
           hint: `slug harus cocok pola ${SLUG_PATTERN.source} (huruf kecil, angka, tanda hubung; maks 64)`,
         });
       }
-      if (!docs.has(slug) && !(await store.exists(slug))) throw new LakarError('NOT_FOUND', `dokumen ${slug} tidak ada`, { hint: 'pakai slug dari GET /viewer/docs' });
+      if (!docs.has(slug) && !rooms?.has(slug) && !(await store.exists(slug))) throw new LakarError('NOT_FOUND', `dokumen ${slug} tidak ada`, { hint: 'pakai slug dari GET /viewer/docs' });
     }
     focus.set(originOf(req.headers), slug);
     return reply.code(200).send({ ok: true, data: { slug, focused: focus.current() ?? null } });

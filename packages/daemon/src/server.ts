@@ -23,7 +23,6 @@ import {
   summarizeFindings,
   type AnyNode,
   type ApiErrorBody,
-  type ErrorCode,
   type IconGlyph,
   type LakarDocument,
   type ResolvedDocument,
@@ -34,7 +33,7 @@ import { join } from 'node:path';
 import { randomBytes } from 'node:crypto';
 import { readAsset } from './assets.js';
 import { PhotoService, SEARCH_LIMIT_MAX } from './photos/service.js';
-import { notFound } from './errors.js';
+import { STATUS, notFound } from './errors.js';
 import { runCheck } from './check.js';
 import { CheckLedger } from './checks.js';
 import { readRenderModule, RENDER_PAGE_HTML } from './chromium.js';
@@ -47,7 +46,8 @@ import { registerAgentPageRoutes } from './agent-pages.js';
 import { registerAnalyzeRoutes } from './analyze.js';
 import { registerCommentRoutes, registerViewerCommentRoutes } from './comments.js';
 import { DocStore } from './store.js';
-import { ActivityBus, agentOf, registerActivityHooks } from './events.js';
+import { ActivityBus, VIEWER_CLIENT, agentOf, registerActivityHooks } from './events.js';
+import { RoomRegistry, registerRoomRoutes, roomCall } from './rooms.js';
 import { registerConnectionRoutes } from './connections.js';
 import { registerHarnessRoutes, type HarnessDeps } from './harnesses.js';
 import { FILES_LOCK, freeSlugFor, registerFileRoutes, slugClaimed, slugify } from './files.js';
@@ -66,25 +66,6 @@ import { registerVisualDiffRoutes } from './visual-diff.js';
 import { HugHeights } from './hug-heights.js';
 import { registerCodeExportRoutes } from './code-export.js';
 import { VIEWER_DIST_DIR, peekDocument, registerViewerRoutes } from './viewer.js';
-
-const STATUS: Record<ErrorCode, number> = {
-  SCHEMA_INVALID: 400,
-  NOT_FOUND: 404,
-  CONFLICT: 409,
-  NO_ACTIVE_DOC: 409,
-  EXEC_TIMEOUT: 422,
-  EXEC_ERROR: 422,
-  ICON_UNKNOWN: 422,
-  TOKEN_UNKNOWN: 422,
-  FONT_MISSING: 422,
-  RENDER_FAILED: 503,
-  EXPORT_FAILED: 500,
-  VERSION_MISMATCH: 409,
-  // Dipakai transport file (`lakar --file`): fitur yang butuh render/jaringan/viewer. 501 = not implemented.
-  NOT_SUPPORTED: 501,
-  // Dipakai transport server (`lakar --server`): capability token room menolak aksi (mis. token view menulis).
-  FORBIDDEN: 403,
-};
 
 /** Parser impor CSS variables (@lakar/render) untuk `importCssVariables` di execute (exec tidak bergantung pada render, AD-17). */
 const CSS_VARIABLES = { parse: parseCssVariables };
@@ -296,6 +277,8 @@ export type Daemon = {
   photos: PhotoService;
   /** Bus event aktivitas viewer (`GET /viewer/events`). */
   activity: ActivityBus;
+  /** Room `@lakar/sync` yang digabung (slug `room-<token6>`; spec-collab-cloud story 5). */
+  rooms: RoomRegistry;
   /** Seleksi canvas efemeral per dokumen (AD-9). */
   selections: SelectionStore;
   /** Dokumen yang difokuskan tiap jendela viewer (spec-agent-open-doc). */
@@ -332,6 +315,26 @@ export function buildServer({
   const focus = new FocusStore();
   /** Tumpukan undo/redo agen per sesi per dokumen, hanya di memori (spec-agent-undo). */
   const agentSteps = new AgentSteps();
+
+  // Room cloud (spec-collab-cloud story 5): dokumen `@lakar/sync` yang digabung dipetakan sebagai slug
+  // `room-<token6>` — replika lokal di memori (tanpa DocStore), tulis sebagai ops ke sequencer room.
+  const rooms = new RoomRegistry({
+    activity,
+    transport: { icons },
+    client: VIEWER_CLIENT,
+    // Cek dua arah anti-tabrakan slug: join tidak menempel di atas file lokal (memori/disk/arsip),
+    // dan helper slug files.ts sebaliknya menghindari slug room yang sedang ter-mount.
+    claimed: (slug) => slugClaimed(docs, store, slug),
+    touched: (prev, next) => touchedBoards(resolveDocument(prev), resolveDocument(next)),
+    // Leave melepas sesi yang terpaku ke room itu (seperti delete lokal) dan membuang fokus/seleksinya.
+    onLeave: (slug) => {
+      sessions.retarget(slug, undefined);
+      selections.onFileChange({ kind: 'delete', slug });
+      focus.onFileChange({ kind: 'delete', slug });
+    },
+  });
+  /** Dokumen lokal ATAU replika room untuk route baca/render (replika boleh dipakai render pool, catatan desain). */
+  const docOf = (slug: string): LakarDocument | undefined => rooms.doc(slug) ?? docs.get(slug);
 
   const ok = (reply: FastifyReply, data: unknown) => reply.code(200).send({ ok: true, data });
   /** Catatan aditif: foto jarak jauh yang tampil sebagai placeholder (cache dingin + jaringan gagal). */
@@ -485,9 +488,9 @@ export function buildServer({
       throw new LakarError('SCHEMA_INVALID', `nama ${JSON.stringify(name)} tidak menghasilkan nama file yang valid`, { hint: 'pakai huruf atau angka, mis. "My Landing" → my-landing' });
     }
     return docLocks.run(FILES_LOCK, async () => {
-      const slug = await freeSlugFor(docs, store, base);
+      const slug = await freeSlugFor(docs, store, base, rooms);
       return docLocks.run(slug, async () => {
-        if (await slugClaimed(docs, store, slug)) throw new LakarError('CONFLICT', `dokumen ${slug} baru saja dibuat`, { hint: 'coba lagi', retryable: true });
+        if (await slugClaimed(docs, store, slug, rooms)) throw new LakarError('CONFLICT', `dokumen ${slug} baru saja dibuat`, { hint: 'coba lagi', retryable: true });
         const doc = createDocument();
         await store.dropOrphanHistory(slug);
         await store.write(slug, doc);
@@ -511,12 +514,15 @@ export function buildServer({
           hint: `slug harus cocok pola ${SLUG_PATTERN.source} (huruf kecil, angka, tanda hubung; maks 64)`,
         });
       }
-      result = { ...(await openOrCreate(slug)), slug, source: 'slug' };
+      const roomDoc = rooms.doc(slug);
+      result = roomDoc ? { doc: roomDoc, slug, created: false, source: 'slug' } : { ...(await openOrCreate(slug)), slug, source: 'slug' };
     } else {
       const focused = focus.current();
       // Dokumen fokus bisa hilang dari disk di antara laporan dan open (dihapus dari luar aplikasi): buat baru.
-      const hit = focused !== undefined && (docs.has(focused) || (await store.exists(focused))) ? focused : undefined;
-      if (hit !== undefined) result = { ...(await openOrCreate(hit)), slug: hit, source: 'viewer' };
+      const hit = focused !== undefined && (docs.has(focused) || rooms.has(focused) || (await store.exists(focused))) ? focused : undefined;
+      const hitRoom = hit !== undefined ? rooms.doc(hit) : undefined;
+      if (hitRoom && hit !== undefined) result = { doc: hitRoom, slug: hit, created: false, source: 'viewer' };
+      else if (hit !== undefined) result = { ...(await openOrCreate(hit)), slug: hit, source: 'viewer' };
       else result = { ...(await createFresh(body.name?.trim() || DEFAULT_DOC_NAME)), created: true, source: 'created' };
     }
     const { doc, slug, created, source } = result;
@@ -549,7 +555,7 @@ export function buildServer({
     parse(ListDocumentsBody, req.body ?? undefined, 'kirim {} (tanpa argumen)');
     const focused = focus.current();
     const seen = new Set<string>();
-    type Entry = { slug: string; name: string; rev: number; updatedAt: string; open: boolean; focused: boolean; active?: true };
+    type Entry = { slug: string; name: string; rev: number; updatedAt: string; open: boolean; focused: boolean; active?: true; remote?: true; server?: string; peers?: number };
     const documents: Entry[] = [];
     const push = (slug: string, doc: LakarDocument, mtimeMs: number) => {
       seen.add(slug);
@@ -573,12 +579,19 @@ export function buildServer({
     }
     // Dokumen yang hanya ada di memori (file dihapus dari luar, salinan masih dipakai sesi).
     for (const [slug, doc] of docs) if (!seen.has(slug)) push(slug, doc, Date.now());
+    // Dokumen room yang sedang digabung (spec-collab-cloud story 5; field remote/server/peers additive).
+    for (const r of rooms.list()) {
+      documents.push({ slug: r.slug, name: r.name, rev: r.rev, updatedAt: r.updatedAt, open: focus.isOpen(r.slug), focused: r.slug === focused, remote: true, server: r.server, peers: r.peers, ...(r.slug === session.activeSlug ? { active: true as const } : {}) });
+    }
     documents.sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : a.updatedAt > b.updatedAt ? -1 : a.slug.localeCompare(b.slug)));
     return ok(reply, { documents, focused: focused ?? null, ...(session.activeSlug ? { active: session.activeSlug } : {}) });
   });
 
   app.post('/execute', async (req, reply) => {
     const { session, slug } = activeDoc(req.headers[SESSION_HEADER]);
+    // Dokumen room: snippet → ops lewat DocTransport replika (paritas penuh termasuk editId/dryRun).
+    const room = rooms.get(slug);
+    if (room) return roomCall(room, '/execute', req.body ?? {}, reply, agentOf(req.headers));
     const body = parse(ExecuteBody, req.body, EXECUTE_BODY_HINT);
     if (body.code !== undefined && body.editId !== undefined) {
       throw new LakarError('SCHEMA_INVALID', 'kirim code ATAU editId, bukan keduanya', {
@@ -751,7 +764,7 @@ export function buildServer({
       throw new LakarError('SCHEMA_INVALID', 'kirim boardId ATAU nodeId, bukan keduanya', { hint: SCREENSHOT_HINT });
     }
     // AD-6/AD-16: render hanya menerima dokumen ter-resolve; token diselesaikan di daemon.
-    const doc = resolveDocument(docs.get(slug)!);
+    const doc = resolveDocument(docOf(slug)!);
     // scale 2 = zoom review (piksel 2× bounds); default 1 = perilaku lama.
     const scaleOpt = body?.scale === 2 ? { scale: 2 as const } : {};
     if (body?.nodeId !== undefined) {
@@ -781,7 +794,7 @@ export function buildServer({
   app.post('/boards', async (req, reply) => {
     const { slug } = activeDoc(req.headers[SESSION_HEADER]);
     parse(BoardsBody, req.body ?? undefined, 'kirim {} (tanpa argumen)');
-    const stored = docs.get(slug)!;
+    const stored = docOf(slug)!;
     const resolved = resolveDocument(stored);
     // Board hug: `height` = tinggi terukur (angka, seperti board fixed) + `heightMode:'hug'`; gagal render → 0.
     const heights = await hugs.ensure(render, resolved);
@@ -808,7 +821,7 @@ export function buildServer({
   app.post('/inspect', async (req, reply) => {
     const { slug } = activeDoc(req.headers[SESSION_HEADER]);
     const body = parse(InspectBody, req.body, `kirim {id, depth?} (depth 0–${INSPECT_DEPTH_MAX}, default ${INSPECT_DEPTH_DEFAULT})`);
-    const stored = docs.get(slug)!;
+    const stored = docOf(slug)!;
     const resolved = resolveDocument(stored);
     const hit = locateNode(stored, body.id);
     const rBoard = hit ? findBoard(resolved, hit.board.id) : undefined;
@@ -825,7 +838,7 @@ export function buildServer({
   app.post('/export', async (req, reply) => {
     const { slug } = activeDoc(req.headers[SESSION_HEADER]);
     const body = parse(ExportBody, req.body ?? undefined, 'kirim {id?, scale?}: id board/node (default board pertama), scale 1 atau 2 (default 1)');
-    const stored = docs.get(slug)!;
+    const stored = docOf(slug)!;
     const doc = resolveDocument(stored);
     const id = body?.id ?? firstBoardId(doc);
     if (!id) throw notFound(`dokumen ${slug} belum punya board`, 'buat board dulu lewat execute');
@@ -874,7 +887,7 @@ export function buildServer({
   app.post('/layout-check', async (req, reply) => {
     const { slug } = activeDoc(req.headers[SESSION_HEADER]);
     const body = parse(LayoutCheckBody, req.body ?? undefined, 'kirim {boardId?} (tanpa boardId = semua board dokumen aktif)');
-    const stored = docs.get(slug)!;
+    const stored = docOf(slug)!;
     const doc = resolveDocument(stored);
     let boardIds: string[];
     if (body?.boardId !== undefined) {
@@ -929,7 +942,7 @@ export function buildServer({
   });
 
   // Viewer baca-saja (Viewer B slice 1): `/viewer/*` dan `/app/*`. Route lama tidak berubah.
-  registerViewerRoutes(app, { docs, store, sessions, checks, distDir: config.viewerDir ?? VIEWER_DIST_DIR, serveStatic: !headless });
+  registerViewerRoutes(app, { docs, store, sessions, checks, distDir: config.viewerDir ?? VIEWER_DIST_DIR, serveStatic: !headless, rooms });
   registerFileRoutes(app, {
     docs,
     store,
@@ -937,20 +950,22 @@ export function buildServer({
     docLocks,
     activity,
     dataDir: config.dataDir,
+    rooms,
     onChange: (c) => {
       selections.onFileChange(c);
       focus.onFileChange(c);
     },
   });
-  registerFocusRoutes(app, { docs, store, focus });
-  registerPageRoutes(app, { docs, store, docLocks, activity });
-  registerAgentPageRoutes(app, { docs, store, docLocks, activeDoc });
-  registerCommentRoutes(app, { docs, store, docLocks, activeDoc });
+  registerFocusRoutes(app, { docs, store, focus, rooms });
+  registerPageRoutes(app, { docs, store, docLocks, activity, rooms });
+  registerAgentPageRoutes(app, { docs, store, docLocks, activeDoc, rooms });
+  registerCommentRoutes(app, { docs, store, docLocks, activeDoc, rooms });
   // Komentar dari aplikasi (story 9.4): penulis pengguna + event `change` untuk jendela lain.
-  registerViewerCommentRoutes(app, { docs, store, docLocks, activity });
-  registerAnalyzeRoutes(app, { docs, activeDoc });
-  registerOpsRoutes(app, { docs, store, docLocks, activity, icons });
-  registerFixCheckRoutes(app, { docs, store, docLocks, sessions, render, hugs, checks, agentSteps, icons });
+  registerViewerCommentRoutes(app, { docs, store, docLocks, activity, rooms });
+  registerAnalyzeRoutes(app, { docs, activeDoc, rooms });
+  registerOpsRoutes(app, { docs, store, docLocks, activity, icons, rooms });
+  registerRoomRoutes(app, { rooms });
+  registerFixCheckRoutes(app, { docs, store, docLocks, sessions, render, hugs, checks, agentSteps, icons, rooms });
   // Paste HTML (story 4): render terisolasi lewat renderer Chromium bila ada (renderer palsu tes → RENDER_FAILED).
   const snapshotter = typeof (render as Partial<HtmlSnapshotter>).snapshotHtml === 'function' ? (render as unknown as HtmlSnapshotter) : undefined;
   registerPasteRoutes(app, {
@@ -959,6 +974,7 @@ export function buildServer({
     docLocks,
     sessions,
     activity,
+    rooms,
     ...(snapshotter ? { html: snapshotter } : {}),
     fonts: (family) => fonts.entry(family),
     dataDir: config.dataDir,
@@ -971,18 +987,19 @@ export function buildServer({
     docLocks,
     sessions,
     activity,
+    rooms,
     ...(snapshotter ? { html: snapshotter } : {}),
     fonts: (family) => fonts.entry(family),
     dataDir: config.dataDir,
     agentSteps,
     ...(pageFetch ? { page: pageFetch } : {}),
   });
-  registerAgentUndoRoutes(app, { docs, store, docLocks, sessions, steps: agentSteps, icons });
-  registerSelectionRoutes(app, { docs, store, sessions, selections, focus, activity, render, assertIcons });
+  registerAgentUndoRoutes(app, { docs, store, docLocks, sessions, steps: agentSteps, icons, rooms });
+  registerSelectionRoutes(app, { docs, store, sessions, selections, focus, activity, render, assertIcons, rooms });
   registerRenderDepsRoutes(app, { fonts, icons });
-  registerExportRoutes(app, { docs, store, render, icons });
-  registerVisualDiffRoutes(app, { docs, store, render, activeDoc, assertIcons });
-  registerCodeExportRoutes(app, { docs, sessions, icons });
+  registerExportRoutes(app, { docs, store, render, icons, rooms });
+  registerVisualDiffRoutes(app, { docs, store, render, activeDoc, assertIcons, rooms });
+  registerCodeExportRoutes(app, { docs, sessions, icons, rooms });
   registerConnectionRoutes(app, {
     host: config.host,
     port: config.port,
@@ -1022,5 +1039,5 @@ export function buildServer({
     return reply.type(remote.type).header('cache-control', remote.placeholder ? 'no-store' : 'no-cache').send(remote.body);
   });
 
-  return { app, store, sessions, fonts, icons, photos, activity, selections, focus, startedAt: startedAt.toISOString() };
+  return { app, store, sessions, fonts, icons, photos, activity, rooms, selections, focus, startedAt: startedAt.toISOString() };
 }

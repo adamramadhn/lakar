@@ -56,6 +56,8 @@ export type FixCheckRoutesOptions = {
   /** Hook tulis agen (undo agen + dasar visual_diff). */
   agentSteps: AgentSteps;
   icons: { canonical(lib: string, icon: string): unknown };
+  /** Room `@lakar/sync` yang digabung: fix di-commit sebagai ops lewat klien room (tanpa snapshot/undo lokal). */
+  rooms?: { doc(slug: string): LakarDocument | undefined; get(slug: string): { client: { commitOps(ops: unknown[], description?: string): Promise<{ doc: LakarDocument }> } } | undefined };
 };
 
 /** Properti yang di-patch op masih menyimpan ref token (`{$token}`) di dokumen tersimpan → fix memutus token. */
@@ -76,12 +78,13 @@ function capped(byBoard: ReadonlyMap<string, Finding[]>): { findings: Finding[];
 }
 
 export function registerFixCheckRoutes(app: FastifyInstance, opts: FixCheckRoutesOptions): void {
-  const { docs, store, docLocks, sessions, render, hugs, checks, agentSteps, icons } = opts;
+  const { docs, store, docLocks, sessions, render, hugs, checks, agentSteps, icons, rooms } = opts;
 
   app.post('/viewer/fix-check', async (req, reply) => {
     const session = sessions.require(req.headers[SESSION_HEADER]);
     const slug = session.activeSlug;
-    if (!slug || !docs.get(slug)) throw new LakarError('NO_ACTIVE_DOC', 'sesi ini belum punya dokumen aktif', { hint: NO_ACTIVE_DOC_HINT });
+    const room = slug ? rooms?.get(slug) : undefined;
+    if (!slug || !(docs.get(slug) ?? rooms?.doc(slug))) throw new LakarError('NO_ACTIVE_DOC', 'sesi ini belum punya dokumen aktif', { hint: NO_ACTIVE_DOC_HINT });
     const parsed = FixCheckBody.safeParse(req.body ?? undefined);
     if (!parsed.success) {
       throw new LakarError('SCHEMA_INVALID', parsed.error.issues.map((i) => `${i.path.join('.') || 'body'}: ${i.message}`).join('; '), { hint: FIX_CHECK_HINT });
@@ -90,7 +93,7 @@ export function registerFixCheckRoutes(app: FastifyInstance, opts: FixCheckRoute
     const dryRun = body.dryRun === true;
 
     // 1. Check penuh pada rev N (tanpa kunci; dokumen immutable), tanpa batas per aturan supaya semua fix terlihat.
-    const base = docs.get(slug)!;
+    const base = (docs.get(slug) ?? rooms?.doc(slug))!;
     const baseResolved = resolveDocument(base);
     let boardIds: string[];
     if (body.boardId !== undefined) {
@@ -106,7 +109,7 @@ export function registerFixCheckRoutes(app: FastifyInstance, opts: FixCheckRoute
 
     // 2. Di bawah kunci: saring basi/token/invalid, terapkan sisanya sebagai satu transaksi, check ulang, commit.
     const out = await docLocks.run(slug, async () => {
-      const current = docs.get(slug);
+      const current = docs.get(slug) ?? rooms?.doc(slug);
       if (!current || session.activeSlug !== slug) throw new LakarError('NO_ACTIVE_DOC', 'sesi ini belum punya dokumen aktif', { hint: NO_ACTIVE_DOC_HINT });
       const currentResolved = current === base ? baseResolved : resolveDocument(current);
       const { fresh, stale } = staleFixes(planned, baseResolved, currentResolved);
@@ -133,8 +136,12 @@ export function registerFixCheckRoutes(app: FastifyInstance, opts: FixCheckRoute
         const shown = capped(before.byBoard);
         return { rev: current.rev, applied, skipped, boards: boardSummaries(before.boards, shown.boards), remaining: shown.findings, newFindings: [] as Finding[] };
       }
-      const committed = await transact(current, { sessionId: session.id, description: FIX_CHECK_DESCRIPTION }, (tx) => applyOps(tx, applied.flatMap((it) => it.ops)));
-      const after = resolveDocument(committed.doc);
+      const flatOps = applied.flatMap((it) => it.ops);
+      const committed = await transact(current, { sessionId: session.id, description: FIX_CHECK_DESCRIPTION }, (tx) => applyOps(tx, flatOps));
+      // Room: ops yang sama di-commit ke sequencer; isi sama dengan preview deterministik, rev dari broadcast.
+      const roomOutcome = room && !dryRun ? await room.client.commitOps(flatOps, FIX_CHECK_DESCRIPTION) : undefined;
+      const committedDoc = roomOutcome?.doc ?? committed.doc;
+      const after = resolveDocument(committedDoc);
       // Review 33-4: kunci dipegang selama render, jadi hanya board yang berubah sejak check (fix ini atau tulis lain)
       // dirender ulang; board lain memakai hasil check awal. Fix pada board itu sendiri (posisi/ukuran, LC-12) mengubah
       // tabrakan board lain → semua board dicek ulang. Board yang hilang (dijaga) dilewati.
@@ -151,17 +158,24 @@ export function registerFixCheckRoutes(app: FastifyInstance, opts: FixCheckRoute
       const remaining = findings.filter((f) => old.has(findingKey(f)));
       const newFindings = findings.filter((f) => !old.has(findingKey(f)));
       if (!dryRun) {
-        await store.commit(slug, committed.doc, { ...committed.entry!, ...authorOf(session) });
-        docs.set(slug, committed.doc);
-        if (ran) {
-          checks.record(committed.doc.id, current.rev, committed.doc.rev, ran.boards);
-          hugs.record(after, ran.measures, current.rev);
+        if (room) {
+          if (ran) {
+            checks.record(committedDoc.id, current.rev, committedDoc.rev, ran.boards);
+            hugs.record(after, ran.measures, current.rev);
+          }
+        } else {
+          await store.commit(slug, committedDoc, { ...committed.entry!, ...authorOf(session) });
+          docs.set(slug, committedDoc);
+          if (ran) {
+            checks.record(committedDoc.id, current.rev, committedDoc.rev, ran.boards);
+            hugs.record(after, ran.measures, current.rev);
+          }
+          // Hook tulis agen tunggal (spec-agent-visual-diff X1): fix_check = satu langkah undo agen, dan dasar
+          // visual_diff {} = rev sebelum fix_check.
+          agentSteps.onAgentWrite(session, committedDoc.id, current.rev, committedDoc.rev, committed.inverse, FIX_CHECK_DESCRIPTION);
         }
-        // Hook tulis agen tunggal (spec-agent-visual-diff X1): fix_check = satu langkah undo agen, dan dasar
-        // visual_diff {} = rev sebelum fix_check.
-        agentSteps.onAgentWrite(session, committed.doc.id, current.rev, committed.doc.rev, committed.inverse, FIX_CHECK_DESCRIPTION);
       }
-      return { rev: dryRun ? current.rev : committed.doc.rev, applied, skipped, boards, remaining, newFindings };
+      return { rev: dryRun ? current.rev : committedDoc.rev, applied, skipped, boards, remaining, newFindings };
     });
 
     const all = [...out.remaining, ...out.newFindings];

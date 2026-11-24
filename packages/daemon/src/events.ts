@@ -164,11 +164,24 @@ export type SelectionEvent = { seq: number; type: 'selection'; selection: DocSel
 export type DocOpenRequest = { slug: string; origin?: string };
 export type OpenTabEvent = { seq: number; type: 'openTab'; openTab: DocOpenRequest };
 
+/**
+ * Daftar peer room `slug` atau status koneksinya berubah (spec-collab-cloud story 5). `peers` = daftar
+ * penuh terkini termasuk klien kita sendiri; `connected` false = WS room putus (peer tetap, tandai redup).
+ */
+export type RoomPeer = { peerId: string; name: string; kind: 'human' | 'agent'; access: 'edit' | 'view'; presence?: unknown };
+/** `self` = peerId koneksi kita saat ini (baru tiap welcome/reconnect) — viewer memakainya untuk menandai chip sendiri. */
+export type RoomPeers = { slug: string; connected: boolean; peers: RoomPeer[]; self?: string };
+export type PeersEvent = { seq: number; type: 'peers'; peers: RoomPeers };
+
+/** Presence satu peer room berubah (kursor/seleksi jarak jauh); `presence` = payload bebas yang dikirim peer. */
+export type RoomPresence = { slug: string; peerId: string; presence: unknown };
+export type PresenceEvent = { seq: number; type: 'presence'; presence: RoomPresence };
+
 export type ActivityEvent = { seq: number; type: 'call'; call: ActivityCall } | { seq: number; type: 'session'; session: ActivitySession };
 type ActivityPayload = { type: 'call'; call: ActivityCall } | { type: 'session'; session: ActivitySession };
 
-/** Semua event bus: aktivitas (masuk ring) + perubahan aplikasi, seleksi, dan buka tab (tidak masuk ring). */
-export type BusEvent = ActivityEvent | ChangeEvent | SelectionEvent | OpenTabEvent;
+/** Semua event bus: aktivitas (masuk ring) + perubahan aplikasi, seleksi, buka tab, dan room (tidak masuk ring). */
+export type BusEvent = ActivityEvent | ChangeEvent | SelectionEvent | OpenTabEvent | PeersEvent | PresenceEvent;
 export type ActivityListener = (event: ActivityEvent) => void;
 export type BusListener = (event: BusEvent) => void;
 
@@ -211,6 +224,19 @@ export class ActivityBus {
     this.#broadcast(event);
     return event;
   }
+  /** Siarkan perubahan peer/koneksi room (story 5; tanpa ring, hanya pelanggan `subscribeAll`). */
+  peers(peers: RoomPeers): PeersEvent {
+    const clean = Object.fromEntries(Object.entries(peers).filter(([, v]) => v !== undefined)) as RoomPeers;
+    const event: PeersEvent = { seq: ++this.#seq, type: 'peers', peers: clean };
+    this.#broadcast(event);
+    return event;
+  }
+  /** Siarkan presence satu peer room (tanpa ring, hanya pelanggan `subscribeAll`). */
+  presence(presence: RoomPresence): PresenceEvent {
+    const event: PresenceEvent = { seq: ++this.#seq, type: 'presence', presence };
+    this.#broadcast(event);
+    return event;
+  }
   /** Minta viewer membuka tab dokumen (tanpa ring, hanya pelanggan `subscribeAll`). Field kosong dibuang. */
   openTab(request: DocOpenRequest): OpenTabEvent {
     const clean = Object.fromEntries(Object.entries(request).filter(([, v]) => v !== undefined)) as DocOpenRequest;
@@ -250,7 +276,7 @@ export class ActivityBus {
   }
   #broadcast(event: BusEvent): void {
     for (const [l, { all }] of [...this.#listeners]) {
-      if ((event.type === 'change' || event.type === 'selection' || event.type === 'openTab') && !all) continue;
+      if ((event.type === 'change' || event.type === 'selection' || event.type === 'openTab' || event.type === 'peers' || event.type === 'presence') && !all) continue;
       try {
         l(event);
       } catch {
@@ -266,7 +292,7 @@ export class ActivityBus {
   subscribe(l: ActivityListener): () => void {
     return this.#add(l as BusListener, false);
   }
-  /** Event aktivitas + event `change`, `selection`, dan `openTab`. */
+  /** Event aktivitas + event `change`, `selection`, `openTab`, `peers`, dan `presence`. */
   subscribeAll(l: BusListener): () => void {
     return this.#add(l, true);
   }

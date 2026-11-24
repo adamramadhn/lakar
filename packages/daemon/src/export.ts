@@ -26,6 +26,8 @@ export type ExportRoutesOptions = {
   store: DocStore;
   render: RenderPort<ResolvedDocument>;
   icons: IconCatalogPort<string, IconGlyph>;
+  /** Room `@lakar/sync` yang digabung: slug room mengekspor replika (tanpa snapshot revisi). */
+  rooms?: { doc(slug: string): LakarDocument | undefined; has(slug: string): boolean };
 };
 
 /** Nama file unduhan `<slug>-<board-name>@<scale>x.png`; nama board di-slugify (kosong → id board). */
@@ -34,7 +36,7 @@ export function exportFileName(slug: string, board: { id: string; name: string }
   return `${slug}-${name}@${scale}x.png`;
 }
 
-export function registerExportRoutes(app: FastifyInstance, { docs, store, render, icons }: ExportRoutesOptions): void {
+export function registerExportRoutes(app: FastifyInstance, { docs, store, render, icons, rooms }: ExportRoutesOptions): void {
   app.post<{ Params: { slug: string } }>('/viewer/docs/:slug/export', async (req, reply) => {
     const { slug } = req.params;
     if (!SLUG_PATTERN.test(slug)) {
@@ -45,7 +47,7 @@ export function registerExportRoutes(app: FastifyInstance, { docs, store, render
       throw new LakarError('SCHEMA_INVALID', r.error.issues.map((i) => `${i.path.join('.') || 'body'}: ${i.message}`).join('; '), { hint: EXPORT_HINT });
     }
     const { boardId, scale, nodeId } = r.data;
-    const stored = docs.get(slug) ?? (await peekDocument(store, slug));
+    const stored = docs.get(slug) ?? rooms?.doc(slug) ?? (await peekDocument(store, slug));
     if (!stored) throw notFound(`dokumen ${slug} tidak ada`, 'pakai slug dari GET /viewer/docs');
     const doc = resolveDocument(stored);
     const board = findBoard(doc, boardId);
@@ -73,6 +75,7 @@ export function registerExportRoutes(app: FastifyInstance, { docs, store, render
       throw new LakarError('SCHEMA_INVALID', `slug tidak valid: ${JSON.stringify(slug)}`, { hint: `slug harus cocok pola ${SLUG_PATTERN.source}` });
     }
     const rev = parseRevParam(req.params.rev);
+    if (rooms?.has(slug)) throw notFound(`dokumen room ${slug} tidak punya snapshot revisi`, 'dokumen room tidak menyimpan riwayat lokal');
     const r = RevShotBody.safeParse(req.body);
     if (!r.success) {
       throw new LakarError('SCHEMA_INVALID', r.error.issues.map((i) => `${i.path.join('.') || 'body'}: ${i.message}`).join('; '), { hint: 'kirim {boardId} dari dokumen versi itu' });

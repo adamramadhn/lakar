@@ -43,6 +43,10 @@ export type DocOp =
    */
   | { op: 'insertPage'; page: Props; index?: number }
   /** Hapus halaman `id` beserta seluruh board-nya; halaman terakhir tidak boleh dihapus. Invers `insertPage`. */
-  | { op: 'removePage'; id: string };
+  | { op: 'removePage'; id: string }
+  /** Ganti nama halaman `id` menjadi `name` (1–100 karakter). Inversnya renamePage ke nama lama. */
+  | { op: 'renamePage'; id: string; name: string }
+  /** Pindahkan halaman `id` ke posisi `index` di daftar `pages` (0..n-1). Inversnya movePage ke indeks lama. */
+  | { op: 'movePage'; id: string; index: number };
 
 export type DocOpKind = DocOp['op'];

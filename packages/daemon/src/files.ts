@@ -19,6 +19,7 @@ import { z } from 'zod';
 import { imageSize, writeAsset } from './assets.js';
 import { FOLDER_ID_PATTERN, FolderStore } from './folders.js';
 import { VIEWER_CLIENT, originOf, publicSessionId, type ActivityBus, type ActivityCall, type DocChange } from './events.js';
+import type { RoomRegistry } from './rooms.js';
 import type { Sessions } from './sessions.js';
 import type { DocStore } from './store.js';
 import { peekDocument, summarize, type ViewerDocSummary } from './viewer.js';
@@ -32,16 +33,19 @@ export const SLUG_MAX = 64;
 /** Kunci global kelola file; `#` tidak valid di slug, jadi tidak bentrok dengan kunci dokumen. */
 export const FILES_LOCK = '#files';
 
-/** Slug tidak boleh dipakai file baru: ada di memori, di disk, atau milik file di arsip (Unarchive nanti tidak bentrok). */
-export async function slugClaimed(docs: ReadonlyMap<string, unknown>, store: DocStore, slug: string): Promise<boolean> {
-  return docs.has(slug) || (await store.exists(slug)) || (await store.exists(slug, true));
+/**
+ * Slug tidak boleh dipakai file baru: ada di memori, di disk, milik file di arsip (Unarchive nanti tidak
+ * bentrok), atau sedang dipakai room `@lakar/sync` yang digabung (`rooms`) — dua arah anti-tabrakan.
+ */
+export async function slugClaimed(docs: ReadonlyMap<string, unknown>, store: DocStore, slug: string, rooms?: { has(slug: string): boolean }): Promise<boolean> {
+  return docs.has(slug) || rooms?.has(slug) === true || (await store.exists(slug)) || (await store.exists(slug, true));
 }
 
-/** Slug pertama yang bebas (termasuk arsip): `base`, `base-2`, `base-3`, … Pemanggil memegang `FILES_LOCK`. */
-export async function freeSlugFor(docs: ReadonlyMap<string, unknown>, store: DocStore, base: string): Promise<string> {
+/** Slug pertama yang bebas (termasuk arsip dan room yang digabung): `base`, `base-2`, `base-3`, … Pemanggil memegang `FILES_LOCK`. */
+export async function freeSlugFor(docs: ReadonlyMap<string, unknown>, store: DocStore, base: string, rooms?: { has(slug: string): boolean }): Promise<string> {
   for (let n = 1; ; n++) {
     const slug = withSuffix(base, n);
-    if (!(await slugClaimed(docs, store, slug))) return slug;
+    if (!(await slugClaimed(docs, store, slug, rooms))) return slug;
   }
 }
 
@@ -106,6 +110,8 @@ export type FileRoutesOptions = {
   activity?: ActivityBus;
   /** Direktori data daemon: unggahan gambar ditulis ke `<dataDir>/assets`. Tanpa ini route unggah tidak didaftarkan. */
   dataDir?: string;
+  /** Room `@lakar/sync` yang digabung: slug room-nya menolak kelola file lokal (NOT_SUPPORTED). */
+  rooms?: RoomRegistry;
   /** Pencatat masalah non-fatal (file arsip rusak dilewati). Default `console.warn`. */
   log?: (message: string) => void;
   /** Kait sesudah setiap perubahan file (mis. seleksi efemeral slug yang di-rename/diarsipkan/dihapus dibuang). */
@@ -168,7 +174,14 @@ const historyEntry = (rev: number, description: string, opsSummary = ''): Histor
   at: new Date().toISOString(),
 });
 
-export function registerFileRoutes(app: FastifyInstance, { docs, store, sessions, docLocks, activity, dataDir, log = (m) => console.warn(m), onChange }: FileRoutesOptions): void {
+export function registerFileRoutes(app: FastifyInstance, { docs, store, sessions, docLocks, activity, dataDir, rooms, log = (m) => console.warn(m), onChange }: FileRoutesOptions): void {
+  /** Dokumen room tidak punya file lokal: operasi kelola file → NOT_SUPPORTED (hint: leave). */
+  const roomGuard = (slug: string) => {
+    if (!rooms?.has(slug)) return;
+    throw new LakarError('NOT_SUPPORTED', `dokumen ${slug} adalah room jarak jauh — tidak ada file lokal untuk diubah`, {
+      hint: `keluar room lewat POST /viewer/rooms/${slug}/leave; isi tetap dikelola oleh sync server`,
+    });
+  };
   /** Jalankan `fn` memegang kunci setiap slug (urut, unik); `locked` memegang `#files` dulu. Kunci tidak reentrant. */
   const lockSlugs = <T>(slugs: string[], fn: () => Promise<T>): Promise<T> => {
     const keys = [...new Set(slugs)].sort();
@@ -176,10 +189,10 @@ export function registerFileRoutes(app: FastifyInstance, { docs, store, sessions
     return step(0);
   };
   const locked = <T>(slugs: string[], fn: () => Promise<T>): Promise<T> => docLocks.run(FILES_LOCK, () => lockSlugs(slugs, fn));
-  /** Slug terpakai: ada di memori (mis. baru dibuka agen) atau di disk. */
-  const taken = async (slug: string) => docs.has(slug) || (await store.exists(slug));
-  const claimed = (slug: string) => slugClaimed(docs, store, slug);
-  const freeSlug = (base: string) => freeSlugFor(docs, store, base);
+  /** Slug terpakai: ada di memori (mis. baru dibuka agen), di disk, atau sedang dipakai room yang digabung. */
+  const taken = async (slug: string) => docs.has(slug) || rooms?.has(slug) === true || (await store.exists(slug));
+  const claimed = (slug: string) => slugClaimed(docs, store, slug, rooms);
+  const freeSlug = (base: string) => freeSlugFor(docs, store, base, rooms);
   const mustExist = async (slug: string) => {
     if (!(await taken(slug))) throw new LakarError('NOT_FOUND', `dokumen ${slug} tidak ada`, { hint: 'pakai slug dari GET /viewer/docs' });
   };
@@ -239,6 +252,7 @@ export function registerFileRoutes(app: FastifyInstance, { docs, store, sessions
   app.post<{ Params: { slug: string } }>('/viewer/docs/:slug/rename', async (req, reply) => {
     const from = req.params.slug;
     checkSlug(from);
+    roomGuard(from);
     const to = slugOf(parse(RenameBody, req.body, 'kirim {name}').name);
     const data = await locked([from, to], async () => {
       await mustExist(from);
@@ -262,6 +276,7 @@ export function registerFileRoutes(app: FastifyInstance, { docs, store, sessions
   app.post<{ Params: { slug: string } }>('/viewer/docs/:slug/duplicate', async (req, reply) => {
     const from = req.params.slug;
     checkSlug(from);
+    roomGuard(from);
     const data = await docLocks.run(FILES_LOCK, async () => {
       const slug = await freeSlug(`${from.slice(0, SLUG_MAX - 5).replace(/-+$/, '')}-copy`);
       return lockSlugs([from, slug], async () => {
@@ -283,6 +298,7 @@ export function registerFileRoutes(app: FastifyInstance, { docs, store, sessions
   app.post<{ Params: { slug: string } }>('/viewer/docs/:slug/archive', async (req, reply) => {
     const { slug } = req.params;
     checkSlug(slug);
+    roomGuard(slug);
     await locked([slug], async () => {
       await writeBackMemoryOnly(slug);
       await store.archive(slug);
@@ -298,6 +314,7 @@ export function registerFileRoutes(app: FastifyInstance, { docs, store, sessions
   app.post<{ Params: { slug: string } }>('/viewer/docs/:slug/unarchive', async (req, reply) => {
     const { slug } = req.params;
     checkSlug(slug);
+    roomGuard(slug);
     await locked([slug], async () => {
       if (docs.has(slug)) throw new LakarError('CONFLICT', `dokumen ${slug} sudah ada`, { hint: 'ganti nama atau hapus dokumen aktif itu dulu' });
       await store.unarchive(slug);
@@ -311,6 +328,7 @@ export function registerFileRoutes(app: FastifyInstance, { docs, store, sessions
   app.delete<{ Params: { slug: string }; Querystring: Record<string, string> }>('/viewer/docs/:slug', async (req, reply) => {
     const { slug } = req.params;
     checkSlug(slug);
+    roomGuard(slug);
     const archived = parse(DeleteQuery, req.query ?? {}, 'query opsional: archived=true untuk menghapus dari arsip').archived === 'true';
     await locked([slug], async () => {
       if (archived) {
@@ -334,6 +352,8 @@ export function registerFileRoutes(app: FastifyInstance, { docs, store, sessions
   app.get<{ Params: { slug: string; rev: string } }>('/viewer/docs/:slug/revs/:rev', async (req, reply) => {
     const { slug } = req.params;
     checkSlug(slug);
+    // Dokumen room tidak punya snapshot revisi di daemon (riwayat milik sync server) → selalu 404.
+    if (rooms?.has(slug)) throw new LakarError('NOT_FOUND', `dokumen room ${slug} tidak punya snapshot revisi`, { hint: 'dokumen room tidak menyimpan riwayat lokal; pakai rev terkini' });
     const doc = await readRevision(docs, store, slug, parseRevParam(req.params.rev));
     return reply.code(200).send({ ok: true, data: { doc } });
   });
@@ -344,6 +364,7 @@ export function registerFileRoutes(app: FastifyInstance, { docs, store, sessions
   app.post<{ Params: { slug: string } }>('/viewer/docs/:slug/restore', async (req, reply) => {
     const { slug } = req.params;
     checkSlug(slug);
+    roomGuard(slug);
     const { rev, baseRev } = parse(RestoreBody, req.body, 'kirim {rev, baseRev?} (rev dari GET /viewer/docs/:slug/history; baseRev = rev terkini yang dilihat klien)');
     const description = `Restored r${rev}`;
     const origin = originOf(req.headers);

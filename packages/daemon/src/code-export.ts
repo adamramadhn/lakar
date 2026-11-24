@@ -45,9 +45,11 @@ export type CodeExportRoutesOptions = {
   docs: Map<string, LakarDocument>;
   sessions: Sessions;
   icons: IconCatalogPort<string, IconGlyph>;
+  /** Room `@lakar/sync` yang digabung: dokumen aktif bisa berupa replika room. */
+  rooms?: { doc(slug: string): LakarDocument | undefined };
 };
 
-export function registerCodeExportRoutes(app: FastifyInstance, { docs, sessions, icons }: CodeExportRoutesOptions): void {
+export function registerCodeExportRoutes(app: FastifyInstance, { docs, sessions, icons, rooms }: CodeExportRoutesOptions): void {
   app.post('/viewer/export-code', async (req, reply) => {
     const session = sessions.require(req.headers[SESSION_HEADER]);
     if (!session.activeSlug) {
@@ -59,7 +61,7 @@ export function registerCodeExportRoutes(app: FastifyInstance, { docs, sessions,
       throw new LakarError('SCHEMA_INVALID', parsed.error.issues.map((i) => `${i.path.join('.') || 'body'}: ${i.message}`).join('; '), { hint: EXPORT_CODE_HINT });
     }
     const body = parsed.data;
-    const stored = docs.get(slug)!;
+    const stored = (docs.get(slug) ?? rooms?.doc(slug))!;
     const target = body.target ?? 'react-tailwind';
     if (target === 'dtcg') {
       // Token tingkat dokumen: satu berkas tokens.json W3C DTCG (tanpa resolusi node).

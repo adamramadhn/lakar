@@ -67,6 +67,14 @@ export type DocSummary = {
   lastClient?: string;
   lastAgent?: string;
   check?: { error: number; warning: number };
+  /** Dokumen room `@lakar/sync` yang digabung (story 5): bukan file lokal — tanpa history/snapshot/folder. */
+  remote?: boolean;
+  /** Origin sync server room (`remote` saja). */
+  server?: string;
+  /** Jumlah peer di room, termasuk klien daemon (`remote` saja). */
+  peers?: number;
+  /** Koneksi room hidup (`remote` saja; false = menyambung ulang). */
+  connected?: boolean;
 };
 /** Status pool render (`/status` → `pool`); `lastError` mis. "Chrome atau Edge tidak ditemukan …" di aplikasi desktop. */
 export type PoolStatus = { size: number; ready: number; browserVersion?: string; lastError?: string };
@@ -108,6 +116,12 @@ export type UploadedAsset = { assetId: string; mime: string; width: number; heig
 export type IconResult = { lib: string; icon: string; title?: string; aliasOf?: string };
 /** Hasil operasi halaman (`/viewer/docs/:slug/pages…`). */
 export type PageResult = { slug: string; rev: number; pageId: string };
+/** Peer room (story 5): `kind` membedakan chip bulat (human) dan kotak (agent) di title bar. */
+export type RoomPeer = { peerId: string; name: string; kind: 'human' | 'agent'; access: 'edit' | 'view'; presence?: unknown };
+/** Hasil `POST /viewer/rooms/join`. */
+export type RoomJoin = { slug: string; server: string; name: string; rev: number; peers: number; connected: boolean };
+/** Hasil `GET /viewer/rooms/:slug/peers`. */
+export type RoomPeers = { slug: string; connected: boolean; peers: RoomPeer[]; self?: string };
 /**
  * Hasil `POST /viewer/docs/:slug/ops`: `inverse` = op yang membatalkan commit ini (kosong bila tanpa efek). ID node baru
  * per op diketahui lewat `refs` (ref lokal → ID; kirim `ref` pada add/duplicate). `created` = semua node yang muncul
@@ -366,6 +380,28 @@ class ViewerClient {
     const { doc } = await request<{ doc: LakarDocument }>('GET', `/viewer/docs/${encodeURIComponent(slug)}`);
     this.#known.add(slug);
     return doc;
+  }
+
+  // ---- Room `@lakar/sync` (story 5) ----
+
+  /** Gabung room: `{server, token}` → slug `room-<token6>` yang tampil di Dashboard sebagai remote. */
+  joinRoom(server: string, token: string, name?: string): Promise<RoomJoin> {
+    return request<RoomJoin>('POST', '/viewer/rooms/join', { server, token, ...(name !== undefined ? { name } : {}) });
+  }
+
+  /** Keluar room (koneksi WS ditutup; dokumen tidak disimpan lokal). */
+  leaveRoom(slug: string): Promise<{ slug: string; server: string }> {
+    return request('POST', `/viewer/rooms/${encodeURIComponent(slug)}/leave`);
+  }
+
+  /** Daftar peer + status koneksi room (untuk chip title bar; sisanya event `peers` di stream). */
+  listRoomPeers(slug: string): Promise<RoomPeers> {
+    return request('GET', `/viewer/rooms/${encodeURIComponent(slug)}/peers`);
+  }
+
+  /** Siarkan presence klien ini ke peer room (kursor/seleksi; payload bebas). */
+  sendRoomPresence(slug: string, presence: unknown): Promise<{ slug: string }> {
+    return request('PUT', `/viewer/rooms/${encodeURIComponent(slug)}/presence`, { presence });
   }
 
   /**

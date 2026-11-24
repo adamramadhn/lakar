@@ -14,6 +14,7 @@ import { activityHub, openTabRequest, remoteDocCall, remoteEffect } from './acti
 import { api, connection } from './api';
 import { Dashboard } from './Dashboard';
 import { docHash, parseRoute, type Route } from './files';
+import { JoinRoomDialog } from './JoinRoomDialog';
 import { attachFocusReporter, windowActivate } from './focusSync';
 import { NewFileDialog } from './NewFileDialog';
 import { OfflineBanner } from './OfflineBanner';
@@ -91,8 +92,14 @@ export function App() {
   // Updater aplikasi desktop: sekali per mount (cek + unduh latar bila kebijakan auto). No-op di browser.
   useEffect(() => initUpdates(), []);
 
+  // `#/join?server=…&token=…`: token room adalah capability — sesudah route terbaca (prefill dialog),
+  // bersihkan query dari entri history supaya token tidak tersimpan di riwayat navigasi.
   useEffect(() => {
-    const titles: Record<Route['name'], string> = { recents: 'Lakar', files: 'Files · Lakar', archive: 'Archive · Lakar', settings: 'Settings · Lakar', connections: 'Connections · Lakar', updates: 'Updates · Lakar', viewer: 'Lakar' };
+    if (route.name === 'join' && (route.server !== undefined || route.token !== undefined)) replaceHash('#/join');
+  }, [route]);
+
+  useEffect(() => {
+    const titles: Record<Route['name'], string> = { recents: 'Lakar', files: 'Files · Lakar', archive: 'Archive · Lakar', settings: 'Settings · Lakar', connections: 'Connections · Lakar', updates: 'Updates · Lakar', join: 'Join room · Lakar', viewer: 'Lakar' };
     // Halaman folder (`#/files/<id>`): Dashboard mengganti judul dengan nama folder setelah folder dimuat.
     document.title = route.name === 'viewer' ? `${route.slug} · Lakar` : titles[route.name];
   }, [route]);
@@ -217,9 +224,16 @@ export function App() {
         {route.name === 'viewer' ? (
           <Viewer key={route.slug} slug={route.slug} />
         ) : (
-          <Dashboard page={route.name} {...(route.name === 'files' && route.folder ? { folder: route.folder } : {})} menuOpen={menuOpen} onCloseMenu={() => setMenuOpen(false)} onOpenMenu={() => setMenuOpen((v) => !v)} />
+          <Dashboard
+            page={route.name === 'join' ? 'recents' : route.name}
+            {...(route.name === 'files' && route.folder ? { folder: route.folder } : {})}
+            menuOpen={menuOpen}
+            onCloseMenu={() => setMenuOpen(false)}
+            onOpenMenu={() => setMenuOpen((v) => !v)}
+          />
         )}
       </main>
+      {route.name === 'join' && <JoinRoomDialog initialServer={route.server} initialToken={route.token} onClose={() => (location.hash = '#/')} />}
       {creating && <NewFileDialog taken={creating} onClose={() => setCreating(undefined)} />}
     </div>
   );

@@ -165,13 +165,15 @@ function fileHandlers(archived: boolean, setMenu: (m: MenuState) => void, onDupl
       const at = { slug: d.slug, x: r.left + 16, y: r.top + 16 };
       if (e.key === 'F2' && !archived) {
         e.preventDefault();
-        setMenu({ ...at, dialog: 'rename' });
+        // Room remote (collab story 5): rename ditolak daemon → buka menu biasa (berisi Leave room).
+        setMenu(d.remote ? at : { ...at, dialog: 'rename' });
       } else if (e.key === 'Delete') {
         e.preventDefault();
-        setMenu({ ...at, dialog: 'delete' });
+        setMenu(d.remote ? at : { ...at, dialog: 'delete' });
       } else if (e.key.toLowerCase() === 'd' && (e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && !archived) {
         e.preventDefault();
-        onDuplicate(d.slug);
+        if (d.remote) setMenu(at);
+        else onDuplicate(d.slug);
       } else if (e.key === 'ContextMenu' || (e.key === 'F10' && e.shiftKey)) {
         e.preventDefault();
         setMenu(at);
@@ -196,6 +198,11 @@ function FileLink({ d, archived, className, onOpen, onKeyDown }: { d: DocSummary
   return (
     <a className={`file-link ${className}`} href={docHash(d.slug)} aria-keyshortcuts={SHORTCUT.file.aria} title={SHORTCUT.file.title} onClick={click} onAuxClick={(e) => e.button === 1 && click(e)} onKeyDown={onKeyDown} draggable={false}>
       {d.slug}
+      {d.remote === true && (
+        <span className="remote-badge" title={`Shared room${d.server ? ` on ${d.server}` : ''}${d.connected === false ? ' — reconnecting' : ''}`}>
+          Remote
+        </span>
+      )}
     </a>
   );
 }
@@ -508,10 +515,15 @@ export function Dashboard({
   const handlers = fileHandlers(archivedPage, setMenu, duplicate);
 
   const newFileBtn = (
-    <button type="button" className="btn primary new-file-btn" aria-label="New file" onClick={() => setCreating('Untitled')}>
-      <Icon name="plus" size={15} />
-      <span className="btn-label">New file</span>
-    </button>
+    <>
+      <a className="btn join-room-btn" href="#/join" aria-label="Join room" title="Open a shared document from a sync server">
+        <span className="btn-label">Join room</span>
+      </a>
+      <button type="button" className="btn primary new-file-btn" aria-label="New file" onClick={() => setCreating('Untitled')}>
+        <Icon name="plus" size={15} />
+        <span className="btn-label">New file</span>
+      </button>
+    </>
   );
   const dragProps = (slug: string) => (filesPage ? dragSource(slug) : {});
   const menuFolder = folderMenu ? folders.find((f) => f.id === folderMenu.id) : undefined;
@@ -843,6 +855,7 @@ export function Dashboard({
           target={menu}
           {...(menu.dialog ? { dialog: menu.dialog } : {})}
           archived={archivedPage}
+          remote={docs?.find((d) => d.slug === menu.slug)?.remote === true}
           port={status?.port}
           taken={taken}
           {...(filesPage && folderState ? { folders, folderOf: memberOf(membership, menu.slug) } : {})}

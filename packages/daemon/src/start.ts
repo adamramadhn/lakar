@@ -65,6 +65,7 @@ export async function startDaemon(config: DaemonConfig, opts: StartOptions = {})
     renderer,
     warmed,
     async close() {
+      daemon.rooms.close();
       await renderer.close();
       await daemon.app.close();
     },

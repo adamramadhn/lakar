@@ -13,7 +13,8 @@ import { applyOps, transact, type DocumentLocks } from '@lakar/core';
 import { iconRefs } from '@lakar/render';
 import { LakarError, SESSION_HEADER, findBoard, resolveDocument, type DocOp, type HistoryEntry, type LakarDocument } from '@lakar/schema';
 import { z } from 'zod';
-import { VIEWER_CLIENT } from './events.js';
+import { VIEWER_CLIENT, agentOf } from './events.js';
+import { roomCall, type RoomRegistry } from './rooms.js';
 import { NO_ACTIVE_DOC_HINT, authorOf, noteWrite, type Session, type Sessions } from './sessions.js';
 import type { DocStore } from './store.js';
 
@@ -104,9 +105,11 @@ export type AgentUndoRoutesOptions = {
   steps: AgentSteps;
   /** Katalog ikon: board tersentuh dicek seperti route ops (ICON_UNKNOWN). */
   icons: { canonical(lib: string, icon: string): unknown };
+  /** Room `@lakar/sync` yang digabung: undo/redo didelegasikan ke DocTransport room. */
+  rooms?: RoomRegistry;
 };
 
-export function registerAgentUndoRoutes(app: FastifyInstance, { docs, store, docLocks, sessions, steps, icons }: AgentUndoRoutesOptions): void {
+export function registerAgentUndoRoutes(app: FastifyInstance, { docs, store, docLocks, sessions, steps, icons, rooms }: AgentUndoRoutesOptions): void {
   for (const dir of ['undo', 'redo'] as const) {
     const other: UndoDir = dir === 'undo' ? 'redo' : 'undo';
     const Verb = dir === 'undo' ? 'Undo' : 'Redo';
@@ -119,6 +122,11 @@ export function registerAgentUndoRoutes(app: FastifyInstance, { docs, store, doc
       const n = parsed.data?.steps ?? 1;
       const slug = session.activeSlug;
       if (!slug) throw new LakarError('NO_ACTIVE_DOC', 'sesi ini belum punya dokumen aktif', { hint: NO_ACTIVE_DOC_HINT });
+      const room = rooms?.get(slug);
+      if (room) {
+        // Undo/redo room dijalankan sequencer (DocTransport /undo|/redo); tumpukan undo lokal tidak dipakai.
+        return roomCall(room, `/${dir}`, { ...(parsed.data?.steps !== undefined ? { steps: n } : {}) }, reply, agentOf(req.headers));
+      }
       const data = await docLocks.run(slug, async () => {
         const current = docs.get(slug) ?? (await store.read(slug));
         if (!current) throw new LakarError('NO_ACTIVE_DOC', `dokumen ${slug} tidak ada lagi`, { hint: NO_ACTIVE_DOC_HINT });

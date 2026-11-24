@@ -8539,3 +8539,122 @@ button.panel-tab:hover {
 .comments-footer .follow-info {
   margin-right: auto;
 }
+
+/* Badge "Remote" pada kartu file room (story 5): dokumen jarak jauh dari sync server. */
+.remote-badge {
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 14px;
+  color: var(--accent, #5b5bd6);
+  background: color-mix(in srgb, var(--accent, #5b5bd6) 12%, transparent);
+  white-space: nowrap;
+}
+
+/* ---- Peer room @lakar/sync (collab story 5): chip inisial di topbar viewer + kursor berlabel di canvas.
+   Warna per peer (rooms.ts PEER_COLORS) memakai token --who yang sama dengan sesi agen. */
+.peer-chip,
+.peer-cursor {
+  --who: var(--agent);
+}
+.peer-chip.codex,
+.peer-cursor.codex {
+  --who: var(--codex);
+}
+.peer-chip.violet,
+.peer-cursor.violet {
+  --who: var(--agent-violet);
+}
+.peer-chip.emerald,
+.peer-cursor.emerald {
+  --who: var(--agent-emerald);
+}
+.peer-chip.pink,
+.peer-cursor.pink {
+  --who: var(--agent-pink);
+}
+/* Grup chip di topbar viewer: manusia bulat, agen kotak membulat (desain BXo7d). */
+.viewer-peer-chips {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 6px;
+}
+.peer-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--who);
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  user-select: none;
+  box-shadow: 0 0 0 2px var(--bg, #ffffff);
+}
+.peer-chip.agent {
+  border-radius: 6px;
+}
+.peer-chip.more {
+  background: var(--surface-alt, #ececf2);
+  color: var(--text-secondary);
+}
+.peer-chip.offline {
+  opacity: 0.45;
+}
+/* Kursor peer di canvas: ujung pointer di (0,0); posisi dari transform (luncur di JS). */
+.peer-layer {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.peer-cursor {
+  position: absolute;
+  left: 0;
+  top: 0;
+  will-change: transform;
+}
+.peer-cursor-pointer {
+  position: absolute;
+  left: -1px;
+  top: -1px;
+  display: block;
+  fill: var(--who);
+  stroke: #ffffff;
+  stroke-width: 1.2;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 1px 2px rgb(0 0 0 / 0.35));
+}
+.peer-cursor-tag {
+  position: absolute;
+  left: 12px;
+  top: 16px;
+  display: flex;
+  align-items: center;
+  max-width: 200px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: var(--who);
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 14px;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.25);
+  white-space: nowrap;
+}
+.peer-cursor-body {
+  transform-origin: 0 0;
+  animation: agent-cursor-in 180ms cubic-bezier(0.33, 1, 0.68, 1) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .peer-cursor-body {
+    animation: none;
+  }
+}

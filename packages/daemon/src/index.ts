@@ -72,4 +72,6 @@ export {
 export { startDaemon, type RunningDaemon, type StartOptions } from './start.js';
 export { FileTransport, type FileTransportOptions } from './file-transport.js';
 export { DocTransport, applySeeded, type CommitBuild, type CommitPayload, type DocCommitOutcome, type DocTransportBackend, type DocTransportOptions } from './doc-transport.js';
+export { RoomClient, maskToken, sanitizePeerName, type RoomClientHooks, type RoomClientOptions, type RoomFatal, type RoomPeer, type ServerMessage } from './room-client.js';
+export { RoomRegistry, roomCall, type RoomEntry, type RoomJoinResult, type RoomRegistryOptions, type RoomSummary } from './rooms.js';
 export { IconCatalog } from '@lakar/icons';

@@ -10,6 +10,8 @@ import type { ActiveDoc } from './agent-pages.js';
 export type AnalyzeRoutesOptions = {
   docs: Map<string, LakarDocument>;
   activeDoc: ActiveDoc;
+  /** Room `@lakar/sync` yang digabung: dokumen aktif bisa berupa replika room. */
+  rooms?: { doc(slug: string): LakarDocument | undefined };
 };
 
 const parse = <S extends z.ZodType>(schema: S, body: unknown, hint: string): z.output<S> => {
@@ -223,10 +225,10 @@ export function analyzeClusters(doc: LakarDocument, boardId: string | undefined,
   return { clusters };
 }
 
-export function registerAnalyzeRoutes(app: FastifyInstance, { docs, activeDoc }: AnalyzeRoutesOptions): void {
+export function registerAnalyzeRoutes(app: FastifyInstance, { docs, activeDoc, rooms }: AnalyzeRoutesOptions): void {
   const scopedDoc = (header: string | string[] | undefined, body: { boardId?: string }) => {
     const { slug } = activeDoc(header);
-    const doc = docs.get(slug);
+    const doc = docs.get(slug) ?? rooms?.doc(slug);
     if (!doc) throw new LakarError('NO_ACTIVE_DOC', 'sesi ini belum punya dokumen aktif', { hint: NO_ACTIVE_DOC_HINT });
     requireBoard(doc, body.boardId, slug);
     return { doc, slug };

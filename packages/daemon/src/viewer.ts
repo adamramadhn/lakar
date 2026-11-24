@@ -10,6 +10,7 @@ import { LakarError, SLUG_PATTERN, errorMessage, type HistoryEntry, type LakarDo
 import type { CheckCounts, CheckLedger } from './checks.js';
 import { notFound } from './errors.js';
 import { VIEWER_CLIENT, isAgentName } from './events.js';
+import type { RoomRegistry } from './rooms.js';
 import type { Sessions } from './sessions.js';
 import type { DocStore } from './store.js';
 
@@ -30,6 +31,11 @@ export type ViewerDocSummary = {
   lastAgent?: string;
   /** Hasil check terakhir yang mencakup semua board pada rev terkini (opsional; hanya memori daemon). */
   check?: CheckCounts;
+  /** Dokumen room `@lakar/sync` yang digabung (spec-collab-cloud story 5; `server`/`peers`/`connected` ikut bila remote). */
+  remote?: true;
+  server?: string;
+  peers?: number;
+  connected?: boolean;
 };
 
 type DocMeta = Pick<ViewerDocSummary, 'createdAt' | 'lastClient' | 'lastAgent'>;
@@ -66,6 +72,8 @@ export type ViewerRoutesOptions = {
    * route `/viewer/*` tetap jalan (spec-collab-cloud story 6).
    */
   serveStatic?: boolean;
+  /** Room `@lakar/sync` yang digabung (entri `remote` di daftar + replika untuk GET dokumen; story 5). */
+  rooms?: RoomRegistry;
   /** Pencatat masalah non-fatal (file rusak dilewati). Default `console.warn`. */
   log?: (message: string) => void;
 };
@@ -173,7 +181,7 @@ export function historyMeta(history: readonly HistoryEntry[], sessions?: Session
   return { ...(first ? { createdAt: first.at } : {}), ...(client ? { lastClient: client } : {}), ...(agent ? { lastAgent: agent } : {}) };
 }
 
-export function registerViewerRoutes(app: FastifyInstance, { docs, store, sessions, checks, distDir, serveStatic = true, log = (m) => console.warn(m) }: ViewerRoutesOptions): void {
+export function registerViewerRoutes(app: FastifyInstance, { docs, store, sessions, checks, distDir, serveStatic = true, rooms, log = (m) => console.warn(m) }: ViewerRoutesOptions): void {
   const root = resolve(distDir);
   /** Ringkasan dokumen dari file per `slug@mtime`: file yang tidak berubah tidak di-parse ulang. */
   const cache = new Map<string, { mtimeMs: number; summary: ViewerDocSummary; docId: string; boardIds: string[] }>();
@@ -226,6 +234,21 @@ export function registerViewerRoutes(app: FastifyInstance, { docs, store, sessio
         log(`lakard: viewer melewati ${slug}.lakar.json: ${errorMessage(e)}`);
       }
     }
+    // Room yang digabung muncul di Dashboard dengan penanda remote (tanpa riwayat/meta/check lokal).
+    for (const r of rooms?.list() ?? []) {
+      const doc = rooms?.doc(r.slug);
+      out.push({
+        slug: r.slug,
+        rev: r.rev,
+        updatedAt: r.updatedAt,
+        boardCount: doc?.pages.reduce((n, p) => n + p.children.length, 0) ?? 0,
+        firstBoardId: doc?.pages.find((p) => p.children.length > 0)?.children[0]?.id ?? null,
+        remote: true,
+        server: r.server,
+        peers: r.peers,
+        connected: r.connected,
+      });
+    }
     out.sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : a.updatedAt > b.updatedAt ? -1 : a.slug.localeCompare(b.slug)));
     return reply.code(200).send({ ok: true, data: { docs: out } });
   });
@@ -233,7 +256,7 @@ export function registerViewerRoutes(app: FastifyInstance, { docs, store, sessio
   app.get<{ Params: { slug: string } }>('/viewer/docs/:slug', async (req, reply) => {
     const { slug } = req.params;
     if (!SLUG_PATTERN.test(slug)) throw invalidSlug(slug);
-    const doc = docs.get(slug) ?? (await peekDocument(store, slug));
+    const doc = rooms?.doc(slug) ?? docs.get(slug) ?? (await peekDocument(store, slug));
     if (!doc) throw docNotFound(slug);
     return reply.code(200).send({ ok: true, data: { doc } });
   });
@@ -242,6 +265,8 @@ export function registerViewerRoutes(app: FastifyInstance, { docs, store, sessio
   app.get<{ Params: { slug: string } }>('/viewer/docs/:slug/history', async (req, reply) => {
     const { slug } = req.params;
     if (!SLUG_PATTERN.test(slug)) throw invalidSlug(slug);
+    // Dokumen room tidak punya riwayat di daemon (riwayat room = tanggung jawab sync server).
+    if (rooms?.doc(slug)) return reply.code(200).send({ ok: true, data: { entries: [] } });
     if (!docs.has(slug)) {
       const exists = await stat(store.docPath(slug)).then(
         (s) => s.isFile(),

@@ -63,8 +63,16 @@ export type SelectionEvent = { seq: number; type: 'selection'; selection: DocSel
 /** Permintaan buka tab dokumen baru dari `open_doc` agen (salinan `DocOpenRequest` events.ts). */
 export type DocOpenRequest = { slug: string; origin?: string };
 export type OpenTabEvent = { seq: number; type: 'openTab'; openTab: DocOpenRequest };
+/** Peer room berubah atau status koneksi room berubah (story 5; broadcast-only, tanpa ring). `self` = peerId koneksi kita saat itu. */
+export type PeersEvent = {
+  seq: number;
+  type: 'peers';
+  peers: { slug: string; connected: boolean; peers: { peerId: string; name: string; kind: 'human' | 'agent'; access: 'edit' | 'view'; presence?: unknown }[]; self?: string };
+};
+/** Presence satu peer room (kursor/seleksi jarak jauh; broadcast-only). */
+export type PresenceEvent = { seq: number; type: 'presence'; presence: { slug: string; peerId: string; presence: unknown } };
 /** Semua event stream `/viewer/events` sesudah `hello`. */
-export type StreamEvent = ActivityEvent | ChangeEvent | SelectionEvent | OpenTabEvent;
+export type StreamEvent = ActivityEvent | ChangeEvent | SelectionEvent | OpenTabEvent | PeersEvent | PresenceEvent;
 
 // ---- Reducer ----
 
@@ -92,8 +100,8 @@ export const isDocChangeFromViewer = (c: Pick<ActivityCall, 'client' | 'tool'>) 
 function applyEvent(state: ActivityState, event: StreamEvent): ActivityState {
   if (event.seq <= state.seq) return state;
   const next: ActivityState = { ...state, seq: event.seq };
-  // Perubahan dari aplikasi, seleksi, dan permintaan buka tab tidak tampil di Activity.
-  if (event.type === 'change' || event.type === 'selection' || event.type === 'openTab') return next;
+  // Perubahan dari aplikasi, seleksi, buka tab, dan event room tidak tampil di Activity.
+  if (event.type === 'change' || event.type === 'selection' || event.type === 'openTab' || event.type === 'peers' || event.type === 'presence') return next;
   if (event.type === 'session') {
     if (isViewer(event.session.client)) return next;
     next.sessions = { ...state.sessions, [event.session.id]: { ...state.sessions[event.session.id], ...event.session } };

@@ -23,6 +23,8 @@ const OP_KEYS: Record<DocOpKind, { required: readonly string[]; optional: readon
   setComments: { required: ['comments'], optional: [] },
   insertPage: { required: ['page'], optional: ['index'] },
   removePage: { required: ['id'], optional: [] },
+  renamePage: { required: ['id', 'name'], optional: [] },
+  movePage: { required: ['id', 'index'], optional: [] },
 };
 
 const OPS_HINT =
@@ -138,6 +140,12 @@ export function applyOps(tx: Transaction, ops: unknown): ApplyOpsResult {
         case 'removePage':
           tx.removePage(addr(o.id) as string);
           break;
+        case 'renamePage':
+          tx.renamePage(addr(o.id) as string, o.name);
+          break;
+        case 'movePage':
+          tx.movePage(addr(o.id) as string, o.index);
+          break;
       }
       if ((o.op === 'add' || o.op === 'duplicate' || o.op === 'detach') && o.ref !== undefined && id !== undefined) refs[o.ref] = id;
     } catch (e) {
@@ -248,6 +256,14 @@ export function recordOps(tx: Transaction): { tx: Transaction; ops: DocOp[] } {
     removePage(id) {
       tx.removePage(id);
       ops.push({ op: 'removePage', id });
+    },
+    renamePage(id, name) {
+      tx.renamePage(id, name);
+      ops.push({ op: 'renamePage', id: remap(String(id)), name: String(name) });
+    },
+    movePage(id, index) {
+      tx.movePage(id, index);
+      ops.push({ op: 'movePage', id: remap(String(id)), index: index as number });
     },
     view: () => tx.view(),
     commit: (description) => tx.commit(description),

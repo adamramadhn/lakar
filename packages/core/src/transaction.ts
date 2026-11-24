@@ -57,7 +57,9 @@ export type OpKind =
   | 'detach'
   | 'setComments'
   | 'insertPage'
-  | 'removePage';
+  | 'removePage'
+  | 'renamePage'
+  | 'movePage';
 
 /**
  * Hasil commit. `entry === null` berarti tidak ada op yang sukses: tidak ada revisi baru, `doc` adalah
@@ -120,6 +122,10 @@ export interface Transaction {
   insertPage(page: unknown, index?: number): string;
   /** Hapus halaman `id` beserta seluruh board-nya; halaman terakhir tidak boleh dihapus. Inversnya `insertPage`. */
   removePage(id: string): void;
+  /** Ganti nama halaman `id`; nama harus string tidak kosong. Inversnya renamePage ke nama lama. */
+  renamePage(id: unknown, name: unknown): void;
+  /** Pindahkan halaman `id` ke posisi `index` (0..jumlah-1); halaman lain bergeser. Inversnya movePage ke indeks lama. */
+  movePage(id: unknown, index: unknown): void;
   /**
    * Salinan kerja hidup (melihat op yang sudah sukses di transaksi ini). Hanya-baca menurut kontrak:
    * pemanggil tidak boleh memutasinya. Melempar bila transaksi sudah ditutup.
@@ -1019,6 +1025,44 @@ export function beginTransaction(doc: Doc, opts: TransactionOptions): Transactio
         }
         // Invers menyimpan isi halaman + posisi (undo memulihkan utuh di tempat yang sama).
         undo({ op: 'insertPage', page: host.structuredClone(page), index: i });
+      });
+    },
+
+    renamePage(id, name) {
+      op('renamePage', (w, undo) => {
+        const pid = requireId('renamePage', 'id', id);
+        if (typeof name !== 'string' || name.trim() === '') {
+          throw new LakarError('SCHEMA_INVALID', `renamePage: name harus string tidak kosong, bukan ${JSON.stringify(name) ?? 'undefined'}`, {
+            hint: 'renamePage menerima {id, name}; id = ID halaman dari list_pages',
+          });
+        }
+        const i = w.pages.findIndex((p) => p.id === pid);
+        if (i < 0) {
+          throw new LakarError('SCHEMA_INVALID', `renamePage: halaman ${pid} tidak ada`, { hint: 'pakai id halaman dari list_pages' });
+        }
+        const prev = w.pages[i]!.name;
+        if (prev === name) return;
+        undo({ op: 'renamePage', id: pid, name: prev });
+        w.pages[i] = { ...w.pages[i]!, name };
+      });
+    },
+
+    movePage(id, index) {
+      op('movePage', (w, undo) => {
+        const pid = requireId('movePage', 'id', id);
+        const i = w.pages.findIndex((p) => p.id === pid);
+        if (i < 0) {
+          throw new LakarError('SCHEMA_INVALID', `movePage: halaman ${pid} tidak ada`, { hint: 'pakai id halaman dari list_pages' });
+        }
+        if (typeof index !== 'number' || !Number.isInteger(index) || index < 0 || index >= w.pages.length) {
+          throw new LakarError('SCHEMA_INVALID', `movePage: index harus integer 0..${w.pages.length - 1}, bukan ${JSON.stringify(index) ?? 'undefined'}`, {
+            hint: 'index = posisi tujuan di daftar pages (0 = paling kiri)',
+          });
+        }
+        if (i === index) return;
+        undo({ op: 'movePage', id: pid, index: i });
+        const page = w.pages.splice(i, 1)[0]!;
+        w.pages.splice(index, 0, page);
       });
     },
 
