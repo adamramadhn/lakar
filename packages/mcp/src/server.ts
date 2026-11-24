@@ -1,6 +1,4 @@
-// Server MCP Lakar: 20 tool (AD-11 + photo_search + get_selection + export_code + paste + import_url + list_documents
-// + undo + redo + visual_diff + fix_check) → HTTP lakard: status, read_skill, open_doc, list_documents, list_boards,
-// execute, inspect, layout_check, screenshot, export, export_code, icon_search, photo_search, get_selection, paste,
+// Server MCP Lakar: 32 tool → HTTP lakard. Daftar lengkap dipaku di tests (daftar tool + anotasi read/write).
 // import_url, undo, redo, visual_diff, fix_check.
 import { McpServer, type CallToolResult } from '@modelcontextprotocol/server';
 import { z } from 'zod';
@@ -739,6 +737,56 @@ export function createLakarMcpServer(daemonUrl: string): McpServer {
       }),
     },
     ({ threadId, resolved }) => guarded(async () => asText(await client.call('/comments/resolve', resolved !== undefined ? { threadId, resolved } : { threadId }))),
+  );
+
+  // Audit desain (story 9.6): baca-saja, dihitung pada dokumen tersimpan sesi. Route agen `/analyze/*`.
+  server.registerTool(
+    'analyze_colors',
+    {
+      annotations: toolAnnotations('analyze_colors'),
+      description:
+        'Frekuensi warna di dokumen/board aktif: {colors:[{value, count, bound, token?, candidates?, uses:[{nodeId, prop}], totalUses}]} terurut pakai terbanyak. ' +
+        'value hex = literal tak terikat (candidates = ≤3 token color terdekat per jarak RGB); value "{$token:nama}" = terikat. ' +
+        'Pakai untuk mengikat literal ke token: setTokens + update nodeId di uses.',
+      inputSchema: z.object({
+        boardId: z.string().optional().describe('batasi satu board (id dari list_boards; default seluruh dokumen)'),
+      }),
+    },
+    (args) => guarded(async () => asText(await client.call('/analyze/colors', args.boardId !== undefined ? { boardId: args.boardId } : {}))),
+  );
+
+  server.registerTool(
+    'analyze_typography',
+    {
+      annotations: toolAnnotations('analyze_typography'),
+      description:
+        'Frekuensi gaya teks (node text) di dokumen/board aktif: {styles:[{family?, size?, weight?, style?, lineHeight?, count, nodeIds[], offScale?, suggestedSize?}]} ' +
+        'terurut pakai terbanyak. offScale = size literal di luar skala DESIGN.md (suggestedSize = skala terdekat); prop token-bound tampil sebagai "{$token:nama}".',
+      inputSchema: z.object({
+        boardId: z.string().optional().describe('batasi satu board (id dari list_boards; default seluruh dokumen)'),
+      }),
+    },
+    (args) => guarded(async () => asText(await client.call('/analyze/typography', args.boardId !== undefined ? { boardId: args.boardId } : {}))),
+  );
+
+  server.registerTool(
+    'analyze_clusters',
+    {
+      annotations: toolAnnotations('analyze_clusters'),
+      description:
+        'Struktur kontainer berulang (kandidat komponen) di dokumen/board aktif: {clusters:[{shape, count, example, nodeIds[], totalNodes}]} ' +
+        'untuk grup signature identik (tipe + nama-prop + struktur anak; konten diabaikan) yang muncul ≥ min (default 3). ' +
+        'Pakai nodeIds dengan setComponent + instance untuk mengganti pengulangan menjadi komponen.',
+      inputSchema: z.object({
+        boardId: z.string().optional().describe('batasi satu board (id dari list_boards; default seluruh dokumen)'),
+        min: z.number().int().min(2).max(50).optional().describe('batas minimal pengulangan 2–50 (default 3)'),
+      }),
+    },
+    (args) =>
+      guarded(async () => {
+        const body = Object.fromEntries(Object.entries(args).filter(([, v]) => v !== undefined));
+        return asText(await client.call('/analyze/clusters', body));
+      }),
   );
 
   // undo/redo agen (spec-agent-undo): hanya langkah execute/paste sesi ini; edit pengguna/agen lain sesudahnya → ditolak.
