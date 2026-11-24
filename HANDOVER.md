@@ -56,7 +56,14 @@ Epic ke-8 (`epic-adopsi-open-pencil`, 12 story: anotasi tool MCP, LC-34/35 overl
 - **Retrospektif: `accepted`** — `lakar-meta/_bmad-output/initiative-lakar-paper/tickets/epic-adopsi-open-pencil/epic-adopsi-open-pencil-retrospective.md` + 3 ADR di folder yang sama. Semua 12 tiket `done`.
 - **Verifikasi retro (Linux, Node 26):** build + 3028 tes hijau; SSRF/guard Origin, impor URL nyata, PNG `nodeId` + kompat lama, DTCG ekspor/impor, 20 anotasi tool MCP, dan `flex-wrap`/`row-gap` dilatih live ke daemon.
 - **Temuan fix-now dari retro** (regex TOML Codex, inline-table lakar, `.bak` revert, prefiks translasi IPv6 SSRF, `checkPageUrl` untuk fetcher terinjeksi, `??=` prototype DTCG, versi `release.yml`, `undoLabel` impor) diperbaiki di branch `fix/retro-adopsi-open-pencil`.
-- **Sisa:** 23 item defer tercatat di `deferred-work.md` (race/symlink config, content-encoding, updater bytes/origin, tes kontrak serde Rust, kesenjangan tes viewer, dsb.). Belum ada rilis ≥ epic — Done-when "fitur ada di installer rilis" baru benar setelah tag berikutnya dipotong.
+- **Sisa:** 23 item defer tercatat di `deferred-work.md` (race/symlink config, content-encoding, updater bytes/origin, tes kontrak serde Rust, kesenjangan tes viewer, dsb.).
+- **Rilis `v0.1.6` dipotong 2026-11-24** — memuat semua epic adopsi + fix retro. Cek artefak updater macOS bernama `Lakar_0.1.6_*` (uji nyata fix `release.yml` versi dari tag).
+
+### Epic kolaborasi agen (2026-11-24, berjalan)
+
+Epic ke-9 (`epic-kolaborasi-agen`, 6 story, dipecah dari hasil refresh riset open-pencil): desain UI kolaborasi di `lakar-ui.pen` (9.1, sedang dikerjakan orkestrator Claude Opus 5.5 headless di `design/lakar-ui.op9.pen`), tool halaman via MCP (9.2), model+tool komentar canvas (9.3), UI komentar viewer (9.4), pratinjau execute dry-run (9.5), audit desain `analyze_*` (9.6).
+
+- **9.2 selesai di branch `feat/agent-page-tools` (PR #55).** Lima tool baru: `list_pages`, `get_current_page`, `switch_page` (nama/id), `create_page`, `get_page_tree`. `session.activePage` menjadi target `add(null)`/`children(null)`/`place()`; default halaman pertama jadi sesi lama identik. Server MCP kini 25 tool.
 
 ## Langkah berikutnya
 
