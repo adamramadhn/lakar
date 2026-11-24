@@ -4,7 +4,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { generateCode } from '@lakar/codegen';
+import { dtcgTokensJson, generateCode } from '@lakar/codegen';
 import { buildServer, loadConfig } from './index.js';
 import { exportGlyphs } from './code-export.js';
 
@@ -87,6 +87,20 @@ describe('POST /viewer/export-code (export_code)', () => {
     expect(none).toEqual([]);
     expect(generateCode(doc, { ...opts, icons: none }).warnings.map((w) => w.code)).toEqual(['icon-glyph-missing']);
     expect(exportGlyphs(doc, opts, t.daemon.icons).map((g) => `${g.lib}/${g.icon}`)).toEqual(['lucide/star']);
+  });
+
+  it("target 'dtcg': satu berkas tokens.json W3C DTCG (tanpa id/board), isi = dtcgTokensJson", async () => {
+    const t = await setup();
+    await t.inject('/docs/open', { slug: t.slug }, { 'x-lakar-session': t.sid });
+    const r = await t.call({ target: 'dtcg' });
+    expect(r.statusCode, r.body).toBe(200);
+    const data = r.json().data;
+    const doc = await t.docGet();
+    expect(data).toMatchObject({ docId: doc.id, slug: t.slug, rev: doc.rev, id: null, name: null, target: 'dtcg' });
+    expect(data.files).toEqual([{ path: 'tokens.json', contents: dtcgTokensJson(doc), bytes: Buffer.byteLength(dtcgTokensJson(doc), 'utf8') }]);
+    const parsed = JSON.parse(data.files[0].contents);
+    expect(parsed.colors.brand).toMatchObject({ $type: 'color', $value: '#0E7490' });
+    expect(data.warnings).toEqual([]);
   });
 
   it('target tak dikenal / kunci asing → SCHEMA_INVALID; id asing → NOT_FOUND', async () => {

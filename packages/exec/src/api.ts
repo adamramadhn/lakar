@@ -2,7 +2,7 @@
 // (`LakarApi`) dan tabel runtime `API` (signature, doc, contoh yang dites, implementasi host).
 // Tanpa IO. Semua op baca bekerja di salinan kerja transaksi dan mengembalikan salinan.
 import { isPlainObject, type Transaction } from '@lakar/core';
-import type { CssVariableSkip, CssVariablesPort, IconCatalogMatch, IconCatalogPort, PhotoInfo, PhotoLibraryPort } from '@lakar/ports';
+import type { CssVariableSkip, CssVariablesPort, DtcgPort, DtcgSkip, IconCatalogMatch, IconCatalogPort, PhotoInfo, PhotoLibraryPort } from '@lakar/ports';
 import {
   ICON_SEARCH_DEFAULT_LIMIT,
   ICON_SEARCH_MAX_LIMIT,
@@ -108,6 +108,13 @@ export type CssImportResult = {
   modes: string[];
   skipped: CssVariableSkip[];
 };
+/** Hasil `importDtcgTokens`. `path` = path DTCG (= `token`); `alias` = target mentah `{a.b}` bila `$value` referensi. */
+export type DtcgImportResult = {
+  tokens: { path: string; token: string; type: TokenTypeName; status: 'new' | 'update'; alias?: string }[];
+  /** `tokenModes` dokumen sesudah impor. */
+  modes: string[];
+  skipped: DtcgSkip[];
+};
 
 /** Fungsi global yang tersedia di snippet `execute`. */
 export interface LakarApi {
@@ -156,6 +163,12 @@ export interface LakarApi {
    * mode baru didaftarkan, token bernama sama diperbarui (mode yang tidak disebut CSS tetap). Variabel yang tak terpetakan dilaporkan di `skipped`.
    */
   importCssVariables(css: string): CssImportResult;
+  /**
+   * Buat token bertipe dari JSON W3C DTCG (nested group → nama dipisah `.`; `$extensions.mode` = mode tema;
+   * `$extensions["com.lakar"].type` = tipe Lakar asli; alias `{a.b}` di-resolve ke nilai target). Mode baru
+   * didaftarkan, token bernama sama diperbarui; entri yang tak didukung dilaporkan di `skipped`.
+   */
+  importDtcgTokens(json: string): DtcgImportResult;
   /** Baca satu node (salinan datar). */
   get(id: string): NodeView;
   /** Cari node dalam urutan dokumen. */
@@ -192,6 +205,8 @@ export type ApiContext = {
   photos?: PhotoLibraryPort;
   /** Parser CSS variables (`importCssVariables`), disuntikkan daemon dari @lakar/render; tidak ada → EXEC_ERROR. */
   cssVariables?: CssVariablesPort;
+  /** Parser JSON W3C DTCG (`importDtcgTokens`), disuntikkan daemon dari @lakar/codegen; tidak ada → EXEC_ERROR. */
+  dtcg?: DtcgPort;
   /**
    * Tinggi terukur board `height:'hug'` (render terakhir sebelum snippet; spec-board-hug-height). Dipakai `place` dan
    * `measuredHeight` di view board. Tanpa entri (mis. board baru di snippet ini) = belum terukur.
@@ -201,6 +216,8 @@ export type ApiContext = {
 
 /** Ukuran maksimum stylesheet `importCssVariables` (karakter). */
 export const CSS_IMPORT_MAX_CHARS = 256 * 1024;
+/** Ukuran maksimum JSON `importDtcgTokens` (karakter). */
+export const DTCG_IMPORT_MAX_CHARS = 256 * 1024;
 
 /** Format ref foto (`photo_search`): `unsplash:<id>`, `wikimedia:<pageid>`, `openverse:<uuid>`, atau `pexels:<id>` (lama). */
 export const PHOTO_REF_PATTERN = /^(?:unsplash:[A-Za-z0-9_-]{6,32}|(?:pexels|openverse):[A-Za-z0-9-]{1,64}|wikimedia:\d{1,12})$/;
@@ -385,6 +402,7 @@ const boardRect = (n: AnyNode, heights?: ReadonlyMap<string, number>): Rect => {
 const clash = (a: Rect, b: Rect, gap: number) => a.x < b.x + b.w + gap && b.x < a.x + a.w + gap && a.y < b.y + b.h + gap && b.y < a.y + a.h + gap;
 
 const CSS_IMPORT_HINT = "contoh: importCssVariables(':root { --colors-bg: #ffffff; } [data-theme=\"dark\"] { --colors-bg: #0f0f0f; }'); hanya custom property (--nama) di :root/html dan [data-theme=\"…\"]";
+const DTCG_IMPORT_HINT = 'contoh: importDtcgTokens(\'{"colors":{"bg":{"$type":"color","$value":"#FFFFFF","$extensions":{"mode":{"dark":"#0B0C0F"}}}}}\'); nama token = path grup digabung ".", mode di $extensions.mode, alias "{a.b}" menunjuk token lain di file yang sama';
 
 const BOARD = "const b = add(null, {type:'board', name:'Beranda', x:0, y:0, width:390, height:844, screen:'mobile'});";
 
@@ -613,6 +631,46 @@ export const API: { readonly [K in keyof LakarApi]: ApiFunction } = {
       mutation(ctx, () => ctx.tx.setTokens(map));
       const out: CssImportResult = {
         tokens: parsed.entries.map((e) => ({ variable: e.variable, token: e.token, type: e.type as TokenTypeName, status: e.status })),
+        modes: [...(ctx.view().tokenModes ?? [])],
+        skipped: parsed.skipped,
+      };
+      return JSON.parse(JSON.stringify(out)) as unknown;
+    },
+  },
+  importDtcgTokens: {
+    kind: 'op',
+    signature: 'importDtcgTokens(json: string): {tokens: {path, token, type, status, alias?}[], modes: string[], skipped: {source, reason, detail}[]}',
+    doc:
+      'Buat token bertipe dari isi file JSON W3C DTCG (satu commit: setTokenModes lalu setTokens). Grup bersarang menjadi nama token dipisah "."; $extensions.mode = nilai per mode tema (didaftarkan ke tokenModes). ' +
+      'Tipe: $extensions["com.lakar"].type (ditulis ekspor Lakar) > $type (color/fontFamily/fontWeight 1:1; dimension px → nama bila cocok selain itu spacing, em → letterSpacing; number → fontWeight hanya bila nama mengandung "weight") > segmen nama (radius, breakpoint, container, size, leading). ' +
+      'Alias "{a.b}" di-resolve ke nilai token target dalam file yang sama (kolom alias di hasil); fontFamily array digabung ", "; keyword weight (thin…black, normal, bold) jadi angka; rem = 16px. ' +
+      'Entri tak didukung (typography, shadow, border, gradient, transition, nama mode/nama token tidak valid, alias tak dikenal, nilai tak valid) dilewati dan dilaporkan di skipped; tidak ada token sama sekali → SCHEMA_INVALID.',
+    returns: '{tokens: [{path, token, type, status, alias?}], modes, skipped: [{source, reason, detail}]}',
+    errors: ['SCHEMA_INVALID', 'EXEC_ERROR'],
+    example:
+      'importDtcgTokens(JSON.stringify({colors:{bg:{$type:"color",$value:"#FFFFFF",$extensions:{mode:{dark:"#0B0C0F"}}}},"radius-md":{$type:"dimension",$value:{value:12,unit:"px"},$extensions:{"com.lakar":{type:"radius"}}}}));\n' +
+      `${BOARD}\nupdate(b, {themeMode:'dark'});\nadd(b, {type:'rect', name:'Kartu', width:120, height:80, radius:{$token:'radius-md'}, fills:[{type:'solid', color:{$token:'colors.bg'}}]});`,
+    call(ctx, [json]) {
+      if (typeof json !== 'string' || !json.trim()) {
+        throw new LakarError('SCHEMA_INVALID', `importDtcgTokens: json harus string isi file DTCG, bukan ${show(json)}`, { hint: DTCG_IMPORT_HINT });
+      }
+      if (json.length > DTCG_IMPORT_MAX_CHARS) {
+        throw new LakarError('SCHEMA_INVALID', `importDtcgTokens: json maks ${DTCG_IMPORT_MAX_CHARS / 1024} K karakter, dikirim ${json.length}`, { hint: 'impor per file atau per bagian' });
+      }
+      if (!ctx.dtcg) {
+        throw new LakarError('EXEC_ERROR', 'importDtcgTokens: parser DTCG tidak tersedia di host ini', { hint: 'jalankan lewat lakard (tool execute MCP)' });
+      }
+      const doc = ctx.view();
+      const parsed = ctx.dtcg.parse(json, { tokens: doc.tokens ?? {}, ...(doc.tokenModes ? { modes: doc.tokenModes } : {}) });
+      if (!parsed.entries.length) {
+        const why = parsed.skipped.slice(0, 5).map((s) => `${s.source}: ${s.reason}`);
+        throw new LakarError('SCHEMA_INVALID', `importDtcgTokens: tidak ada token DTCG yang bisa diimpor${why.length ? ` (${why.join('; ')})` : ''}`, { hint: DTCG_IMPORT_HINT });
+      }
+      if (parsed.tokenModes) mutation(ctx, () => ctx.tx.setTokenModes(parsed.tokenModes));
+      const map = Object.fromEntries(parsed.entries.map((e) => [e.token, { type: e.type, value: e.value, ...(e.modes ? { modes: e.modes } : {}) }]));
+      mutation(ctx, () => ctx.tx.setTokens(map));
+      const out: DtcgImportResult = {
+        tokens: parsed.entries.map((e) => ({ path: e.path, token: e.token, type: e.type as TokenTypeName, status: e.status, ...(e.alias ? { alias: e.alias } : {}) })),
         modes: [...(ctx.view().tokenModes ?? [])],
         skipped: parsed.skipped,
       };

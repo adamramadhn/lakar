@@ -21,6 +21,7 @@
     "test": "vitest run --root ../.. packages/codegen/"
   },
   "dependencies": {
+    "@lakar/ports": "workspace:*",
     "@lakar/render": "workspace:*",
     "@lakar/schema": "workspace:*"
   }

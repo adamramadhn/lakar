@@ -3,7 +3,7 @@
 // `iconRefs` (dokumen ter-ekspansi) → `icons.glyph` katalog (route `/viewer/render-deps` memakai fungsi yang sama),
 // lalu `generateCode` dengan opsi yang sama, jadi berkasnya identik byte. Route baru; route/tool lama tidak berubah (AD-4).
 import type { FastifyInstance } from 'fastify';
-import { generateCode, iconRefs, type CodegenOptions } from '@lakar/codegen';
+import { dtcgTokensJson, generateCode, iconRefs, type CodegenOptions } from '@lakar/codegen';
 import type { IconCatalogPort } from '@lakar/ports';
 import { ICON_LIBS, LakarError, SESSION_HEADER, type IconGlyph, type IconLib, type LakarDocument } from '@lakar/schema';
 import { z } from 'zod';
@@ -11,7 +11,7 @@ import { notFound } from './errors.js';
 import { locateNode } from './inspect.js';
 import { NO_ACTIVE_DOC_HINT, type Sessions } from './sessions.js';
 
-export const CODE_TARGETS = ['react-tailwind', 'react-css'] as const;
+export const CODE_TARGETS = ['react-tailwind', 'react-css', 'dtcg'] as const;
 
 const Body = z
   .object({
@@ -23,7 +23,7 @@ const Body = z
   })
   .strict();
 const HINT =
-  "kirim {id?, target?, components?, tokens?, typescript?}: id board/node (default board pertama), target 'react-tailwind' (default) atau 'react-css', components/tokens/typescript boolean (default true)";
+  "kirim {id?, target?, components?, tokens?, typescript?}: id board/node (default board pertama), target 'react-tailwind' (default), 'react-css', atau 'dtcg' (seluruh token dokumen sebagai tokens.json W3C DTCG), components/tokens/typescript boolean (default true)";
 
 export type CodeExportOptions = Omit<CodegenOptions, 'icons' | 'assetBase' | 'componentName'>;
 
@@ -60,13 +60,19 @@ export function registerCodeExportRoutes(app: FastifyInstance, { docs, sessions,
     }
     const body = parsed.data;
     const stored = docs.get(slug)!;
+    const target = body.target ?? 'react-tailwind';
+    if (target === 'dtcg') {
+      // Token tingkat dokumen: satu berkas tokens.json W3C DTCG (tanpa resolusi node).
+      const contents = dtcgTokensJson(stored);
+      const files = [{ path: 'tokens.json', contents, bytes: Buffer.byteLength(contents, 'utf8') }];
+      return reply.code(200).send({ ok: true, data: { docId: stored.id, slug, rev: stored.rev, id: null, name: null, target, files, warnings: [] } });
+    }
     // Board pertama = aturan yang sama dengan `export`/`screenshot` (anak pertama halaman pertama).
     const id = body.id ?? stored.pages[0]?.children[0]?.id;
     if (!id) throw notFound(`dokumen ${slug} belum punya board`, 'buat board dulu lewat execute');
     // Alamat komposit (isi instance) di-resolve codegen sendiri; ID tersimpan dicek di sini agar pesannya sama dengan export.
     const hit = id.includes('/') ? undefined : locateNode(stored, id);
     if (!id.includes('/') && !hit) throw notFound(`node ${id} tidak ada di dokumen ${slug}`, 'pakai ID dari created[] execute atau list_boards');
-    const target = body.target ?? 'react-tailwind';
     const opts: CodeExportOptions = {
       nodeId: id,
       target,

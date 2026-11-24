@@ -7,6 +7,7 @@ import type { DocOp, LakarDocument } from '@lakar/schema';
 import { highlight, formatBytes, TOK_CLASS, type Tok } from './codeExport';
 import { copyText } from './Connections';
 import { CSS_IMPORT_MAX_CHARS, importPlan, tokenVarHint, type ImportRow } from './cssImport';
+import { DTCG_IMPORT_MAX_CHARS, dtcgImportPlan, type DtcgImportRow } from './dtcgImport';
 import { Icon } from './icons';
 import { Modal } from './NewFileDialog';
 import { modeLabel } from './themeModel';
@@ -97,7 +98,7 @@ export function CopyTokensPopover({ doc, onClose }: { doc: LakarDocument; onClos
   );
 }
 
-const isColor = (v: string | number) => typeof v === 'string' && /^#[0-9A-F]{6}([0-9A-F]{2})?$/.test(v);
+const isColor = (v: string | number) => typeof v === 'string' && /^#[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?$/.test(v);
 const STATUS_LABEL: Record<ImportRow['status'], string> = { new: 'New', update: 'Update', skipped: 'Skipped' };
 
 /**
@@ -309,6 +310,236 @@ export function ImportCssDialog({
         <span className="css-import-stat">
           <i className="dot warning" />
           {plan.counts.skipped} skipped
+        </span>
+        {(commitError ?? (plan.rows.length > 0 ? plan.error : undefined)) && (
+          <small className="danger" role="alert">
+            {commitError ?? plan.error}
+          </small>
+        )}
+        <span className="code-spacer" />
+        <button type="button" className="btn" onClick={onClose}>
+          Cancel
+        </button>
+        {editable && (
+          <button type="button" className="btn primary" disabled={!n || busy} onClick={() => void submit()}>
+            <Icon name="fileDown" size={14} />
+            {n ? `Import ${n} ${n === 1 ? 'token' : 'tokens'}` : 'Import'}
+          </button>
+        )}
+      </footer>
+    </Modal>
+  );
+}
+
+const DTCG_STATUS_LABEL: Record<DtcgImportRow['status'], string> = { new: 'New', update: 'Update', unsupported: 'Unsupported' };
+
+/**
+ * Dialog Import DTCG tokens (Section 11). Sama dengan `ImportCssDialog`: pratinjau dihitung dari dokumen terkini dan
+ * `onImport` men-commit satu set op (setTokenModes + setTokens) pada dokumen terbaru → satu rev, bisa di-undo.
+ */
+export function ImportDtcgDialog({
+  doc,
+  editable,
+  onImport,
+  onClose,
+}: {
+  doc: LakarDocument;
+  editable: boolean;
+  onImport: (build: (d: LakarDocument) => { ops: DocOp[]; label: string } | { error: string }) => Promise<string | undefined>;
+  onClose: () => void;
+}) {
+  const [source, setSource] = useState<'paste' | 'file'>('paste');
+  const [pasted, setPasted] = useState('');
+  const [file, setFile] = useState<{ name: string; size: number; text: string } | undefined>(undefined);
+  const [fileError, setFileError] = useState<string | undefined>(undefined);
+  const [busy, setBusy] = useState(false);
+  const [commitError, setCommitError] = useState<string | undefined>(undefined);
+  const input = useRef<HTMLInputElement>(null);
+  const json = source === 'paste' ? pasted : (file?.text ?? '');
+  const plan = useMemo(() => dtcgImportPlan(doc, json), [doc, json]);
+  const n = plan.counts.new + plan.counts.update;
+  const columns = plan.modes.length ? plan.modes : [undefined];
+  const grid = { gridTemplateColumns: `minmax(140px, 210px) 96px 88px repeat(${columns.length}, 84px) 92px` };
+  const skippedNotes = plan.rows.filter((r): r is Extract<DtcgImportRow, { status: 'unsupported' }> => r.status === 'unsupported');
+
+  const pick = async (f: File | undefined) => {
+    if (!f) return;
+    // Batas karakter diperiksa sebelum membaca: UTF-8 ≤ 4 byte per karakter.
+    if (f.size > DTCG_IMPORT_MAX_CHARS * 4) {
+      setFile(undefined);
+      setFileError(`${f.name} is larger than ${DTCG_IMPORT_MAX_CHARS / 1024} KB. Import it in parts.`);
+      return;
+    }
+    try {
+      setFile({ name: f.name, size: f.size, text: await f.text() });
+      setFileError(undefined);
+    } catch {
+      setFileError(`Could not read ${f.name}.`);
+    }
+  };
+  const submit = async () => {
+    if (!n || !editable || busy) return;
+    setBusy(true);
+    setCommitError(undefined);
+    const error = await onImport((d) => {
+      const p = dtcgImportPlan(d, json);
+      return p.ops.length ? { ops: p.ops, label: p.label } : { error: p.error ?? 'No DTCG tokens to import.' };
+    });
+    setBusy(false);
+    if (error) setCommitError(error);
+    else onClose();
+  };
+
+  return (
+    <Modal label="Import DTCG tokens" onClose={onClose} className="css-import-dialog dtcg-import-dialog">
+      <header className="code-header">
+        <Icon name="fileDown" size={16} />
+        <div className="code-titles">
+          <h2>Import DTCG tokens</h2>
+          <span>Bring design tokens from a W3C DTCG JSON file. Nothing changes until you import.</span>
+        </div>
+        <span className="code-spacer" />
+        <button type="button" className="dp-icon-btn boxed" aria-label="Close" title="Close" onClick={onClose}>
+          <Icon name="x" size={14} />
+        </button>
+      </header>
+      <div className="code-body">
+        <div className="css-import-source">
+          <div className="segmented" role="radiogroup" aria-label="Source">
+            {(
+              [
+                ['paste', 'Paste JSON', 'clipboard'],
+                ['file', 'Choose file', 'file'],
+              ] as const
+            ).map(([s, label, icon]) => (
+              <button
+                key={s}
+                type="button"
+                role="radio"
+                aria-checked={source === s}
+                className={`segment${source === s ? ' active' : ''}`}
+                onClick={() => {
+                  setSource(s);
+                  if (s === 'file' && !file) input.current?.click();
+                }}
+              >
+                <Icon name={icon} size={13} />
+                {label}
+              </button>
+            ))}
+          </div>
+          <input
+            ref={input}
+            type="file"
+            accept=".json,application/json"
+            hidden
+            onChange={(e) => {
+              void pick(e.currentTarget.files?.[0]);
+              e.currentTarget.value = '';
+            }}
+          />
+          {source === 'paste' ? (
+            <textarea
+              className="css-import-text mono"
+              value={pasted}
+              spellCheck={false}
+              aria-label="DTCG JSON"
+              placeholder={'{\n  "colors": {\n    "bg": {\n      "$type": "color",\n      "$value": "#FFFFFF"\n    }\n  }\n}'}
+              onChange={(e) => setPasted(e.currentTarget.value)}
+              data-autofocus=""
+            />
+          ) : (
+            <>
+              <button type="button" className="css-import-chip" onClick={() => input.current?.click()}>
+                <Icon name="fileCode" size={13} />
+                <span className="mono">{file?.name ?? 'Choose a .json file'}</span>
+                {file && <small>{formatBytes(file.size)}</small>}
+              </button>
+              {fileError && (
+                <small className="danger" role="alert">
+                  {fileError}
+                </small>
+              )}
+              {file && file.text.length <= DTCG_IMPORT_MAX_CHARS && <Snippet path="tokens.json" text={file.text} className="css-import-code" />}
+            </>
+          )}
+        </div>
+        <div className="css-import-preview">
+          {plan.modes.length > 0 && (
+            <div className="css-import-modes">
+              <span className="field-label">Modes</span>
+              {plan.modes.map((m, i) => (
+                <div key={m} className="css-import-mode">
+                  <span className="css-import-sel mono">$extensions.mode</span>
+                  <Icon name="arrowRight" size={13} />
+                  <span className="css-import-target">
+                    <small>Mode</small>
+                    {modeLabel(m)}
+                    {i === 0 ? ' · default' : ''}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="css-import-table" role="table" aria-label="Tokens to import">
+            <div className="css-import-row head" role="row" style={grid}>
+              <span role="columnheader">Path</span>
+              <span role="columnheader">Alias</span>
+              <span role="columnheader">Type</span>
+              {columns.map((m) => (
+                <span key={m ?? '__value'} role="columnheader">
+                  {m ? modeLabel(m) : 'Value'}
+                </span>
+              ))}
+              <span role="columnheader">Status</span>
+            </div>
+            {plan.rows.length === 0 && <div className="css-import-empty">{plan.error ?? 'Paste DTCG JSON or choose a .json file to preview its tokens.'}</div>}
+            {plan.rows.map((r, i) => (
+              <div key={`${r.path}-${i}`} className={`css-import-row ${r.status}`} role="row" style={grid}>
+                <span className="mono var" role="cell" title={r.path}>
+                  {r.path}
+                </span>
+                <span className="mono" role="cell">
+                  {r.status === 'unsupported' ? '—' : (r.alias ?? '—')}
+                </span>
+                <span role="cell">{r.status === 'unsupported' ? '—' : r.type}</span>
+                {columns.map((m, j) => {
+                  const v = r.status === 'unsupported' ? undefined : r.values[j];
+                  return (
+                    <span key={m ?? '__value'} className={`mono${v?.inherited ? ' inherited' : ''}`} role="cell">
+                      {v && isColor(v.value) && <i className="css-import-swatch" style={{ background: String(v.value) }} />}
+                      {v ? String(v.value) : '—'}
+                    </span>
+                  );
+                })}
+                <span role="cell">
+                  <span className={`css-import-status ${r.status}`}>{DTCG_STATUS_LABEL[r.status]}</span>
+                </span>
+              </div>
+            ))}
+            {skippedNotes.length > 0 && (
+              <div className="css-import-note">
+                <Icon name="alert" size={13} />
+                <span>
+                  {skippedNotes.map((s) => `${s.path}: ${s.detail}`).join(' ')} Existing tokens with the same name are updated; their layers keep the reference.
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+      <footer className="code-footer">
+        <span className="css-import-stat">
+          <i className="dot success" />
+          {plan.counts.new} new
+        </span>
+        <span className="css-import-stat">
+          <i className="dot accent" />
+          {plan.counts.update} update
+        </span>
+        <span className="css-import-stat">
+          <i className="dot warning" />
+          {plan.counts.skipped} unsupported
         </span>
         {(commitError ?? (plan.rows.length > 0 ? plan.error : undefined)) && (
           <small className="danger" role="alert">

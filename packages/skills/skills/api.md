@@ -214,6 +214,22 @@ update(b, {themeMode:'dark'});
 add(b, {type:'rect', name:'Kartu', width:120, height:80, radius:{$token:'radius.md'}, fills:[{type:'solid', color:{$token:'colors.bg'}}]});
 ```
 
+### importDtcgTokens
+
+`importDtcgTokens(json: string): {tokens: {path, token, type, status, alias?}[], modes: string[], skipped: {source, reason, detail}[]}`
+
+Buat token bertipe dari isi file JSON W3C DTCG (satu commit: setTokenModes lalu setTokens). Grup bersarang menjadi nama token dipisah "."; $extensions.mode = nilai per mode tema (didaftarkan ke tokenModes). Tipe: $extensions["com.lakar"].type (ditulis ekspor Lakar) > $type (color/fontFamily/fontWeight 1:1; dimension px → nama bila cocok selain itu spacing, em → letterSpacing; number → fontWeight hanya bila nama mengandung "weight") > segmen nama (radius, breakpoint, container, size, leading). Alias "{a.b}" di-resolve ke nilai token target dalam file yang sama (kolom alias di hasil); fontFamily array digabung ", "; keyword weight (thin…black, normal, bold) jadi angka; rem = 16px. Entri tak didukung (typography, shadow, border, gradient, transition, nama mode/nama token tidak valid, alias tak dikenal, nilai tak valid) dilewati dan dilaporkan di skipped; tidak ada token sama sekali → SCHEMA_INVALID.
+
+- Mengembalikan: {tokens: [{path, token, type, status, alias?}], modes, skipped: [{source, reason, detail}]}
+- Error: SCHEMA_INVALID, EXEC_ERROR
+
+```js
+importDtcgTokens(JSON.stringify({colors:{bg:{$type:"color",$value:"#FFFFFF",$extensions:{mode:{dark:"#0B0C0F"}}}},"radius-md":{$type:"dimension",$value:{value:12,unit:"px"},$extensions:{"com.lakar":{type:"radius"}}}}));
+const b = add(null, {type:'board', name:'Beranda', x:0, y:0, width:390, height:844, screen:'mobile'});
+update(b, {themeMode:'dark'});
+add(b, {type:'rect', name:'Kartu', width:120, height:80, radius:{$token:'radius-md'}, fills:[{type:'solid', color:{$token:'colors.bg'}}]});
+```
+
 ### get
 
 `get(id: string): NodeView`

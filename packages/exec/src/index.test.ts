@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { beginTransaction, createDocument } from '@lakar/core';
-import type { CssVariablesParseOptions, CssVariablesPort, IconCatalogPort, PhotoInfo, PhotoLibraryPort } from '@lakar/ports';
+import type { CssVariablesParseOptions, CssVariablesPort, DtcgParseOptions, DtcgPort, IconCatalogPort, PhotoInfo, PhotoLibraryPort } from '@lakar/ports';
 import { LakarDocument, LakarError, resolveTokens, type LakarDocument as Doc } from '@lakar/schema';
 import { API, API_GLOBALS, MAX_OPS, PACKAGE, photoRefsInCode, runSnippet as runSnippetRaw, type RunOptions, type RunResult } from './index.js';
 
@@ -72,8 +72,29 @@ const fakeCss: CssVariablesPort & { calls: { css: string; opts: CssVariablesPars
     };
   },
 };
+/**
+ * Parser DTCG palsu (struktural): hasil tetap untuk JSON berisi `"colors"`, kosong untuk lainnya.
+ * Parser asli (@lakar/codegen) dites di packages/codegen/src/dtcg.test.ts dan tests/dtcg-roundtrip.test.ts.
+ */
+const fakeDtcg: DtcgPort & { calls: { input: unknown; opts: DtcgParseOptions | undefined }[] } = {
+  calls: [],
+  parse(input, opts) {
+    this.calls.push({ input, opts });
+    const has = typeof input === 'string' ? input.includes('"colors"') : false;
+    if (!has) return { entries: [], tokenModes: null, skipped: [{ source: 'effects.shadow', reason: 'unsupported-type', detail: 'Type "shadow" is not supported.' }] };
+    return {
+      entries: [
+        { path: 'colors.bg', token: 'colors.bg', type: 'color', value: '#FFFFFF', modes: { dark: '#0F0F0F' }, status: opts?.tokens?.['colors.bg'] ? 'update' : 'new' },
+        { path: 'colors.link', token: 'colors.link', type: 'color', value: '#FFFFFF', alias: '{colors.bg}', status: 'new' },
+        { path: 'radius-md', token: 'radius-md', type: 'radius', value: 12, status: 'new' },
+      ],
+      tokenModes: opts?.modes?.includes('dark') ? null : ['light', 'dark'],
+      skipped: [{ source: 'effects.shadow', reason: 'unsupported-type', detail: 'x' }],
+    };
+  },
+};
 const runSnippet = (code: string, tx: Parameters<typeof runSnippetRaw>[1], opts: Partial<RunOptions> = {}) =>
-  runSnippetRaw(code, tx, { icons: fakeIcons, photos: fakePhotos, cssVariables: fakeCss, ...opts });
+  runSnippetRaw(code, tx, { icons: fakeIcons, photos: fakePhotos, cssVariables: fakeCss, dtcg: fakeDtcg, ...opts });
 
 const tracer = `const b=add(null,{type:'board',name:'Tracer',x:0,y:0,width:390,height:844,screen:'mobile'}); add(b,{type:'text',name:'Judul',content:'Halo dari Lakar',size:32})`;
 const BOARD = (name = 'B', x = 0, w = 390, h = 844) => `add(null,{type:'board',name:'${name}',x:${x},y:0,width:${w},height:${h},screen:'mobile'})`;
@@ -97,7 +118,7 @@ async function commitRun(code: string, doc: Doc = createDocument()) {
 describe('@lakar/exec', () => {
   it('mengekspor nama paket dan permukaan API lengkap (AD-7)', () => {
     expect(PACKAGE).toBe('@lakar/exec');
-    expect(Object.keys(API)).toEqual(['add', 'update', 'replace', 'move', 'duplicate', 'remove', 'setComponent', 'resetOverride', 'detach', 'setTokens', 'setTokenModes', 'renameToken', 'importCssVariables', 'get', 'find', 'children', 'getTokens', 'place', 'iconSearch', 'photo']);
+    expect(Object.keys(API)).toEqual(['add', 'update', 'replace', 'move', 'duplicate', 'remove', 'setComponent', 'resetOverride', 'detach', 'setTokens', 'setTokenModes', 'renameToken', 'importCssVariables', 'importDtcgTokens', 'get', 'find', 'children', 'getTokens', 'place', 'iconSearch', 'photo']);
     for (const [name, fn] of Object.entries(API)) {
       expect(fn.signature.startsWith(`${name}(`), name).toBe(true);
       expect(fn.doc.length, name).toBeGreaterThan(20);
@@ -336,7 +357,7 @@ describe('@lakar/exec', () => {
       const ts = errRun(await runSnippet('const a = 1;\nconst b: number = 2', txFor()));
       expect(ts.message).toMatch(/^baris 2:\d+: SyntaxError/);
       const ref = errRun(await runSnippet('fetch("x")', txFor()));
-      expect(ref.hint).toContain('add, update, replace, move, duplicate, remove, setComponent, resetOverride, detach, setTokens, setTokenModes, renameToken, importCssVariables, get, find, children, getTokens, place, iconSearch, photo, keep, console.log');
+      expect(ref.hint).toContain('add, update, replace, move, duplicate, remove, setComponent, resetOverride, detach, setTokens, setTokenModes, renameToken, importCssVariables, importDtcgTokens, get, find, children, getTokens, place, iconSearch, photo, keep, console.log');
     });
 
     it('error host yang ditangkap snippet tidak membatalkan transaksi; e.code tersedia', async () => {
@@ -536,6 +557,40 @@ describe('@lakar/exec', () => {
       expect(none.message).toContain('body: unsupported-selector');
       expect(errRun(await runSnippet("importCssVariables(':root{--colors-bg:#fff}' + ' '.repeat(300000))", txFor())).code).toBe('SCHEMA_INVALID');
       const noPort = errRun(await runSnippetRaw("importCssVariables(':root{--colors-bg:#fff}')", txFor(), { icons: fakeIcons }));
+      expect(noPort.code).toBe('EXEC_ERROR');
+    });
+
+    it('importDtcgTokens: commit setTokenModes + setTokens dari port dalam satu transaksi, hasil path/alias/skipped', async () => {
+      fakeDtcg.calls.length = 0;
+      const { r, c } = await commitRun("setTokens({'colors.bg': '#000000'}); importDtcgTokens(JSON.stringify({colors:{bg:{$type:'color'}}}))");
+      expect(r.value).toEqual({
+        tokens: [
+          { path: 'colors.bg', token: 'colors.bg', type: 'color', status: 'update' },
+          { path: 'colors.link', token: 'colors.link', type: 'color', status: 'new', alias: '{colors.bg}' },
+          { path: 'radius-md', token: 'radius-md', type: 'radius', status: 'new' },
+        ],
+        modes: ['light', 'dark'],
+        skipped: [{ source: 'effects.shadow', reason: 'unsupported-type', detail: 'x' }],
+      });
+      expect(fakeDtcg.calls[0]!.opts).toEqual({ tokens: { 'colors.bg': { type: 'color', value: '#000000' } } });
+      expect(c.doc.tokens).toEqual({
+        'colors.bg': { type: 'color', value: '#FFFFFF', modes: { dark: '#0F0F0F' } },
+        'colors.link': { type: 'color', value: '#FFFFFF' },
+        'radius-md': { type: 'radius', value: 12 },
+      });
+      expect(c.doc.tokenModes).toEqual(['light', 'dark']);
+      expect(c.entry!.opsSummary).toBe('setTokens×2, setTokenModes×1');
+      expect(c.inverse.length).toBeGreaterThan(0);
+    });
+
+    it('importDtcgTokens: argumen salah, tanpa token, besar, dan tanpa port', async () => {
+      expect(errRun(await runSnippet('importDtcgTokens(42)', txFor())).code).toBe('SCHEMA_INVALID');
+      expect(errRun(await runSnippet("importDtcgTokens('  ')", txFor())).code).toBe('SCHEMA_INVALID');
+      const none = errRun(await runSnippet("importDtcgTokens('{\"effects\":{\"x\":{}}}')", txFor()));
+      expect(none.code).toBe('SCHEMA_INVALID');
+      expect(none.message).toContain('effects.shadow: unsupported-type');
+      expect(errRun(await runSnippet("importDtcgTokens('{\"colors\":{}}' + ' '.repeat(300000))", txFor())).code).toBe('SCHEMA_INVALID');
+      const noPort = errRun(await runSnippetRaw("importDtcgTokens('{\"colors\":{}}')", txFor(), { icons: fakeIcons, cssVariables: fakeCss }));
       expect(noPort.code).toBe('EXEC_ERROR');
     });
   });
