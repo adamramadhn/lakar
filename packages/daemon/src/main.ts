@@ -17,13 +17,15 @@ try {
 }
 
 try {
+  // `--headless` (spec-collab-cloud story 6): server API penuh tanpa viewer statis `/app/` (deployment VPS).
+  const headless = process.argv.includes('--headless');
   const fonts = FontRegistry.load();
   if (fonts.missing.length) console.warn(`lakard: paket font tidak ditemukan: ${fonts.missing.join(', ')}`);
   // Katalog ikon dimuat saat start (bukan di permintaan pertama); paket hilang → gagal start yang jelas.
   const icons = IconCatalog.load();
   // Foto stok: key Unsplash (dan Pexels lama) dibaca dari file (bukan env) saat dibutuhkan; tanpa key → Wikimedia → Openverse.
   const photos = new PhotoService({ dataDir: config.dataDir, keyFile: config.pexelsKeyFile, unsplashKeyFile: config.unsplashKeyFile, unsplashAppName: config.unsplashAppName });
-  const daemon = await startDaemon(config, { fonts, icons, photos });
+  const daemon = await startDaemon(config, { fonts, icons, photos, ...(headless ? { headless: true } : {}) });
   let closing = false;
   const shutdown = (signal: string) => {
     if (closing) return;
@@ -48,7 +50,7 @@ try {
   }
   // Baris kesiapan dicetak SETELAH handler sinyal terpasang: pengawas (tes, tracer-e2e) boleh
   // langsung mengirim SIGTERM begitu membaca baris ini tanpa membunuh proses lewat aksi default.
-  console.log(`lakard: mendengarkan ${daemon.url} (data: ${config.dataDir})`);
+  console.log(`lakard: mendengarkan ${daemon.url} (data: ${config.dataDir}${headless ? ', headless: tanpa /app/' : ''})`);
   if (config.configPath) console.log(`lakard: config ${config.configPath}`);
   const ph = photos.status();
   console.log(`lakard: foto stok ${ph.provider} (file key: ${ph.keyFile}, terimpor: ${ph.imported})`);

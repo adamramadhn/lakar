@@ -85,16 +85,22 @@ describe('arah dependensi: fixture pelanggaran', () => {
     expect(checkPackage(pkg('daemon', "import { readFile } from 'node:fs';"))).toEqual([]);
   });
 
-  it('mcp impor @lakar/core → direction', () => {
-    expect(checkPackage(pkg('mcp', "import '@lakar/core';"))).toEqual([
-      { pkg: 'mcp', kind: 'direction', specifier: '@lakar/core', file: 'src/index.ts' },
+  it('mcp impor @lakar/viewer → direction', () => {
+    expect(checkPackage(pkg('mcp', "import '@lakar/viewer';"))).toEqual([
+      { pkg: 'mcp', kind: 'direction', specifier: '@lakar/viewer', file: 'src/index.ts' },
     ]);
   });
 
-  it('mcp dengan dep @lakar/core di package.json → direction', () => {
-    expect(checkPackage(pkg('mcp', '', { '@lakar/core': 'workspace:*' }))).toEqual([
-      { pkg: 'mcp', kind: 'direction', specifier: '@lakar/core', file: 'package.json' },
+  it('mcp dengan dep @lakar/viewer di package.json → direction', () => {
+    expect(checkPackage(pkg('mcp', '', { '@lakar/viewer': 'workspace:*' }))).toEqual([
+      { pkg: 'mcp', kind: 'direction', specifier: '@lakar/viewer', file: 'package.json' },
     ]);
+  });
+
+  it('mcp boleh @lakar/daemon (mode --file) dan closure-nya (core/exec/render/…)', () => {
+    expect(checkPackage(pkg('mcp', "import { FileTransport } from '@lakar/daemon';"))).toEqual([]);
+    expect(checkPackage(pkg('mcp', '', { '@lakar/daemon': 'workspace:*' }))).toEqual([]);
+    expect([...allowedDeps('mcp')].sort()).toEqual(['check', 'codegen', 'core', 'daemon', 'exec', 'icons', 'ports', 'render', 'schema', 'skills']);
   });
 
   it('arah terbalik: schema impor @lakar/core → direction', () => {
@@ -109,11 +115,11 @@ describe('arah dependensi: fixture pelanggaran', () => {
     ]);
   });
 
-  it('subpath @lakar/core/x dinormalisasi ke @lakar/core', () => {
+  it('subpath @lakar/viewer/x dinormalisasi ke @lakar/viewer', () => {
     expect(normalizeSpecifier('@lakar/core/x')).toBe('@lakar/core');
     expect(normalizeSpecifier('node:fs/promises')).toBe('fs');
-    expect(checkPackage(pkg('mcp', "import { y } from '@lakar/core/x';"))).toMatchObject([
-      { pkg: 'mcp', kind: 'direction', specifier: '@lakar/core' },
+    expect(checkPackage(pkg('mcp', "import { y } from '@lakar/viewer/x';"))).toMatchObject([
+      { pkg: 'mcp', kind: 'direction', specifier: '@lakar/viewer' },
     ]);
   });
 

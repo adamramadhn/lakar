@@ -61,6 +61,11 @@ export type ViewerRoutesOptions = {
   checks?: CheckLedger;
   /** Direktori hasil build viewer (berisi `index.html`). */
   distDir: string;
+  /**
+   * Sajikan viewer statis `/app` + `/app/*` (default true). Mode `--headless` mematikannya:
+   * route `/viewer/*` tetap jalan (spec-collab-cloud story 6).
+   */
+  serveStatic?: boolean;
   /** Pencatat masalah non-fatal (file rusak dilewati). Default `console.warn`. */
   log?: (message: string) => void;
 };
@@ -168,7 +173,7 @@ export function historyMeta(history: readonly HistoryEntry[], sessions?: Session
   return { ...(first ? { createdAt: first.at } : {}), ...(client ? { lastClient: client } : {}), ...(agent ? { lastAgent: agent } : {}) };
 }
 
-export function registerViewerRoutes(app: FastifyInstance, { docs, store, sessions, checks, distDir, log = (m) => console.warn(m) }: ViewerRoutesOptions): void {
+export function registerViewerRoutes(app: FastifyInstance, { docs, store, sessions, checks, distDir, serveStatic = true, log = (m) => console.warn(m) }: ViewerRoutesOptions): void {
   const root = resolve(distDir);
   /** Ringkasan dokumen dari file per `slug@mtime`: file yang tidak berubah tidak di-parse ulang. */
   const cache = new Map<string, { mtimeMs: number; summary: ViewerDocSummary; docId: string; boardIds: string[] }>();
@@ -270,31 +275,33 @@ export function registerViewerRoutes(app: FastifyInstance, { docs, store, sessio
     return reply.code(200).send({ ok: true, data: { entries } });
   });
 
-  // Viewer statis. `/app` → `/app/` supaya path relatif aset benar.
-  app.get('/app', async (_req, reply) => reply.redirect('/app/', 302));
-  app.get<{ Params: { '*': string } }>('/app/*', async (req, reply) => {
-    const rel = req.params['*'] || 'index.html';
-    const indexPath = resolve(root, 'index.html');
-    if (rel.includes('\0')) throw notFound(`file viewer ${JSON.stringify(rel)} tidak ada`, 'periksa path');
-    const target = resolve(root, rel);
-    if (target !== root && !target.startsWith(root + sep)) {
-      throw notFound(`file viewer ${JSON.stringify(rel)} tidak ada`, 'periksa path');
-    }
-    const built = await stat(indexPath).then(
-      (s) => s.isFile(),
-      () => false,
-    );
-    if (!built) throw notFound(`viewer belum dibangun (${indexPath} tidak ada)`, 'jalankan pnpm build');
-    let body: Buffer;
-    try {
-      body = await readFile(target);
-    } catch (e) {
-      if (isEnoent(e)) throw notFound(`file viewer ${JSON.stringify(rel)} tidak ada`, 'periksa path');
-      throw e;
-    }
-    const type = MIME[extname(target).toLowerCase()] ?? 'application/octet-stream';
-    // Aset Vite ber-hash → immutable; index.html selalu divalidasi ulang.
-    const cache = rel.startsWith('assets/') ? 'public, max-age=31536000, immutable' : 'no-cache';
-    return reply.type(type).header('cache-control', cache).header('x-content-type-options', 'nosniff').send(body);
-  });
+  // Viewer statis. `/app` → `/app/` supaya path relatif aset benar. Mode --headless tidak menyajikannya.
+  if (serveStatic) {
+    app.get('/app', async (_req, reply) => reply.redirect('/app/', 302));
+    app.get<{ Params: { '*': string } }>('/app/*', async (req, reply) => {
+      const rel = req.params['*'] || 'index.html';
+      const indexPath = resolve(root, 'index.html');
+      if (rel.includes('\0')) throw notFound(`file viewer ${JSON.stringify(rel)} tidak ada`, 'periksa path');
+      const target = resolve(root, rel);
+      if (target !== root && !target.startsWith(root + sep)) {
+        throw notFound(`file viewer ${JSON.stringify(rel)} tidak ada`, 'periksa path');
+      }
+      const built = await stat(indexPath).then(
+        (s) => s.isFile(),
+        () => false,
+      );
+      if (!built) throw notFound(`viewer belum dibangun (${indexPath} tidak ada)`, 'jalankan pnpm build');
+      let body: Buffer;
+      try {
+        body = await readFile(target);
+      } catch (e) {
+        if (isEnoent(e)) throw notFound(`file viewer ${JSON.stringify(rel)} tidak ada`, 'periksa path');
+        throw e;
+      }
+      const type = MIME[extname(target).toLowerCase()] ?? 'application/octet-stream';
+      // Aset Vite ber-hash → immutable; index.html selalu divalidasi ulang.
+      const cache = rel.startsWith('assets/') ? 'public, max-age=31536000, immutable' : 'no-cache';
+      return reply.type(type).header('cache-control', cache).header('x-content-type-options', 'nosniff').send(body);
+    });
+  }
 }

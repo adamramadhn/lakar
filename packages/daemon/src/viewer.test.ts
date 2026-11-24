@@ -50,9 +50,9 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-async function setup(opts: { viewerDir?: string } = {}) {
+async function setup(opts: { viewerDir?: string; headless?: boolean } = {}) {
   const dataDir = await tempDir('data-');
-  const { app } = buildServer({ config: { ...baseConfig, port: 0, dataDir, ...(opts.viewerDir ? { viewerDir: opts.viewerDir } : {}) }, render: noRender });
+  const { app } = buildServer({ config: { ...baseConfig, port: 0, dataDir, ...(opts.viewerDir ? { viewerDir: opts.viewerDir } : {}) }, render: noRender, ...(opts.headless ? { headless: true } : {}) });
   const docsDir = join(dataDir, 'docs');
   const put = async (slug: string, body: unknown, mtime?: Date) => {
     await mkdir(docsDir, { recursive: true });
@@ -359,6 +359,50 @@ describe('GET /app/*', () => {
     try {
       expect((await get('/status')).json().ok).toBe(true);
       expect((await post('/sessions', { client: 'lakar-viewer' })).json().data.sessionId).toEqual(expect.any(String));
+    } finally {
+      await app.close();
+    }
+  });
+});
+
+// `lakard --headless` (spec-collab-cloud story 6): viewer statis `/app/` tidak disajikan; semua API tetap jalan.
+describe('lakard --headless', () => {
+  it('/app* tidak terdaftar; /viewer/*, /sessions, /status tetap jalan dan /status menandai headless', async () => {
+    const dist = join(await tempDir('happ-'), 'dist');
+    await mkdir(dist, { recursive: true });
+    await writeFile(join(dist, 'index.html'), '<!doctype html>');
+    const { app, get, post, put } = await setup({ viewerDir: dist, headless: true });
+    try {
+      await put('ada', docJson('Dheadles', 1, [{ id: 'Bheadles', name: 'B' }]));
+      // Viewer statis tidak disajikan: route /app dan /app/* tidak terdaftar → 404 bawaan fastify.
+      for (const url of ['/app', '/app/', '/app/index.html', '/app/assets/index.js']) {
+        expect((await get(url)).statusCode, url).toBe(404);
+      }
+      // Route API tetap penuh.
+      const docs = (await get('/viewer/docs')).json();
+      expect(docs.ok).toBe(true);
+      expect(docs.data.docs.map((d: { slug: string }) => d.slug)).toContain('ada');
+      const detail = (await get('/viewer/docs/ada')).json();
+      expect(detail.ok).toBe(true);
+      expect((await post('/sessions', { client: 'lakar-mcp' })).json().data.sessionId).toEqual(expect.any(String));
+      const status = (await get('/status')).json();
+      expect(status.ok).toBe(true);
+      expect(status.data.headless).toBe(true);
+    } finally {
+      await app.close();
+    }
+  });
+
+  it('tanpa headless: /app/ tetap disajikan dan /status tidak punya field headless', async () => {
+    const dist = join(await tempDir('napp-'), 'dist');
+    await mkdir(dist, { recursive: true });
+    await writeFile(join(dist, 'index.html'), '<!doctype html>');
+    const { app, get } = await setup({ viewerDir: dist });
+    try {
+      expect((await get('/app/')).statusCode).toBe(200);
+      const status = (await get('/status')).json();
+      expect(status.ok).toBe(true);
+      expect('headless' in status.data).toBe(false);
     } finally {
       await app.close();
     }

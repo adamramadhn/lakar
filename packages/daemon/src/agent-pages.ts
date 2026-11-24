@@ -34,9 +34,9 @@ const PageName = z
   .string()
   .transform((s) => s.trim())
   .pipe(z.string().min(1, 'nama halaman tidak boleh kosong').max(PAGE_NAME_MAX, `nama halaman maks ${PAGE_NAME_MAX} karakter`));
-const SwitchBody = z.object({ page: z.string().min(1, 'page tidak boleh kosong') }).strict();
-const CreateBody = z.object({ name: PageName.optional() }).strict();
-const TreeBody = z
+export const SwitchBody = z.object({ page: z.string().min(1, 'page tidak boleh kosong') }).strict();
+export const CreateBody = z.object({ name: PageName.optional() }).strict();
+export const TreeBody = z
   .object({
     page: z.string().min(1).optional(),
     depth: z.number().int().min(0).max(INSPECT_DEPTH_MAX).optional(),
@@ -44,13 +44,13 @@ const TreeBody = z
   .strict();
 
 /** Ringkasan satu halaman untuk respons list/switch/tree. */
-const pageSummary = <P extends { id: string; name: string; children: readonly unknown[] }>(p: P, index: number) => ({ id: p.id, name: p.name, index, boards: p.children.length });
+export const pageSummary = <P extends { id: string; name: string; children: readonly unknown[] }>(p: P, index: number) => ({ id: p.id, name: p.name, index, boards: p.children.length });
 
 /**
  * Halaman dari nama ATAU id (open-pencil `switch_page` menerima keduanya). Id dicek dulu; nama tidak
  * unik → SCHEMA_INVALID (pakai id). Tidak ditemukan → NOT_FOUND dengan hint list_pages.
  */
-function resolvePageRef<P extends { id: string; name: string }>(doc: { pages: readonly P[] }, ref: string, slug: string): { page: P; index: number } {
+export function resolvePageRef<P extends { id: string; name: string }>(doc: { pages: readonly P[] }, ref: string, slug: string): { page: P; index: number } {
   if (ID_PATTERN.test(ref)) {
     const index = doc.pages.findIndex((p) => p.id === ref);
     if (index !== -1) return { page: doc.pages[index]!, index };
@@ -75,7 +75,7 @@ const CONTENT_MAX = 120;
  * Outline ringkas sebuah node: id/type/name + geometri tersimpan + `content` teks terpotong; anak sampai
  * `depth`, lebih dalam → `childCount`. Mengembalikan `{node, truncated}` (`truncated` = ada pemotongan depth).
  */
-function outlineNode(n: AnyNode, depth: number): { node: Record<string, unknown>; truncated: boolean } {
+export function outlineNode(n: AnyNode, depth: number): { node: Record<string, unknown>; truncated: boolean } {
   const out: Record<string, unknown> = { id: n.id, type: n.type, name: n.name };
   const rec = n as unknown as Record<string, unknown>;
   for (const k of ['x', 'y', 'width', 'height', 'layout', 'component'] as const) {

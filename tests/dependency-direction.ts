@@ -16,7 +16,8 @@ export const EDGES: Readonly<Record<string, readonly string[]>> = {
   exec: ['core', 'ports'],
   icons: ['schema'],
   daemon: ['core', 'exec', 'render', 'check', 'icons', 'skills', 'codegen'],
-  mcp: ['schema'],
+  // mcp → daemon: mode `lakar --file` memakai FileTransport daemon (spec-collab-cloud story 2).
+  mcp: ['schema', 'daemon'],
   bench: ['schema'],
   viewer: ['schema', 'render', 'codegen'],
   sync: ['core', 'schema'],

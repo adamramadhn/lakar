@@ -349,6 +349,9 @@ importers:
 
   packages/mcp:
     dependencies:
+      '@lakar/daemon':
+        specifier: workspace:*
+        version: link:../daemon
       '@lakar/schema':
         specifier: workspace:*
         version: link:../schema
