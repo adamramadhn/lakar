@@ -937,7 +937,7 @@ export function buildServer({
   registerFocusRoutes(app, { docs, store, focus });
   registerPageRoutes(app, { docs, store, docLocks, activity });
   registerAgentPageRoutes(app, { docs, store, docLocks, activeDoc });
-  registerCommentRoutes(app, { docs, store, docLocks, activeDoc });
+  registerCommentRoutes(app, { docs, store, docLocks, sessions, activeDoc });
   // Komentar dari aplikasi (story 9.4): penulis pengguna + event `change` untuk jendela lain.
   registerViewerCommentRoutes(app, { docs, store, docLocks, activity });
   registerAnalyzeRoutes(app, { docs, activeDoc });

@@ -66,6 +66,9 @@ function commentsProps(over: Record<string, unknown> = {}) {
     onReply: vi.fn(),
     onResolve: vi.fn(),
     onDelete: vi.fn(),
+    onRequestFix: vi.fn(),
+    onCancelFix: vi.fn(),
+    onCopyPrompt: vi.fn(),
     onDraftSubmit: vi.fn(),
     onDraftCancel: vi.fn(),
     ...over,
@@ -129,6 +132,56 @@ describe('Canvas — pin dan popover komentar', () => {
     // Escape saat fokus di input draft: kartu sendiri yang menutup (shortcut kanvas melewati target ketik).
     await user.keyboard('{Escape}');
     expect(comments.onDraftCancel).toHaveBeenCalled();
+  });
+
+  it('mailbox fix (spec-comment-to-fix): Ask agent → onRequestFix; menu agent; Copy prompt; open → Stop; done → chip', async () => {
+    const comments = commentsProps({ openId: 'Com00001', fixAgents: ['claude-code', 'zed'] });
+    const { user } = renderUi(<Canvas {...baseProps({ comments })} />);
+    await mounted(CARD);
+
+    // Tombol utama + ghost Copy prompt.
+    await user.click(screen.getByRole('button', { name: 'Ask agent to fix' }));
+    expect(comments.onRequestFix).toHaveBeenCalledWith('Com00001', undefined);
+    await user.click(screen.getByRole('button', { name: 'Choose agent' }));
+    const menu = document.querySelector('.comment-fix-menu')!;
+    expect(menu).toHaveTextContent('Any agent');
+    expect(menu).toHaveTextContent('Claude Code');
+    await user.click(screen.getByRole('menuitem', { name: 'zed' }));
+    expect(comments.onRequestFix).toHaveBeenLastCalledWith('Com00001', 'zed');
+    await user.click(screen.getByRole('button', { name: 'Copy prompt' }));
+    expect(comments.onCopyPrompt).toHaveBeenCalledWith(PINNED);
+  });
+
+  it('fixRequest open → status + Stop (onCancelFix); done → chip penutup; failed → Retry; resolved → tanpa aksi fix', async () => {
+    const open = { ...PINNED, fixRequest: { status: 'open', agent: 'claude-code', at: AT } } as CommentThread;
+    const c1 = commentsProps({ threads: [open], openId: 'Com00001' });
+    const v1 = renderUi(<Canvas {...baseProps({ comments: c1 })} />);
+    await mounted(CARD);
+    expect(document.querySelector('.comment-card')).toHaveTextContent('Waiting for Claude Code to fix…');
+    await v1.user.click(screen.getByRole('button', { name: 'Stop' }));
+    expect(c1.onCancelFix).toHaveBeenCalledWith('Com00001');
+    v1.unmount();
+
+    const done = { ...PINNED, fixRequest: { status: 'done', agent: 'claude-code', at: AT, note: 'ok' } } as CommentThread;
+    const v2 = renderUi(<Canvas {...baseProps({ comments: commentsProps({ threads: [done], openId: 'Com00001' }) })} />);
+    await mounted(CARD);
+    expect(document.querySelector('.comment-fix-chip')).toHaveTextContent('fixed by Claude Code');
+    v2.unmount();
+
+    const failed = { ...PINNED, fixRequest: { status: 'failed', agent: 'zed', at: AT } } as CommentThread;
+    const c3 = commentsProps({ threads: [failed], openId: 'Com00001' });
+    const v3 = renderUi(<Canvas {...baseProps({ comments: c3 })} />);
+    await mounted(CARD);
+    expect(document.querySelector('.comment-fix-chip')).toHaveTextContent('fix failed by zed');
+    await v3.user.click(screen.getByRole('button', { name: 'Retry fix' }));
+    expect(c3.onRequestFix).toHaveBeenCalledWith('Com00001', undefined);
+    v3.unmount();
+
+    const resolved = { ...PINNED, status: 'resolved', resolvedAt: AT } as CommentThread;
+    renderUi(<Canvas {...baseProps({ comments: commentsProps({ threads: [resolved], showResolved: true, openId: 'Com00001' }) })} />);
+    await mounted(CARD);
+    expect(screen.queryByRole('button', { name: 'Ask agent to fix' })).toBeNull();
+    expect(document.querySelector('.comment-fix-status')).toBeNull();
   });
 
   it('tool komentar: tombol/C mengaktifkan; tap → onCommentAt + tool kembali ke Select; ruang kosong = titik bebas', async () => {
@@ -199,6 +252,32 @@ async function openViewer(threads: CommentThread[] = [PINNED]) {
     const b = req.body as { threadId: string };
     state.doc = { ...state.doc, rev: state.doc.rev + 1, comments: state.doc.comments!.filter((c) => c.id !== b.threadId) };
     return { slug: SLUG, rev: state.doc.rev, threadId: b.threadId };
+  });
+  // Mailbox fix (spec-comment-to-fix): route path-param — `{agent?}` minta fix, `{outcome:'cancelled'}` batal.
+  d.on('POST', new RegExp(`^/viewer/docs/${SLUG}/comments/([A-Za-z0-9]+)/fix$`), (req, m) => {
+    const threadId = m[1]!;
+    const b = (req.body ?? {}) as { agent?: string; outcome?: string };
+    let thread: CommentThread | undefined;
+    state.doc = {
+      ...state.doc,
+      rev: state.doc.rev + 1,
+      comments: state.doc.comments!.map((t) => {
+        if (t.id !== threadId) return t;
+        const fixRequest =
+          b.outcome === 'cancelled'
+            ? { status: 'cancelled' as const, at: new Date().toISOString() }
+            : { status: 'open' as const, ...(b.agent !== undefined ? { agent: b.agent } : {}), at: new Date().toISOString() };
+        thread = {
+          ...t,
+          fixRequest,
+          ...(b.outcome === 'cancelled'
+            ? {}
+            : { messages: [...t.messages, { author: { kind: 'user' as const, name: 'You' }, text: `Fix request — Lakar document "${SLUG}"\nThread: ${t.id}`, at: new Date().toISOString() }] }),
+        };
+        return thread;
+      }),
+    };
+    return { slug: SLUG, rev: state.doc.rev, threadId, fixRequest: thread!.fixRequest, thread };
   });
   const view = renderUi(<Viewer slug={SLUG} />);
   await waitFor(() => expect(document.querySelector(`[data-layer="${BOARD}"]`)).not.toBeNull());
@@ -272,5 +351,34 @@ describe('Viewer — tab Comments', () => {
     // Muatan ulang memuat komentar baru; popover thread barunya terbuka otomatis.
     await waitFor(() => expect(document.querySelectorAll('.comment-pin').length).toBe(2));
     await waitFor(() => expect(document.querySelector('.comment-card')).toHaveTextContent('tombol ini'));
+  });
+
+  it('mailbox fix: Ask agent → POST fix lalu status + Stop; Stop → POST cancelled; Copy prompt → clipboard', async () => {
+    const { user } = await openViewer();
+    await user.click(document.querySelector('.comment-pin')!);
+    await waitFor(() => expect(document.querySelector('.comment-card')).toHaveTextContent('Ask agent to fix'));
+
+    await user.click(screen.getByRole('button', { name: 'Ask agent to fix' }));
+    const fixUrl = `/viewer/docs/${SLUG}/comments/Com00001/fix`;
+    await waitFor(() => expect(dom().daemon.find('POST', fixUrl)).toHaveLength(1));
+    expect(dom().daemon.find('POST', fixUrl)[0]!.body).toEqual({});
+    // Muatan ulang membawa fixRequest open → status menunggu + tombol Stop.
+    await waitFor(() => expect(document.querySelector('.comment-card')).toHaveTextContent('Waiting for an agent to fix…'));
+
+    await user.click(screen.getByRole('button', { name: 'Stop' }));
+    await waitFor(() => expect(dom().daemon.find('POST', fixUrl)).toHaveLength(2));
+    expect(dom().daemon.find('POST', fixUrl)[1]!.body).toMatchObject({ outcome: 'cancelled' });
+    // Cancelled → aksi awal tampil lagi.
+    await waitFor(() => expect(document.querySelector('.comment-card')).toHaveTextContent('Ask agent to fix'));
+
+    // Copy prompt: teks prompt yang sama (dokumen, thread, pin, komentar) ke clipboard + toast.
+    await user.click(screen.getByRole('button', { name: 'Copy prompt' }));
+    await waitFor(async () => {
+      const copied = await navigator.clipboard.readText();
+      expect(copied).toContain(`Fix request — Lakar document "${SLUG}"`);
+      expect(copied).toContain('Thread: Com00001');
+      expect(copied).toContain('naikkan padding tombol');
+    });
+    expect(screen.getByRole('status')).toHaveTextContent('Fix prompt copied to clipboard');
   });
 });

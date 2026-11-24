@@ -19,8 +19,8 @@ const parse = (raw: unknown): Doc => LakarDocument.parse(raw);
 const ok = (raw: unknown) => LakarDocument.safeParse(raw).success;
 
 describe('skema v4: grid', () => {
-  it('SCHEMA_VERSION 10 (v4 + komponen + vektor + tag + hug board + wrap + komentar)', () => {
-    expect(SCHEMA_VERSION).toBe(10);
+  it('SCHEMA_VERSION 11 (v4 + komponen + vektor + tag + hug board + wrap + komentar + fixRequest)', () => {
+    expect(SCHEMA_VERSION).toBe(11);
   });
 
   it('frame grid dengan semua jenis track, rows, gap sumbu, dan anak berpenempatan valid', () => {

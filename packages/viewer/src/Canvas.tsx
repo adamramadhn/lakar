@@ -1254,9 +1254,13 @@ export function Canvas({
               x={cardPos(cam.x + p.x * cam.z, 0).x}
               y={cardPos(0, cam.y + p.y * cam.z).y}
               busy={comments.busy === true}
+              fixAgents={comments.fixAgents}
               onReply={(text) => comments.onReply(open.id, text)}
               onResolve={(resolved) => comments.onResolve(open.id, resolved)}
               onDelete={() => comments.onDelete(open.id)}
+              onRequestFix={(agent) => comments.onRequestFix(open.id, agent)}
+              onCancelFix={() => comments.onCancelFix(open.id)}
+              onCopyPrompt={() => comments.onCopyPrompt(open)}
               onClose={() => comments.onOpen(undefined)}
             />
           );

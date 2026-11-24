@@ -94,7 +94,7 @@ import { agentPresence, fadePlans, followRect, layerMarks, pendingAgents, type L
 import { sheetForTab, type SheetState } from './sheet';
 import { requestCloseTab } from './tabs';
 import { getCamera, getViewState, saveCamera, saveViewState, type PanelTab } from './viewState';
-import { CommentsPanel, type CanvasComments } from './comments';
+import { CommentsPanel, fixPromptText, type CanvasComments } from './comments';
 import type { CommentThread } from './api';
 
 const FOLLOW_KEY = 'lakar.viewer.followAgent';
@@ -1590,6 +1590,20 @@ export function Viewer({ slug }: { slug: string }) {
       () => api.resolveComment(slug, threadId, resolved),
       (r) => setOpenThreadId((id) => (id === r.threadId && r.status === 'resolved' && !showResolved ? undefined : id)),
     );
+  // Mailbox "Ask agent to fix" (spec-comment-to-fix): minta/batal lewat route fix; sukses → muat ulang seperti tulis lain.
+  const requestFix = (threadId: string, agent?: string) => commentWrite(() => api.requestFix(slug, threadId, agent));
+  const cancelFix = (threadId: string) => commentWrite(() => api.cancelFix(slug, threadId));
+  /** Copy prompt = fallback manual: teks yang sama dengan pesan prompt daemon, ke clipboard + toast. */
+  const copyFixPrompt = (t: CommentThread) => {
+    navigator.clipboard
+      .writeText(fixPromptText(slug, t))
+      .then(
+        () => setToastState({ message: 'Fix prompt copied to clipboard', kind: 'info' }),
+        () => setToast('Couldn’t copy to the clipboard. Select the text and copy it manually.'),
+      );
+  };
+  /** Opsi menu "Choose agent": nama harness agen Live pada dokumen ini (unik, urut). */
+  const fixAgents = [...new Set(views.filter((v) => v.live).map((v) => whoOf(v.session)).filter((n): n is string => n !== undefined))].sort();
   /** Klik thread di panel: pindah ke halamannya, buka popover, dan fokus board pemilik pin (mekanisme Focus). */
   const openCommentThread = (t: CommentThread) => {
     if (preview) return;
@@ -1619,6 +1633,10 @@ export function Viewer({ slug }: { slug: string }) {
         onReply: replyComment,
         onResolve: resolveComment,
         onDelete: deleteComment,
+        onRequestFix: requestFix,
+        onCancelFix: cancelFix,
+        onCopyPrompt: copyFixPrompt,
+        fixAgents,
         onDraftSubmit: submitComment,
         onDraftCancel: () => setCommentDraft(undefined),
       };

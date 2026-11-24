@@ -72,11 +72,12 @@ describe('@lakar/schema', () => {
     expect(BoardNode.safeParse({ ...node, id: 'short' }).success).toBe(false);
   });
 
-  it('LakarDocument: schemaVersion = SCHEMA_VERSION (10) dan minimal 1 halaman; v1..v9 hanya lewat migrasi (@lakar/core)', () => {
-    expect(SCHEMA_VERSION).toBe(10);
+  it('LakarDocument: schemaVersion = SCHEMA_VERSION (11) dan minimal 1 halaman; v1..v10 hanya lewat migrasi (@lakar/core)', () => {
+    expect(SCHEMA_VERSION).toBe(11);
     const doc = { schemaVersion: SCHEMA_VERSION, id: 'Dddddddd', rev: 0, pages: [{ id: 'Pppppppp', name: 'Page 1', children: [] }] };
     expect(LakarDocument.safeParse(doc).success).toBe(true);
-    expect(LakarDocument.safeParse({ ...doc, schemaVersion: 11 }).success).toBe(false);
+    expect(LakarDocument.safeParse({ ...doc, schemaVersion: 12 }).success).toBe(false);
+    expect(LakarDocument.safeParse({ ...doc, schemaVersion: 10 }).success).toBe(false);
     expect(LakarDocument.safeParse({ ...doc, schemaVersion: 9 }).success).toBe(false);
     expect(LakarDocument.safeParse({ ...doc, schemaVersion: 8 }).success).toBe(false);
     expect(LakarDocument.safeParse({ ...doc, schemaVersion: 7 }).success).toBe(false);
@@ -102,6 +103,25 @@ describe('@lakar/schema', () => {
     expect(LakarDocument.safeParse({ ...doc, comments: [{ ...thread, foo: 1 }] }).success).toBe(false);
     expect(LakarDocument.safeParse({ ...doc, comments: [{ ...thread, messages: [{ ...msg, author: { kind: 'robot', name: 'x' } }] }] }).success).toBe(false);
     expect(LakarDocument.safeParse({ ...doc, comments: {} }).success).toBe(false);
+  });
+
+  it('fixRequest (v11): opsional; status open/done/failed/cancelled, agent+note opsional, field asing ditolak (strict)', () => {
+    const doc = { schemaVersion: SCHEMA_VERSION, id: 'Dddddddd', rev: 0, pages: [{ id: 'Pppppppp', name: 'Page 1', children: [] }] };
+    const msg = { author: { kind: 'user', name: 'You' }, text: 'halo', at: '2026-11-24T00:00:00Z' };
+    const thread = { id: 'Ttttttt1', pageId: 'Pppppppp', x: 10, y: 20, status: 'open', messages: [msg] };
+    const open = { status: 'open', at: '2026-11-24T01:00:00Z' };
+    // Tanpa fixRequest dan tiap status valid; agent dan note opsional.
+    expect(LakarDocument.safeParse({ ...doc, comments: [thread] }).success).toBe(true);
+    expect(LakarDocument.safeParse({ ...doc, comments: [{ ...thread, fixRequest: open }] }).success).toBe(true);
+    expect(LakarDocument.safeParse({ ...doc, comments: [{ ...thread, fixRequest: { status: 'done', agent: 'claude-code', at: 'x', note: 'selesai' } }] }).success).toBe(true);
+    expect(LakarDocument.safeParse({ ...doc, comments: [{ ...thread, fixRequest: { status: 'failed', agent: 'codex', at: 'x', note: 'gagal' } }] }).success).toBe(true);
+    expect(LakarDocument.safeParse({ ...doc, comments: [{ ...thread, fixRequest: { status: 'cancelled', at: 'x' } }] }).success).toBe(true);
+    // Status asing, tanpa at, agent/note melebihi batas, dan field asing ditolak.
+    expect(LakarDocument.safeParse({ ...doc, comments: [{ ...thread, fixRequest: { status: 'working', at: 'x' } }] }).success).toBe(false);
+    expect(LakarDocument.safeParse({ ...doc, comments: [{ ...thread, fixRequest: { status: 'open' } }] }).success).toBe(false);
+    expect(LakarDocument.safeParse({ ...doc, comments: [{ ...thread, fixRequest: { ...open, agent: 'a'.repeat(81) } }] }).success).toBe(false);
+    expect(LakarDocument.safeParse({ ...doc, comments: [{ ...thread, fixRequest: { ...open, note: 'n'.repeat(4001) } }] }).success).toBe(false);
+    expect(LakarDocument.safeParse({ ...doc, comments: [{ ...thread, fixRequest: { ...open, foo: 1 } }] }).success).toBe(false);
   });
 
   it.each([

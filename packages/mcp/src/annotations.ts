@@ -62,6 +62,8 @@ export const TOOL_EFFECTS = {
   reply_to_comment: 'write',
   // Mengubah status thread (resolved/open), idempoten.
   resolve_comment: 'write',
+  // Menutup permintaan fix (mailbox) pada thread: status + satu pesan hasil; node pengguna tidak dihapus/ditimpa.
+  fix_comment: 'write',
   // Menghapus thread komentar permanen dari dokumen.
   delete_comment: 'destructive',
 } as const satisfies Record<string, ToolEffect>;

@@ -139,6 +139,9 @@ function fakeDaemon() {
     if (req.url === '/comments/delete') {
       return send(200, { ok: true, data: { slug: 'a', rev: 9, threadId: body.threadId } });
     }
+    if (req.url === '/comments/fix') {
+      return send(200, { ok: true, data: { slug: body.slug ?? 'a', rev: 10, threadId: body.threadId, fixRequest: { status: body.outcome, agent: 'claude-code', at: '2026-11-24T00:04:00Z', ...(body.note ? { note: body.note } : {}) }, thread: { id: body.threadId, status: 'open' } } });
+    }
     if (req.url === '/analyze/colors') {
       if (body.boardId === 'ZZzzzz99') return send(404, { ok: false, error: { code: 'NOT_FOUND', message: 'board ZZzzzz99 tidak ada di dokumen a', hint: 'pakai boardId dari list_boards', retryable: false } });
       return send(200, { ok: true, data: { colors: [{ value: '#FF6B6B', count: 3, bound: false, candidates: [{ token: 'colors.brand', distance: 4.2 }], uses: [{ nodeId: 'Nnnnnnn1', prop: 'fills.0.color' }], totalUses: 3 }] } });
@@ -268,7 +271,7 @@ describe('@lakar/mcp', () => {
     const c = await connect(url);
     const { tools } = await c.listTools();
     expect(tools.map((t) => t.name).sort()).toEqual(
-      ['execute', 'export', 'export_code', 'get_selection', 'icon_search', 'import_url', 'inspect', 'layout_check', 'list_boards', 'list_documents', 'open_doc', 'paste', 'photo_search', 'read_skill', 'redo', 'screenshot', 'status', 'undo', 'visual_diff', 'fix_check', 'list_pages', 'get_current_page', 'switch_page', 'create_page', 'get_page_tree', 'list_comments', 'add_comment', 'reply_to_comment', 'resolve_comment', 'delete_comment', 'analyze_colors', 'analyze_typography', 'analyze_clusters'].sort(),
+      ['execute', 'export', 'export_code', 'get_selection', 'icon_search', 'import_url', 'inspect', 'layout_check', 'list_boards', 'list_documents', 'open_doc', 'paste', 'photo_search', 'read_skill', 'redo', 'screenshot', 'status', 'undo', 'visual_diff', 'fix_check', 'list_pages', 'get_current_page', 'switch_page', 'create_page', 'get_page_tree', 'list_comments', 'add_comment', 'reply_to_comment', 'resolve_comment', 'delete_comment', 'fix_comment', 'analyze_colors', 'analyze_typography', 'analyze_clusters'].sort(),
     );
     expect(SERVER_VERSION).toBe(LAKAR_VERSION);
     expect(c.getServerVersion()?.version).toBe(LAKAR_VERSION);
@@ -366,6 +369,13 @@ describe('@lakar/mcp', () => {
     const del = await c.callTool({ name: 'delete_comment', arguments: { threadId: 'Ttttttt1' } });
     expect(JSON.parse((del.content as any)[0].text).threadId).toBe('Ttttttt1');
     expect(fake.seen.findLast((s) => s.path === '/comments/delete')!.body).toEqual({ threadId: 'Ttttttt1' });
+
+    // Mailbox fix (spec-comment-to-fix): fix_comment → /comments/fix; slug eksplisit diteruskan (tutup tanpa open_doc).
+    const fix = await c.callTool({ name: 'fix_comment', arguments: { threadId: 'Ttttttt1', outcome: 'done', note: 'padding diperbaiki' } });
+    expect(JSON.parse((fix.content as any)[0].text).fixRequest).toMatchObject({ status: 'done', agent: 'claude-code', note: 'padding diperbaiki' });
+    expect(fake.seen.findLast((s) => s.path === '/comments/fix')!.body).toEqual({ threadId: 'Ttttttt1', outcome: 'done', note: 'padding diperbaiki' });
+    await c.callTool({ name: 'fix_comment', arguments: { threadId: 'Ttttttt1', outcome: 'failed', slug: 'b' } });
+    expect(fake.seen.findLast((s) => s.path === '/comments/fix')!.body).toEqual({ threadId: 'Ttttttt1', outcome: 'failed', slug: 'b' });
 
     // Semua panggilan komentar bersesi.
     expect(fake.seen.filter((s) => s.path?.startsWith('/comments')).every((s) => s.session)).toBe(true);
@@ -866,7 +876,7 @@ describe('@lakar/mcp', () => {
       const r = await c2.callTool({ name: 'execute', arguments: { code: '1' } });
       expect(r.isError).toBe(true);
       expect((r.content as any)[0].text).toContain('http://127.0.0.1:1');
-      expect((await c2.listTools()).tools).toHaveLength(33);
+      expect((await c2.listTools()).tools).toHaveLength(34);
     } finally {
       await c2.close();
       await deadTransport.close();

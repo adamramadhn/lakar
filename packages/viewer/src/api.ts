@@ -132,6 +132,11 @@ export type LayoutCheck = { docId: string; rev: number; boards: unknown; summary
 export type CommentAuthor = { kind: 'user' | 'agent'; name: string };
 export type CommentMessage = { author: CommentAuthor; text: string; at: string };
 /**
+ * Permintaan fix pada thread (skema v11, spec-comment-to-fix): `open` = menunggu agen; `done`/`failed` = ditutup
+ * agen (`agent` = harness penutup, `note` opsional); `cancelled` = dibatalkan pengguna. `at` = transisi terakhir.
+ */
+export type CommentFixRequest = { status: 'open' | 'done' | 'failed' | 'cancelled'; agent?: string; at: string; note?: string };
+/**
  * Thread komentar di root dokumen (skema v10): pin di layer (`nodeId`) atau titik bebas koordinat halaman
  * (`x`,`y`). `pageName`/`nodeName` hanya diisi respons list viewer (nama untuk panel; aditif).
  */
@@ -143,6 +148,7 @@ export type CommentThread = {
   y: number;
   status: 'open' | 'resolved';
   resolvedAt?: string;
+  fixRequest?: CommentFixRequest;
   messages: CommentMessage[];
   pageName?: string;
   nodeName?: string;
@@ -153,6 +159,7 @@ export type CommentCreateResult = { slug: string; rev: number; thread: CommentTh
 export type CommentReplyResult = { slug: string; rev: number; threadId: string; message: CommentMessage; thread: CommentThread };
 export type CommentResolveResult = { slug: string; rev: number; threadId: string; status: 'open' | 'resolved'; resolvedAt?: string };
 export type CommentDeleteResult = { slug: string; rev: number; threadId: string };
+export type CommentFixResult = { slug: string; rev: number; threadId: string; fixRequest: CommentFixRequest; thread: CommentThread };
 
 /** lakard tidak bisa dihubungi (jaringan). */
 export class OfflineError extends Error {}
@@ -689,6 +696,25 @@ class ViewerClient {
   resolveComment(slug: string, threadId: string, resolved?: boolean): Promise<CommentResolveResult> {
     return this.#write(
       () => request<CommentResolveResult>('POST', `${commentsPath(slug)}/resolve`, { threadId, ...(resolved !== undefined ? { resolved } : {}) }),
+      () => [slug],
+    );
+  }
+
+  /**
+   * Minta agen memperbaiki thread ini (mailbox, spec-comment-to-fix): fixRequest `open` + pesan prompt di thread.
+   * `agent` = harness yang dituju (opsional). Idempoten — sudah open → rev tetap.
+   */
+  requestFix(slug: string, threadId: string, agent?: string): Promise<CommentFixResult> {
+    return this.#write(
+      () => request<CommentFixResult>('POST', `${commentsPath(slug)}/${encodeURIComponent(threadId)}/fix`, agent !== undefined ? { agent } : {}),
+      () => [slug],
+    );
+  }
+
+  /** Batalkan permintaan fix yang masih open. Idempoten — sudah cancelled → rev tetap; terminal lain → 409. */
+  cancelFix(slug: string, threadId: string): Promise<CommentFixResult> {
+    return this.#write(
+      () => request<CommentFixResult>('POST', `${commentsPath(slug)}/${encodeURIComponent(threadId)}/fix`, { outcome: 'cancelled' }),
       () => [slug],
     );
   }

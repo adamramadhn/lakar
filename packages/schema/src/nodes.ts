@@ -24,7 +24,9 @@ import { NODE_ADDRESS_PATTERN } from './selection.js';
 // ke baris berikut, CSS flex-wrap); dokumen v8 dimigrasi identitas (`@lakar/core` MIGRATIONS[8]).
 // v10 (story komentar canvas, epic kolaborasi-agen) menambah `comments` opsional di root dokumen; dokumen v9
 // dimigrasi identitas (`@lakar/core` MIGRATIONS[9]).
-export const SCHEMA_VERSION = 10 as const;
+// v11 (spec-comment-to-fix) menambah `fixRequest` opsional pada thread komentar (mailbox "minta agen memperbaiki");
+// dokumen v10 dimigrasi identitas (`@lakar/core` MIGRATIONS[10]).
+export const SCHEMA_VERSION = 11 as const;
 
 // ---------------------------------------------------------------------------
 // Primitif
@@ -723,7 +725,7 @@ export const Page = z.object({ id: Id, name: Name, children: z.array(BoardNode) 
 export type Page = z.infer<typeof Page>;
 
 // ---------------------------------------------------------------------------
-// Komentar canvas (v10, epic kolaborasi-agen)
+// Komentar canvas (v10, epic kolaborasi-agen; fixRequest v11, spec-comment-to-fix)
 // ---------------------------------------------------------------------------
 
 /** Penulis pesan komentar: `user` (aplikasi) atau `agent` (sesi MCP; `name` = harness, mis. "Claude Code"). */
@@ -739,6 +741,22 @@ export const CommentMessage = z
 export type CommentMessage = z.infer<typeof CommentMessage>;
 
 /**
+ * Permintaan "agen, perbaiki komentar ini" (v11, spec-comment-to-fix): mailbox di thread — pengguna membukanya dari
+ * aplikasi (`open`, `agent` = harness yang dituju bila dipilih), agen menutupnya (`done`/`failed` + `note` opsional,
+ * `agent` = harness penutup), pengguna membatalkannya (`cancelled`). `at` = waktu transisi terakhir. Permintaan baru
+ * boleh dibuka lagi setelah status terminal.
+ */
+export const CommentFixRequest = z
+  .object({
+    status: z.enum(['open', 'done', 'failed', 'cancelled']),
+    agent: z.string().max(80).optional(),
+    at: z.string(),
+    note: z.string().max(COMMENT_TEXT_MAX).optional(),
+  })
+  .strict();
+export type CommentFixRequest = z.infer<typeof CommentFixRequest>;
+
+/**
  * Thread komentar di canvas: `nodeId` = pin di layer (komentar mengikuti layer itu di UI), tanpa `nodeId` = pin
  * bebas. `x,y` selalu disimpan dalam koordinat halaman — untuk pin layer ini posisi pin saat komentar dibuat
  * (fallback bila layer dihapus/dipindah). `resolvedAt` ada hanya saat `status:'resolved'`.
@@ -752,6 +770,7 @@ export const CommentThread = z
     y: z.number().finite(),
     status: z.enum(['open', 'resolved']),
     resolvedAt: z.string().optional(),
+    fixRequest: CommentFixRequest.optional(),
     messages: z.array(CommentMessage).min(1),
   })
   .strict();

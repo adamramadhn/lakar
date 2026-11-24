@@ -1,6 +1,6 @@
 // Tes unit @lakar/codegen (matriks spec kode-2): murni, tanpa IO. Golden korpus + typecheck ada di tests/codegen.test.ts.
 import { describe, expect, it } from 'vitest';
-import type { IconGlyph, LakarDocument } from '@lakar/schema';
+import { SCHEMA_VERSION, type IconGlyph, type LakarDocument } from '@lakar/schema';
 import { buildTree, declToTailwind, generateCode, tailwindThemeCss, tokensCss, type CodeElement } from './index.js';
 import { camelName, pascalName } from './names.js';
 
@@ -10,7 +10,7 @@ const BOARD = 'Board001';
 
 function doc(children: AnyNode[], extra: AnyNode = {}, board: AnyNode = {}): LakarDocument {
   return {
-    schemaVersion: 10,
+    schemaVersion: SCHEMA_VERSION,
     id: 'Doc00001',
     rev: 1,
     tokens: {
