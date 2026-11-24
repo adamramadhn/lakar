@@ -1,5 +1,5 @@
-// Sidebar Viewer yang bisa dilipat dan hilangnya pill layout_check (spec-viewer-collapsible-panels): toggle per sisi,
-// shortcut (bukan saat mengetik), state tersimpan, reduced motion instan, dan badge jumlah temuan di tab Checks.
+// Sidebar Viewer yang bisa dilipat (spec-viewer-collapsible-panels): toggle per sisi, shortcut (bukan saat mengetik),
+// state tersimpan, reduced motion instan. Tab Checks dan marker check sudah dihapus (spec-viewer-merged-design-tab).
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { dom, reducedMotion, renderUi } from './test/dom';
@@ -7,12 +7,11 @@ import { BOARD, makeDoc, SLUG } from './test/fixtures';
 import { EXPAND_MS, SIDEBARS_KEY } from './sidebars';
 import { Viewer } from './Viewer';
 
-function routes(summary = { error: 1, warning: 2, gate: 0, info: 0 }) {
+function routes() {
   const d = dom().daemon;
   d.on('GET', `/viewer/docs/${SLUG}`, () => ({ doc: makeDoc(1) }));
   d.on('POST', '/sessions', () => ({ sessionId: 'sess-1' }));
   d.on('POST', '/docs/open', () => ({ rev: 1 }));
-  d.on('POST', '/layout-check', () => ({ docId: 'Doc00001', rev: 1, boards: [BOARD], summary, findings: [] }));
 }
 
 async function openViewer() {
@@ -27,23 +26,14 @@ const toggle = (side: 'left' | 'right') => document.querySelector<HTMLButtonElem
 const key = (target: Element | Window, code: string, mods: { altKey?: boolean } = {}) =>
   fireEvent.keyDown(target, { key: code === 'Backslash' ? '\\' : code === 'BracketLeft' ? '[' : ']', code, ctrlKey: true, ...mods });
 
-describe('Viewer — pill layout_check', () => {
-  it('pill di kanvas tidak ada lagi; jumlah temuan tampil sebagai badge di tab Checks', async () => {
+describe('Viewer — tab Checks dihapus', () => {
+  it('panel kanan hanya punya Activity, Design, History; canvas tanpa marker check', async () => {
     await openViewer();
-    const tab = screen.getByRole('tab', { name: /Checks/ });
-    await waitFor(() => expect(tab.querySelector('.tab-badge')).toHaveTextContent('3'));
-    expect(tab.querySelector('.tab-badge')).toHaveClass('danger');
-    expect(tab).toHaveAttribute('title', '1 errors, 2 warnings');
-    expect(document.querySelector('.checks-pill')).toBeNull();
-    expect(screen.queryByText('layout_check')).toBeNull();
-  });
-
-  it('tanpa temuan: tab Checks tanpa badge', async () => {
-    routes({ error: 0, warning: 0, gate: 0, info: 0 });
-    renderUi(<Viewer slug={SLUG} />);
-    await waitFor(() => expect(dom().daemon.find('POST', '/layout-check')).toBeDefined());
-    await waitFor(() => expect(document.querySelector('[data-layer]')).not.toBeNull());
-    expect(screen.getByRole('tab', { name: 'Checks' }).querySelector('.tab-badge')).toBeNull();
+    const tabs = [...document.querySelectorAll('.side-panel .panel-tab, [role="tab"]')].map((t) => t.textContent);
+    expect(tabs).not.toContain('Checks');
+    expect(document.querySelector('.finding-marker')).toBeNull();
+    expect(document.querySelector('.marker-layer')).toBeNull();
+    expect(dom().daemon.find('POST', '/layout-check')).toHaveLength(0);
   });
 });
 

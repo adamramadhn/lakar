@@ -90,7 +90,9 @@ import {
   splitHex,
   WEIGHT_NAMES,
 } from './designValues';
+import { ExportSection, type ExportSel } from './ExportSection';
 import { Menu } from './FileMenu';
+import { ThemeSection } from './ThemeSection';
 import { cellOf, modeIcon, modeLabel, newTokenName, readThemeMode, themeModeOps, TYPE_META, type TokenMap } from './themeModel';
 import {
   anyRef,
@@ -1743,6 +1745,17 @@ export type DesignPanelProps = {
   onExportCode?: ((id: string) => void) | undefined;
   /** Mode edit titik path node primer (paste-vektor story 5, desain J7AmQi): grup Point menggantikan Position & size. */
   pathEdit?: PathEditPanel | undefined;
+  /** Dokumen terkini untuk seksi Theme (spec-viewer-merged-design-tab); ops token lewat `onCommit`. */
+  doc: LakarDocument;
+  /** Slug dokumen untuk seksi Export (route /viewer/docs/:slug/export-file). */
+  slug: string;
+  /** Target ekspor seleksi tunggal (seksi Export); undefined = tanpa seleksi sah. */
+  exportSel?: ExportSel | undefined;
+  /** Buka dialog Import (dipicu dari menu seksi Theme). */
+  onImportCss?: (() => void) | undefined;
+  onImportDtcg?: (() => void) | undefined;
+  /** Dialog impor sedang terbuka (Escape di seksi tidak menelannya). */
+  importOpen?: boolean;
 };
 
 /** Info komponen node primer untuk panel (dihitung Viewer dari dokumen tersimpan). */
@@ -1830,7 +1843,7 @@ function AlignGroup({ align, disabled }: { align: NonNullable<DesignPanelProps['
   );
 }
 
-export function DesignPanel({ targets, path, editable, fonts, inspectNode, rev, onCommit, align, tokenModes, tokens, component, componentEdit, onExportCode, pathEdit }: DesignPanelProps) {
+export function DesignPanel({ targets, path, editable, fonts, inspectNode, rev, onCommit, align, tokenModes, tokens, component, componentEdit, onExportCode, pathEdit, doc, slug, exportSel, onImportCss, onImportDtcg, importOpen }: DesignPanelProps) {
   const [menu, setMenu] = useState<{ x: number; y: number } | undefined>(undefined);
   const [picker, setPicker] = useState<{ anchor: HTMLElement; spec: TokenSpec; trigger: HTMLElement | undefined } | undefined>(undefined);
   // Picker ditutup saat seleksi berganti, panel menjadi baca-saja (pratinjau/offline), atau field jangkarnya hilang
@@ -1884,10 +1897,14 @@ export function DesignPanel({ targets, path, editable, fonts, inspectNode, rev, 
   const primary = targets[targets.length - 1];
   if (!primary) {
     return (
-      <div className="panel-empty">
-        <Icon name="pointer" size={20} />
-        <strong>Nothing selected</strong>
-        <span>Select a layer or a board on the canvas to edit its design.</span>
+      <div className="inspect design-panel">
+        <div className="panel-empty">
+          <Icon name="pointer" size={20} />
+          <strong>Nothing selected</strong>
+          <span>Select a layer or a board on the canvas to edit its design.</span>
+        </div>
+        <ThemeSection doc={doc} rev={rev} editable={editable} onCommit={onCommit} onImportCss={onImportCss} onImportDtcg={onImportDtcg} importOpen={importOpen} />
+        <ExportSection slug={slug} sel={undefined} onExportCode={undefined} />
       </div>
     );
   }
@@ -2017,6 +2034,8 @@ export function DesignPanel({ targets, path, editable, fonts, inspectNode, rev, 
           {groups.includes('effects') && <EffectsGroup targets={targets} ctx={ctx} />}
         </Fragment>
       </OverrideContext.Provider>
+      <ThemeSection doc={doc} rev={rev} editable={editable} onCommit={onCommit} onImportCss={onImportCss} onImportDtcg={onImportDtcg} importOpen={importOpen} />
+      <ExportSection slug={slug} sel={exportSel} onExportCode={exportSel && onExportCode ? () => onExportCode(exportSel.nodeId) : undefined} />
       {!editable && (
         <div className="read-only-note">
           <Icon name="lock" size={14} />

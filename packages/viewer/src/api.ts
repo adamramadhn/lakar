@@ -729,6 +729,44 @@ class ViewerClient {
     throw new ApiError(err.code, err.message, err.hint, res.status);
   }
 
+  /**
+   * Ekspor seleksi ke berkas di disk (seksi Export tab Design): POST /viewer/docs/:slug/export-file. Daemon menulis
+   * langsung ke `dir` (absolut/`~`) dengan ekstensi dari `format`; nama benturan diberi suffix. Balasan: path tertulis.
+   */
+  async exportFile(
+    slug: string,
+    body: { boardId: string; nodeId?: string; scale: 1 | 2; format: 'png' | 'svg'; dir: string; name: string },
+  ): Promise<{ path: string; bytes: number; dropped: string[] }> {
+    let res: Response;
+    try {
+      res = await fetch(`/viewer/docs/${encodeURIComponent(slug)}/export-file`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+    } catch (e) {
+      setOffline(true);
+      throw new OfflineError(e instanceof Error ? e.message : String(e));
+    }
+    let json: { ok?: boolean; data?: { path: string; bytes: number; dropped: string[] }; error?: { code: string; message: string; hint: string } } | undefined;
+    try {
+      json = await res.json();
+    } catch {
+      json = undefined;
+    }
+    if (!json && (res.status === 502 || res.status === 504)) {
+      setOffline(true);
+      throw new OfflineError(`HTTP ${res.status}`);
+    }
+    if (res.ok && json?.ok && json.data) {
+      setOffline(false);
+      return json.data;
+    }
+    setOffline(false);
+    const err = json?.error ?? { code: 'EXPORT_FAILED', message: `HTTP ${res.status}`, hint: '' };
+    throw new ApiError(err.code, err.message, err.hint, res.status);
+  }
+
   #sessionId(): Promise<string> {
     this.#session ??= request<{ sessionId: string }>('POST', '/sessions', { client: CLIENT }).then(
       (d) => d.sessionId,

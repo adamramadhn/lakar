@@ -68,8 +68,8 @@ import { BottomSheet, MOBILE_QUERY } from './BottomSheet';
 import { SidebarToggle, useSidebars } from './SidebarToggle';
 import { sidebarShortcut } from './sidebars';
 import { AddLayerButton, IconPicker, Toast, type ToastState } from './AddLayer';
-import { api, ApiError, errorText, OfflineError, type FontFamily, type HistoryEntry, type ImportUrlBody, type InspectResult, type LayoutCheck } from './api';
-import { Canvas, type CanvasMarker, type CanvasPreview, type Focus, type Highlight, type InsertPoint } from './Canvas';
+import { api, ApiError, errorText, OfflineError, type FontFamily, type HistoryEntry, type ImportUrlBody, type InspectResult } from './api';
+import { Canvas, type CanvasPreview, type Focus, type Highlight, type InsertPoint } from './Canvas';
 import type { PathEditPanel } from './pathTools';
 import { measuredBoards, withHeight } from './boardHeight';
 import { failureText, imageFileProblem, insertBoardAt, insertBoardPlaced, insertIntoBoard, canvasInsertTarget, menuInsertTarget, type InsertExtra, type InsertKind, type InsertTarget } from './codegen';
@@ -82,9 +82,7 @@ import { FileMenu } from './FileMenu';
 import { useNow, useOffline, useRetry } from './hooks';
 import { Icon, NODE_ICON } from './icons';
 import { Modal } from './NewFileDialog';
-import { ChecksPanel } from './panels';
 import { DesignPanel } from './DesignPanel';
-import { ThemeButton, ThemePanel } from './ThemePanel';
 import { CodeExportDialog } from './CodeExportDialog';
 import { ImportCssDialog, ImportDtcgDialog } from './TokensCss';
 import { effectiveMode } from './themeModel';
@@ -137,7 +135,6 @@ type Tab = PanelTab;
 const TABS: { id: Tab; label: string }[] = [
   { id: 'activity', label: 'Activity' },
   { id: 'design', label: 'Design' },
-  { id: 'checks', label: 'Checks' },
   { id: 'history', label: 'History' },
 ];
 
@@ -261,9 +258,6 @@ function collectAssets(doc: LakarDocument): AssetItem[] {
   return out;
 }
 
-/** Batas node temuan yang diukur untuk marker kanvas per run check. */
-const MARKER_MAX = 24;
-
 /** Durasi toast rollback di atas kanvas (desain "Viewer — Desktop — Error"). */
 const ROLLBACK_MS = 6000;
 
@@ -290,7 +284,6 @@ export function Viewer({ slug }: { slug: string }) {
     });
   }, []);
   const [inspect, setInspect] = useState<Loaded<InspectResult> | undefined>(undefined);
-  const [checks, setChecks] = useState<Loaded<LayoutCheck> | undefined>(undefined);
   const [tab, setTab] = useState<Tab>(saved?.panel ?? 'activity');
   const [attempt, setAttempt] = useState(0);
   const activity = useSyncExternalStore(activityHub.subscribeState, activityHub.getState);
@@ -309,9 +302,6 @@ export function Viewer({ slug }: { slug: string }) {
   const [restoreAsk, setRestoreAsk] = useState<HistoryEntry | undefined>(undefined);
   const [restoring, setRestoring] = useState(false);
   const [restoreError, setRestoreError] = useState<string | undefined>(undefined);
-  /** Panel Theme (epic token-tema story 3); ditutup saat pratinjau versi (tombol Theme tidak tampil). */
-  const [themeOpen, setThemeOpen] = useState(false);
-  const closeTheme = useCallback(() => setThemeOpen(false), []);
   /** Dialog Export code (epic kode story 5): id node sumber; ditutup saat pratinjau versi. */
   const [codeExport, setCodeExport] = useState<string | undefined>(undefined);
   /** Dialog Import (panel Theme): CSS variables (epic kode story 5) dan DTCG tokens (story 9). */
@@ -324,9 +314,6 @@ export function Viewer({ slug }: { slug: string }) {
     setCssImportOpen(false);
     setDtcgImportOpen(false);
     setImportUrlOpen(false);
-  }, [preview]);
-  useEffect(() => {
-    if (preview) setThemeOpen(false);
   }, [preview]);
   const offline = useOffline();
   /** Toast sisip/hapus/unggah: gagal, "Deleted …" + Undo, atau "Uploading image…". */
@@ -734,43 +721,6 @@ export function Viewer({ slug }: { slug: string }) {
   const fadeEpoch = fadeEpochRef.current.epoch;
   const nameOf = useCallback((id: string) => index.get(id)?.name, [index]);
 
-  const runChecks = useCallback(() => {
-    if (!current || current.pages.every((p) => p.children.length === 0)) return;
-    setChecks({ state: 'loading' });
-    api.layoutCheck(slug).then(
-      (r) => setChecks({ state: 'ok', value: r }),
-      (e) => setChecks({ state: 'error', message: errorText(e) }),
-    );
-  }, [slug, current]);
-  useEffect(runChecks, [runChecks]);
-
-  // Marker temuan di kanvas (desain "Warning Outline/Marker"): bounds node temuan diukur lewat POST /inspect
-  // (maks. MARKER_MAX node per run check). Temuan pada board cukup memakai kotak board.
-  const [findingBounds, setFindingBounds] = useState<Record<string, { boardId: string; bounds: [number, number, number, number] }>>({});
-  const checkFindings = checks?.state === 'ok' ? checks.value.findings : undefined;
-  const indexRef = useRef(index);
-  indexRef.current = index;
-  useEffect(() => {
-    if (!checkFindings) return;
-    let live = true;
-    const ids = [...new Set(checkFindings.map((f) => f.nodeId))].filter((id) => {
-      const info = indexRef.current.get(id);
-      return info && info.type !== 'board';
-    });
-    setFindingBounds({});
-    for (const id of ids.slice(0, MARKER_MAX)) {
-      api.inspect(slug, id, 0).then(
-        (r) => {
-          const b = r.node.bounds;
-          if (live && b) setFindingBounds((m) => ({ ...m, [id]: { boardId: r.boardId, bounds: b } }));
-        },
-        () => {},
-      );
-    }
-    return () => {
-      live = false;
-    };
-  }, [slug, checkFindings]);
 
   // Isi slot instance (story 5): POST /inspect (route lama) tidak menelusuri slot.
   const selectedInSlot = !!selectedId && !!components && inSlotContent(components, selectedId);
@@ -1445,22 +1395,6 @@ export function Viewer({ slug }: { slug: string }) {
         : selectedInfo
           ? { boardId: selectedInfo.boardId }
           : undefined;
-  const summary = checks?.state === 'ok' ? checks.value.summary : undefined;
-  /** Marker temuan per node (level terberat menang); disembunyikan saat pratinjau versi. */
-  const markers: CanvasMarker[] = [];
-  if (!preview && checks?.state === 'ok') {
-    const byNode = new Map<string, CanvasMarker>();
-    for (const f of checks.value.findings) {
-      const info = index.get(f.nodeId);
-      if (!info) continue;
-      const fb = findingBounds[f.nodeId];
-      const m: CanvasMarker | undefined =
-        info.type === 'board' ? { nodeId: f.nodeId, boardId: info.boardId, level: f.level } : fb ? { nodeId: f.nodeId, boardId: fb.boardId, bounds: fb.bounds, level: f.level } : undefined;
-      const prev = byNode.get(f.nodeId);
-      if (m && (!prev || (prev.level === 'warning' && m.level === 'error'))) byNode.set(f.nodeId, m);
-    }
-    markers.push(...byNode.values());
-  }
   /**
    * Target panel Design (story 5): node tersimpan + pasangan ter-resolve + layout induk + ukuran terukur DOM live, urut
    * seleksi (terakhir = primer). Hanya dihitung saat tab Design terbuka.
@@ -1491,6 +1425,14 @@ export function Viewer({ slug }: { slug: string }) {
       resetAll: resetAllOverrides,
       select: (address) => setSelection([address]),
     }) : undefined;
+  /** Target seksi Export (desain viewer-panel-redesign): seleksi tunggal node tersimpan (bukan alamat komposit). */
+  const exportSel =
+    selection.length === 1 && selectedId && !isComposite(selectedId)
+      ? (() => {
+          const info = index.get(selectedId);
+          return info ? { boardId: info.boardId, nodeId: selectedId, name: info.name } : undefined;
+        })()
+      : undefined;
   const docHasBoards = d.pages.some((p) => p.children.length > 0);
   const meta = previewDoc
     ? `Previewing rev ${d.rev} · latest ${latestDoc.rev}`
@@ -1838,7 +1780,6 @@ export function Viewer({ slug }: { slug: string }) {
         onCommitCreate={commitCreate}
         onPathEdit={setPathEdit}
         shareBadge={shareBadge}
-        actions={<ThemeButton open={themeOpen} onToggle={() => setThemeOpen((o) => !o)} />}
         leadingActions={<SidebarToggle side="right" collapsed={sidebars.collapsed.right} onToggle={() => toggleSidebar('right')} />}
         canUndo={editable && undoDepth.undo > 0}
         canRedo={editable && undoDepth.redo > 0}
@@ -1856,19 +1797,11 @@ export function Viewer({ slug }: { slug: string }) {
         onInsert={onCanvasInsert}
         docEmpty={!docHasBoards}
         stale={offline ? relativeTime(lastSync.current, now) : undefined}
-        markers={markers}
-        onMarker={(id) => {
-          select(id);
-          openTab('checks');
-        }}
         comments={canvasComments}
         onCommentAt={onCommentAt}
         overlay={
           <>
             <SidebarToggle side="left" collapsed={sidebars.collapsed.left} onToggle={() => toggleSidebar('left')} />
-            {themeOpen && !preview && (
-              <ThemePanel doc={latestDoc} rev={latestDoc.rev} editable={editable} onCommit={commitOps} onClose={closeTheme} onImportCss={() => setCssImportOpen(true)} onImportDtcg={() => setDtcgImportOpen(true)} importOpen={cssImportOpen || dtcgImportOpen} />
-            )}
             {undoSkipped && <UndoSkippedToast key={undoSkipped.key} toast={undoSkipped} onHistory={() => openTab('history')} onClose={closeUndoSkipped} />}
             {pasteToast && !undoSkipped && <PasteToast key={pasteToast.key} toast={pasteToast} onUndo={undoPaste} onClose={closePasteToast} />}
             {rollback && (
@@ -1887,7 +1820,7 @@ export function Viewer({ slug }: { slug: string }) {
         }
       />
 
-      <BottomSheet state={sheet} onState={setSheet} tabs={TABS} tab={tab} onTab={openTab} summary={summary} onChecks={() => openTab('checks')}>
+      <BottomSheet state={sheet} onState={setSheet} tabs={TABS} tab={tab} onTab={openTab}>
         <div className="panel-body">
           {tab === 'design' && (
             <DesignPanel
@@ -1905,9 +1838,14 @@ export function Viewer({ slug }: { slug: string }) {
               pathEdit={pathEdit}
               onExportCode={preview ? undefined : setCodeExport}
               align={designTargets.length > 1 ? { enabled: editable ? actionState(sceneRef.current?.() ?? [], selection) : NO_ACTIONS, run: (a) => runAction(a) } : undefined}
+              slug={slug}
+              doc={latestDoc}
+              exportSel={exportSel}
+              onImportCss={() => setCssImportOpen(true)}
+              onImportDtcg={() => setDtcgImportOpen(true)}
+              importOpen={cssImportOpen || dtcgImportOpen}
             />
           )}
-          {tab === 'checks' && <ChecksPanel checks={checks} index={index} selectedId={selectedId} onSelect={select} onRun={runChecks} hasBoards={d.pages.some((p) => p.children.length > 0)} />}
           {tab === 'activity' && <ActivityPanel views={views} connected={activity.connected} offline={offline} follow={follow} onFollow={setFollow} nameOf={nameOf} onLocate={locate} />}
           {tab === 'history' && (
             <HistoryPanel

@@ -19,11 +19,11 @@ describe('viewState', () => {
   });
 
   it('moveViewState: state pindah ke slug baru', () => {
-    saveViewState('mv-a', { pageIndex: 1, selectedId: 'N', panel: 'checks' });
+    saveViewState('mv-a', { pageIndex: 1, selectedId: 'N', panel: 'history' });
     saveCamera('mv-a', 'P', { x: 1, y: 1, z: 1 });
     moveViewState('mv-a', 'mv-x');
     expect(getViewState('mv-a')).toBeUndefined();
-    expect(getViewState('mv-x')).toMatchObject({ pageIndex: 1, selectedId: 'N', panel: 'checks' });
+    expect(getViewState('mv-x')).toMatchObject({ pageIndex: 1, selectedId: 'N', panel: 'history' });
     expect(getCamera('mv-x', 'P')).toEqual({ x: 1, y: 1, z: 1 });
   });
 
@@ -33,7 +33,7 @@ describe('viewState', () => {
     moveViewState('mv-b', 'mv-y');
     expect(getViewState('mv-y')).toMatchObject({ pageIndex: 3, panel: 'history' });
 
-    saveViewState('mv-z', { pageIndex: 5, selectedId: 'stale', panel: 'checks' });
+    saveViewState('mv-z', { pageIndex: 5, selectedId: 'stale', panel: 'history' });
     moveViewState('mv-none', 'mv-z');
     expect(getViewState('mv-z')).toBeUndefined();
   });

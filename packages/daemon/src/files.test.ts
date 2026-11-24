@@ -1,7 +1,7 @@
 // Kelola file dari aplikasi (aplikasi 1): POST /viewer/docs, rename, duplicate, archive/unarchive, DELETE, GET /viewer/archive.
 // Seluruh matriks I/O spec; RenderPort palsu (execute butuh check board tersentuh).
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -660,5 +660,76 @@ describe('event change untuk sinkron antar jendela', () => {
     calls.length = 0;
     expect((await t.post('/viewer/docs/a/restore', { rev: 2 })).statusCode).toBe(200);
     expect(calls.every((c) => c.origin === undefined)).toBe(true);
+  });
+});
+
+describe('POST /viewer/docs/:slug/export-file (seksi Export tab Design)', () => {
+  const pngOf = (width: number, height: number): Uint8Array => {
+    const b = Buffer.alloc(33);
+    Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]).copy(b, 0);
+    b.writeUInt32BE(13, 8);
+    b.write('IHDR', 12, 'latin1');
+    b.writeUInt32BE(width, 16);
+    b.writeUInt32BE(height, 20);
+    return new Uint8Array(b);
+  };
+  const render = {
+    screenshot: async (doc: any, boardId: string, opts: { scale?: number; nodeId?: string } = {}) => {
+      const b = doc.pages.flatMap((p: any) => p.children).find((x: any) => x.id === boardId);
+      return pngOf((opts.nodeId ? 100 : b.width) * (opts.scale ?? 1), (opts.nodeId ? 80 : b.height) * (opts.scale ?? 1));
+    },
+    measure: async () => ({}),
+  } as never;
+
+  async function fileSetup() {
+    const dataDir = await mkdtemp(join(root, 'exfile-doc-'));
+    const outDir = await mkdtemp(join(root, 'exfile-out-'));
+    const { app } = buildServer({ config: { ...baseConfig, port: 0, dataDir }, render });
+    const post = (payload: unknown) => app.inject({ method: 'POST', url: '/viewer/docs/my-landing/export-file', payload: payload as object });
+    const committed = await transact(createDocument(), { sessionId: 'test', description: 'seed' }, (tx) => {
+      const b = tx.add(null, { type: 'board', name: 'Desktop', x: 0, y: 0, width: 1440, height: 900, screen: 'landing' });
+      tx.add(b, { type: 'frame', name: 'Card', position: 'absolute', x: 20, y: 30, width: 100, height: 80 });
+      tx.add(b, { type: 'path', name: 'Icon', position: 'absolute', x: 0, y: 0, width: 24, height: 24, d: 'M0 0h24v24z', viewBox: [0, 0, 24, 24], fills: [{ type: 'solid', color: '#000000' }] });
+    });
+    await mkdir(join(dataDir, 'docs'), { recursive: true });
+    await writeFile(join(dataDir, 'docs', 'my-landing.lakar.json'), JSON.stringify(committed.doc));
+    const kids = committed.doc.pages[0]!.children[0]!.children!;
+    return { app, post, outDir, boardId: committed.doc.pages[0]!.children[0]!.id, cardId: kids[0]!.id, iconId: kids[1]!.id };
+  }
+
+  it('png: byte render ditulis ke dir/name.png; respons path; konflik nama → suffix -1', async () => {
+    const t = await fileSetup();
+    const r = await t.post({ boardId: t.boardId, nodeId: t.cardId, scale: 2, format: 'png', dir: t.outDir, name: 'card@2x' });
+    expect(r.statusCode, r.body).toBe(200);
+    const data = r.json().data;
+    expect(data.path).toBe(join(t.outDir, 'card@2x.png'));
+    expect(new Uint8Array(readFileSync(data.path))).toEqual(pngOf(200, 160));
+    const again = await t.post({ boardId: t.boardId, nodeId: t.cardId, scale: 2, format: 'png', dir: t.outDir, name: 'card@2x' });
+    expect(again.json().data.path).toBe(join(t.outDir, 'card@2x-1.png'));
+  });
+
+  it('svg: node path → dokumen SVG mandiri; node frame juga bisa (children path dilaporkan di dropped)', async () => {
+    const t = await fileSetup();
+    const r = await t.post({ boardId: t.boardId, nodeId: t.iconId, scale: 1, format: 'svg', dir: t.outDir, name: 'icon' });
+    expect(r.statusCode, r.body).toBe(200);
+    const svg = readFileSync(r.json().data.path, 'utf8');
+    expect(svg).toContain('<svg');
+    expect(svg).toContain('viewBox="0 0 24 24"');
+  });
+
+  it('name dengan separator / dir relatif → 400; folder tidak ada → 404', async () => {
+    const t = await fileSetup();
+    const bad1 = await t.post({ boardId: t.boardId, nodeId: t.cardId, scale: 1, format: 'png', dir: t.outDir, name: 'a/b' });
+    expect(bad1.statusCode).toBe(400);
+    const bad2 = await t.post({ boardId: t.boardId, nodeId: t.cardId, scale: 1, format: 'png', dir: 'rel/dir', name: 'x' });
+    expect(bad2.statusCode).toBe(400);
+    const gone = await t.post({ boardId: t.boardId, nodeId: t.cardId, scale: 1, format: 'png', dir: join(t.outDir, 'nope'), name: 'x' });
+    expect(gone.statusCode).toBe(404);
+  });
+
+  it('nodeId di board lain / tidak ada → 404; node non-vektor untuk svg → EXPORT_FAILED', async () => {
+    const t = await fileSetup();
+    const r404 = await t.post({ boardId: t.boardId, nodeId: 'nope', scale: 1, format: 'png', dir: t.outDir, name: 'x' });
+    expect(r404.statusCode).toBe(404);
   });
 });

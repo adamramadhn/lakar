@@ -23,7 +23,7 @@
 // live: DOM lama tetap tampil sampai mount baru siap.
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type MutableRefObject, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
 import { findBoard } from '@lakar/render';
-import { resolveDocument, type DocOp, type FindingLevel, type LakarDocument, type ResolvedDocument } from '@lakar/schema';
+import { resolveDocument, type DocOp, type LakarDocument, type ResolvedDocument } from '@lakar/schema';
 import { boardDepKeys, boardSignature, boardSource, ensureFaces, mountLive, RenderDepsCache } from './liveBoard';
 import { api, errorText } from './api';
 import { CommentPin, CommentThreadCard, NewCommentCard, pinPoint, threadLocation, type CanvasComments } from './comments';
@@ -68,8 +68,6 @@ export type CanvasPreview = {
 };
 /** Titik sisip: dalam board (`boardId`, koordinat board) atau di halaman (tanpa board, koordinat halaman). */
 export type InsertPoint = { boardId: string; x: number; y: number } | { boardId?: undefined; x: number; y: number };
-/** Marker temuan layout_check: tanpa `bounds` = temuan pada board (lingkaran di sudut board saja). */
-export type CanvasMarker = { nodeId: string; boardId: string; bounds?: [number, number, number, number]; level: FindingLevel };
 type Tool = 'select' | 'hand' | 'pen' | 'comment' | InsertKind;
 const isInsertTool = (t: Tool): t is InsertKind => t !== 'select' && t !== 'hand' && t !== 'pen' && t !== 'comment';
 /** Tool sisip, Pen, atau komentar (kursor crosshair; kembali ke Select saat pratinjau/offline atau Escape). */
@@ -423,8 +421,6 @@ export function Canvas({
   onCamera,
   docEmpty = false,
   stale,
-  markers,
-  onMarker,
   overlay,
   doc,
   selection = [],
@@ -486,10 +482,6 @@ export function Canvas({
   docEmpty?: boolean;
   /** lakard offline: teks "Last synced …" dan board diredupkan. */
   stale?: string | undefined;
-  /** Marker temuan layout_check di halaman ini. */
-  markers?: readonly CanvasMarker[];
-  /** Klik marker: pilih node temuan. */
-  onMarker?: (nodeId: string) => void;
   /** Elemen tambahan di atas kanvas (toast rollback, chip Follow). */
   overlay?: ReactNode;
   /** Kamera tersimpan (pindah tab, viewState.ts): dipakai saat mount, tanpa auto-fit. */
@@ -1201,32 +1193,6 @@ export function Canvas({
             />
           )}
 
-      {markers && markers.length > 0 && (
-        <div className="marker-layer">
-          {markers.map((m) => {
-            const b = boardById.get(m.boardId);
-            if (!b) return null;
-            const r = m.bounds ? nodeBox(b, m.bounds, cam) : undefined;
-            const right = r ? r.left + r.width : cam.x + (b.x + b.width) * cam.z;
-            const top = r ? r.top : cam.y + b.y * cam.z;
-            return (
-              <div key={m.nodeId}>
-                {r && <div className={`finding-outline ${m.level}`} style={{ left: r.left, top: r.top, width: r.width, height: r.height }} />}
-                <button
-                  type="button"
-                  className={`finding-marker canvas-overlay-ui ${m.level}`}
-                  style={{ left: right - 10, top: top - 10 }}
-                  aria-label={m.level === 'error' ? 'Layout error: show in Checks' : 'Layout warning: show in Checks'}
-                  title="Show in Checks"
-                  onClick={() => onMarker?.(m.nodeId)}
-                >
-                  <Icon name="alert" size={11} />
-                </button>
-              </div>
-            );
-          })}
-        </div>
-      )}
 
       {!preview && presence && <AgentLayer presence={presence} boardById={boardById} cam={cam} />}
 

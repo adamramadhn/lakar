@@ -1399,7 +1399,7 @@ code {
 .layers-panel .panel-tabs {
   border-bottom: 0;
 }
-/* Badge jumlah temuan di tab Checks (desain "Panel Tab" › Badge): pengganti pill layout_check di kanvas. */
+/* Badge jumlah di tab panel (mis. Comments, desain "Panel Tab" › Badge). */
 .panel-tab .tab-badge {
   display: inline-grid;
   place-items: center;
@@ -1412,14 +1412,6 @@ code {
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   vertical-align: 1px;
-}
-.panel-tab .tab-badge.danger {
-  background: var(--danger-soft);
-  color: var(--danger);
-}
-.panel-tab .tab-badge.warning {
-  background: var(--surface-hover);
-  color: var(--warning);
 }
 .panel-tab {
   height: 25px;
@@ -3491,135 +3483,6 @@ button.panel-tab:hover {
   padding-left: 10px;
   border-left: 1px solid var(--border);
 }
-.checks-summary {
-  padding: 14px;
-  border-bottom: 1px solid var(--border);
-}
-.stats {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
-}
-.stat {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 10px 12px;
-  border-radius: 8px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-}
-.stat-value {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 18px;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-}
-.stat-label {
-  color: var(--text-secondary);
-  font-size: 11px;
-}
-.checks-meta {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  margin-top: 10px;
-  color: var(--text-muted);
-  font-size: 11px;
-}
-.findings {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 12px;
-}
-.finding {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 12px;
-  border-radius: 8px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  text-align: left;
-}
-.finding.error {
-  border-color: var(--danger);
-}
-.finding:hover:not(:disabled) {
-  background: var(--surface-hover);
-}
-.finding.selected {
-  outline: 2px solid var(--accent);
-  outline-offset: -1px;
-}
-.finding:disabled {
-  cursor: default;
-}
-.finding-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.rule {
-  padding: 1px 6px;
-  border-radius: 4px;
-  font-family: var(--font-mono);
-  font-size: 11px;
-  color: #fff;
-  flex: none;
-}
-.rule.error {
-  background: var(--danger);
-}
-.rule.warning {
-  background: var(--warning);
-  color: #1a1a1a;
-}
-.finding-title {
-  flex: 1;
-  font-size: 12px;
-  font-weight: 600;
-}
-.gate {
-  font-size: 10px;
-  color: var(--text-muted);
-}
-.finding-node {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--text-secondary);
-  font-size: 11px;
-  min-width: 0;
-}
-.finding-node span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.finding-detail {
-  color: var(--text-muted);
-  font-family: var(--font-mono);
-  font-size: 11px;
-  overflow-wrap: anywhere;
-}
-.passed-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  height: 35px;
-  padding: 0 12px;
-  color: var(--text-secondary);
-  font-size: 12px;
-}
-.passed-row .ok {
-  color: var(--success);
-}
-
 /* ---- Settings → Connections (desain e7hIme) ---- */
 .connect-actions {
   display: flex;
@@ -4198,8 +4061,7 @@ button.panel-tab:hover {
 .viewer-topbar,
 .layers-toggle,
 .layers-scrim,
-.sheet-grabber,
-.sheet-checks {
+.sheet-grabber {
   display: none;
 }
 /* Tablet: kanvas + panel kanan 300px; Layers/Pages jadi laci di atas kanvas lewat tombol "Layers". */
@@ -4399,16 +4261,6 @@ button.panel-tab:hover {
   /* History hanya di strip saat aktif; dibuka dari tombol History di top bar. */
   .side-panel .panel-tab.tab-history:not(.active) {
     display: none;
-  }
-  .sheet-checks {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    height: 26px;
-    margin-left: auto;
-    padding: 0 4px;
-    border-radius: 6px;
-    font-size: 12px;
   }
   /* Toolbar kanvas dan toast duduk di atas sheet (`--sheet-h` ditulis BottomSheet). Zoom lewat pinch. */
   .viewer .view-controls {
@@ -6250,45 +6102,11 @@ button.panel-tab:hover {
   color: var(--text-secondary);
 }
 
-/* Marker temuan layout_check (desain "Warning Outline", "Warning Marker", "Board Warning Marker"). */
-.marker-layer {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-}
-.finding-outline {
-  position: absolute;
-  border: 1px dashed var(--danger);
-}
-.finding-outline.warning {
-  border-color: var(--warning);
-}
-.finding-marker {
-  position: absolute;
-  display: grid;
-  place-items: center;
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  border: 2px solid var(--canvas);
-  background: var(--danger);
-  color: #ffffff;
-  pointer-events: auto;
-  z-index: 3;
-}
-.finding-marker.warning {
-  background: var(--warning);
-  color: #1a1a1a;
-}
-.canvas.previewing .marker-layer {
-  display: none;
-}
 
 /* Offline (desain "Viewer — Desktop — Offline"): board diredupkan, pill "Last synced …" di tengah atas. */
 .canvas.stale .board,
 .canvas.stale .board-label,
-.canvas.stale .selection,
-.canvas.stale .marker-layer {
+.canvas.stale .selection {
   opacity: 0.45;
 }
 .stale-pill {
@@ -6764,9 +6582,7 @@ button.panel-tab:hover {
   }
   /* Desain mobile: tanpa tombol Layers (laci dibuka dari nama file) dan tanpa Export. */
   .viewer .layers-toggle,
-  .viewer .export,
-  .viewer .theme-btn,
-  .viewer .theme-panel {
+  .viewer .export {
     display: none;
   }
   .session-card.open .session-chevron {
@@ -6814,110 +6630,14 @@ button.panel-tab:hover {
   }
 }
 
-/* ---- Panel Theme (epic token-tema story 3, desain 07 Theme & tokens gXCqM/Ci5XZ, njMhO/IDR9G) ---- */
-.theme-btn {
-  height: 32px;
-  font-size: 13px;
-  gap: 6px;
-}
-.theme-btn.active {
-  background: var(--surface-hover);
-}
-.theme-panel {
-  position: absolute;
-  top: 58px;
-  left: 16px;
-  z-index: 6;
-  width: min(828px, calc(100% - 32px));
-  height: min(720px, calc(100% - 74px));
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  background: var(--modal);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  box-shadow: 0 24px 60px #00000059;
-  color: var(--text-primary);
-  font-size: 12px;
-}
-.theme-header {
-  flex: none;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 12px 12px 12px 16px;
-  border-bottom: 1px solid var(--border);
-}
-.theme-header strong {
-  font-size: 14px;
-  font-weight: 600;
-}
+/* ---- Seksi Theme di tab Design (spec-viewer-merged-design-tab, desain viewer-panel-redesign) ---- */
 .theme-spacer {
   flex: 1;
-}
-.theme-body {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-}
-.theme-types {
-  flex: none;
-  width: 200px;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 10px;
-  border-right: 1px solid var(--border);
-  overflow-y: auto;
-}
-.theme-types-label {
-  padding: 0 0 2px;
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--text-muted);
-}
-.theme-type {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  height: 30px;
-  padding: 0 10px;
-  border: 0;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--text-secondary);
-  font: inherit;
-  font-size: 12px;
-  font-weight: 500;
-  text-align: left;
-  cursor: pointer;
-}
-.theme-type:hover,
-.theme-type.active {
-  background: var(--surface-hover);
-  color: var(--text-primary);
-}
-.theme-type-label {
-  flex: 1;
-  min-width: 0;
 }
 .theme-type-count {
   font-size: 11px;
   font-weight: 400;
   color: var(--text-muted);
-}
-.theme-table {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-}
-.theme-toolbar {
-  flex: none;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 14px;
 }
 .theme-filter {
   flex: 1;
@@ -6942,54 +6662,6 @@ button.panel-tab:hover {
 }
 .theme-filter input::placeholder {
   color: var(--text-muted);
-}
-.theme-row {
-  display: grid;
-  align-items: center;
-  padding: 0 14px;
-  border-bottom: 1px solid var(--border);
-}
-.theme-head {
-  flex: none;
-  height: 32px;
-}
-.theme-head .theme-cell {
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--text-muted);
-}
-.theme-cell {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-  height: 100%;
-}
-.theme-mode {
-  gap: 6px;
-}
-.theme-mode-label {
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  cursor: text;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.theme-mode-label:disabled {
-  cursor: default;
-}
-.badge.small {
-  padding: 1px 6px;
-  font-size: 10px;
-  line-height: 12px;
-  font-weight: 400;
-}
-.theme-actions {
-  justify-content: flex-end;
 }
 .theme-icon-btn {
   display: grid;
@@ -7025,42 +6697,12 @@ button.panel-tab:hover {
   color: var(--danger);
   box-shadow: inset 0 0 0 1px var(--danger);
 }
-.theme-rows {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-}
-.theme-group {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  width: 100%;
-  padding: 10px 14px 4px;
-  border: 0;
-  background: transparent;
-  color: var(--text-secondary);
-  font-family: var(--font-mono);
-  font-size: 11px;
-  font-weight: 600;
-  text-align: left;
-  cursor: pointer;
-}
-.theme-group svg {
-  color: var(--text-muted);
-  transition: transform 0.12s;
-}
-.theme-group.collapsed svg {
-  transform: rotate(-90deg);
-}
 .theme-token {
   height: 34px;
 }
 .theme-token:hover,
 .theme-token.selected {
   background: var(--surface-hover);
-}
-.theme-name {
-  padding-right: 8px;
 }
 .theme-name-icon {
   flex: none;
@@ -7083,15 +6725,6 @@ button.panel-tab:hover {
 .theme-name-text:disabled {
   cursor: default;
 }
-.theme-usage {
-  flex: none;
-  visibility: hidden;
-  font-size: 11px;
-  color: var(--text-muted);
-}
-.theme-token:hover .theme-usage {
-  visibility: visible;
-}
 .theme-value {
   height: 24px;
   max-width: 100%;
@@ -7111,15 +6744,6 @@ button.panel-tab:hover {
   padding: 0;
   background: transparent;
 }
-.theme-value.static {
-  display: inline-flex;
-  align-items: center;
-  cursor: default;
-}
-.theme-value:disabled,
-.theme-inherited:disabled {
-  cursor: default;
-}
 .theme-value:hover:not(:disabled):not(.plain) {
   color: var(--text-primary);
 }
@@ -7134,9 +6758,6 @@ button.panel-tab:hover {
   font-family: var(--font-mono);
   font-size: 12px;
   cursor: text;
-}
-.theme-inherited.static {
-  cursor: default;
 }
 .theme-input {
   width: 100%;
@@ -7175,23 +6796,6 @@ button.panel-tab:hover {
   gap: 8px;
   padding: 10px 14px;
   border-top: 1px solid var(--border);
-}
-.theme-add {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: var(--accent);
-  font: inherit;
-  font-size: 12px;
-  font-weight: 500;
-  cursor: pointer;
-}
-.theme-add:disabled {
-  cursor: default;
-  opacity: 0.5;
 }
 .theme-hint {
   display: inline-flex;
@@ -8538,4 +8142,284 @@ button.panel-tab:hover {
 }
 .comments-footer .follow-info {
   margin-right: auto;
+}
+
+/* ---- Seksi collapsible di tab Design: Theme + Export (spec-viewer-merged-design-tab) ---- */
+.dp-section-head {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 34px;
+  padding: 0 8px 0 0;
+  border-top: 1px solid var(--border);
+}
+.dp-section-toggle {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 100%;
+  padding: 0 4px 0 10px;
+  border: 0;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+.dp-section-toggle:hover {
+  background: var(--surface-hover);
+}
+.dp-section-caret {
+  flex: none;
+  color: var(--text-muted);
+  transform: rotate(-90deg);
+  transition: transform 0.12s;
+}
+.dp-section-caret.open {
+  transform: none;
+}
+.dp-section-title {
+  flex: none;
+}
+.dp-section-summary {
+  flex: 1;
+  min-width: 0;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 400;
+  text-align: right;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.theme-menu-sep {
+  height: 1px;
+  margin: 4px 6px;
+  background: var(--border);
+}
+
+/* Seksi Theme: body, switch mode, grup per jenis token, baris token. */
+.theme-section {
+  position: relative;
+}
+.theme-section-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px 0 8px;
+}
+.theme-mode-row {
+  padding: 2px 10px 6px;
+}
+.theme-mode-row .segmented {
+  width: 100%;
+}
+.theme-mode-row .segment {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  height: 26px;
+}
+.theme-mode-row .select {
+  width: 100%;
+}
+.theme-section .theme-filter {
+  margin: 0 10px 4px;
+}
+.theme-type-head {
+  display: flex;
+  align-items: center;
+  height: 28px;
+  padding: 0 8px 0 10px;
+  border-top: 1px solid var(--border);
+}
+.theme-type-toggle {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+.theme-type-toggle svg {
+  color: var(--text-muted);
+  transition: transform 0.12s;
+}
+.theme-type-toggle.folded svg {
+  transform: rotate(-90deg);
+}
+.theme-type-toggle .theme-type-count {
+  margin-left: auto;
+  font-weight: 400;
+}
+.theme-type-head .theme-icon-btn {
+  margin-left: 8px;
+}
+.theme-section .theme-token {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 30px;
+  padding: 0 8px 0 12px;
+}
+.theme-section .theme-token .theme-name-text {
+  flex: 1;
+  min-width: 0;
+}
+.theme-section .theme-token .theme-input {
+  flex: 1;
+  min-width: 0;
+}
+.theme-token.draft {
+  border-top: 1px solid var(--accent-soft, var(--border));
+}
+.theme-more {
+  display: block;
+  width: 100%;
+  padding: 4px 12px;
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  font-size: 11px;
+  text-align: left;
+  cursor: pointer;
+}
+.theme-more:hover {
+  text-decoration: underline;
+}
+.theme-section .theme-footer {
+  border-top: 0;
+  padding: 6px 12px 0;
+}
+.theme-section .theme-confirm {
+  top: auto;
+  bottom: 8px;
+  right: 8px;
+  left: 8px;
+  width: auto;
+}
+
+/* Seksi Export: preset baris, tujuan, tombol, preview, row Code. */
+.export-section-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 6px 10px 12px;
+}
+.export-preset {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.export-preset .segmented {
+  width: 84px;
+  flex: none;
+}
+.export-preset .segment {
+  height: 26px;
+  font-size: 11px;
+}
+.export-suffix {
+  flex: 1;
+  min-width: 0;
+  height: 30px;
+}
+.export-format {
+  width: 62px;
+  flex: none;
+  height: 30px;
+}
+.export-dest {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.export-dest-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.export-dest-label {
+  flex: none;
+  width: 44px;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+.export-dest-row .input {
+  flex: 1;
+  min-width: 0;
+  height: 30px;
+}
+.export-preview-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+.export-preview-toggle:hover:not(:disabled) {
+  color: var(--text-primary);
+}
+.export-preview-toggle:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+.export-preview-img {
+  display: block;
+  max-width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--canvas);
+}
+.export-code-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+.export-code-label {
+  flex: none;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+}
+.export-code-target {
+  flex: 1;
+  min-width: 0;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.export-code-btn {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }

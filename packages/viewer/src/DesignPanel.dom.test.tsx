@@ -2,6 +2,7 @@
 // PU4cd/oMWUS): Segmented "No wrap/Wrap" → op `update {wrap:true}` / `{wrap:null}` (hapus), Field "Row gap" → `rowGap`.
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+import type { LakarDocument } from '@lakar/schema';
 import type { DesignTarget, Raw } from './designModel.js';
 import { DesignPanel } from './DesignPanel';
 import { renderUi } from './test/dom';
@@ -16,9 +17,18 @@ const t = (id: string, stored: Raw, extra: Partial<DesignTarget> = {}): DesignTa
   ...extra,
 });
 
+const DOC = {
+  schemaVersion: 8,
+  id: 'Doc00001',
+  rev: 1,
+  pages: [{ id: 'Page0001', name: 'Page', children: [] }],
+  tokenModes: [],
+  tokens: {},
+} as unknown as LakarDocument;
+
 function panel(targets: DesignTarget[], editable = true) {
   const onCommit = vi.fn(async () => true);
-  renderUi(<DesignPanel targets={targets} path={['Board', 'Frame']} editable={editable} fonts={[]} inspectNode={undefined} rev={1} onCommit={onCommit} />);
+  renderUi(<DesignPanel targets={targets} path={['Board', 'Frame']} editable={editable} fonts={[]} inspectNode={undefined} rev={1} onCommit={onCommit} doc={DOC} slug="doc" />);
   return onCommit;
 }
 
