@@ -136,6 +136,16 @@ function fakeDaemon() {
     if (req.url === '/comments/resolve') {
       return send(200, { ok: true, data: { slug: 'a', rev: 8, threadId: body.threadId, status: body.resolved === false ? 'open' : 'resolved', ...(body.resolved === false ? {} : { resolvedAt: '2026-11-24T00:03:00Z' }) } });
     }
+    if (req.url === '/analyze/colors') {
+      if (body.boardId === 'ZZzzzz99') return send(404, { ok: false, error: { code: 'NOT_FOUND', message: 'board ZZzzzz99 tidak ada di dokumen a', hint: 'pakai boardId dari list_boards', retryable: false } });
+      return send(200, { ok: true, data: { colors: [{ value: '#FF6B6B', count: 3, bound: false, candidates: [{ token: 'colors.brand', distance: 4.2 }], uses: [{ nodeId: 'Nnnnnnn1', prop: 'fills.0.color' }], totalUses: 3 }] } });
+    }
+    if (req.url === '/analyze/typography') {
+      return send(200, { ok: true, data: { styles: [{ size: 16, count: 3, nodeIds: ['Nnnnnnn1'], totalNodes: 3 }, { size: 15, count: 1, nodeIds: ['Nnnnnnn2'], totalNodes: 1, offScale: true, suggestedSize: 16 }] } });
+    }
+    if (req.url === '/analyze/clusters') {
+      return send(200, { ok: true, data: { clusters: [{ shape: 'frame<>[text<>|rect<>]', count: 3, example: { nodeId: 'Fffffff1', boardId: 'Bbbbbbbb', name: 'Kartu' }, nodeIds: ['Fffffff1', 'Fffffff2', 'Fffffff3'], totalNodes: 3 }] } });
+    }
     if (req.url === '/viewer/documents') {
       return send(200, { ok: true, data: { documents: [{ slug: 'untitled', name: 'untitled', rev: 3, updatedAt: 'x', open: true, focused: true }], focused: 'untitled' } });
     }
@@ -255,7 +265,7 @@ describe('@lakar/mcp', () => {
     const c = await connect(url);
     const { tools } = await c.listTools();
     expect(tools.map((t) => t.name).sort()).toEqual(
-      ['execute', 'export', 'export_code', 'get_selection', 'icon_search', 'import_url', 'inspect', 'layout_check', 'list_boards', 'list_documents', 'open_doc', 'paste', 'photo_search', 'read_skill', 'redo', 'screenshot', 'status', 'undo', 'visual_diff', 'fix_check', 'list_pages', 'get_current_page', 'switch_page', 'create_page', 'get_page_tree', 'list_comments', 'add_comment', 'reply_to_comment', 'resolve_comment'].sort(),
+      ['execute', 'export', 'export_code', 'get_selection', 'icon_search', 'import_url', 'inspect', 'layout_check', 'list_boards', 'list_documents', 'open_doc', 'paste', 'photo_search', 'read_skill', 'redo', 'screenshot', 'status', 'undo', 'visual_diff', 'fix_check', 'list_pages', 'get_current_page', 'switch_page', 'create_page', 'get_page_tree', 'list_comments', 'add_comment', 'reply_to_comment', 'resolve_comment', 'analyze_colors', 'analyze_typography', 'analyze_clusters'].sort(),
     );
     expect(SERVER_VERSION).toBe(LAKAR_VERSION);
     expect(c.getServerVersion()?.version).toBe(LAKAR_VERSION);
@@ -352,6 +362,35 @@ describe('@lakar/mcp', () => {
 
     // Semua panggilan komentar bersesi.
     expect(fake.seen.filter((s) => s.path?.startsWith('/comments')).every((s) => s.session)).toBe(true);
+  });
+
+  it('tool audit (story 9.6): analyze_colors/typography/clusters → route /analyze/* dalam sesi; argumen diteruskan; error terformat; readOnly', async () => {
+    const c = await connect(url);
+    const { tools } = await c.listTools();
+    for (const n of ['analyze_colors', 'analyze_typography', 'analyze_clusters']) {
+      expect(tools.find((t) => t.name === n)!.annotations?.readOnlyHint).toBe(true);
+    }
+
+    const colors = await c.callTool({ name: 'analyze_colors', arguments: {} });
+    const cd = JSON.parse((colors.content as any)[0].text);
+    expect(cd.colors[0].candidates[0].token).toBe('colors.brand');
+    await c.callTool({ name: 'analyze_colors', arguments: { boardId: 'Bbbbbbbb' } });
+    expect(fake.seen.findLast((s) => s.path === '/analyze/colors')!.body).toEqual({ boardId: 'Bbbbbbbb' });
+    const bad = await c.callTool({ name: 'analyze_colors', arguments: { boardId: 'ZZzzzz99' } });
+    expect(bad.isError).toBe(true);
+    expect((bad.content as any)[0].text).toContain('NOT_FOUND');
+
+    const typo = await c.callTool({ name: 'analyze_typography', arguments: { boardId: 'Bbbbbbbb' } });
+    const td = JSON.parse((typo.content as any)[0].text);
+    expect(td.styles[1].offScale).toBe(true);
+    expect(fake.seen.findLast((s) => s.path === '/analyze/typography')!.body).toEqual({ boardId: 'Bbbbbbbb' });
+
+    const clu = await c.callTool({ name: 'analyze_clusters', arguments: { min: 4, boardId: 'Bbbbbbbb' } });
+    const kd = JSON.parse((clu.content as any)[0].text);
+    expect(kd.clusters[0].count).toBe(3);
+    expect(fake.seen.findLast((s) => s.path === '/analyze/clusters')!.body).toEqual({ boardId: 'Bbbbbbbb', min: 4 });
+
+    expect(fake.seen.filter((s) => s.path?.startsWith('/analyze')).every((s) => s.session)).toBe(true);
   });
 
   it('get_selection → POST /viewer/selection dalam sesi; slug opsional diteruskan; teks JSON; error terformat', async () => {
@@ -820,7 +859,7 @@ describe('@lakar/mcp', () => {
       const r = await c2.callTool({ name: 'execute', arguments: { code: '1' } });
       expect(r.isError).toBe(true);
       expect((r.content as any)[0].text).toContain('http://127.0.0.1:1');
-      expect((await c2.listTools()).tools).toHaveLength(29);
+      expect((await c2.listTools()).tools).toHaveLength(32);
     } finally {
       await c2.close();
       await deadTransport.close();
@@ -944,6 +983,21 @@ describe.skipIf(!browserInstalled)('layout_check dengan respons lakard asli', ()
     const old = await c.callTool({ name: 'read_skill', arguments: { name: 'polish' } });
     expect(old.isError).toBe(true);
     expect((old.content as any)[0].text).toContain('NOT_FOUND: skill "polish" tidak ada: skill polish dipecah menjadi layout, typography, color, accessibility, ui, interface, writing, review');
+  }, 60_000);
+
+  it('analyze_* terhadap lakard asli: MCP → route /analyze/* sungguhan, bentuk kontrak', async () => {
+    const c = await connect(proxyUrl);
+    expect((await c.callTool({ name: 'open_doc', arguments: { slug: 'mcp-check' } })).isError).toBeFalsy();
+    const colors = await c.callTool({ name: 'analyze_colors', arguments: {} });
+    expect(colors.isError, (colors.content as any)[0].text).toBeFalsy();
+    const cd = JSON.parse((colors.content as any)[0].text);
+    expect(cd).toMatchObject({ slug: expect.any(String), rev: expect.any(Number), colors: expect.any(Array) });
+    const typo = await c.callTool({ name: 'analyze_typography', arguments: {} });
+    expect(typo.isError).toBeFalsy();
+    expect(JSON.parse((typo.content as any)[0].text).styles).toBeInstanceOf(Array);
+    const clu = await c.callTool({ name: 'analyze_clusters', arguments: {} });
+    expect(clu.isError).toBeFalsy();
+    expect(JSON.parse((clu.content as any)[0].text).clusters).toBeInstanceOf(Array);
   }, 60_000);
 
   it('status terhadap lakard asli: versi cocok, pool 2 halaman', async () => {

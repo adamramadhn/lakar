@@ -53,6 +53,10 @@ export const TOOL_EFFECTS = {
   // Menambah halaman baru; isi pengguna tidak dihapus/ditimpa.
   create_page: 'write',
   list_comments: 'read',
+  // Audit desain baca-saja (story 9.6): frekuensi warna, gaya teks, struktur berulang.
+  analyze_colors: 'read',
+  analyze_typography: 'read',
+  analyze_clusters: 'read',
   // Menambah thread/pesan komentar baru; node pengguna tidak dihapus/ditimpa.
   add_comment: 'write',
   reply_to_comment: 'write',
