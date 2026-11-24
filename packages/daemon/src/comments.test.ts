@@ -327,12 +327,49 @@ describe('POST /viewer/docs/:slug/comments/{create,reply,resolve}', () => {
       expect(again.statusCode).toBe(200);
       expect((await t.doc(slug)).rev).toBe(revAfter);
       expect(t.changes).toHaveLength(changesBefore);
+      // Hapus thread permanen (route viewer): thread hilang dari dokumen; change ber-origin terpancar.
+      const del = await t.post(`/viewer/docs/${slug}/comments/delete`, { threadId: th.id }, undefined, headers);
+      expect(del.statusCode, del.body).toBe(200);
+      expect((await t.doc(slug)).comments!.find((c) => c.id === th.id)).toBeUndefined();
+      expect(t.changes.at(-1)).toMatchObject({ kind: 'edit', origin: 'win-test', rev: del.json().data.rev });
+      // Thread kedua (pin layer) masih ada; hapus lagi → 404.
+      expect((await t.doc(slug)).comments).toHaveLength(1);
+      expect((await t.post(`/viewer/docs/${slug}/comments/delete`, { threadId: th.id })).statusCode).toBe(404);
       // Validasi sama dengan route agen: body jelek 400, thread asing 404, slug asing 404.
       expect((await t.post(`/viewer/docs/${slug}/comments/create`, { text: '   ', x: 1, y: 2 })).statusCode).toBe(400);
       expect((await t.post(`/viewer/docs/${slug}/comments/reply`, { threadId: 'ZZzzzz99', text: 'x' })).statusCode).toBe(404);
       expect((await t.post(`/viewer/docs/${slug}/comments/resolve`, { threadId: 'ZZzzzz99' })).statusCode).toBe(404);
       expect((await t.post('/viewer/docs/tidak-ada/comments/create', { text: 'x', x: 1, y: 2 })).statusCode).toBe(404);
       expect((await t.post(`/viewer/docs/${slug}/comments/create`, { text: 'x', x: 1, y: 2 }, undefined, { origin: 'https://evil.example' })).statusCode).toBe(403);
+    } finally {
+      await t.app.close();
+    }
+  });
+});
+
+describe('POST /comments/delete (agen)', () => {
+  it('menghapus thread permanen; riwayat atas nama agen; event Activity delete_comment; kedua kali → 404', async () => {
+    const t = await setup();
+    try {
+      const slug = await t.create('Hapus Agen');
+      const s = await t.session('claude-code');
+      await t.open(s, slug);
+      const made = await t.post('/comments/create', { text: 'untuk dihapus', x: 5, y: 5 }, s);
+      const threadId = made.json().data.thread.id;
+      const del = await t.post('/comments/delete', { threadId }, s);
+      expect(del.statusCode, del.body).toBe(200);
+      // Thread hilang; array kosong dibersihkan dari dokumen.
+      expect((await t.doc(slug)).comments).toBeUndefined();
+      const last = (await t.history(slug)).at(-1)!;
+      expect(last.description).toBe(`Deleted comment ${threadId}`);
+      expect(last.client).toBe('lakar-mcp');
+      expect(last.agent).toBe('claude-code');
+      expect(t.events.some((e) => e.type === 'call' && e.call.tool === 'delete_comment')).toBe(true);
+      // Kedua kali → 404; thread asing → 404; body jelek → 400; tanpa sesi → 401.
+      expect((await t.post('/comments/delete', { threadId }, s)).statusCode).toBe(404);
+      expect((await t.post('/comments/delete', { threadId: 'ZZzzzz99' }, s)).statusCode).toBe(404);
+      expect((await t.post('/comments/delete', { nope: 1 }, s)).statusCode).toBe(400);
+      expect((await t.post('/comments/delete', { threadId })).statusCode).toBe(401);
     } finally {
       await t.app.close();
     }

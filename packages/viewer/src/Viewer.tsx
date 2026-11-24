@@ -1580,6 +1580,11 @@ export function Viewer({ slug }: { slug: string }) {
     );
   };
   const replyComment = (threadId: string, text: string) => commentWrite(() => api.replyComment(slug, threadId, text));
+  const deleteComment = (threadId: string) =>
+    commentWrite(
+      () => api.deleteComment(slug, threadId),
+      (r) => setOpenThreadId((id) => (id === r.threadId ? undefined : id)),
+    );
   const resolveComment = (threadId: string, resolved: boolean) =>
     commentWrite(
       () => api.resolveComment(slug, threadId, resolved),
@@ -1613,6 +1618,7 @@ export function Viewer({ slug }: { slug: string }) {
         onOpen: setOpenThreadId,
         onReply: replyComment,
         onResolve: resolveComment,
+        onDelete: deleteComment,
         onDraftSubmit: submitComment,
         onDraftCancel: () => setCommentDraft(undefined),
       };

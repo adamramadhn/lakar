@@ -49,7 +49,7 @@ describe('anotasi tool MCP', () => {
     const byName = Object.fromEntries((await listTools()).map((t) => [t.name, t.annotations]));
     const read = ['status', 'read_skill', 'list_boards', 'list_documents', 'inspect', 'screenshot', 'layout_check', 'get_selection', 'icon_search', 'photo_search', 'export_code', 'visual_diff', 'list_pages', 'get_current_page', 'get_page_tree', 'list_comments', 'analyze_colors', 'analyze_typography', 'analyze_clusters'];
     const write = ['open_doc', 'paste', 'import_url', 'export', 'undo', 'switch_page', 'create_page', 'add_comment', 'reply_to_comment', 'resolve_comment'];
-    const destructive = ['execute', 'redo', 'fix_check'];
+    const destructive = ['execute', 'redo', 'fix_check', 'delete_comment'];
     expect([...read, ...write, ...destructive].sort()).toEqual(Object.keys(byName).sort());
     for (const n of read) expect(byName[n], n).toEqual({ readOnlyHint: true });
     for (const n of write) expect(byName[n], n).toEqual({ readOnlyHint: false, destructiveHint: false });

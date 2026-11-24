@@ -152,6 +152,7 @@ export type CommentCreateBody = { text: string; nodeId?: string; pageId?: string
 export type CommentCreateResult = { slug: string; rev: number; thread: CommentThread };
 export type CommentReplyResult = { slug: string; rev: number; threadId: string; message: CommentMessage; thread: CommentThread };
 export type CommentResolveResult = { slug: string; rev: number; threadId: string; status: 'open' | 'resolved'; resolvedAt?: string };
+export type CommentDeleteResult = { slug: string; rev: number; threadId: string };
 
 /** lakard tidak bisa dihubungi (jaringan). */
 export class OfflineError extends Error {}
@@ -672,6 +673,14 @@ class ViewerClient {
   replyComment(slug: string, threadId: string, text: string): Promise<CommentReplyResult> {
     return this.#write(
       () => request<CommentReplyResult>('POST', `${commentsPath(slug)}/reply`, { threadId, text }),
+      () => [slug],
+    );
+  }
+
+  /** Hapus thread permanen (bukan resolve — dokumen kehilangan threadnya; restore lewat History). */
+  deleteComment(slug: string, threadId: string): Promise<CommentDeleteResult> {
+    return this.#write(
+      () => request<CommentDeleteResult>('POST', `${commentsPath(slug)}/delete`, { threadId }),
       () => [slug],
     );
   }

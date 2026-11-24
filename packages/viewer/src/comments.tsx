@@ -62,6 +62,8 @@ export type CanvasComments = {
   onOpen: (id: string | undefined) => void;
   onReply: (threadId: string, text: string) => Promise<unknown> | void;
   onResolve: (threadId: string, resolved: boolean) => Promise<unknown> | void;
+  /** Hapus thread permanen. */
+  onDelete: (threadId: string) => Promise<unknown> | void;
   onDraftSubmit: (text: string) => Promise<unknown> | void;
   onDraftCancel: () => void;
 };
@@ -150,6 +152,7 @@ export function CommentThreadCard({
   busy,
   onReply,
   onResolve,
+  onDelete,
   onClose,
 }: {
   thread: CommentThread;
@@ -162,6 +165,7 @@ export function CommentThreadCard({
   busy: boolean;
   onReply: (text: string) => Promise<unknown> | void;
   onResolve: (resolved: boolean) => void;
+  onDelete: () => void;
   onClose: () => void;
 }) {
   const now = useNow(30_000);
@@ -176,6 +180,9 @@ export function CommentThreadCard({
         <button type="button" className={`comment-resolve-btn${resolved ? ' reopen' : ''}`} onClick={() => onResolve(!resolved)} disabled={busy}>
           <Icon name="check" size={12} />
           {resolved ? 'Unresolve' : 'Resolve'}
+        </button>
+        <button type="button" className="comment-card-close comment-delete" aria-label="Delete comment" title="Delete comment" onClick={onDelete} disabled={busy}>
+          <Icon name="trash" size={13} />
         </button>
         <button type="button" className="comment-card-close" aria-label="Close" onClick={onClose}>
           <Icon name="x" size={13} />
