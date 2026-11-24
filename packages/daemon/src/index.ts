@@ -71,4 +71,5 @@ export {
 } from './harnesses.js';
 export { startDaemon, type RunningDaemon, type StartOptions } from './start.js';
 export { FileTransport, type FileTransportOptions } from './file-transport.js';
+export { DocTransport, applySeeded, type CommitBuild, type CommitPayload, type DocCommitOutcome, type DocTransportBackend, type DocTransportOptions } from './doc-transport.js';
 export { IconCatalog } from '@lakar/icons';

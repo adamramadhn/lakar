@@ -145,11 +145,16 @@ export type StatusData = {
   icons?: Record<string, string>;
   photos?: { provider: string; keyFile: string; imported: number };
   sessions?: { count: number; active: { id: string; activeSlug?: string; executes: number }[] };
-  /** Mode `lakar --file`: transport 'file' + berkas/slug/rev dokumen + hint batasan tanpa renderer. */
+  /** Mode `lakar --file` / `--server`: nama transport + detailnya (file: berkas/slug/rev; server: url/room/peer). */
   transport?: string;
   file?: string;
   slug?: string;
   rev?: number;
+  /** Mode `lakar --server`: URL `@lakar/sync`, capability token room, status koneksi WS, jumlah peer. */
+  server?: string;
+  room?: string;
+  connected?: boolean;
+  peers?: number;
   hint?: string;
 };
 
@@ -174,7 +179,11 @@ export function formatStatus(st: StatusData): string {
     ? `sesi: ${ss.count}${ss.active.length ? ` (${ss.active.map((a) => `${a.id} ${a.activeSlug ?? '-'}, ${a.executes} execute`).join('; ')})` : ''}`
     : 'sesi: -';
   const fileLine = st.transport === 'file' ? `lakar file: ${st.slug ?? '?'} (rev ${st.rev ?? '?'})${st.file ? ` · ${st.file}` : ''}` : undefined;
-  return [head, ...(fileLine ? [fileLine] : []), pool, fonts, icons, photos, sessions, ...(st.hint ? [`hint: ${st.hint}`] : [])].join('\n');
+  const serverLine =
+    st.transport === 'server'
+      ? `lakar server: ${st.server ?? '?'} room ${st.room ?? '?'} · koneksi ${st.connected === true ? 'hidup' : 'putus/menyambung ulang'} · rev ${st.rev ?? '?'} · ${st.peers ?? 0} peer`
+      : undefined;
+  return [head, ...(fileLine ? [fileLine] : []), ...(serverLine ? [serverLine] : []), pool, fonts, icons, photos, sessions, ...(st.hint ? [`hint: ${st.hint}`] : [])].join('\n');
 }
 
 /** Deskripsi tool `status`. */

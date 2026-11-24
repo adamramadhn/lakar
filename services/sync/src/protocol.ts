@@ -91,7 +91,21 @@ const ErrorBody = z.object({ code: z.string(), message: z.string(), hint: z.stri
 export const ServerWelcome = z.object({ type: z.literal('welcome'), peerId: z.string(), rev: z.number().int(), doc: z.unknown(), peers: z.array(PeerInfoSchema) }).strict();
 export const ServerPeerJoin = z.object({ type: z.literal('peer_join'), peer: PeerInfoSchema }).strict();
 export const ServerPeerLeave = z.object({ type: z.literal('peer_leave'), peerId: z.string() }).strict();
-export const ServerAck = z.object({ type: z.literal('ack'), rev: z.number().int(), refs: z.record(z.string(), z.string()), created: z.array(z.unknown()) }).strict();
+export const ServerAck = z
+  .object({
+    type: z.literal('ack'),
+    rev: z.number().int(),
+    refs: z.record(z.string(), z.string()),
+    created: z.array(z.unknown()),
+    /**
+     * Seed + stempel commit ops sendiri (sama dengan yang di-broadcast ke peer lain): pengirim tidak
+     * menerima broadcast ops-nya, jadi keduanya ikut di `ack` supaya replay lokal memakai kontrak
+     * deterministik yang sama (`transact(doc, ops, {random: seededRandom(seed), now: () => new Date(at)})`).
+     */
+    seed: z.string(),
+    at: z.string(),
+  })
+  .strict();
 export const ServerOps = z
   .object({
     type: z.literal('ops'),

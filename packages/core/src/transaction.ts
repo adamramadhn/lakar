@@ -5,12 +5,14 @@
 // sehingga op gagal yang ditangkap snippet tidak meninggalkan jejak. Setiap op sukses mencatat op inversnya (AD-8);
 // commit mengembalikan daftar invers yang, diterapkan sebagai transaksi baru, mengembalikan isi dokumen. Tanpa IO.
 import {
+  CommentThread,
   ComponentDef,
   ID_PATTERN,
   INSTANCE_KEYS,
   LakarError,
   NodeInput,
   OVERRIDABLE_PROPS,
+  Page,
   TokenDef,
   TokenModes,
   TokenName,
@@ -52,7 +54,10 @@ export type OpKind =
   | 'renameToken'
   | 'setComponent'
   | 'resetOverride'
-  | 'detach';
+  | 'detach'
+  | 'setComments'
+  | 'insertPage'
+  | 'removePage';
 
 /**
  * Hasil commit. `entry === null` berarti tidak ada op yang sukses: tidak ada revisi baru, `doc` adalah
@@ -106,6 +111,15 @@ export interface Transaction {
   resetOverride(address: string, props?: unknown): void;
   /** Ganti instance dengan node biasa ber-ID baru; `null` bila akarnya disembunyikan prop sendiri (instance dihapus). */
   detach(id: string): string | null;
+  /** Ganti seluruh daftar komentar dokumen; `null` menghapus field `comments`. Tiap entri divalidasi `CommentThread`. */
+  setComments(comments: unknown): void;
+  /**
+   * Sisipkan halaman tersimpan utuh (`{id, name, children}`) pada `index` (default akhir). ID halaman dan semua
+   * ID node di dalamnya harus belum dipakai → CONFLICT. Dipakai op `insertPage` (klien sync) dan invers `removePage`.
+   */
+  insertPage(page: unknown, index?: number): string;
+  /** Hapus halaman `id` beserta seluruh board-nya; halaman terakhir tidak boleh dihapus. Inversnya `insertPage`. */
+  removePage(id: string): void;
   /**
    * Salinan kerja hidup (melihat op yang sudah sukses di transaksi ini). Hanya-baca menurut kontrak:
    * pemanggil tidak boleh memutasinya. Melempar bila transaksi sudah ditutup.
@@ -918,6 +932,93 @@ export function beginTransaction(doc: Doc, opts: TransactionOptions): Transactio
         const r = withRollback(() => detachOne(live(), 'detach', iid));
         r.inv.forEach(undo);
         return r.id;
+      });
+    },
+
+    setComments(raw) {
+      op('setComments', (w, undo) => {
+        const revert: DocOp = { op: 'setComments', comments: w.comments ? host.structuredClone(w.comments) : null };
+        if (raw === null) {
+          // Hanya invers bila memang ada field sebelumnya — idempotent terhadap doc tanpa komentar.
+          if (w.comments !== undefined) undo(revert);
+          delete w.comments;
+          return;
+        }
+        if (!Array.isArray(raw)) {
+          throw new LakarError('SCHEMA_INVALID', `setComments: comments harus array CommentThread atau null, bukan ${JSON.stringify(raw) ?? 'undefined'}`, {
+            hint: 'setComments menerima array CommentThread utuh ({id, pageId, nodeId?, x, y, status, messages[]}) atau null',
+          });
+        }
+        const next: CommentThread[] = [];
+        raw.forEach((t, i) => {
+          const r = CommentThread.safeParse(t);
+          if (!r.success) throw new LakarError('SCHEMA_INVALID', `setComments comments[${i}]: ${zodToLakarError(r.error, 'CommentThread').message}`, {
+            hint: 'setComments menerima array CommentThread utuh ({id, pageId, nodeId?, x, y, status, messages[]}) atau null',
+          });
+          next.push(r.data);
+        });
+        if (!sameValue(w.comments ?? null, next.length ? next : null)) undo(revert);
+        if (next.length === 0) delete w.comments;
+        else w.comments = next;
+      });
+    },
+
+    insertPage(raw, index) {
+      return op('insertPage', (w, undo) => {
+        if (!isPlainObject(raw)) {
+          throw new LakarError('SCHEMA_INVALID', `insertPage: page harus objek {id, name, children}, bukan ${Array.isArray(raw) ? 'array' : JSON.stringify(raw) ?? 'undefined'}`, {
+            hint: 'insertPage menerima halaman tersimpan utuh (mis. dari op invers removePage)',
+          });
+        }
+        const parsed = Page.safeParse(raw);
+        if (!parsed.success) throw zodToLakarError(parsed.error, 'insertPage');
+        const page = parsed.data;
+        if (index !== undefined && (typeof index !== 'number' || !Number.isInteger(index) || index < 0 || index > w.pages.length)) {
+          throw new LakarError('SCHEMA_INVALID', `insertPage: index harus integer 0..${w.pages.length}, bukan ${JSON.stringify(index) ?? 'undefined'}`, {
+            hint: 'index = posisi di daftar pages; hilangkan index untuk menaruh di akhir',
+          });
+        }
+        // ID halaman + seluruh ID node di dalamnya harus unik (payload membawa ID sendiri).
+        const fresh = [page.id, ...page.children.flatMap((b) => subtree(b).map((n) => n.id))];
+        const taken = new Set(collectIds(w));
+        const seen = new Set<string>();
+        for (const nid of fresh) {
+          if (taken.has(nid) || seen.has(nid)) {
+            throw new LakarError('CONFLICT', `insertPage: ID ${nid} sudah dipakai di dokumen`, {
+              hint: 'halaman dengan ID ini sudah ada (mis. undo yang sudah diterapkan); muat ulang dokumen',
+            });
+          }
+          seen.add(nid);
+        }
+        w.pages.splice(index ?? w.pages.length, 0, page);
+        for (const nid of fresh) ids.reserve(nid);
+        undo({ op: 'removePage', id: page.id });
+        return page.id;
+      });
+    },
+
+    removePage(id) {
+      op('removePage', (w, undo) => {
+        const pid = requireId('removePage', 'id', id);
+        const i = w.pages.findIndex((p) => p.id === pid);
+        if (i < 0) {
+          throw new LakarError('SCHEMA_INVALID', `removePage: halaman ${pid} tidak ada`, { hint: 'pakai id halaman dari list_pages' });
+        }
+        if (w.pages.length <= 1) {
+          throw new LakarError('SCHEMA_INVALID', 'removePage: tidak bisa menghapus halaman terakhir dokumen', { hint: 'dokumen wajib punya minimal satu halaman' });
+        }
+        const page = w.pages.splice(i, 1)[0]!;
+        // Thread komentar milik halaman ini ikut dihapus: `pageId` wajib di skema CommentThread,
+        // jadi tidak boleh dibiarkan menggantung ke halaman yang sudah tidak ada. Invers memulihkan
+        // daftar komentar utuh (setComments direplay sebelum insertPage — keduanya independen).
+        if (w.comments?.some((t) => t.pageId === pid)) {
+          undo({ op: 'setComments', comments: host.structuredClone(w.comments) });
+          const kept = w.comments.filter((t) => t.pageId !== pid);
+          if (kept.length) w.comments = kept;
+          else delete w.comments;
+        }
+        // Invers menyimpan isi halaman + posisi (undo memulihkan utuh di tempat yang sama).
+        undo({ op: 'insertPage', page: host.structuredClone(page), index: i });
       });
     },
 

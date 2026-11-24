@@ -97,10 +97,11 @@ describe('arah dependensi: fixture pelanggaran', () => {
     ]);
   });
 
-  it('mcp boleh @lakar/daemon (mode --file) dan closure-nya (core/exec/render/…)', () => {
+  it('mcp boleh @lakar/daemon (mode --file/--server) dan closure-nya + @lakar/sync (tes e2e)', () => {
     expect(checkPackage(pkg('mcp', "import { FileTransport } from '@lakar/daemon';"))).toEqual([]);
     expect(checkPackage(pkg('mcp', '', { '@lakar/daemon': 'workspace:*' }))).toEqual([]);
-    expect([...allowedDeps('mcp')].sort()).toEqual(['check', 'codegen', 'core', 'daemon', 'exec', 'icons', 'ports', 'render', 'schema', 'skills']);
+    expect(checkPackage(pkg('mcp', '', { '@lakar/sync': 'workspace:*' }))).toEqual([]);
+    expect([...allowedDeps('mcp')].sort()).toEqual(['check', 'codegen', 'core', 'daemon', 'exec', 'icons', 'ports', 'render', 'schema', 'skills', 'sync']);
   });
 
   it('arah terbalik: schema impor @lakar/core → direction', () => {

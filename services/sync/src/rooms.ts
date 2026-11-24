@@ -264,7 +264,7 @@ export class RoomManager {
       }
       room.doc = committed.doc;
       room.rev = res.rev;
-      RoomManager.send(peer, { type: 'ack', rev: res.rev, refs: committed.value.refs, created: committed.created });
+      RoomManager.send(peer, { type: 'ack', rev: res.rev, refs: committed.value.refs, created: committed.created, seed, at: at.toISOString() });
       RoomManager.broadcast(room, { type: 'ops', rev: res.rev, ops: msg.ops, seed, at: at.toISOString(), from: { peerId: peer.id, name: peer.name, kind: peer.kind } }, peer.id);
     });
   }

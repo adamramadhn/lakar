@@ -82,6 +82,8 @@ const STATUS: Record<ErrorCode, number> = {
   VERSION_MISMATCH: 409,
   // Dipakai transport file (`lakar --file`): fitur yang butuh render/jaringan/viewer. 501 = not implemented.
   NOT_SUPPORTED: 501,
+  // Dipakai transport server (`lakar --server`): capability token room menolak aksi (mis. token view menulis).
+  FORBIDDEN: 403,
 };
 
 /** Parser impor CSS variables (@lakar/render) untuk `importCssVariables` di execute (exec tidak bergantung pada render, AD-17). */

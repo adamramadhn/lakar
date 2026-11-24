@@ -36,3 +36,4 @@ export { CLIENT_NAME, DaemonClient, DaemonUnavailableError, START_HINT, VERSION_
 // FileClient sengaja TIDAK diekspor di sini: file-client.ts memuat @lakar/daemon (DocStore/core/exec), dan
 // impor index di mode daemon tidak boleh menariknya. Dimuat malas lewat `await import('./file-client.js')`
 // hanya di cabang `--file`/`LAKAR_FILE` pada main.ts; tes mengimpor './file-client.js' langsung.
+// SyncClient idem (sync-client.ts memuat ws + @lakar/daemon): dimuat malas di cabang `--server`/`LAKAR_SERVER`.

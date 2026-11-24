@@ -15,6 +15,7 @@ export const ErrorCode = z.enum([
   'EXPORT_FAILED',
   'VERSION_MISMATCH',
   'NOT_SUPPORTED',
+  'FORBIDDEN',
 ]);
 export type ErrorCode = z.infer<typeof ErrorCode>;
 

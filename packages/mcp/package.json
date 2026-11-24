@@ -23,10 +23,13 @@
     "@lakar/daemon": "workspace:*",
     "@lakar/schema": "workspace:*",
     "@modelcontextprotocol/server": "2.4.0",
+    "ws": "8.23.0",
     "zod": "4.6.7"
   },
   "devDependencies": {
+    "@lakar/sync": "workspace:*",
     "@modelcontextprotocol/client": "2.4.0",
-    "@types/node": "26.6.6"
+    "@types/node": "26.6.6",
+    "@types/ws": "8.18.2"
   }
 }
