@@ -14,7 +14,7 @@ import { chromiumInstalled, DEFAULT_BROWSERS_PATH } from '../../../tests/support
 import { testLog } from '../../../tests/support/log.ts';
 
 /** Skill v1 (packages/skills; mcp tidak bergantung pada paket itu, hanya membaca file untuk perbandingan). */
-const SKILL_NAMES = ['core', 'landing', 'mobile', 'webapp', 'layout', 'typography', 'color', 'accessibility', 'ui', 'interface', 'writing', 'review', 'icons', 'api', 'selection', 'break-ui', 'variants'] as const;
+const SKILL_NAMES = ['core', 'landing', 'mobile', 'webapp', 'layout', 'typography', 'color', 'accessibility', 'ui', 'interface', 'writing', 'review', 'icons', 'api', 'selection', 'break-ui', 'variants', 'export-code'] as const;
 const readSkill = (name: string) => readFile(fileURLToPath(new URL(`../../skills/skills/${name}.md`, import.meta.url)), 'utf8');
 
 const PNG_B64 = Buffer.from('fake-png').toString('base64');

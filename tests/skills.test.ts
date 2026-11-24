@@ -35,6 +35,7 @@ const LIMITS = {
   selection: { prose: 1200, total: 2600 },
   'break-ui': { total: 1800 },
   variants: { total: 1000 },
+  'export-code': { total: 1800 },
 } as const;
 /** Iterasi 6 story 2.16: 11.500 → 9.600 (biaya berpikir agen); turun saja, jangan naik. */
 const LOAD_LIMIT = 9_600;
@@ -68,7 +69,7 @@ describe('skill: batas token (estimateTokens = karakter / 3.2)', () => {
   });
 
   it('daftar skill: 17 nama, tanpa polish; domain berjudul "# Lakar: <nama>"', () => {
-    expect(SKILL_NAMES).toHaveLength(17);
+    expect(SKILL_NAMES).toHaveLength(18);
     expect(SKILL_NAMES).not.toContain('polish');
     for (const n of DOMAIN_SKILLS) expect(read(n).split('\n')[0], n).toBe(`# Lakar: ${n}`);
   });
