@@ -61,9 +61,11 @@ Epic ke-8 (`epic-adopsi-open-pencil`, 12 story: anotasi tool MCP, LC-34/35 overl
 
 ### Epic kolaborasi agen (2026-11-24, berjalan)
 
-Epic ke-9 (`epic-kolaborasi-agen`, 6 story, dipecah dari hasil refresh riset open-pencil): desain UI kolaborasi di `lakar-ui.pen` (9.1, sedang dikerjakan orkestrator Claude Opus 5.5 headless di `design/lakar-ui.op9.pen`), tool halaman via MCP (9.2), model+tool komentar canvas (9.3), UI komentar viewer (9.4), pratinjau execute dry-run (9.5), audit desain `analyze_*` (9.6).
+Epic ke-9 (`epic-kolaborasi-agen`, 6 story, dipecah dari hasil refresh riset open-pencil): desain UI kolaborasi di `lakar-ui.pen` (9.1), tool halaman via MCP (9.2), model+tool komentar canvas (9.3), UI komentar viewer (9.4), pratinjau execute dry-run (9.5), audit desain `analyze_*` (9.6).
 
-- **9.2 selesai di branch `feat/agent-page-tools` (PR #55).** Lima tool baru: `list_pages`, `get_current_page`, `switch_page` (nama/id), `create_page`, `get_page_tree`. `session.activePage` menjadi target `add(null)`/`children(null)`/`place()`; default halaman pertama jadi sesi lama identik. Server MCP kini 25 tool.
+- **9.1 selesai.** Section 12 · Agent collaboration tercommit ke `design/lakar-ui.pen` (lakar-meta `48206e9`): 16 layar (8 dark + 8 light) + 7 komponen baru (Comment Pin, Comment Message, Thread Row, Page Row·Agent, Change Op Row, Audit Color Row, Cluster Card); 19 PNG pratinjau di `design/previews/`; catatan di `design/README.md`.
+- **9.2 selesai di branch `feat/agent-page-tools` (PR #55).** Lima tool baru: `list_pages`, `get_current_page`, `switch_page` (nama/id), `create_page`, `get_page_tree`. `session.activePage` menjadi target `add(null)`/`children(null)`/`place()`; default halaman pertama jadi sesi lama identik. Server MCP 25 tool.
+- **9.3 di branch `feat/canvas-comments` (PR #56, bertumpuk di atas #55).** Skema v10: `comments` opsional di dokumen — thread pin `nodeId` (mengikuti layer) atau titik bebas `x,y` (koordinat halaman), pesan berpenulis `user|agent`, status `open|resolved` + `resolvedAt`. Route agen `/comments*` (list/create/reply/resolve, resolve idempoten tanpa rev), 4 tool MCP baru → server 29 tool. `collectIds` ikut memindai id thread. Route viewer + UI = story 9.4.
 
 ## Langkah berikutnya
 
