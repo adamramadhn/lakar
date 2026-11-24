@@ -72,7 +72,29 @@ const errOf = async (p: Promise<unknown>): Promise<LakarError> => {
 
 describe('SafeNet', () => {
   it('isBlockedIp: loopback, privat, link-local, CGNAT, ULA, multicast, mapped → diblokir; publik → lolos', () => {
-    for (const ip of ['127.0.0.1', '10.1.2.3', '172.20.0.1', '192.168.1.1', '169.254.169.254', '100.64.0.1', '0.0.0.0', '224.0.0.1', '::1', '::', 'fd00::1', 'fe80::1', 'ff02::1', '::ffff:10.0.0.1', '::ffff:127.0.0.1', 'bukan-ip']) {
+    for (const ip of [
+      '127.0.0.1',
+      '10.1.2.3',
+      '172.20.0.1',
+      '192.168.1.1',
+      '169.254.169.254',
+      '100.64.0.1',
+      '0.0.0.0',
+      '224.0.0.1',
+      '::1',
+      '::',
+      'fd00::1',
+      'fe80::1',
+      'ff02::1',
+      '::ffff:10.0.0.1',
+      '::ffff:127.0.0.1',
+      // Prefiks translasi IPv6 dengan IPv4 ter-embed (bisa privat): 6to4, Teredo, NAT64 lokal, IPv4-compatible.
+      '2002:a00:1::',
+      '2001::5efe:c0a8:101',
+      '64:ff9b:1::a00:1',
+      '::a00:1',
+      'bukan-ip',
+    ]) {
       expect(isBlockedIp(ip), ip).toBe(true);
     }
     for (const ip of ['8.8.8.8', '104.16.1.1', '2606:4700::1111', '::ffff:8.8.8.8']) expect(isBlockedIp(ip), ip).toBe(false);

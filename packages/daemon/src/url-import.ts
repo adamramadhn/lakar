@@ -18,7 +18,7 @@ import { HtmlImportError, importHtml } from './paste/html.js';
 import { PASTE_NAME_MAX } from './paste/svg.js';
 import { PASTE_DESCRIPTION_MAX, PASTE_WIDTH_MAX, countNodes, pasteOps, type Imported, type PasteRoutesOptions } from './paste.js';
 import { NO_ACTIVE_DOC_HINT, authorOf, type Session } from './sessions.js';
-import { URL_FETCH_URL_MAX, fetchPageHtml, type PageFetch } from './url-fetch.js';
+import { URL_FETCH_URL_MAX, checkPageUrl, fetchPageHtml, type PageFetch } from './url-fetch.js';
 
 /** Lebar board+viewport default bila `width` tidak dikirim (preset Desktop desain section 11). */
 export const URL_IMPORT_DEFAULT_WIDTH = 1440;
@@ -121,9 +121,16 @@ async function commitUrlImport(opts: UrlImportRoutesOptions, slug: string, body:
     throw new LakarError('NOT_FOUND', `halaman ${body.pageId} tidak ada di dokumen ${slug}`, { hint: 'pakai pageId dari dokumen (list_boards/inspect)' });
   }
   // Fetch di luar kunci dokumen: hanya atas permintaan eksplisit ini; skrip tidak dijalankan (murni GET HTML).
-  const page = await (opts.page ?? fetchPageHtml)(body.url).catch((e: unknown) => {
-    throw e instanceof NetError ? netToLakar(e) : e;
-  });
+  // `checkPageUrl` dipanggil di route juga (bukan hanya di dalam fetcher default): `opts.page` yang
+  // diinjeksikan host lain tetap tunduk pada validasi skema/kredensial/literal-IP yang sama.
+  const page = await Promise.resolve()
+    .then(() => {
+      checkPageUrl(body.url);
+      return (opts.page ?? fetchPageHtml)(body.url);
+    })
+    .catch((e: unknown) => {
+      throw e instanceof NetError ? netToLakar(e) : e;
+    });
   const width = Math.round(body.width ?? URL_IMPORT_DEFAULT_WIDTH);
   const imported = await importHtmlPage(opts, page.html, width, body.name);
   const description = body.description ?? describeImport(page.title, page.finalUrl);

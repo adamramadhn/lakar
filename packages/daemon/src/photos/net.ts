@@ -80,9 +80,17 @@ for (const [net, prefix] of [
 for (const [net, prefix] of [
   ['::', 128],
   ['::1', 128],
+  // IPv4-compatible `::a.b.c.d` (deprecated): IPv4 ter-embed di 32 bit terakhir bisa privat.
+  ['::', 96],
   ['64:ff9b::', 96],
+  // NAT64 prefix lokal (RFC 8215): IPv4 ter-embed bisa privat.
+  ['64:ff9b:1::', 48],
   ['100::', 64],
+  // Teredo `2001:0000::/32` (2001:db8 dokumentasi tetap terpisah di bawah).
+  ['2001::', 32],
   ['2001:db8::', 32],
+  // 6to4 `2002::/16`: IPv4 ter-embed bisa privat.
+  ['2002::', 16],
   ['fc00::', 7],
   ['fe80::', 10],
   ['fec0::', 10],

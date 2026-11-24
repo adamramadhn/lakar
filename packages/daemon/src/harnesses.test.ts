@@ -363,6 +363,8 @@ describe('POST …/uninstall dan revert', () => {
     const r = await t.act('claude-code', 'revert');
     expect(r.json().data).toEqual({ id: 'claude-code', restored: true });
     expect(await readFile(file, 'utf8')).toBe(old);
+    // .bak dihapus setelah restore sukses: revert berikutnya tidak menerapkan backup basi.
+    expect(existsSync(`${file}.bak`)).toBe(false);
     await t.app.close();
 
     const t2 = await setup();
@@ -390,6 +392,43 @@ describe('POST …/uninstall dan revert', () => {
     expect((await t.act('claude-code', 'revert')).json().data).toEqual({ id: 'claude-code', restored: false });
     expect(await readFile(file, 'utf8')).toBe(old);
     await t.app.close();
+  });
+
+  it('codex: header tabel ber-key arbitrer ([projects."/x"]) mengakhiri blok lakar — tidak ikut terhapus', async () => {
+    const t = await setup();
+    const dir = join(t.home, '.codex');
+    await mkdir(dir, { recursive: true });
+    const file = join(dir, 'config.toml');
+    const old = '[mcp_servers.lakar]\ncommand = "x"\n\n[projects."/home/user/app"]\ntrust = true\n';
+    await writeFile(file, old);
+    expect((await t.act('codex', 'uninstall')).json().data.state).toBe('not-installed');
+    expect(await readFile(file, 'utf8')).toBe('[projects."/home/user/app"]\ntrust = true\n');
+    await t.app.close();
+  });
+
+  it('codex: entri lakar inline-table → installed:true; install/uninstall failed manual, file utuh', async () => {
+    const t = await setup();
+    const dir = join(t.home, '.codex');
+    await mkdir(dir, { recursive: true });
+    const file = join(dir, 'config.toml');
+    const old = '[mcp_servers]\nlakar = { command = "old" }\n\n[model]\nx = 1\n';
+    await writeFile(file, old);
+    expect(await row(t, 'codex')).toMatchObject({ installed: true, matches: false });
+    expect((await t.act('codex', 'install')).json().data.state).toBe('failed');
+    expect((await t.act('codex', 'uninstall')).json().data.state).toBe('failed');
+    expect(await readFile(file, 'utf8')).toBe(old);
+    expect(existsSync(`${file}.bak`)).toBe(false);
+    await t.app.close();
+
+    const t2 = await setup();
+    const dir2 = join(t2.home, '.codex');
+    await mkdir(dir2, { recursive: true });
+    const file2 = join(dir2, 'config.toml');
+    const old2 = 'mcp_servers = { lakar = { command = "old" } }\n';
+    await writeFile(file2, old2);
+    expect(await row(t2, 'codex')).toMatchObject({ installed: true, matches: false });
+    expect((await t2.act('codex', 'install')).json().data.state).toBe('failed');
+    await t2.app.close();
   });
 
   it('codex dotted-key → uninstall failed; entri tidak disentuh', async () => {
