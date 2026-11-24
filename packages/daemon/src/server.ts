@@ -21,6 +21,7 @@ import {
   findBoard,
   resolveDocument,
   summarizeFindings,
+  type AnyNode,
   type ApiErrorBody,
   type ErrorCode,
   type IconGlyph,
@@ -126,11 +127,71 @@ const ExecuteBody = z
     description: z.string().optional(),
     editId: z.string().optional(),
     edits: z.array(z.object({ find: z.string().min(1), replace: z.string() }).strict()).optional(),
+    // Story 9.5: pratinjau — transaksi + check dihitung pada salinan, hasil (diff + temuan) dikembalikan tanpa commit.
+    dryRun: z.boolean().optional(),
   })
   .strict();
 const EXECUTE_BODY_HINT =
-  "kirim {code, description} (description 3–8 kata, mis. 'tambah hero landing kopi') atau perbaikan {editId, edits:[{find, replace}], description?}";
+  "kirim {code, description} (description 3–8 kata, mis. 'tambah hero landing kopi'), perbaikan {editId, edits:[{find, replace}], description?}, atau pratinjau tanpa commit {code, description, dryRun:true}";
 const DESCRIPTION_EXAMPLE = "mis. description: 'tambah hero landing kopi'";
+
+type NodeRef = { id: string; type: string; name?: string; pageId: string; boardId: string };
+type NodeChanges = {
+  added: NodeRef[];
+  updated: (NodeRef & { props: string[] })[];
+  deleted: NodeRef[];
+  moved: NodeRef[];
+  other: string[];
+  counts: { added: number; updated: number; deleted: number; moved: number };
+};
+
+/** Stringify stabil terhadap urutan kunci (replace/buildNode bisa menyusun ulang key dengan nilai sama → phantom updated). */
+const stableJson = (v: unknown): string =>
+  JSON.stringify(v, (_k, x) => (x !== null && typeof x === 'object' && !Array.isArray(x) ? Object.fromEntries(Object.keys(x as Record<string, unknown>).sort().map((k) => [k, (x as Record<string, unknown>)[k]])) : x));
+
+/** Diff struktural dokumen tersimpan (story 9.5, dry-run execute): added/updated/deleted/moved per node dengan halaman+board. */
+function nodeChanges(before: LakarDocument, after: LakarDocument): NodeChanges {
+  type Ent = { node: AnyNode; pageId: string; boardId: string; parentId: string; index: number };
+  const mapOf = (doc: LakarDocument) => {
+    const out = new Map<string, Ent>();
+    const walk = (n: AnyNode, pageId: string, boardId: string, parentId: string, index: number) => {
+      out.set(n.id, { node: n, pageId, boardId, parentId, index });
+      if ('children' in n) n.children.forEach((c, i) => walk(c, pageId, boardId, n.id, i));
+      if (n.type === 'instance') for (const kids of Object.values(n.slots ?? {})) kids.forEach((c, i) => walk(c, pageId, boardId, n.id, i));
+    };
+    for (const p of doc.pages) p.children.forEach((b, i) => walk(b, p.id, b.id, p.id, i));
+    return out;
+  };
+  const old = mapOf(before);
+  const now = mapOf(after);
+  const refOf = (id: string, node: AnyNode, pageId: string, boardId: string): NodeRef => ({ id, type: node.type, ...(typeof node.name === 'string' ? { name: node.name } : {}), pageId, boardId });
+  const added: NodeRef[] = [];
+  const updated: (NodeRef & { props: string[] })[] = [];
+  const moved: NodeRef[] = [];
+  for (const [id, { node, pageId, boardId, parentId, index }] of now) {
+    const ref = refOf(id, node, pageId, boardId);
+    const prev = old.get(id);
+    if (!prev) {
+      added.push(ref);
+      continue;
+    }
+    if (prev.parentId !== parentId || prev.index !== index) moved.push(ref);
+    const cur = node as unknown as Record<string, unknown>;
+    const was = prev.node as unknown as Record<string, unknown>;
+    const props = [...new Set([...Object.keys(cur), ...Object.keys(was)])].filter((k) => stableJson(cur[k]) !== stableJson(was[k]));
+    if (props.length) updated.push({ ...ref, props });
+  }
+  const deleted: NodeRef[] = [];
+  for (const [id, { node, pageId, boardId }] of old) if (!now.has(id)) deleted.push(refOf(id, node, pageId, boardId));
+  // Di luar pohon node: kunci top-level selain pages/rev (tokens, comments, name) + susunan/nama halaman.
+  const other: string[] = [];
+  const keys = [...new Set([...Object.keys(before), ...Object.keys(after)])].filter((k) => k !== 'pages' && k !== 'rev').sort();
+  for (const k of keys) if (stableJson((before as unknown as Record<string, unknown>)[k]) !== stableJson((after as unknown as Record<string, unknown>)[k])) other.push(k);
+  if (stableJson(before.pages.map((p) => [p.id, p.name])) !== stableJson(after.pages.map((p) => [p.id, p.name]))) other.push('pages');
+  return { added, updated, deleted, moved, other, counts: { added: added.length, updated: updated.length, deleted: deleted.length, moved: moved.length } };
+}
+
+const EMPTY_CHANGES: NodeChanges = { added: [], updated: [], deleted: [], moved: [], other: [], counts: { added: 0, updated: 0, deleted: 0, moved: 0 } };
 
 /** Label riwayat wajib 3–8 kata (AD-7). */
 function descriptionProblem(description: string | undefined): string | undefined {
@@ -621,15 +682,36 @@ export function buildServer({
           checkMs: Math.round((performance.now() - t0) * 10) / 10,
           summary,
         };
-        // Klien dan harness sesi ikut dicatat (opsional) supaya History dan "Last agent" Dashboard tetap terbaca
-        // setelah restart.
-        await store.commit(slug, committed.doc, { ...committed.entry, ...authorOf(session) });
-        docs.set(slug, committed.doc);
-        // Hook tulis agen tunggal: langkah undo (spec-agent-undo) + dasar visual_diff (spec-agent-visual-diff).
-        agentSteps.onAgentWrite(session, committed.doc.id, doc.rev, committed.doc.rev, committed.inverse, label);
-        checks.record(committed.doc.id, doc.rev, committed.doc.rev, ran.boards);
-        hugs.record(after, ran.measures, doc.rev);
-        result = { docId: committed.doc.id, rev: committed.doc.rev, created: committed.created };
+        if (body.dryRun !== true) {
+          // Klien dan harness sesi ikut dicatat (opsional) supaya History dan "Last agent" Dashboard tetap terbaca
+          // setelah restart.
+          await store.commit(slug, committed.doc, { ...committed.entry, ...authorOf(session) });
+          docs.set(slug, committed.doc);
+          // Hook tulis agen tunggal: langkah undo (spec-agent-undo) + dasar visual_diff (spec-agent-visual-diff).
+          agentSteps.onAgentWrite(session, committed.doc.id, doc.rev, committed.doc.rev, committed.inverse, label);
+          checks.record(committed.doc.id, doc.rev, committed.doc.rev, ran.boards);
+          hugs.record(after, ran.measures, doc.rev);
+          result = { docId: committed.doc.id, rev: committed.doc.rev, created: committed.created };
+        }
+      }
+      // dryRun (story 9.5): transaksi dan check sudah dihitung pada salinan; diff dikembalikan tanpa commit,
+      // tanpa riwayat/snapshot, tanpa langkah undo, dan tanpa menulis session.keep.
+      if (body.dryRun === true) {
+        return {
+          docId: doc.id,
+          slug,
+          rev: doc.rev,
+          dryRun: true,
+          changes: committed.entry !== null ? nodeChanges(doc, committed.doc) : EMPTY_CHANGES,
+          created: committed.created,
+          target: targetOf(slug, doc),
+          ...(run.value !== undefined ? { value: run.value } : {}),
+          ...(run.valueTruncated ? { valueTruncated: true } : {}),
+          ...(run.logs.length ? { logs: run.logs.join('\n') } : {}),
+          ...(checked
+            ? { check: checked.check, bounds: checked.bounds, ...(checked.boundsTruncated !== undefined ? { boundsTruncated: checked.boundsTruncated } : {}) }
+            : {}),
+        };
       }
       session.keep = run.keep;
       logExecute(session, {

@@ -1038,6 +1038,7 @@ export const API_REFERENCE: readonly ApiReferenceSection[] = [
       'Sukses: `{docId, rev, created:[{id, name, path}], value?, valueTruncated?, logs?, check?, bounds?, boundsTruncated?}`. `value` = nilai ekspresi terakhir (JSON). Snippet tanpa op mutasi tidak menaikkan rev (tanpa check/bounds).',
       '`check {boards, summary:{error, warning, gate}, findings:[{level, rule, nodeId, nodeName, detail, expected}]}`: board yang disentuh dirender dan dicek sebelum commit. Temuan tidak membatalkan commit; perbaiki lalu execute lagi.',
       '`bounds {id:[x,y,w,h]}`: dibulatkan, relatif board, untuk board tersentuh, node baru, dan node berubah (maks 60). Pakai untuk tinggi akhir board landing.',
+      'Pratinjau `dryRun:true`: ops dijalankan pada salinan lalu dibuang — rev/riwayat/undo/keep tidak berubah. Respons berisi `changes {added, updated:[{…node, props}], deleted, moved, other, counts}` per node (ref `{id, type, name?, pageId, boardId}`); `other` menandai perubahan non-node (`tokens`, `comments`, `pages`). Temuan `check` sama seperti commit sungguhan. ID pada `added`/`created` hanya berlaku untuk pratinjau itu — commit sungguhan mencetak ID baru.',
       'Gagal: rollback penuh; error menyebut baris:kolom dan membawa `editId`. Perbaiki tanpa mengirim ulang kode: `execute({editId, edits:[{find, replace}]})` (find muncul tepat sekali; description diwarisi; edits kosong = jalankan ulang; editId hilang saat daemon restart).',
     ],
   },

@@ -59,14 +59,36 @@ export function findingLines(findings: readonly Finding[], max: number): string[
   return lines;
 }
 
-type ExecuteData = { check?: { boards: string[]; summary: FindingSummary; findings: Finding[] } } & Record<string, unknown>;
+type ChangeRef = { id: string; type: string; name?: string; props?: string[] };
+type ExecuteChanges = { added: ChangeRef[]; updated: ChangeRef[]; deleted: ChangeRef[]; moved?: ChangeRef[]; other?: string[]; counts: { added: number; updated: number; deleted: number; moved?: number } };
+type ExecuteData = {
+  check?: { boards: string[]; summary: FindingSummary; findings: Finding[] };
+  changes?: ExecuteChanges;
+} & Record<string, unknown>;
 
-/** Output execute: field lain sebagai JSON, lalu ringkasan check + baris temuan (maks 20). */
+/** Maks entri per daftar changes di output execute (sisanya satu baris "… N lagi"). */
+const EXECUTE_CHANGE_LINES = 10;
+
+const refText = (r: ChangeRef): string => `${r.type}${r.name ? ` ${r.name}` : ''} (${r.id})${r.props?.length ? `: ${r.props.join(', ')}` : ''}`;
+const changeLines = (sign: string, items: readonly ChangeRef[] | undefined): string[] => {
+  if (!items?.length) return [];
+  const lines = items.slice(0, EXECUTE_CHANGE_LINES).map((r) => `  ${sign} ${refText(r)}`);
+  if (items.length > EXECUTE_CHANGE_LINES) lines.push(`  … ${items.length - EXECUTE_CHANGE_LINES} lagi`);
+  return lines;
+};
+
+/** Output execute: field lain sebagai JSON, lalu ringkasan changes (dry-run) + ringkasan check + baris temuan (maks 20). */
 export function formatExecute(data: ExecuteData): string {
-  const { check, ...rest } = data;
-  if (!check) return JSON.stringify(data);
-  const head = check.boards.length ? `check board ${check.boards.join(', ')}: ${summaryText(check.summary)}` : 'check: tidak ada board tersentuh';
-  return [JSON.stringify(rest), head, ...findingLines(check.findings, EXECUTE_FINDING_LINES)].join('\n');
+  const { check, changes, ...rest } = data;
+  if (!check && !changes) return JSON.stringify(data);
+  const lines = [JSON.stringify(rest)];
+  if (changes) {
+    const c = changes.counts;
+    lines.push(`changes: +${c.added} ~${c.updated} -${c.deleted}${c.moved ? ` →${c.moved}` : ''}${changes.other?.length ? ` · ${changes.other.join(', ')}` : ''}`);
+    lines.push(...changeLines('+', changes.added), ...changeLines('~', changes.updated), ...changeLines('-', changes.deleted), ...changeLines('→', changes.moved));
+  }
+  if (check) lines.push(check.boards.length ? `check board ${check.boards.join(', ')}: ${summaryText(check.summary)}` : 'check: tidak ada board tersentuh', ...findingLines(check.findings, EXECUTE_FINDING_LINES));
+  return lines.join('\n');
 }
 
 /**
@@ -331,7 +353,11 @@ export const EXECUTE_DESCRIPTION =
   'Temuan tidak membatalkan commit; perbaiki lalu execute lagi (daftar penuh: layout_check). ' +
   'Board tersentuh yang tidak bisa dirender (FONT_MISSING: keluarga tak terdaftar atau karakter di luar font; aset NOT_FOUND; ICON_UNKNOWN) → dokumen tidak di-commit, error membawa editId. ' +
   'Error menyebut baris:kolom snippet dan membawa editId: perbaiki tanpa mengirim ulang kode dengan execute({editId, edits:[{find, replace}]}) ' +
-  '(find harus muncul tepat sekali; description diwarisi; edits kosong = jalankan ulang; editId hilang saat daemon restart → kirim code lengkap).';
+  '(find harus muncul tepat sekali; description diwarisi; edits kosong = jalankan ulang; editId hilang saat daemon restart → kirim code lengkap). ' +
+  'dryRun:true = pratinjau tanpa commit: ops dijalankan pada salinan, respons berisi changes {added, updated:{id,props}, deleted, moved, other, counts} per node+board ' +
+  'dan temuan check yang sama seperti commit sungguhan; rev, riwayat, undo, dan keep tidak berubah. ' +
+  'other berisi perubahan non-node (tokens, comments, pages). ID pada added/created hanya berlaku untuk pratinjau ini — commit sungguhan mencetak ID baru. ' +
+  'Pakai untuk memverifikasi dampak sebelum menerapkan.';
 
 /** Deskripsi tool `icon_search` (AD-9). */
 export const ICON_SEARCH_DESCRIPTION =
@@ -748,9 +774,10 @@ export function createLakarMcpServer(daemonUrl: string): McpServer {
           .array(z.object({ find: z.string().describe('potongan teks persis yang muncul tepat sekali'), replace: z.string() }))
           .optional()
           .describe('edit find/replace berurutan terhadap snippet editId; kosong = jalankan ulang'),
+        dryRun: z.boolean().optional().describe('true = pratinjau: jalankan ops pada salinan, kembalikan changes (added/updated/deleted/moved per node+board, other untuk tokens/halaman) + temuan check tanpa commit/rev/riwayat; ID added/created sekali-pakai'),
       }),
     },
-    async ({ code, description, editId, edits }) => {
+    async ({ code, description, editId, edits, dryRun }) => {
       // Dihitung per instance server (= satu sesi agen), sukses maupun error.
       const n = ++executes;
       return withExecuteCount(
@@ -760,6 +787,7 @@ export function createLakarMcpServer(daemonUrl: string): McpServer {
           if (description !== undefined) body.description = description;
           if (editId !== undefined) body.editId = editId;
           if (edits !== undefined) body.edits = edits;
+          if (dryRun !== undefined) body.dryRun = dryRun;
           return asText(await client.call<ExecuteData>('/execute', body), formatExecute);
         }),
         n,

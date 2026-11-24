@@ -759,8 +759,17 @@ describe('@lakar/mcp', () => {
     expect(fake.seen.find((x) => x.path === '/execute')!.body).toEqual({ editId: 'Eeeeeeee', edits });
     const { tools } = await c.listTools();
     const exec = tools.find((t) => t.name === 'execute')!;
-    expect(Object.keys((exec.inputSchema as any).properties).sort()).toEqual(['code', 'description', 'editId', 'edits']);
+    expect(Object.keys((exec.inputSchema as any).properties).sort()).toEqual(['code', 'description', 'dryRun', 'editId', 'edits']);
+    expect(exec.description).toMatch(/dryRun/);
     expect(exec.description).toMatch(/3–8 kata/);
+  });
+
+  it('execute dryRun:true diteruskan apa adanya ke body /execute daemon', async () => {
+    fake.seen.length = 0;
+    const c = await connect(url);
+    const r = await c.callTool({ name: 'execute', arguments: { code: '1', description: 'satu dua tiga', dryRun: true } });
+    expect(r.isError).toBeFalsy();
+    expect(fake.seen.find((x) => x.path === '/execute')!.body).toMatchObject({ code: '1', dryRun: true });
   });
 
   it('sesi hilang (401) → sesi baru, permintaan diulang sekali', async () => {
