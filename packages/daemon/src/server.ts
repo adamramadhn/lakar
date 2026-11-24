@@ -62,6 +62,7 @@ import type { PageFetch } from './url-fetch.js';
 import { SelectionStore, registerSelectionRoutes } from './selection.js';
 import { registerRenderDepsRoutes } from './render-deps.js';
 import { registerExportRoutes } from './export.js';
+import { registerShareRoutes } from './share.js';
 import { registerVisualDiffRoutes } from './visual-diff.js';
 import { HugHeights } from './hug-heights.js';
 import { registerCodeExportRoutes } from './code-export.js';
@@ -973,6 +974,8 @@ export function buildServer({
   registerSelectionRoutes(app, { docs, store, sessions, selections, focus, activity, render, assertIcons });
   registerRenderDepsRoutes(app, { fonts, icons });
   registerExportRoutes(app, { docs, store, render, icons });
+  // Share-link snapshot v1 (spec-collab-cloud story 1): upload doc + PNG per board ke @lakar/api.
+  registerShareRoutes(app, { docs, store, render, icons });
   registerVisualDiffRoutes(app, { docs, store, render, activeDoc, assertIcons });
   registerCodeExportRoutes(app, { docs, sessions, icons });
   registerConnectionRoutes(app, {

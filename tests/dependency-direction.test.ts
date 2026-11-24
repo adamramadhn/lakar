@@ -21,7 +21,7 @@ const pkg = (name: string, code: string, deps: Record<string, string> = {}): Pac
 describe('arah dependensi: repo nyata', () => {
   const packages = loadWorkspace(root);
 
-  it('menemukan 12 paket', () => {
+  it('menemukan 13 paket', () => {
     expect(packages.map((p) => p.name).sort()).toEqual(Object.keys(EDGES).sort());
     for (const p of packages) expect(Object.keys(p.files).length).toBeGreaterThan(0);
   });
