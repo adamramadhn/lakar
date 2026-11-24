@@ -57,7 +57,11 @@ async function setup() {
   const boardId = async (slug: string) => (await doc(slug)).pages[0]!.children[0]!.id;
   const events: ActivityEvent[] = [];
   daemon.activity.subscribe((e) => events.push(e));
-  return { ...daemon, post, session, create, open, doc, history, boardId, events };
+  const changes: { kind?: string; origin?: string; rev?: number }[] = [];
+  daemon.activity.subscribeAll((e) => {
+    if (e.type === 'change') changes.push(e.change);
+  });
+  return { ...daemon, post, session, create, open, doc, history, boardId, events, changes };
 }
 
 describe('POST /comments (list)', () => {
@@ -225,6 +229,110 @@ describe('POST /comments — filter', () => {
       expect(users.json().data.threads).toHaveLength(0);
       // Filter status asing → SCHEMA_INVALID.
       expect((await t.post('/comments', { status: 'closed' }, s)).statusCode).toBe(400);
+    } finally {
+      await t.app.close();
+    }
+  });
+});
+
+// ---- Route komentar aplikasi (story 9.4): dokumen dari slug di URL tanpa sesi; penulis {user,'You'},
+//      riwayat atas nama lakar-viewer; event `change` edit dipancarkan manual dengan origin jendela. ----
+describe('POST /viewer/docs/:slug/comments (list)', () => {
+  it('tanpa sesi; pageName/nodeName aditif per thread; slug asing 404; slug di luar pola 400', async () => {
+    const t = await setup();
+    try {
+      const slug = await t.create('List Viewer');
+      // Dokumen tanpa komentar → daftar kosong (tetap 200; dokumen dibaca dari disk).
+      const empty = await t.post(`/viewer/docs/${slug}/comments`, {});
+      expect(empty.statusCode, empty.body).toBe(200);
+      expect(empty.json().data).toMatchObject({ slug, total: 0, open: 0, threads: [] });
+      // Thread pin layer dari agen → nama node/halaman ikut di respons list viewer.
+      const s = await t.session('claude-code');
+      await t.open(s, slug);
+      const nodeId = await t.boardId(slug);
+      await t.post('/comments/create', { text: 'agen menandai', nodeId }, s);
+      const list = await t.post(`/viewer/docs/${slug}/comments`, {});
+      expect(list.statusCode, list.body).toBe(200);
+      const th = list.json().data.threads[0];
+      expect(th.nodeId).toBe(nodeId);
+      expect(th.nodeName).toBe((await t.doc(slug)).pages[0]!.children[0]!.name);
+      expect(th.pageName).toBe((await t.doc(slug)).pages[0]!.name);
+      // Filter bekerja sama dengan route agen.
+      expect((await t.post(`/viewer/docs/${slug}/comments`, { status: 'resolved' })).json().data.threads).toHaveLength(0);
+      // Slug asing → 404; slug di luar pola → 400.
+      expect((await t.post('/viewer/docs/tidak-ada/comments', {})).statusCode).toBe(404);
+      expect((await t.post('/viewer/docs/INVALID%20SLUG/comments', {})).statusCode).toBe(400);
+      // Origin lintas situs → 403 (guard global route tulis /viewer/*).
+      const foreign = await t.post(`/viewer/docs/${slug}/comments`, {}, undefined, { origin: 'https://evil.example' });
+      expect(foreign.statusCode).toBe(403);
+    } finally {
+      await t.app.close();
+    }
+  });
+});
+
+describe('POST /viewer/docs/:slug/comments/{create,reply,resolve}', () => {
+  it('penulis {user,You}; riwayat lakar-viewer; change ber-origin; resolve idempoten tanpa rev/event baru', async () => {
+    const t = await setup();
+    try {
+      const slug = await t.create('Tulis Viewer');
+      const headers = { 'x-lakar-origin': 'win-test' };
+      const made = await t.post(`/viewer/docs/${slug}/comments/create`, { text: 'geser tombol ini', x: 10, y: 20 }, undefined, headers);
+      expect(made.statusCode, made.body).toBe(200);
+      const th = made.json().data.thread;
+      expect(th.messages[0].author).toEqual({ kind: 'user', name: 'You' });
+      // Titik bebas tanpa pageId → halaman pertama.
+      expect(th.pageId).toBe((await t.doc(slug)).pages[0]!.id);
+      expect(th.x).toBe(10);
+      expect(th.y).toBe(20);
+      // Riwayat atas nama viewer (seperti kelola file), opsSummary comments.
+      const last = (await t.history(slug)).at(-1)!;
+      expect(last.sessionId).toBe('lakar-viewer');
+      expect(last.client).toBe('lakar-viewer');
+      expect(last.opsSummary).toBe('comments');
+      // Event change edit ber-origin: jendela pembuat mengabaikannya, jendela lain memuat ulang.
+      // (Hanya terlihat lewat subscribeAll — event change tidak masuk ring aktivitas.)
+      const change = t.changes.at(-1);
+      expect(change?.kind).toBe('edit');
+      expect(change?.origin).toBe('win-test');
+      expect(change?.rev).toBe(made.json().data.rev);
+      // Pin di layer tanpa x/y → koordinat default = posisi tersimpan node; pageId = halaman node.
+      const board = await t.boardId(slug);
+      const pinned = await t.post(`/viewer/docs/${slug}/comments/create`, { text: 'pin layer', nodeId: board });
+      expect(pinned.statusCode, pinned.body).toBe(200);
+      const pth = pinned.json().data.thread;
+      const bnode = (await t.doc(slug)).pages[0]!.children[0]! as { x: number; y: number };
+      expect(pth.nodeId).toBe(board);
+      expect(pth.x).toBe(bnode.x);
+      expect(pth.y).toBe(bnode.y);
+      // Reply dan resolve (yang mengubah status) sama-sama memancarkan change edit — jendela lain memuat ulang.
+      const rep = await t.post(`/viewer/docs/${slug}/comments/reply`, { threadId: th.id, text: 'balasan pengguna' });
+      expect(rep.statusCode, rep.body).toBe(200);
+      expect(rep.json().data.thread.messages.at(-1).author).toEqual({ kind: 'user', name: 'You' });
+      expect(t.changes.at(-1)).toMatchObject({ kind: 'edit', rev: rep.json().data.rev });
+      const res = await t.post(`/viewer/docs/${slug}/comments/resolve`, { threadId: th.id });
+      expect(res.json().data.status).toBe('resolved');
+      expect(res.json().data.resolvedAt).toBeTruthy();
+      expect(t.changes.at(-1)).toMatchObject({ kind: 'edit', rev: res.json().data.rev });
+      // Reopen (resolved:false) membuka kembali + memancarkan change; status kembali 'open' tanpa resolvedAt.
+      const reopen = await t.post(`/viewer/docs/${slug}/comments/resolve`, { threadId: th.id, resolved: false });
+      expect(reopen.json().data.status).toBe('open');
+      expect(reopen.json().data.resolvedAt).toBeUndefined();
+      expect(t.changes.at(-1)).toMatchObject({ kind: 'edit', rev: reopen.json().data.rev });
+      await t.post(`/viewer/docs/${slug}/comments/resolve`, { threadId: th.id });
+      const revAfter = (await t.doc(slug)).rev;
+      const changesBefore = t.changes.length;
+      // Idempoten: resolved → resolved lagi = rev tetap, tanpa event change baru.
+      const again = await t.post(`/viewer/docs/${slug}/comments/resolve`, { threadId: th.id });
+      expect(again.statusCode).toBe(200);
+      expect((await t.doc(slug)).rev).toBe(revAfter);
+      expect(t.changes).toHaveLength(changesBefore);
+      // Validasi sama dengan route agen: body jelek 400, thread asing 404, slug asing 404.
+      expect((await t.post(`/viewer/docs/${slug}/comments/create`, { text: '   ', x: 1, y: 2 })).statusCode).toBe(400);
+      expect((await t.post(`/viewer/docs/${slug}/comments/reply`, { threadId: 'ZZzzzz99', text: 'x' })).statusCode).toBe(404);
+      expect((await t.post(`/viewer/docs/${slug}/comments/resolve`, { threadId: 'ZZzzzz99' })).statusCode).toBe(404);
+      expect((await t.post('/viewer/docs/tidak-ada/comments/create', { text: 'x', x: 1, y: 2 })).statusCode).toBe(404);
+      expect((await t.post(`/viewer/docs/${slug}/comments/create`, { text: 'x', x: 1, y: 2 }, undefined, { origin: 'https://evil.example' })).statusCode).toBe(403);
     } finally {
       await t.app.close();
     }

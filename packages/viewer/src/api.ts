@@ -10,6 +10,7 @@
 // Layer manual (aplikasi 4): `execute` (POST /execute dari sesi viewer sendiri, kode dari codegen.ts), unggah
 // gambar (POST /viewer/assets, byte mentah), dan cari ikon (POST /icons/search).
 // Folder (aplikasi 10): GET/POST /viewer/folders*, tulis lewat antrean yang sama (memanggil pendengar `onDocsChanged`).
+// Komentar (story 9.4): POST /viewer/docs/:slug/comments* (list/create/reply/resolve) — penulis pengguna aplikasi.
 // Sinkron antar jendela: setiap permintaan membawa id jendela (`x-lakar-origin`, acak per muat halaman) sehingga event
 // `change` dari jendela ini bisa dikenali sebagai gema; perubahan dari jendela lain diterapkan lewat `applyRemote`.
 // Memori: blob URL PNG di-revoke saat entri cache dibuang (dengan jeda, supaya <img> yang masih memakainya sempat
@@ -125,6 +126,33 @@ export type ImportUrlResult = OpsResult & { nodeId: string; boardId: string; rep
 export type FontFamily = { family: string; weights: number[]; styles: string[] };
 export type LayoutCheck = { docId: string; rev: number; boards: unknown; summary: FindingSummary; findings: Finding[]; ranAt: number };
 
+// ---- Komentar (epic kolaborasi-agen story 9.4) ----
+
+/** Penulis pesan komentar (bentuk `CommentAuthor` @lakar/schema; disalin agar bundle tidak menarik zod). */
+export type CommentAuthor = { kind: 'user' | 'agent'; name: string };
+export type CommentMessage = { author: CommentAuthor; text: string; at: string };
+/**
+ * Thread komentar di root dokumen (skema v10): pin di layer (`nodeId`) atau titik bebas koordinat halaman
+ * (`x`,`y`). `pageName`/`nodeName` hanya diisi respons list viewer (nama untuk panel; aditif).
+ */
+export type CommentThread = {
+  id: string;
+  pageId: string;
+  nodeId?: string;
+  x: number;
+  y: number;
+  status: 'open' | 'resolved';
+  resolvedAt?: string;
+  messages: CommentMessage[];
+  pageName?: string;
+  nodeName?: string;
+};
+/** Body thread baru: pin di layer (`nodeId`) atau titik bebas (`x`,`y` wajib; `pageId` → halaman itu). */
+export type CommentCreateBody = { text: string; nodeId?: string; pageId?: string; x?: number; y?: number };
+export type CommentCreateResult = { slug: string; rev: number; thread: CommentThread };
+export type CommentReplyResult = { slug: string; rev: number; threadId: string; message: CommentMessage; thread: CommentThread };
+export type CommentResolveResult = { slug: string; rev: number; threadId: string; status: 'open' | 'resolved'; resolvedAt?: string };
+
 /** lakard tidak bisa dihubungi (jaringan). */
 export class OfflineError extends Error {}
 
@@ -237,6 +265,7 @@ function trim<V>(map: Map<string, V>, max: number, evicted?: (v: V) => void) {
 }
 
 const pagesPath = (slug: string, pageId?: string) => `/viewer/docs/${encodeURIComponent(slug)}/pages${pageId ? `/${encodeURIComponent(pageId)}` : ''}`;
+const commentsPath = (slug: string) => `/viewer/docs/${encodeURIComponent(slug)}/comments`;
 const harnessPath = (id: string) => `/viewer/connections/harnesses/${encodeURIComponent(id)}`;
 
 // ---- Klien ----
@@ -624,6 +653,33 @@ class ViewerClient {
   deletePage(slug: string, pageId: string): Promise<PageResult> {
     return this.#write(
       () => request<PageResult>('DELETE', pagesPath(slug, pageId)),
+      () => [slug],
+    );
+  }
+
+  // ---- Komentar (story 9.4): POST /viewer/docs/:slug/comments/{create,reply,resolve} — penulis pesan = pengguna
+  // aplikasi ("You"). Route list `…/comments` tidak dipakai klien (thread ikut dokumen) — tetap ada untuk konsumen lain. ----
+
+  /** Thread baru: pin di layer (`nodeId`) atau titik bebas (`x`,`y`; `pageId` opsional → halaman pertama). */
+  addComment(slug: string, body: CommentCreateBody): Promise<CommentCreateResult> {
+    return this.#write(
+      () => request<CommentCreateResult>('POST', `${commentsPath(slug)}/create`, body),
+      () => [slug],
+    );
+  }
+
+  /** Balas thread `threadId` (pesan pengguna di akhir thread). */
+  replyComment(slug: string, threadId: string, text: string): Promise<CommentReplyResult> {
+    return this.#write(
+      () => request<CommentReplyResult>('POST', `${commentsPath(slug)}/reply`, { threadId, text }),
+      () => [slug],
+    );
+  }
+
+  /** Tandai thread resolved / buka kembali (`resolved` default true). Idempoten — status sama → rev tetap. */
+  resolveComment(slug: string, threadId: string, resolved?: boolean): Promise<CommentResolveResult> {
+    return this.#write(
+      () => request<CommentResolveResult>('POST', `${commentsPath(slug)}/resolve`, { threadId, ...(resolved !== undefined ? { resolved } : {}) }),
       () => [slug],
     );
   }

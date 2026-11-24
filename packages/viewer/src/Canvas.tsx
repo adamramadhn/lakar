@@ -26,13 +26,14 @@ import { findBoard } from '@lakar/render';
 import { resolveDocument, type DocOp, type FindingLevel, type LakarDocument, type ResolvedDocument } from '@lakar/schema';
 import { boardDepKeys, boardSignature, boardSource, ensureFaces, mountLive, RenderDepsCache } from './liveBoard';
 import { api, errorText } from './api';
+import { CommentPin, CommentThreadCard, NewCommentCard, pinPoint, threadLocation, type CanvasComments } from './comments';
 import { SelectionBox, useCanvasEdit } from './canvasEdit';
 import { usePathTools, type PathEditPanel } from './pathTools';
 import { INSERT_KINDS, type InsertKind } from './codegen';
 import { COMPONENT_DRAG_TYPE, exitInstanceSelection, type ComponentInfo } from './componentModel';
 import { ExportButton } from './ExportPopover';
 import { Menu, type Item } from './FileMenu';
-import { unionBox, type GeoNode } from './gesture';
+import { hitPath, unionBox, type GeoNode } from './gesture';
 import { useOffline, useRetry } from './hooks';
 import { Icon, type IconName } from './icons';
 import type { AgentPresence, PendingAgent, Rect } from './presence';
@@ -69,10 +70,10 @@ export type CanvasPreview = {
 export type InsertPoint = { boardId: string; x: number; y: number } | { boardId?: undefined; x: number; y: number };
 /** Marker temuan layout_check: tanpa `bounds` = temuan pada board (lingkaran di sudut board saja). */
 export type CanvasMarker = { nodeId: string; boardId: string; bounds?: [number, number, number, number]; level: FindingLevel };
-type Tool = 'select' | 'hand' | 'pen' | InsertKind;
-const isInsertTool = (t: Tool): t is InsertKind => t !== 'select' && t !== 'hand' && t !== 'pen';
-/** Tool sisip atau Pen (kembali ke Select saat pratinjau/offline atau Escape). */
-const isDrawTool = (t: Tool) => isInsertTool(t) || t === 'pen';
+type Tool = 'select' | 'hand' | 'pen' | 'comment' | InsertKind;
+const isInsertTool = (t: Tool): t is InsertKind => t !== 'select' && t !== 'hand' && t !== 'pen' && t !== 'comment';
+/** Tool sisip, Pen, atau komentar (kursor crosshair; kembali ke Select saat pratinjau/offline atau Escape). */
+const isDrawTool = (t: Tool) => isInsertTool(t) || t === 'pen' || t === 'comment';
 const TOOL_ICON: Record<InsertKind, IconName> = { frame: 'frame', rect: 'square', ellipse: 'circle', text: 'text', image: 'image', icon: 'shapes' };
 const TOOL_KEYS: Record<string, InsertKind> = { f: 'frame', r: 'rect', o: 'ellipse', t: 'text', i: 'icon' };
 const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
@@ -444,6 +445,8 @@ export function Canvas({
   pastedTag,
   onCommitCreate,
   onPathEdit,
+  comments,
+  onCommentAt,
 }: {
   /** Commit yang membuat node (Pen tool, epic paste-vektor story 5): id node baru, undefined bila gagal. */
   onCommitCreate?: ((ops: DocOp[], description: string) => Promise<string | undefined>) | undefined;
@@ -520,6 +523,10 @@ export function Canvas({
   editable?: boolean;
   /** Klik dengan tool sisip: board di bawah kursor (koordinat board) atau halaman (hanya Frame). */
   onInsert?: (kind: InsertKind, at: InsertPoint) => void;
+  /** Pin komentar + popover thread/draft di halaman ini (story 9.4); `undefined` = disembunyikan. */
+  comments?: CanvasComments | undefined;
+  /** Klik dengan tool komentar: titik halaman + layer di bawah kursor (`nodeId`, untuk pin di layer). */
+  onCommentAt?: ((at: { x: number; y: number; nodeId?: string }) => void) | undefined;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   // Sekali per objek dokumen (bukan per frame kamera); error resolve tampil di setiap board.
@@ -542,10 +549,12 @@ export function Canvas({
   }, [cam, fitted]);
   const [tool, setTool] = useState<Tool>('select');
   const canInsert = editable && !preview && onInsert !== undefined;
-  // Pratinjau/offline: tool sisip yang aktif kembali ke Select.
+  // Tool komentar (story 9.4): aktif bersama tool sisip; klik di canvas membuka draft komentar baru.
+  const canComment = editable && !preview && onCommentAt !== undefined;
+  // Pratinjau/offline: tool gambar yang aktif kembali ke Select (komentar menilai `canComment` sendiri).
   useEffect(() => {
-    if (!canInsert) setTool((t) => (isDrawTool(t) ? 'select' : t));
-  }, [canInsert]);
+    setTool((t) => (t === 'comment' ? (!canComment ? 'select' : t) : isDrawTool(t) && !canInsert ? 'select' : t));
+  }, [canInsert, canComment]);
   const [spaceHeld, setSpaceHeld] = useState(false);
   /** Alt ditahan: mode ukur jarak Alt+hover (desain bagian 11 "Measure distance", GSpGv). */
   const [altHeld, setAltHeld] = useState(false);
@@ -632,6 +641,9 @@ export function Canvas({
   /** Seleksi terkini untuk listener keyboard (Escape keluar dari isi instance). */
   const selectionRef = useRef(selection);
   selectionRef.current = selection;
+  /** State komentar terkini untuk listener keyboard (Escape menutup draft/popover). */
+  const commentsRef = useRef(comments);
+  commentsRef.current = comments;
   const cancelEdit = edit.cancel;
   if (sceneRef) sceneRef.current = edit.scene;
   const onSceneChangeRef = useRef(onSceneChange);
@@ -861,6 +873,8 @@ export function Canvas({
         if (canInsert) setTool(insertKey);
       } else if ((e.key === 'p' || e.key === 'P') && !e.shiftKey) {
         if (canPen) setTool('pen');
+      } else if ((e.key === 'c' || e.key === 'C') && !e.shiftKey) {
+        if (canComment) setTool('comment');
       }
       else if (e.key === 'Enter' && !e.shiftKey) {
         // Satu teks terpilih → edit inline; preventDefault supaya Enter tidak masuk ke teks yang baru difokus.
@@ -875,6 +889,16 @@ export function Canvas({
       else if (e.key === 'Escape') {
         // Gestur berjalan: hanya dibatalkan (seleksi tetap).
         if (cancelEdit()) return;
+        // Draft/popover komentar terbuka: tutup dulu (tool dan seleksi tidak disentuh).
+        const cs = commentsRef.current;
+        if (cs?.draft !== undefined) {
+          cs.onDraftCancel();
+          return;
+        }
+        if (cs?.openId !== undefined) {
+          cs.onOpen(undefined);
+          return;
+        }
         setTool((t) => (isDrawTool(t) ? 'select' : t));
         // Isi instance terpilih (alamat komposit, desain dQRib "Esc to exit instance"): naik ke instance terluar.
         const exited = exitInstanceSelection(selectionRef.current);
@@ -904,7 +928,7 @@ export function Canvas({
       window.removeEventListener('keyup', up);
       window.removeEventListener('blur', blur);
     };
-  }, [fit, zoomAt, zoomTo, zoomToSelection, size, onSelect, selectIds, canInsert, canPen, cancelEdit]);
+  }, [fit, zoomAt, zoomTo, zoomToSelection, size, onSelect, selectIds, canInsert, canPen, canComment, cancelEdit]);
 
   const onPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
     if ((e.target as HTMLElement).closest('.canvas-overlay-ui')) return;
@@ -998,6 +1022,10 @@ export function Canvas({
       insertAt(tool, d.x, d.y, d.target);
       return;
     }
+    if (tool === 'comment') {
+      commentAt(d.x, d.y);
+      return;
+    }
     onSelect(d.target);
   };
   /** Klik tool sisip di (clientX, clientY): koordinat board = (clientX − kiri kanvas − cam.x)/z − board.x. */
@@ -1011,6 +1039,20 @@ export function Canvas({
     if (b) onInsert?.(kind, { boardId: b.id, x: Math.round(px - b.x), y: Math.round(py - b.y) });
     else if (kind === 'frame') onInsert?.(kind, { x: Math.round(px), y: Math.round(py) });
     else return; // tipe lain butuh board: klik di luar board diabaikan, tool tetap aktif
+    setTool('select');
+  };
+  /** Klik tool komentar di (clientX, clientY): titik halaman + layer tersimpan di bawah kursor untuk pin nodeId. */
+  const commentAt = (clientX: number, clientY: number) => {
+    const el = ref.current;
+    if (!el || !canComment) return;
+    const r = el.getBoundingClientRect();
+    const px = (clientX - r.left - cam.x) / cam.z;
+    const py = (clientY - r.top - cam.y) / cam.z;
+    // Layer terdalam dengan id tersimpan (isi instance = alamat komposit `/`, bukan nodeId sah); board
+    // sendiri tidak dihitung — klik di ruang kosong board membuat titik bebas di koordinat klik.
+    const path = liveActive ? hitPath(edit.scene(), { x: px, y: py }) : [];
+    const node = [...path].reverse().find((n) => n.type !== 'board' && !n.id.includes('/'));
+    onCommentAt?.({ x: px, y: py, ...(node ? { nodeId: node.id } : {}) });
     setTool('select');
   };
   /** Gestur dibatalkan (mis. sistem mengambil alih pointer): jari pinch → jari tersisa lanjut menggeser; selain itu bersihkan tanpa memilih. */
@@ -1049,6 +1091,13 @@ export function Canvas({
   const handMode = tool === 'hand' || spaceHeld;
   /** Rev snapshot yang dirender board: hanya setelah dokumen versi itu termuat (board-nya milik versi itu). */
   const previewRev = preview && !preview.loading && !preview.error ? preview.rev : undefined;
+
+  // Popover komentar (280px × maks 320px + offset 14/18) dijaga tetap di dalam viewport canvas.
+  const cardPos = (sx: number, sy: number) => {
+    const cw = ref.current?.clientWidth ?? 0;
+    const ch = ref.current?.clientHeight ?? 0;
+    return { x: Math.max(-6, Math.min(sx, cw - 296)), y: Math.max(-10, Math.min(sy, ch - 338)) };
+  };
 
   return (
     <section
@@ -1180,6 +1229,50 @@ export function Canvas({
       )}
 
       {!preview && presence && <AgentLayer presence={presence} boardById={boardById} cam={cam} />}
+
+      {/* Pin komentar (story 9.4): avatar bulat warna penulis di titik halaman; resolved pudar + centang (toggle panel). */}
+      {comments && !preview && (
+        <div className="comment-layer">
+          {comments.threads
+            .filter((t) => t.status === 'open' || comments.showResolved)
+            .map((t) => {
+              const p = pinPoint(t, (id) => edit.nodeGeo(id)?.box);
+              return <CommentPin key={t.id} thread={t} x={cam.x + p.x * cam.z} y={cam.y + p.y * cam.z} selected={comments.openId === t.id} onClick={() => comments.onOpen(comments.openId === t.id ? undefined : t.id)} />;
+            })}
+        </div>
+      )}
+      {comments &&
+        !preview &&
+        (() => {
+          const open = comments.openId !== undefined ? comments.threads.find((t) => t.id === comments.openId) : undefined;
+          if (!open) return null;
+          const p = pinPoint(open, (id) => edit.nodeGeo(id)?.box);
+          return (
+            <CommentThreadCard
+              thread={open}
+              location={threadLocation(open, (id) => edit.nodeGeo(id)?.name)}
+              x={cardPos(cam.x + p.x * cam.z, 0).x}
+              y={cardPos(0, cam.y + p.y * cam.z).y}
+              busy={comments.busy === true}
+              onReply={(text) => comments.onReply(open.id, text)}
+              onResolve={(resolved) => comments.onResolve(open.id, resolved)}
+              onClose={() => comments.onOpen(undefined)}
+            />
+          );
+        })()}
+      {comments && !preview && comments.draft && (
+        <>
+          <span className="comment-pin user draft" aria-hidden="true" style={{ left: cam.x + comments.draft.x * cam.z, top: cam.y + comments.draft.y * cam.z }} />
+          <NewCommentCard
+            location={comments.draft.nodeId !== undefined ? (edit.nodeGeo(comments.draft.nodeId)?.name ?? 'Node') : 'Free point'}
+            x={cardPos(cam.x + comments.draft.x * cam.z, 0).x}
+            y={cardPos(0, cam.y + comments.draft.y * cam.z).y}
+            busy={comments.busy === true}
+            onSubmit={comments.onDraftSubmit}
+            onClose={comments.onDraftCancel}
+          />
+        </>
+      )}
       {/* Execute pertama sesi (spec-progressive-live-build): board tujuan belum diketahui, jadi label Generating
           tampil di tingkat dokumen (atas tengah canvas), bukan ditebak pada board. */}
       {!preview &&
@@ -1253,6 +1346,17 @@ export function Canvas({
           onClick={() => setTool(tool === 'pen' ? 'select' : 'pen')}
         >
           <Icon name="penTool" />
+        </button>
+        <button
+          type="button"
+          className={`tool${tool === 'comment' ? ' active' : ''}`}
+          aria-label="Comment (C)"
+          title={canComment ? 'Comment (C)' : preview ? 'Comment: not available while previewing a version' : 'Comment: lakard is offline'}
+          aria-pressed={tool === 'comment'}
+          disabled={!canComment}
+          onClick={() => setTool(tool === 'comment' ? 'select' : 'comment')}
+        >
+          <Icon name="messageCircle" />
         </button>
         <span className="divider" />
         <button type="button" className="tool zoom-btn" aria-label="Zoom out" title="Zoom out (-)" onClick={() => zoomAt(1 / 1.25, ...center())}>
