@@ -8539,3 +8539,49 @@ button.panel-tab:hover {
 .comments-footer .follow-info {
   margin-right: auto;
 }
+
+/* Versi bernama di tab History (spec-viewer-named-versions): chip label aksen + input inline. */
+.history-version {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 6px;
+  border-radius: 5px;
+  background: var(--accent-soft, rgba(88, 140, 255, 0.16));
+  color: var(--accent, #7ea2ff);
+  font-size: 10.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.history-version-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  padding: 0;
+  border: 0;
+  border-radius: 3px;
+  background: none;
+  color: inherit;
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.history-version-remove:hover {
+  background: #ffffff26;
+}
+
+.history-naming {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.history-naming .input {
+  flex: 1;
+  min-width: 0;
+}

@@ -2,7 +2,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { spawn } from 'node:child_process';
 import { existsSync, readdirSync } from 'node:fs';
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -177,4 +177,52 @@ describe('DocStore', () => {
       expect(tmpFiles(store.docsDir)).toEqual([]);
     }
   }, 120_000);
+});
+
+describe('DocStore — versi bernama (spec-viewer-named-versions)', () => {
+  it('tag menempel ke rev; rename menimpa; remove membersihkan file saat kosong', async () => {
+    const store = new DocStore(join(root, 'ver'));
+    const doc = createDocument();
+    await store.commit('d', withRev(doc, 1), entry(1));
+    const t1 = await store.addVersionTag('d', 1, 'v1 — ready');
+    expect(t1).toMatchObject({ rev: 1, name: 'v1 — ready' });
+    expect((await store.readVersions('d')).map((t) => [t.rev, t.name])).toEqual([[1, 'v1 — ready']]);
+    // Rename rev sama → timpa.
+    await store.addVersionTag('d', 1, 'v1 final');
+    expect((await store.readVersions('d'))).toHaveLength(1);
+    expect((await store.readVersions('d'))[0]!.name).toBe('v1 final');
+    // Remove → daftar kosong → file dihapus (bukan `{}` yatim).
+    expect(await store.removeVersionTag('d', 1)).toBe(true);
+    expect(await store.removeVersionTag('d', 1)).toBe(false);
+    await expect(stat(store.versionsPath('d'))).rejects.toMatchObject({ code: 'ENOENT' });
+  });
+
+  it('rev bertag lolos retensi snapshotKeep dan byte; rename/arsip/hapus memindahkan file versions', async () => {
+    const store = new DocStore(join(root, 'ver2'), { snapshotKeep: 2 });
+    const base = createDocument();
+    for (let rev = 1; rev <= 2; rev++) await store.commit('d', withRev(base, rev), entry(rev));
+    // Tag sebelum retensi menendang: snapshot rev 1 masih ada saat pin dipasang.
+    await store.addVersionTag('d', 1, 'pinned');
+    for (let rev = 3; rev <= 5; rev++) await store.commit('d', withRev(base, rev), entry(rev));
+    // Tanpa pin: [4,5]; rev 1 bertag bertahan.
+    expect([...(await store.snapshotRevs('d'))].sort()).toEqual([1, 4, 5]);
+    // Rename → file ikut; tag masih terbaca di slug baru.
+    await store.rename('d', 'd2');
+    expect((await store.readVersions('d2'))[0]!.name).toBe('pinned');
+    // Archive → file ikut ke arsip.
+    await store.archive('d2');
+    expect((await store.readVersions('d2'))).toHaveLength(0);
+    // Unarchive → kembali; delete → file hilang.
+    await store.unarchive('d2');
+    await store.remove('d2');
+    await expect(stat(store.versionsPath('d2'))).rejects.toMatchObject({ code: 'ENOENT' });
+  });
+
+  it('sidecar rusak dibaca sebagai kosong; dropOrphanHistory ikut membuangnya', async () => {
+    const store = new DocStore(join(root, 'ver3'));
+    await store.writeVersions('d', [{ rev: 1, name: 'x', at: '2026-01-01T00:00:00Z' }]);
+    expect(await store.readVersions('d')).toHaveLength(1);
+    await store.dropOrphanHistory('d');
+    expect(await store.readVersions('d')).toEqual([]);
+  });
 });

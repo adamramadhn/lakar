@@ -101,7 +101,7 @@ export type HarnessRevealResult = { id: string; opened: boolean };
 export type Screenshot = { boardId: string; width: number; height: number; url: string };
 export type InspectNode = Record<string, unknown> & { id: string; name: string; type?: string; bounds?: [number, number, number, number]; children?: InspectNode[]; childCount?: number };
 export type InspectResult = { docId: string; rev: number; boardId: string; node: InspectNode; truncated?: boolean };
-export type HistoryEntry = { rev: number; description: string; opsSummary: string; opCount: number; at: string; session: string; client?: string; agent?: string; snapshot?: boolean };
+export type HistoryEntry = { rev: number; description: string; opsSummary: string; opCount: number; at: string; session: string; client?: string; agent?: string; snapshot?: boolean; label?: string };
 /** Hasil execute dari viewer (subset respons `/execute`). */
 export type ExecuteResult = { docId: string; rev: number; created: { id: string; name: string }[]; check?: { boards?: string[] } };
 export type UploadedAsset = { assetId: string; mime: string; width: number; height: number };
@@ -390,6 +390,16 @@ class ViewerClient {
   async getHistory(slug: string): Promise<HistoryEntry[]> {
     const { entries } = await request<{ entries: HistoryEntry[] }>('GET', `/viewer/docs/${encodeURIComponent(slug)}/history`);
     return entries;
+  }
+
+  /** Versi bernama (spec-viewer-named-versions): tag `rev` (default terkini) dengan `name`; snapshot rev itu di-pin. */
+  async nameVersion(slug: string, name: string, rev?: number): Promise<{ rev: number; name: string; at: string }> {
+    return request('POST', `/viewer/docs/${encodeURIComponent(slug)}/versions`, { name, ...(rev !== undefined ? { rev } : {}) });
+  }
+
+  /** Hapus label versi bernama di `rev` (snapshot kembali masuk retensi biasa). */
+  async unnameVersion(slug: string, rev: number): Promise<void> {
+    await request('DELETE', `/viewer/docs/${encodeURIComponent(slug)}/versions/${rev}`);
   }
 
   /** File terarsip (GET /viewer/archive). */

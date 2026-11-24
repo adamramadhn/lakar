@@ -4,7 +4,7 @@
 // snapshot: Compare/Restore nonaktif ("No snapshot for this version").
 // Seperti desain, tombol Compare/Restore hanya tampil pada entri terkini (Compare) dan entri yang sedang
 // dipratinjau (latar biru); entri lain cukup judul + meta (klik untuk pratinjau). Jam 24 jam ("14:32").
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { LakarDocument } from '@lakar/schema';
 import { harnessColor, harnessLabel, whoOf } from './activity';
 import { api, errorText, type HistoryEntry } from './api';
@@ -41,6 +41,11 @@ export function HistoryPanel({
   const [loaded, setLoaded] = useState<Loaded>({ state: 'loading' });
   const [attempt, setAttempt] = useState(0);
   const [comparing, setComparing] = useState<number | undefined>(undefined);
+  // Versi bernama (spec-viewer-named-versions): rev yang sedang diedit labelnya (undefined = tidak ada), dan
+  // label baru yang menunggu penyimpanan (anti dobel-klik).
+  const [naming, setNaming] = useState<number | undefined>(undefined);
+  const [namingBusy, setNamingBusy] = useState(false);
+  const [namingError, setNamingError] = useState<string | undefined>(undefined);
   useRetry(() => setAttempt((a) => a + 1));
   useEffect(() => {
     let live = true;
@@ -78,6 +83,40 @@ export function HistoryPanel({
         <span>Each execute that changes the document adds a revision here.</span>
       </div>
     );
+
+  const saveName = async (e: HistoryEntry, name: string) => {
+    const trimmed = name.trim();
+    if (namingBusy || !trimmed) return;
+    setNamingBusy(true);
+    setNamingError(undefined);
+    try {
+      if (trimmed === e.label) {
+        // tidak berubah
+      } else {
+        await api.nameVersion(slug, trimmed, e.rev);
+      }
+      setNaming(undefined);
+      setAttempt((a) => a + 1);
+    } catch (err) {
+      setNamingError(errorText(err));
+    } finally {
+      setNamingBusy(false);
+    }
+  };
+  const removeName = async (e: HistoryEntry) => {
+    if (namingBusy) return;
+    setNamingBusy(true);
+    setNamingError(undefined);
+    try {
+      await api.unnameVersion(slug, e.rev);
+      setNaming(undefined);
+      setAttempt((a) => a + 1);
+    } catch (err) {
+      setNamingError(errorText(err));
+    } finally {
+      setNamingBusy(false);
+    }
+  };
 
   const entries = loaded.entries;
   const top = entries[0]!.rev;
@@ -133,6 +172,25 @@ export function HistoryPanel({
                       </span>
                       {current && <span className={`history-current ${color}`}>Current</span>}
                       {previewing && <span className="history-previewing">Previewing</span>}
+                      {e.label !== undefined && (
+                        <span className="history-version" title={`Named version — rev ${e.rev}`}>
+                          <Icon name="tag" size={11} />
+                          {e.label}
+                          <button
+                            type="button"
+                            className="history-version-remove"
+                            aria-label={`Remove version name ${e.label}`}
+                            title="Remove version name"
+                            disabled={namingBusy}
+                            onClick={(ev) => {
+                              ev.stopPropagation();
+                              void removeName(e);
+                            }}
+                          >
+                            ×
+                          </button>
+                        </span>
+                      )}
                     </div>
                     <div className="history-title">{e.description}</div>
                     <div className="history-meta">
@@ -158,7 +216,23 @@ export function HistoryPanel({
                         <Icon name="rotateCcw" size={13} /> Restore
                       </button>
                     )}
+                    <button
+                      type="button"
+                      className={`btn small${naming === e.rev ? ' active' : ''}`}
+                      title={e.label ? 'Rename this version' : 'Name this version'}
+                      aria-expanded={naming === e.rev}
+                      onClick={(ev) => {
+                        ev.stopPropagation();
+                        setNamingError(undefined);
+                        setNaming(naming === e.rev ? undefined : e.rev);
+                      }}
+                    >
+                      <Icon name="tag" size={13} /> {e.label ? 'Rename' : 'Name'}
+                    </button>
                   </div>
+                  )}
+                  {naming === e.rev && (
+                    <VersionNameInput busy={namingBusy} error={naming === e.rev ? namingError : undefined} initial={e.label ?? ''} onSave={(name) => void saveName(e, name)} onCancel={() => setNaming(undefined)} />
                   )}
                 </div>
               </div>
@@ -242,4 +316,35 @@ function Thumb({ slug, rev, boardId, empty }: { slug: string; rev: number | unde
       </div>
     );
   return <div className="compare-thumb skeleton" />;
+}
+
+/** Input inline nama versi (spec-viewer-named-versions): Enter menyimpan, Escape membatalkan; autoFocus. */
+function VersionNameInput({ busy, error, initial, onSave, onCancel }: { busy: boolean; error?: string | undefined; initial: string; onSave: (name: string) => void; onCancel: () => void }) {
+  const ref = useRef<HTMLInputElement>(null);
+  useEffect(() => ref.current?.focus(), []);
+  return (
+    <div className="history-naming" onClick={(e) => e.stopPropagation()}>
+      <input
+        ref={ref}
+        className="input"
+        defaultValue={initial}
+        placeholder="Version name (e.g. v1 — ready for review)"
+        maxLength={100}
+        disabled={busy}
+        aria-label="Version name"
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') onSave(e.currentTarget.value);
+          else if (e.key === 'Escape') onCancel();
+        }}
+      />
+      <button type="button" className="btn small primary" disabled={busy} onClick={() => ref.current && onSave(ref.current.value)}>
+        Save
+      </button>
+      {error && (
+        <div className="export-note danger" role="alert">
+          <span>{error}</span>
+        </div>
+      )}
+    </div>
+  );
 }

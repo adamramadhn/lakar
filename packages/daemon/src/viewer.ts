@@ -49,6 +49,8 @@ export type ViewerHistoryEntry = {
   agent?: string;
   /** Isi versi ini tersimpan sebagai snapshot (bisa dipratinjau, dibandingkan, dan dipulihkan). */
   snapshot?: boolean;
+  /** Nama versi bernama yang menempel ke rev ini (spec-viewer-named-versions); snapshotnya di-pin. */
+  label?: string;
 };
 
 export type ViewerRoutesOptions = {
@@ -246,6 +248,8 @@ export function registerViewerRoutes(app: FastifyInstance, { docs, store, sessio
     }
     const history = await store.readHistory(slug);
     const snapshots = await store.snapshotRevs(slug);
+    // Versi bernama (spec-viewer-named-versions): entri bertag membawa `label`.
+    const labels = new Map((await store.readVersions(slug)).map((t) => [t.rev, t.name]));
     const entries: ViewerHistoryEntry[] = history
       // `isHistoryEntry` store hanya memeriksa rev/opsSummary: lewati baris tanpa field yang dipakai di sini.
       .filter((h) => typeof h.sessionId === 'string' && typeof h.at === 'string' && typeof h.description === 'string')
@@ -264,6 +268,7 @@ export function registerViewerRoutes(app: FastifyInstance, { docs, store, sessio
           ...(agent ? { agent } : {}),
           // Opsional: hanya ditulis bila ada (bentuk entri lama tidak berubah).
           ...(snapshots.has(h.rev) ? { snapshot: true } : {}),
+          ...(labels.has(h.rev) ? { label: labels.get(h.rev) } : {}),
         };
       })
       .sort((a, b) => b.rev - a.rev);
