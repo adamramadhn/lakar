@@ -26,6 +26,7 @@ export const SKILL_NAMES = [
   'selection',
   'break-ui',
   'variants',
+  'export-code',
 ] as const;
 export type SkillName = (typeof SKILL_NAMES)[number];
 
@@ -35,8 +36,8 @@ export const DOMAIN_SKILLS = ['layout', 'typography', 'color', 'accessibility', 
 /** Skill jenis layar. */
 export const SCREEN_SKILLS = ['landing', 'mobile', 'webapp'] as const satisfies readonly SkillName[];
 
-/** Skill opsional di luar muat per jenis layar (spec-design-skills-emil): uji data terburuk dan N variasi beda arah. */
-export const OPTIONAL_SKILLS = ['break-ui', 'variants'] as const satisfies readonly SkillName[];
+/** Skill opsional di luar muat per jenis layar: uji data terburuk, N variasi beda arah (spec-design-skills-emil), pipeline design→code. */
+export const OPTIONAL_SKILLS = ['break-ui', 'variants', 'export-code'] as const satisfies readonly SkillName[];
 
 /** Nama skill lama yang sudah tidak ada → pesan pengganti (bukan alias; `read_skill` tetap NOT_FOUND). */
 export const RETIRED_SKILLS: Readonly<Record<string, string>> = {

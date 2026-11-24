@@ -182,9 +182,10 @@ export const READ_SKILL_DESCRIPTION =
   '(layout, typography, color, accessibility, ui, interface, writing, review) + skill jenis layar (landing, mobile, atau webapp; ' +
   'aplikasi desktop/dashboard → webapp; berisi contoh teruji) di giliran yang sama (10 panggilan paralel); icons bila ragu nama ikon; api hanya untuk referensi lengkap; ' +
   'selection bila permintaan merujuk node yang dipilih pengguna di viewer (varian responsif, cek konsistensi); ' +
-  'opsional: break-ui bila diminta uji data terburuk/edge case, variants bila diminta beberapa variasi/alternatif beda arah. ' +
+  'opsional: break-ui bila diminta uji data terburuk/edge case, variants bila diminta beberapa variasi/alternatif beda arah, ' +
+  'export-code bila diminta mengimplementasikan desain sebagai kode/proyek (design → code, Next.js/React) atau mengekspor token. ' +
   'Tanpa name → daftar {skills:[{name, available}]}; dengan name → isi skill. ' +
-  'Nama: core, landing, mobile, webapp, layout, typography, color, accessibility, ui, interface, writing, review, icons, api, selection, break-ui, variants. ' +
+  'Nama: core, landing, mobile, webapp, layout, typography, color, accessibility, ui, interface, writing, review, icons, api, selection, break-ui, variants, export-code. ' +
   'Nama lain atau skill yang belum tersedia → NOT_FOUND dengan daftar yang tersedia (polish sudah dipecah ke delapan skill domain).';
 
 /** Instruksi server MCP (dikirim saat initialize): urutan kerja singkat. */
@@ -203,7 +204,8 @@ export const SERVER_INSTRUCTIONS =
   'akhiri dengan satu screenshot board + satu screenshot zoom (nodeId, scale 2) area terpadat (skill review), satu execute perbaikan, ' +
   'visual_diff untuk memastikan hanya area yang dimaksud berubah, lalu export PNG. ' +
   'Langkah sendiri yang salah (execute/paste/fix_check): undo {steps?} (redo mengulang); ditolak bila ada edit lain sesudahnya, maka perbaiki maju lewat execute. ' +
-  'Opsional: read_skill break-ui bila diminta uji data terburuk/edge case; variants bila diminta beberapa variasi/alternatif.';
+  'Opsional: read_skill break-ui bila diminta uji data terburuk/edge case; variants bila diminta beberapa variasi/alternatif; ' +
+  'export-code bila diminta mengimplementasikan desain sebagai kode/proyek (design → code) atau mengekspor token.';
 
 /** Deskripsi tool `list_boards`. */
 export const LIST_BOARDS_DESCRIPTION =
@@ -487,7 +489,7 @@ export function createLakarMcpServer(daemonUrl: string): McpServer {
     {
       annotations: toolAnnotations('read_skill'),
       description: READ_SKILL_DESCRIPTION,
-      inputSchema: z.object({ name: z.string().optional().describe('core | landing | mobile | webapp | layout | typography | color | accessibility | ui | interface | writing | review | icons | api | selection | break-ui | variants; kosongkan untuk daftar') }),
+      inputSchema: z.object({ name: z.string().optional().describe('core | landing | mobile | webapp | layout | typography | color | accessibility | ui | interface | writing | review | icons | api | selection | break-ui | variants | export-code; kosongkan untuk daftar') }),
     },
     ({ name }) =>
       guarded(async () => {

@@ -89,7 +89,7 @@ const FIXTURE_FINDINGS: Record<string, { rule: string; node: RegExp; detail: str
 };
 
 /** Skill tanpa contoh teruji (domain dan skill opsional berisi aturan saja); skill lain selain api wajib punya ≥ 1 blok js. */
-const NO_EXAMPLES: readonly SkillName[] = ['layout', 'typography', 'color', 'accessibility', 'interface', 'writing', 'review', 'break-ui', 'variants'];
+const NO_EXAMPLES: readonly SkillName[] = ['layout', 'typography', 'color', 'accessibility', 'interface', 'writing', 'review', 'break-ui', 'variants', 'export-code'];
 
 describe('PENDING_2_10', () => {
   it('hanya entri api.md (contoh skill lain bebas pengecualian)', () => {
