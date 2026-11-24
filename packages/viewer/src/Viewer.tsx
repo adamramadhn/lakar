@@ -86,6 +86,7 @@ import { ChecksPanel } from './panels';
 import { DesignPanel } from './DesignPanel';
 import { ThemeButton, ThemePanel } from './ThemePanel';
 import { CodeExportDialog } from './CodeExportDialog';
+import { ShareDialog } from './ShareDialog';
 import { ImportCssDialog, ImportDtcgDialog } from './TokensCss';
 import { effectiveMode } from './themeModel';
 import { parentLayoutOf, type DesignTarget } from './designModel';
@@ -314,6 +315,8 @@ export function Viewer({ slug }: { slug: string }) {
   const closeTheme = useCallback(() => setThemeOpen(false), []);
   /** Dialog Export code (epic kode story 5): id node sumber; ditutup saat pratinjau versi. */
   const [codeExport, setCodeExport] = useState<string | undefined>(undefined);
+  /** Dialog Share link (plan-share-link-ui): tombol di topbar; ditutup saat pratinjau versi. */
+  const [shareOpen, setShareOpen] = useState(false);
   /** Dialog Import (panel Theme): CSS variables (epic kode story 5) dan DTCG tokens (story 9). */
   const [cssImportOpen, setCssImportOpen] = useState(false);
   const [dtcgImportOpen, setDtcgImportOpen] = useState(false);
@@ -1644,6 +1647,10 @@ export function Viewer({ slug }: { slug: string }) {
         <button type="button" className={`viewer-topbar-btn${tab === 'history' ? ' active' : ''}`} aria-label="History" title="History" onClick={() => openTab('history')}>
           <Icon name="history" size={18} />
         </button>
+        <button type="button" className="viewer-topbar-share" onClick={() => setShareOpen(true)} disabled={preview !== undefined}>
+          <Icon name="link" size={14} />
+          Share
+        </button>
       </header>
       <aside className="layers-panel">
         <div className="file-header">
@@ -1936,6 +1943,7 @@ export function Viewer({ slug }: { slug: string }) {
       )}
       {toast && <Toast toast={toast} onClose={closeToast} />}
       {codeExport && !preview && <CodeExportDialog doc={latestDoc} nodeId={codeExport} onClose={() => setCodeExport(undefined)} />}
+      {shareOpen && !preview && <ShareDialog slug={slug} onClose={() => setShareOpen(false)} />}
       {cssImportOpen && !preview && (
         <ImportCssDialog
           doc={latestDoc}

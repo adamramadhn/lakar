@@ -17,6 +17,7 @@ const share = (token: string, over: Partial<NewShare> = {}): NewShare => ({
   title: `Doc ${token}`,
   permissions: { comment: true, download: true },
   doc: createDocument(),
+  expiresAt: null,
   boards: [
     { id: 'b1', name: 'Board 1', x: 0, y: 0, w: 390, h: 844, png: PNG },
     { id: 'b2', name: 'Board 2', x: 500, y: 0, w: 390, h: 844, png: PNG },
@@ -83,6 +84,53 @@ describe.skipIf(!URL_)('PgShareRepo (Postgres nyata)', () => {
 
   it('ping → true', async () => {
     expect(await repo.ping()).toBe(true);
+  });
+
+  it('expiry: expires_at lampau → get undefined tapi tetap di list; update expiresAt:null menghidupkan lagi', async () => {
+    await repo.create(share('tok_pg_exp', { expiresAt: new Date(Date.now() - 1000) }));
+    expect(await repo.get('tok_pg_exp')).toBeUndefined();
+    expect((await repo.list()).map((x) => x.token)).toContain('tok_pg_exp');
+    const revived = await repo.update('tok_pg_exp', { expiresAt: null });
+    expect(revived?.expiresAt).toBeNull();
+    expect(await repo.get('tok_pg_exp')).toBeTruthy();
+  });
+
+  it('update izin shallow-merge; countView hanya menaikkan views', async () => {
+    await repo.create(share('tok_pg_upd'));
+    const patched = await repo.update('tok_pg_upd', { permissions: { download: false } });
+    expect(patched?.permissions).toEqual({ comment: true, download: false });
+    expect((await repo.get('tok_pg_upd'))!.views).toBe(0);
+    expect((await repo.countView('tok_pg_upd'))!.views).toBe(1);
+    expect((await repo.countView('tok_pg_upd'))!.views).toBe(2);
+    expect(await repo.update('tidak-ada', { permissions: { comment: false } })).toBeUndefined();
+  });
+
+  it('refresh: doc+boards diganti atomik, komentar board hilang terhapus (+ cascade balasan), token sama', async () => {
+    await repo.create(share('tok_pg_rf'));
+    const gone = await repo.addComment('tok_pg_rf', { boardId: 'b1', x: 0, y: 0, author: 'A', body: 'hilang', guestId: 'g1' });
+    // Balasan di board yang bertahan tetap ikut terhapus bila induknya hilang (ON DELETE CASCADE).
+    await repo.addComment('tok_pg_rf', { boardId: 'b3', x: 0, y: 0, author: 'B', body: 're-cascade', parentId: (gone as { comment: { id: number } }).comment.id });
+    await repo.addComment('tok_pg_rf', { boardId: 'b3', x: 0, y: 0, author: 'A', body: 'stay' });
+    expect(await repo.refresh('tok_pg_rf', { doc: createDocument(), boards: [{ id: 'b3', name: 'Baru', x: 0, y: 0, w: 10, h: 10, png: PNG }] })).toBe(true);
+    const meta = await repo.get('tok_pg_rf');
+    expect(meta!.boards.map((b) => b.id)).toEqual(['b3']);
+    expect(await repo.boardPng('tok_pg_rf', 'b1')).toBeUndefined();
+    expect(await repo.boardPng('tok_pg_rf', 'b3')).toBeTruthy();
+    expect((await repo.comments('tok_pg_rf'))!.map((c) => c.body)).toEqual(['stay']);
+    expect(await repo.refresh('tidak-ada', { doc: {}, boards: [] })).toBe(false);
+  });
+
+  it('komentar guestId: update/delete hanya pemilik; delete cascade ke balasan', async () => {
+    await repo.create(share('tok_pg_gc'));
+    const c = await repo.addComment('tok_pg_gc', { boardId: 'b1', x: 0, y: 0, author: 'A', body: 'hi', guestId: 'g1' });
+    const id = (c as { comment: { id: number } }).comment.id;
+    const r = await repo.addComment('tok_pg_gc', { boardId: 'b1', x: 0, y: 0, author: 'A', body: 're', parentId: id, guestId: 'g1' });
+    expect(r.status).toBe('ok');
+    expect((await repo.updateComment('tok_pg_gc', id, 'g2', 'x')).status).toBe('forbidden');
+    expect((await repo.updateComment('tok_pg_gc', id, 'g1', 'edited')).status).toBe('ok');
+    expect((await repo.deleteComment('tok_pg_gc', id, 'g2')).status).toBe('forbidden');
+    expect((await repo.deleteComment('tok_pg_gc', id, 'g1')).status).toBe('ok');
+    expect(await repo.comments('tok_pg_gc')).toHaveLength(0);
   });
 });
 

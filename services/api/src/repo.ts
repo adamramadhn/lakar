@@ -18,15 +18,21 @@ export type NewShare = {
   /** Dokumen `.lakar.json` tervalidasi `parseDocument` (bentuk tersimpan, bukan resolved). */
   doc: unknown;
   boards: readonly NewShareBoard[];
+  /** Batas kedaluwarsa link; `null` = "Never" (tidak pernah kedaluwarsa). Diisi route (default +30 hari). */
+  expiresAt: Date | null;
 };
 
-/** Meta publik satu share (tanpa doc/png). `undefined` dari repo untuk token tak dikenal atau revoked. */
+/** Meta publik satu share (tanpa doc/png). `undefined` dari repo untuk token tak dikenal, revoked, atau kedaluwarsa. */
 export type ShareMeta = {
   token: string;
   slug: string;
   title: string;
   permissions: SharePermissions;
   createdAt: string;
+  /** ISO waktu kedaluwarsa, `null` = tidak pernah kedaluwarsa. */
+  expiresAt: string | null;
+  /** Jumlah buka halaman tamu (hanya GET meta yang menghitung). */
+  views: number;
   boards: { id: string; name: string; w: number; h: number }[];
 };
 
@@ -38,20 +44,43 @@ export type ShareComment = {
   author: string;
   body: string;
   parentId?: number;
+  /** UUID acak sisi klien (localStorage `lakar_guest_id`); hanya pemiliknya yang boleh edit/hapus.
+   *  Internal repo — respons publik tidak men-serialize field ini (kepemilikan dibawa `mine`). */
+  guestId?: string;
   createdAt: string;
 };
 
-export type NewComment = { boardId: string; x: number; y: number; author: string; body: string; parentId?: number };
+/** Komentar dalam respons publik: tanpa `guestId` mentah; `mine` dihitung server dari
+ *  header `x-lakar-guest-id` peminta (true = komentar milik browser yang meminta). */
+export type PublicComment = Omit<ShareComment, 'guestId'> & { mine: boolean };
+
+export type NewComment = { boardId: string; x: number; y: number; author: string; body: string; parentId?: number; guestId?: string };
 
 /** Hasil addComment: share hilang/di-revoke dan komentar induk tak dikenal dibedakan untuk mapping HTTP. */
 export type AddCommentResult = { status: 'ok'; comment: ShareComment } | { status: 'missing-share' } | { status: 'missing-parent' };
 
+/** Hasil edit/hapus komentar tamu: 'missing' (share/komentar tak aktif), 'forbidden' (guestId bukan pemilik). */
+export type CommentEditResult = { status: 'ok'; comment: ShareComment } | { status: 'missing' } | { status: 'forbidden' };
+export type CommentDeleteResult = { status: 'ok' } | { status: 'missing' } | { status: 'forbidden' };
+
+/** Bidang yang bisa diubah pemilik lewat PATCH (izin instan + kedaluwarsa); `permissions` di-merge shallow. */
+export type SharePatch = { permissions?: Partial<SharePermissions>; expiresAt?: Date | null };
+
+/** Snapshot pengganti untuk PUT refresh (doc + PNG baru, token tetap; judul/slug/izin opsional). */
+export type ShareRefresh = { doc: unknown; boards: readonly NewShareBoard[]; title?: string; slug?: string; permissions?: Partial<SharePermissions> };
+
 export interface ShareRepo {
   create(share: NewShare): Promise<void>;
-  /** Meta share aktif; `undefined` bila tak dikenal atau sudah di-revoke. */
+  /** Meta share aktif; `undefined` bila tak dikenal, sudah di-revoke, atau kedaluwarsa. */
   get(token: string): Promise<ShareMeta | undefined>;
-  /** Semua share aktif, terbaru dulu (tanpa doc/png). */
+  /** Seperti `get` + menaikkan `views` (hanya untuk GET meta publik; PNG/komentar tidak menghitung). */
+  countView(token: string): Promise<ShareMeta | undefined>;
+  /** Semua share yang belum di-revoke, terbaru dulu (tanpa doc/png; share kedaluwarsa ikut tampil). */
   list(): Promise<ShareMeta[]>;
+  /** Terapkan `patch` pada share yang belum di-revoke (share kedaluwarsa boleh — PATCH bisa menghidupkannya lagi). */
+  update(token: string, patch: SharePatch): Promise<ShareMeta | undefined>;
+  /** Ganti doc+boards share yang belum di-revoke dalam satu transaksi. `false` bila revoked/tak dikenal. */
+  refresh(token: string, snap: ShareRefresh): Promise<boolean>;
   /** Tandai revoked. `false` bila token tak dikenal atau sudah revoked. */
   revoke(token: string): Promise<boolean>;
   boardPng(token: string, boardId: string): Promise<Buffer | undefined>;
@@ -59,6 +88,10 @@ export interface ShareRepo {
   docJson(token: string): Promise<unknown | undefined>;
   comments(token: string): Promise<ShareComment[] | undefined>;
   addComment(token: string, c: NewComment): Promise<AddCommentResult>;
+  /** Edit isi komentar; hanya pemilik `guestId` komentar itu. */
+  updateComment(token: string, id: number, guestId: string, body: string): Promise<CommentEditResult>;
+  /** Hapus komentar; hanya pemilik `guestId` komentar itu. */
+  deleteComment(token: string, id: number, guestId: string): Promise<CommentDeleteResult>;
   /** Koneksi DB hidup (untuk /healthz; impl memori selalu true). */
   ping(): Promise<boolean>;
   close(): Promise<void>;
@@ -68,11 +101,16 @@ export interface ShareRepo {
 // Implementasi Postgres (adaptor; SQL plain, tanpa ORM)
 // ---------------------------------------------------------------------------
 
-type ShareRow = { token: string; slug: string; title: string; permissions: SharePermissions; created_at: Date };
+type ShareRow = { token: string; slug: string; title: string; permissions: SharePermissions; created_at: Date; expires_at: Date | null; views: number };
 type BoardRow = { board_id: string; name: string; w: number; h: number };
-type CommentRow = { id: string; board_id: string; x: number; y: number; author: string; body: string; parent_id: string | null; created_at: Date };
+type CommentRow = { id: string; board_id: string; x: number; y: number; author: string; body: string; parent_id: string | null; guest_id: string | null; created_at: Date };
 /** Baris LEFT JOIN comments: kolom c.* NULL semua saat share aktif belum punya komentar. */
 type CommentJoinRow = { [K in keyof CommentRow]: CommentRow[K] | null };
+
+/** Kondisi "share masih hidup untuk publik": belum di-revoke dan belum kedaluwarsa (prefiks tabel opsional). */
+const activeSql = (alias = '') => `${alias}revoked_at IS NULL AND (${alias}expires_at IS NULL OR ${alias}expires_at > now())`;
+const ACTIVE_SQL = activeSql();
+const META_COLS = 'token, slug, title, permissions, created_at, expires_at, views';
 
 const toMeta = (s: ShareRow, boards: BoardRow[]): ShareMeta => ({
   token: s.token,
@@ -80,6 +118,8 @@ const toMeta = (s: ShareRow, boards: BoardRow[]): ShareMeta => ({
   title: s.title,
   permissions: s.permissions,
   createdAt: s.created_at.toISOString(),
+  expiresAt: s.expires_at === null ? null : s.expires_at.toISOString(),
+  views: s.views,
   boards: boards.map((b) => ({ id: b.board_id, name: b.name, w: b.w, h: b.h })),
 });
 
@@ -91,6 +131,7 @@ const toComment = (r: CommentRow): ShareComment => ({
   author: r.author,
   body: r.body,
   ...(r.parent_id !== null ? { parentId: Number(r.parent_id) } : {}),
+  ...(r.guest_id !== null ? { guestId: r.guest_id } : {}),
   createdAt: r.created_at.toISOString(),
 });
 
@@ -101,12 +142,13 @@ export class PgShareRepo implements ShareRepo {
     const client = await this.pool.connect();
     try {
       await client.query('BEGIN');
-      await client.query('INSERT INTO shares (token, slug, title, permissions, doc) VALUES ($1, $2, $3, $4, $5)', [
+      await client.query('INSERT INTO shares (token, slug, title, permissions, doc, expires_at) VALUES ($1, $2, $3, $4, $5, $6)', [
         share.token,
         share.slug,
         share.title,
         JSON.stringify(share.permissions),
         JSON.stringify(share.doc),
+        share.expiresAt,
       ]);
       for (const [i, b] of share.boards.entries()) {
         await client.query('INSERT INTO share_boards (token, board_id, ord, name, x, y, w, h, png) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)', [
@@ -130,8 +172,22 @@ export class PgShareRepo implements ShareRepo {
     }
   }
 
+  /** Meta share dari baris `shares` + boards; `active` false = tampilkan juga yang kedaluwarsa (tampilan pemilik). */
+  private async metaRow(token: string, active: boolean): Promise<ShareMeta | undefined> {
+    const { rows } = await this.pool.query<ShareRow>(`SELECT ${META_COLS} FROM shares WHERE token = $1 AND ${active ? ACTIVE_SQL : 'revoked_at IS NULL'}`, [token]);
+    const share = rows[0];
+    if (!share) return undefined;
+    const boards = await this.pool.query<BoardRow>('SELECT board_id, name, w, h FROM share_boards WHERE token = $1 ORDER BY ord', [token]);
+    return toMeta(share, boards.rows);
+  }
+
   async get(token: string): Promise<ShareMeta | undefined> {
-    const { rows } = await this.pool.query<ShareRow>('SELECT token, slug, title, permissions, created_at FROM shares WHERE token = $1 AND revoked_at IS NULL', [token]);
+    return this.metaRow(token, true);
+  }
+
+  async countView(token: string): Promise<ShareMeta | undefined> {
+    // Satu statement bersyarat: share revoked/kedaluwarsa menulis 0 baris → undefined (identik get()).
+    const { rows } = await this.pool.query<ShareRow>(`UPDATE shares SET views = views + 1 WHERE token = $1 AND ${ACTIVE_SQL} RETURNING ${META_COLS}`, [token]);
     const share = rows[0];
     if (!share) return undefined;
     const boards = await this.pool.query<BoardRow>('SELECT board_id, name, w, h FROM share_boards WHERE token = $1 ORDER BY ord', [token]);
@@ -139,13 +195,79 @@ export class PgShareRepo implements ShareRepo {
   }
 
   async list(): Promise<ShareMeta[]> {
-    const { rows } = await this.pool.query<ShareRow>('SELECT token, slug, title, permissions, created_at FROM shares WHERE revoked_at IS NULL ORDER BY created_at DESC');
+    const { rows } = await this.pool.query<ShareRow>(`SELECT ${META_COLS} FROM shares WHERE revoked_at IS NULL ORDER BY created_at DESC`);
     const out: ShareMeta[] = [];
     for (const share of rows) {
       const boards = await this.pool.query<BoardRow>('SELECT board_id, name, w, h FROM share_boards WHERE token = $1 ORDER BY ord', [share.token]);
       out.push(toMeta(share, boards.rows));
     }
     return out;
+  }
+
+  async update(token: string, patch: SharePatch): Promise<ShareMeta | undefined> {
+    // `expiresAt` bisa diset null ("Never"), jadi klausa SET dibangun dinamis — COALESCE tidak bisa
+    // membedakan "tidak dikirim" dari "set null".
+    const sets: string[] = [];
+    const params: unknown[] = [token];
+    if (patch.permissions !== undefined) {
+      // Merge shallow jsonb (`||`): kunci izin yang tidak dikirim dipertahankan.
+      params.push(JSON.stringify(patch.permissions));
+      sets.push(`permissions = permissions || $${params.length}::jsonb`);
+    }
+    if (patch.expiresAt !== undefined) {
+      params.push(patch.expiresAt);
+      sets.push(`expires_at = $${params.length}`);
+    }
+    if (sets.length) {
+      const { rowCount } = await this.pool.query(`UPDATE shares SET ${sets.join(', ')} WHERE token = $1 AND revoked_at IS NULL`, params);
+      if ((rowCount ?? 0) === 0) return undefined;
+    }
+    // Tampilan pemilik: share kedaluwarsa tetap kembali (meta membawa expiresAt untuk badge "expired").
+    return this.metaRow(token, false);
+  }
+
+  async refresh(token: string, snap: ShareRefresh): Promise<boolean> {
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN');
+      // created_at ikut maju: kolom ini dipakai UI sebagai "waktu snapshot terakhir" + umur link,
+      // dan membuat link yang baru di-refresh naik ke atas daftar (ORDER BY created_at DESC).
+      const { rowCount } = await client.query("UPDATE shares SET doc = $2, title = COALESCE($3, title), slug = COALESCE($4, slug), permissions = permissions || COALESCE($5, '{}'::jsonb), created_at = now() WHERE token = $1 AND revoked_at IS NULL", [
+        token,
+        JSON.stringify(snap.doc),
+        snap.title ?? null,
+        snap.slug ?? null,
+        snap.permissions !== undefined ? JSON.stringify(snap.permissions) : null,
+      ]);
+      if ((rowCount ?? 0) === 0) {
+        await client.query('ROLLBACK');
+        return false;
+      }
+      await client.query('DELETE FROM share_boards WHERE token = $1', [token]);
+      for (const [i, b] of snap.boards.entries()) {
+        await client.query('INSERT INTO share_boards (token, board_id, ord, name, x, y, w, h, png) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)', [
+          token,
+          b.id,
+          i,
+          b.name,
+          b.x,
+          b.y,
+          b.w,
+          b.h,
+          b.png,
+        ]);
+      }
+      // Komentar pada board yang hilang dari snapshot baru ikut dihapus (semantik "snapshot") —
+      // pin-nya tidak punya gambar untuk ditambatkan. Balasannya terhapus lewat ON DELETE CASCADE.
+      await client.query('DELETE FROM share_comments WHERE token = $1 AND NOT (board_id = ANY($2::text[]))', [token, snap.boards.map((b) => b.id)]);
+      await client.query('COMMIT');
+      return true;
+    } catch (e) {
+      await client.query('ROLLBACK').catch(() => {});
+      throw e;
+    } finally {
+      client.release();
+    }
   }
 
   async revoke(token: string): Promise<boolean> {
@@ -155,14 +277,14 @@ export class PgShareRepo implements ShareRepo {
 
   async boardPng(token: string, boardId: string): Promise<Buffer | undefined> {
     const { rows } = await this.pool.query<{ png: Buffer }>(
-      'SELECT b.png FROM share_boards b JOIN shares s ON s.token = b.token WHERE b.token = $1 AND b.board_id = $2 AND s.revoked_at IS NULL',
+      `SELECT b.png FROM share_boards b JOIN shares s ON s.token = b.token WHERE b.token = $1 AND b.board_id = $2 AND ${activeSql('s.')}`,
       [token, boardId],
     );
     return rows[0]?.png;
   }
 
   async docJson(token: string): Promise<unknown | undefined> {
-    const { rows } = await this.pool.query<{ doc: unknown }>('SELECT doc FROM shares WHERE token = $1 AND revoked_at IS NULL', [token]);
+    const { rows } = await this.pool.query<{ doc: unknown }>(`SELECT doc FROM shares WHERE token = $1 AND ${ACTIVE_SQL}`, [token]);
     return rows[0]?.doc;
   }
 
@@ -171,9 +293,9 @@ export class PgShareRepo implements ShareRepo {
     // membocorkan komentar — LEFT JOIN membedakan share hilang/revoked (0 baris) dari share
     // aktif tanpa komentar (1 baris dengan c.id NULL).
     const { rows } = await this.pool.query<CommentJoinRow>(
-      `SELECT c.id, c.board_id, c.x, c.y, c.author, c.body, c.parent_id, c.created_at
+      `SELECT c.id, c.board_id, c.x, c.y, c.author, c.body, c.parent_id, c.guest_id, c.created_at
        FROM shares s LEFT JOIN share_comments c ON c.token = s.token
-       WHERE s.token = $1 AND s.revoked_at IS NULL
+       WHERE s.token = $1 AND ${activeSql('s.')}
        ORDER BY c.created_at, c.id`,
       [token],
     );
@@ -190,14 +312,46 @@ export class PgShareRepo implements ShareRepo {
     // INSERT bersyarat EXISTS: revoke yang mendarat sebelum statement ini membuat 0 baris
     // tertulis → 'missing-share' (tanpa jendela TOCTOU seperti pre-check get()).
     const { rows } = await this.pool.query<CommentRow>(
-      `INSERT INTO share_comments (token, board_id, x, y, author, body, parent_id)
-       SELECT $1, $2, $3, $4, $5, $6, $7
-       WHERE EXISTS (SELECT 1 FROM shares WHERE token = $1 AND revoked_at IS NULL)
-       RETURNING id, board_id, x, y, author, body, parent_id, created_at`,
-      [token, c.boardId, c.x, c.y, c.author, c.body, c.parentId ?? null],
+      `INSERT INTO share_comments (token, board_id, x, y, author, body, parent_id, guest_id)
+       SELECT $1, $2, $3, $4, $5, $6, $7, $8
+       WHERE EXISTS (SELECT 1 FROM shares WHERE token = $1 AND ${ACTIVE_SQL})
+       RETURNING id, board_id, x, y, author, body, parent_id, guest_id, created_at`,
+      [token, c.boardId, c.x, c.y, c.author, c.body, c.parentId ?? null, c.guestId ?? null],
     );
     if (!rows[0]) return { status: 'missing-share' };
     return { status: 'ok', comment: toComment(rows[0]) };
+  }
+
+  /** Pre-check bersama untuk edit/hapus komentar tamu: membedakan share mati / komentar hilang / bukan pemilik. */
+  private async commentGuard(token: string, id: number, guestId: string): Promise<{ status: 'ok' } | { status: 'missing' } | { status: 'forbidden' }> {
+    const { rows } = await this.pool.query<{ guest_id: string | null; dead: boolean }>(
+      `SELECT c.guest_id, (s.revoked_at IS NOT NULL OR (s.expires_at IS NOT NULL AND s.expires_at <= now())) AS dead
+       FROM share_comments c JOIN shares s ON s.token = c.token
+       WHERE c.id = $1 AND c.token = $2`,
+      [id, token],
+    );
+    const row = rows[0];
+    if (!row || row.dead) return { status: 'missing' };
+    if (row.guest_id === null || row.guest_id !== guestId) return { status: 'forbidden' };
+    return { status: 'ok' };
+  }
+
+  async updateComment(token: string, id: number, guestId: string, body: string): Promise<CommentEditResult> {
+    const guard = await this.commentGuard(token, id, guestId);
+    if (guard.status !== 'ok') return guard;
+    const { rows } = await this.pool.query<CommentRow>(
+      'UPDATE share_comments SET body = $3 WHERE id = $1 AND token = $2 RETURNING id, board_id, x, y, author, body, parent_id, guest_id, created_at',
+      [id, token, body],
+    );
+    if (!rows[0]) return { status: 'missing' };
+    return { status: 'ok', comment: toComment(rows[0]) };
+  }
+
+  async deleteComment(token: string, id: number, guestId: string): Promise<CommentDeleteResult> {
+    const guard = await this.commentGuard(token, id, guestId);
+    if (guard.status !== 'ok') return guard;
+    const { rowCount } = await this.pool.query('DELETE FROM share_comments WHERE id = $1 AND token = $2', [id, token]);
+    return (rowCount ?? 0) > 0 ? { status: 'ok' } : { status: 'missing' };
   }
 
   async ping(): Promise<boolean> {
@@ -218,7 +372,7 @@ export class PgShareRepo implements ShareRepo {
 // Implementasi memori (tes unit; kontrak sama dengan PgShareRepo)
 // ---------------------------------------------------------------------------
 
-type StoredShare = NewShare & { createdAt: string; revoked: boolean };
+type StoredShare = NewShare & { createdAt: string; revoked: boolean; views: number };
 
 export class MemoryShareRepo implements ShareRepo {
   private readonly shares = new Map<string, StoredShare>();
@@ -228,35 +382,78 @@ export class MemoryShareRepo implements ShareRepo {
   up = true;
 
   async create(share: NewShare): Promise<void> {
-    this.shares.set(share.token, { ...share, boards: [...share.boards], createdAt: new Date().toISOString(), revoked: false });
+    this.shares.set(share.token, { ...share, boards: [...share.boards], createdAt: new Date().toISOString(), revoked: false, views: 0 });
   }
 
-  private active(token: string): StoredShare | undefined {
+  /** Belum di-revoke (tampilan pemilik — share kedaluwarsa ikut). */
+  private live(token: string): StoredShare | undefined {
     const s = this.shares.get(token);
     return s && !s.revoked ? s : undefined;
   }
 
-  async get(token: string): Promise<ShareMeta | undefined> {
-    const s = this.active(token);
-    if (!s) return undefined;
+  /** Hidup untuk publik: belum revoked dan belum kedaluwarsa. */
+  private active(token: string): StoredShare | undefined {
+    const s = this.live(token);
+    return s && (s.expiresAt === null || s.expiresAt.getTime() > Date.now()) ? s : undefined;
+  }
+
+  private metaOf(s: StoredShare): ShareMeta {
     return {
       token: s.token,
       slug: s.slug,
       title: s.title,
       permissions: s.permissions,
       createdAt: s.createdAt,
+      expiresAt: s.expiresAt === null ? null : s.expiresAt.toISOString(),
+      views: s.views,
       boards: s.boards.map((b) => ({ id: b.id, name: b.name, w: b.w, h: b.h })),
     };
   }
 
+  async get(token: string): Promise<ShareMeta | undefined> {
+    const s = this.active(token);
+    return s ? this.metaOf(s) : undefined;
+  }
+
+  async countView(token: string): Promise<ShareMeta | undefined> {
+    const s = this.active(token);
+    if (!s) return undefined;
+    s.views += 1;
+    return this.metaOf(s);
+  }
+
   async list(): Promise<ShareMeta[]> {
     const out: ShareMeta[] = [];
-    for (const s of this.shares.values()) if (!s.revoked) out.push((await this.get(s.token))!);
+    for (const s of this.shares.values()) if (!s.revoked) out.push(this.metaOf(s));
     return out.sort((a, b) => (a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0));
   }
 
+  async update(token: string, patch: SharePatch): Promise<ShareMeta | undefined> {
+    const s = this.live(token);
+    if (!s) return undefined;
+    if (patch.permissions !== undefined) s.permissions = { ...s.permissions, ...patch.permissions };
+    if (patch.expiresAt !== undefined) s.expiresAt = patch.expiresAt;
+    return this.metaOf(s);
+  }
+
+  async refresh(token: string, snap: ShareRefresh): Promise<boolean> {
+    const s = this.live(token);
+    if (!s) return false;
+    s.doc = snap.doc;
+    s.boards = [...snap.boards];
+    if (snap.title !== undefined) s.title = snap.title;
+    if (snap.slug !== undefined) s.slug = snap.slug;
+    if (snap.permissions !== undefined) s.permissions = { ...s.permissions, ...snap.permissions };
+    // Paritas dengan Pg: created_at maju = "waktu snapshot terakhir" + umur link di UI.
+    s.createdAt = new Date().toISOString();
+    // Paritas dengan Pg: komentar pada board yang hilang dari snapshot baru dihapus (semantik snapshot).
+    const keep = new Set(snap.boards.map((b) => b.id));
+    this.dropCascade(token, new Set((this.commentsBy.get(token) ?? []).filter((c) => !keep.has(c.boardId)).map((c) => c.id)));
+    return true;
+  }
+
   async revoke(token: string): Promise<boolean> {
-    const s = this.active(token);
+    const s = this.live(token);
     if (!s) return false;
     s.revoked = true;
     return true;
@@ -283,6 +480,48 @@ export class MemoryShareRepo implements ShareRepo {
     list.push(comment);
     this.commentsBy.set(token, list);
     return { status: 'ok', comment };
+  }
+
+  /** Pre-check edit/hapus komentar: share mati / komentar hilang → 'missing', guestId beda → 'forbidden'. */
+  private commentGuard(token: string, id: number, guestId: string): { status: 'ok'; comment: ShareComment } | { status: 'missing' } | { status: 'forbidden' } {
+    if (!this.active(token)) return { status: 'missing' };
+    const comment = (this.commentsBy.get(token) ?? []).find((c) => c.id === id);
+    if (!comment) return { status: 'missing' };
+    if (comment.guestId === undefined || comment.guestId !== guestId) return { status: 'forbidden' };
+    return { status: 'ok', comment };
+  }
+
+  async updateComment(token: string, id: number, guestId: string, body: string): Promise<CommentEditResult> {
+    const guard = this.commentGuard(token, id, guestId);
+    if (guard.status !== 'ok') return guard;
+    guard.comment.body = body;
+    return { status: 'ok', comment: guard.comment };
+  }
+
+  /** Hapus komentar dengan id di `gone` + balasannya transitif (paritas ON DELETE CASCADE Postgres). */
+  private dropCascade(token: string, gone: Set<number>): void {
+    if (gone.size === 0) return;
+    const list = this.commentsBy.get(token) ?? [];
+    for (let grew = true; grew; ) {
+      grew = false;
+      for (const c of list) {
+        if (c.parentId !== undefined && gone.has(c.parentId) && !gone.has(c.id)) {
+          gone.add(c.id);
+          grew = true;
+        }
+      }
+    }
+    this.commentsBy.set(
+      token,
+      list.filter((c) => !gone.has(c.id)),
+    );
+  }
+
+  async deleteComment(token: string, id: number, guestId: string): Promise<CommentDeleteResult> {
+    const guard = this.commentGuard(token, id, guestId);
+    if (guard.status !== 'ok') return guard;
+    this.dropCascade(token, new Set([id]));
+    return { status: 'ok' };
   }
 
   async ping(): Promise<boolean> {

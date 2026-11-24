@@ -122,6 +122,31 @@ export type PasteResult = OpsResult & { nodeId: string; report: PasteReport };
 export type ImportUrlBody = { url: string; pageId?: string; x?: number; y?: number; name?: string; description?: string; width?: number; screen?: 'landing' | 'app' | 'mobile' };
 /** Hasil impor URL: seperti paste + `boardId` board baru dan metadata halaman yang diambil. */
 export type ImportUrlResult = OpsResult & { nodeId: string; boardId: string; report: PasteReport; page: { url: string; finalUrl: string; title?: string } };
+
+// ---- Share link (plan-share-link-ui): proxy daemon → @lakar/api; kunci cloud hanya di daemon. ----
+
+/** Izin satu share link (lihat selalu ada — token = izin). */
+export type SharePermissions = { comment: boolean; download: boolean };
+/** Satu baris "Active links" di dialog Share (meta service + url halaman tamu). */
+export type ShareLink = {
+  token: string;
+  slug: string;
+  title: string;
+  permissions: SharePermissions;
+  url: string;
+  createdAt: string;
+  /** ISO kedaluwarsa; null = Never. */
+  expiresAt: string | null;
+  views: number;
+  boards: { id: string; name: string; w: number; h: number }[];
+};
+/** `GET /viewer/docs/:slug/shares`: `configured:false` = cloud env belum diset di lakard. */
+export type ShareList = { configured: boolean; host?: string; shares: ShareLink[] };
+/** Hasil upload/refresh snapshot share. */
+export type ShareUpload = { token: string; url: string; boards: number };
+/** Body PATCH share: izin parsial dan/atau kedaluwarsa (null = Never). */
+export type SharePatch = { permissions?: Partial<SharePermissions>; expiresAt?: string | null };
+
 /** Font terpasang (GET /viewer/fonts). */
 export type FontFamily = { family: string; weights: number[]; styles: string[] };
 export type LayoutCheck = { docId: string; rev: number; boards: unknown; summary: FindingSummary; findings: Finding[]; ranAt: number };
@@ -201,7 +226,7 @@ export const connection = {
   },
 };
 
-async function request<T>(method: 'GET' | 'POST' | 'PUT' | 'DELETE', path: string, body?: unknown, session?: string, keepalive?: boolean): Promise<T> {
+async function request<T>(method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE', path: string, body?: unknown, session?: string, keepalive?: boolean): Promise<T> {
   let res: Response;
   try {
     res = await fetch(path, {
@@ -900,6 +925,33 @@ class ViewerClient {
 
   layoutCheck(slug: string): Promise<LayoutCheck> {
     return this.#withDoc(slug, async (s) => ({ ...(await request<Omit<LayoutCheck, 'ranAt'>>('POST', '/layout-check', {}, s)), ranAt: Date.now() }));
+  }
+
+  // ---- Share link (plan-share-link-ui): proxy `/viewer/*` ke @lakar/api; tanpa sesi dokumen. ----
+
+  /** Daftar share aktif dokumen `slug` (+ `configured:false` bila cloud env lakard belum diset). */
+  listShares(slug: string): Promise<ShareList> {
+    return request<ShareList>('GET', `/viewer/docs/${encodeURIComponent(slug)}/shares`);
+  }
+
+  /** Buat link baru: render snapshot board lalu upload ke service (daemon yang merender). */
+  createShare(slug: string, permissions?: SharePermissions): Promise<ShareUpload> {
+    return request<ShareUpload>('POST', `/viewer/docs/${encodeURIComponent(slug)}/share`, permissions ? { permissions } : undefined);
+  }
+
+  /** Ubah izin dan/atau kedaluwarsa link `token` (`expiresAt:null` = Never). */
+  patchShare(token: string, patch: SharePatch): Promise<Record<string, unknown>> {
+    return request('PATCH', `/viewer/shares/${encodeURIComponent(token)}`, patch);
+  }
+
+  /** Revoke link `token` — semua GET publiknya langsung 404. */
+  revokeShare(token: string): Promise<{ token: string; revoked: boolean }> {
+    return request('DELETE', `/viewer/shares/${encodeURIComponent(token)}`);
+  }
+
+  /** "Update snapshot": render ulang `slug` dan ganti PNG/doc link `token` (URL & komentar tetap). */
+  refreshShare(token: string, slug: string): Promise<ShareUpload> {
+    return request<ShareUpload>('POST', `/viewer/shares/${encodeURIComponent(token)}/refresh`, { slug });
   }
 }
 

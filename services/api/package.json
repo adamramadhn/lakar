@@ -15,7 +15,8 @@
   "types": "./dist/index.d.ts",
   "files": [
     "dist",
-    "migrations"
+    "migrations",
+    "public"
   ],
   "scripts": {
     "test": "vitest run --root ../.. services/api/",
