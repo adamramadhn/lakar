@@ -2,6 +2,28 @@
 
 Catatan serah-terima untuk melanjutkan di ADE atau IDE lain. Aturan dan jebakan repo ada di [AGENTS.md](AGENTS.md).
 
+## Update 2026-11-24 — gelombang fitur Figma-parity + cloud collab (OPEN)
+
+PR terbuka menunggu merge (semua branch lepas `main` baseline `77d4235`; tiga di antaranya bentrok versi skema — lihat catatan):
+
+| PR | Isi |
+|---|---|
+| #64 | Tab Design gabungan di viewer |
+| #65 | Device presets |
+| #66 | Named versions |
+| #67 | Section groups (`boardShape.section`, schema v11) |
+| #68 | Comment→fix mailbox (`fixRequest` di thread + tool `fix_comment`, schema v11) |
+| #69 | Prototype mode v1 (`interactions[]`/`flows[]`, `PresentView`, `ConnectionLayer`, schema v11) |
+| #70 | MCP `--file` transport + `lakard --headless` (story 2+6 cloud spec) |
+| #71 | `@lakar/api` share-link snapshot service + `POST /viewer/docs/:slug/share` (story 1 backend) |
+| #72 | `@lakar/sync` sync server multiplayer: WS rooms, sequencer `FOR UPDATE`, seededRandom deterministik (story 3) |
+
+Catatan:
+- **Bentrok schema v11**: #67, #68, #69 masing-masing bump 10→11. Yang merge kedua/ketiga wajib rebase ke v12/v13 (renomor `MIGRATIONS`, `SCHEMA_VERSION`, pin tes, fixture `tests/fixtures/docs/vNN/` + goldens codegen).
+- **Bentrok wiring services**: #71 dan #72 sama-sama menambah `services/*` di pnpm-workspace/tsconfig/vitest/dependency-direction — resolusi: `api` + `sync` dua-duanya di EDGES (14 paket).
+- Kontrak protokol sync (`@lakar/sync`): pesan `ops` membawa `seed`+`at`; klien WAJIB replay lewat `transact(doc, ops, {random: seededRandom(seed), now: () => new Date(at)})` — `seededRandom` ada di `@lakar/schema`.
+- Roadmap cloud tersisa: story 4 (MCP `--server`), story 5 (viewer cloud + UI collab), share-link UI (menunggu mockup `share-link.pen`), deployment (butuh infra dari Fatmuh).
+
 ## Branch dan PR
 
 Semua PR ada di repo GitHub `fatmuh/lakar` (dulu `adamramadhn/lakar`; alamat lama di-redirect).
