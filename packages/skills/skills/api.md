@@ -8,7 +8,7 @@ Referensi lengkap fungsi global di snippet `execute` (sandbox QuickJS sinkron). 
 
 `add(parentId: string | null, node: {type: 'board'|'frame'|'text'|'rect'|'ellipse'|'path'|'icon'|'instance', name, ...}): string`
 
-Tambah node ke board/frame parentId (null = halaman, khusus board). Katalog tertutup: board, frame, text, rect, ellipse, path, icon, instance (bagian Komponen). parentId '<instanceId>/<idFrameSlot>' mengisi slot instance. Anak ditambahkan satu per satu (tanpa children bersarang). Mengembalikan ID 8 karakter secara sinkron. Icon: {type:'icon', lib:'lucide'|'simple-icons', icon:<nama kanonik>, size, color?, strokeWidth?, filled?}; alias dikonversi ke nama kanonik (lucide 'home' → 'house'), name default 'Icon / <lib> / <icon>', version diisi otomatis (jangan dikirim); nama tidak dikenal → ICON_UNKNOWN + 3 saran (cari dengan iconSearch).
+Tambah node ke board/frame parentId (null = halaman aktif sesi — default halaman pertama; khusus board). Katalog tertutup: board, frame, text, rect, ellipse, path, icon, instance (bagian Komponen). parentId '<instanceId>/<idFrameSlot>' mengisi slot instance. Anak ditambahkan satu per satu (tanpa children bersarang). Mengembalikan ID 8 karakter secara sinkron. Icon: {type:'icon', lib:'lucide'|'simple-icons', icon:<nama kanonik>, size, color?, strokeWidth?, filled?}; alias dikonversi ke nama kanonik (lucide 'home' → 'house'), name default 'Icon / <lib> / <icon>', version diisi otomatis (jangan dikirim); nama tidak dikenal → ICON_UNKNOWN + 3 saran (cari dengan iconSearch).
 
 - Mengembalikan: ID node baru (string 8 karakter)
 - Error: SCHEMA_INVALID, NOT_FOUND, ICON_UNKNOWN
@@ -264,7 +264,7 @@ find({type:'text', name:/^Jud/, within: b}).map((n) => n.id);
 
 `children(id: string | null): NodeView[]`
 
-Anak langsung node dalam urutan dokumen; null = board di halaman. Instance → isi slot tersimpannya (bukan isi master; itu lewat get alamat komposit). Node daun → [].
+Anak langsung node dalam urutan dokumen; null = board di halaman aktif sesi. Instance → isi slot tersimpannya (bukan isi master; itu lewat get alamat komposit). Node daun → [].
 
 - Mengembalikan: NodeView[]
 - Error: SCHEMA_INVALID, NOT_FOUND
@@ -295,7 +295,7 @@ const { tokens, modes } = getTokens();
 
 `place(w: number, h: number | 'hug', opts?: {near?: string, gap?: number}): {x, y}`
 
-Posisi {x, y} untuk board baru w×h yang tidak tumpang tindih board di halaman (termasuk yang dibuat di snippet ini), berjarak gap (default 80). h 'hug' = board height:'hug' (hanya tepi atasnya dihitung); board hug yang ada memakai tinggi terukur render terakhir. Halaman kosong → {x:0, y:0}; tanpa near → baris atas, kiri ke kanan; near → kanan board itu, lalu di bawahnya.
+Posisi {x, y} untuk board baru w×h yang tidak tumpang tindih board di halaman aktif sesi (termasuk yang dibuat di snippet ini), berjarak gap (default 80). h 'hug' = board height:'hug' (hanya tepi atasnya dihitung); board hug yang ada memakai tinggi terukur render terakhir. Halaman kosong → {x:0, y:0}; tanpa near → baris atas, kiri ke kanan; near → kanan board itu, lalu di bawahnya.
 
 - Mengembalikan: {x: number, y: number}
 - Error: SCHEMA_INVALID, NOT_FOUND

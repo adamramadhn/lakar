@@ -36,6 +36,8 @@ export type RunOptions = {
   dtcg?: DtcgPort;
   /** Tinggi terukur board `height:'hug'` (render terakhir; `place`, `measuredHeight`). Tidak ada → belum terukur. */
   boardHeights?: ReadonlyMap<string, number>;
+  /** ID halaman aktif sesi (target `add(null)`/`children(null)`/`place`). Tidak ada → halaman pertama. */
+  activePageId?: string;
 };
 export type RunSuccess = {
   ok: true;
@@ -253,6 +255,7 @@ export async function runSnippet(code: string, tx: Transaction, opts: RunOptions
     ...(opts.cssVariables ? { cssVariables: opts.cssVariables } : {}),
     ...(opts.dtcg ? { dtcg: opts.dtcg } : {}),
     ...(opts.boardHeights ? { boardHeights: opts.boardHeights } : {}),
+    ...(opts.activePageId !== undefined ? { activePageId: opts.activePageId } : {}),
     countOp() {
       ops++;
       if (ops > MAX_OPS) {
