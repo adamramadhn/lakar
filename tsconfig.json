@@ -36,6 +36,9 @@
     },
     {
       "path": "./bench"
+    },
+    {
+      "path": "./services/sync"
     }
   ]
 }

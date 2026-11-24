@@ -19,6 +19,7 @@ export const EDGES: Readonly<Record<string, readonly string[]>> = {
   mcp: ['schema'],
   bench: ['schema'],
   viewer: ['schema', 'render', 'codegen'],
+  sync: ['core', 'schema'],
 };
 
 /** Paket yang tidak boleh menyentuh IO (builtin Node atau pustaka IO). */
@@ -123,10 +124,11 @@ function walkTs(dir: string, base: string, acc: Record<string, string>): void {
   }
 }
 
-/** Baca semua paket workspace (`packages/*` + `bench`) dari disk. */
+/** Baca semua paket workspace (`packages/*` + `services/*` + `bench`) dari disk. */
 export function loadWorkspace(root: string): PackageSource[] {
   const dirs = [
     ...readdirSync(join(root, 'packages')).map((d) => join(root, 'packages', d)),
+    ...(existsSync(join(root, 'services')) ? readdirSync(join(root, 'services')).map((d) => join(root, 'services', d)) : []),
     join(root, 'bench'),
   ].filter((d) => existsSync(join(d, 'package.json')));
   return dirs.map((dir) => {
