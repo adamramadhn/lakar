@@ -411,6 +411,25 @@ export const PAGE_TREE_DESCRIPTION =
   `lalu children sampai depth (0–6, default 2); lebih dalam → childCount + truncated:true. Lebih hemat token daripada inspect per board — ` +
   'pakai untuk melihat struktur halaman, lalu inspect/screenshot board tertentu untuk detail.';
 
+/** Deskripsi tool `list_comments` (story 9.3). */
+export const LIST_COMMENTS_DESCRIPTION =
+  'Daftar thread komentar di dokumen aktif sesi: {total, open, threads:[{id, pageId, nodeId?, x, y, status, resolvedAt?, messages:[{author:{kind,name}, text, at}]}]}. ' +
+  'Filter opsional: status open/resolved/all, pageId, kind (penulis pembuka thread: user/agent). Pin nodeId = di layer; tanpa nodeId = titik bebas di x,y (koordinat halaman).';
+
+/** Deskripsi tool `add_comment` (story 9.3). */
+export const ADD_COMMENT_DESCRIPTION =
+  'Buat thread komentar baru di dokumen aktif — untuk catatan review, pertanyaan ke pengguna, atau penanda hasil execute. ' +
+  'Pin di layer: {text, nodeId} (x,y opsional; default posisi node). Titik bebas: {text, x, y, pageId?} (default halaman aktif sesi). ' +
+  'Menambah rev (riwayat + snapshot); penulis tercatat sebagai agen sesi ini.';
+
+/** Deskripsi tool `reply_to_comment` (story 9.3). */
+export const REPLY_COMMENT_DESCRIPTION = 'Balas thread komentar: {threadId, text}. Pesan ditambah ke thread; menambah rev.';
+
+/** Deskripsi tool `resolve_comment` (story 9.3). */
+export const RESOLVE_COMMENT_DESCRIPTION =
+  'Tandai thread komentar resolved atau buka kembali: {threadId, resolved?} (default true; false = buka kembali). ' +
+  'Resolve menetapkan resolvedAt. Idempoten — status sudah sama → tanpa rev baru.';
+
 /** Deskripsi tool `visual_diff` (spec-agent-visual-diff). */
 export const VISUAL_DIFF_DESCRIPTION =
   'Bandingkan render board/node dokumen aktif di dua rev (snapshot History) untuk memastikan edit hanya mengubah area yang dimaksud. ' +
@@ -629,6 +648,71 @@ export function createLakarMcpServer(daemonUrl: string): McpServer {
         const body = Object.fromEntries(Object.entries({ page, depth }).filter(([, v]) => v !== undefined));
         return asText(await client.call('/pages/tree', body));
       }),
+  );
+
+  // Komentar canvas (story 9.3): thread komentar di dokumen aktif. Route agen `/comments*`.
+  server.registerTool(
+    'list_comments',
+    {
+      annotations: toolAnnotations('list_comments'),
+      description: LIST_COMMENTS_DESCRIPTION,
+      inputSchema: z.object({
+        status: z.enum(['open', 'resolved', 'all']).optional().describe('filter status thread (default semua)'),
+        pageId: z.string().optional().describe('filter halaman (id dari list_pages)'),
+        kind: z.enum(['user', 'agent']).optional().describe('filter penulis pembuka thread'),
+      }),
+    },
+    (args) =>
+      guarded(async () => {
+        const body = Object.fromEntries(Object.entries(args).filter(([, v]) => v !== undefined));
+        return asText(await client.call('/comments', body));
+      }),
+  );
+
+  server.registerTool(
+    'add_comment',
+    {
+      annotations: toolAnnotations('add_comment'),
+      description: ADD_COMMENT_DESCRIPTION,
+      inputSchema: z.object({
+        text: z.string().min(1).max(4000).describe('isi komentar (1–4000 karakter)'),
+        nodeId: z.string().optional().describe('pin di layer ini (id dari inspect/get_page_tree); pin mengikuti layer di viewer'),
+        x: z.number().optional().describe('posisi X pin (koordinat halaman); wajib dengan y bila tanpa nodeId'),
+        y: z.number().optional().describe('posisi Y pin (koordinat halaman); wajib dengan x bila tanpa nodeId'),
+        pageId: z.string().optional().describe('halaman tujuan titik bebas (id dari list_pages; default halaman aktif sesi)'),
+      }),
+    },
+    (args) =>
+      guarded(async () => {
+        const body = Object.fromEntries(Object.entries(args).filter(([, v]) => v !== undefined));
+        return asText(await client.call('/comments/create', body));
+      }),
+  );
+
+  server.registerTool(
+    'reply_to_comment',
+    {
+      annotations: toolAnnotations('reply_to_comment'),
+      description: REPLY_COMMENT_DESCRIPTION,
+      inputSchema: z.object({
+        threadId: z.string().describe('id thread dari list_comments'),
+        text: z.string().min(1).max(4000).describe('isi balasan (1–4000 karakter)'),
+      }),
+    },
+    ({ threadId, text }) => guarded(async () => asText(await client.call('/comments/reply', { threadId, text }))),
+  );
+
+  server.registerTool(
+    'resolve_comment',
+    {
+      annotations: toolAnnotations('resolve_comment'),
+      description: RESOLVE_COMMENT_DESCRIPTION,
+      inputSchema: z.object({
+        threadId: z.string().describe('id thread dari list_comments'),
+        resolved: z.boolean().optional().describe('true = tandai selesai (default), false = buka kembali'),
+      }),
+    },
+    ({ threadId, resolved }) => guarded(async () => asText(await client.call('/comments/resolve', resolved !== undefined ? { threadId, resolved } : { threadId }))),
   );
 
   // undo/redo agen (spec-agent-undo): hanya langkah execute/paste sesi ini; edit pengguna/agen lain sesudahnya → ditolak.

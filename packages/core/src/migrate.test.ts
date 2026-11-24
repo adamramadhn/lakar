@@ -24,10 +24,10 @@ const chain: MigrationRegistry = {
 };
 
 describe('migrateDocument', () => {
-  it('registri resmi: 1→2 identitas, 2→3 token bertipe, 3→4 identitas (grid), 4→5 identitas (komponen), 5→6 identitas (vektor), 6→7 identitas (tag), 7→8 identitas (board hug), 8→9 identitas (frame wrap); versi kini → apa adanya (objek yang sama)', () => {
-    expect(Object.keys(MIGRATIONS)).toEqual(['1', '2', '3', '4', '5', '6', '7', '8']);
+  it('registri resmi: 1→2 identitas, 2→3 token bertipe, 3→4 identitas (grid), 4→5 identitas (komponen), 5→6 identitas (vektor), 6→7 identitas (tag), 7→8 identitas (board hug), 8→9 identitas (frame wrap), 9→10 identitas (komentar); versi kini → apa adanya (objek yang sama)', () => {
+    expect(Object.keys(MIGRATIONS)).toEqual(['1', '2', '3', '4', '5', '6', '7', '8', '9']);
     const doc = JSON.parse(JSON.stringify(createDocument()));
-    expect(doc.schemaVersion).toBe(9);
+    expect(doc.schemaVersion).toBe(10);
     expect(migrateDocument(doc)).toBe(doc);
   });
 
@@ -50,7 +50,7 @@ describe('migrateDocument', () => {
   });
 
   it('lebih baru dari target → VERSION_MISMATCH', () => {
-    expect(codeOf(() => migrateDocument({ schemaVersion: 10 }))).toBe('VERSION_MISMATCH');
+    expect(codeOf(() => migrateDocument({ schemaVersion: 11 }))).toBe('VERSION_MISMATCH');
     expect(codeOf(() => parseDocument({ ...createDocument(), schemaVersion: 99 }))).toBe('VERSION_MISMATCH');
   });
 
@@ -174,7 +174,7 @@ describe('migrasi 2 → 3', () => {
     const snapshot = structuredClone(v3);
     expect(MIGRATIONS[3]!(v3)).toEqual({ ...snapshot, schemaVersion: 4 });
     expect(v3).toEqual(snapshot);
-    expect(parseDocument(v3).schemaVersion).toBe(9);
+    expect(parseDocument(v3).schemaVersion).toBe(10);
   });
 
   it('langkah 4 → 5 (komponen): identitas yang hanya menaikkan versi, input tidak dimutasi', () => {
@@ -182,7 +182,7 @@ describe('migrasi 2 → 3', () => {
     const snapshot = structuredClone(v4);
     expect(MIGRATIONS[4]!(v4)).toEqual({ ...snapshot, schemaVersion: 5 });
     expect(v4).toEqual(snapshot);
-    expect(parseDocument(v4)).toEqual({ ...snapshot, schemaVersion: 9 });
+    expect(parseDocument(v4)).toEqual({ ...snapshot, schemaVersion: 10 });
   });
 
   it('langkah 5 → 6 (vektor): identitas yang hanya menaikkan versi, input tidak dimutasi', () => {
@@ -190,7 +190,7 @@ describe('migrasi 2 → 3', () => {
     const snapshot = structuredClone(v5);
     expect(MIGRATIONS[5]!(v5)).toEqual({ ...snapshot, schemaVersion: 6 });
     expect(v5).toEqual(snapshot);
-    expect(parseDocument(v5)).toEqual({ ...snapshot, schemaVersion: 9 });
+    expect(parseDocument(v5)).toEqual({ ...snapshot, schemaVersion: 10 });
   });
 
   it('langkah 6 → 7 (tag semantik): identitas yang hanya menaikkan versi, input tidak dimutasi', () => {
@@ -198,7 +198,7 @@ describe('migrasi 2 → 3', () => {
     const snapshot = structuredClone(v6);
     expect(MIGRATIONS[6]!(v6)).toEqual({ ...snapshot, schemaVersion: 7 });
     expect(v6).toEqual(snapshot);
-    expect(parseDocument(v6)).toEqual({ ...snapshot, schemaVersion: 9 });
+    expect(parseDocument(v6)).toEqual({ ...snapshot, schemaVersion: 10 });
   });
 
   it('langkah 7 → 8 (board hug): identitas; tinggi board angka tetap angka, input tidak dimutasi', () => {
@@ -209,7 +209,7 @@ describe('migrasi 2 → 3', () => {
     expect(MIGRATIONS[7]!(v7)).toEqual({ ...snapshot, schemaVersion: 8 });
     expect(v7).toEqual(snapshot);
     const doc = parseDocument(v7);
-    expect(doc.schemaVersion).toBe(9);
+    expect(doc.schemaVersion).toBe(10);
     expect(doc.pages[0]!.children[0]!.height).toBe(4050);
   });
 
@@ -221,6 +221,22 @@ describe('migrasi 2 → 3', () => {
     expect(() => parseDocument({ ...base, schemaVersion: 8, pages: [{ ...pages[0], children: [{ ...board, height: 'fill' }] }] })).toThrow();
   });
 
+  it('langkah 9 → 10 (komentar canvas): identitas yang hanya menaikkan versi, input tidak dimutasi; comments lama ikut', () => {
+    const base = JSON.parse(JSON.stringify(createDocument()));
+    const comments = [
+      { id: 'Ttttttt1', pageId: base.pages[0].id, x: 5, y: 6, status: 'open', messages: [{ author: { kind: 'agent', name: 'claude-code' }, text: 'cek', at: '2026-11-24T00:00:00Z' }] },
+    ];
+    const v9 = { ...base, schemaVersion: 9, comments };
+    const snapshot = structuredClone(v9);
+    expect(MIGRATIONS[9]!(v9)).toEqual({ ...snapshot, schemaVersion: 10 });
+    expect(v9).toEqual(snapshot);
+    const doc = parseDocument(v9);
+    expect(doc.schemaVersion).toBe(10);
+    expect(doc.comments).toEqual(comments);
+    // Dokumen v9 tanpa comments → v10 valid tanpa field.
+    expect(parseDocument({ ...base, schemaVersion: 9 }).comments).toBeUndefined();
+  });
+
   it('langkah 8 → 9 (frame wrap): identitas yang hanya menaikkan versi, input tidak dimutasi', () => {
     const base = JSON.parse(JSON.stringify(createDocument()));
     const frame = { type: 'frame', id: 'Fwrap001', name: 'F', layout: 'row', children: [] };
@@ -229,7 +245,7 @@ describe('migrasi 2 → 3', () => {
     expect(MIGRATIONS[8]!(v8)).toEqual({ ...snapshot, schemaVersion: 9 });
     expect(v8).toEqual(snapshot);
     const doc = parseDocument(v8);
-    expect(doc.schemaVersion).toBe(9);
+    expect(doc.schemaVersion).toBe(10);
     expect((doc.pages[0]!.children[0]!.children[0] as Record<string, unknown>).wrap).toBeUndefined();
   });
 

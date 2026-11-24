@@ -72,11 +72,12 @@ describe('@lakar/schema', () => {
     expect(BoardNode.safeParse({ ...node, id: 'short' }).success).toBe(false);
   });
 
-  it('LakarDocument: schemaVersion = SCHEMA_VERSION (9) dan minimal 1 halaman; v1..v8 hanya lewat migrasi (@lakar/core)', () => {
-    expect(SCHEMA_VERSION).toBe(9);
+  it('LakarDocument: schemaVersion = SCHEMA_VERSION (10) dan minimal 1 halaman; v1..v9 hanya lewat migrasi (@lakar/core)', () => {
+    expect(SCHEMA_VERSION).toBe(10);
     const doc = { schemaVersion: SCHEMA_VERSION, id: 'Dddddddd', rev: 0, pages: [{ id: 'Pppppppp', name: 'Page 1', children: [] }] };
     expect(LakarDocument.safeParse(doc).success).toBe(true);
-    expect(LakarDocument.safeParse({ ...doc, schemaVersion: 10 }).success).toBe(false);
+    expect(LakarDocument.safeParse({ ...doc, schemaVersion: 11 }).success).toBe(false);
+    expect(LakarDocument.safeParse({ ...doc, schemaVersion: 9 }).success).toBe(false);
     expect(LakarDocument.safeParse({ ...doc, schemaVersion: 8 }).success).toBe(false);
     expect(LakarDocument.safeParse({ ...doc, schemaVersion: 7 }).success).toBe(false);
     expect(LakarDocument.safeParse({ ...doc, schemaVersion: 6 }).success).toBe(false);
@@ -86,6 +87,21 @@ describe('@lakar/schema', () => {
     expect(LakarDocument.safeParse({ ...doc, schemaVersion: 2 }).success).toBe(false);
     expect(LakarDocument.safeParse({ ...doc, schemaVersion: 1 }).success).toBe(false);
     expect(LakarDocument.safeParse({ ...doc, pages: [] }).success).toBe(false);
+  });
+
+  it('comments (v10): opsional; thread strict — pin layer/titik bebas, status open/resolved, resolvedAt opsional', () => {
+    const doc = { schemaVersion: SCHEMA_VERSION, id: 'Dddddddd', rev: 0, pages: [{ id: 'Pppppppp', name: 'Page 1', children: [] }] };
+    const msg = { author: { kind: 'agent', name: 'claude-code' }, text: 'halo', at: '2026-11-24T00:00:00Z' };
+    const thread = { id: 'Ttttttt1', pageId: 'Pppppppp', x: 10, y: 20, status: 'open', messages: [msg] };
+    expect(LakarDocument.safeParse({ ...doc, comments: [thread] }).success).toBe(true);
+    expect(LakarDocument.safeParse({ ...doc, comments: [{ ...thread, nodeId: 'Nnnnnnn1' }] }).success).toBe(true);
+    expect(LakarDocument.safeParse({ ...doc, comments: [{ ...thread, status: 'resolved', resolvedAt: '2026-11-24T01:00:00Z' }] }).success).toBe(true);
+    // Status asing, pesan kosong, field asing, dan komentar non-array ditolak (strict).
+    expect(LakarDocument.safeParse({ ...doc, comments: [{ ...thread, status: 'closed' }] }).success).toBe(false);
+    expect(LakarDocument.safeParse({ ...doc, comments: [{ ...thread, messages: [] }] }).success).toBe(false);
+    expect(LakarDocument.safeParse({ ...doc, comments: [{ ...thread, foo: 1 }] }).success).toBe(false);
+    expect(LakarDocument.safeParse({ ...doc, comments: [{ ...thread, messages: [{ ...msg, author: { kind: 'robot', name: 'x' } }] }] }).success).toBe(false);
+    expect(LakarDocument.safeParse({ ...doc, comments: {} }).success).toBe(false);
   });
 
   it.each([

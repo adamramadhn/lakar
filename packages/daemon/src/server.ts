@@ -43,6 +43,7 @@ import { INSPECT_DEPTH_DEFAULT, INSPECT_DEPTH_MAX, WIP_PREFIX, boundsMap, inspec
 import { readPngSize } from './png.js';
 import { NO_ACTIVE_DOC_HINT, Sessions, UnknownSessionError, activePageIndex, authorOf, logExecute, recallFailed, rememberFailed, setActiveDoc } from './sessions.js';
 import { registerAgentPageRoutes } from './agent-pages.js';
+import { registerCommentRoutes } from './comments.js';
 import { DocStore } from './store.js';
 import { ActivityBus, agentOf, registerActivityHooks } from './events.js';
 import { registerConnectionRoutes } from './connections.js';
@@ -853,6 +854,7 @@ export function buildServer({
   registerFocusRoutes(app, { docs, store, focus });
   registerPageRoutes(app, { docs, store, docLocks, activity });
   registerAgentPageRoutes(app, { docs, store, docLocks, activeDoc });
+  registerCommentRoutes(app, { docs, store, docLocks, activeDoc });
   registerOpsRoutes(app, { docs, store, docLocks, activity, icons });
   registerFixCheckRoutes(app, { docs, store, docLocks, sessions, render, hugs, checks, agentSteps, icons });
   // Paste HTML (story 4): render terisolasi lewat renderer Chromium bila ada (renderer palsu tes → RENDER_FAILED).

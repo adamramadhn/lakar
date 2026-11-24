@@ -52,6 +52,12 @@ export const TOOL_EFFECTS = {
   switch_page: 'write',
   // Menambah halaman baru; isi pengguna tidak dihapus/ditimpa.
   create_page: 'write',
+  list_comments: 'read',
+  // Menambah thread/pesan komentar baru; node pengguna tidak dihapus/ditimpa.
+  add_comment: 'write',
+  reply_to_comment: 'write',
+  // Mengubah status thread (resolved/open), idempoten.
+  resolve_comment: 'write',
 } as const satisfies Record<string, ToolEffect>;
 
 export type ToolName = keyof typeof TOOL_EFFECTS;
