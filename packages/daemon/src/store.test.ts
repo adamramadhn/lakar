@@ -115,7 +115,7 @@ describe('DocStore', () => {
     expect(await readFile(plain.docPath('d'), 'utf8')).toBe(after);
   });
 
-  it('read: dokumen v1 lama dimigrasi resmi ke versi kini (v9) dan ditulis balik', async () => {
+  it('read: dokumen v1 lama dimigrasi resmi ke versi kini (v10) dan ditulis balik', async () => {
     const dir = join(root, 'v1');
     const plain = new DocStore(dir);
     const doc = createDocument();
@@ -124,7 +124,7 @@ describe('DocStore', () => {
     await writeFile(plain.docPath('lama'), `${JSON.stringify(v1, null, 2)}\n`, 'utf8');
     const read = await new DocStore(dir).read('lama');
     expect(read).toEqual(doc);
-    expect(read!.schemaVersion).toBe(9);
+    expect(read!.schemaVersion).toBe(10);
     expect(JSON.parse(await readFile(plain.docPath('lama'), 'utf8'))).toEqual(doc);
     expect(tmpFiles(plain.docsDir)).toEqual([]);
   });

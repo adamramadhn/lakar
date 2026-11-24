@@ -71,6 +71,10 @@ export const TOOL_ROUTES: Readonly<Record<string, string>> = {
   '/pages/switch': 'switch_page',
   '/pages/create': 'create_page',
   '/pages/tree': 'get_page_tree',
+  '/comments': 'list_comments',
+  '/comments/create': 'add_comment',
+  '/comments/reply': 'reply_to_comment',
+  '/comments/resolve': 'resolve_comment',
 };
 
 export const publicSessionId = (id: string) => id.slice(0, 8);
@@ -347,6 +351,11 @@ function targetOf(tool: string, body: Record<string, unknown> | undefined): stri
       return str(body.page);
     case 'create_page':
       return str(body.name);
+    case 'add_comment':
+      return str(body.nodeId) ?? str(body.pageId);
+    case 'reply_to_comment':
+    case 'resolve_comment':
+      return str(body.threadId);
     case 'icon_search':
     case 'photo_search':
       return str(body.query);

@@ -22,7 +22,9 @@ import { NODE_ADDRESS_PATTERN } from './selection.js';
 // Dokumen v7 (tinggi board selalu angka) dimigrasi identitas (`@lakar/core` MIGRATIONS[7]).
 // v9 (story flex-wrap, epic adopsi-open-pencil) menambah `wrap?:boolean` pada frame (anak flex row/column membungkus
 // ke baris berikut, CSS flex-wrap); dokumen v8 dimigrasi identitas (`@lakar/core` MIGRATIONS[8]).
-export const SCHEMA_VERSION = 9 as const;
+// v10 (story komentar canvas, epic kolaborasi-agen) menambah `comments` opsional di root dokumen; dokumen v9
+// dimigrasi identitas (`@lakar/core` MIGRATIONS[9]).
+export const SCHEMA_VERSION = 10 as const;
 
 // ---------------------------------------------------------------------------
 // Primitif
@@ -720,6 +722,41 @@ export const NodeInput = z.discriminatedUnion('type', [
 export const Page = z.object({ id: Id, name: Name, children: z.array(BoardNode) }).strict();
 export type Page = z.infer<typeof Page>;
 
+// ---------------------------------------------------------------------------
+// Komentar canvas (v10, epic kolaborasi-agen)
+// ---------------------------------------------------------------------------
+
+/** Penulis pesan komentar: `user` (aplikasi) atau `agent` (sesi MCP; `name` = harness, mis. "Claude Code"). */
+export const CommentAuthor = z.object({ kind: z.enum(['user', 'agent']), name: z.string().min(1).max(80) }).strict();
+export type CommentAuthor = z.infer<typeof CommentAuthor>;
+
+/** Panjang maksimum satu pesan komentar (karakter). */
+export const COMMENT_TEXT_MAX = 4000;
+
+export const CommentMessage = z
+  .object({ author: CommentAuthor, text: z.string().min(1).max(COMMENT_TEXT_MAX), at: z.string().min(1) })
+  .strict();
+export type CommentMessage = z.infer<typeof CommentMessage>;
+
+/**
+ * Thread komentar di canvas: `nodeId` = pin di layer (komentar mengikuti layer itu di UI), tanpa `nodeId` = pin
+ * bebas. `x,y` selalu disimpan dalam koordinat halaman — untuk pin layer ini posisi pin saat komentar dibuat
+ * (fallback bila layer dihapus/dipindah). `resolvedAt` ada hanya saat `status:'resolved'`.
+ */
+export const CommentThread = z
+  .object({
+    id: Id,
+    pageId: Id,
+    nodeId: Id.optional(),
+    x: z.number().finite(),
+    y: z.number().finite(),
+    status: z.enum(['open', 'resolved']),
+    resolvedAt: z.string().optional(),
+    messages: z.array(CommentMessage).min(1),
+  })
+  .strict();
+export type CommentThread = z.infer<typeof CommentThread>;
+
 const documentShape = {
   schemaVersion: z.literal(SCHEMA_VERSION),
   id: Id,
@@ -728,6 +765,8 @@ const documentShape = {
   tokens: Tokens.optional(),
   /** Mode tema yang dideklarasikan (AD-11); elemen pertama = default. */
   tokenModes: TokenModes.optional(),
+  /** Thread komentar canvas (v10); opsional — dokumen tanpa komentar tetap valid. */
+  comments: z.array(CommentThread).optional(),
 };
 
 export const LakarDocument = z

@@ -52,5 +52,7 @@ export function collectIds(doc: Doc): string[] {
     ids.push(p.id);
     p.children.forEach(walk);
   }
+  // ID thread komentar (v10) ikut namespace yang sama — jangan sampai dialokasikan ke node/thread baru.
+  for (const t of doc.comments ?? []) ids.push(t.id);
   return ids;
 }

@@ -113,6 +113,29 @@ function fakeDaemon() {
         },
       });
     }
+    if (req.url === '/comments') {
+      return send(200, {
+        ok: true,
+        data: {
+          docId: 'Dddddddd',
+          slug: 'a',
+          rev: 5,
+          total: 1,
+          open: 1,
+          threads: [{ id: 'Ttttttt1', pageId: 'Pppppppp', nodeId: 'Bbbbbbbb', x: 10, y: 20, status: 'open', messages: [{ author: { kind: 'agent', name: 'claude-code' }, text: 'cek padding', at: '2026-11-24T00:00:00Z' }] }],
+        },
+      });
+    }
+    if (req.url === '/comments/create') {
+      if (body.nodeId === 'ZZzzzz99') return send(404, { ok: false, error: { code: 'NOT_FOUND', message: 'node ZZzzzz99 tidak ada di dokumen a', hint: 'pakai id dari inspect/get_page_tree', retryable: false } });
+      return send(200, { ok: true, data: { slug: 'a', rev: 6, thread: { id: 'Ttttttt2', pageId: 'Pppppppp', ...(body.nodeId ? { nodeId: body.nodeId } : {}), x: body.x ?? 0, y: body.y ?? 0, status: 'open', messages: [{ author: { kind: 'agent', name: 'claude-code' }, text: body.text, at: '2026-11-24T00:01:00Z' }] } } });
+    }
+    if (req.url === '/comments/reply') {
+      return send(200, { ok: true, data: { slug: 'a', rev: 7, threadId: body.threadId, message: { author: { kind: 'agent', name: 'claude-code' }, text: body.text, at: '2026-11-24T00:02:00Z' }, thread: { id: body.threadId, status: 'open' } } });
+    }
+    if (req.url === '/comments/resolve') {
+      return send(200, { ok: true, data: { slug: 'a', rev: 8, threadId: body.threadId, status: body.resolved === false ? 'open' : 'resolved', ...(body.resolved === false ? {} : { resolvedAt: '2026-11-24T00:03:00Z' }) } });
+    }
     if (req.url === '/viewer/documents') {
       return send(200, { ok: true, data: { documents: [{ slug: 'untitled', name: 'untitled', rev: 3, updatedAt: 'x', open: true, focused: true }], focused: 'untitled' } });
     }
@@ -232,7 +255,7 @@ describe('@lakar/mcp', () => {
     const c = await connect(url);
     const { tools } = await c.listTools();
     expect(tools.map((t) => t.name).sort()).toEqual(
-      ['execute', 'export', 'export_code', 'get_selection', 'icon_search', 'import_url', 'inspect', 'layout_check', 'list_boards', 'list_documents', 'open_doc', 'paste', 'photo_search', 'read_skill', 'redo', 'screenshot', 'status', 'undo', 'visual_diff', 'fix_check', 'list_pages', 'get_current_page', 'switch_page', 'create_page', 'get_page_tree'].sort(),
+      ['execute', 'export', 'export_code', 'get_selection', 'icon_search', 'import_url', 'inspect', 'layout_check', 'list_boards', 'list_documents', 'open_doc', 'paste', 'photo_search', 'read_skill', 'redo', 'screenshot', 'status', 'undo', 'visual_diff', 'fix_check', 'list_pages', 'get_current_page', 'switch_page', 'create_page', 'get_page_tree', 'list_comments', 'add_comment', 'reply_to_comment', 'resolve_comment'].sort(),
     );
     expect(SERVER_VERSION).toBe(LAKAR_VERSION);
     expect(c.getServerVersion()?.version).toBe(LAKAR_VERSION);
@@ -294,6 +317,41 @@ describe('@lakar/mcp', () => {
     expect(fake.seen.findLast((s) => s.path === '/pages/tree')!.body).toEqual({});
     // Semua panggilan bersesi.
     expect(fake.seen.filter((s) => s.path?.startsWith('/pages')).every((s) => s.session)).toBe(true);
+  });
+
+  it('tool komentar (story 9.3): list_comments/add_comment/reply_to_comment/resolve_comment → route /comments* dalam sesi; argumen diteruskan; error terformat', async () => {
+    const c = await connect(url);
+
+    const list = await c.callTool({ name: 'list_comments', arguments: {} });
+    const listData = JSON.parse((list.content as any)[0].text);
+    expect(listData.total).toBe(1);
+    expect(listData.threads[0].nodeId).toBe('Bbbbbbbb');
+    await c.callTool({ name: 'list_comments', arguments: { status: 'open', pageId: 'Pppppppp', kind: 'agent' } });
+    expect(fake.seen.findLast((s) => s.path === '/comments')!.body).toEqual({ status: 'open', pageId: 'Pppppppp', kind: 'agent' });
+
+    const pinned = await c.callTool({ name: 'add_comment', arguments: { text: 'cek padding', nodeId: 'Bbbbbbbb' } });
+    expect(JSON.parse((pinned.content as any)[0].text).thread.nodeId).toBe('Bbbbbbbb');
+    expect(fake.seen.findLast((s) => s.path === '/comments/create')!.body).toEqual({ text: 'cek padding', nodeId: 'Bbbbbbbb' });
+    // Titik bebas: x,y (+pageId) diteruskan.
+    await c.callTool({ name: 'add_comment', arguments: { text: 'area ini', x: 10, y: 20, pageId: 'Pppppppp' } });
+    expect(fake.seen.findLast((s) => s.path === '/comments/create')!.body).toEqual({ text: 'area ini', x: 10, y: 20, pageId: 'Pppppppp' });
+    // Error daemon terformat.
+    const bad = await c.callTool({ name: 'add_comment', arguments: { text: 'x', nodeId: 'ZZzzzz99' } });
+    expect(bad.isError).toBe(true);
+    expect((bad.content as any)[0].text).toContain('NOT_FOUND');
+
+    const rep = await c.callTool({ name: 'reply_to_comment', arguments: { threadId: 'Ttttttt1', text: 'sudah kubetulkan' } });
+    expect(JSON.parse((rep.content as any)[0].text).message.text).toBe('sudah kubetulkan');
+    expect(fake.seen.findLast((s) => s.path === '/comments/reply')!.body).toEqual({ threadId: 'Ttttttt1', text: 'sudah kubetulkan' });
+
+    const res = await c.callTool({ name: 'resolve_comment', arguments: { threadId: 'Ttttttt1' } });
+    expect(JSON.parse((res.content as any)[0].text).status).toBe('resolved');
+    await c.callTool({ name: 'resolve_comment', arguments: { threadId: 'Ttttttt1', resolved: false } });
+    const bodies = fake.seen.filter((s) => s.path === '/comments/resolve').map((s) => s.body);
+    expect(bodies).toEqual([{ threadId: 'Ttttttt1' }, { threadId: 'Ttttttt1', resolved: false }]);
+
+    // Semua panggilan komentar bersesi.
+    expect(fake.seen.filter((s) => s.path?.startsWith('/comments')).every((s) => s.session)).toBe(true);
   });
 
   it('get_selection → POST /viewer/selection dalam sesi; slug opsional diteruskan; teks JSON; error terformat', async () => {
@@ -753,7 +811,7 @@ describe('@lakar/mcp', () => {
       const r = await c2.callTool({ name: 'execute', arguments: { code: '1' } });
       expect(r.isError).toBe(true);
       expect((r.content as any)[0].text).toContain('http://127.0.0.1:1');
-      expect((await c2.listTools()).tools).toHaveLength(25);
+      expect((await c2.listTools()).tools).toHaveLength(29);
     } finally {
       await c2.close();
       await deadTransport.close();

@@ -44,6 +44,7 @@ export const MIGRATIONS: MigrationRegistry = Object.freeze({
   6: (d: RawDocument): RawDocument => ({ ...d, schemaVersion: 7 }),
   7: (d: RawDocument): RawDocument => ({ ...d, schemaVersion: 8 }),
   8: (d: RawDocument): RawDocument => ({ ...d, schemaVersion: 9 }),
+  9: (d: RawDocument): RawDocument => ({ ...d, schemaVersion: 10 }),
 });
 
 export type MigrateOptions = { migrations?: MigrationRegistry; target?: number };

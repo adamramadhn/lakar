@@ -1,0 +1,52 @@
+{
+  "schemaVersion": 10,
+  "id": "CorpV10C",
+  "rev": 5,
+  "pages": [
+    {
+      "id": "PageCm01",
+      "name": "Page 1",
+      "children": [
+        {
+          "type": "board",
+          "id": "BrdCm001",
+          "name": "Kartu",
+          "x": 0,
+          "y": 0,
+          "width": 400,
+          "height": 300,
+          "screen": "app",
+          "fills": [{ "type": "solid", "color": "#F5F5F0" }],
+          "children": [
+            { "type": "text", "id": "TxtCm001", "name": "Judul", "content": "Halo", "weight": 600, "size": 18, "lineHeight": 24, "color": "#1A1A1A" }
+          ]
+        }
+      ]
+    }
+  ],
+  "comments": [
+    {
+      "id": "ThrCm001",
+      "pageId": "PageCm01",
+      "nodeId": "TxtCm001",
+      "x": 0,
+      "y": 0,
+      "status": "open",
+      "messages": [
+        { "author": { "kind": "agent", "name": "claude-code" }, "text": "Judul masih off-scale — pakai token text.title?", "at": "2026-11-24T08:00:00.000Z" },
+        { "author": { "kind": "user", "name": "You" }, "text": "iya, ganti ke token", "at": "2026-11-24T08:05:00.000Z" }
+      ]
+    },
+    {
+      "id": "ThrCm002",
+      "pageId": "PageCm01",
+      "x": 420,
+      "y": 80,
+      "status": "resolved",
+      "resolvedAt": "2026-11-24T09:00:00.000Z",
+      "messages": [
+        { "author": { "kind": "agent", "name": "codex" }, "text": "warna board belum terikat token", "at": "2026-11-24T08:30:00.000Z" }
+      ]
+    }
+  ]
+}
