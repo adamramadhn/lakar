@@ -93,3 +93,94 @@ Perubahan sesudah gelombang fitur di atas:
 
 - Worktree lama ada di `.claude/worktrees/`. Hapus dengan `git worktree remove <path>` bila tidak dipakai lagi.
 - Checkout utama `D:\Work\Personal\lakar` mungkin masih menunjukkan `design/lakar-ui.pen` sebagai modified. Salinannya sudah di-commit di `claude/app-design-parity`.
+
+## Pindah environment / server baru (tutorial langkah per langkah)
+
+Dua repo terlibat: `fatmuh/lakar` (kode, publik) dan `fatmuh/lakar-meta` (privat: `_bmad-output/`, `_bmad/`, `.claude/skills/`, `design/` termasuk `lakar-ui.pen`). Checkout meta dipasang kembali ke path aslinya lewat junction (Windows) atau symlink (Linux) oleh `scripts/link-meta`.
+
+### 1. Prasyarat
+
+| Alat | Keterangan |
+|---|---|
+| Git + akses GitHub | `lakar-meta` privat → login `gh auth login` atau SSH key/PAT scope `repo` di akun yang diundang |
+| Node ≥ 26 | Windows: nvm; Linux: `bash tools/node26/install.sh` (pasang ke `/opt/node-26`, tidak menyentuh Node sistem) |
+| pnpm 12.21.0 | `npx -y pnpm@12.21.0` selalu bisa dipakai tanpa instal global |
+| Browser render | Windows: Edge/Chrome sistem (`LAKAR_BROWSER_CHANNEL=msedge`); Linux: `bash scripts/install-browser.sh` (chromium-headless-shell ke `~/.cache/lakar/ms-playwright`) |
+| Rust + prasyarat Tauri | Hanya untuk build aplikasi desktop; CI yang membangun installer resmi |
+| Pencil | Untuk membuka/mengedit `design/lakar-ui.pen` — lihat langkah 6 |
+
+### 2. Clone dan tautkan meta
+
+```sh
+git clone https://github.com/fatmuh/lakar
+git clone https://github.com/fatmuh/lakar-meta
+cd lakar
+scripts\link-meta.cmd D:\path\ke\lakar-meta      # Windows (junction)
+bash scripts/link-meta.sh /path/ke/lakar-meta   # Linux/macOS (symlink)
+```
+
+Tanpa argumen, script mencoba env `LAKAR_META` lalu file `%USERPROFILE%\.lakar-meta`/`~/.lakar-meta` berisi path meta. Path yang kembali berfungsi persis seperti sebelum split: `_bmad-output/`, `_bmad/`, `.claude/skills/`, `design/` — Pencil, BMAD, dan bench tidak perlu tahu bedanya. Commit perubahan di path itu selalu di repo `lakar-meta`, bukan `lakar`.
+
+### 3. Build dan tes
+
+```sh
+pnpm install
+pnpm build        # wajib sebelum daemon atau tes yang pakai dist
+pnpm test         # opsional tapi disarankan sekali
+```
+
+### 4. Jalankan
+
+```sh
+pnpm lakard       # daemon + viewer di http://127.0.0.1:7466/app/
+```
+
+- **Windows**: `set LAKAR_BROWSER_CHANNEL=msedge` (atau `auto`) supaya render memakai browser sistem.
+- **Linux server sebagai service**: `bash tools/lakard/install-service.sh` (systemd `--user`). Agar tetap hidup setelah logout: `sudo loginctl enable-linger <user>` — keputusan admin, skrip hanya melaporkannya.
+- **Akses viewer dari laptop** saat daemon di server: `ssh -L 7466:127.0.0.1:7466 user@server` lalu buka `http://127.0.0.1:7466/app/`. Daemon memang sengaja loopback-only.
+- **Aplikasi desktop** tidak perlu dibangun lokal; pasang installer dari GitHub Releases. Di server headless cukup daemon + viewer lewat tunnel.
+
+### 5. Hubungkan agen (MCP)
+
+Buka viewer → Settings → Connections → "Install in an agent". Lakar mendeteksi Claude Code, Codex, Pi, dan OpenCode lalu menulis config MCP-nya (dengan backup `.bak` dan Undo). Ini satu klik — tidak perlu edit file JSON manual.
+
+### 6. Pencil / pen.dev (file `.pen` dan aturan desain)
+
+`design/lakar-ui.pen` adalah sumber kebenaran visual dan **terenkripsi** — jangan pernah dibaca/diubah sebagai teks. Dua cara memakainya:
+
+- **Mesin dengan GUI (laptop/PC desainer):** pasang aplikasi Pencil dari https://pen.dev (Windows/macOS; AppImage untuk Linux). Buka `design/lakar-ui.pen` dari aplikasi. Untuk agen, config Pencil MCP menunjuk binary `mcp-server-*` di dalam instalasi aplikasi (lihat contoh di `.mcp.json` atau config harness).
+- **Server headless:** aplikasi desktop tidak bisa (butuh display). Pakai CLI resminya:
+
+  ```sh
+  npm install -g @pen.dev/cli      # butuh Node ≥ 22.19; Node 26 aman
+  pen login                         # sekali; atau PEN_CLI_KEY=pencil_cli_... untuk non-interaktif/CI
+  pen interactive --in design/lakar-ui.pen --out design/lakar-ui.pen
+  pen --prompt "..." --out design/lakar-ui.pen
+  ```
+
+  CLI menjalankan engine editor yang sama dengan aplikasi — hasil file identik, hanya tanpa canvas live (minta `--enable-preview`/`--preview-output` untuk PNG). `PEN_CLI_KEY` dibuat di Developer Keys di org settings pen.dev.
+
+- **Aturan desain-dulu.** Layar/fitur UI baru didesain dulu di `lakar-ui.pen` lewat Pencil (aplikasi atau CLI), baru diimplementasikan di viewer/desktop. Jangan mengarang tampilan langsung di kode.
+
+### 7. Data dan kunci yang TIDAK ikut git (bawa manual bila perlu)
+
+| Apa | Lokasi di mesin ini |
+|---|---|
+| Dokumen desain (daemon CLI) | `%USERPROFILE%\.local\share\Lakar` |
+| Data aplikasi desktop (dokumen, config, log) | `%LOCALAPPDATA%\id.lakar.desktop\data` |
+| Kunci privat updater Tauri | `C:\Users\Fatmuh\.lakar-updater-key\` — JANGAN masuk repo; sudah ada sebagai secret `TAURI_SIGNING_PRIVATE_KEY` di GitHub, cukup untuk build rilis |
+| API key foto (pexels/unsplash) | file yang ditunjuk `LAKAR_PEXELS_KEY_FILE`/`LAKAR_UNSPLASH_KEY_FILE` di config daemon |
+| Pointer lokasi meta | `%USERPROFILE%\.lakar-meta` atau env `LAKAR_META` (atau selalu pakai argumen script) |
+
+Di Linux, path setara: `~/.local/share/lakar` (daemon) dan `~/.local/share/id.lakar.desktop` (desktop). Folder data tinggal disalin utuh — semua dokumen ikut.
+
+### 8. Checklist pindah
+
+1. `gh auth login` di mesin baru (akses `lakar-meta`).
+2. Clone `lakar` + `lakar-meta`, jalankan `link-meta`.
+3. `pnpm install && pnpm build`.
+4. Browser: `scripts/install-browser.sh` (Linux) atau pastikan Edge/Chrome ada (Windows).
+5. Salin folder data dokumen bila mau melanjutkan file lama.
+6. `pnpm lakard` → buka viewer → install MCP ke harness → verifikasi agen bisa `open_doc`.
+7. Pasang Pencil (GUI) atau `@pen.dev/cli` + `pen login` (headless) bila akan menyentuh `lakar-ui.pen`.
+8. Tidak perlu: kunci updater (CI), Rust/Tauri (kecuali build desktop), installer lama.
