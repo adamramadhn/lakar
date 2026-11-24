@@ -115,6 +115,22 @@ describe('POST /viewer/docs/:slug/import-url', () => {
     }
   });
 
+  it('URL non-publik → 400 walau pageFetch diinjeksikan (checkPageUrl di route, bukan hanya di fetcher)', async () => {
+    let called = 0;
+    const t = await setup({ pageFetch: async (raw) => (called++, { ...PAGE, finalUrl: raw }) });
+    try {
+      const slug = await t.create('Impor Ditolak');
+      for (const url of ['http://127.0.0.1/', 'file:///etc/passwd', 'http://user:pass@example.com/']) {
+        const r = await t.post(`/viewer/docs/${slug}/import-url`, { url });
+        expect(r.statusCode, `${url} → ${r.body}`).toBe(400);
+        expect(r.json().error.code).toBe('SCHEMA_INVALID');
+      }
+      expect(called).toBe(0);
+    } finally {
+      await t.app.close();
+    }
+  });
+
   it('skema non-http(s), kredensial, dan IP non-publik → 400 SCHEMA_INVALID (fetch asli, tanpa jaringan)', async () => {
     // Tanpa pageFetch: `fetchPageHtml` asli menjalankan `checkPageUrl` sebelum transport apa pun.
     const t = await setup();

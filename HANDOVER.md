@@ -20,7 +20,7 @@ Semua PR di bawah sudah di-merge ke `main`.
 
 ## Isi `claude/app-design-parity`
 
-Spec per fitur ada di `_bmad-output/implementation-artifacts/`.
+Spec per fitur ada di `_bmad-output/implementation-artifacts/` — sejak meta split (PR #48/#52) lokasinya di repo `lakar-meta`, bukan di repo ini.
 
 | Fitur | Spec |
 |---|---|
@@ -44,10 +44,19 @@ Perubahan sesudah gelombang fitur di atas:
 
 ## Arah kerja (sejak 2026-11-22)
 
-- **Inisiatif aktif: `_bmad-output/initiative-lakar-paper/`.** Tujuannya Lakar setara paper.design: editor canvas, agen di canvas yang sama, token dan tema, komponen, ekspor kode, paste HTML/SVG dan vektor. Tidak ada gerbang benchmark.
+- **Inisiatif aktif: `_bmad-output/initiative-lakar-paper/`** — sekarang di repo `lakar-meta` (meta split #48/#52; `_bmad` dan `_bmad-output` tidak lagi di repo kode). Tujuannya Lakar setara paper.design: editor canvas, agen di canvas yang sama, token dan tema, komponen, ekspor kode, paste HTML/SVG dan vektor. Tidak ada gerbang benchmark.
 - **`initiative-lakar` ditutup dan tidak mengikat.** G0 selesai, B (viewer + desktop) sudah dibangun, G1 vs pen.dev tidak dilanjutkan. File-nya disimpan sebagai riwayat.
 - **Desain dulu, baru kode (C6 inisiatif baru).** UI/UX/motion mengikuti `design/lakar-ui.pen`. Layar baru didesain dulu di Pencil, lalu dikodekan lewat MCP pencil.
 - **Installer sudah diuji Fatmuh** dari build GitHub Actions dan terpasang aman.
+
+### Epic adopsi open-pencil (2026-11-24)
+
+Epic ke-8 (`epic-adopsi-open-pencil`, 12 story: anotasi tool MCP, LC-34/35 overlap/overflow, aturan skill, snapping+smart guide+pengukur jarak+zoom, flex wrap skema v9, Copy as PNG, impor URL, token DTCG, updater desktop, instal MCP ke harness) sudah merge lewat PR #36–#51.
+
+- **Retrospektif: `accepted`** — `lakar-meta/_bmad-output/initiative-lakar-paper/tickets/epic-adopsi-open-pencil/epic-adopsi-open-pencil-retrospective.md` + 3 ADR di folder yang sama. Semua 12 tiket `done`.
+- **Verifikasi retro (Linux, Node 26):** build + 3028 tes hijau; SSRF/guard Origin, impor URL nyata, PNG `nodeId` + kompat lama, DTCG ekspor/impor, 20 anotasi tool MCP, dan `flex-wrap`/`row-gap` dilatih live ke daemon.
+- **Temuan fix-now dari retro** (regex TOML Codex, inline-table lakar, `.bak` revert, prefiks translasi IPv6 SSRF, `checkPageUrl` untuk fetcher terinjeksi, `??=` prototype DTCG, versi `release.yml`, `undoLabel` impor) diperbaiki di branch `fix/retro-adopsi-open-pencil`.
+- **Sisa:** 23 item defer tercatat di `deferred-work.md` (race/symlink config, content-encoding, updater bytes/origin, tes kontrak serde Rust, kesenjangan tes viewer, dsb.). Belum ada rilis ≥ epic — Done-when "fitur ada di installer rilis" baru benar setelah tag berikutnya dipotong.
 
 ## Langkah berikutnya
 

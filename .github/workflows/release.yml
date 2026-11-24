@@ -194,7 +194,9 @@ jobs:
           for tgz in "$out"/*.app.tar.gz; do
             [ -e "$tgz" ] || continue
             product="$(basename "$tgz" .app.tar.gz)"
-            ver="$(node -p "require('./apps/desktop/src-tauri/tauri.conf.json').version")"
+            # Sumber versi sama dengan yang di-bake ke bundle (LAKAR_APP_VERSION dari tag; fallback
+            # tauri.conf.json untuk tag non-x.y.z/dispatch — sesuai ci-config.json).
+            ver="${LAKAR_APP_VERSION:-$(node -p "require('./apps/desktop/src-tauri/tauri.conf.json').version")}"
             arch="${{ matrix.target }}"; arch="${arch%%-*}"; [ "$arch" = "x86_64" ] && arch=x64
             mv "$tgz" "$out/${product}_${ver}_${arch}.app.tar.gz"
             [ ! -f "$tgz.sig" ] || mv "$tgz.sig" "$out/${product}_${ver}_${arch}.app.tar.gz.sig"

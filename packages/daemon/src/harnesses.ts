@@ -137,8 +137,13 @@ const codexBlock = (mcp: McpServerConfig): string =>
 const LAKAR_TABLE_HEADER = /^\s*\[\s*mcp_servers\s*\.\s*["']?lakar["']?(?:\s*\]|\s*\.[^\]]*\])\s*(?:#.*)?$/;
 /** Bentuk dotted-key `mcp_servers.lakar.<key> = …` — tidak bisa distrip/ditimpa blok; gagalkan manual. */
 const DOTTED_LAKAR = /^\s*mcp_servers\s*\.\s*["']?lakar["']?\s*\./m;
-/** Header tabel TOML mana pun sampai akhir baris (penanda akhir blok), termasuk array-of-tables `[[x]]`. */
-const TABLE_HEADER = /^\s*\[+\s*[A-Za-z0-9_.'" -]+\s*\]+\s*(?:#.*)?$/;
+/** Header tabel TOML mana pun sampai akhir baris (penanda akhir blok), termasuk array-of-tables `[[x]]`
+ * dan key quoted arbitrer (`[projects."/home/x"]`, `[a@b:c]` — charset sengaja tidak dibatasi). */
+const TABLE_HEADER = /^\s*\[+.+?\]+\s*(?:#.*)?$/;
+/** Header section `[mcp_servers]` polos — entri `lakar = {…}` inline di dalamnya tidak bisa dikelola blok. */
+const MCP_SERVERS_SECTION = /^\s*\[\s*mcp_servers\s*\]\s*(?:#.*)?$/;
+/** Bentuk inline `mcp_servers = { …lakar… }` di akar — tidak bisa distrip/ditimpa blok; gagalkan manual. */
+const INLINE_MCP_LAKAR = /^\s*mcp_servers\s*=\s*\{[^}\n]*\blakar\b/m;
 
 /**
  * Buang semua blok `[mcp_servers.lakar(.…)]` (header sampai header tabel berikut / EOF).
@@ -176,12 +181,26 @@ function mergeCodexToml(text: string | undefined, mcp: McpServerConfig): { ok: t
   return { ok: true, out };
 }
 
+/** `lakar` ada sebagai entri inline di `[mcp_servers]` (`lakar = {…}`) atau `mcp_servers = {lakar …}` —
+ * bentuk ini tidak bisa distrip/ditimpa blok seperti `[mcp_servers.lakar]`, jadi gagalkan ke manual. */
+function hasInlineCodexLakar(text: string): boolean {
+  if (INLINE_MCP_LAKAR.test(text)) return true;
+  let inServers = false;
+  for (const line of text.split('\n')) {
+    if (TABLE_HEADER.test(line)) inServers = MCP_SERVERS_SECTION.test(line);
+    else if (inServers && /^\s*lakar\s*=/.test(line)) return true;
+  }
+  return false;
+}
+
 /** `installed` = ada blok lakar; `matches` = command/args/LAKAR_URL blok pertama sama dengan entri kini. */
 function scanCodexToml(text: string, mcp: McpServerConfig | null): { installed: boolean; matches: boolean } {
   const lines = text.split('\n');
   const start = lines.findIndex((l) => LAKAR_TABLE_HEADER.test(l));
-  // Bentuk dotted-key dianggap terpasang (ada entri lakar) tapi tidak bisa dibanding/ditulis otomatis.
-  if (start === -1) return DOTTED_LAKAR.test(text) ? { installed: true, matches: false } : { installed: false, matches: false };
+  // Bentuk dotted-key/inline dianggap terpasang (ada entri lakar) tapi tidak bisa dibanding/ditulis otomatis.
+  if (start === -1) {
+    return DOTTED_LAKAR.test(text) || hasInlineCodexLakar(text) ? { installed: true, matches: false } : { installed: false, matches: false };
+  }
   const end = lines.findIndex((l, i) => i > start && TABLE_HEADER.test(l));
   const block = lines.slice(start, end === -1 ? undefined : end).join('\n');
   if (!mcp) return { installed: true, matches: false };
@@ -476,7 +495,7 @@ export function registerHarnessRoutes(app: FastifyInstance, { host, port, mcpEnt
   };
 
   /** Pesan gagal untuk entri lakar bentuk dotted-key TOML (tidak bisa digabung/dihapus blok). */
-  const dottedLakarFailed = (id: string): HarnessResult => ({ id, state: 'failed', message: 'entri lakar memakai bentuk dotted-key; sunting manual di file config' });
+  const manualLakarFailed = (id: string): HarnessResult => ({ id, state: 'failed', message: 'entri lakar memakai bentuk yang tidak bisa ditulis otomatis (dotted-key/inline); sunting manual di file config' });
 
   /**
    * Pasang entri `lakar` ke file config `h`: deteksi → entry MCP → baca+merge → backup `.bak` → tulis atomik.
@@ -495,7 +514,7 @@ export function registerHarnessRoutes(app: FastifyInstance, { host, port, mcpEnt
     const entry = h.format === 'jsonc' ? opencodeEntry(mcp) : jsonEntry(mcp);
     let out: string;
     if (h.format === 'toml') {
-      if (text !== undefined && DOTTED_LAKAR.test(text)) return dottedLakarFailed(h.id);
+      if (text !== undefined && (DOTTED_LAKAR.test(text) || hasInlineCodexLakar(text))) return manualLakarFailed(h.id);
       out = mergeCodexToml(text, mcp).out;
     } else {
       const obj = text === undefined ? {} : parseObject(text, h.format === 'jsonc');
@@ -528,7 +547,7 @@ export function registerHarnessRoutes(app: FastifyInstance, { host, port, mcpEnt
     const { text } = read;
     let out: string;
     if (h.format === 'toml') {
-      if (DOTTED_LAKAR.test(text)) return dottedLakarFailed(h.id);
+      if (DOTTED_LAKAR.test(text) || hasInlineCodexLakar(text)) return manualLakarFailed(h.id);
       if (!text.split('\n').some((l) => LAKAR_TABLE_HEADER.test(l))) return { id: h.id, state: 'not-installed' };
       out = stripCodexLakar(text);
     } else {
@@ -585,6 +604,9 @@ export function registerHarnessRoutes(app: FastifyInstance, { host, port, mcpEnt
       }
       await writeFileAtomic(file, backup, mode);
       restored = true;
+      // .bak sudah tercopy ke path asli: hapus supaya revert berikutnya tidak menerapkan backup basi
+      // (dan supaya salinan config lama — bisa memuat kredensial — tidak tertinggal permanen).
+      await rm(bak, { force: true });
     } catch (e) {
       if (isEnoent(e)) {
         // .bak tidak ada: pulihkan state "file belum ada" hanya bila file memang buatan install (hanya lakar).

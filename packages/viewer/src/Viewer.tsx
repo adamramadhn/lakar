@@ -1008,7 +1008,7 @@ export function Viewer({ slug }: { slug: string }) {
         pendingSelect.current = r.boardId;
         setSelectedId(r.boardId);
         loadDoc(true);
-        setPasteToast({ key: Date.now(), report: r.report, layer: r.created.find((c) => c.id === r.boardId)?.name ?? 'page', nodeId: r.boardId, title: importToastTitle(r) });
+        setPasteToast({ key: Date.now(), report: r.report, layer: r.created.find((c) => c.id === r.boardId)?.name ?? 'page', nodeId: r.boardId, title: importToastTitle(r), undoLabel: 'Undo import' });
       } finally {
         editing.current--;
         setImportingUrl(false);

@@ -41,6 +41,11 @@ describe('dtcgTokensJson', () => {
     // Round-trip dari bentuk datar: path mengembalikan nama penuh.
     expect(parseDtcgTokens(json).entries.map((e) => e.token)).toEqual(['a', 'a.b', 'a.b.c']);
   });
+
+  it('segmen nama bertabrakan dengan properti Object (constructor.x) tetap diekspor utuh', () => {
+    const o = JSON.parse(dtcgTokensJson(doc({ tokens: { 'constructor.x': { type: 'color', value: '#123456' } } })));
+    expect(o.constructor.x).toEqual({ $type: 'color', $value: '#123456' });
+  });
 });
 
 describe('parseDtcgTokens', () => {

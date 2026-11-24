@@ -61,7 +61,10 @@ function tokenJson(t: AnyTokenDef): Record<string, unknown> {
  * sama-sama token) ditulis datar di akar agar impor apa pun tetap membaca path penuh.
  */
 export function dtcgTokensJson(doc: Pick<LakarDocument, 'tokens' | 'tokenModes'>): string {
-  const root: Record<string, unknown> = {};
+  // Akar+grup ber-prototype-null: segmen bernama `constructor`/`toString` (nama token sah menurut
+  // TOKEN_NAME_PATTERN) tidak membaca rantai prototype Object — tanpa ini token hilang dari output
+  // dan `??=` akan menulis properti ke objek global.
+  const root: Record<string, unknown> = Object.create(null);
   if (doc.tokenModes?.length) root.$extensions = { 'com.lakar': { tokenModes: [...doc.tokenModes] } };
   const tokens = doc.tokens ?? {};
   const names = new Set(Object.keys(tokens));
@@ -73,7 +76,7 @@ export function dtcgTokensJson(doc: Pick<LakarDocument, 'tokens' | 'tokenModes'>
       continue;
     }
     let node = root;
-    for (let i = 0; i < segs.length - 1; i++) node = (node[segs[i]!] ??= {}) as Record<string, unknown>;
+    for (let i = 0; i < segs.length - 1; i++) node = (node[segs[i]!] ??= Object.create(null)) as Record<string, unknown>;
     node[segs[segs.length - 1]!] = tokenJson(t);
   }
   return `${JSON.stringify(root, null, 2)}\n`;
