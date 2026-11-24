@@ -62,6 +62,8 @@ export const TOOL_EFFECTS = {
   reply_to_comment: 'write',
   // Mengubah status thread (resolved/open), idempoten.
   resolve_comment: 'write',
+  // Menghapus thread komentar permanen dari dokumen.
+  delete_comment: 'destructive',
 } as const satisfies Record<string, ToolEffect>;
 
 export type ToolName = keyof typeof TOOL_EFFECTS;

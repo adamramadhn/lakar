@@ -454,6 +454,11 @@ export const RESOLVE_COMMENT_DESCRIPTION =
   'Tandai thread komentar resolved atau buka kembali: {threadId, resolved?} (default true; false = buka kembali). ' +
   'Resolve menetapkan resolvedAt. Idempoten — status sudah sama → tanpa rev baru.';
 
+/** Deskripsi tool `delete_comment` (story 9.4 lanjutan). */
+export const DELETE_COMMENT_DESCRIPTION =
+  'Hapus thread komentar permanen dari dokumen aktif: {threadId}. Berbeda dengan resolve — dokumen kehilangan threadnya ' +
+  '(pulihkan lewat History/restore di aplikasi). Menambah rev; threadId dari list_comments.';
+
 /** Deskripsi tool `visual_diff` (spec-agent-visual-diff). */
 export const VISUAL_DIFF_DESCRIPTION =
   'Bandingkan render board/node dokumen aktif di dua rev (snapshot History) untuk memastikan edit hanya mengubah area yang dimaksud. ' +
@@ -737,6 +742,18 @@ export function createLakarMcpServer(daemonUrl: string): McpServer {
       }),
     },
     ({ threadId, resolved }) => guarded(async () => asText(await client.call('/comments/resolve', resolved !== undefined ? { threadId, resolved } : { threadId }))),
+  );
+
+  server.registerTool(
+    'delete_comment',
+    {
+      annotations: toolAnnotations('delete_comment'),
+      description: DELETE_COMMENT_DESCRIPTION,
+      inputSchema: z.object({
+        threadId: z.string().describe('id thread dari list_comments'),
+      }),
+    },
+    ({ threadId }) => guarded(async () => asText(await client.call('/comments/delete', { threadId }))),
   );
 
   // Audit desain (story 9.6): baca-saja, dihitung pada dokumen tersimpan sesi. Route agen `/analyze/*`.

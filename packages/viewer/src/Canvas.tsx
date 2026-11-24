@@ -1256,6 +1256,7 @@ export function Canvas({
               busy={comments.busy === true}
               onReply={(text) => comments.onReply(open.id, text)}
               onResolve={(resolved) => comments.onResolve(open.id, resolved)}
+              onDelete={() => comments.onDelete(open.id)}
               onClose={() => comments.onOpen(undefined)}
             />
           );

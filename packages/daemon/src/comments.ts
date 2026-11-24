@@ -41,6 +41,7 @@ const CreateBody = z
   .strict();
 const ReplyBody = z.object({ threadId: ThreadId, text: Text }).strict();
 const ResolveBody = z.object({ threadId: ThreadId, resolved: z.boolean().optional() }).strict();
+const DeleteBody = z.object({ threadId: ThreadId }).strict();
 
 /** Penulis pesan: agen = harness sesi (`x-lakar-agent`, fallback nama klien); tanpa sesi = pengguna viewer. */
 const authorFor = (session: Session | undefined): CommentAuthor =>
@@ -136,6 +137,17 @@ const mutateResolve =
     return { changed: true, description: `${resolved ? 'Resolved' : 'Reopened'} comment ${threadId}`, extra: { threadId, status: t.status, ...(t.resolvedAt ? { resolvedAt: t.resolvedAt } : {}) } };
   };
 
+/** Mutasi delete: thread dihapus permanen dari dokumen (restore lewat History bila perlu). Thread asing → 404. */
+const mutateDelete =
+  (slug: string, threadId: string): Mutate<{ threadId: string }> =>
+  (doc) => {
+    const idx = (doc.comments ?? []).findIndex((c) => c.id === threadId);
+    if (idx < 0) throw new LakarError('NOT_FOUND', `thread komentar ${threadId} tidak ada di dokumen ${slug}`, { hint: 'pakai threadId dari list_comments' });
+    doc.comments!.splice(idx, 1);
+    if (doc.comments!.length === 0) delete doc.comments;
+    return { changed: true, description: `Deleted comment ${threadId}`, extra: { threadId } };
+  };
+
 /** Daftar thread `doc` dengan filter ListBody (dipakai route agen dan viewer). */
 const filterThreads = (doc: LakarDocument, body: z.output<typeof ListBody>): CommentThread[] => {
   let threads = doc.comments ?? [];
@@ -191,6 +203,14 @@ export function registerCommentRoutes(app: FastifyInstance, { docs, store, docLo
     const { session, slug } = activeDoc(req.headers[SESSION_HEADER]);
     const body = parse(ResolveBody, req.body, 'kirim {threadId, resolved?} (default true)');
     const data = await run(slug, session, mutateResolve(slug, body.threadId, body.resolved ?? true));
+    return ok(reply, data);
+  });
+
+  // Hapus thread permanen (bukan resolve — dokumen kehilangan threadnya; restore lewat History).
+  app.post('/comments/delete', async (req, reply) => {
+    const { session, slug } = activeDoc(req.headers[SESSION_HEADER]);
+    const body = parse(DeleteBody, req.body, 'kirim {threadId}');
+    const data = await run(slug, session, mutateDelete(slug, body.threadId));
     return ok(reply, data);
   });
 }
@@ -292,5 +312,15 @@ export function registerViewerCommentRoutes(app: FastifyInstance, { docs, store,
     const data = await run(slug, mutateResolve(slug, body.threadId, body.resolved ?? true));
     notify(req.headers, data);
     return ok(reply, { slug: data.slug, rev: data.rev, threadId: data.threadId, status: data.status, ...(data.resolvedAt ? { resolvedAt: data.resolvedAt } : {}) });
+  });
+
+  // Hapus thread permanen dari aplikasi.
+  app.post<{ Params: { slug: string } }>('/viewer/docs/:slug/comments/delete', async (req, reply) => {
+    const { slug } = req.params;
+    checkSlug(slug);
+    const body = parse(DeleteBody, req.body, 'kirim {threadId}');
+    const data = await run(slug, mutateDelete(slug, body.threadId));
+    notify(req.headers, data);
+    return ok(reply, { slug: data.slug, rev: data.rev, threadId: data.threadId });
   });
 }

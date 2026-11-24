@@ -65,6 +65,7 @@ function commentsProps(over: Record<string, unknown> = {}) {
     onOpen: vi.fn(),
     onReply: vi.fn(),
     onResolve: vi.fn(),
+    onDelete: vi.fn(),
     onDraftSubmit: vi.fn(),
     onDraftCancel: vi.fn(),
     ...over,
@@ -194,6 +195,11 @@ async function openViewer(threads: CommentThread[] = [PINNED]) {
     };
     return { slug: SLUG, rev: state.doc.rev, threadId: b.threadId, status: resolved ? 'resolved' : 'open', resolvedAt: resolved ? AT : undefined };
   });
+  d.on('POST', `/viewer/docs/${SLUG}/comments/delete`, (req) => {
+    const b = req.body as { threadId: string };
+    state.doc = { ...state.doc, rev: state.doc.rev + 1, comments: state.doc.comments!.filter((c) => c.id !== b.threadId) };
+    return { slug: SLUG, rev: state.doc.rev, threadId: b.threadId };
+  });
   const view = renderUi(<Viewer slug={SLUG} />);
   await waitFor(() => expect(document.querySelector(`[data-layer="${BOARD}"]`)).not.toBeNull());
   return { ...view, state };
@@ -234,6 +240,16 @@ describe('Viewer — tab Comments', () => {
     await waitFor(() => expect(document.querySelector('.comment-card')).toHaveTextContent('noted'));
     const req = dom().daemon.find('POST', `/viewer/docs/${SLUG}/comments/reply`)[0]!;
     expect(req.body).toMatchObject({ threadId: 'Com00001', text: 'noted' });
+  });
+
+  it('hapus dari popover: POST delete lalu pin dan kartu hilang dari canvas', async () => {
+    const { user } = await openViewer();
+    await user.click(document.querySelector('.comment-pin')!);
+    await user.click(await screen.findByRole('button', { name: 'Delete comment' }));
+    await waitFor(() => expect(dom().daemon.find('POST', `/viewer/docs/${SLUG}/comments/delete`)).toHaveLength(1));
+    expect(dom().daemon.find('POST', `/viewer/docs/${SLUG}/comments/delete`)[0]!.body).toMatchObject({ threadId: 'Com00001' });
+    await waitFor(() => expect(document.querySelector('.comment-pin')).toBeNull());
+    await waitFor(() => expect(document.querySelector('.comment-card')).toBeNull());
   });
 
   it('tool komentar + tap + tulis: POST create lalu pin baru dari muatan ulang; popover baru terbuka', async () => {

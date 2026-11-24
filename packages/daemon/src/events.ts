@@ -75,6 +75,7 @@ export const TOOL_ROUTES: Readonly<Record<string, string>> = {
   '/comments/create': 'add_comment',
   '/comments/reply': 'reply_to_comment',
   '/comments/resolve': 'resolve_comment',
+  '/comments/delete': 'delete_comment',
   '/analyze/colors': 'analyze_colors',
   '/analyze/typography': 'analyze_typography',
   '/analyze/clusters': 'analyze_clusters',
