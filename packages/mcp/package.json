@@ -20,6 +20,7 @@
     "test": "vitest run --root ../.. packages/mcp/"
   },
   "dependencies": {
+    "@lakar/daemon": "workspace:*",
     "@lakar/schema": "workspace:*",
     "@modelcontextprotocol/server": "2.4.0",
     "zod": "4.6.7"

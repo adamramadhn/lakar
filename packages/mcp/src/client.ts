@@ -45,15 +45,30 @@ export function agentHeader(info: AgentInfo | undefined): string | undefined {
 
 export type DaemonClientOptions = { agent?: () => AgentInfo | undefined };
 
+/**
+ * Satu bentuk transport untuk dua backend: `DaemonClient` (HTTP ke lakard) dan `FileClient`
+ * (mode `--file`, tanpa daemon). `setAgent` dipanggil sesudah initialize MCP, saat `clientInfo` diketahui.
+ */
+export type LakarTransport = {
+  call<T>(path: string, body?: unknown): Promise<ApiResult<T>>;
+  status<T>(): Promise<ApiResult<T>>;
+  setAgent(provider: () => AgentInfo | undefined): void;
+};
+
 export class DaemonClient {
   readonly url: string;
   /** Promise sesi dibagi semua pemanggil paralel; direset bila gagal atau 401. */
   #sessionPromise: Promise<string> | undefined;
-  readonly #agent: (() => AgentInfo | undefined) | undefined;
+  #agent: (() => AgentInfo | undefined) | undefined;
 
   constructor(url: string, options: DaemonClientOptions = {}) {
     this.url = url.replace(/\/+$/, '');
     this.#agent = options.agent;
+  }
+
+  /** Ganti penyedia info agen (backend lain: FileClient menyalurkan ke FileTransport). */
+  setAgent(provider: () => AgentInfo | undefined): void {
+    this.#agent = provider;
   }
 
   async #request<T>(path: string, body: unknown, session?: string, method: 'POST' | 'GET' = 'POST', extra: Record<string, string> = {}): Promise<{ status: number; result: ApiResult<T> }> {
@@ -143,7 +158,7 @@ export class DaemonClient {
   }
 
   /** Panggil endpoint daemon dalam sesi. Sesi hilang (daemon restart, HTTP 401) → sesi baru, ulang sekali. */
-  async call<T>(path: string, body: unknown): Promise<ApiResult<T>> {
+  async call<T>(path: string, body: unknown = {}): Promise<ApiResult<T>> {
     const pending = this.#session();
     const first = await this.#request<T>(path, body, await pending);
     if (first.status !== 401) return first.result;

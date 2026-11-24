@@ -80,6 +80,8 @@ const STATUS: Record<ErrorCode, number> = {
   RENDER_FAILED: 503,
   EXPORT_FAILED: 500,
   VERSION_MISMATCH: 409,
+  // Dipakai transport file (`lakar --file`): fitur yang butuh render/jaringan/viewer. 501 = not implemented.
+  NOT_SUPPORTED: 501,
 };
 
 /** Parser impor CSS variables (@lakar/render) untuk `importCssVariables` di execute (exec tidak bergantung pada render, AD-17). */
@@ -114,15 +116,15 @@ const firstBoardId = (doc: { pages: readonly { children: readonly { id: string }
 
 // Tanpa `.strict()` seperti dulu (kunci lain diabaikan). Tanpa slug = dokumen fokus viewer, atau dokumen baru.
 // `name` hanya divalidasi bila slug tidak ada: dengan slug, kunci lain diabaikan seperti dulu (AD-4).
-const OpenBody = z.union([
+export const OpenBody = z.union([
   z.object({ slug: z.string() }),
   z.object({ slug: z.undefined().optional(), name: z.string().max(200, 'name maks 200 karakter').optional() }),
 ]);
-const OPEN_HINT = 'kirim {} (dokumen yang terbuka di aplikasi Lakar, atau dokumen baru), {name} (nama dokumen baru bila tidak ada yang terbuka), atau {slug} (file tertentu)';
+export const OPEN_HINT = 'kirim {} (dokumen yang terbuka di aplikasi Lakar, atau dokumen baru), {name} (nama dokumen baru bila tidak ada yang terbuka), atau {slug} (file tertentu)';
 /** Nama dokumen baru dari `open_doc` tanpa slug dan tanpa name (sama dengan default New file di viewer). */
 export const DEFAULT_DOC_NAME = 'Untitled';
-const ListDocumentsBody = z.object({}).strict().optional();
-const ExecuteBody = z
+export const ListDocumentsBody = z.object({}).strict().optional();
+export const ExecuteBody = z
   .object({
     code: z.string().min(1).optional(),
     description: z.string().optional(),
@@ -132,12 +134,12 @@ const ExecuteBody = z
     dryRun: z.boolean().optional(),
   })
   .strict();
-const EXECUTE_BODY_HINT =
+export const EXECUTE_BODY_HINT =
   "kirim {code, description} (description 3–8 kata, mis. 'tambah hero landing kopi'), perbaikan {editId, edits:[{find, replace}], description?}, atau pratinjau tanpa commit {code, description, dryRun:true}";
-const DESCRIPTION_EXAMPLE = "mis. description: 'tambah hero landing kopi'";
+export const DESCRIPTION_EXAMPLE = "mis. description: 'tambah hero landing kopi'";
 
 type NodeRef = { id: string; type: string; name?: string; pageId: string; boardId: string };
-type NodeChanges = {
+export type NodeChanges = {
   added: NodeRef[];
   updated: (NodeRef & { props: string[] })[];
   deleted: NodeRef[];
@@ -151,7 +153,7 @@ const stableJson = (v: unknown): string =>
   JSON.stringify(v, (_k, x) => (x !== null && typeof x === 'object' && !Array.isArray(x) ? Object.fromEntries(Object.keys(x as Record<string, unknown>).sort().map((k) => [k, (x as Record<string, unknown>)[k]])) : x));
 
 /** Diff struktural dokumen tersimpan (story 9.5, dry-run execute): added/updated/deleted/moved per node dengan halaman+board. */
-function nodeChanges(before: LakarDocument, after: LakarDocument): NodeChanges {
+export function nodeChanges(before: LakarDocument, after: LakarDocument): NodeChanges {
   type Ent = { node: AnyNode; pageId: string; boardId: string; parentId: string; index: number };
   const mapOf = (doc: LakarDocument) => {
     const out = new Map<string, Ent>();
@@ -192,10 +194,10 @@ function nodeChanges(before: LakarDocument, after: LakarDocument): NodeChanges {
   return { added, updated, deleted, moved, other, counts: { added: added.length, updated: updated.length, deleted: deleted.length, moved: moved.length } };
 }
 
-const EMPTY_CHANGES: NodeChanges = { added: [], updated: [], deleted: [], moved: [], other: [], counts: { added: 0, updated: 0, deleted: 0, moved: 0 } };
+export const EMPTY_CHANGES: NodeChanges = { added: [], updated: [], deleted: [], moved: [], other: [], counts: { added: 0, updated: 0, deleted: 0, moved: 0 } };
 
 /** Label riwayat wajib 3–8 kata (AD-7). */
-function descriptionProblem(description: string | undefined): string | undefined {
+export function descriptionProblem(description: string | undefined): string | undefined {
   if (description === undefined || !description.trim()) return 'description wajib diisi (label riwayat 3–8 kata)';
   const words = description.trim().split(/\s+/).length;
   if (words < 3 || words > 8) return `description harus 3–8 kata, bukan ${words} kata: ${JSON.stringify(description)}`;
@@ -203,7 +205,7 @@ function descriptionProblem(description: string | undefined): string | undefined
 }
 
 /** Terapkan edit find/replace berurutan; setiap `find` harus muncul tepat sekali di teks saat itu. */
-function applyEdits(code: string, edits: { find: string; replace: string }[]): string {
+export function applyEdits(code: string, edits: { find: string; replace: string }[]): string {
   let out = code;
   edits.forEach(({ find, replace }, i) => {
     let count = 0;
@@ -234,17 +236,17 @@ const ScreenshotBody = z
   .optional();
 const SCREENSHOT_HINT = 'kirim {boardId?} (board; kosong = board pertama) ATAU {nodeId} (potret satu node), bukan keduanya; scale 1 atau 2 (default 1)';
 const SessionBody = z.object({ client: z.string().max(64).optional(), version: z.string().max(64).optional(), schemaVersion: z.number().int().optional() }).strict().optional();
-const InspectBody = z.object({ id: z.string().min(1), depth: z.number().int().min(0).max(INSPECT_DEPTH_MAX).optional() }).strict();
+export const InspectBody = z.object({ id: z.string().min(1), depth: z.number().int().min(0).max(INSPECT_DEPTH_MAX).optional() }).strict();
 const ExportBody = z.object({ id: z.string().min(1).optional(), scale: z.union([z.literal(1), z.literal(2)]).optional() }).strict().optional();
-const BoardsBody = z.object({}).strict().optional();
-const SkillBody = z.object({ name: z.string().optional() }).strict().optional();
+export const BoardsBody = z.object({}).strict().optional();
+export const SkillBody = z.object({ name: z.string().optional() }).strict().optional();
 /** Maks sesi yang ditampilkan di `/status`. */
 export const STATUS_SESSIONS_MAX = 10;
 const LayoutCheckBody = z.object({ boardId: z.string().optional() }).strict().optional();
 /** Batas entri `bounds` di respons execute. */
 const BOUNDS_MAX = 60;
-const NOT_COMMITTED = 'dokumen tidak di-commit (board tersentuh gagal dirender untuk check)';
-const IconSearchBody = z
+export const NOT_COMMITTED = 'dokumen tidak di-commit (board tersentuh gagal dirender untuk check)';
+export const IconSearchBody = z
   .object({
     query: z.string().trim().min(1, 'query wajib (string tidak kosong)'),
     lib: z.enum(ICON_LIBS).optional(),
@@ -260,7 +262,7 @@ const PhotoSearchBody = z
   })
   .strict();
 const PHOTO_SEARCH_HINT = `kirim {query, orientation?, limit?, preview?}, mis. {query:'kamar hotel', orientation:'landscape'}; limit 1–${SEARCH_LIMIT_MAX} (default 6)`;
-const ICON_SEARCH_HINT = "kirim {query, lib?, limit?}, mis. {query:'dumbbell'} atau {query:'github', lib:'simple-icons'}; limit 1–50 (default 10)";
+export const ICON_SEARCH_HINT = "kirim {query, lib?, limit?}, mis. {query:'dumbbell'} atau {query:'github', lib:'simple-icons'}; limit 1–50 (default 10)";
 
 export type BuildOptions = {
   config: DaemonConfig;
@@ -279,6 +281,8 @@ export type BuildOptions = {
   harnessDeps?: Partial<HarnessDeps>;
   /** Fetch halaman impor URL (default `fetchPageHtml`; untuk tes, tanpa menyentuh validasi route). */
   pageFetch?: PageFetch;
+  /** Mode `--headless` resmi (spec-collab-cloud story 6): viewer statis `/app/` tidak disajikan; API tetap penuh. */
+  headless?: boolean;
 };
 
 export type Daemon = {
@@ -307,6 +311,7 @@ export function buildServer({
   activityHeartbeatMs,
   harnessDeps,
   pageFetch,
+  headless = false,
 }: BuildOptions): Daemon {
   const app = Fastify({ logger: false, bodyLimit: 1024 * 1024 });
   const startedAt = new Date();
@@ -414,6 +419,7 @@ export function buildServer({
       host: config.host,
       port,
       dataDir: config.dataDir,
+      ...(headless ? { headless: true } : {}),
       pool: render.status?.() ?? null,
       fonts: { families: fonts.families(), missing: [...fonts.missing] },
       icons: { ...icons.versions },
@@ -921,7 +927,7 @@ export function buildServer({
   });
 
   // Viewer baca-saja (Viewer B slice 1): `/viewer/*` dan `/app/*`. Route lama tidak berubah.
-  registerViewerRoutes(app, { docs, store, sessions, checks, distDir: config.viewerDir ?? VIEWER_DIST_DIR });
+  registerViewerRoutes(app, { docs, store, sessions, checks, distDir: config.viewerDir ?? VIEWER_DIST_DIR, serveStatic: !headless });
   registerFileRoutes(app, {
     docs,
     store,

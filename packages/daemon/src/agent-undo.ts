@@ -77,13 +77,13 @@ export class AgentSteps {
   }
 }
 
-const StepsBody = z.object({ steps: z.number().int().min(1).max(AGENT_UNDO_MAX).optional() }).strict().optional();
-const BODY_HINT = `kirim {steps?} (bilangan bulat 1–${AGENT_UNDO_MAX}, default 1)`;
+export const StepsBody = z.object({ steps: z.number().int().min(1).max(AGENT_UNDO_MAX).optional() }).strict().optional();
+export const BODY_HINT = `kirim {steps?} (bilangan bulat 1–${AGENT_UNDO_MAX}, default 1)`;
 
-const FIX_FORWARD = 'inspect/list_boards untuk melihat keadaan kini, lalu perbaiki maju lewat execute';
+export const FIX_FORWARD = 'inspect/list_boards untuk melihat keadaan kini, lalu perbaiki maju lewat execute';
 
 /** Siapa yang menulis rev pertama sesudah `head` (untuk pesan penolakan); riwayat tak terbaca → generik. */
-async function laterAuthor(store: DocStore, slug: string, head: number): Promise<{ who: string; entry?: HistoryEntry }> {
+export async function laterAuthor(store: DocStore, slug: string, head: number): Promise<{ who: string; entry?: HistoryEntry }> {
   let entries: HistoryEntry[] = [];
   try {
     entries = await store.readHistory(slug);

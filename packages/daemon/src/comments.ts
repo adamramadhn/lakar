@@ -33,18 +33,18 @@ const ok = (reply: FastifyReply, data: unknown) => reply.code(200).send({ ok: tr
 const Text = z.string().transform((s) => s.trim()).pipe(z.string().min(1, 'text tidak boleh kosong').max(COMMENT_TEXT_MAX, `text maks ${COMMENT_TEXT_MAX} karakter`));
 const Coord = z.number().finite();
 const ThreadId = z.string().regex(ID_PATTERN);
-const ListBody = z
+export const ListBody = z
   .object({ status: z.enum(['open', 'resolved', 'all']).optional(), pageId: ThreadId.optional(), kind: z.enum(['user', 'agent']).optional() })
   .strict();
-const CreateBody = z
+export const CreateBody = z
   .object({ text: Text, nodeId: ThreadId.optional(), pageId: ThreadId.optional(), x: Coord.optional(), y: Coord.optional() })
   .strict();
-const ReplyBody = z.object({ threadId: ThreadId, text: Text }).strict();
-const ResolveBody = z.object({ threadId: ThreadId, resolved: z.boolean().optional() }).strict();
-const DeleteBody = z.object({ threadId: ThreadId }).strict();
+export const ReplyBody = z.object({ threadId: ThreadId, text: Text }).strict();
+export const ResolveBody = z.object({ threadId: ThreadId, resolved: z.boolean().optional() }).strict();
+export const DeleteBody = z.object({ threadId: ThreadId }).strict();
 
 /** Penulis pesan: agen = harness sesi (`x-lakar-agent`, fallback nama klien); tanpa sesi = pengguna viewer. */
-const authorFor = (session: Session | undefined): CommentAuthor =>
+export const authorFor = (session: Session | undefined): CommentAuthor =>
   session ? { kind: 'agent', name: session.agent ?? session.client ?? 'agent' } : { kind: 'user', name: 'You' };
 
 type Entry = { node: AnyNode; pageId: string };
@@ -68,13 +68,13 @@ const findThread = (doc: LakarDocument, slug: string, threadId: string): Comment
 };
 
 /** Isi `doc` hasil clone; `changed:false` = tanpa rev baru (resolve idempoten). */
-type Mutate<T> = (doc: LakarDocument) => { changed: boolean; description: string; extra: T };
+export type Mutate<T> = (doc: LakarDocument) => { changed: boolean; description: string; extra: T };
 
 /**
  * Mutasi create (dipakai route agen dan viewer): pin di layer (`nodeId` → halaman node, x/y default posisi node
  * tersimpan) atau titik bebas (`x`,`y` wajib; `pageId` atau halaman dari `pageIndex` — sesi agen / halaman pertama).
  */
-const mutateCreate =
+export const mutateCreate =
   (slug: string, body: z.output<typeof CreateBody>, author: CommentAuthor, pageIndex: (doc: LakarDocument) => number): Mutate<{ thread: CommentThread }> =>
   (doc) => {
     let pageId: string;
@@ -114,7 +114,7 @@ const mutateCreate =
   };
 
 /** Mutasi reply: pesan baru di akhir thread. */
-const mutateReply =
+export const mutateReply =
   (slug: string, body: z.output<typeof ReplyBody>, author: CommentAuthor): Mutate<{ threadId: string; message: CommentThread['messages'][number]; thread: CommentThread }> =>
   (doc) => {
     const t = findThread(doc, slug, body.threadId);
@@ -124,7 +124,7 @@ const mutateReply =
   };
 
 /** Mutasi resolve/reopen: idempoten — status sama → tanpa rev baru. */
-const mutateResolve =
+export const mutateResolve =
   (slug: string, threadId: string, resolved: boolean): Mutate<{ threadId: string; status: CommentThread['status']; resolvedAt?: string }> =>
   (doc) => {
     const t = findThread(doc, slug, threadId);
@@ -138,7 +138,7 @@ const mutateResolve =
   };
 
 /** Mutasi delete: thread dihapus permanen dari dokumen (restore lewat History bila perlu). Thread asing → 404. */
-const mutateDelete =
+export const mutateDelete =
   (slug: string, threadId: string): Mutate<{ threadId: string }> =>
   (doc) => {
     const idx = (doc.comments ?? []).findIndex((c) => c.id === threadId);
@@ -149,7 +149,7 @@ const mutateDelete =
   };
 
 /** Daftar thread `doc` dengan filter ListBody (dipakai route agen dan viewer). */
-const filterThreads = (doc: LakarDocument, body: z.output<typeof ListBody>): CommentThread[] => {
+export const filterThreads = (doc: LakarDocument, body: z.output<typeof ListBody>): CommentThread[] => {
   let threads = doc.comments ?? [];
   if (body.status && body.status !== 'all') threads = threads.filter((t) => t.status === body.status);
   if (body.pageId) threads = threads.filter((t) => t.pageId === body.pageId);

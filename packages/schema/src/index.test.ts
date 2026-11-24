@@ -20,9 +20,10 @@ describe('@lakar/schema', () => {
     expect(PACKAGE).toBe('@lakar/schema');
   });
 
-  it('enum ErrorCode AD-11 berisi 12 kode', () => {
-    expect(ErrorCode.options).toHaveLength(12);
+  it('enum ErrorCode AD-11 berisi 13 kode (NOT_SUPPORTED untuk transport file)', () => {
+    expect(ErrorCode.options).toHaveLength(13);
     expect(ErrorCode.options).toContain('VERSION_MISMATCH');
+    expect(ErrorCode.options).toContain('NOT_SUPPORTED');
   });
 
   it.each([

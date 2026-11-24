@@ -14,6 +14,7 @@ export const ErrorCode = z.enum([
   'RENDER_FAILED',
   'EXPORT_FAILED',
   'VERSION_MISMATCH',
+  'NOT_SUPPORTED',
 ]);
 export type ErrorCode = z.infer<typeof ErrorCode>;
 

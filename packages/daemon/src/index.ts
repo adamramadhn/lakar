@@ -70,4 +70,5 @@ export {
   type HarnessState,
 } from './harnesses.js';
 export { startDaemon, type RunningDaemon, type StartOptions } from './start.js';
+export { FileTransport, type FileTransportOptions } from './file-transport.js';
 export { IconCatalog } from '@lakar/icons';
