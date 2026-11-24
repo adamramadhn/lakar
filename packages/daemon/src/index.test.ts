@@ -448,6 +448,110 @@ describe('execute AD-7: description, editId, keep, value/logs', () => {
   });
 });
 
+describe('execute dryRun (story 9.5): pratinjau tanpa commit', () => {
+  let s: string;
+  const slug = 'dry-run-doc';
+  const file = () => join(dataDir, 'docs', `${slug}.lakar.json`);
+  const hist = () => join(dataDir, 'docs', `${slug}.history.jsonl`);
+  const snapshot = async () => ({ doc: await readFile(file(), 'utf8'), hist: existsSync(hist()) ? await readFile(hist(), 'utf8') : '' });
+
+  beforeAll(async () => {
+    s = await newSession();
+    await call('/docs/open', { slug }, s);
+    const r = await call('/execute', {
+      code: `const b=add(null,{type:'board',name:'Base',x:0,y:0,width:390,height:844,screen:'mobile'}); add(b,{type:'text',name:'Satu',content:'satu',size:16}); add(b,{type:'text',name:'Dua',content:'dua',size:16})`,
+      description: 'board dasar untuk dry run',
+    }, s);
+    expect(r.status, JSON.stringify(r.body.error)).toBe(200);
+  });
+
+  it('ops pada salinan: changes added/updated/deleted per board, check ada, rev+file+riwayat identik byte', async () => {
+    const before = await snapshot();
+    const diffBefore = (await call('/viewer/visual-diff', {}, s)).body.data;
+    const docBefore = JSON.parse(before.doc) as { rev: number; pages: { id: string; children: { id: string; children: { id: string }[] }[] }[] };
+    const pageId = docBefore.pages[0]!.id;
+    const boardId = docBefore.pages[0]!.children[0]!.id;
+    const [t1 = '', t2 = ''] = docBefore.pages[0]!.children[0]!.children.map((c) => c.id);
+    const code = `update('${t1}',{content:'baru'}); add('${boardId}',{type:'rect',name:'Baru',width:10,height:10}); remove('${t2}')`;
+    const r = await call('/execute', { code, description: 'pratinjau tiga jenis perubahan', dryRun: true }, s);
+    expect(r.status, JSON.stringify(r.body.error)).toBe(200);
+    const d = r.body.data;
+    expect(d.dryRun).toBe(true);
+    expect(d.rev).toBe(docBefore.rev);
+    // Teks diupdate, rect ditambah, teks dihapus; board sendiri updated karena children berubah.
+    expect(d.changes.counts).toEqual({ added: 1, updated: 2, deleted: 1, moved: 0 });
+    expect(d.changes.added[0]).toMatchObject({ type: 'rect', name: 'Baru', pageId, boardId });
+    const upd = Object.fromEntries(d.changes.updated.map((u: { id: string; props: string[] }) => [u.id, u.props]));
+    expect(upd[t1]).toEqual(['content']);
+    expect(upd[boardId]).toEqual(['children']);
+    expect(d.changes.deleted[0]).toMatchObject({ id: t2, type: 'text', pageId, boardId });
+    // Check dihitung pada salinan seperti commit sungguhan.
+    expect(d.check.boards).toEqual([boardId]);
+    expect(d.check.summary).toBeDefined();
+    // Disk identik byte: tidak ada rev/riwayat/snapshot baru.
+    expect(await snapshot()).toEqual(before);
+    // Jejak in-memory: docs map tidak bocor (Baru tidak ada), dasar visual_diff tidak bergeser.
+    const find = await call('/execute', { code: `find({name:'Baru'}).length`, description: 'cari node pratinjau tadi' }, s);
+    expect(find.body.data.value).toBe(0);
+    expect((await call('/viewer/visual-diff', {}, s)).body.data).toEqual(diffBefore);
+  });
+
+  it('move di salinan: node muncul di moved (bukan added/deleted), parent updated children', async () => {
+    const before = await snapshot();
+    const doc = JSON.parse(before.doc) as { pages: { children: { id: string; children: { id: string }[] }[] }[] };
+    const boardId = doc.pages[0]!.children[0]!.id;
+    const t2 = doc.pages[0]!.children[0]!.children[1]!.id;
+    const r = await call('/execute', { code: `move('${t2}','${boardId}',0)`, description: 'pratinjau pindah urutan node', dryRun: true }, s);
+    expect(r.status, JSON.stringify(r.body.error)).toBe(200);
+    expect(r.body.data.changes.moved.map((m: { id: string }) => m.id)).toContain(t2);
+    expect(r.body.data.changes.counts.moved).toBe(2);
+    expect(r.body.data.changes.deleted).toEqual([]);
+    expect(await snapshot()).toEqual(before);
+  });
+
+  it('setTokens di salinan: tanpa perubahan node, other menandai tokens', async () => {
+    const before = await snapshot();
+    const r = await call('/execute', { code: `setTokens({'colors.brand':'#FF0000'})`, description: 'pratinjau set token warna', dryRun: true }, s);
+    expect(r.status, JSON.stringify(r.body.error)).toBe(200);
+    expect(r.body.data.changes.counts).toEqual({ added: 0, updated: 0, deleted: 0, moved: 0 });
+    expect(r.body.data.changes.other).toContain('tokens');
+    // Token tidak benar-benar tersimpan (file identik byte).
+    expect(await snapshot()).toEqual(before);
+  });
+
+  it('snippet baca-saja: changes kosong, tanpa check, tanpa rev', async () => {
+    const before = await snapshot();
+    const r = await call('/execute', { code: `find({name:'Base'}).length`, description: 'hitung board saja', dryRun: true }, s);
+    expect(r.status, JSON.stringify(r.body.error)).toBe(200);
+    expect(r.body.data.dryRun).toBe(true);
+    expect(r.body.data.changes.counts).toEqual({ added: 0, updated: 0, deleted: 0, moved: 0 });
+    expect(r.body.data).not.toHaveProperty('check');
+    expect(r.body.data.value).toBe(1);
+    expect(await snapshot()).toEqual(before);
+  });
+
+  it('snippet gagal → error + editId; perbaikan lewat editId tetap dry-run tanpa jejak', async () => {
+    const before = await snapshot();
+    const fail = await call('/execute', { code: `update('ZZzzzz99',{content:'x'})`, description: 'gagal untuk edit id', dryRun: true }, s);
+    expect(fail.status).toBe(404);
+    expect(fail.body.error!.editId).toMatch(/^[A-Za-z0-9]{8}$/);
+    const docNow = JSON.parse((await snapshot()).doc) as { pages: { children: { children: { id: string }[] }[] }[] };
+    const t1 = docNow.pages[0]!.children[0]!.children[0]!.id;
+    const ok = await call('/execute', { editId: fail.body.error!.editId, edits: [{ find: 'ZZzzzz99', replace: t1 }], dryRun: true }, s);
+    expect(ok.status, JSON.stringify(ok.body.error)).toBe(200);
+    expect(ok.body.data.dryRun).toBe(true);
+    expect(ok.body.data.changes.updated.map((u: { id: string }) => u.id)).toContain(t1);
+    expect(await snapshot()).toEqual(before);
+  });
+
+  it('keep tidak tertulis oleh dry-run: variabel dari pratinjau tidak hidup di execute berikutnya', async () => {
+    const r = await call('/execute', { code: `keep.dry = 42`, description: 'isi keep lewat dry run', dryRun: true }, s);
+    expect(r.status, JSON.stringify(r.body.error)).toBe(200);
+    const after = await call('/execute', { code: `typeof keep.dry`, description: 'cek keep sesudah dry run' }, s);
+    expect(after.body.data.value).toBe('undefined');
+  });
+});
+
 describe('ikon (AD-9): kanonik, ICON_UNKNOWN, /icons/search, render', () => {
   let s: string;
   const slug = 'ikon-a';
