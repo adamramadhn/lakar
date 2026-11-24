@@ -41,7 +41,8 @@ import type { DaemonConfig } from './config.js';
 import { FontRegistry } from './fonts.js';
 import { INSPECT_DEPTH_DEFAULT, INSPECT_DEPTH_MAX, WIP_PREFIX, boundsMap, inspectFit, locateNode } from './inspect.js';
 import { readPngSize } from './png.js';
-import { NO_ACTIVE_DOC_HINT, Sessions, UnknownSessionError, authorOf, logExecute, recallFailed, rememberFailed, setActiveDoc } from './sessions.js';
+import { NO_ACTIVE_DOC_HINT, Sessions, UnknownSessionError, activePageIndex, authorOf, logExecute, recallFailed, rememberFailed, setActiveDoc } from './sessions.js';
+import { registerAgentPageRoutes } from './agent-pages.js';
 import { DocStore } from './store.js';
 import { ActivityBus, agentOf, registerActivityHooks } from './events.js';
 import { registerConnectionRoutes } from './connections.js';
@@ -570,13 +571,15 @@ export function buildServer({
       // Rename/archive/delete yang antre lebih dulu di kunci ini bisa melepas slug dari sesi: sama dengan cek awal.
       const doc = docs.get(slug);
       if (!doc) throw new LakarError('NO_ACTIVE_DOC', 'sesi ini belum punya dokumen aktif', { hint: NO_ACTIVE_DOC_HINT });
+      // Halaman aktif sesi (story 9.2): target add(null)/children(null)/place; halaman terhapus → NOT_FOUND + dibersihkan.
+      const activePageId = doc.pages[activePageIndex(session, doc)]!.id;
       // Board `height:'hug'`: tinggi terukur rev ini untuk `place`/`measuredHeight` (render hanya bila belum tercatat).
       const boardHeights = await hugs.ensure(render, resolveDocument(doc));
       let committed;
       try {
         // AD-4: error tak tertangkap di snippet → lempar di dalam body → rollback penuh oleh `transact`.
         committed = await transact(doc, { sessionId: session.id, description: label }, async (tx) => {
-          const run = await runSnippet(code, tx, { timeoutMs: config.execTimeoutMs, memoryBytes: config.execMemoryBytes, keep: session.keep, icons, photos, cssVariables: CSS_VARIABLES, dtcg: DTCG, boardHeights });
+          const run = await runSnippet(code, tx, { timeoutMs: config.execTimeoutMs, memoryBytes: config.execMemoryBytes, keep: session.keep, icons, photos, cssVariables: CSS_VARIABLES, dtcg: DTCG, boardHeights, activePageId });
           if (!run.ok) throw run.error;
           return run;
         });
@@ -849,6 +852,7 @@ export function buildServer({
   });
   registerFocusRoutes(app, { docs, store, focus });
   registerPageRoutes(app, { docs, store, docLocks, activity });
+  registerAgentPageRoutes(app, { docs, store, docLocks, activeDoc });
   registerOpsRoutes(app, { docs, store, docLocks, activity, icons });
   registerFixCheckRoutes(app, { docs, store, docLocks, sessions, render, hugs, checks, agentSteps, icons });
   // Paste HTML (story 4): render terisolasi lewat renderer Chromium bila ada (renderer palsu tes → RENDER_FAILED).

@@ -212,6 +212,11 @@ export type ApiContext = {
    * `measuredHeight` di view board. Tanpa entri (mis. board baru di snippet ini) = belum terukur.
    */
   boardHeights?: ReadonlyMap<string, number>;
+  /**
+   * ID halaman aktif sesi (story 9.2): target `add(null,…)`, `children(null)`, dan `place()`. Tidak ada (sesi belum
+   * pernah switch_page, pemanggil non-sesi) → halaman pertama, perilaku lama.
+   */
+  activePageId?: string;
 };
 
 /** Ukuran maksimum stylesheet `importCssVariables` (karakter). */
@@ -348,6 +353,9 @@ const ICON_SEARCH_HINT = "contoh: iconSearch('dumbbell') atau iconSearch('arrow 
 
 type Entry = { node: AnyNode; parentId: string | null; path: string[] };
 
+/** Halaman aktif sesi untuk target `add(null)`/`children(null)`/`place`; fallback halaman pertama. */
+const activePageOf = (ctx: ApiContext, doc: Readonly<Doc>) => doc.pages.find((p) => p.id === ctx.activePageId) ?? doc.pages[0]!;
+
 /** Semua node tersimpan dalam urutan dokumen (pre-order: halaman → board → anak; isi slot instance ber-parent instance). */
 function walk(doc: Readonly<Doc>): Entry[] {
   const out: Entry[] = [];
@@ -415,7 +423,7 @@ export const API: { readonly [K in keyof LakarApi]: ApiFunction } = {
     kind: 'op',
     signature: "add(parentId: string | null, node: {type: 'board'|'frame'|'text'|'rect'|'ellipse'|'path'|'icon'|'instance', name, ...}): string",
     doc:
-      'Tambah node ke board/frame parentId (null = halaman, khusus board). Katalog tertutup: board, frame, text, rect, ellipse, path, icon, instance (bagian Komponen). ' +
+      'Tambah node ke board/frame parentId (null = halaman aktif sesi — default halaman pertama; khusus board). Katalog tertutup: board, frame, text, rect, ellipse, path, icon, instance (bagian Komponen). ' +
       "parentId '<instanceId>/<idFrameSlot>' mengisi slot instance. " +
       'Anak ditambahkan satu per satu (tanpa children bersarang). Mengembalikan ID 8 karakter secara sinkron. ' +
       "Icon: {type:'icon', lib:'lucide'|'simple-icons', icon:<nama kanonik>, size, color?, strokeWidth?, filled?}; alias dikonversi ke nama kanonik " +
@@ -426,7 +434,9 @@ export const API: { readonly [K in keyof LakarApi]: ApiFunction } = {
     call(ctx, [parentId, node]) {
       rejectDerivedKeys('add', node);
       const n = iconNode(ctx, 'add', node);
-      return mutation(ctx, () => ctx.tx.add(parentId as string | null, n));
+      // parentId null untuk board → halaman aktif sesi (transaction.ts menerima pageId sebagai parent board).
+      const pid = parentId === null ? (ctx.activePageId ?? null) : parentId;
+      return mutation(ctx, () => ctx.tx.add(pid as string | null, n));
     },
   },
   update: {
@@ -739,14 +749,14 @@ export const API: { readonly [K in keyof LakarApi]: ApiFunction } = {
   children: {
     kind: 'read',
     signature: 'children(id: string | null): NodeView[]',
-    doc: 'Anak langsung node dalam urutan dokumen; null = board di halaman. Instance → isi slot tersimpannya (bukan isi master; itu lewat get alamat komposit). Node daun → [].',
+    doc: 'Anak langsung node dalam urutan dokumen; null = board di halaman aktif sesi. Instance → isi slot tersimpannya (bukan isi master; itu lewat get alamat komposit). Node daun → [].',
     returns: 'NodeView[]',
     errors: ['SCHEMA_INVALID', 'NOT_FOUND'],
     example: `${BOARD}\nadd(b, {type:'text', name:'Judul', content:'Halo', size:32});\nchildren(b).map((n) => n.name);`,
     call(ctx, [id]) {
       const doc = ctx.view();
       if (id === null || id === undefined) {
-        const boards = new Set(doc.pages[0]!.children.map((b) => b.id));
+        const boards = new Set(activePageOf(ctx, doc).children.map((b) => b.id));
         return walk(doc).filter((e) => e.parentId === null && boards.has(e.node.id)).map((e) => toView(e, ctx.boardHeights));
       }
       const nid = requireId('children', 'id', id);
@@ -779,7 +789,7 @@ export const API: { readonly [K in keyof LakarApi]: ApiFunction } = {
     kind: 'read',
     signature: "place(w: number, h: number | 'hug', opts?: {near?: string, gap?: number}): {x, y}",
     doc:
-      'Posisi {x, y} untuk board baru w×h yang tidak tumpang tindih board di halaman (termasuk yang dibuat di snippet ini), berjarak gap (default 80). ' +
+      'Posisi {x, y} untuk board baru w×h yang tidak tumpang tindih board di halaman aktif sesi (termasuk yang dibuat di snippet ini), berjarak gap (default 80). ' +
       "h 'hug' = board height:'hug' (hanya tepi atasnya dihitung); board hug yang ada memakai tinggi terukur render terakhir. " +
       'Halaman kosong → {x:0, y:0}; tanpa near → baris atas, kiri ke kanan; near → kanan board itu, lalu di bawahnya.',
     returns: '{x: number, y: number}',
@@ -803,7 +813,7 @@ export const API: { readonly [K in keyof LakarApi]: ApiFunction } = {
         throw new LakarError('SCHEMA_INVALID', `place: gap harus angka ≥ 0, bukan ${show(gap)}`, { hint: 'hilangkan gap untuk default 80' });
       }
       const doc = ctx.view();
-      const boards = doc.pages[0]!.children.map((b) => boardRect(b, ctx.boardHeights));
+      const boards = activePageOf(ctx, doc).children.map((b) => boardRect(b, ctx.boardHeights));
       // Board hug baru: tingginya belum ada, jadi hanya tepi atasnya (1 px) yang dijaga dari tabrakan.
       const size = { w: w as number, h: h === 'hug' ? 1 : (h as number) };
       if (o.near !== undefined) {

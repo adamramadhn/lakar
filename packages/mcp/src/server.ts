@@ -382,6 +382,35 @@ export const LIST_DOCUMENTS_DESCRIPTION =
   'open = tampil di jendela aplikasi; focused = dokumen yang terakhir difokuskan pengguna (dipakai open_doc tanpa slug); active = dokumen kerja sesi ini. ' +
   'Pakai slug untuk open_doc {slug} bila pengguna menyebut file tertentu.';
 
+/** Deskripsi tool `list_pages` (story 9.2). */
+export const LIST_PAGES_DESCRIPTION =
+  'Daftar halaman dokumen aktif sesi: {pages:[{id, name, index, boards}], active:{id, name, index, boards}, docId, rev}. ' +
+  'index = urutan halaman; boards = jumlah board di halaman itu. Halaman aktif menentukan target add(null,…), children(null), dan place() di execute.';
+
+/** Deskripsi tool `get_current_page` (story 9.2). */
+export const GET_CURRENT_PAGE_DESCRIPTION =
+  'Halaman aktif sesi sekarang: {id, name, index, boards}. Default halaman pertama sampai switch_page dipanggil. ' +
+  'Target execute (add(null,…), children(null), place()) mengikuti halaman ini.';
+
+/** Deskripsi tool `switch_page` (story 9.2). */
+export const SWITCH_PAGE_DESCRIPTION =
+  'Pindah halaman aktif sesi ke {page} — nama ATAU id halaman dari list_pages (nama tidak unik → pakai id). ' +
+  'Hanya state sesi: tanpa rev, tanpa riwayat, dan tidak memindahkan tab/halaman yang dilihat pengguna di aplikasi. ' +
+  'Sesudahnya execute menulis di halaman ini (add(null,…)), dan children(null)/place() membaca halaman ini. ' +
+  'Mengembalikan {page:{id, name, index, boards}, previous:{id}}.';
+
+/** Deskripsi tool `create_page` (story 9.2). */
+export const CREATE_PAGE_DESCRIPTION =
+  'Buat halaman baru di akhir dokumen aktif sesi dan jadikan halaman aktif sesi. ' +
+  'name opsional (1–100 karakter; default "Page N"). Tercatat di riwayat atas nama sesi ini; bisa dikembalikan lewat Restore di aplikasi. ' +
+  'Mengembalikan {slug, rev, page:{id, name, index, boards}}.';
+
+/** Deskripsi tool `get_page_tree` (story 9.2). */
+export const PAGE_TREE_DESCRIPTION =
+  'Outline ringkas pohon node sebuah halaman (default halaman aktif sesi; page = nama/id): per node {id, type, name, x?, y?, width?, height?, content?} ' +
+  `lalu children sampai depth (0–6, default 2); lebih dalam → childCount + truncated:true. Lebih hemat token daripada inspect per board — ` +
+  'pakai untuk melihat struktur halaman, lalu inspect/screenshot board tertentu untuk detail.';
+
 /** Deskripsi tool `visual_diff` (spec-agent-visual-diff). */
 export const VISUAL_DIFF_DESCRIPTION =
   'Bandingkan render board/node dokumen aktif di dua rev (snapshot History) untuk memastikan edit hanya mengubah area yang dimaksud. ' +
@@ -546,6 +575,60 @@ export function createLakarMcpServer(daemonUrl: string): McpServer {
     'list_documents',
     { annotations: toolAnnotations('list_documents'), description: LIST_DOCUMENTS_DESCRIPTION, inputSchema: z.object({}) },
     () => guarded(async () => asText(await client.call('/viewer/documents', {}))),
+  );
+
+  // Halaman (story 9.2): halaman aktif sesi + outline. Route agen `/pages*`, bukan `/viewer/*`.
+  server.registerTool(
+    'list_pages',
+    { annotations: toolAnnotations('list_pages'), description: LIST_PAGES_DESCRIPTION, inputSchema: z.object({}) },
+    () => guarded(async () => asText(await client.call('/pages', {}))),
+  );
+
+  server.registerTool(
+    'get_current_page',
+    { annotations: toolAnnotations('get_current_page'), description: GET_CURRENT_PAGE_DESCRIPTION, inputSchema: z.object({}) },
+    () =>
+      guarded(async () => {
+        const r = await client.call<{ active: Record<string, unknown> }>('/pages', {});
+        return asText(r, (data) => JSON.stringify(data.active));
+      }),
+  );
+
+  server.registerTool(
+    'switch_page',
+    {
+      annotations: toolAnnotations('switch_page'),
+      description: SWITCH_PAGE_DESCRIPTION,
+      inputSchema: z.object({ page: z.string().describe('nama atau id halaman dari list_pages') }),
+    },
+    ({ page }) => guarded(async () => asText(await client.call('/pages/switch', { page }))),
+  );
+
+  server.registerTool(
+    'create_page',
+    {
+      annotations: toolAnnotations('create_page'),
+      description: CREATE_PAGE_DESCRIPTION,
+      inputSchema: z.object({ name: z.string().optional().describe('nama halaman (1–100 karakter; default "Page N")') }),
+    },
+    ({ name }) => guarded(async () => asText(await client.call('/pages/create', name !== undefined ? { name } : {}))),
+  );
+
+  server.registerTool(
+    'get_page_tree',
+    {
+      annotations: toolAnnotations('get_page_tree'),
+      description: PAGE_TREE_DESCRIPTION,
+      inputSchema: z.object({
+        page: z.string().optional().describe('nama atau id halaman; kosongkan untuk halaman aktif sesi'),
+        depth: z.number().int().min(0).max(6).optional().describe('kedalaman anak 0–6 (default 2)'),
+      }),
+    },
+    ({ page, depth }) =>
+      guarded(async () => {
+        const body = Object.fromEntries(Object.entries({ page, depth }).filter(([, v]) => v !== undefined));
+        return asText(await client.call('/pages/tree', body));
+      }),
   );
 
   // undo/redo agen (spec-agent-undo): hanya langkah execute/paste sesi ini; edit pengguna/agen lain sesudahnya → ditolak.

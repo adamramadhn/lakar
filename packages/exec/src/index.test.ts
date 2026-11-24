@@ -290,6 +290,40 @@ describe('@lakar/exec', () => {
     });
   });
 
+  // Story 9.2: `activePageId` membuat add(null)/children(null)/place() menargetkan halaman aktif sesi.
+  describe('halaman aktif sesi (activePageId)', () => {
+    const twoPages = () => {
+      const doc = createDocument();
+      doc.pages.push({ id: 'Ppppppp2', name: 'Kedua', children: [] });
+      return doc;
+    };
+
+    it('add(null) dan children(null) menargetkan halaman aktif; tanpa opsi → halaman pertama', async () => {
+      const tx = txFor(twoPages());
+      const r = okRun(await runSnippet(`${BOARD('B2', 0)}; children(null).map((n) => n.name)`, tx, { activePageId: 'Ppppppp2' }));
+      expect(r.value).toEqual(['B2']);
+      const c = tx.commit('tes');
+      expect(c.doc.pages[0]!.children).toHaveLength(0);
+      expect(c.doc.pages[1]!.children.map((b) => b.name)).toEqual(['B2']);
+    });
+
+    it('place() menghitung tabrakan hanya di halaman aktif', async () => {
+      const tx = txFor(twoPages());
+      okRun(await runSnippet(`${BOARD('DiDua', 0, 100, 100)}`, tx, { activePageId: 'Ppppppp2' }));
+      const c = tx.commit('tes');
+      // Halaman kedua punya board di x:0 (lebar 100) → place = x 180 (gap 80); halaman pertama kosong → {0,0}.
+      const onSecond = okRun(await runSnippet('place(100, 100)', txFor(c.doc), { activePageId: 'Ppppppp2' })).value;
+      expect(onSecond).toEqual({ x: 180, y: 0 });
+      const onFirst = okRun(await runSnippet('place(100, 100)', txFor(c.doc))).value;
+      expect(onFirst).toEqual({ x: 0, y: 0 });
+    });
+
+    it('activePageId yang tidak ada di dokumen → fallback halaman pertama', async () => {
+      const v = okRun(await runSnippet('children(null).length; place(100, 100)', txFor(twoPages()), { activePageId: 'ZZZZZZZZ' })).value;
+      expect(v).toEqual({ x: 0, y: 0 });
+    });
+  });
+
   describe('keep, value, logs', () => {
     it('keep masuk dan keluar; gagal → error (pemanggil mempertahankan keep lama)', async () => {
       const r1 = okRun(await runSnippet(`keep.hero = ${BOARD('Hero')}; keep.n = (keep.n || 0) + 1`, txFor()));

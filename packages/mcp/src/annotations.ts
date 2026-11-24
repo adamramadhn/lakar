@@ -45,6 +45,13 @@ export const TOOL_EFFECTS = {
   redo: 'destructive',
   // Menimpa properti node yang ada (anotasi statis: dryRun tidak mengubahnya).
   fix_check: 'destructive',
+  list_pages: 'read',
+  get_current_page: 'read',
+  get_page_tree: 'read',
+  // Hanya mengubah state sesi (halaman aktif), bukan dokumen.
+  switch_page: 'write',
+  // Menambah halaman baru; isi pengguna tidak dihapus/ditimpa.
+  create_page: 'write',
 } as const satisfies Record<string, ToolEffect>;
 
 export type ToolName = keyof typeof TOOL_EFFECTS;

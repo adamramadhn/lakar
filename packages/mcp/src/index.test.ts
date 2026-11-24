@@ -79,6 +79,40 @@ function fakeDaemon() {
       }
       return send(200, { ok: true, data: { docId: 'Dddddddd', slug: body.slug, rev: 0, created: true } });
     }
+    if (req.url === '/pages') {
+      return send(200, {
+        ok: true,
+        data: {
+          docId: 'Dddddddd',
+          rev: 3,
+          pages: [
+            { id: 'Pppppppp', name: 'Page 1', index: 0, boards: 2 },
+            { id: 'Ppppppp2', name: 'Detail', index: 1, boards: 0 },
+          ],
+          active: { id: 'Pppppppp', name: 'Page 1', index: 0, boards: 2 },
+        },
+      });
+    }
+    if (req.url === '/pages/switch') {
+      if (body.page === 'Nope') return send(404, { ok: false, error: { code: 'NOT_FOUND', message: 'halaman "Nope" tidak ada di dokumen a', hint: 'lihat daftar dengan list_pages', retryable: false } });
+      return send(200, { ok: true, data: { docId: 'Dddddddd', rev: 3, page: { id: 'Ppppppp2', name: 'Detail', index: 1, boards: 0 }, previous: { id: 'Pppppppp' } } });
+    }
+    if (req.url === '/pages/create') {
+      return send(200, { ok: true, data: { slug: 'a', rev: 4, page: { id: 'Ppppppp3', name: body.name ?? 'Page 3', index: 2, boards: 0 } } });
+    }
+    if (req.url === '/pages/tree') {
+      return send(200, {
+        ok: true,
+        data: {
+          docId: 'Dddddddd',
+          rev: 3,
+          page: { id: 'Pppppppp', name: 'Page 1', index: 0, boards: 2 },
+          children: [{ id: 'Bbbbbbbb', type: 'board', name: 'Home', x: 0, y: 0, width: 390, height: 844, childCount: 4 }],
+          truncated: true,
+          depth: body.depth ?? 2,
+        },
+      });
+    }
     if (req.url === '/viewer/documents') {
       return send(200, { ok: true, data: { documents: [{ slug: 'untitled', name: 'untitled', rev: 3, updatedAt: 'x', open: true, focused: true }], focused: 'untitled' } });
     }
@@ -198,7 +232,7 @@ describe('@lakar/mcp', () => {
     const c = await connect(url);
     const { tools } = await c.listTools();
     expect(tools.map((t) => t.name).sort()).toEqual(
-      ['execute', 'export', 'export_code', 'get_selection', 'icon_search', 'import_url', 'inspect', 'layout_check', 'list_boards', 'list_documents', 'open_doc', 'paste', 'photo_search', 'read_skill', 'redo', 'screenshot', 'status', 'undo', 'visual_diff', 'fix_check'].sort(),
+      ['execute', 'export', 'export_code', 'get_selection', 'icon_search', 'import_url', 'inspect', 'layout_check', 'list_boards', 'list_documents', 'open_doc', 'paste', 'photo_search', 'read_skill', 'redo', 'screenshot', 'status', 'undo', 'visual_diff', 'fix_check', 'list_pages', 'get_current_page', 'switch_page', 'create_page', 'get_page_tree'].sort(),
     );
     expect(SERVER_VERSION).toBe(LAKAR_VERSION);
     expect(c.getServerVersion()?.version).toBe(LAKAR_VERSION);
@@ -223,6 +257,43 @@ describe('@lakar/mcp', () => {
     expect(JSON.parse((list.content as any[])[0].text)).toMatchObject({ focused: 'untitled', documents: [{ slug: 'untitled', open: true, focused: true }] });
     expect(fake.seen.find((x) => x.path === '/viewer/documents')!.body).toEqual({});
     expect(LIST_DOCUMENTS_DESCRIPTION).toContain('focused');
+  });
+
+  it('tool halaman (story 9.2): list_pages/get_current_page/switch_page/create_page/get_page_tree → route /pages* dalam sesi; argumen diteruskan; error terformat', async () => {
+    fake.seen.length = 0;
+    const c = await connect(url);
+    await c.callTool({ name: 'open_doc', arguments: {} });
+
+    const list = await c.callTool({ name: 'list_pages', arguments: {} });
+    const listData = JSON.parse((list.content as any)[0].text);
+    expect(listData.pages).toHaveLength(2);
+    expect(listData.active.name).toBe('Page 1');
+
+    const current = await c.callTool({ name: 'get_current_page', arguments: {} });
+    expect(JSON.parse((current.content as any)[0].text)).toMatchObject({ name: 'Page 1', index: 0 });
+
+    const sw = await c.callTool({ name: 'switch_page', arguments: { page: 'Detail' } });
+    expect(JSON.parse((sw.content as any)[0].text).page.name).toBe('Detail');
+    const bad = await c.callTool({ name: 'switch_page', arguments: { page: 'Nope' } });
+    expect(bad.isError).toBe(true);
+    expect((bad.content as any)[0].text).toContain('NOT_FOUND');
+
+    const created = await c.callTool({ name: 'create_page', arguments: { name: 'Checkout' } });
+    expect(JSON.parse((created.content as any)[0].text).page).toMatchObject({ name: 'Checkout', index: 2 });
+    await c.callTool({ name: 'create_page', arguments: {} });
+    const bodies = fake.seen.filter((s) => s.path === '/pages/create').map((s) => s.body);
+    expect(bodies).toEqual([{ name: 'Checkout' }, {}]);
+
+    const tree = await c.callTool({ name: 'get_page_tree', arguments: { page: 'Detail', depth: 0 } });
+    const td = JSON.parse((tree.content as any)[0].text);
+    expect(td.truncated).toBe(true);
+    const treeBody = fake.seen.findLast((s) => s.path === '/pages/tree')!.body;
+    expect(treeBody).toEqual({ page: 'Detail', depth: 0 });
+    // Tanpa argumen → {} (default daemon).
+    await c.callTool({ name: 'get_page_tree', arguments: {} });
+    expect(fake.seen.findLast((s) => s.path === '/pages/tree')!.body).toEqual({});
+    // Semua panggilan bersesi.
+    expect(fake.seen.filter((s) => s.path?.startsWith('/pages')).every((s) => s.session)).toBe(true);
   });
 
   it('get_selection → POST /viewer/selection dalam sesi; slug opsional diteruskan; teks JSON; error terformat', async () => {
@@ -682,7 +753,7 @@ describe('@lakar/mcp', () => {
       const r = await c2.callTool({ name: 'execute', arguments: { code: '1' } });
       expect(r.isError).toBe(true);
       expect((r.content as any)[0].text).toContain('http://127.0.0.1:1');
-      expect((await c2.listTools()).tools).toHaveLength(20);
+      expect((await c2.listTools()).tools).toHaveLength(25);
     } finally {
       await c2.close();
       await deadTransport.close();

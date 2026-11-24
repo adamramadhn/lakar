@@ -67,6 +67,10 @@ export const TOOL_ROUTES: Readonly<Record<string, string>> = {
   '/viewer/undo': 'undo',
   '/viewer/redo': 'redo',
   '/viewer/fix-check': 'fix_check',
+  '/pages': 'list_pages',
+  '/pages/switch': 'switch_page',
+  '/pages/create': 'create_page',
+  '/pages/tree': 'get_page_tree',
 };
 
 export const publicSessionId = (id: string) => id.slice(0, 8);
@@ -337,6 +341,11 @@ function targetOf(tool: string, body: Record<string, unknown> | undefined): stri
     case 'fix_check':
       return str(body.boardId);
     case 'read_skill':
+      return str(body.name);
+    case 'switch_page':
+    case 'get_page_tree':
+      return str(body.page);
+    case 'create_page':
       return str(body.name);
     case 'icon_search':
     case 'photo_search':

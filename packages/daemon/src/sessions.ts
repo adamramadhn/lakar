@@ -2,7 +2,7 @@
 // Per sesi daemon menyimpan `keep` snippet, snippet gagal (editId, LRU), dan log panggilan execute.
 import { randomBytes, randomUUID } from 'node:crypto';
 import { PALETTE_KEEP_KEYS } from '@lakar/exec';
-import { LakarError, type ErrorCode, type FindingSummary } from '@lakar/schema';
+import { LakarError, type ErrorCode, type FindingSummary, type LakarDocument } from '@lakar/schema';
 
 /** Jumlah snippet gagal yang diingat per sesi (LRU). */
 const FAILED_MAX = 20;
@@ -35,6 +35,12 @@ export type ExecuteLogEntry = {
 export type Session = {
   id: string;
   activeSlug?: string;
+  /**
+   * ID halaman aktif sesi (story 9.2): target default `add(null,…)`, `children(null)`, dan `place()` di execute.
+   * Tidak ada → halaman pertama. Diisi `switch_page`/`create_page`, dikosongkan saat pindah dokumen (`setActiveDoc`),
+   * dan divalidasi di setiap pemakaian (halaman terhapus → NOT_FOUND + nilai dibersihkan).
+   */
+  activePage?: string;
   createdAt: string;
   /** Aktivitas terakhir (permintaan bersesi apa pun). */
   lastAt?: string;
@@ -96,13 +102,31 @@ export function recallFailed(session: Session, editId: string): FailedSnippet | 
  * (`keep.C`/`keep.FONT`, spec-skeleton-live-build) supaya palet dokumen sebelumnya tidak bocor; isi `keep` lain
  * (milik agen) tetap. Membuka ulang dokumen yang sama tidak mengubah apa pun.
  */
-export function setActiveDoc(session: Pick<Session, 'activeSlug' | 'keep'>, slug: string): void {
+export function setActiveDoc(session: Pick<Session, 'activeSlug' | 'activePage' | 'keep'>, slug: string): void {
   if (session.activeSlug !== slug) {
     const keep = { ...session.keep };
     for (const k of PALETTE_KEEP_KEYS) delete keep[k];
     session.keep = keep;
+    // ID halaman milik dokumen lama; sesi baru mulai dari halaman pertama.
+    delete session.activePage;
   }
   session.activeSlug = slug;
+}
+
+/**
+ * Indeks halaman aktif sesi di `doc` (default 0). Halaman yang tersimpan sudah dihapus → NOT_FOUND dan nilai
+ * `activePage` dibersihkan, jadi panggilan berikutnya kembali ke halaman pertama.
+ */
+export function activePageIndex(session: Pick<Session, 'activePage'>, doc: Pick<LakarDocument, 'id' | 'pages'>): number {
+  if (session.activePage === undefined) return 0;
+  const i = doc.pages.findIndex((p) => p.id === session.activePage);
+  if (i === -1) {
+    delete session.activePage;
+    throw new LakarError('NOT_FOUND', `halaman aktif sesi sudah tidak ada di dokumen ${doc.id}`, {
+      hint: 'halaman mungkin dihapus dari aplikasi; pilih lagi dengan switch_page — tanpa switch, halaman pertama yang dipakai',
+    });
+  }
+  return i;
 }
 
 /** Catat tulis agen di dokumen `docId` yang berangkat dari rev `fromRev` (bahan default visual_diff). */
