@@ -173,6 +173,20 @@ describe('update', () => {
     const r = tx.commit('board');
     expect(find(r.doc, home)).toMatchObject({ x: 1000, name: '[WIP] Home', screen: 'mobile' });
   });
+
+  it('update board section (v11): set nama, update {section:null} menghapus; string kosong/non-string → SCHEMA_INVALID', () => {
+    const { doc, home } = fixture();
+    const tx = beginTransaction(doc, { sessionId: 's' });
+    tx.update(home, { section: 'Hero' });
+    expect(code(() => tx.update(home, { section: '' }))).toBe('SCHEMA_INVALID');
+    expect(code(() => tx.update(home, { section: 5 }))).toBe('SCHEMA_INVALID');
+    const r = tx.commit('section');
+    expect(find(r.doc, home)).toMatchObject({ section: 'Hero' });
+    const tx2 = beginTransaction(r.doc, { sessionId: 's' });
+    tx2.update(home, { section: null });
+    const r2 = tx2.commit('unsection');
+    expect((find(r2.doc, home) as { section?: string }).section).toBeUndefined();
+  });
 });
 
 describe('replace', () => {

@@ -44,7 +44,7 @@ import { pinchCamera, pointerIntent, TAP_SLOP, type Point } from './sheet';
 import type { Camera } from './viewState';
 
 /** Board kanvas: `height` selalu angka (board `height:'hug'` = tinggi terukur, `hug: true`; boardHeight.ts). */
-export type CanvasBoard = { id: string; name: string; x: number; y: number; width: number; height: number; hug?: true | undefined };
+export type CanvasBoard = { id: string; name: string; x: number; y: number; width: number; height: number; hug?: true | undefined; section?: string | undefined };
 export type Highlight = { boardId: string; bounds?: [number, number, number, number] };
 /**
  * Permintaan Follow agent: geser kamera ke board ini (sekali per `nonce`). `rect` (relatif board) = wilayah node baru
@@ -199,6 +199,36 @@ function nodeBox(b: CanvasBoard, r: Rect, cam: Camera) {
 }
 
 /** Lapisan kehadiran agen: outline board, outline node (working / Just changed), dan kursor. */
+/** Bingkai section (spec-section-groups): rounded rect + label di belakang board anggotanya; union bounds + padding. */
+const SECTION_PAD = 40;
+
+function SectionLayer({ boards, cam }: { boards: readonly CanvasBoard[]; cam: Camera }) {
+  const groups = new Map<string, { x: number; y: number; w: number; h: number }>();
+  for (const b of boards) {
+    if (!b.section) continue;
+    const g = groups.get(b.section);
+    const x2 = b.x + b.width, y2 = b.y + b.height;
+    if (!g) groups.set(b.section, { x: b.x, y: b.y, w: b.width, h: b.height });
+    else {
+      const nx = Math.min(g.x, b.x), ny = Math.min(g.y, b.y);
+      groups.set(b.section, { x: nx, y: ny, w: Math.max(g.x + g.w, x2) - nx, h: Math.max(g.y + g.h, y2) - ny });
+    }
+  }
+  return (
+    <>
+      {[...groups].map(([name, g]) => (
+        <div
+          key={`section:${name}`}
+          className="canvas-section"
+          style={{ left: cam.x + (g.x - SECTION_PAD) * cam.z, top: cam.y + (g.y - SECTION_PAD) * cam.z, width: (g.w + SECTION_PAD * 2) * cam.z, height: (g.h + SECTION_PAD * 2) * cam.z }}
+        >
+          <span className="canvas-section-name">{name}</span>
+        </div>
+      ))}
+    </>
+  );
+}
+
 function AgentLayer({ presence, boardById, cam }: { presence: readonly AgentPresence[]; boardById: ReadonlyMap<string, CanvasBoard>; cam: Camera }) {
   const cursors = useExitingCursors(presence);
   return (
@@ -1228,6 +1258,7 @@ export function Canvas({
         </div>
       )}
 
+      {!preview && <SectionLayer boards={boards} cam={cam} />}
       {!preview && presence && <AgentLayer presence={presence} boardById={boardById} cam={cam} />}
 
       {/* Pin komentar (story 9.4): avatar bulat warna penulis di titik halaman; resolved pudar + centang (toggle panel). */}

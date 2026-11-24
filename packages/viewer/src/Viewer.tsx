@@ -1968,6 +1968,21 @@ export function Viewer({ slug }: { slug: string }) {
           onAction={(a) => runAction(a, editMenu.ids)}
           onClose={() => setEditMenu(undefined)}
           onExportCode={preview ? undefined : editMenu.ids.length === 1 ? () => setCodeExport(editMenu.ids[0]) : null}
+          onSection={
+            preview || !editable || !editMenu.ids.some((id) => boards.some((b) => b.id === id))
+              ? undefined
+              : {
+                  current: (() => {
+                    const sel = editMenu.ids.map((id) => boards.find((b) => b.id === id)).filter((b): b is (typeof boards)[number] => b !== undefined).map((b) => (b as { section?: string }).section);
+                    return sel.length > 0 && sel.every((n) => n === sel[0]) ? (sel[0] ?? null) : null;
+                  })(),
+                  set: (name) =>
+                    void commitOps(
+                      editMenu.ids.filter((id) => boards.some((b) => b.id === id)).map((id) => ({ op: 'update' as const, id, patch: { section: name } })),
+                      name ? `Move to section "${name}"` : 'Remove from section',
+                    ),
+                }
+          }
         />
       )}
       {importUrlOpen && <ImportUrlDialog busy={importingUrl} onSubmit={importPage} onClose={() => setImportUrlOpen(false)} />}

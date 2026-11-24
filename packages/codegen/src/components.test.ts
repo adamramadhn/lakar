@@ -1,7 +1,7 @@
 // Tes unit komponen di codegen (spec kode-3): master → komponen React, instance → pemakaian, selisih akar per
 // keluarga shorthand, varian prop, dan jalur inline. Murni, tanpa IO; korpus + typecheck ada di tests/codegen.test.ts.
 import { describe, expect, it } from 'vitest';
-import type { LakarDocument } from '@lakar/schema';
+import { SCHEMA_VERSION, type LakarDocument } from '@lakar/schema';
 import { applySite, buildTree, evalNodes, exportModel, family, generateCode, sameTree, siteDiff, type CodeElement } from './index.js';
 import { condExpr, fixed, lookupExpr, type Driver, type Varying } from './jsx.js';
 
@@ -10,7 +10,7 @@ const BOARD = 'Board001';
 
 function doc(children: AnyNode[], board: AnyNode = {}): LakarDocument {
   return {
-    schemaVersion: 10,
+    schemaVersion: SCHEMA_VERSION,
     id: 'Doc00001',
     rev: 1,
     tokenModes: ['light', 'dark'],

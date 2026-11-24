@@ -45,6 +45,8 @@ export const MIGRATIONS: MigrationRegistry = Object.freeze({
   7: (d: RawDocument): RawDocument => ({ ...d, schemaVersion: 8 }),
   8: (d: RawDocument): RawDocument => ({ ...d, schemaVersion: 9 }),
   9: (d: RawDocument): RawDocument => ({ ...d, schemaVersion: 10 }),
+  // 10 → 11 (spec-section-groups): v11 hanya menambah `section?` pada board; dokumen v10 valid apa adanya.
+  10: (d: RawDocument): RawDocument => ({ ...d, schemaVersion: 11 }),
 });
 
 export type MigrateOptions = { migrations?: MigrationRegistry; target?: number };
