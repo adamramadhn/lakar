@@ -53,7 +53,7 @@ pnpm lakard         # jalankan daemon (viewer: http://127.0.0.1:7466/app/)
 - **Sumber C7 dan juri.** Tidak ada di repo. CI memakai `LAKAR_C7_ALLOW_MISSING_SOURCES=1`.
 - **Release.**
   - `.github/workflows/release.yml`: tag `v*` membangun installer dan menerbitkannya. `workflow_dispatch` membangun saja, tetapi baru bisa dipicu setelah file workflow ada di `main`.
-  - `.github/workflows/nightly.yml`: tiap malam (01:00 WIB) + `workflow_dispatch` memanggil `release.yml` dengan `nightly: true` — build tip `dev` dan menimpa rilis pra-rilis `nightly` (tag rilis dipindah ke commit terbaru; pointer `latest` updater tidak terpengaruh). Fitur baru masuk `dev` dulu, `main` hanya untuk rilis stabil bertag `v*`.
+  - `.github/workflows/nightly.yml`: tiap malam (01:00 WIB) + `workflow_dispatch` memanggil `release.yml` dengan `nightly: true` — build tip `dev` dan menerbitkan rilis pra-rilis `nightly-<ts>` baru (tag unik; repo mengaktifkan *immutable releases* sehingga tag bergulir mustahil — tag tak bisa dipindah/dihapus/dipakai ulang). Feed `latest.json` nightly di-push ke branch `nightly-feed` setelah rilis terbit, lalu rilis `nightly-*` lama dihapus. Pointer `latest` updater stabil tidak terpengaruh. Fitur baru masuk `dev` dulu, `main` hanya untuk rilis stabil bertag `v*`.
   - Untuk menguji release di branch lain, tambahkan trigger `push` sementara ke branch itu, lalu hapus lagi di commit berikutnya.
 - **Desktop.** `desktop-check.yml` menjalankan `cargo clippy -D warnings` dan `cargo test` untuk PR yang menyentuh `apps/desktop`.
 - **Viewer.** Viewer memakai satu stream `/viewer/events` per jendela lewat `activityHub` (`packages/viewer/src/activity.ts`). Jangan membuka `EventSource` sendiri, karena jumlah koneksi HTTP/1.1 per host terbatas.

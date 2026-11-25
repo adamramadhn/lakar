@@ -8,8 +8,9 @@ on:
   workflow_dispatch:
   workflow_call:
     inputs:
-      # Dipanggil nightly.yml: build dev tip dan terbitkan/timpa rilis pra-rilis `nightly`
-      # (bukan tag v* — tidak memengaruhi pointer `latest` updater pengguna stabil).
+      # Dipanggil nightly.yml: build dev tip dan terbitkan rilis pra-rilis `nightly-<ts>`
+      # baru tiap malam (immutable releases aktif — tag bergulir mustahil; feed updater
+      # nightly ada di branch `nightly-feed`, pointer `latest` stabil tidak terpengaruh).
       nightly:
         type: boolean
         default: false
@@ -30,6 +31,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.version.outputs.version }}
+      nightly_tag: ${{ steps.version.outputs.nightly_tag }}
     steps:
       - uses: actions/checkout@v6
       - name: Compute nightly version
@@ -42,6 +44,8 @@ jobs:
             | awk '{print $2}' | sed 's|refs/tags/||' > "$RUNNER_TEMP/tags.txt"
           version="$(node apps/desktop/scripts/nightly-version.mjs --tags "$RUNNER_TEMP/tags.txt" --now "$(date -u +%Y-%m-%dT%H:%M:%SZ)")"
           echo "version=$version" >> "$GITHUB_OUTPUT"
+          # Rilis immutable tak boleh pakai tag bergulir — tiap build dapat tag unik `nightly-<ts>`.
+          echo "nightly_tag=nightly-${version##*-nightly.}" >> "$GITHUB_OUTPUT"
           echo "Nightly version: $version"
 
   build:
@@ -290,7 +294,7 @@ jobs:
           if [[ "${{ inputs.nightly }}" == "true" ]]; then
             # Versi unik dari job meta — sama dengan yang di-bake ke bundle via LAKAR_APP_VERSION.
             version="${{ needs.meta.outputs.version }}"
-            tag="nightly"
+            tag="${{ needs.meta.outputs.nightly_tag }}"
           else
             version="${GITHUB_REF_NAME#v}"
             if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
@@ -319,43 +323,81 @@ jobs:
   publish:
     name: publish release
     if: startsWith(github.ref, 'refs/tags/v') || inputs.nightly == true
-    needs: [build, latest-json]
+    needs: [build, latest-json, meta]
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v6
+
       # Semua artefak (installer + sig + latest.json bila ada) digabung; ikut SHA256SUMS dan unggahan rilis.
       - uses: actions/download-artifact@v4
         with:
           path: installers
           merge-multiple: true
 
+      # Repo ini mengaktifkan immutable releases: rilis terkunci begitu terbit — tag tak bisa
+      # dipindah/dihapus, aset tak bisa diubah, dan nama tag tak bisa dipakai ulang walau rilis
+      # dihapus. Karena itu (a) semua rilis dibuat sebagai draft (masih mutable) lalu diunggahi
+      # aset dan baru dipublish, dan (b) nightly memakai tag unik per build, bukan tag bergulir.
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ inputs.nightly && 'nightly' || github.ref_name }}
+          TAG: ${{ inputs.nightly && needs.meta.outputs.nightly_tag || github.ref_name }}
           TARGET: ${{ github.sha }}
         run: |
           (cd installers && sha256sum * > SHA256SUMS.txt && cat SHA256SUMS.txt)
           prerelease=""
-          if [[ "$TAG" == *-* ]] || [[ "$TAG" == "nightly" ]]; then prerelease="--prerelease"; fi
+          if [[ "$TAG" == *-* ]]; then prerelease="--prerelease"; fi
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --target "$TARGET"
-            gh release upload "$TAG" installers/* --clobber --repo "$GITHUB_REPOSITORY"
-          elif [[ "$TAG" == "nightly" ]]; then
-            gh release create "$TAG" installers/* --repo "$GITHUB_REPOSITORY" --target "$TARGET" --generate-notes --title "Lakar Nightly" $prerelease
+            echo "Release $TAG already exists — skipping create"
+          elif [[ "${{ inputs.nightly }}" == "true" ]]; then
+            gh release create "$TAG" installers/* --repo "$GITHUB_REPOSITORY" --target "$TARGET" \
+              --draft $prerelease --generate-notes --title "Lakar Nightly $TAG"
+            gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --draft=false
           else
-            gh release create "$TAG" installers/* --repo "$GITHUB_REPOSITORY" --verify-tag --generate-notes --title "Lakar $TAG" $prerelease
+            gh release create "$TAG" installers/* --repo "$GITHUB_REPOSITORY" --verify-tag \
+              --draft $prerelease --generate-notes --title "Lakar $TAG"
+            gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --draft=false
           fi
-          # Nightly: tiap file memuat versi unik, jadi --clobber tidak menimpa aset malam lalu —
-          # tanpa langkah ini rilis `nightly` menumpuk satu set installer baru setiap hari.
-          # Urutan: unggah dulu (di atas), baru hapus aset yang tak ada di set baru, supaya
-          # latest.json lama tidak pernah menunjuk aset yang sudah terhapus.
-          if [[ "$TAG" == "nightly" ]]; then
-            gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets -q '.assets[].name' | while read -r asset; do
-              if [[ ! -f "installers/$asset" ]]; then
-                echo "Pruning stale nightly asset: $asset"
-                gh release delete-asset "$TAG" "$asset" --repo "$GITHUB_REPOSITORY" -y
-              fi
-            done
+
+      # Feed updater nightly tidak bisa jadi aset rilis immutable → disimpan di branch
+      # `nightly-feed` (raw.githubusercontent.com/…/nightly-feed/latest.json). Push SETELAH
+      # rilis terbit supaya latest.json tak sempat menunjuk aset yang belum ada.
+      - name: Publish nightly feed
+        if: inputs.nightly == true && hashFiles('installers/latest.json') != ''
+        env:
+          VERSION: ${{ needs.meta.outputs.version }}
+          FEED_BRANCH: nightly-feed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git fetch origin "$FEED_BRANCH" 2>/dev/null; then
+            git checkout -B "$FEED_BRANCH" FETCH_HEAD
+          else
+            git checkout --orphan "$FEED_BRANCH"
+            git rm -rf .
           fi
+          cp installers/latest.json latest.json
+          git add latest.json
+          if git diff --cached --quiet; then
+            echo "Feed unchanged"
+          else
+            git commit -m "nightly feed: $VERSION"
+            git push origin "$FEED_BRANCH"
+          fi
+
+      # Rilis `nightly-*` lama dihapus SETELAH feed menunjuk tag baru — rilis tak menumpuk
+      # dan latest.json tak pernah menunjuk aset yang sudah dihapus. Rilis `nightly` lama
+      # (immutable, namanya tak bisa dipakai ulang) sengaja dibiarkan.
+      - name: Prune old nightly releases
+        if: inputs.nightly == true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.meta.outputs.nightly_tag }}
+        run: |
+          gh api "repos/$GITHUB_REPOSITORY/releases?per_page=100" --jq '.[].tag_name' \
+            | grep '^nightly-' | grep -vx "$TAG" | while read -r old; do
+                echo "Deleting old nightly release: $old"
+                gh release delete "$old" --repo "$GITHUB_REPOSITORY" --cleanup-tag -y
+              done

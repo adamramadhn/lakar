@@ -21,8 +21,11 @@ pub enum UpdateChannel {
     Nightly,
 }
 
-/// Endpoint `latest.json` rilis pra-rilis `nightly` (job latest-json di release.yml).
-const NIGHTLY_ENDPOINT: &str = "https://github.com/fatmuh/lakar/releases/download/nightly/latest.json";
+/// Endpoint `latest.json` channel nightly. Rilis nightly memakai tag unik `nightly-<ts>`
+/// (immutable releases melarang tag bergulir), jadi feed statisnya disimpan CI di branch
+/// `nightly-feed` dan dilayani raw.githubusercontent.com.
+const NIGHTLY_ENDPOINT: &str =
+    "https://raw.githubusercontent.com/fatmuh/lakar/nightly-feed/latest.json";
 
 /// File teks polos di app_config_dir (pola `theme`) berisi `stable`/`nightly`; dibuat hanya saat
 /// pengguna memilih eksplisit — tanpa file, channel diturunkan dari versi yang berjalan.
