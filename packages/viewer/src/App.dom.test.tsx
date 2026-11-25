@@ -1,11 +1,11 @@
 // Kerangka App (spec-agent-open-doc): event stream `openTab` membuka dokumen baru di jendela ini (location.hash), dan
 // reporter fokus melaporkan dokumen yang tampil lewat PUT /viewer/focus (mount, pindah dokumen, reconnect stream).
-import { waitFor } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { api } from './api';
 import { App } from './App';
 import { docHash } from './files';
-import { dom, FakeEventSource, renderUi, stream } from './test/dom';
+import { dom, fail, FakeEventSource, renderUi, stream } from './test/dom';
 import { makeDoc } from './test/fixtures';
 
 /** Daemon tiruan minimum untuk App + Dashboard + Viewer. */
@@ -47,6 +47,92 @@ describe('App — openTab dari agen', () => {
     daemon();
     renderUi(<App />);
     expect(stream.current().url).toBe(`/viewer/events?origin=${encodeURIComponent(api.origin)}`);
+  });
+});
+
+// ---- Gate sign-in first-run (spec-first-run-signin task D): tampil hanya saat daemon bilang
+// `onboarding.signin === 'pending'` + boot ke Dashboard; selain itu fail-open (tanpa gate). ----
+
+const AUTH_PENDING = { signedIn: false, configured: true, providers: ['google', 'github', 'email'], host: 'api.lakar.dev', onboarding: { signin: 'pending' } };
+/** Daemon + auth status; `status` `undefined` = route tidak terdaftar (daemon lama / request gagal). */
+function daemonAuth(status: Record<string, unknown> | undefined) {
+  const d = daemon();
+  if (status !== undefined) d.on('GET', '/viewer/auth/status', () => status);
+  return d;
+}
+
+describe('App — gate first-run sign-in', () => {
+  it('pending + boot ke Dashboard → gate tampil; TitleBar minimal (tanpa tab/menu)', async () => {
+    daemonAuth(AUTH_PENDING);
+    location.hash = '#/';
+    renderUi(<App />);
+    await waitFor(() => expect(document.querySelector('#onboarding-title')?.textContent).toBe('Welcome to Lakar'));
+    expect(document.querySelector('.titlebar')).not.toBeNull();
+    expect(document.querySelector('.titlebar .tabs')).toBeNull();
+    expect(document.querySelector('.titlebar-menu')).toBeNull();
+    expect(document.querySelector('main.body')).toBeNull();
+  });
+
+  it('field onboarding hilang (daemon lama), non-pending, configured:false, signed in → tanpa gate', async () => {
+    const { onboarding, ...tanpaField } = AUTH_PENDING;
+    // Route terakhir menang di FakeDaemon — daftar ulang auth/status per iterasi cukup.
+    for (const status of [undefined, tanpaField, { ...AUTH_PENDING, onboarding: { signin: 'completed' } }, { ...AUTH_PENDING, onboarding: { signin: 'disabled' } }, { ...AUTH_PENDING, configured: false }, { ...AUTH_PENDING, signedIn: true }]) {
+      daemonAuth(status as Record<string, unknown> | undefined);
+      location.hash = '#/';
+      const { unmount } = renderUi(<App />);
+      await waitFor(() => expect(document.querySelector('main.body')).not.toBeNull());
+      expect(document.querySelector('.onboarding')).toBeNull();
+      unmount();
+    }
+  });
+
+  it('boot ke deep link dokumen → gate tidak tampil (E11), dokumen langsung terbuka', async () => {
+    daemonAuth(AUTH_PENDING);
+    location.hash = docHash('demo');
+    renderUi(<App />);
+    await waitFor(() => expect(document.querySelector('main.body')).not.toBeNull());
+    expect(document.querySelector('.onboarding')).toBeNull();
+  });
+
+  it('skip → POST /viewer/onboarding + gate hilang, Dashboard tampil', async () => {
+    const d = daemonAuth(AUTH_PENDING);
+    d.on('POST', '/viewer/onboarding', () => ({ signin: 'skipped' }));
+    location.hash = '#/';
+    const { user } = renderUi(<App />);
+    await waitFor(() => expect(document.querySelector('.onboarding')).not.toBeNull());
+    await user.click(screen.getByRole('button', { name: 'Continue without an account' }));
+    await waitFor(() => expect(document.querySelector('main.body')).not.toBeNull());
+    expect(document.querySelector('.onboarding')).toBeNull();
+    expect(d.find('POST', '/viewer/onboarding')).toHaveLength(1);
+  });
+
+  it('skip gagal (E5) → gate hilang + toast "couldn’t save this choice"', async () => {
+    const d = daemonAuth(AUTH_PENDING);
+    d.on('POST', '/viewer/onboarding', () => {
+      throw fail('INTERNAL', 500);
+    });
+    location.hash = '#/';
+    const { user } = renderUi(<App />);
+    await waitFor(() => expect(document.querySelector('.onboarding')).not.toBeNull());
+    await user.click(screen.getByRole('button', { name: 'Continue without an account' }));
+    await waitFor(() => expect(document.querySelector('.onboarding')).toBeNull());
+    await waitFor(() => expect(document.querySelector('.toast')?.textContent).toContain('see this screen again'));
+  });
+});
+
+describe('App — session expired (E4)', () => {
+  it('event auth reason:expired → satu toast dengan aksi Sign in; event berulang tidak menduplikasi', async () => {
+    daemonAuth({ signedIn: true, configured: true, user: { id: 'u1', email: 'ana@studio.id' } });
+    location.hash = '#/';
+    renderUi(<App />);
+    stream.hello();
+    stream.event('auth', { auth: { signedIn: false, reason: 'expired' } });
+    stream.event('auth', { auth: { signedIn: false, reason: 'expired' } });
+    await waitFor(() => expect(document.querySelectorAll('.toast')).toHaveLength(1));
+    expect(document.querySelector('.toast')?.textContent).toContain('session expired');
+    await screen.findByRole('button', { name: 'Sign in' });
+    // Gate tidak tampil — onboarding tidak pending di skenario ini.
+    expect(document.querySelector('.onboarding')).toBeNull();
   });
 });
 

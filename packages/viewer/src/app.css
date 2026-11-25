@@ -9565,3 +9565,236 @@ button.panel-tab:hover {
 .viewer-topbar-share:disabled {
   opacity: 0.5;
 }
+
+/* ---- Gate sign-in first-run (spec-first-run-signin task D): layar penuh di area body.
+   Kartu terpusat, semua metode sign-in setara visual (tanpa aksen — aksen hanya ring fokus);
+   skip adalah .btn ghost lebar penuh, bukan link kecil (anti dark-pattern). ---- */
+.onboarding {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 24px 16px;
+  background: var(--bg);
+}
+.onboarding-card {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  width: min(400px, 100%);
+  padding: 32px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+}
+.onboarding-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.onboarding-logo {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: var(--accent);
+  color: var(--btn-text);
+  font-size: 20px;
+  font-weight: 700;
+}
+.onboarding-wordmark {
+  font-size: 16px;
+  font-weight: 600;
+}
+.onboarding-title {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 600;
+}
+.onboarding-title:focus {
+  outline: none;
+}
+.onboarding-tagline {
+  margin: 6px 0 0;
+  color: var(--text-secondary);
+  font-size: 14px;
+  line-height: 1.45;
+}
+.onboarding-email {
+  font-weight: 600;
+  color: var(--text-primary);
+  word-break: break-all;
+}
+.onboarding-benefits {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.45;
+}
+.onboarding-benefits li {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.onboarding-benefits svg {
+  flex: none;
+  margin-top: 2px;
+}
+.onboarding-providers {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.onboarding-providers .cloud-btn {
+  height: 40px;
+}
+.onboarding-providers .cloud-email {
+  flex-direction: column;
+}
+.onboarding-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+.onboarding-divider::before,
+.onboarding-divider::after {
+  content: '';
+  flex: 1;
+  border-top: 1px solid var(--border);
+}
+.onboarding-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.onboarding-note {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin: 0;
+}
+.onboarding-skip {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.onboarding-skip .onboarding-divider {
+  margin-bottom: 4px;
+}
+/* Skip: .btn ghost lebar penuh — sama mudah ditemukan dengan tombol sign-in. */
+.btn.ghost {
+  width: 100%;
+  background: transparent;
+  border-color: transparent;
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 500;
+}
+.btn.ghost:hover {
+  background: var(--surface-hover);
+}
+.onboarding-skip-help {
+  margin: 0;
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.45;
+}
+.onboarding-footer {
+  color: var(--text-secondary);
+  font-family: var(--mono, monospace);
+  font-size: 12px;
+}
+.onboarding-success {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  text-align: center;
+}
+.onboarding-success-icon {
+  color: var(--success);
+}
+.onboarding-success .btn {
+  width: 100%;
+}
+@media (max-width: 480px) {
+  .onboarding-card {
+    padding: 24px;
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .onboarding-card {
+    animation: onboarding-in 150ms ease-out;
+  }
+}
+@keyframes onboarding-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* ---- Account chip di sidebar Dashboard (spec-first-run-signin task E): blok identitas yang
+   menjadi status akun cloud. Seluruh baris <a> ke Connections; state expired pakai titik --warning. ---- */
+.account-chip {
+  text-decoration: none;
+  color: inherit;
+  border-radius: 6px;
+}
+.account-chip:hover {
+  background: var(--surface-hover);
+}
+.account-chip-info {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  flex: 1;
+  min-width: 0;
+}
+.account-chip-avatar {
+  width: 24px;
+  height: 24px;
+  font-size: 11px;
+}
+.account-chip-name {
+  font-size: 13px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.account-chip-sub {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.account-chip-sub.expired {
+  color: var(--text-secondary);
+}
+.account-chip-dot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--warning);
+}
+.account-chip-signin {
+  margin-left: auto;
+}

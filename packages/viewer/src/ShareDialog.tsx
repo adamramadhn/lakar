@@ -7,10 +7,10 @@
 import { useEffect, useRef, useState, type ReactElement } from 'react';
 import { activityHub } from './activity';
 import { api, ApiError, errorText, type AuthStatus, type ShareLink, type ShareList } from './api';
-import { isDesktop, openExternal } from './desktop';
 import { CONNECTIONS_HASH } from './files';
 import { Icon, type IconName } from './icons';
 import { Modal } from './NewFileDialog';
+import { useCloudSignIn } from './useCloudSignIn';
 
 type Phase = 'loading' | 'creating' | 'ready' | 'unconfigured' | 'signin';
 
@@ -94,12 +94,18 @@ export function ShareDialog({ slug, onClose }: { slug: string; onClose: () => vo
   const [list, setList] = useState<ShareList>({ configured: false, shares: [] });
   const [auth, setAuth] = useState<AuthStatus | undefined>(undefined); // undefined = route tak ada/daemon lama
   const [active, setActive] = useState<string | undefined>(undefined); // token "this link"
-  const [busy, setBusy] = useState<string | undefined>(undefined); // 'create' | 'refresh' | provider OAuth | token
+  const [busy, setBusy] = useState<string | undefined>(undefined); // 'create' | 'refresh' | token
   const [error, setError] = useState<string | undefined>(undefined);
   const [copied, setCopied] = useState<string | undefined>(undefined);
   const [confirmRevoke, setConfirmRevoke] = useState<string | undefined>(undefined);
   const [justUpdated, setJustUpdated] = useState(false);
-  const [waiting, setWaiting] = useState(false); // OAuth dibuka di browser — menunggu SSE `auth`
+  // Alur OAuth dibagi lewat `useCloudSignIn` (spec-first-run-signin task C); `phase==='waiting'` = menunggu SSE `auth`.
+  const signin = useCloudSignIn();
+  const waiting = signin.phase === 'waiting';
+  const setWaiting = (v: boolean) => {
+    if (!v) signin.cancel();
+  };
+  const signinError = signin.error;
   const [chooser, setChooser] = useState(false); // chooser provider inline (>1 OAuth diiklankan)
   const copyTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const updatedTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -214,39 +220,13 @@ export function ShareDialog({ slug, onClose }: { slug: string; onClose: () => vo
   );
 
   /**
-   * OAuth dari CTA sign-in: `{url}` daemon dibuka di browser sistem; SSE `auth` yang memajukan fase.
-   * Di desktop `window.open` no-op → URL dibuka lewat opener Tauri sesudah fetch. Di browser, jendela
-   * kosong dibuka sinkron di click handler (masih dalam user activation) lalu diarahkan sesudah fetch —
-   * `null` = pop-up diblokir; kegagalan fetch menutup jendela itu lagi. `busy` = nama provider supaya
-   * label "Opening…" hanya tampil di tombol yang diklik.
+   * OAuth dari CTA sign-in (task C: `useCloudSignIn.start`): `{url}` daemon dibuka di browser
+   * sistem; SSE `auth` yang memajukan fase. Error sign-in disalin ke `error` dialog supaya tampil
+   * di posisi yang sama seperti sebelum refactor.
    */
   const startSignIn = async (provider: 'google' | 'github') => {
-    if (busy) return;
-    setBusy(provider);
     setError(undefined);
-    const desktop = isDesktop();
-    const w = desktop ? undefined : window.open('about:blank', '_blank');
-    if (w === null) {
-      setBusy(undefined);
-      setError('Allow pop-ups to sign in.');
-      return;
-    }
-    try {
-      const r = await api.authStart({ provider });
-      if ('url' in r) {
-        if (desktop) await openExternal(r.url);
-        else w!.location.href = r.url;
-        setWaiting(true);
-      } else {
-        w?.close();
-        setError('The sign-in service did not return a URL — try another method.');
-      }
-    } catch (e) {
-      w?.close();
-      setError(errorText(e));
-    } finally {
-      setBusy(undefined);
-    }
+    await signin.start(provider);
   };
 
   const current = list.shares.find((s) => s.token === active) ?? list.shares[0];
@@ -358,9 +338,9 @@ export function ShareDialog({ slug, onClose }: { slug: string; onClose: () => vo
           <h2>Share “{slug}”</h2>
           <p>Sign in to create share links{auth?.host ? ` on ${auth.host}` : ''}. Guests still open links without an account.</p>
         </div>
-        {error && (
+        {(error ?? signinError) && (
           <div className="modal-error" role="alert">
-            {error}
+            {error ?? signinError}
           </div>
         )}
         {waiting ? (
@@ -390,8 +370,8 @@ export function ShareDialog({ slug, onClose }: { slug: string; onClose: () => vo
         ) : chooser ? (
           <div className="share-signin">
             {oauth.map((p) => (
-              <button key={p} type="button" className="btn cloud-btn" disabled={busy !== undefined} onClick={() => void startSignIn(p)}>
-                {busy === p ? 'Opening…' : p === 'google' ? 'Continue with Google' : 'Continue with GitHub'}
+              <button key={p} type="button" className="btn cloud-btn" disabled={busy !== undefined || signin.busy !== undefined} onClick={() => void startSignIn(p)}>
+                {signin.busy === p ? 'Opening…' : p === 'google' ? 'Continue with Google' : 'Continue with GitHub'}
               </button>
             ))}
           </div>
@@ -401,10 +381,10 @@ export function ShareDialog({ slug, onClose }: { slug: string; onClose: () => vo
               type="button"
               className="btn primary"
               data-autofocus
-              disabled={busy !== undefined}
+              disabled={busy !== undefined || signin.busy !== undefined}
               onClick={() => (oauth.length === 1 ? void startSignIn(oauth[0]!) : setChooser(true))}
             >
-              {busy !== undefined ? 'Opening…' : 'Sign in to create share links'}
+              {busy !== undefined || signin.busy !== undefined ? 'Opening…' : 'Sign in to create share links'}
             </button>
           </div>
         )}

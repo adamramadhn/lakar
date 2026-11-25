@@ -12,7 +12,6 @@ import {
   api,
   errorText,
   type AuthStatus,
-  type CloudUser,
   type Connections as ConnectionsInfo,
   type DaemonStatus,
   type HarnessInfo,
@@ -20,7 +19,8 @@ import {
   type HarnessState,
   type McpServerConfig,
 } from './api';
-import { isDesktop, openExternal } from './desktop';
+import { initialsOf, sessionExpired } from './cloudAuth';
+import { useCloudSignIn } from './useCloudSignIn';
 import { Menu, type Item } from './FileMenu';
 import { HARNESSES, nonDefaultPort } from './harnesses';
 import { useNow, useRetry } from './hooks';
@@ -119,41 +119,30 @@ function DaemonCard({ info, status }: { info: ConnectionsInfo | undefined; statu
 
 // ---- Lakar Cloud (spec-cloud-auth story D): blok sign-in di Connections. ----
 
-/** Inisial avatar dari nama (2 kata → huruf pertama masing-masing) atau email (2 huruf pertama). */
-function initialsOf(u: CloudUser): string {
-  const base = u.name?.trim() || u.email;
-  const parts = base.split(/\s+/).filter(Boolean);
-  const init = parts.length >= 2 ? `${parts[0]![0]}${parts[1]![0]}` : base.slice(0, 2);
-  return init.toUpperCase();
-}
-
 /** Pola email longgar untuk mengaktifkan tombol magic link (validasi penuh tetap di daemon/service). */
 const EMAIL_OK = /^\S+@\S+\.\S+$/;
 
 /** Label tombol OAuth per provider yang diiklankan. */
 const OAUTH_LABEL: Record<'google' | 'github', string> = { google: 'Continue with Google', github: 'Continue with GitHub' };
 
-/** Sub-state kartu saat signed-out: tombol (out) → menunggu callback browser (waiting) → magic link terkirim (sent). */
-type CloudPhase = 'out' | 'waiting' | 'sent';
-
 /**
  * Kartu "Lakar Cloud" (story D): status sign-in + aksi per state —
  * `configured:false` → pesan env; signed-out → tombol provider yang diiklankan + form magic link;
  * `waiting` → menunggu callback browser; `sent` → link terkirim + Resend; signed-in → akun + Sign out.
  * Event SSE `auth` (sign-in/out dari callback browser atau jendela lain) memicu muat ulang status.
+ * Alur OAuth/magic link dibagi lewat `useCloudSignIn` (spec-first-run-signin task C).
  */
 function CloudAuthCard() {
   const [status, setStatus] = useState<AuthStatus | undefined>(undefined);
   const [loadError, setLoadError] = useState<string | undefined>(undefined);
-  const [phase, setPhase] = useState<CloudPhase>('out');
   const [email, setEmail] = useState('');
-  const [sentTo, setSentTo] = useState('');
-  const [busy, setBusy] = useState<string | undefined>(undefined);
-  const [error, setError] = useState<string | undefined>(undefined);
+  const [signingOut, setSigningOut] = useState(false);
+  const { phase, busy, error, setError, sentTo, start, sendLink, cancel, reset } = useCloudSignIn();
 
   const load = useCallback(() => {
     api.authStatus().then(
       (s) => {
+        sessionExpired.noteStatus(s);
         setStatus(s);
         setLoadError(undefined);
       },
@@ -176,71 +165,18 @@ function CloudAuthCard() {
     [load],
   );
 
-  /**
-   * OAuth: `{url}` dari daemon dibuka di browser sistem; sign-in selesai lewat SSE `auth` (atau Cancel).
-   * Di desktop `window.open` no-op → URL dibuka lewat opener Tauri sesudah fetch. Di browser, jendela
-   * kosong dibuka sinkron di click handler (masih dalam user activation) lalu diarahkan sesudah fetch —
-   * `null` = pop-up diblokir; kegagalan fetch menutup jendela itu lagi.
-   */
-  const start = async (provider: 'google' | 'github') => {
-    if (busy) return;
-    setBusy(provider);
-    setError(undefined);
-    const desktop = isDesktop();
-    const w = desktop ? undefined : window.open('about:blank', '_blank');
-    if (w === null) {
-      setBusy(undefined);
-      setError('Allow pop-ups to sign in.');
-      return;
-    }
-    try {
-      const r = await api.authStart({ provider });
-      if ('url' in r) {
-        if (desktop) await openExternal(r.url);
-        else w!.location.href = r.url;
-        setPhase('waiting');
-      } else {
-        w?.close();
-        setError('The sign-in service did not return a URL — try another method.');
-      }
-    } catch (e) {
-      w?.close();
-      setError(errorText(e));
-    } finally {
-      setBusy(undefined);
-    }
-  };
-
-  /** Magic link: `{sent:true}` → state `sent` (email tujuan disimpan untuk Resend — tanpa polling). */
-  const sendLink = async (to?: string) => {
-    const target = (to ?? email).trim();
-    if (busy || !target) return;
-    setBusy('email');
-    setError(undefined);
-    try {
-      await api.authStart({ provider: 'email', email: target });
-      setSentTo(target);
-      setPhase('sent');
-    } catch (e) {
-      setError(errorText(e));
-    } finally {
-      setBusy(undefined);
-    }
-  };
-
   const signOut = async () => {
-    if (busy) return;
-    setBusy('logout');
+    if (busy || signingOut) return;
+    setSigningOut(true);
     setError(undefined);
     try {
       await api.authLogout();
-      setPhase('out');
+      reset();
       setEmail('');
-      setSentTo('');
     } catch (e) {
       setError(errorText(e));
     } finally {
-      setBusy(undefined);
+      setSigningOut(false);
       load();
     }
   };
@@ -297,9 +233,9 @@ function CloudAuthCard() {
           </span>
           <span className="cloud-user-sub">{u.name?.trim() ? u.email : `Signed in${status.host ? ` · ${status.host}` : ''}`}</span>
         </span>
-        <button type="button" className="btn small" disabled={busy !== undefined} onClick={() => void signOut()}>
+        <button type="button" className="btn small" disabled={busy !== undefined || signingOut} onClick={() => void signOut()}>
           <Icon name="logOut" size={13} />
-          {busy === 'logout' ? 'Signing out…' : 'Sign out'}
+          {signingOut ? 'Signing out…' : 'Sign out'}
         </button>
       </div>
     );
@@ -315,7 +251,7 @@ function CloudAuthCard() {
             Waiting for sign-in in your browser…
           </p>
           <div>
-            <button type="button" className="btn small" onClick={() => setPhase('out')}>
+            <button type="button" className="btn small" onClick={cancel}>
               Cancel
             </button>
           </div>
@@ -339,7 +275,7 @@ function CloudAuthCard() {
               disabled={busy !== undefined}
               onClick={() => {
                 setEmail(sentTo);
-                setPhase('out');
+                cancel();
               }}
             >
               Use a different email
@@ -371,7 +307,7 @@ function CloudAuthCard() {
                   className="cloud-email"
                   onSubmit={(e) => {
                     e.preventDefault();
-                    void sendLink();
+                    void sendLink(email);
                   }}
                 >
                   <input

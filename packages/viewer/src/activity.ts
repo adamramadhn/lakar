@@ -71,8 +71,8 @@ export type PeersEvent = {
 };
 /** Presence satu peer room (kursor/seleksi jarak jauh; broadcast-only). */
 export type PresenceEvent = { seq: number; type: 'presence'; presence: { slug: string; peerId: string; presence: unknown } };
-/** Status sign-in cloud berubah (spec-cloud-auth story C/D; broadcast-only, tanpa ring). `user` hanya ada saat `signedIn`. */
-export type CloudAuthState = { signedIn: boolean; user?: CloudUser };
+/** Status sign-in cloud berubah (spec-cloud-auth story C/D; broadcast-only, tanpa ring). `user` hanya ada saat `signedIn`. Aditif (spec-first-run-signin task B): `reason:'expired'` = session dicabut service; `onboarding` = penanda skip/completed berubah di jendela lain. */
+export type CloudAuthState = { signedIn: boolean; user?: CloudUser; reason?: 'expired'; onboarding?: 'skipped' | 'completed' };
 export type AuthEvent = { seq: number; type: 'auth'; auth: CloudAuthState };
 /** Semua event stream `/viewer/events` sesudah `hello`. */
 export type StreamEvent = ActivityEvent | ChangeEvent | SelectionEvent | OpenTabEvent | PeersEvent | PresenceEvent | AuthEvent;

@@ -181,8 +181,16 @@ export type PresenceEvent = { seq: number; type: 'presence'; presence: RoomPrese
 /**
  * Status sign-in cloud berubah (spec-cloud-auth story C): sign-in/out di `/viewer/auth/*` supaya
  * semua jendela viewer memuat ulang blok Lakar Cloud. `user` hanya ada saat `signedIn`.
+ * Aditif (spec-first-run-signin task B): `reason:'expired'` menandai logout paksa karena session
+ * ditolak service (viewer: toast "session expired", bukan gate); `onboarding` mengabari jendela lain
+ * bahwa penanda onboarding berubah (`POST /viewer/onboarding` skip / sign-in selesai).
  */
-export type CloudAuthState = { signedIn: boolean; user?: { id: string; email: string; name?: string; avatarUrl?: string } };
+export type CloudAuthState = {
+  signedIn: boolean;
+  user?: { id: string; email: string; name?: string; avatarUrl?: string };
+  reason?: 'expired';
+  onboarding?: 'skipped' | 'completed';
+};
 export type AuthEvent = { seq: number; type: 'auth'; auth: CloudAuthState };
 
 export type ActivityEvent = { seq: number; type: 'call'; call: ActivityCall } | { seq: number; type: 'session'; session: ActivitySession };

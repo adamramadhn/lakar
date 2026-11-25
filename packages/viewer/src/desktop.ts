@@ -24,3 +24,17 @@ export const isDesktop = (): boolean => tauriInvoke() !== undefined;
 export async function openExternal(url: string): Promise<void> {
   await tauriInvoke()?.('plugin:opener|open_url', { url });
 }
+
+/**
+ * Kembalikan fokus ke jendela Lakar sesudah sign-in OAuth selesai di browser (spec-first-run-signin
+ * S5) — pengguna tidak perlu mencari jendela sendiri. Best-effort: tanpa `__TAURI__` atau izin
+ * `core:window:allow-set-focus` tidak ada → no-op, error diabaikan.
+ */
+export async function focusWindow(): Promise<void> {
+  try {
+    const g = typeof window !== 'undefined' ? (window as { __TAURI__?: { window?: { getCurrentWindow?: () => { setFocus(): Promise<void> } } } }) : undefined;
+    await g?.__TAURI__?.window?.getCurrentWindow?.().setFocus();
+  } catch {
+    // izin capability belum ada di build lama / platform menolak — abaikan
+  }
+}

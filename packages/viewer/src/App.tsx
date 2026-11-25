@@ -11,13 +11,16 @@
 // `open_doc` tanpa slug memakainya; dokumen baru dari agen (event `openTab` untuk jendela ini) dibuka sebagai tab.
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { activityHub, openTabRequest, remoteDocCall, remoteEffect } from './activity';
-import { api, connection } from './api';
+import { Toast, type ToastState } from './AddLayer';
+import { api, connection, type AuthStatus } from './api';
+import { sessionExpired, shouldShowGate } from './cloudAuth';
 import { Dashboard } from './Dashboard';
-import { docHash, parseRoute, type Route } from './files';
+import { CONNECTIONS_HASH, docHash, parseRoute, type Route } from './files';
 import { JoinRoomDialog } from './JoinRoomDialog';
 import { attachFocusReporter, windowActivate } from './focusSync';
 import { NewFileDialog } from './NewFileDialog';
 import { OfflineBanner } from './OfflineBanner';
+import { OnboardingGate, type GateDoneReason } from './OnboardingGate';
 import { applyFileEvent, closeTab, onOpenInNewTab, onRequestCloseTab, openTab, pruneTabs, readTabs, serializeTabs, TABS_KEY } from './tabs';
 import { TitleBar } from './TitleBar';
 import { initUpdates } from './updates';
@@ -52,7 +55,28 @@ export function App() {
   const [tabs, setTabs] = useState<string[]>(() => (route.name === 'viewer' ? openTab(loadTabs(), route.slug) : loadTabs()));
   const [menuOpen, setMenuOpen] = useState(false);
   const [creating, setCreating] = useState<ReadonlySet<string> | undefined>(undefined);
+  const [toast, setToast] = useState<ToastState | undefined>(undefined);
   const offline = useSyncExternalStore(connection.subscribe, connection.isOffline);
+  // ---- Gate sign-in first-run (spec-first-run-signin): keputusan sekali per pemuatan halaman. ----
+  /** Route saat boot — deep link (`viewer`/`present`/`join`) menekan gate untuk pemuatan ini. */
+  const bootRoute = useRef<Route['name'] | undefined>(undefined);
+  if (bootRoute.current === undefined) bootRoute.current = route.name;
+  const [authStatus, setAuthStatus] = useState<AuthStatus | undefined>(undefined);
+  const [gateDone, setGateDone] = useState<GateDoneReason | undefined>(undefined);
+  const loadAuth = useCallback(() => {
+    api.authStatus().then(
+      (s) => {
+        sessionExpired.noteStatus(s);
+        setAuthStatus(s);
+      },
+      () => {},
+    );
+  }, []);
+  useEffect(loadAuth, [loadAuth]);
+  // `offline` = "Continue offline" — tutup hanya untuk pemuatan ini (E2), tidak ditulis.
+  const gate = gateDone === undefined && shouldShowGate(authStatus, bootRoute.current, false);
+  const gateRef = useRef(gate);
+  gateRef.current = gate;
   // Route `present` melaporkan slug-nya juga: fokus agen (`open_doc` tanpa slug) tetap menunjuk dokumen yang dipresentasikan.
   const active = route.name === 'viewer' || route.name === 'present' ? route.slug : undefined;
   // Ref untuk pendengar event (tanpa daftar ulang tiap render).
@@ -141,6 +165,9 @@ export function App() {
     [apply],
   );
 
+  /** Toast "session expired" sekali per pemuatan (E4 — dedupe; event bisa berulang antar jalur). */
+  const expiredToastShown = useRef(false);
+
   // Perubahan dari jendela/tab viewer lain (stream): gema jendela ini diabaikan di `remoteEffect`.
   useEffect(
     () =>
@@ -153,12 +180,28 @@ export function App() {
             // Agen membuat dokumen baru: tampilkan di jendela ini (route menambah tabnya).
             const slug = openTabRequest(e, api.origin);
             if (slug !== undefined) location.hash = docHash(slug);
+          } else if (e.type === 'auth') {
+            // Status sign-in berubah di luar jendela ini (callback OAuth, skip jendela lain,
+            // session dicabut service) — muat ulang; `reason:'expired'` → toast + chip (E4).
+            if (e.auth.reason === 'expired') {
+              sessionExpired.markExpired();
+              if (!expiredToastShown.current) {
+                expiredToastShown.current = true;
+                setToast({
+                  message: 'Your Lakar Cloud session expired.',
+                  kind: 'info',
+                  action: { label: 'Sign in', run: () => (location.hash = CONNECTIONS_HASH) },
+                });
+              }
+            }
+            if (e.auth.signedIn) sessionExpired.clear();
+            loadAuth();
           } else if (remoteDocCall(e, api.origin)) api.notifyDocsChanged();
         },
         // Event selama putus tidak diputar ulang: muat ulang daftar.
         onReconnect: () => api.notifyDocsChanged(),
       }),
-    [],
+    [loadAuth],
   );
 
   // Dokumen yang tampil di jendela ini → daemon (`open_doc` tanpa slug). Dashboard = null.
@@ -201,7 +244,7 @@ export function App() {
       const slug = activeRef.current;
       const t = e.target;
       const editable = t instanceof HTMLElement && (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || t instanceof HTMLSelectElement || t.isContentEditable);
-      if (slug === undefined || e.repeat || editable || document.querySelector('.modal-scrim, .menu-layer')) return;
+      if (slug === undefined || e.repeat || editable || gateRef.current || document.querySelector('.modal-scrim, .menu-layer')) return;
       e.preventDefault();
       close(slug);
     };
@@ -223,23 +266,28 @@ export function App() {
 
   return (
     <div className="app">
-      <TitleBar tabs={tabs} active={active} onMenu={() => setMenuOpen((v) => !v)} onClose={close} onNew={startNew} />
+      <TitleBar tabs={tabs} active={active} onMenu={() => setMenuOpen((v) => !v)} onClose={close} onNew={startNew} minimal={gate} />
       {offline && <OfflineBanner />}
-      <main className="body">
-        {route.name === 'viewer' ? (
-          <Viewer key={route.slug} slug={route.slug} />
-        ) : (
-          <Dashboard
-            page={route.name === 'join' ? 'recents' : route.name}
-            {...(route.name === 'files' && route.folder ? { folder: route.folder } : {})}
-            menuOpen={menuOpen}
-            onCloseMenu={() => setMenuOpen(false)}
-            onOpenMenu={() => setMenuOpen((v) => !v)}
-          />
-        )}
-      </main>
-      {route.name === 'join' && <JoinRoomDialog initialServer={route.server} initialToken={route.token} onClose={() => (location.hash = '#/')} />}
-      {creating && <NewFileDialog taken={creating} onClose={() => setCreating(undefined)} />}
+      {gate && authStatus ? (
+        <OnboardingGate status={authStatus} onDone={setGateDone} onRetry={loadAuth} onToast={(message) => setToast({ message, kind: 'info' })} />
+      ) : (
+        <main className="body">
+          {route.name === 'viewer' ? (
+            <Viewer key={route.slug} slug={route.slug} />
+          ) : (
+            <Dashboard
+              page={route.name === 'join' ? 'recents' : route.name}
+              {...(route.name === 'files' && route.folder ? { folder: route.folder } : {})}
+              menuOpen={menuOpen}
+              onCloseMenu={() => setMenuOpen(false)}
+              onOpenMenu={() => setMenuOpen((v) => !v)}
+            />
+          )}
+        </main>
+      )}
+      {!gate && route.name === 'join' && <JoinRoomDialog initialServer={route.server} initialToken={route.token} onClose={() => (location.hash = '#/')} />}
+      {!gate && creating && <NewFileDialog taken={creating} onClose={() => setCreating(undefined)} />}
+      {toast && <Toast toast={toast} onClose={() => setToast(undefined)} />}
     </div>
   );
 }
