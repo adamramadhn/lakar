@@ -9,7 +9,7 @@ export default defineConfig({
         extends: true,
         test: {
           name: 'node',
-          include: ['packages/*/src/**/*.test.ts', 'services/*/src/**/*.test.ts', 'packages/render/test/**/*.test.ts', 'bench/src/**/*.test.ts', 'tests/**/*.test.ts'],
+          include: ['packages/*/src/**/*.test.ts', 'packages/render/test/**/*.test.ts', 'bench/src/**/*.test.ts', 'tests/**/*.test.ts'],
         },
       },
       'packages/viewer/vitest.config.ts',

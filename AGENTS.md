@@ -11,6 +11,7 @@ Lakar adalah alat desain berbasis AI.
 - **Viewer.** `packages/viewer` (Vite + React) disajikan `lakard` di `/app/`. Sejak 2026-11-21 viewer juga bisa mengedit langsung: file, folder, page, layer, export, dan restore. Aplikasi sengaja tidak punya kotak prompt.
 - **Desktop.** `apps/desktop` adalah Tauri v2. `lakard` berjalan sebagai sidecar (Node 26 dibundel + hasil `pnpm deploy`). Ada tray, single-instance, dan window chrome sendiri.
 - **Desain.** `design/lakar-ui.pen` adalah sumber kebenaran visual. File ini terenkripsi, jadi buka hanya dengan aplikasi Pencil (pen.dev) atau tool MCP Pencil. Jangan dibaca atau diubah sebagai teks.
+- **Cloud (private).** `services/api` + `services/sync` + `deploy/` dipindah ke repo private `fatmuh/lakar-cloud` (lisensi terpisah — repo ini MIT). Repo itu memasang repo ini sebagai git submodule `lakar/`; `@lakar/schema`/`@lakar/core` tetap di-resolve lewat workspace di sana. Klien cloud tetap di sini: viewer rooms/bridge, daemon `room-client.ts`, mcp `sync-client.ts`. Tes e2e yang menjalankan server sync sungguhan ikut pindah ke `tests/` di repo private.
 
 ## Perintah
 

@@ -17,6 +17,13 @@ Perbaikan bug laten yang tertangkap saat merge:
 - Fixture `v11-section-groups`: board tanpa children → `walkBoard` yield 0 (di-fix saat merge #67).
 - Tes `nodeId di board lain` di export-file: judul janji `EXPORT_FAILED` tapi assertion tak pernah ditulis.
 
+**Pemisahan repo cloud**: `services/api` + `services/sync` + `deploy/` dipindah ke repo private
+`fatmuh/lakar-cloud` (public repo ini MIT). Repo private memasang `fatmuh/lakar` sebagai submodule `lakar/`
+(branch `dev`) — `@lakar/schema`/`@lakar/core` di-resolve lewat pnpm workspace di sana; PR cloud → repo private,
+PR kode publik → repo ini. Tes e2e terhadap server sync sungguhan (`tests/rooms.test.ts`, `packages/mcp/src/
+sync-client.test.ts`) ikut pindah. Klien cloud (viewer rooms, daemon `room-client.ts`, mcp `sync-client.ts`)
+tetap publik — kontraknya lewat protokol WS/HTTP, bukan impor kode.
+
 **Alur dev → main**: PR fitur menargetkan `dev`. Nightly build: `.github/workflows/nightly.yml` (01:00 WIB +
 manual dispatch) memanggil `release.yml` (`workflow_call`, input `nightly`) → installer 4 OS → rilis pra-rilis
 `nightly` yang tag-nya dipindah ke tip dev terbaru. Rilis stabil tetap tag `v*` di `main` (merge `dev` → `main`

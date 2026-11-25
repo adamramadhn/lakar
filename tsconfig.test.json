@@ -17,7 +17,6 @@
   },
   "include": [
     "packages/*/src/**/*.test.ts",
-    "services/*/src/**/*.test.ts",
     "packages/render/test/**/*.ts",
     "bench/src/**/*.test.ts",
     "tests/**/*.ts",

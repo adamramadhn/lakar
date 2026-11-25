@@ -16,13 +16,10 @@ export const EDGES: Readonly<Record<string, readonly string[]>> = {
   exec: ['core', 'ports'],
   icons: ['schema'],
   daemon: ['core', 'exec', 'render', 'check', 'icons', 'skills', 'codegen'],
-  // mcp → daemon: mode `lakar --file` memakai FileTransport daemon (spec-collab-cloud story 2);
-  // mcp → sync: tes e2e SyncClient (story 4) menjalankan buildSync sungguhan (devDependency saja).
-  mcp: ['schema', 'daemon', 'sync'],
+  // mcp → daemon: mode `lakar --file`/`--server` memakai transport daemon (spec-collab-cloud story 2/4).
+  mcp: ['schema', 'daemon'],
   bench: ['schema'],
   viewer: ['schema', 'render', 'codegen'],
-  api: ['core', 'schema'],
-  sync: ['core', 'schema'],
 };
 
 /** Paket yang tidak boleh menyentuh IO (builtin Node atau pustaka IO). */
@@ -127,11 +124,10 @@ function walkTs(dir: string, base: string, acc: Record<string, string>): void {
   }
 }
 
-/** Baca semua paket workspace (`packages/*` + `services/*` + `bench`) dari disk. */
+/** Baca semua paket workspace (`packages/*` + `bench`) dari disk. */
 export function loadWorkspace(root: string): PackageSource[] {
   const dirs = [
     ...readdirSync(join(root, 'packages')).map((d) => join(root, 'packages', d)),
-    ...(existsSync(join(root, 'services')) ? readdirSync(join(root, 'services')).map((d) => join(root, 'services', d)) : []),
     join(root, 'bench'),
   ].filter((d) => existsSync(join(d, 'package.json')));
   return dirs.map((dir) => {

@@ -21,7 +21,7 @@ const pkg = (name: string, code: string, deps: Record<string, string> = {}): Pac
 describe('arah dependensi: repo nyata', () => {
   const packages = loadWorkspace(root);
 
-  it('menemukan 13 paket', () => {
+  it('menemukan 11 paket', () => {
     expect(packages.map((p) => p.name).sort()).toEqual(Object.keys(EDGES).sort());
     for (const p of packages) expect(Object.keys(p.files).length).toBeGreaterThan(0);
   });
@@ -97,11 +97,11 @@ describe('arah dependensi: fixture pelanggaran', () => {
     ]);
   });
 
-  it('mcp boleh @lakar/daemon (mode --file/--server) dan closure-nya + @lakar/sync (tes e2e)', () => {
+  it('mcp boleh @lakar/daemon (mode --file/--server) dan closure-nya', () => {
     expect(checkPackage(pkg('mcp', "import { FileTransport } from '@lakar/daemon';"))).toEqual([]);
     expect(checkPackage(pkg('mcp', '', { '@lakar/daemon': 'workspace:*' }))).toEqual([]);
-    expect(checkPackage(pkg('mcp', '', { '@lakar/sync': 'workspace:*' }))).toEqual([]);
-    expect([...allowedDeps('mcp')].sort()).toEqual(['check', 'codegen', 'core', 'daemon', 'exec', 'icons', 'ports', 'render', 'schema', 'skills', 'sync']);
+    expect(checkPackage(pkg('mcp', '', { '@lakar/sync': 'workspace:*' }))).toHaveLength(1);
+    expect([...allowedDeps('mcp')].sort()).toEqual(['check', 'codegen', 'core', 'daemon', 'exec', 'icons', 'ports', 'render', 'schema', 'skills']);
   });
 
   it('arah terbalik: schema impor @lakar/core → direction', () => {

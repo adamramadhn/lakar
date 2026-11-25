@@ -1,6 +1,5 @@
 packages:
   - 'packages/*'
-  - 'services/*'
   - 'bench'
   - 'apps/desktop'
 
