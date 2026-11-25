@@ -195,8 +195,9 @@ export function registerAuthRoutes(app: FastifyInstance, opts: AuthRoutesOptions
     return providers;
   };
 
-  // `GET /viewer/auth/status` → status jujur: `configured` = cloud URL diset; `user` dari
-  // session.json (cache — tidak memanggil service); `providers` best-effort bila service menjawab.
+  // `GET /viewer/auth/status` → status jujur: `configured` = cloud URL diset; `host` = host service
+  // (aditif — viewer menampilkannya di blok Lakar Cloud); `user` dari session.json (cache — tidak
+  // memanggil service); `providers` best-effort bila service menjawab.
   app.get('/viewer/auth/status', async (_req, reply) => {
     const base = cloudBase(env());
     const session = await store.load();
@@ -208,9 +209,18 @@ export function registerAuthRoutes(app: FastifyInstance, opts: AuthRoutesOptions
         // Service tak terjangkau: providers tidak diketahui — field dihilangkan, bukan dibohongi.
       }
     }
+    // `host` aditif untuk tampilan viewer; LAKAR_CLOUD_URL tanpa skema (bukan URL valid) → field dihilangkan.
+    let host: string | undefined;
+    if (base) {
+      try {
+        host = new URL(base).host;
+      } catch {
+        host = undefined;
+      }
+    }
     return reply.code(200).send({
       ok: true,
-      data: { signedIn: session !== undefined, configured: base !== undefined, ...(session ? { user: session.user } : {}), ...(providers ? { providers } : {}) },
+      data: { signedIn: session !== undefined, configured: base !== undefined, ...(host ? { host } : {}), ...(session ? { user: session.user } : {}), ...(providers ? { providers } : {}) },
     });
   });
 

@@ -111,7 +111,7 @@ export const stream = {
     act(() => openStream().emit('hello', { sessions: [], recent: [], ...hello }));
   },
   /** Event sesudah hello; `seq` diisi otomatis bila tidak ada. */
-  event(type: 'call' | 'session' | 'change' | 'selection' | 'openTab', payload: Record<string, unknown>) {
+  event(type: 'call' | 'session' | 'change' | 'selection' | 'openTab' | 'peers' | 'presence' | 'auth', payload: Record<string, unknown>) {
     const ev = { seq: nextSeq(), type, ...payload };
     act(() => openStream().emit(type, ev));
   },

@@ -3971,6 +3971,118 @@ button.panel-tab:hover {
   content: none;
 }
 
+/* ---- Lakar Cloud (spec-cloud-auth story D): kartu sign-in di Settings → Connections.
+   Mengikuti konvensi conn-card: kepala `conn-daemon` + body terpisah garis atas. ---- */
+.cloud-head {
+  padding: 14px 16px;
+}
+.cloud-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px 16px;
+  border-top: 1px solid var(--border);
+}
+/* Pesan "not configured" — baris info seperti conn-render, tanpa latar error. */
+.cloud-empty {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.45;
+}
+.cloud-empty > svg {
+  flex: none;
+  margin-top: 1px;
+  color: var(--accent);
+}
+/* Baris akun signed-in: avatar inisial + nama/email + Sign out. */
+.cloud-user {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--border);
+}
+.cloud-avatar {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--btn-text);
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+.cloud-user-info {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  flex: 1;
+  min-width: 0;
+}
+.cloud-user-title {
+  font-size: 13px;
+}
+.cloud-user-title strong {
+  font-weight: 600;
+}
+.cloud-user-sub {
+  color: var(--text-secondary);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Tombol provider OAuth selebar kartu (satu per baris). */
+.cloud-providers {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.cloud-btn {
+  width: 100%;
+}
+/* Form magic link: input fleksibel + tombol primary. */
+.cloud-email {
+  display: flex;
+  gap: 8px;
+}
+.cloud-email .input {
+  flex: 1;
+  min-width: 0;
+}
+.cloud-note {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.45;
+}
+/* CTA sign-in di dialog Share (story D): blok aksi di bawah teks modal. */
+.share-signin {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 4px 0 8px;
+}
+.share-signin-note {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
 /* Dialog Confirm Install: file tujuan + badge "Adds N lines" + pratinjau + catatan backup/restart. */
 .conn-confirm-file {
   display: flex;

@@ -737,6 +737,9 @@ fn main() {
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| show_main(app)))
         // Updater otomatis (endpoint latest.json GitHub Release; command di modul updates).
         .plugin(tauri_plugin_updater::Builder::new().build())
+        // Opener: `window.open` diabaikan webview — URL eksternal (sign-in OAuth viewer) dibuka di
+        // browser sistem lewat `plugin:opener|open_url` (izin `opener:default` di viewer-window.json).
+        .plugin(tauri_plugin_opener::init())
         .manage(DaemonState::default())
         .manage(updates::PendingUpdate::default())
         .invoke_handler(tauri::generate_handler![
@@ -827,7 +830,8 @@ mod tests {
         let cap: serde_json::Value = serde_json::from_str(include_str!("../capabilities/viewer-window.json")).unwrap();
         assert_eq!(cap["remote"]["urls"], json!(["http://127.0.0.1:*"]));
         assert_eq!(cap["windows"], json!(["main"]));
-        // Command aplikasi untuk halaman remote: sinkron tema + updater; daemon_state/restart_daemon tidak.
+        // Command aplikasi untuk halaman remote: sinkron tema + updater + opener URL default
+        // (sign-in OAuth; `window.open` no-op di webview); daemon_state/restart_daemon tidak.
         let mut expected: Vec<&str> = WINDOW_PERMISSIONS.to_vec();
         expected.extend([
             "allow-set-ui-theme",
@@ -836,6 +840,7 @@ mod tests {
             "allow-download-update",
             "allow-install-update",
             "allow-relaunch-app",
+            "opener:default",
         ]);
         assert_eq!(cap["permissions"], json!(expected));
     }

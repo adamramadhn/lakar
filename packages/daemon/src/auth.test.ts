@@ -68,7 +68,7 @@ describe('GET /viewer/auth/status', () => {
     });
     const r = await t.get('/viewer/auth/status');
     expect(r.statusCode, r.body).toBe(200);
-    expect(r.json().data).toEqual({ signedIn: true, configured: true, user: USER, providers: ['google', 'email'] });
+    expect(r.json().data).toEqual({ signedIn: true, configured: true, host: 'api.example', user: USER, providers: ['google', 'email'] });
   });
 
   it('providers dicache ~30s — dua status berturut hanya satu fetch ke service', async () => {
@@ -93,7 +93,7 @@ describe('GET /viewer/auth/status', () => {
       throw new Error('ECONNREFUSED');
     });
     const r = await t.get('/viewer/auth/status');
-    expect(r.json().data).toEqual({ signedIn: false, configured: true });
+    expect(r.json().data).toEqual({ signedIn: false, configured: true, host: 'api.example' });
   });
 
   it('session.json korup → signedIn:false dan file dibersihkan', async () => {

@@ -137,6 +137,19 @@ export type ImportUrlBody = { url: string; pageId?: string; x?: number; y?: numb
 /** Hasil impor URL: seperti paste + `boardId` board baru dan metadata halaman yang diambil. */
 export type ImportUrlResult = OpsResult & { nodeId: string; boardId: string; report: PasteReport; page: { url: string; finalUrl: string; title?: string } };
 
+// ---- Sign-in cloud (spec-cloud-auth story D): status/start/logout lewat `/viewer/auth/*`.
+// Session disimpan daemon (dataDir/session.json) — viewer tidak pernah memegang token. ----
+
+/** Profil akun dari `/viewer/auth/status` (`user`, bentuk `CloudUser` daemon). */
+export type CloudUser = { id: string; email: string; name?: string; avatarUrl?: string };
+/** Provider sign-in yang diiklankan service; `email` = magic link (butuh alamat email). */
+export type AuthProvider = 'google' | 'github' | 'email';
+/** `GET /viewer/auth/status`: `configured:false` = LAKAR_CLOUD_URL belum diset; `host` = host service; `providers` hanya ada bila service menjawab. */
+export type AuthStatus = { signedIn: boolean; configured: boolean; user?: CloudUser; providers?: string[]; host?: string };
+/** Body `POST /viewer/auth/start`: OAuth (`google`/`github`) → `{url}` untuk dibuka di browser sistem; magic link (`email`) → `{sent:true}`. */
+export type AuthStartBody = { provider: 'google' | 'github' } | { provider: 'email'; email: string };
+export type AuthStartResult = { url: string } | { sent: true };
+
 // ---- Share link (plan-share-link-ui): proxy daemon → @lakar/api; kunci cloud hanya di daemon. ----
 
 /** Izin satu share link (lihat selalu ada — token = izin). */
@@ -961,6 +974,27 @@ class ViewerClient {
 
   layoutCheck(slug: string): Promise<LayoutCheck> {
     return this.#withDoc(slug, async (s) => ({ ...(await request<Omit<LayoutCheck, 'ranAt'>>('POST', '/layout-check', {}, s)), ranAt: Date.now() }));
+  }
+
+  // ---- Sign-in cloud (spec-cloud-auth story D): `/viewer/auth/*`; token session tetap di daemon. ----
+
+  /** Status sign-in cloud (`GET /viewer/auth/status`). `providers` diisi bila service menjawab; `host` = host LAKAR_CLOUD_URL. */
+  authStatus(): Promise<AuthStatus> {
+    return request<AuthStatus>('GET', '/viewer/auth/status');
+  }
+
+  /**
+   * Mulai sign-in (POST /viewer/auth/start): `{provider:'google'|'github'}` → `{url}` yang dibuka viewer
+   * di browser sistem (`window.open` di browser; `openExternal` desktop.ts di aplikasi Tauri —
+   * `window.open` no-op di sana); `{provider:'email', email}` → `{sent:true}` (magic link terkirim).
+   */
+  authStart(body: AuthStartBody): Promise<AuthStartResult> {
+    return request<AuthStartResult>('POST', '/viewer/auth/start', body);
+  }
+
+  /** Sign out (POST /viewer/auth/logout): hapus session lokal + revoke di service. Idempoten. */
+  authLogout(): Promise<{ signedIn: false }> {
+    return request<{ signedIn: false }>('POST', '/viewer/auth/logout');
   }
 
   // ---- Share link (plan-share-link-ui): proxy `/viewer/*` ke @lakar/api; tanpa sesi dokumen. ----

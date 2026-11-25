@@ -20,6 +20,7 @@ tauri-plugin-updater = "2.14"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 dunce = "1"
+tauri-plugin-opener = "~2.5.5"
 
 [profile.release]
 codegen-units = 1

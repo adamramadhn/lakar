@@ -1,13 +1,18 @@
 // Dialog Share (plan-share-link-ui, mockup KxNaI): daftar share aktif dokumen lewat proxy daemon
 // (`api.*Share`), link field + Copy, toggle izin (view selalu on), select Expires 7/30/90/Never,
 // "Update snapshot" (re-render + PUT; URL & komentar tetap), footer "Stored on <host>".
-// Cloud env belum diset di lakard → pesan "not configured" saja (tak ada aksi).
+// Cloud env belum diset di lakard → pesan "not configured" saja (tak ada aksi); cloud terkonfigurasi
+// tapi belum sign-in (spec-cloud-auth story D) → CTA "Sign in to create share links" (OAuth langsung
+// di sini, provider lain → Settings → Connections). Event SSE `auth` me-refresh fase itu.
 import { useEffect, useRef, useState, type ReactElement } from 'react';
-import { api, errorText, type ShareLink, type ShareList } from './api';
+import { activityHub } from './activity';
+import { api, ApiError, errorText, type AuthStatus, type ShareLink, type ShareList } from './api';
+import { isDesktop, openExternal } from './desktop';
+import { CONNECTIONS_HASH } from './files';
 import { Icon, type IconName } from './icons';
 import { Modal } from './NewFileDialog';
 
-type Phase = 'loading' | 'creating' | 'ready' | 'unconfigured';
+type Phase = 'loading' | 'creating' | 'ready' | 'unconfigured' | 'signin';
 
 /** Umur singkat untuk baris link ("2 min ago"). */
 function ageOf(iso: string): string {
@@ -65,6 +70,17 @@ function expired(s: ShareLink): boolean {
   return s.expiresAt !== null && new Date(s.expiresAt).getTime() <= Date.now();
 }
 
+/**
+ * Error kredensial dari panggilan service lewat lakard: 401/UNAUTHORIZED langsung, atau EXPORT_FAILED
+ * yang pesan/hint-nya jelas soal auth (proxy share memetakan 401 service → EXPORT_FAILED dengan hint
+ * LAKAR_CLOUD_KEY / "sign in"). Error lain (service down, respons rusak) bukan urusan sign-in.
+ */
+function isAuthError(e: unknown): boolean {
+  if (!(e instanceof ApiError)) return false;
+  if (e.status === 401 || e.code === 'UNAUTHORIZED') return true;
+  return e.code === 'EXPORT_FAILED' && /auth|cloud_key|sign.?in/i.test(`${e.message} ${e.hint}`);
+}
+
 function PermToggle({ on, disabled, label, onChange }: { on: boolean; disabled?: boolean; label: string; onChange: (v: boolean) => void }) {
   return (
     <button type="button" role="switch" aria-checked={on} aria-label={label} disabled={disabled} className={`switch${on ? ' on' : ''}`} onClick={() => onChange(!on)}>
@@ -76,14 +92,21 @@ function PermToggle({ on, disabled, label, onChange }: { on: boolean; disabled?:
 export function ShareDialog({ slug, onClose }: { slug: string; onClose: () => void }): ReactElement {
   const [phase, setPhase] = useState<Phase>('loading');
   const [list, setList] = useState<ShareList>({ configured: false, shares: [] });
+  const [auth, setAuth] = useState<AuthStatus | undefined>(undefined); // undefined = route tak ada/daemon lama
   const [active, setActive] = useState<string | undefined>(undefined); // token "this link"
-  const [busy, setBusy] = useState<string | undefined>(undefined); // 'create' | 'refresh' | token
+  const [busy, setBusy] = useState<string | undefined>(undefined); // 'create' | 'refresh' | provider OAuth | token
   const [error, setError] = useState<string | undefined>(undefined);
   const [copied, setCopied] = useState<string | undefined>(undefined);
   const [confirmRevoke, setConfirmRevoke] = useState<string | undefined>(undefined);
   const [justUpdated, setJustUpdated] = useState(false);
+  const [waiting, setWaiting] = useState(false); // OAuth dibuka di browser — menunggu SSE `auth`
+  const [chooser, setChooser] = useState(false); // chooser provider inline (>1 OAuth diiklankan)
   const copyTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const updatedTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  /** `false` sesudah unmount — dipakai bersama boot mount + boot SSE. */
+  const alive = useRef(true);
+  /** Naik tiap boot; hanya boot terbaru yang menerapkan hasilnya (balapan mount ↔ SSE `auth`). */
+  const bootGen = useRef(0);
   useEffect(
     () => () => {
       clearTimeout(copyTimer.current);
@@ -112,38 +135,119 @@ export function ShareDialog({ slug, onClose }: { slug: string; onClose: () => vo
     }
   };
 
-  // Buka dialog: tanpa link aktif → buat link pertama otomatis (daemon render + upload).
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      try {
-        const l = await api.listShares(slug);
-        if (cancelled) return;
-        setList(l);
-        if (!l.configured) {
-          setPhase('unconfigured');
+  /**
+   * Alur buka (dipakai mount + event SSE `auth`): status auth + daftar share diambil paralel.
+   * `authStatus` best-effort — route bisa tidak ada di daemon lama → `undefined` → perilaku lama.
+   * Fase `signin` hanya masuk bila signed-out DAN daftar share ditolak karena kredensial — deployment
+   * era admin-key (`LAKAR_CLOUD_KEY`) tetap menjawab daftar walau belum sign-in → alur share normal.
+   * `unconfigured` tetap dari `configured:false`. Generasi menahan hasil boot usang (balapan
+   * mount ↔ SSE); error non-auth → pesan error + fase `ready` (sama seperti mount lama).
+   */
+  const boot = async (): Promise<void> => {
+    const gen = ++bootGen.current;
+    const stale = () => !alive.current || gen !== bootGen.current;
+    try {
+      const [a, l] = await Promise.all([
+        api.authStatus().catch(() => undefined),
+        api.listShares(slug).then(
+          (list) => ({ list }),
+          (err: unknown) => ({ err }),
+        ),
+      ]);
+      if (stale()) return;
+      setAuth(a);
+      const signedOut = a?.configured === true && !a.signedIn;
+      if ('err' in l) {
+        if (signedOut && isAuthError(l.err)) {
+          setPhase('signin');
           return;
         }
-        if (l.shares.length) {
-          setActive(l.shares[0]!.token);
-          setPhase('ready');
-          return;
-        }
-        setPhase('creating');
-        await api.createShare(slug);
-        if (!cancelled) await load(false);
-      } catch (e) {
-        if (!cancelled) {
-          setError(errorText(e));
-          setPhase('ready');
-        }
+        throw l.err;
       }
-    })();
+      setList(l.list);
+      if (!l.list.configured) {
+        setPhase('unconfigured');
+        return;
+      }
+      if (l.list.shares.length) {
+        setActive(l.list.shares[0]!.token);
+        setPhase('ready');
+        return;
+      }
+      // Tanpa link aktif → buat link pertama otomatis (daemon render + upload).
+      setPhase('creating');
+      await api.createShare(slug);
+      if (!stale()) await load(false);
+    } catch (e) {
+      if (!stale()) {
+        setError(errorText(e));
+        setPhase('ready');
+      }
+    }
+  };
+
+  // Buka dialog: boot di atas (list → signin/unconfigured/ready; tanpa link → auto-create).
+  useEffect(() => {
+    alive.current = true;
+    void boot();
     return () => {
-      cancelled = true;
+      alive.current = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slug]);
+
+  // SSE `auth` (sign-in/out di jendela lain atau callback browser): status disegarkan → CTA hilang
+  // dan alur share berjalan normal (matrix story D). State CTA lokal direset supaya konsisten.
+  // Boot menelan errornya sendiri (generasi + `alive` di atas menahan hasil usang/unmount).
+  useEffect(
+    () =>
+      activityHub.listen({
+        onEvent: (e) => {
+          if (e.type !== 'auth') return;
+          setWaiting(false);
+          setChooser(false);
+          void boot();
+        },
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [slug],
+  );
+
+  /**
+   * OAuth dari CTA sign-in: `{url}` daemon dibuka di browser sistem; SSE `auth` yang memajukan fase.
+   * Di desktop `window.open` no-op → URL dibuka lewat opener Tauri sesudah fetch. Di browser, jendela
+   * kosong dibuka sinkron di click handler (masih dalam user activation) lalu diarahkan sesudah fetch —
+   * `null` = pop-up diblokir; kegagalan fetch menutup jendela itu lagi. `busy` = nama provider supaya
+   * label "Opening…" hanya tampil di tombol yang diklik.
+   */
+  const startSignIn = async (provider: 'google' | 'github') => {
+    if (busy) return;
+    setBusy(provider);
+    setError(undefined);
+    const desktop = isDesktop();
+    const w = desktop ? undefined : window.open('about:blank', '_blank');
+    if (w === null) {
+      setBusy(undefined);
+      setError('Allow pop-ups to sign in.');
+      return;
+    }
+    try {
+      const r = await api.authStart({ provider });
+      if ('url' in r) {
+        if (desktop) await openExternal(r.url);
+        else w!.location.href = r.url;
+        setWaiting(true);
+      } else {
+        w?.close();
+        setError('The sign-in service did not return a URL — try another method.');
+      }
+    } catch (e) {
+      w?.close();
+      setError(errorText(e));
+    } finally {
+      setBusy(undefined);
+    }
+  };
 
   const current = list.shares.find((s) => s.token === active) ?? list.shares[0];
   const totalViews = list.shares.reduce((n, s) => n + s.views, 0);
@@ -235,6 +339,77 @@ export function ShareDialog({ slug, onClose }: { slug: string; onClose: () => vo
         </div>
         <div className="modal-buttons">
           <button type="button" data-autofocus className="btn primary" onClick={onClose}>
+            Done
+          </button>
+        </div>
+      </Modal>
+    );
+  }
+
+  // Fase `signin` (story D): cloud terkonfigurasi tapi belum ada session — CTA menggantikan pesan
+  // "not configured". Satu provider OAuth → start langsung; lebih dari satu → chooser inline;
+  // tanpa OAuth yang diiklankan (mis. hanya magic link) → arahkan ke Settings → Connections.
+  if (phase === 'signin') {
+    const advertised = auth?.providers;
+    const oauth = advertised === undefined ? (['google', 'github'] as const) : advertised.filter((p): p is 'google' | 'github' => p === 'google' || p === 'github');
+    return (
+      <Modal label="Share" onClose={onClose} className="share-dialog">
+        <div className="modal-text">
+          <h2>Share “{slug}”</h2>
+          <p>Sign in to create share links{auth?.host ? ` on ${auth.host}` : ''}. Guests still open links without an account.</p>
+        </div>
+        {error && (
+          <div className="modal-error" role="alert">
+            {error}
+          </div>
+        )}
+        {waiting ? (
+          <div className="share-signin">
+            <p className="share-signin-note">
+              <Icon name="loaderCircle" size={14} className="spin" /> Waiting for sign-in in your browser…
+            </p>
+            <button type="button" className="btn" onClick={() => setWaiting(false)}>
+              Cancel
+            </button>
+          </div>
+        ) : oauth.length === 0 ? (
+          <div className="share-signin">
+            <p className="share-signin-note">This service doesn't offer a browser sign-in method here — sign in from Settings instead.</p>
+            <button
+              type="button"
+              className="btn primary"
+              data-autofocus
+              onClick={() => {
+                onClose();
+                location.hash = CONNECTIONS_HASH;
+              }}
+            >
+              Sign in from Settings
+            </button>
+          </div>
+        ) : chooser ? (
+          <div className="share-signin">
+            {oauth.map((p) => (
+              <button key={p} type="button" className="btn cloud-btn" disabled={busy !== undefined} onClick={() => void startSignIn(p)}>
+                {busy === p ? 'Opening…' : p === 'google' ? 'Continue with Google' : 'Continue with GitHub'}
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div className="share-signin">
+            <button
+              type="button"
+              className="btn primary"
+              data-autofocus
+              disabled={busy !== undefined}
+              onClick={() => (oauth.length === 1 ? void startSignIn(oauth[0]!) : setChooser(true))}
+            >
+              {busy !== undefined ? 'Opening…' : 'Sign in to create share links'}
+            </button>
+          </div>
+        )}
+        <div className="modal-buttons">
+          <button type="button" className="btn" onClick={onClose}>
             Done
           </button>
         </div>

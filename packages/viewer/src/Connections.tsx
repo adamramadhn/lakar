@@ -5,12 +5,14 @@
 // menampilkan pratinjau entri; "Set up manually" membuka Setup Card lama (tab + blok kode + Copy).
 // Data dari `GET /viewer/connections` (URL lakard sebenarnya), `GET /status` (pool render),
 // `GET /viewer/connections/harnesses` (Rescan), dan `GET /viewer/events` (sesi).
-import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore, type ReactElement } from 'react';
 import { activityHub, shortAgo } from './activity';
 import { Toast, type ToastState } from './AddLayer';
 import {
   api,
   errorText,
+  type AuthStatus,
+  type CloudUser,
   type Connections as ConnectionsInfo,
   type DaemonStatus,
   type HarnessInfo,
@@ -18,6 +20,7 @@ import {
   type HarnessState,
   type McpServerConfig,
 } from './api';
+import { isDesktop, openExternal } from './desktop';
 import { Menu, type Item } from './FileMenu';
 import { HARNESSES, nonDefaultPort } from './harnesses';
 import { useNow, useRetry } from './hooks';
@@ -111,6 +114,313 @@ function DaemonCard({ info, status }: { info: ConnectionsInfo | undefined; statu
         </div>
       )}
     </div>
+  );
+}
+
+// ---- Lakar Cloud (spec-cloud-auth story D): blok sign-in di Connections. ----
+
+/** Inisial avatar dari nama (2 kata → huruf pertama masing-masing) atau email (2 huruf pertama). */
+function initialsOf(u: CloudUser): string {
+  const base = u.name?.trim() || u.email;
+  const parts = base.split(/\s+/).filter(Boolean);
+  const init = parts.length >= 2 ? `${parts[0]![0]}${parts[1]![0]}` : base.slice(0, 2);
+  return init.toUpperCase();
+}
+
+/** Pola email longgar untuk mengaktifkan tombol magic link (validasi penuh tetap di daemon/service). */
+const EMAIL_OK = /^\S+@\S+\.\S+$/;
+
+/** Label tombol OAuth per provider yang diiklankan. */
+const OAUTH_LABEL: Record<'google' | 'github', string> = { google: 'Continue with Google', github: 'Continue with GitHub' };
+
+/** Sub-state kartu saat signed-out: tombol (out) → menunggu callback browser (waiting) → magic link terkirim (sent). */
+type CloudPhase = 'out' | 'waiting' | 'sent';
+
+/**
+ * Kartu "Lakar Cloud" (story D): status sign-in + aksi per state —
+ * `configured:false` → pesan env; signed-out → tombol provider yang diiklankan + form magic link;
+ * `waiting` → menunggu callback browser; `sent` → link terkirim + Resend; signed-in → akun + Sign out.
+ * Event SSE `auth` (sign-in/out dari callback browser atau jendela lain) memicu muat ulang status.
+ */
+function CloudAuthCard() {
+  const [status, setStatus] = useState<AuthStatus | undefined>(undefined);
+  const [loadError, setLoadError] = useState<string | undefined>(undefined);
+  const [phase, setPhase] = useState<CloudPhase>('out');
+  const [email, setEmail] = useState('');
+  const [sentTo, setSentTo] = useState('');
+  const [busy, setBusy] = useState<string | undefined>(undefined);
+  const [error, setError] = useState<string | undefined>(undefined);
+
+  const load = useCallback(() => {
+    api.authStatus().then(
+      (s) => {
+        setStatus(s);
+        setLoadError(undefined);
+      },
+      (e) => setLoadError(errorText(e)),
+    );
+  }, []);
+  // `load` mengembalikan Promise — effect callback harus sinkron, jadi dibungkus (bukan `useEffect(load, …)`).
+  useEffect(() => {
+    void load();
+  }, [load]);
+  useRetry(load);
+  // SSE `auth` dari daemon: session dibuat/dihapus di luar UI ini (callback browser, jendela lain) → refresh.
+  useEffect(
+    () =>
+      activityHub.listen({
+        onEvent: (e) => {
+          if (e.type === 'auth') load();
+        },
+      }),
+    [load],
+  );
+
+  /**
+   * OAuth: `{url}` dari daemon dibuka di browser sistem; sign-in selesai lewat SSE `auth` (atau Cancel).
+   * Di desktop `window.open` no-op → URL dibuka lewat opener Tauri sesudah fetch. Di browser, jendela
+   * kosong dibuka sinkron di click handler (masih dalam user activation) lalu diarahkan sesudah fetch —
+   * `null` = pop-up diblokir; kegagalan fetch menutup jendela itu lagi.
+   */
+  const start = async (provider: 'google' | 'github') => {
+    if (busy) return;
+    setBusy(provider);
+    setError(undefined);
+    const desktop = isDesktop();
+    const w = desktop ? undefined : window.open('about:blank', '_blank');
+    if (w === null) {
+      setBusy(undefined);
+      setError('Allow pop-ups to sign in.');
+      return;
+    }
+    try {
+      const r = await api.authStart({ provider });
+      if ('url' in r) {
+        if (desktop) await openExternal(r.url);
+        else w!.location.href = r.url;
+        setPhase('waiting');
+      } else {
+        w?.close();
+        setError('The sign-in service did not return a URL — try another method.');
+      }
+    } catch (e) {
+      w?.close();
+      setError(errorText(e));
+    } finally {
+      setBusy(undefined);
+    }
+  };
+
+  /** Magic link: `{sent:true}` → state `sent` (email tujuan disimpan untuk Resend — tanpa polling). */
+  const sendLink = async (to?: string) => {
+    const target = (to ?? email).trim();
+    if (busy || !target) return;
+    setBusy('email');
+    setError(undefined);
+    try {
+      await api.authStart({ provider: 'email', email: target });
+      setSentTo(target);
+      setPhase('sent');
+    } catch (e) {
+      setError(errorText(e));
+    } finally {
+      setBusy(undefined);
+    }
+  };
+
+  const signOut = async () => {
+    if (busy) return;
+    setBusy('logout');
+    setError(undefined);
+    try {
+      await api.authLogout();
+      setPhase('out');
+      setEmail('');
+      setSentTo('');
+    } catch (e) {
+      setError(errorText(e));
+    } finally {
+      setBusy(undefined);
+      load();
+    }
+  };
+
+  const providers = status?.providers;
+  const offered = (p: 'google' | 'github' | 'email') => providers === undefined || providers.includes(p);
+  // Hanya iklan kosong yang berarti "tanpa metode" — provider yang belum dikenal (forward-compat)
+  // tetap dianggap ada, hanya belum ada tombolnya di versi ini.
+  const noProviders = providers !== undefined && providers.length === 0;
+
+  let body: ReactElement | undefined;
+  let pill: ReactElement | undefined;
+  let sub = 'account & sharing service';
+  if (loadError !== undefined) {
+    body = (
+      <div className="conn-render error" role="alert">
+        <Icon name="alert" size={14} />
+        <span>{loadError}</span>
+        <button type="button" className="btn small" onClick={load}>
+          <Icon name="refresh" size={13} /> Try again
+        </button>
+      </div>
+    );
+    pill = <span className="status-pill error">Unreachable</span>;
+  } else if (status === undefined) {
+    body = (
+      <div className="cloud-body" aria-busy="true">
+        <div className="skeleton line" />
+        <div className="skeleton line short" />
+      </div>
+    );
+    pill = <span className="status-pill">Checking…</span>;
+  } else if (!status.configured) {
+    body = (
+      <div className="cloud-empty" role="note">
+        <Icon name="info" size={14} />
+        <span>
+          Lakar Cloud isn't configured on this machine. Set <span className="mono">LAKAR_CLOUD_URL</span> on lakard, then reload this page.
+        </span>
+      </div>
+    );
+    pill = <span className="status-pill muted">Not configured</span>;
+    sub = 'not configured';
+  } else if (status.signedIn && status.user) {
+    const u = status.user;
+    body = (
+      <div className="cloud-user">
+        <span className="cloud-avatar" aria-hidden="true">
+          {initialsOf(u)}
+        </span>
+        <span className="cloud-user-info">
+          <span className="cloud-user-title">
+            <strong>{u.name?.trim() || u.email}</strong>
+          </span>
+          <span className="cloud-user-sub">{u.name?.trim() ? u.email : `Signed in${status.host ? ` · ${status.host}` : ''}`}</span>
+        </span>
+        <button type="button" className="btn small" disabled={busy !== undefined} onClick={() => void signOut()}>
+          <Icon name="logOut" size={13} />
+          {busy === 'logout' ? 'Signing out…' : 'Sign out'}
+        </button>
+      </div>
+    );
+    pill = <span className="status-pill ok">Signed in</span>;
+    sub = status.host ?? 'connected';
+  } else {
+    sub = status.host ?? 'configured';
+    if (phase === 'waiting') {
+      body = (
+        <div className="cloud-body">
+          <p className="cloud-note">
+            <Icon name="loaderCircle" size={14} className="spin" />
+            Waiting for sign-in in your browser…
+          </p>
+          <div>
+            <button type="button" className="btn small" onClick={() => setPhase('out')}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      );
+    } else if (phase === 'sent') {
+      body = (
+        <div className="cloud-body">
+          <p className="cloud-note">
+            <Icon name="mail" size={14} />
+            Check your email — link sent to {sentTo}.
+          </p>
+          <div>
+            <button type="button" className="btn small" disabled={busy !== undefined} onClick={() => void sendLink(sentTo)}>
+              {busy === 'email' ? 'Sending…' : 'Resend'}
+            </button>
+            {/* Jalan keluar fase `sent`: salah ketik alamat tidak membuat pengguna mentok di sini. */}
+            <button
+              type="button"
+              className="btn small"
+              disabled={busy !== undefined}
+              onClick={() => {
+                setEmail(sentTo);
+                setPhase('out');
+              }}
+            >
+              Use a different email
+            </button>
+          </div>
+        </div>
+      );
+    } else {
+      body = (
+        <div className="cloud-body">
+          {noProviders ? (
+            <p className="cloud-note">No sign-in methods are available on this service yet.</p>
+          ) : (
+            <>
+              <div className="cloud-providers">
+                {offered('google') && (
+                  <button type="button" className="btn cloud-btn" disabled={busy !== undefined} onClick={() => void start('google')}>
+                    {busy === 'google' ? 'Opening…' : OAUTH_LABEL.google}
+                  </button>
+                )}
+                {offered('github') && (
+                  <button type="button" className="btn cloud-btn" disabled={busy !== undefined} onClick={() => void start('github')}>
+                    {busy === 'github' ? 'Opening…' : OAUTH_LABEL.github}
+                  </button>
+                )}
+              </div>
+              {offered('email') && (
+                <form
+                  className="cloud-email"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    void sendLink();
+                  }}
+                >
+                  <input
+                    className="input"
+                    type="email"
+                    placeholder="you@example.com"
+                    aria-label="Email address"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    disabled={busy !== undefined}
+                  />
+                  <button type="submit" className="btn primary" disabled={busy !== undefined || !EMAIL_OK.test(email.trim())}>
+                    {busy === 'email' ? 'Sending…' : 'Email me a sign-in link'}
+                  </button>
+                </form>
+              )}
+            </>
+          )}
+        </div>
+      );
+    }
+  }
+
+  return (
+    <section className="conn-section">
+      <h2>Lakar Cloud</h2>
+      <p>Sign in to share snapshots and create rooms with your account. Guests never need one.</p>
+      <div className="conn-card conn-cloud">
+        <div className="conn-daemon cloud-head">
+          <span className="conn-daemon-icon">
+            <Icon name="cloud" size={16} />
+          </span>
+          <div className="conn-daemon-text">
+            <div className="conn-daemon-title">
+              <strong>Lakar Cloud</strong>
+              {pill}
+            </div>
+            <span className="conn-daemon-sub mono">{sub}</span>
+          </div>
+        </div>
+        {body}
+        {error && (
+          <div className="conn-render error" role="alert">
+            <Icon name="alert" size={14} />
+            <span>{error}</span>
+          </div>
+        )}
+      </div>
+    </section>
   );
 }
 
@@ -554,6 +864,8 @@ export function Connections() {
   return (
     <div className="connections">
       <DaemonCard info={info} status={status} />
+
+      <CloudAuthCard />
 
       <ConnectedAgents />
 

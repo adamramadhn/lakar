@@ -3,9 +3,9 @@
 // Failed bila install gagal, menu More (Open config file / Remove), dan dialog Manual setup berisi Setup Card.
 // Daemon diganti `dom().daemon` (FakeDaemon) per route.
 import { waitFor } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { Connections } from './Connections';
-import { dom, renderUi } from './test/dom';
+import { dom, fail, renderUi, stream } from './test/dom';
 
 const MCP = { command: '/fake/node', args: ['/mcp/main.js'], env: { LAKAR_URL: 'http://127.0.0.1:7466' } };
 
@@ -168,5 +168,207 @@ describe('Install in an agent — alur', () => {
     const before = scans().length;
     await user.click([...document.querySelectorAll('button')].find((b) => b.textContent?.includes('Rescan'))!);
     await waitFor(() => expect(scans().length).toBeGreaterThan(before));
+  });
+});
+
+// ---- Lakar Cloud (story D): kartu sign-in di Connections — status + alur OAuth/magic/SSE/logout. ----
+
+const CLOUD_USER = { id: 'u-1', email: 'adi@example.com', name: 'Adi Nugraha', avatarUrl: 'https://cdn.example/a.png' };
+
+const cloudStatus = (status: () => unknown) => dom().daemon.on('GET', '/viewer/auth/status', status);
+const cloudCard = () => document.querySelector('.conn-cloud')!;
+const cloudButtons = () => [...cloudCard().querySelectorAll('button')];
+
+async function cloudLoaded() {
+  await waitFor(() => expect(cloudCard().querySelector('.cloud-body, .cloud-empty, .cloud-user')).not.toBeNull());
+}
+
+describe('Lakar Cloud — status', () => {
+  it('configured:false → pesan env LAKAR_CLOUD_URL (bukan CTA sign-in)', async () => {
+    daemon();
+    cloudStatus(() => ({ signedIn: false, configured: false }));
+    renderUi(<Connections />);
+    await cloudLoaded();
+    expect(cloudCard().querySelector('.cloud-empty')!.textContent).toContain('LAKAR_CLOUD_URL');
+    expect(cloudCard().querySelector('.status-pill')!.textContent).toBe('Not configured');
+    expect(cloudCard().querySelector('.cloud-providers')).toBeNull();
+    expect(cloudCard().querySelector('.cloud-email')).toBeNull();
+  });
+
+  it('signed out + providers → tombol provider yang diiklankan + form magic link; host tampil', async () => {
+    daemon();
+    cloudStatus(() => ({ signedIn: false, configured: true, host: 'cloud.example', providers: ['google', 'github', 'email'] }));
+    renderUi(<Connections />);
+    await cloudLoaded();
+    expect([...cloudCard().querySelectorAll('.cloud-btn')].map((b) => b.textContent)).toEqual(['Continue with Google', 'Continue with GitHub']);
+    expect(cloudCard().querySelector('.cloud-email')).not.toBeNull();
+    expect(cloudCard().querySelector('.conn-daemon-sub')!.textContent).toBe('cloud.example');
+  });
+
+  it('providers subset (hanya github) → hanya tombol GitHub, tanpa form email', async () => {
+    daemon();
+    cloudStatus(() => ({ signedIn: false, configured: true, providers: ['github'] }));
+    renderUi(<Connections />);
+    await cloudLoaded();
+    expect([...cloudCard().querySelectorAll('.cloud-btn')].map((b) => b.textContent)).toEqual(['Continue with GitHub']);
+    expect(cloudCard().querySelector('.cloud-email')).toBeNull();
+  });
+
+  it('signed in → avatar inisial + nama + email + host + Sign out', async () => {
+    daemon();
+    cloudStatus(() => ({ signedIn: true, configured: true, host: 'cloud.example', user: CLOUD_USER }));
+    renderUi(<Connections />);
+    await waitFor(() => expect(cloudCard().querySelector('.cloud-user')).not.toBeNull());
+    expect(cloudCard().querySelector('.cloud-avatar')!.textContent).toBe('AN');
+    expect(cloudCard().querySelector('.cloud-user-title')!.textContent).toBe('Adi Nugraha');
+    expect(cloudCard().querySelector('.cloud-user-sub')!.textContent).toContain('adi@example.com');
+    expect(cloudCard().querySelector('.conn-daemon-sub')!.textContent).toBe('cloud.example');
+    expect(cloudCard().querySelector('.status-pill')!.textContent).toBe('Signed in');
+    expect(cloudButtons().map((b) => b.textContent)).toContain('Sign out');
+  });
+});
+
+describe('Lakar Cloud — alur', () => {
+  /** Jendela kosong palsu untuk `window.open('about:blank')` — URL OAuth diisi sesudah fetch. */
+  const popup = () => {
+    const w = { location: { href: '' }, close: vi.fn() };
+    vi.spyOn(window, 'open').mockReturnValue(w as unknown as Window);
+    return w;
+  };
+
+  it('klik provider → POST start → jendela kosong diisi URL → "Waiting for sign-in" → Cancel kembali ke tombol', async () => {
+    daemon();
+    cloudStatus(() => ({ signedIn: false, configured: true, providers: ['google'] }));
+    const w = popup();
+    dom().daemon.on('POST', '/viewer/auth/start', () => ({ url: 'https://cloud.example/oauth/google/start?return_to=x' }));
+    const { user } = renderUi(<Connections />);
+    await cloudLoaded();
+    await user.click(cloudButtons().find((b) => b.textContent === 'Continue with Google')!);
+    await waitFor(() => expect(window.open).toHaveBeenCalledWith('about:blank', '_blank'));
+    await waitFor(() => expect(w.location.href).toBe('https://cloud.example/oauth/google/start?return_to=x'));
+    expect(dom().daemon.find('POST', '/viewer/auth/start')[0]!.body).toEqual({ provider: 'google' });
+    expect(cloudCard().textContent).toContain('Waiting for sign-in in your browser…');
+    await user.click(cloudButtons().find((b) => b.textContent === 'Cancel')!);
+    expect([...cloudCard().querySelectorAll('.cloud-btn')].map((b) => b.textContent)).toEqual(['Continue with Google']);
+  });
+
+  it('POST start pending → "Opening…" hanya di tombol yang diklik', async () => {
+    daemon();
+    cloudStatus(() => ({ signedIn: false, configured: true, providers: ['google', 'github'] }));
+    popup();
+    let release!: () => void;
+    dom().daemon.on('POST', '/viewer/auth/start', () => new Promise<unknown>((res) => (release = () => res({ url: 'https://cloud.example/start' }))));
+    const { user } = renderUi(<Connections />);
+    await cloudLoaded();
+    await user.click(cloudButtons().find((b) => b.textContent === 'Continue with Google')!);
+    await waitFor(() => expect(cloudButtons().map((b) => b.textContent)).toContain('Opening…'));
+    expect(cloudButtons().map((b) => b.textContent)).toContain('Continue with GitHub');
+    release();
+    await waitFor(() => expect(cloudCard().textContent).toContain('Waiting for sign-in'));
+  });
+
+  it('POST start gagal → error tampil + jendela kosong ditutup (tidak nyangkut di waiting)', async () => {
+    daemon();
+    cloudStatus(() => ({ signedIn: false, configured: true, providers: ['google'] }));
+    const w = popup();
+    dom().daemon.on('POST', '/viewer/auth/start', () => {
+      throw fail('EXPORT_FAILED', 502, 'service auth tidak bisa dihubungi');
+    });
+    const { user } = renderUi(<Connections />);
+    await cloudLoaded();
+    await user.click(cloudButtons().find((b) => b.textContent === 'Continue with Google')!);
+    await waitFor(() => expect(cloudCard().querySelector('[role="alert"]')?.textContent).toContain('service auth tidak bisa dihubungi'));
+    expect(w.close).toHaveBeenCalled();
+    expect(cloudCard().textContent).not.toContain('Waiting for sign-in');
+    expect(cloudButtons().map((b) => b.textContent)).toContain('Continue with Google');
+  });
+
+  it('window.open diblokir (null) → error "Allow pop-ups", tombol provider tetap (tanpa fetch start)', async () => {
+    daemon();
+    cloudStatus(() => ({ signedIn: false, configured: true, providers: ['google'] }));
+    vi.spyOn(window, 'open').mockReturnValue(null);
+    const { user } = renderUi(<Connections />);
+    await cloudLoaded();
+    await user.click(cloudButtons().find((b) => b.textContent === 'Continue with Google')!);
+    await waitFor(() => expect(cloudCard().querySelector('[role="alert"]')?.textContent).toContain('Allow pop-ups to sign in'));
+    expect(cloudCard().textContent).not.toContain('Waiting for sign-in');
+    expect(cloudButtons().map((b) => b.textContent)).toContain('Continue with Google');
+    expect(dom().daemon.find('POST', '/viewer/auth/start')).toHaveLength(0);
+  });
+
+  it('menunggu → SSE auth{signedIn:true} → status di-fetch ulang → tampilan signed-in', async () => {
+    daemon();
+    let signedIn = false;
+    cloudStatus(() => (signedIn ? { signedIn: true, configured: true, host: 'cloud.example', user: CLOUD_USER } : { signedIn: false, configured: true, providers: ['google'] }));
+    popup();
+    dom().daemon.on('POST', '/viewer/auth/start', () => ({ url: 'https://cloud.example/start' }));
+    const { user } = renderUi(<Connections />);
+    await cloudLoaded();
+    await user.click(cloudButtons().find((b) => b.textContent === 'Continue with Google')!);
+    await waitFor(() => expect(cloudCard().textContent).toContain('Waiting for sign-in'));
+    signedIn = true;
+    stream.event('auth', { auth: { signedIn: true, user: CLOUD_USER } });
+    await waitFor(() => expect(cloudCard().querySelector('.cloud-user')).not.toBeNull());
+    expect(cloudCard().querySelector('.status-pill')!.textContent).toBe('Signed in');
+  });
+
+  it('signed in → SSE auth{signedIn:false} → status di-fetch ulang → tombol provider lagi', async () => {
+    daemon();
+    let signedIn = true;
+    cloudStatus(() => (signedIn ? { signedIn: true, configured: true, host: 'cloud.example', user: CLOUD_USER } : { signedIn: false, configured: true, providers: ['google'] }));
+    renderUi(<Connections />);
+    await waitFor(() => expect(cloudCard().querySelector('.cloud-user')).not.toBeNull());
+    signedIn = false;
+    stream.event('auth', { auth: { signedIn: false } });
+    await waitFor(() => expect(cloudCard().querySelectorAll('.cloud-btn')).toHaveLength(1));
+    expect(cloudCard().querySelector('.cloud-user')).toBeNull();
+  });
+
+  it('magic link: email → POST start {provider:email} → "Check your email" + Resend → POST ulang', async () => {
+    daemon();
+    cloudStatus(() => ({ signedIn: false, configured: true, providers: ['email'] }));
+    dom().daemon.on('POST', '/viewer/auth/start', () => ({ sent: true }));
+    const { user } = renderUi(<Connections />);
+    await cloudLoaded();
+    // Hanya email yang diiklankan → tanpa tombol OAuth.
+    expect(cloudCard().querySelectorAll('.cloud-btn')).toHaveLength(0);
+    const input = cloudCard().querySelector<HTMLInputElement>('.cloud-email input')!;
+    await user.type(input, 'adi@example.com');
+    await user.click(cloudButtons().find((b) => b.textContent === 'Email me a sign-in link')!);
+    await waitFor(() => expect(cloudCard().textContent).toContain('Check your email — link sent to adi@example.com'));
+    expect(dom().daemon.find('POST', '/viewer/auth/start')[0]!.body).toEqual({ provider: 'email', email: 'adi@example.com' });
+    await user.click(cloudButtons().find((b) => b.textContent === 'Resend')!);
+    await waitFor(() => expect(dom().daemon.find('POST', '/viewer/auth/start')).toHaveLength(2));
+  });
+
+  it('sent → "Use a different email" kembali ke tombol dengan email terisi', async () => {
+    daemon();
+    cloudStatus(() => ({ signedIn: false, configured: true, providers: ['email'] }));
+    dom().daemon.on('POST', '/viewer/auth/start', () => ({ sent: true }));
+    const { user } = renderUi(<Connections />);
+    await cloudLoaded();
+    const input = cloudCard().querySelector<HTMLInputElement>('.cloud-email input')!;
+    await user.type(input, 'salah@example.com');
+    await user.click(cloudButtons().find((b) => b.textContent === 'Email me a sign-in link')!);
+    await waitFor(() => expect(cloudCard().textContent).toContain('Check your email'));
+    await user.click(cloudButtons().find((b) => b.textContent === 'Use a different email')!);
+    // Kembali ke fase `out`: form + tombol provider lagi, email lama tetap terisi.
+    await waitFor(() => expect(cloudCard().querySelector('.cloud-email')).not.toBeNull());
+    expect(cloudCard().querySelector<HTMLInputElement>('.cloud-email input')!.value).toBe('salah@example.com');
+  });
+
+  it('Sign out → POST logout → status di-fetch ulang → tombol provider lagi', async () => {
+    daemon();
+    let signedIn = true;
+    cloudStatus(() => (signedIn ? { signedIn: true, configured: true, host: 'cloud.example', user: CLOUD_USER } : { signedIn: false, configured: true, providers: ['google'] }));
+    dom().daemon.on('POST', '/viewer/auth/logout', () => {
+      signedIn = false;
+      return { signedIn: false };
+    });
+    const { user } = renderUi(<Connections />);
+    await waitFor(() => expect(cloudCard().querySelector('.cloud-user')).not.toBeNull());
+    await user.click(cloudButtons().find((b) => b.textContent === 'Sign out')!);
+    await waitFor(() => expect(dom().daemon.find('POST', '/viewer/auth/logout')).toHaveLength(1));
+    await waitFor(() => expect(cloudCard().querySelector('.cloud-providers')).not.toBeNull());
   });
 });
