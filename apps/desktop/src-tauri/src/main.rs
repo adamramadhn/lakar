@@ -815,16 +815,14 @@ mod tests {
         assert_eq!(config.traffic_light_position, Some(TRAFFIC_LIGHTS));
     }
 
-    /// Izin jendela yang dipakai title bar viewer (tombol + drag region) dan gate first-run
-    /// (setFocus — kembali fokus sesudah sign-in OAuth di browser, spec-first-run-signin); tidak lebih.
-    const WINDOW_PERMISSIONS: [&str; 7] = [
+    /// Izin jendela yang dipakai title bar viewer (tombol + drag region); tidak lebih.
+    const WINDOW_PERMISSIONS: [&str; 6] = [
         "core:window:allow-minimize",
         "core:window:allow-toggle-maximize",
         "core:window:allow-internal-toggle-maximize",
         "core:window:allow-close",
         "core:window:allow-start-dragging",
         "core:window:allow-is-maximized",
-        "core:window:allow-set-focus",
     ];
 
     #[test]
@@ -833,9 +831,12 @@ mod tests {
         assert_eq!(cap["remote"]["urls"], json!(["http://127.0.0.1:*"]));
         assert_eq!(cap["windows"], json!(["main"]));
         // Command aplikasi untuk halaman remote: sinkron tema + updater + opener URL default
-        // (sign-in OAuth; `window.open` no-op di webview); daemon_state/restart_daemon tidak.
+        // (sign-in OAuth; `window.open` no-op di webview) + setFocus untuk gate first-run
+        // (kembali fokus sesudah sign-in di browser, spec-first-run-signin);
+        // daemon_state/restart_daemon tidak.
         let mut expected: Vec<&str> = WINDOW_PERMISSIONS.to_vec();
         expected.extend([
+            "core:window:allow-set-focus",
             "allow-set-ui-theme",
             "allow-app-version",
             "allow-check-update",
