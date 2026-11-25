@@ -72,7 +72,7 @@ import { api, ApiError, errorText, OfflineError, type FontFamily, type HistoryEn
 import { Canvas, type CanvasPreview, type Focus, type Highlight, type InsertPoint } from './Canvas';
 import type { PathEditPanel } from './pathTools';
 import { measuredBoards, withHeight } from './boardHeight';
-import { failureText, imageFileProblem, insertBoardAt, insertBoardPlaced, insertIntoBoard, canvasInsertTarget, menuInsertTarget, type InsertExtra, type InsertKind, type InsertTarget } from './codegen';
+import { failureText, imageFileProblem, insertBoardAt, insertBoardPlaced, insertIntoBoard, canvasInsertTarget, menuInsertTarget, type BoardPreset, type InsertExtra, type InsertKind, type InsertTarget } from './codegen';
 import { resolvePageIndex } from './pages';
 import { PagesPanel } from './PagesPanel';
 import { indexDocument, relativeTime, type NodeInfo, type TreeNode } from './format';
@@ -1462,6 +1462,16 @@ export function Viewer({ slug }: { slug: string }) {
   const onCanvasInsert = (kind: InsertKind, at: InsertPoint) => {
     beginInsert(canvasInsertTarget(kind, at, boards, page));
   };
+  /** Pilih preset perangkat saat tool Frame (spec-viewer-device-presets): board preset di kanan board terakhir halaman aktif. */
+  const onFramePreset = (preset: BoardPreset) => {
+    if (!page) return;
+    const { code, description } = insertBoardPlaced(page.id, boards, preset);
+    void runEdit(code, description, (id) => {
+      if (!id) return;
+      pendingSelect.current = id;
+      setSelectedId(id);
+    });
+  };
   /** Menu "+": board terpilih (atau board pertama halaman) di kiri atas + 40px; tanpa board → Frame jadi board baru di halaman aktif. */
   const menuBoard = (selectedInfo && boards.find((b) => b.id === selectedInfo.boardId)) ?? boards[0];
   const onMenuInsert = (kind: InsertKind) => {
@@ -1795,6 +1805,7 @@ export function Viewer({ slug }: { slug: string }) {
         preview={canvasPreview}
         editable={editable}
         onInsert={onCanvasInsert}
+        onFramePreset={editable ? onFramePreset : undefined}
         docEmpty={!docHasBoards}
         stale={offline ? relativeTime(lastSync.current, now) : undefined}
         comments={canvasComments}

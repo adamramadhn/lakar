@@ -110,6 +110,21 @@ describe('board baru dan hapus', () => {
     expect(insertBoardAt(0, 0).code.startsWith('add(null, ')).toBe(true);
   });
 
+  it('preset perangkat (spec-viewer-device-presets): board preset di kanan board terakhir halaman, deskripsi menyebut nama', async () => {
+    const base = await baseDoc();
+    const doc = structuredClone(base.doc);
+    doc.pages.push({ id: 'PageTwo2', name: 'Page 2', children: [] });
+    const preset = { name: 'iPhone 18 Pro', width: 402, height: 874, screen: 'mobile' as const };
+    const { code, description } = insertBoardPlaced('PageTwo2', doc.pages[1]!.children, preset);
+    expect(description).toBe('Insert iPhone 18 Pro board');
+    expect(wordCount(description)).toBeLessThanOrEqual(8);
+    const r = await run(doc, code);
+    expect(r.doc.pages[1]!.children[0]).toMatchObject({ id: r.created[0]!.id, name: 'iPhone 18 Pro', x: 0, y: 0, width: 402, height: 874, screen: 'mobile', fills: [{ type: 'solid', color: '#FFFFFF' }] });
+    // insertBoardAt dengan preset: posisi klik + nama preset lolos JSON (aman untuk nama aneh).
+    const weird = await run(doc, insertBoardAt(50, 60, 'PageTwo2', { name: "a'); remove('x'); ('b", width: 10, height: 10, screen: 'app' }).code);
+    expect(weird.doc.pages[1]!.children.at(-1)!.name).toBe("a'); remove('x'); ('b");
+  });
+
   it('semua deskripsi 3–8 kata', () => {
     const b = { id: 'B1', name: 'Hero Section For The Landing Page' };
     for (const { kind } of INSERT_KINDS) {

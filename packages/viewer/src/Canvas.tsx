@@ -29,7 +29,8 @@ import { api, errorText } from './api';
 import { CommentPin, CommentThreadCard, NewCommentCard, pinPoint, threadLocation, type CanvasComments } from './comments';
 import { SelectionBox, useCanvasEdit } from './canvasEdit';
 import { usePathTools, type PathEditPanel } from './pathTools';
-import { INSERT_KINDS, type InsertKind } from './codegen';
+import { INSERT_KINDS, type BoardPreset, type InsertKind } from './codegen';
+import { DEVICE_PRESETS } from './devicePresets';
 import { COMPONENT_DRAG_TYPE, exitInstanceSelection, type ComponentInfo } from './componentModel';
 import { ExportButton } from './ExportPopover';
 import { Menu, type Item } from './FileMenu';
@@ -417,6 +418,7 @@ export function Canvas({
   preview,
   editable = false,
   onInsert,
+  onFramePreset,
   camera,
   onCamera,
   docEmpty = false,
@@ -515,6 +517,8 @@ export function Canvas({
   editable?: boolean;
   /** Klik dengan tool sisip: board di bawah kursor (koordinat board) atau halaman (hanya Frame). */
   onInsert?: (kind: InsertKind, at: InsertPoint) => void;
+  /** Pilih preset perangkat saat tool Frame aktif (spec-viewer-device-presets): board preset di halaman aktif. */
+  onFramePreset?: (preset: BoardPreset) => void;
   /** Pin komentar + popover thread/draft di halaman ini (story 9.4); `undefined` = disembunyikan. */
   comments?: CanvasComments | undefined;
   /** Klik dengan tool komentar: titik halaman + layer di bawah kursor (`nodeId`, untuk pin di layer). */
@@ -1275,6 +1279,24 @@ export function Canvas({
               <ExportButton slug={slug} boards={boards} selectedBoardId={highlight?.boardId} onExportCode={onExportCode} />
             </>
           )}
+        </div>
+      )}
+
+      {tool === 'frame' && onFramePreset !== undefined && (
+        <div className="frame-presets canvas-overlay-ui" role="group" aria-label="Frame presets">
+          {DEVICE_PRESETS.map((g) => (
+            <div key={g.group} className="frame-presets-group">
+              <div className="frame-presets-label">{g.group}</div>
+              {g.presets.map((p) => (
+                <button key={p.name} type="button" className="frame-preset" onClick={() => onFramePreset?.(p)}>
+                  <span className="frame-preset-name">{p.name}</span>
+                  <span className="frame-preset-size">
+                    {p.width} × {p.height}
+                  </span>
+                </button>
+              ))}
+            </div>
+          ))}
         </div>
       )}
 

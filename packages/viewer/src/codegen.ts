@@ -4,6 +4,9 @@
 
 export type InsertKind = 'frame' | 'rect' | 'ellipse' | 'text' | 'image' | 'icon';
 
+/** Preset perangkat untuk board baru (spec-viewer-device-presets): nama/ukuran/screen menggantikan default 400×300 'Frame'. */
+export type BoardPreset = { name: string; width: number; height: number; screen: 'landing' | 'app' | 'mobile' };
+
 /** Urutan tool/menu sisip dengan label UI dan shortcut. */
 export const INSERT_KINDS: readonly { kind: InsertKind; label: string; key: string }[] = [
   { kind: 'frame', label: 'Frame', key: 'F' },
@@ -83,8 +86,10 @@ export function insertIntoBoard(kind: InsertKind, board: { id: string; name: str
   };
 }
 
-const boardNode = (x: string, y: string) =>
-  `{type: 'board', name: 'Frame', x: ${x}, y: ${y}, width: ${NEW_BOARD.width}, height: ${NEW_BOARD.height}, screen: 'app', fills: [{type: 'solid', color: '#FFFFFF'}]}`;
+const boardNode = (x: string, y: string, preset?: BoardPreset) => {
+  const p = preset ?? { name: 'Frame', width: NEW_BOARD.width, height: NEW_BOARD.height, screen: 'app' as const };
+  return `{type: 'board', name: ${JSON.stringify(p.name)}, x: ${x}, y: ${y}, width: ${p.width}, height: ${p.height}, screen: ${JSON.stringify(p.screen)}, fills: [{type: 'solid', color: '#FFFFFF'}]}`;
+};
 
 /** Jarak board baru tanpa klik dari board terakhir halaman. */
 export const BOARD_GAP = 80;
@@ -96,17 +101,20 @@ export function nextBoardPosition(boards: readonly { x: number; y: number; width
 }
 
 /**
- * Board baru 400×300 di (x, y) koordinat halaman (tool Frame di area kosong). `pageId` = halaman aktif
- * (`add(pageId, …)`); tanpa itu halaman pertama (`add(null, …)`).
+ * Board baru di (x, y) koordinat halaman (tool Frame di area kosong). `pageId` = halaman aktif (`add(pageId, …)`);
+ * tanpa itu halaman pertama (`add(null, …)`). `preset` menggantikan default 400×300 'Frame' (spec-viewer-device-presets).
  */
-export function insertBoardAt(x: number, y: number, pageId?: string): { code: string; description: string } {
-  return { code: `add(${pageId ? JSON.stringify(pageId) : 'null'}, ${boardNode(String(r(x)), String(r(y)))});`, description: 'Add new frame board to page' };
+export function insertBoardAt(x: number, y: number, pageId?: string, preset?: BoardPreset): { code: string; description: string } {
+  return {
+    code: `add(${pageId ? JSON.stringify(pageId) : 'null'}, ${boardNode(String(r(x)), String(r(y)), preset)});`,
+    description: preset ? sentence('Insert', nameWords(preset.name, 4), 'board') : 'Add new frame board to page',
+  };
 }
 
-/** Board baru 400×300 tanpa klik (menu "+" tanpa board) di halaman `pageId`: posisi dari `nextBoardPosition`. */
-export function insertBoardPlaced(pageId: string, boards: readonly { x: number; y: number; width: number }[]): { code: string; description: string } {
+/** Board baru tanpa klik (menu "+" / preset device) di halaman `pageId`: posisi dari `nextBoardPosition`. */
+export function insertBoardPlaced(pageId: string, boards: readonly { x: number; y: number; width: number }[], preset?: BoardPreset): { code: string; description: string } {
   const p = nextBoardPosition(boards);
-  return insertBoardAt(p.x, p.y, pageId);
+  return insertBoardAt(p.x, p.y, pageId, preset);
 }
 
 // Tujuan sisipan (aplikasi 8): board baru dari viewer membawa ID halaman aktif.
