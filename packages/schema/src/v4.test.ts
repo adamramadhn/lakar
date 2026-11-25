@@ -19,7 +19,7 @@ const parse = (raw: unknown): Doc => LakarDocument.parse(raw);
 const ok = (raw: unknown) => LakarDocument.safeParse(raw).success;
 
 describe('skema v4: grid', () => {
-  it('SCHEMA_VERSION 12 (v4 + komponen + vektor + tag + hug board + wrap + komentar + section + fixRequest)'
+  it('SCHEMA_VERSION 12 (v4 + komponen + vektor + tag + hug board + wrap + komentar + section + fixRequest)', () => {
     expect(SCHEMA_VERSION).toBe(12);
   });
 

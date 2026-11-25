@@ -18,7 +18,7 @@ const message = (node: Record<string, unknown>) => {
 };
 
 describe('skema v6: vektor (AD-14)', () => {
-  it('SCHEMA_VERSION 12 (v6 + tag + hug board + wrap + komentar + section + fixRequest)'
+  it('SCHEMA_VERSION 12 (v6 + tag + hug board + wrap + komentar + section + fixRequest)', () => {
     expect(SCHEMA_VERSION).toBe(12);
   });
 

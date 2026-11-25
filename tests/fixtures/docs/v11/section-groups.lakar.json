@@ -17,7 +17,19 @@
           "height": 900,
           "screen": "landing",
           "section": "Landing",
-          "children": []
+          "children": [
+            {
+              "type": "text",
+              "id": "Tv110001",
+              "name": "Hero heading",
+              "x": 40,
+              "y": 40,
+              "content": "Hero heading",
+              "size": 32,
+              "wrap": "auto",
+              "position": "absolute"
+            }
+          ]
         },
         {
           "type": "board",
@@ -29,7 +41,19 @@
           "height": 800,
           "screen": "landing",
           "section": "Landing",
-          "children": []
+          "children": [
+            {
+              "type": "text",
+              "id": "Tv110002",
+              "name": "Feature card",
+              "x": 40,
+              "y": 40,
+              "content": "Feature card",
+              "size": 32,
+              "wrap": "auto",
+              "position": "absolute"
+            }
+          ]
         },
         {
           "type": "board",
@@ -40,7 +64,19 @@
           "width": 1440,
           "height": 700,
           "screen": "landing",
-          "children": []
+          "children": [
+            {
+              "type": "text",
+              "id": "Tv110003",
+              "name": "Price row",
+              "x": 40,
+              "y": 40,
+              "content": "Price row",
+              "size": 32,
+              "wrap": "auto",
+              "position": "absolute"
+            }
+          ]
         }
       ]
     }
