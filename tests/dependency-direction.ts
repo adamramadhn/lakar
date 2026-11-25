@@ -21,6 +21,7 @@ export const EDGES: Readonly<Record<string, readonly string[]>> = {
   mcp: ['schema', 'daemon', 'sync'],
   bench: ['schema'],
   viewer: ['schema', 'render', 'codegen'],
+  api: ['core', 'schema'],
   sync: ['core', 'schema'],
 };
 
