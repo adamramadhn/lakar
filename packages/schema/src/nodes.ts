@@ -26,7 +26,9 @@ import { NODE_ADDRESS_PATTERN } from './selection.js';
 // dimigrasi identitas (`@lakar/core` MIGRATIONS[9]).
 // v12 (spec-comment-to-fix) menambah `fixRequest` opsional pada thread komentar (mailbox "minta agen memperbaiki");
 // dokumen v11 dimigrasi identitas (`@lakar/core` MIGRATIONS[11]).
-export const SCHEMA_VERSION = 12 as const;
+// v13 (spec-prototype-mode) menambah `interactions` opsional pada node anak dan board serta `flows` opsional di
+// root dokumen; dokumen v12 dimigrasi identitas (`@lakar/core` MIGRATIONS[12]).
+export const SCHEMA_VERSION = 13 as const;
 
 // ---------------------------------------------------------------------------
 // Primitif
@@ -339,7 +341,63 @@ const gridItemShape = {
   gridRow: GridPlacement.optional(),
 };
 
-const childBase = { name: Name, ...positionShape, ...gridItemShape };
+// ---------------------------------------------------------------------------
+// Prototipe (v13): interaksi pada node anak/board dan flow di root dokumen (spec-prototype-mode).
+// ---------------------------------------------------------------------------
+
+/** Trigger interaksi. `tap` didukung penuh di v1; sisanya diterima skema untuk pemakaian mendatang. */
+export const INTERACTION_TRIGGERS = ['tap', 'press', 'hover', 'drag'] as const;
+export type InteractionTrigger = (typeof INTERACTION_TRIGGERS)[number];
+
+/** Transisi antar board (mode Present). `direction`/`durationMs`/`easing` opsional dan hanya bermakna untuk `slide`. */
+export const Transition = z
+  .object({
+    kind: z.enum(['instant', 'dissolve', 'slide']),
+    direction: z.enum(['left', 'right', 'up', 'down']).optional(),
+    durationMs: Positive.optional(),
+    easing: z.string().min(1).optional(),
+  })
+  .strict();
+export type Transition = z.infer<typeof Transition>;
+
+/** Aksi interaksi: `navigate` ke board (`boardId`), `back` ke board sebelumnya (riwayat Present), atau `openLink`. */
+export const InteractionAction = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('navigate'), boardId: Id }).strict(),
+  z.object({ kind: z.literal('back') }).strict(),
+  z.object({ kind: z.literal('openLink'), url: z.string().min(1) }).strict(),
+]);
+export type InteractionAction = z.infer<typeof InteractionAction>;
+
+/** Interaksi prototipe satu node: trigger → aksi (+ transisi opsional). `id` unik per node (kunci UI). */
+export const Interaction = z
+  .object({
+    id: Id,
+    trigger: z.enum(INTERACTION_TRIGGERS),
+    action: InteractionAction,
+    transition: Transition.optional(),
+  })
+  .strict();
+export type Interaction = z.infer<typeof Interaction>;
+
+/** Flow prototipe: titik masuk mode Present. `startBoardId` wajib id board (divalidasi saat commit `setFlows`). */
+export const Flow = z.object({ id: Id, name: Name, startBoardId: Id }).strict();
+export type Flow = z.infer<typeof Flow>;
+
+/** Interaksi pada node anak (dipakai semua childShape lewat childBase) dan board. `id` unik per node (kunci UI/koneksi). */
+const interactionShape = {
+  interactions: z
+    .array(Interaction)
+    .superRefine((arr, ctx) => {
+      const seen = new Set<string>();
+      for (const i of arr) {
+        if (seen.has(i.id)) ctx.addIssue({ code: 'custom', message: `interactions: id duplikat ${i.id}` });
+        seen.add(i.id);
+      }
+    })
+    .optional(),
+};
+
+const childBase = { name: Name, ...positionShape, ...gridItemShape, ...interactionShape };
 
 /**
  * Tag semantik HTML untuk ekspor (v7, AD-1): hanya tag yang reset UA-nya ditulis codegen (`tagResetDecls` di render
@@ -462,6 +520,8 @@ const boardShape = {
   themeMode: ModeName.optional(),
   /** Grup section bernama (v11, spec-section-groups): nama grup kanvas pembungkus board; ketiadaan = tanpa section. */
   section: z.string().min(1).max(120).optional(),
+  /** Interaksi prototipe level board (v13); bentuk sama dengan `childBase.interactions`. */
+  ...interactionShape,
 };
 
 const frameShape = {
@@ -788,6 +848,8 @@ const documentShape = {
   tokenModes: TokenModes.optional(),
   /** Thread komentar canvas (v10); opsional — dokumen tanpa komentar tetap valid. */
   comments: z.array(CommentThread).optional(),
+  /** Flow prototipe (v13); `startBoardId` board dihapus tidak dibersihkan otomatis (Present jatuh ke board pertama). */
+  flows: z.array(Flow).optional(),
 };
 
 export const LakarDocument = z

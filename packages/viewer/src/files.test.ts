@@ -1,7 +1,7 @@
 // Logika murni kelola file + routing hash viewer. Slugify viewer harus sama dengan daemon (sumber kebenaran).
 import { describe, expect, it } from 'vitest';
 import { slugify as daemonSlugify, withSuffix as daemonWithSuffix } from '../../daemon/src/files.ts';
-import { byEdited, byName, CONNECTIONS_HASH, docHash, docLink, fileErrorText, folderHash, folderMeta, inFolder, parseRoute, parseSort, previewSlug, searchDocs, SETTINGS_HASH, slugify, sortDocs, UPDATES_HASH, validSize, withSuffix, wrapIndex } from './files.ts';
+import { byEdited, byName, CONNECTIONS_HASH, docHash, docLink, fileErrorText, folderHash, folderMeta, inFolder, parseRoute, parseSort, presentHash, previewSlug, searchDocs, SETTINGS_HASH, slugify, sortDocs, UPDATES_HASH, validSize, withSuffix, wrapIndex } from './files.ts';
 
 describe('slugify (pratinjau = daemon)', () => {
   const names = ['My Landing', '  Café — Menu 2  ', '--a__b--', '!!!', '', 'Ünïcödé Ñame', 'x'.repeat(80), `a${'-'.repeat(70)}b`, 'Landing 2026 / v2'];
@@ -55,6 +55,9 @@ describe('parseRoute', () => {
     ['#/settings/other', { name: 'recents' }],
     ['#/d/my-landing', { name: 'viewer', slug: 'my-landing' }],
     ['#/d/%E0%A4%A', { name: 'recents' }],
+    ['#/p/my-landing', { name: 'present', slug: 'my-landing' }],
+    ['#/p/my-landing/', { name: 'present', slug: 'my-landing' }],
+    ['#/p/%E0%A4%A', { name: 'recents' }],
     ['#/unknown', { name: 'recents' }],
   ])('%j', (hash, route) => {
     expect(parseRoute(hash)).toEqual(route);
@@ -66,6 +69,9 @@ describe('parseRoute', () => {
   });
   it('docHash bolak-balik', () => {
     expect(parseRoute(docHash('a-b'))).toEqual({ name: 'viewer', slug: 'a-b' });
+  });
+  it('presentHash bolak-balik', () => {
+    expect(parseRoute(presentHash('a-b'))).toEqual({ name: 'present', slug: 'a-b' });
   });
   it('folderHash bolak-balik; tanpa id → Files', () => {
     expect(parseRoute(folderHash('fabc1234567'))).toEqual({ name: 'files', folder: 'fabc1234567' });

@@ -75,6 +75,7 @@ import { measuredBoards, withHeight } from './boardHeight';
 import { failureText, imageFileProblem, insertBoardAt, insertBoardPlaced, insertIntoBoard, canvasInsertTarget, menuInsertTarget, type BoardPreset, type InsertExtra, type InsertKind, type InsertTarget } from './codegen';
 import { resolvePageIndex } from './pages';
 import { PagesPanel } from './PagesPanel';
+import { PrototypePanel } from './PrototypePanel';
 import { indexDocument, relativeTime, type NodeInfo, type TreeNode } from './format';
 import { HistoryPanel, timeOf } from './HistoryPanel';
 import { canRestore, fileMeta, previewLabel } from './history';
@@ -135,6 +136,7 @@ type Tab = PanelTab;
 const TABS: { id: Tab; label: string }[] = [
   { id: 'activity', label: 'Activity' },
   { id: 'design', label: 'Design' },
+  { id: 'prototype', label: 'Prototype' },
   { id: 'history', label: 'History' },
 ];
 
@@ -1875,6 +1877,7 @@ export function Viewer({ slug }: { slug: string }) {
               importOpen={cssImportOpen || dtcgImportOpen}
             />
           )}
+          {tab === 'prototype' && <PrototypePanel slug={slug} doc={latestDoc} selection={selection} editable={editable} onCommit={commitOps} />}
           {tab === 'activity' && <ActivityPanel views={views} connected={activity.connected} offline={offline} follow={follow} onFollow={setFollow} nameOf={nameOf} onLocate={locate} />}
           {tab === 'history' && (
             <HistoryPanel

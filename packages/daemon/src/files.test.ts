@@ -663,7 +663,6 @@ describe('event change untuk sinkron antar jendela', () => {
   });
 });
 
-<<<<<<< HEAD
 describe('POST /viewer/docs/:slug/export-file (seksi Export tab Design)', () => {
   const pngOf = (width: number, height: number): Uint8Array => {
     const b = Buffer.alloc(33);
@@ -732,7 +731,9 @@ describe('POST /viewer/docs/:slug/export-file (seksi Export tab Design)', () => 
     const t = await fileSetup();
     const r404 = await t.post({ boardId: t.boardId, nodeId: 'nope', scale: 1, format: 'png', dir: t.outDir, name: 'x' });
     expect(r404.statusCode).toBe(404);
-=======
+  });
+});
+
 describe('Versi bernama — POST/DELETE /viewer/docs/:slug/versions (spec-viewer-named-versions)', () => {
   it('tag rev terkini (tanpa rev); riwayat membawa label; rename menimpa nama', async () => {
     const t = await setup();
@@ -785,6 +786,5 @@ describe('Versi bernama — POST/DELETE /viewer/docs/:slug/versions (spec-viewer
     const again = await create('Versioned 2');
     const clean = (await t.get(`/viewer/docs/${again.slug}/history`)).json().data.entries as { rev: number; label?: string }[];
     expect(clean.every((e) => e.label === undefined)).toBe(true);
->>>>>>> feat/named-versions
   });
 });

@@ -35,6 +35,7 @@ Loader bersama ada di `tests/support/doc-corpus.ts`.
 | `v9/flex-wrap` | frame `row` + `wrap:true` (chip membungkus 3 baris, `columnGap`/`rowGap`) dan frame `column` + `wrap:true` (anak membungkus ke kolom kedua, `rowGap`/`columnGap`) |
 | `v10/comments` | thread komentar canvas: pin layer dengan balasan, pin bebas resolved (`resolvedAt`), penulis user/agent |
 | `v12/comments-fix` | `fixRequest` pada thread komentar: open (dengan `agent` tujuan), done (penutup + `note`), cancelled |
+| `v13/prototype` | dua board mobile dengan `interactions` (`navigate` + `back`, transisi `slide`/`instant`) pada rect, frame, dan board, serta `flows` (dua flow, `startBoardId` berbeda) |
 
 SVG sumber tiga board ikon pertama ada di `tests/fixtures/svg/ikon-vektor/*.svg`; `packages/render/test/corpus.test.ts` membandingkan render board dengan render SVG sumber itu, dan render ekspor `vectorToSvg` dengan render Lakar (selisih piksel ≤ 1%).
 

@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createDocument } from '@lakar/core';
-import type { HistoryEntry, LakarDocument } from '@lakar/schema';
+import { SCHEMA_VERSION, type HistoryEntry, type LakarDocument } from '@lakar/schema';
 import { DocStore, SNAPSHOT_MAX_BYTES } from './store.js';
 
 const STORE_DIST = fileURLToPath(new URL('../dist/store.js', import.meta.url));
@@ -115,7 +115,7 @@ describe('DocStore', () => {
     expect(await readFile(plain.docPath('d'), 'utf8')).toBe(after);
   });
 
-  it('read: dokumen v1 lama dimigrasi resmi ke versi kini (v11) dan ditulis balik', async () => {
+  it('read: dokumen v1 lama dimigrasi resmi ke versi kini (v13) dan ditulis balik', async () => {
     const dir = join(root, 'v1');
     const plain = new DocStore(dir);
     const doc = createDocument();
@@ -124,7 +124,7 @@ describe('DocStore', () => {
     await writeFile(plain.docPath('lama'), `${JSON.stringify(v1, null, 2)}\n`, 'utf8');
     const read = await new DocStore(dir).read('lama');
     expect(read).toEqual(doc);
-    expect(read!.schemaVersion).toBe(12);
+    expect(read!.schemaVersion).toBe(SCHEMA_VERSION);
     expect(JSON.parse(await readFile(plain.docPath('lama'), 'utf8'))).toEqual(doc);
     expect(tmpFiles(plain.docsDir)).toEqual([]);
   });

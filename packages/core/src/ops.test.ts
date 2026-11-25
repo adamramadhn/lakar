@@ -27,7 +27,7 @@ function fixture() {
 const run = (doc: LakarDocument, ops: unknown) => transact(doc, { sessionId: 'viewer', description: 'ops' }, (tx) => applyOps(tx, ops));
 
 /** Isi dokumen yang dibandingkan undo (rev diabaikan; `tokens` absen ≡ `{}`). */
-const content = (d: LakarDocument) => ({ pages: d.pages, tokens: d.tokens ?? {}, tokenModes: d.tokenModes });
+const content = (d: LakarDocument) => ({ pages: d.pages, tokens: d.tokens ?? {}, tokenModes: d.tokenModes, flows: d.flows });
 
 /** Commit `ops`, undo dengan inversnya, lalu redo dengan invers undo; isi harus bolak-balik persis. */
 async function roundTrip(doc: LakarDocument, ops: DocOp[]) {
@@ -131,6 +131,35 @@ describe('applyOps + inverse per jenis op', () => {
       { op: 'setTokens', tokens: { 'colors.bg': { type: 'color', value: '#FFFFFF' }, 'spacing.2': null } },
     ]);
     await roundTrip(base, [{ op: 'setTokens', tokens: { 'colors.bg': null } }, { op: 'setTokenModes', modes: null }]);
+  });
+
+  it('setFlows (v13): daftar utuh, invers flows lama atau null; validasi startBoardId dan id unik', async () => {
+    const f = fixture();
+    const flows = [{ id: 'Flow0001', name: 'Utama', startBoardId: f.home }];
+    const base = (await run(f.doc, [{ op: 'setFlows', flows }])).doc;
+    expect(base.flows).toEqual(flows);
+    const { done } = await roundTrip(base, [{ op: 'setFlows', flows: [...flows, { id: 'Flow0002', name: 'Kedua', startBoardId: f.kedua }] }]);
+    expect(done.inverse).toEqual([{ op: 'setFlows', flows }]);
+    await roundTrip(base, [{ op: 'setFlows', flows: null }]);
+    // startBoardId harus board (bukan node anak / tidak ada); id flow tidak boleh ganda.
+    let e = await rejects(run(f.doc, [{ op: 'setFlows', flows: [{ id: 'Flow0001', name: 'A', startBoardId: f.isi }] }]));
+    expect(e.code).toBe('SCHEMA_INVALID');
+    e = await rejects(run(f.doc, [{ op: 'setFlows', flows: [{ id: 'Flow0001', name: 'A', startBoardId: f.home }, { id: 'Flow0001', name: 'B', startBoardId: f.kedua }] }]));
+    expect(e.code).toBe('SCHEMA_INVALID');
+    e = await rejects(run(f.doc, [{ op: 'setFlows', flows: 'x' }]));
+    expect(e.code).toBe('SCHEMA_INVALID');
+  });
+
+  it('update patch interactions (v13): array menggantikan array, null menghapus kunci', async () => {
+    const f = fixture();
+    const interactions = [{ id: 'Intr0001', trigger: 'tap', action: { kind: 'navigate', boardId: f.kedua }, transition: { kind: 'dissolve', durationMs: 200 } }];
+    const withI = await run(f.doc, [{ op: 'update', id: f.kotak, patch: { interactions } }]);
+    expect(find(withI.doc, f.kotak)!.interactions).toEqual(interactions);
+    const { done } = await roundTrip(withI.doc, [{ op: 'update', id: f.kotak, patch: { interactions: null } }]);
+    expect(find(done.doc, f.kotak)!.interactions).toBeUndefined();
+    // Bentuk interaksi salah → SCHEMA_INVALID (divalidasi skema node).
+    const e = await rejects(run(f.doc, [{ op: 'update', id: f.kotak, patch: { interactions: [{ id: 'Intr0001', trigger: 'tap', action: { kind: 'navigate' } }] } }]));
+    expect(e.code).toBe('SCHEMA_INVALID');
   });
 
   it('token datar baru yang men-detach ref node lain: invers memulihkan ref', async () => {

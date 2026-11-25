@@ -72,11 +72,11 @@ describe('@lakar/schema', () => {
     expect(BoardNode.safeParse({ ...node, id: 'short' }).success).toBe(false);
   });
 
-  it('LakarDocument: schemaVersion = SCHEMA_VERSION (12) dan minimal 1 halaman; v1..v10 hanya lewat migrasi (@lakar/core)', () => {
-    expect(SCHEMA_VERSION).toBe(12);
+  it('LakarDocument: schemaVersion = SCHEMA_VERSION (13) dan minimal 1 halaman; v1..v10 hanya lewat migrasi (@lakar/core)', () => {
+    expect(SCHEMA_VERSION).toBe(13);
     const doc = { schemaVersion: SCHEMA_VERSION, id: 'Dddddddd', rev: 0, pages: [{ id: 'Pppppppp', name: 'Page 1', children: [] }] };
     expect(LakarDocument.safeParse(doc).success).toBe(true);
-    expect(LakarDocument.safeParse({ ...doc, schemaVersion: 13 }).success).toBe(false);
+    expect(LakarDocument.safeParse({ ...doc, schemaVersion: 14 }).success).toBe(false);
     expect(LakarDocument.safeParse({ ...doc, schemaVersion: 10 }).success).toBe(false);
     expect(LakarDocument.safeParse({ ...doc, schemaVersion: 9 }).success).toBe(false);
     expect(LakarDocument.safeParse({ ...doc, schemaVersion: 8 }).success).toBe(false);
@@ -105,7 +105,7 @@ describe('@lakar/schema', () => {
     expect(LakarDocument.safeParse({ ...doc, comments: {} }).success).toBe(false);
   });
 
-  it('fixRequest (v11): opsional; status open/done/failed/cancelled, agent+note opsional, field asing ditolak (strict)', () => {
+  it('fixRequest (v12): opsional; status open/done/failed/cancelled, agent+note opsional, field asing ditolak (strict)', () => {
     const doc = { schemaVersion: SCHEMA_VERSION, id: 'Dddddddd', rev: 0, pages: [{ id: 'Pppppppp', name: 'Page 1', children: [] }] };
     const msg = { author: { kind: 'user', name: 'You' }, text: 'halo', at: '2026-11-24T00:00:00Z' };
     const thread = { id: 'Ttttttt1', pageId: 'Pppppppp', x: 10, y: 20, status: 'open', messages: [msg] };
@@ -122,6 +122,28 @@ describe('@lakar/schema', () => {
     expect(LakarDocument.safeParse({ ...doc, comments: [{ ...thread, fixRequest: { ...open, agent: 'a'.repeat(81) } }] }).success).toBe(false);
     expect(LakarDocument.safeParse({ ...doc, comments: [{ ...thread, fixRequest: { ...open, note: 'n'.repeat(4001) } }] }).success).toBe(false);
     expect(LakarDocument.safeParse({ ...doc, comments: [{ ...thread, fixRequest: { ...open, foo: 1 } }] }).success).toBe(false);
+  });
+
+  it('interactions/flows (v13): opsional; strict — navigate/back/openLink, trigger enum, transisi', () => {
+    const doc = { schemaVersion: SCHEMA_VERSION, id: 'Dddddddd', rev: 0, pages: [{ id: 'Pppppppp', name: 'Page 1', children: [{ ...board, id: 'Bbbbbbb1', children: [] }] }] };
+    const tap = { id: 'Intr0001', trigger: 'tap', action: { kind: 'navigate', boardId: 'Bbbbbbb1' } };
+    const node = (interactions: unknown) => ({ type: 'rect', name: 'R', id: 'Rrrrrrr1', ...(interactions !== undefined ? { interactions } : {}) });
+    const docWith = (children: unknown[], flows?: unknown) => ({ ...doc, pages: [{ id: 'Pppppppp', name: 'Page 1', children }], ...(flows !== undefined ? { flows } : {}) });
+    // Node anak dan board boleh ber-interactions; bentuk lengkap dan minimal sama-sama sah.
+    expect(LakarDocument.safeParse(docWith([{ ...board, id: 'Bbbbbbb1', children: [node([tap])] }])).success).toBe(true);
+    expect(LakarDocument.safeParse(docWith([{ ...board, id: 'Bbbbbbb1', interactions: [{ ...tap, action: { kind: 'back' } }], children: [] }])).success).toBe(true);
+    expect(LakarDocument.safeParse(docWith([{ ...board, id: 'Bbbbbbb1', children: [node([{ ...tap, transition: { kind: 'slide', direction: 'left', durationMs: 250, easing: 'ease-out' } }])] }])).success).toBe(true);
+    expect(LakarDocument.safeParse(docWith([{ ...board, id: 'Bbbbbbb1', children: [node([{ ...tap, action: { kind: 'openLink', url: 'https://example.com' } }])] }])).success).toBe(true);
+    // Trigger/aksi/kunci asing dan id pendek ditolak.
+    expect(LakarDocument.safeParse(docWith([{ ...board, id: 'Bbbbbbb1', children: [node([{ ...tap, trigger: 'click' }])] }])).success).toBe(false);
+    expect(LakarDocument.safeParse(docWith([{ ...board, id: 'Bbbbbbb1', children: [node([{ ...tap, action: { kind: 'scrollTo', nodeId: 'Rrrrrrr1' } }])] }])).success).toBe(false);
+    expect(LakarDocument.safeParse(docWith([{ ...board, id: 'Bbbbbbb1', children: [node([{ ...tap, id: 'pendek' }])] }])).success).toBe(false);
+    expect(LakarDocument.safeParse(docWith([{ ...board, id: 'Bbbbbbb1', children: [node([{ ...tap, foo: 1 }])] }])).success).toBe(false);
+    // flows: {id, name, startBoardId}; strict.
+    const flow = { id: 'Flow0001', name: 'Utama', startBoardId: 'Bbbbbbb1' };
+    expect(LakarDocument.safeParse(docWith([{ ...board, id: 'Bbbbbbb1', children: [] }], [flow])).success).toBe(true);
+    expect(LakarDocument.safeParse(docWith([{ ...board, id: 'Bbbbbbb1', children: [] }], [{ ...flow, foo: 1 }])).success).toBe(false);
+    expect(LakarDocument.safeParse(docWith([{ ...board, id: 'Bbbbbbb1', children: [] }], [{ ...flow, startBoardId: 'x' }])).success).toBe(false);
   });
 
   it.each([

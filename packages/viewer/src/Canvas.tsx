@@ -23,7 +23,7 @@
 // live: DOM lama tetap tampil sampai mount baru siap.
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type MutableRefObject, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
 import { findBoard } from '@lakar/render';
-import { resolveDocument, type DocOp, type LakarDocument, type ResolvedDocument } from '@lakar/schema';
+import { resolveDocument, type DocOp, type Interaction, type LakarDocument, type ResolvedDocument } from '@lakar/schema';
 import { boardDepKeys, boardSignature, boardSource, ensureFaces, mountLive, RenderDepsCache } from './liveBoard';
 import { api, errorText } from './api';
 import { CommentPin, CommentThreadCard, NewCommentCard, pinPoint, threadLocation, type CanvasComments } from './comments';
@@ -34,7 +34,7 @@ import { DEVICE_PRESETS } from './devicePresets';
 import { COMPONENT_DRAG_TYPE, exitInstanceSelection, type ComponentInfo } from './componentModel';
 import { ExportButton } from './ExportPopover';
 import { Menu, type Item } from './FileMenu';
-import { hitPath, unionBox, type GeoNode } from './gesture';
+import { hitPath, indexGeo, unionBox, type GeoNode } from './gesture';
 import { useOffline, useRetry } from './hooks';
 import { Icon, type IconName } from './icons';
 import type { AgentPresence, PendingAgent, Rect } from './presence';
@@ -272,6 +272,123 @@ function AgentLayer({ presence, boardById, cam }: { presence: readonly AgentPres
         return <AgentCursor key={`cursor:${key}`} p={p} x={x} y={y} cam={cam} exiting={goneAt !== undefined} />;
       })}
     </div>
+  );
+}
+
+type InterNode = { id: string; type?: string | undefined; name?: string | undefined; interactions?: Interaction[] | undefined; children?: unknown; slots?: unknown };
+
+/** Indeks id → node untuk dokumen (tersimpan/ter-resolve): board dan turunannya termasuk isi slot instance. */
+function nodeIndex(root: { pages: readonly { children: readonly unknown[] }[] }): Map<string, InterNode> {
+  const m = new Map<string, InterNode>();
+  const walk = (n: InterNode) => {
+    m.set(n.id, n);
+    for (const c of (n.children ?? []) as InterNode[]) walk(c);
+    for (const list of Object.values((n.slots ?? {}) as Record<string, InterNode[]>)) for (const c of list ?? []) walk(c);
+  };
+  for (const p of root.pages) for (const b of p.children) walk(b as InterNode);
+  return m;
+}
+
+/**
+ * Garis koneksi prototipe (spec-prototype-mode): bezier + panah dari node ber-interaksi `navigate` (geometri live,
+ * kotak board untuk interaksi level board) ke board target di halaman ini. Interaksi instance tersimpan dicocokkan
+ * lewat segmen pertama alamat komposit; target halaman lain/dihapus tidak digambar. Chip label tampil saat node
+ * sumber terpilih. Flag flow (titik masuk Present) ditempel di atas label board.
+ */
+function ConnectionLayer({
+  doc,
+  resolved,
+  stored,
+  boardById,
+  geo,
+  cam,
+  selection,
+}: {
+  doc: LakarDocument;
+  resolved: ReadonlyMap<string, InterNode>;
+  stored: ReadonlyMap<string, InterNode>;
+  boardById: ReadonlyMap<string, CanvasBoard>;
+  geo: readonly GeoNode[];
+  cam: Camera;
+  selection: readonly string[];
+}) {
+  const sel = new Set(selection);
+  const sx = (x: number) => cam.x + x * cam.z;
+  const sy = (y: number) => cam.y + y * cam.z;
+  const conns: { key: string; d: string; arrow: string; label?: { x: number; y: number; text: string } }[] = [];
+  const all = [...indexGeo(geo).values()];
+  for (const g of all) {
+    // Interaksi instance tersimpan digambar tepat satu kali, pada GeoNode akar instance (id polos `I`);
+    // keturunan `I/…` tidak mengulang panah yang sama (akar tetap tercapai saat hit-test menaiki parent).
+    const seg = g.id.split('/')[0]!;
+    const s = seg === g.id ? stored.get(seg) : undefined;
+    const ints = [...(resolved.get(g.id)?.interactions ?? []), ...(s?.type === 'instance' ? (s.interactions ?? []) : [])];
+    for (const it of ints) {
+      if (it.action.kind !== 'navigate') continue;
+      const t = boardById.get(it.action.boardId);
+      if (!t) continue;
+      const s = g.box;
+      const tb = { x: t.x, y: t.y, w: t.width, h: t.height };
+      const scx = s.x + s.w / 2;
+      const scy = s.y + s.h / 2;
+      const tcx = tb.x + tb.w / 2;
+      const tcy = tb.y + tb.h / 2;
+      const dx = tcx - scx;
+      const dy = tcy - scy;
+      const horiz = Math.abs(dx) >= Math.abs(dy);
+      const dir = horiz ? (dx >= 0 ? 1 : -1) : dy >= 0 ? 1 : -1;
+      // Tepi sumber/tujuan mengikuti sumbu dominan; panah menunjuk masuk board target.
+      const ax = horiz ? (dir > 0 ? s.x + s.w : s.x) : scx;
+      const ay = horiz ? scy : dir > 0 ? s.y + s.h : s.y;
+      const bx = horiz ? (dir > 0 ? tb.x : tb.x + tb.w) : tcx;
+      const by = horiz ? tcy : dir > 0 ? tb.y : tb.y + tb.h;
+      const bend = Math.max(24, Math.min(96, (horiz ? Math.abs(bx - ax) : Math.abs(by - ay)) / 2));
+      const c1 = horiz ? `${sx(ax + dir * bend)} ${sy(ay)}` : `${sx(ax)} ${sy(ay + dir * bend)}`;
+      const c2 = horiz ? `${sx(bx - dir * bend)} ${sy(by)}` : `${sx(bx)} ${sy(by - dir * bend)}`;
+      const d = `M ${sx(ax)} ${sy(ay)} C ${c1}, ${c2}, ${sx(bx)} ${sy(by)}`;
+      const a = 7;
+      const arrow = horiz
+        ? `M ${sx(bx)} ${sy(by)} l ${-dir * a} ${-a * 0.55} l 0 ${a * 1.1} z`
+        : `M ${sx(bx)} ${sy(by)} l ${-a * 0.55} ${-dir * a} l ${a * 1.1} 0 z`;
+      const label = sel.has(g.id) ? { x: (sx(ax) + sx(bx)) / 2, y: (sy(ay) + sy(by)) / 2 - 12, text: `${it.trigger} → ${t.name}` } : undefined;
+      conns.push({ key: `${g.id}:${it.id}`, d, arrow, label });
+    }
+  }
+  const atBoard = new Map<string, number>();
+  const flags = (doc.flows ?? []).flatMap((f) => {
+    const b = boardById.get(f.startBoardId);
+    if (!b) return [];
+    const i = atBoard.get(b.id) ?? 0;
+    atBoard.set(b.id, i + 1);
+    return [{ key: f.id, name: f.name, x: sx(b.x), y: sy(b.y) - 42 - i * 22 }];
+  });
+  if (!conns.length && !flags.length) return null;
+  return (
+    <>
+      {conns.length > 0 && (
+        <svg className="connection-layer" aria-hidden="true">
+          {conns.map((c) => (
+            <g key={c.key}>
+              <path className="conn-line" d={c.d} />
+              <path className="conn-arrow" d={c.arrow} />
+            </g>
+          ))}
+        </svg>
+      )}
+      {conns.map(
+        (c) =>
+          c.label && (
+            <span key={`l:${c.key}`} className="conn-label canvas-overlay-ui" style={{ left: c.label.x, top: c.label.y }}>
+              {c.label.text}
+            </span>
+          ),
+      )}
+      {flags.map((f) => (
+        <span key={f.key} className="flow-flag canvas-overlay-ui" style={{ left: f.x, top: f.y }} title={`Flow “${f.name}” starts here`}>
+          <Icon name="flag" size={10} /> {f.name}
+        </span>
+      ))}
+    </>
   );
 }
 
@@ -627,6 +744,11 @@ export function Canvas({
     measuring: altHeld,
   });
   editRef.current = edit;
+  // Indeks interaksi (spec-prototype-mode): node ter-resolve untuk isi instance + node tersimpan (instance sendiri).
+  const connIndex = useMemo(() => {
+    if (!doc || live?.ok !== true) return undefined;
+    return { resolved: nodeIndex(live.doc), stored: nodeIndex(doc) };
+  }, [doc, live]);
   // Fade-in node baru dari agen (spec-canvas-agent-effects): rencana masuk antrean (hanya execute yang selesai sesudah
   // canvas dibuka), lalu diputar saat board di-mount dari rev yang memuatnya. Host board terakhir diingat untuk rencana
   // yang tiba sesudah mount.
@@ -1217,6 +1339,7 @@ export function Canvas({
           </div>
         );
       })}
+      {liveActive && doc && connIndex && <ConnectionLayer doc={doc} resolved={connIndex.resolved} stored={connIndex.stored} boardById={boardById} geo={edit.scene()} cam={cam} selection={selection} />}
       {liveActive
         ? [...edit.overlay, ...paths.overlay]
         : hRect && (

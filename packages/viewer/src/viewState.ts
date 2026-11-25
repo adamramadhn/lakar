@@ -2,7 +2,7 @@
 // node terpilih, tab panel kanan, dan kamera per halaman disimpan di sini lalu dipulihkan saat tab dibuka lagi.
 
 export type Camera = { x: number; y: number; z: number };
-export type PanelTab = 'activity' | 'design' | 'history';
+export type PanelTab = 'activity' | 'design' | 'prototype' | 'history';
 
 export type ViewState = {
   pageIndex: number;

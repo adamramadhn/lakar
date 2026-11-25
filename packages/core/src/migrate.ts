@@ -32,8 +32,12 @@ export type MigrationRegistry = Readonly<Record<number, Migration>>;
  *   valid apa adanya, jadi langkahnya identitas yang menaikkan versi.
  * - 9 → 10 (epic kolaborasi-agen story 9.3): v10 hanya menambah `comments` opsional di root dokumen; dokumen v9
  *   valid apa adanya, jadi langkahnya identitas yang menaikkan versi.
- * - 10 → 11 (spec-comment-to-fix): v11 hanya menambah `fixRequest` opsional pada thread komentar; dokumen v10
+ * - 10 → 11 (spec-section-groups): v11 hanya menambah `section` opsional pada board; dokumen v10 valid apa adanya,
+ *   jadi langkahnya identitas yang menaikkan versi.
+ * - 11 → 12 (spec-comment-to-fix): v12 hanya menambah `fixRequest` opsional pada thread komentar; dokumen v11
  *   valid apa adanya, jadi langkahnya identitas yang menaikkan versi.
+ * - 12 → 13 (spec-prototype-mode): v13 hanya menambah `interactions` opsional pada node anak/board dan `flows`
+ *   opsional di root dokumen; dokumen v12 valid apa adanya, jadi langkahnya identitas yang menaikkan versi.
  */
 export const MIGRATIONS: MigrationRegistry = Object.freeze({
   1: (d: RawDocument): RawDocument => ({ ...d, schemaVersion: 2 }),
@@ -53,6 +57,8 @@ export const MIGRATIONS: MigrationRegistry = Object.freeze({
   10: (d: RawDocument): RawDocument => ({ ...d, schemaVersion: 11 }),
   // 11 → 12 (spec-comment-to-fix): v12 hanya menambah `fixRequest?` pada thread komentar; dokumen v11 valid apa adanya.
   11: (d: RawDocument): RawDocument => ({ ...d, schemaVersion: 12 }),
+  // 12 → 13 (spec-prototype-mode): v13 hanya menambah `interactions?`/`flows?`; dokumen v12 valid apa adanya.
+  12: (d: RawDocument): RawDocument => ({ ...d, schemaVersion: 13 }),
 });
 
 export type MigrateOptions = { migrations?: MigrationRegistry; target?: number };
