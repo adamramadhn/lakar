@@ -815,14 +815,16 @@ mod tests {
         assert_eq!(config.traffic_light_position, Some(TRAFFIC_LIGHTS));
     }
 
-    /// Izin jendela yang dipakai title bar viewer (tombol + drag region); tidak lebih.
-    const WINDOW_PERMISSIONS: [&str; 6] = [
+    /// Izin jendela yang dipakai title bar viewer (tombol + drag region) dan gate first-run
+    /// (setFocus — kembali fokus sesudah sign-in OAuth di browser, spec-first-run-signin); tidak lebih.
+    const WINDOW_PERMISSIONS: [&str; 7] = [
         "core:window:allow-minimize",
         "core:window:allow-toggle-maximize",
         "core:window:allow-internal-toggle-maximize",
         "core:window:allow-close",
         "core:window:allow-start-dragging",
         "core:window:allow-is-maximized",
+        "core:window:allow-set-focus",
     ];
 
     #[test]
