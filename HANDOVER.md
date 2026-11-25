@@ -2,27 +2,25 @@
 
 Catatan serah-terima untuk melanjutkan di ADE atau IDE lain. Aturan dan jebakan repo ada di [AGENTS.md](AGENTS.md).
 
-## Update 2026-11-24 — gelombang fitur Figma-parity + cloud collab (OPEN)
+## Update 2026-11-24 — gelombang Figma-parity + cloud collab MERGED ke `dev` + alur nightly
 
-PR terbuka menunggu merge (semua branch lepas `main` baseline `77d4235`; tiga di antaranya bentrok versi skema — lihat catatan):
+**Semua PR #64–#78 sudah merged ke branch `dev`** (bukan `main` — fitur masuk nightly dulu, `main` untuk rilis stabil).
+Penomoran ulang skema yang dilakukan saat merge: section-groups tetap v11, comment-to-fix direnomor ke v12
+(`MIGRATIONS[11]`), prototype mode direnomor ke v13 (`MIGRATIONS[12]`, fixture `tests/fixtures/docs/v13/prototype`,
+goldens `v13-prototype.*`). Stack cloud (#70–#78, cabang dari v10) di-merge lewat `feat/cloud-signin` — tidak
+menyentuh `SCHEMA_VERSION`, konfliknya union di wiring `services/*`, `comments.ts` (mailbox fix + room commit),
+`Canvas.tsx` (ConnectionLayer + PeerLayer berdampingan), `Viewer.tsx` (tab prototype; checks tab tetap dibuang —
+UI Checks sudah dihapus dev), `recordOps` fasad ditambah `setFlows`.
 
-| PR | Isi |
-|---|---|
-| #64 | Tab Design gabungan di viewer |
-| #65 | Device presets |
-| #66 | Named versions |
-| #67 | Section groups (`boardShape.section`, schema v11) |
-| #68 | Comment→fix mailbox (`fixRequest` di thread + tool `fix_comment`, schema v11) |
-| #69 | Prototype mode v1 (`interactions[]`/`flows[]`, `PresentView`, `ConnectionLayer`, schema v11) |
-| #70 | MCP `--file` transport + `lakard --headless` (story 2+6 cloud spec) |
-| #71 | `@lakar/api` share-link snapshot service + `POST /viewer/docs/:slug/share` (story 1 backend) |
-| #72 | `@lakar/sync` sync server multiplayer: WS rooms, sequencer `FOR UPDATE`, seededRandom deterministik (story 3) |
+Perbaikan bug laten yang tertangkap saat merge:
+- `files.test.ts`: marker konflik ter-commit oleh merge `feat/named-versions` (union ulang benar).
+- Fixture `v11-section-groups`: board tanpa children → `walkBoard` yield 0 (di-fix saat merge #67).
+- Tes `nodeId di board lain` di export-file: judul janji `EXPORT_FAILED` tapi assertion tak pernah ditulis.
 
-Catatan:
-- **Bentrok schema v11**: #67, #68, #69 masing-masing bump 10→11. Yang merge kedua/ketiga wajib rebase ke v12/v13 (renomor `MIGRATIONS`, `SCHEMA_VERSION`, pin tes, fixture `tests/fixtures/docs/vNN/` + goldens codegen).
-- **Bentrok wiring services**: #71 dan #72 sama-sama menambah `services/*` di pnpm-workspace/tsconfig/vitest/dependency-direction — resolusi: `api` + `sync` dua-duanya di EDGES (14 paket).
-- Kontrak protokol sync (`@lakar/sync`): pesan `ops` membawa `seed`+`at`; klien WAJIB replay lewat `transact(doc, ops, {random: seededRandom(seed), now: () => new Date(at)})` — `seededRandom` ada di `@lakar/schema`.
-- Roadmap cloud tersisa: story 4 (MCP `--server`), story 5 (viewer cloud + UI collab), share-link UI (menunggu mockup `share-link.pen`), deployment (butuh infra dari Fatmuh).
+**Alur dev → main**: PR fitur menargetkan `dev`. Nightly build: `.github/workflows/nightly.yml` (01:00 WIB +
+manual dispatch) memanggil `release.yml` (`workflow_call`, input `nightly`) → installer 4 OS → rilis pra-rilis
+`nightly` yang tag-nya dipindah ke tip dev terbaru. Rilis stabil tetap tag `v*` di `main` (merge `dev` → `main`
+saat siap rilis).
 
 ## Branch dan PR
 

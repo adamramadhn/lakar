@@ -6,6 +6,13 @@ on:
   push:
     tags: ['v*']
   workflow_dispatch:
+  workflow_call:
+    inputs:
+      # Dipanggil nightly.yml: build dev tip dan terbitkan/timpa rilis pra-rilis `nightly`
+      # (bukan tag v* — tidak memengaruhi pointer `latest` updater pengguna stabil).
+      nightly:
+        type: boolean
+        default: false
 
 concurrency:
   group: release-${{ github.ref }}
@@ -248,12 +255,17 @@ jobs:
         run: |
           # Versi dari tag bila x.y.z, selain itu versi di tauri.conf.json; tag rilis = ref, fallback v<versi>
           # untuk dry run (URL platform hanya benar di rilis bertanda nyata).
-          version="${GITHUB_REF_NAME#v}"
-          if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            version="$(node -p "require('./apps/desktop/src-tauri/tauri.conf.json').version")"
+          if [[ "${{ inputs.nightly }}" == "true" ]]; then
+            version="$(node -p "require('./apps/desktop/src-tauri/tauri.conf.json').version")-nightly"
+            tag="nightly"
+          else
+            version="${GITHUB_REF_NAME#v}"
+            if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              version="$(node -p "require('./apps/desktop/src-tauri/tauri.conf.json').version")"
+            fi
+            tag="$GITHUB_REF_NAME"
+            if [[ "$tag" != v* ]]; then tag="v$version"; fi
           fi
-          tag="$GITHUB_REF_NAME"
-          if [[ "$tag" != v* ]]; then tag="v$version"; fi
           # Release notes (field "notes" → "What's new" di Settings → Updates). Best-effort: gagal (mis. dry run
           # tanpa tag nyata) → warning dan latest.json terbit tanpa notes.
           notes_args=()
@@ -273,7 +285,7 @@ jobs:
 
   publish:
     name: publish release
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: startsWith(github.ref, 'refs/tags/v') || inputs.nightly == true
     needs: [build, latest-json]
     runs-on: ubuntu-latest
     permissions:
@@ -288,13 +300,17 @@ jobs:
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ github.ref_name }}
+          TAG: ${{ inputs.nightly && 'nightly' || github.ref_name }}
+          TARGET: ${{ github.sha }}
         run: |
           (cd installers && sha256sum * > SHA256SUMS.txt && cat SHA256SUMS.txt)
           prerelease=""
-          if [[ "$TAG" == *-* ]]; then prerelease="--prerelease"; fi
+          if [[ "$TAG" == *-* ]] || [[ "$TAG" == "nightly" ]]; then prerelease="--prerelease"; fi
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --target "$TARGET"
             gh release upload "$TAG" installers/* --clobber --repo "$GITHUB_REPOSITORY"
+          elif [[ "$TAG" == "nightly" ]]; then
+            gh release create "$TAG" installers/* --repo "$GITHUB_REPOSITORY" --target "$TARGET" --generate-notes --title "Lakar Nightly" $prerelease
           else
             gh release create "$TAG" installers/* --repo "$GITHUB_REPOSITORY" --verify-tag --generate-notes --title "Lakar $TAG" $prerelease
           fi
