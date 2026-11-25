@@ -59,7 +59,7 @@ export {
   type CallSummary,
 } from './events.js';
 export { DEFAULT_MCP_ENTRY, registerConnectionRoutes, resolveMcpEntry, resolveMcpNode, type ConnectionsInfo, type McpServerConfig } from './connections.js';
-export { SESSION_FILE, SessionStore, cloudAuth, cloudBase, cloudProviders, cloudUserOf, CLOUD_AUTH_TIMEOUT_MS, type CloudSession, type CloudUser } from './session.js';
+export { SESSION_FILE, SessionStore, cloudAuth, cloudBase, DEFAULT_CLOUD_URL, cloudProviders, cloudUserOf, CLOUD_AUTH_TIMEOUT_MS, type CloudSession, type CloudUser } from './session.js';
 export { registerAuthRoutes, type AuthRoutesOptions } from './auth.js';
 export {
   registerHarnessRoutes,

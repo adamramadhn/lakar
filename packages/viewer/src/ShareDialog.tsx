@@ -335,7 +335,7 @@ export function ShareDialog({ slug, onClose }: { slug: string; onClose: () => vo
       <Modal label="Share" onClose={onClose} className="share-dialog">
         <div className="modal-text">
           <h2>Share “{slug}”</h2>
-          <p>Sharing isn't configured on this machine. Set LAKAR_CLOUD_URL (and LAKAR_CLOUD_KEY) on lakard, then reopen this dialog.</p>
+          <p>Sharing is disabled on this machine (LAKAR_CLOUD_URL=off). Clear that variable on lakard to use Lakar Cloud, then reopen this dialog.</p>
         </div>
         <div className="modal-buttons">
           <button type="button" data-autofocus className="btn primary" onClick={onClose}>

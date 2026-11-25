@@ -278,7 +278,7 @@ function CloudAuthCard() {
       <div className="cloud-empty" role="note">
         <Icon name="info" size={14} />
         <span>
-          Lakar Cloud isn't configured on this machine. Set <span className="mono">LAKAR_CLOUD_URL</span> on lakard, then reload this page.
+          Lakar Cloud is disabled on this machine (<span className="mono">LAKAR_CLOUD_URL</span>=off). Clear that variable on lakard, then reload this page.
         </span>
       </div>
     );

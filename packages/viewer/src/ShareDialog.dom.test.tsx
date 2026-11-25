@@ -34,7 +34,7 @@ describe('ShareDialog', () => {
   it('cloud tidak dikonfigurasi → pesan not configured + Done, tanpa aksi lain', async () => {
     stubList(() => [], false);
     renderUi(<ShareDialog slug={SLUG} onClose={vi.fn()} />);
-    expect(await screen.findByText(/isn't configured/)).toBeInTheDocument();
+    expect(await screen.findByText(/is disabled on this machine/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument();
     expect(dom().daemon.find('POST', /^\/viewer\/docs\//)).toHaveLength(0);
   });

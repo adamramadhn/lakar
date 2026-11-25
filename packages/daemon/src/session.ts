@@ -91,8 +91,18 @@ export class SessionStore {
   }
 }
 
-/** Basis URL service cloud (`LAKAR_CLOUD_URL` tanpa garis miring ujung); undefined = belum dikonfigurasi. */
-export const cloudBase = (env: NodeJS.ProcessEnv): string | undefined => env.LAKAR_CLOUD_URL?.replace(/\/+$/, '') || undefined;
+/** Lakar Cloud hosted resmi — dipakai saat `LAKAR_CLOUD_URL` tidak diset. */
+export const DEFAULT_CLOUD_URL = 'https://api.lakar.dev';
+
+/** Basis URL service cloud tanpa garis miring ujung: `LAKAR_CLOUD_URL` bila diset, default
+ *  {@link DEFAULT_CLOUD_URL}; `off`/`none`/`false` atau kosong menonaktifkan cloud (undefined). */
+export const cloudBase = (env: NodeJS.ProcessEnv): string | undefined => {
+  const raw = env.LAKAR_CLOUD_URL;
+  if (raw === undefined) return DEFAULT_CLOUD_URL;
+  const v = raw.replace(/\/+$/, '');
+  if (!v || /^(off|none|false|disabled)$/i.test(v)) return undefined;
+  return v;
+};
 
 /**
  * Kredensial untuk panggilan cloud: `Bearer <session>` bila pengguna sign-in, jatuh ke

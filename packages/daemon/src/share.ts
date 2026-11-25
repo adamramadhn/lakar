@@ -9,7 +9,7 @@ import { LakarError, SLUG_PATTERN, errorMessage, resolveDocument, type IconGlyph
 import { z } from 'zod';
 import { notFound } from './errors.js';
 import { readPngSize } from './png.js';
-import { cloudAuth, type SessionStore } from './session.js';
+import { cloudAuth, cloudBase, type SessionStore } from './session.js';
 import type { DocStore } from './store.js';
 import { peekDocument } from './viewer.js';
 
@@ -103,7 +103,7 @@ async function cloudCall(
   path: string,
   init: { method: string; body?: string },
 ): Promise<Record<string, unknown> | undefined> {
-  const cloudUrl = env.LAKAR_CLOUD_URL?.replace(/\/+$/, '');
+  const cloudUrl = cloudBase(env);
   if (!cloudUrl) throw cloudMissing();
   const { authorization, session: used } = await cloudAuth(session, env);
   let res: Response;
@@ -188,7 +188,7 @@ export type ShareListResult = { configured: boolean; host?: string; shares: Shar
 
 /** `GET /viewer/docs/:slug/shares`: daftar share service yang slug-nya = dokumen ini. */
 export async function shareList(opts: ShareRoutesOptions, slug: string): Promise<ShareListResult> {
-  const cloudUrl = (opts.env ?? process.env).LAKAR_CLOUD_URL?.replace(/\/+$/, '');
+  const cloudUrl = cloudBase(opts.env ?? process.env);
   if (!cloudUrl) return { configured: false, shares: [] };
   const data = await cloudCall(opts, '/api/shares', { method: 'GET' });
   // Service yang menjawab ok:true tapi `shares` bukan array = respons rusak → EXPORT_FAILED
