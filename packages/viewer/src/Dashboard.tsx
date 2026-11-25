@@ -10,6 +10,7 @@
 // Folder (aplikasi 10): halaman Files menampilkan "Folders" (Folder Item) lalu "Files"; `#/files/<id>` membuka folder
 // dengan breadcrumb `Files › <nama>`. New folder, menu folder, "Move to…", dan seret kartu/baris ke folder/breadcrumb.
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react';
+import { AccountChip } from './AccountChip';
 import { activityHub } from './activity';
 import { api, errorText, OfflineError, type DaemonStatus, type DocSummary, type FolderState } from './api';
 import { openDoc } from './App';
@@ -731,10 +732,7 @@ export function Dashboard({
       {menuOpen && <div className="scrim" onClick={onCloseMenu} />}
       <aside className={`sidebar${menuOpen ? ' open' : ''}`}>
         <div className="sidebar-top">
-          <div className="profile">
-            <span className="avatar">L</span>
-            <span className="profile-name">Lakar</span>
-          </div>
+          <AccountChip />
           <Search docs={searchDocsList} query={query} onQuery={setQuery} onCreate={setCreating} />
           <nav className="nav" aria-label="Dashboard">
             <a className={`nav-item${page === 'recents' ? ' active' : ''}`} href="#/" aria-current={page === 'recents' ? 'page' : undefined}>

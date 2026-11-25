@@ -63,6 +63,7 @@ import { SelectionStore, registerSelectionRoutes } from './selection.js';
 import { registerRenderDepsRoutes } from './render-deps.js';
 import { registerExportRoutes } from './export.js';
 import { registerAuthRoutes } from './auth.js';
+import { OnboardingStore } from './onboarding.js';
 import { SessionStore } from './session.js';
 import { registerShareRoutes } from './share.js';
 import { registerVisualDiffRoutes } from './visual-diff.js';
@@ -284,6 +285,8 @@ export type Daemon = {
   rooms: RoomRegistry;
   /** Session cloud pengguna `dataDir/session.json` (spec-cloud-auth story C). */
   cloudSession: SessionStore;
+  /** Penanda onboarding `dataDir/onboarding.json` (spec-first-run-signin task A). */
+  onboarding: OnboardingStore;
   /** Seleksi canvas efemeral per dokumen (AD-9). */
   selections: SelectionStore;
   /** Dokumen yang difokuskan tiap jendela viewer (spec-agent-open-doc). */
@@ -308,6 +311,8 @@ export function buildServer({
   const store = new DocStore(config.dataDir);
   /** Session sign-in cloud (spec-cloud-auth story C): `dataDir/session.json`, Bearer di panggilan share. */
   const cloudSession = new SessionStore(config.dataDir);
+  /** Penanda onboarding gate sign-in (spec-first-run-signin task A): `dataDir/onboarding.json`. */
+  const onboarding = new OnboardingStore(config.dataDir);
   const sessions = new Sessions();
   const activity = new ActivityBus();
   const checks = new CheckLedger();
@@ -1011,9 +1016,9 @@ export function buildServer({
   registerRenderDepsRoutes(app, { fonts, icons });
   registerExportRoutes(app, { docs, store, render, icons, rooms });
   // Sign-in cloud (spec-cloud-auth story C): `/viewer/auth/*` — session.json dipakai panggilan cloud share.
-  registerAuthRoutes(app, { store: cloudSession, activity, port: boundPort });
+  registerAuthRoutes(app, { store: cloudSession, onboarding, activity, port: boundPort });
   // Share-link snapshot v1 (spec-collab-cloud story 1): upload doc + PNG per board ke @lakar/api.
-  registerShareRoutes(app, { docs, store, render, icons, session: cloudSession });
+  registerShareRoutes(app, { docs, store, render, icons, session: cloudSession, activity });
   registerVisualDiffRoutes(app, { docs, store, render, activeDoc, assertIcons, rooms });
   registerCodeExportRoutes(app, { docs, sessions, icons, rooms });
   registerConnectionRoutes(app, {
@@ -1055,5 +1060,5 @@ export function buildServer({
     return reply.type(remote.type).header('cache-control', remote.placeholder ? 'no-store' : 'no-cache').send(remote.body);
   });
 
-  return { app, store, sessions, fonts, icons, photos, activity, rooms, cloudSession, selections, focus, startedAt: startedAt.toISOString() };
+  return { app, store, sessions, fonts, icons, photos, activity, rooms, cloudSession, onboarding, selections, focus, startedAt: startedAt.toISOString() };
 }

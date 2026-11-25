@@ -144,8 +144,15 @@ export type ImportUrlResult = OpsResult & { nodeId: string; boardId: string; rep
 export type CloudUser = { id: string; email: string; name?: string; avatarUrl?: string };
 /** Provider sign-in yang diiklankan service; `email` = magic link (butuh alamat email). */
 export type AuthProvider = 'google' | 'github' | 'email';
-/** `GET /viewer/auth/status`: `configured:false` = LAKAR_CLOUD_URL belum diset; `host` = host service; `providers` hanya ada bila service menjawab. */
-export type AuthStatus = { signedIn: boolean; configured: boolean; user?: CloudUser; providers?: string[]; host?: string };
+/** `GET /viewer/auth/status`: `configured:false` = LAKAR_CLOUD_URL belum diset; `host` = host service; `providers` hanya ada bila service menjawab. `onboarding` aditif (spec-first-run-signin) — daemon lama tanpa field → gate tidak tampil. */
+export type AuthStatus = {
+  signedIn: boolean;
+  configured: boolean;
+  user?: CloudUser;
+  providers?: string[];
+  host?: string;
+  onboarding?: { signin: 'pending' | 'skipped' | 'completed' | 'disabled' };
+};
 /** Body `POST /viewer/auth/start`: OAuth (`google`/`github`) → `{url}` untuk dibuka di browser sistem; magic link (`email`) → `{sent:true}`. */
 export type AuthStartBody = { provider: 'google' | 'github' } | { provider: 'email'; email: string };
 export type AuthStartResult = { url: string } | { sent: true };
@@ -1069,6 +1076,14 @@ class ViewerClient {
   /** Sign out (POST /viewer/auth/logout): hapus session lokal + revoke di service. Idempoten. */
   authLogout(): Promise<{ signedIn: false }> {
     return request<{ signedIn: false }>('POST', '/viewer/auth/logout');
+  }
+  /**
+   * Skip gate first-run (POST /viewer/onboarding, spec-first-run-signin task A): penanda
+   * "Continue without an account" per instalasi; balasan = nilai efektif (boleh `completed` —
+   * penanda selesai tidak diturunkan). Route hanya ada di daemon baru.
+   */
+  onboardingSkip(): Promise<{ signin: string }> {
+    return request<{ signin: string }>('POST', '/viewer/onboarding', { signin: 'skipped' });
   }
 
   // ---- Share link (plan-share-link-ui): proxy `/viewer/*` ke @lakar/api; tanpa sesi dokumen. ----

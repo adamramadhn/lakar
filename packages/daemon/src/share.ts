@@ -9,6 +9,7 @@ import { LakarError, SLUG_PATTERN, errorMessage, resolveDocument, type IconGlyph
 import { z } from 'zod';
 import { notFound } from './errors.js';
 import { readPngSize } from './png.js';
+import type { ActivityBus } from './events.js';
 import { cloudAuth, cloudBase, type SessionStore } from './session.js';
 import type { DocStore } from './store.js';
 import { peekDocument } from './viewer.js';
@@ -44,6 +45,11 @@ export type ShareRoutesOptions = {
    * `LAKAR_CLOUD_KEY` untuk semua panggilan service. Kosong → perilaku lama (key env saja).
    */
   session?: SessionStore;
+  /**
+   * Bus SSE (spec-first-run-signin task B): session 401 yang dibersihkan memancarkan `auth`
+   * `{signedIn:false, reason:'expired'}` supaya viewer menampilkan toast + chip expired.
+   */
+  activity?: ActivityBus;
 };
 
 export type ShareUploadResult = { token: string; url: string; boards: number };
@@ -99,7 +105,7 @@ function assertBodySize(docJson: string, boards: Snapshot['boards']) {
  * EXPORT_FAILED — cloud tidak dikonfigurasi atau service mati tidak pernah mematikan daemon.
  */
 async function cloudCall(
-  { env = process.env, fetchFn = fetch, session }: ShareRoutesOptions,
+  { env = process.env, fetchFn = fetch, session, activity }: ShareRoutesOptions,
   path: string,
   init: { method: string; body?: string },
 ): Promise<Record<string, unknown> | undefined> {
@@ -137,8 +143,12 @@ async function cloudCall(
     const detail = payload.error?.message ?? `HTTP ${res.status}`;
     // 401 dengan Bearer session = session.json basi (kedaluwarsa/dicabut): bersihkan supaya
     // panggilan berikutnya jatuh ke LAKAR_CLOUD_KEY atau memaksa sign-in ulang — jangan biarkan
-    // session mati terus dipakai.
-    if (res.status === 401 && used) await session?.clear().catch(() => {});
+    // session mati terus dipakai. Kabari viewer: session expired (chip expired + toast), bukan
+    // logout sukarela — `reason:'expired'` baru ada bila file session memang tersimpan sebelumnya.
+    if (res.status === 401 && used) {
+      await session?.clear().catch(() => {});
+      activity?.auth({ signedIn: false, reason: 'expired' });
+    }
     throw new LakarError('EXPORT_FAILED', `service share menolak ${init.method} ${path}: ${detail}`, {
       hint:
         payload.error?.hint ||

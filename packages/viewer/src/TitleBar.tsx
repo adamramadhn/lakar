@@ -68,6 +68,7 @@ export function TitleBar({
   onMenu,
   onClose,
   onNew,
+  minimal,
 }: {
   tabs: readonly string[];
   /** Slug dokumen yang tampil; `undefined` = Dashboard. */
@@ -75,6 +76,8 @@ export function TitleBar({
   onMenu: () => void;
   onClose: (slug: string) => void;
   onNew: () => void;
+  /** Mode gate first-run: tanpa menu/tabs/"+" — drag region & tombol jendela tetap (spec-first-run-signin). */
+  minimal?: boolean;
 }) {
   const [{ win, mac }] = useState(chromeKind);
   const navRef = useRef<HTMLElement>(null);
@@ -88,37 +91,43 @@ export function TitleBar({
     onClose(slug);
   };
   return (
-    <header className={`titlebar${mac ? ' mac' : ''}`} data-tauri-drag-region>
-      <button className="titlebar-menu" type="button" aria-label="Menu" onClick={onMenu}>
-        <Icon name="menu" size={18} />
-      </button>
-      <nav ref={navRef} className="tabs" aria-label="Open tabs" data-tauri-drag-region>
-        <a className={`tab${active === undefined ? ' active' : ''}`} href="#/" aria-current={active === undefined ? 'page' : undefined}>
-          <Icon name="layoutGrid" size={14} />
-          <span>Dashboard</span>
-        </a>
-        {tabs.map((slug) => (
-          <span
-            key={slug}
-            className={`tab doc${slug === active ? ' active' : ''}`}
-            title={slug}
-            // Klik tengah: cegah autoscroll di mousedown, tutup di auxclick.
-            onMouseDown={(e) => e.button === 1 && e.preventDefault()}
-            onAuxClick={middleClose(slug)}
-          >
-            <a className="tab-link" href={docHash(slug)} aria-current={slug === active ? 'page' : undefined}>
-              <Icon name="file" size={14} />
-              <span className="tab-label">{slug}</span>
-            </a>
-            <button type="button" className="tab-close" aria-label={`Close ${slug}`} onClick={() => onClose(slug)}>
-              <Icon name="x" size={12} />
-            </button>
-          </span>
-        ))}
-      </nav>
-      <button type="button" className="tab-new" aria-label="New file" title="New file" onClick={onNew}>
-        <Icon name="plus" size={16} />
-      </button>
+    <header className={`titlebar${mac ? ' mac' : ''}${minimal ? ' minimal' : ''}`} data-tauri-drag-region>
+      {!minimal && (
+        <button className="titlebar-menu" type="button" aria-label="Menu" onClick={onMenu}>
+          <Icon name="menu" size={18} />
+        </button>
+      )}
+      {!minimal && (
+        <nav ref={navRef} className="tabs" aria-label="Open tabs" data-tauri-drag-region>
+          <a className={`tab${active === undefined ? ' active' : ''}`} href="#/" aria-current={active === undefined ? 'page' : undefined}>
+            <Icon name="layoutGrid" size={14} />
+            <span>Dashboard</span>
+          </a>
+          {tabs.map((slug) => (
+            <span
+              key={slug}
+              className={`tab doc${slug === active ? ' active' : ''}`}
+              title={slug}
+              // Klik tengah: cegah autoscroll di mousedown, tutup di auxclick.
+              onMouseDown={(e) => e.button === 1 && e.preventDefault()}
+              onAuxClick={middleClose(slug)}
+            >
+              <a className="tab-link" href={docHash(slug)} aria-current={slug === active ? 'page' : undefined}>
+                <Icon name="file" size={14} />
+                <span className="tab-label">{slug}</span>
+              </a>
+              <button type="button" className="tab-close" aria-label={`Close ${slug}`} onClick={() => onClose(slug)}>
+                <Icon name="x" size={12} />
+              </button>
+            </span>
+          ))}
+        </nav>
+      )}
+      {!minimal && (
+        <button type="button" className="tab-new" aria-label="New file" title="New file" onClick={onNew}>
+          <Icon name="plus" size={16} />
+        </button>
+      )}
       <div className="titlebar-spacer" data-tauri-drag-region />
       {win && <WindowControls win={win} />}
     </header>

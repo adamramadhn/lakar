@@ -14,11 +14,14 @@ import { randomBytes } from 'node:crypto';
 import { LakarError, errorMessage } from '@lakar/schema';
 import { z } from 'zod';
 import type { ActivityBus } from './events.js';
+import type { OnboardingStore } from './onboarding.js';
 import { CLOUD_AUTH_TIMEOUT_MS, SessionStore, cloudBase, cloudProviders, cloudUserOf } from './session.js';
 
 export type AuthRoutesOptions = {
   /** Store session `dataDir/session.json`. */
   store: SessionStore;
+  /** Store penanda onboarding `dataDir/onboarding.json` (spec-first-run-signin task A). */
+  onboarding?: OnboardingStore;
   /** Sumber konfigurasi cloud (default `process.env`); untuk tes. */
   env?: NodeJS.ProcessEnv;
   /** Fetch ke service (default `fetch` global); untuk tes. */
@@ -38,6 +41,9 @@ const StartBody = z
   .strict();
 const START_HINT = 'kirim {provider:"google"|"github"} atau {provider:"email", email}; return_to opsional (default callback lakard)';
 const SessionBody = z.object({ token: z.string().min(1), state: z.string().min(1) }).strict();
+// Skip gate hanya boleh menulis `skipped` — upgrade ke `completed` eksklusif milik alur sign-in
+// (`/viewer/auth/session`) dan `existing-session` di effective().
+const OnboardingBody = z.object({ signin: z.literal('skipped') }).strict();
 
 const cloudMissing = () =>
   new LakarError('EXPORT_FAILED', 'LAKAR_CLOUD_URL tidak diset', {
@@ -162,25 +168,26 @@ export function registerAuthRoutes(app: FastifyInstance, opts: AuthRoutesOptions
   // di `return_to?state=`; script callback meng-echo; `/viewer/auth/session` mengkonsumsi (hapus —
   // replay/state asing → 401). TTL 15 menit — menyamai umur magic link service supaya nonce tak
   // lebih dulu kedaluwarsa dari link yang masih valid; disapu malas di tiap akses — tanpa timer.
+  // Provider ikut disimpan per nonce supaya penanda onboarding tahu `via` yang sah.
   const NONCE_TTL_MS = 15 * 60 * 1000;
-  const pending = new Map<string, number>();
+  const pending = new Map<string, { exp: number; provider: string }>();
   const sweep = () => {
     const now = Date.now();
-    for (const [nonce, exp] of pending) if (exp <= now) pending.delete(nonce);
+    for (const [nonce, p] of pending) if (p.exp <= now) pending.delete(nonce);
   };
-  const mintNonce = (): string => {
+  const mintNonce = (provider: string): string => {
     sweep();
     const nonce = randomBytes(24).toString('base64url');
-    pending.set(nonce, Date.now() + NONCE_TTL_MS);
+    pending.set(nonce, { exp: Date.now() + NONCE_TTL_MS, provider });
     return nonce;
   };
-  /** Konsumsi nonce: ada & belum kedaluwarsa → true (langsung dihapus — sekali pakai); else false. */
-  const consumeNonce = (nonce: string): boolean => {
+  /** Konsumsi nonce: ada & belum kedaluwarsa → provider-nya (langsung dihapus — sekali pakai); else undefined. */
+  const consumeNonce = (nonce: string): string | undefined => {
     sweep();
-    const exp = pending.get(nonce);
-    if (exp === undefined) return false;
+    const p = pending.get(nonce);
+    if (p === undefined) return undefined;
     pending.delete(nonce);
-    return exp > Date.now();
+    return p.exp > Date.now() ? p.provider : undefined;
   };
 
   // Cache pendek `/api/auth/providers` (~30s, per base): `/viewer/auth/status` dipanggil viewer
@@ -219,9 +226,19 @@ export function registerAuthRoutes(app: FastifyInstance, opts: AuthRoutesOptions
         host = undefined;
       }
     }
+    // `onboarding` aditif (spec-first-run-signin task A): nilai efektif dari OnboardingStore —
+    // viewer hanya menampilkan gate saat `signin === 'pending'`; daemon lama tanpa store → field hilang.
+    const onboarding = opts.onboarding ? { signin: await opts.onboarding.effective({ cloudOn: base !== undefined, session }) } : undefined;
     return reply.code(200).send({
       ok: true,
-      data: { signedIn: session !== undefined, configured: base !== undefined, ...(host ? { host } : {}), ...(session ? { user: session.user } : {}), ...(providers ? { providers } : {}) },
+      data: {
+        signedIn: session !== undefined,
+        configured: base !== undefined,
+        ...(host ? { host } : {}),
+        ...(session ? { user: session.user } : {}),
+        ...(providers ? { providers } : {}),
+        ...(onboarding ? { onboarding } : {}),
+      },
     });
   });
 
@@ -241,7 +258,7 @@ export function registerAuthRoutes(app: FastifyInstance, opts: AuthRoutesOptions
     if (body.provider === 'email' && !body.email) {
       throw new LakarError('SCHEMA_INVALID', 'email wajib untuk provider "email"', { hint: START_HINT });
     }
-    const returnTo = `${resolveReturnTo(body.return_to, opts.port())}?state=${mintNonce()}`;
+    const returnTo = `${resolveReturnTo(body.return_to, opts.port())}?state=${mintNonce(body.provider)}`;
     const providers = await cloudProviders(fetchFn(), base);
     if (!providers.includes(body.provider)) {
       throw new LakarError('SCHEMA_INVALID', `provider ${body.provider} tidak tersedia di service`, {
@@ -250,7 +267,17 @@ export function registerAuthRoutes(app: FastifyInstance, opts: AuthRoutesOptions
     }
     if (body.provider === 'email') {
       const res = await call(opts, base, '/api/auth/magic', { method: 'POST', body: JSON.stringify({ email: body.email, return_to: returnTo }) });
-      if (!res.ok) throw rejected('magic link', res);
+      // 429 (rate limit magic link) membawa penanda `HTTP 429` di pesan — kode & status HTTP tetap
+      // EXPORT_FAILED (AD-4, triage T5); viewer mendeteksinya lewat teks untuk copy khusus.
+      if (!res.ok) {
+        if (res.status === 429) {
+          throw new LakarError('EXPORT_FAILED', `service auth membatasi magic link (HTTP 429): ${res.message ?? 'terlalu banyak permintaan'}`, {
+            hint: 'tunggu beberapa menit lalu coba lagi — magic link dibatasi per email+IP',
+            retryable: true,
+          });
+        }
+        throw rejected('magic link', res);
+      }
       return reply.code(200).send({ ok: true, data: { sent: true } });
     }
     return reply.code(200).send({ ok: true, data: { url: `${base}/api/auth/oauth/${body.provider}/start?return_to=${encodeURIComponent(returnTo)}` } });
@@ -277,7 +304,8 @@ export function registerAuthRoutes(app: FastifyInstance, opts: AuthRoutesOptions
     if (!r.success) {
       throw new LakarError('SCHEMA_INVALID', r.error.issues.map((i) => `${i.path.join('.') || 'body'}: ${i.message}`).join('; '), { hint: 'kirim {token,state} — pasangan dari callback sign-in; POST langsung tanpa start tidak diterima' });
     }
-    if (!consumeNonce(r.data.state)) {
+    const via = consumeNonce(r.data.state);
+    if (via === undefined) {
       return reply.code(401).send({ ok: false, error: { code: 'UNAUTHORIZED', message: 'state sign-in tidak dikenal atau sudah dipakai', hint: 'ulangi sign-in dari aplikasi Lakar — /viewer/auth/session hanya sah lewat callback dari /viewer/auth/start', retryable: false } });
     }
     const base = cloudBase(env());
@@ -292,9 +320,31 @@ export function registerAuthRoutes(app: FastifyInstance, opts: AuthRoutesOptions
       throw new LakarError('EXPORT_FAILED', 'service auth menjawab /api/auth/me tanpa profil user', { hint: 'periksa versi service @lakar/api, lalu coba lagi', retryable: true });
     }
     await store.save({ token: r.data.token, user });
-    opts.activity?.auth({ signedIn: true, user });
+    // Sign-in berhasil menutup onboarding selamanya (task A): `via` dari provider nonce.
+    // Best-effort — gagal tulis tidak menggagalkan sign-in yang sudah sah.
+    if (opts.onboarding) await opts.onboarding.save('completed', via === 'google' || via === 'github' || via === 'email' ? via : 'skip').catch(() => {});
+    opts.activity?.auth({ signedIn: true, user, onboarding: 'completed' });
     return reply.code(200).send({ ok: true, data: { signedIn: true, user } });
   });
+
+  // `POST /viewer/onboarding {signin:'skipped'}` (task A): gate "Continue without an account" —
+  // idempoten, guard Origin `/viewer/*` otomatis. Menulis penanda lalu memancarkan `auth`
+  // `{onboarding:'skipped'}` supaya gate di jendela lain ikut tertutup (E9). Balasan membawa nilai
+  // efektif terkini (boleh `completed` — penanda selesai tidak pernah diturunkan).
+  if (opts.onboarding) {
+    const store2 = opts.onboarding;
+    app.post('/viewer/onboarding', async (req, reply) => {
+      const r = OnboardingBody.safeParse(req.body ?? {});
+      if (!r.success) {
+        throw new LakarError('SCHEMA_INVALID', r.error.issues.map((i) => `${i.path.join('.') || 'body'}: ${i.message}`).join('; '), { hint: 'kirim {signin:"skipped"} — satu-satunya nilai yang boleh ditulis dari UI' });
+      }
+      await store2.save('skipped', 'skip');
+      const session = await store.load();
+      const signin = await store2.effective({ cloudOn: cloudBase(env()) !== undefined, session });
+      opts.activity?.auth({ signedIn: session !== undefined, onboarding: 'skipped' });
+      return reply.code(200).send({ ok: true, data: { signin } });
+    });
+  }
 
   // `POST /viewer/auth/logout` → cabut session di service (best-effort) + hapus session.json +
   // event `auth`. Idempoten: tanpa session pun 200.

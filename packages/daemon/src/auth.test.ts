@@ -55,7 +55,7 @@ describe('GET /viewer/auth/status', () => {
     vi.stubEnv('LAKAR_CLOUD_URL', '');
     const r = await t.get('/viewer/auth/status');
     expect(r.statusCode, r.body).toBe(200);
-    expect(r.json().data).toEqual({ signedIn: false, configured: false });
+    expect(r.json().data).toEqual({ signedIn: false, configured: false, onboarding: { signin: 'disabled' } });
   });
 
   it('session tersimpan → {signedIn:true, user} + providers dari service', async () => {
@@ -68,7 +68,7 @@ describe('GET /viewer/auth/status', () => {
     });
     const r = await t.get('/viewer/auth/status');
     expect(r.statusCode, r.body).toBe(200);
-    expect(r.json().data).toEqual({ signedIn: true, configured: true, host: 'api.example', user: USER, providers: ['google', 'email'] });
+    expect(r.json().data).toEqual({ signedIn: true, configured: true, host: 'api.example', user: USER, providers: ['google', 'email'], onboarding: { signin: 'completed' } });
   });
 
   it('providers dicache ~30s — dua status berturut hanya satu fetch ke service', async () => {
@@ -93,7 +93,7 @@ describe('GET /viewer/auth/status', () => {
       throw new Error('ECONNREFUSED');
     });
     const r = await t.get('/viewer/auth/status');
-    expect(r.json().data).toEqual({ signedIn: false, configured: true, host: 'api.example' });
+    expect(r.json().data).toEqual({ signedIn: false, configured: true, host: 'api.example', onboarding: { signin: 'pending' } });
   });
 
   it('session.json korup → signedIn:false dan file dibersihkan', async () => {
@@ -101,13 +101,32 @@ describe('GET /viewer/auth/status', () => {
     await writeFile(sessionPath(t), '{ini bukan json', 'utf8');
     vi.stubEnv('LAKAR_CLOUD_URL', '');
     const r = await t.get('/viewer/auth/status');
-    expect(r.json().data).toEqual({ signedIn: false, configured: false });
+    expect(r.json().data).toEqual({ signedIn: false, configured: false, onboarding: { signin: 'disabled' } });
     expect(existsSync(sessionPath(t))).toBe(false);
     // Bentuk valid tapi field wajib hilang juga korup.
     await writeFile(sessionPath(t), JSON.stringify({ token: 42, user: { id: 'u' } }), 'utf8');
     const r2 = await t.get('/viewer/auth/status');
     expect(r2.json().data.signedIn).toBe(false);
     expect(existsSync(sessionPath(t))).toBe(false);
+  });
+
+  it('field aditif `onboarding`: cloud off → disabled; fresh → pending; penanda/sesi → isi penanda', async () => {
+    const t = await setup();
+    vi.stubEnv('LAKAR_CLOUD_URL', 'off');
+    const off = await t.get('/viewer/auth/status');
+    expect(off.json().data.onboarding).toEqual({ signin: 'disabled' });
+    // Cloud on tanpa penanda/session → pending (gate boleh tampil).
+    vi.stubEnv('LAKAR_CLOUD_URL', 'https://api.example');
+    vi.stubGlobal('fetch', async () => {
+      throw new Error('ECONNREFUSED');
+    });
+    const fresh = await t.get('/viewer/auth/status');
+    expect(fresh.json().data.onboarding).toEqual({ signin: 'pending' });
+    // Session lama tanpa penanda → completed + penanda ditulis existing-session.
+    await t.daemon.cloudSession.save(SESSION);
+    const signedIn = await t.get('/viewer/auth/status');
+    expect(signedIn.json().data.onboarding).toEqual({ signin: 'completed' });
+    expect((await t.daemon.onboarding.load())!.via).toBe('existing-session');
   });
 });
 
@@ -234,6 +253,20 @@ describe('POST /viewer/auth/start', () => {
     expect(notAdvertised.statusCode).toBe(400);
     expect(notAdvertised.json().error.code).toBe('SCHEMA_INVALID');
   });
+
+  it('magic link 429 → EXPORT_FAILED retryable dengan penanda "HTTP 429" di pesan (deteksi viewer, triage T5)', async () => {
+    const t = await setup();
+    vi.stubEnv('LAKAR_CLOUD_URL', 'https://api.example');
+    vi.stubGlobal('fetch', async (url: string) =>
+      url.endsWith('/api/auth/providers') ? okJson({ providers: ['email'] }) : failJson(429, 'too many requests'),
+    );
+    const r = await t.post('/viewer/auth/start', { provider: 'email', email: 'adi@example.com' });
+    expect(r.statusCode).toBe(500);
+    expect(r.json().error.code).toBe('EXPORT_FAILED');
+    expect(r.json().error.retryable).toBe(true);
+    expect(r.json().error.message).toContain('HTTP 429');
+    expect(r.json().error.hint).toContain('menit');
+  });
 });
 
 describe('GET /viewer/auth/callback', () => {
@@ -284,8 +317,10 @@ describe('POST /viewer/auth/session', () => {
     const st = await stat(sessionPath(t));
     expect(st.mode & 0o777).toBe(0o600);
     expect(await t.daemon.cloudSession.load()).toEqual(SESSION);
-    // Event `auth` SSE dipancarkan.
-    expect(t.events.filter((e) => e.type === 'auth')).toEqual([expect.objectContaining({ type: 'auth', auth: { signedIn: true, user: USER } })]);
+    // Sign-in sukses meng-upgrade penanda onboarding ke completed dengan `via` provider nonce.
+    expect(await t.daemon.onboarding.load()).toMatchObject({ signin: 'completed', via: 'google' });
+    // Event `auth` SSE dipancarkan (signedIn + penanda onboarding completed).
+    expect(t.events.filter((e) => e.type === 'auth')).toEqual([expect.objectContaining({ type: 'auth', auth: { signedIn: true, user: USER, onboarding: 'completed' } })]);
     // Replay state yang sama → 401 (nonce sekali pakai).
     const replay = await t.post('/viewer/auth/session', { token: 'sess-token-1', state });
     expect(replay.statusCode).toBe(401);
@@ -334,6 +369,47 @@ describe('POST /viewer/auth/session', () => {
     const off = await t.post('/viewer/auth/session', { token: 'apa', state: state2 });
     expect(off.statusCode).toBe(500);
     expect(off.json().error.code).toBe('EXPORT_FAILED');
+  });
+});
+
+describe('POST /viewer/onboarding', () => {
+  it('skip → penanda ditulis via:"skip" + event auth {onboarding:skipped} + balasan nilai efektif; idempoten', async () => {
+    const t = await setup();
+    vi.stubEnv('LAKAR_CLOUD_URL', 'https://api.example');
+    const r = await t.post('/viewer/onboarding', { signin: 'skipped' });
+    expect(r.statusCode, r.body).toBe(200);
+    expect(r.json().data).toEqual({ signin: 'skipped' });
+    expect(await t.daemon.onboarding.load()).toMatchObject({ signin: 'skipped', via: 'skip' });
+    expect(t.events.filter((e) => e.type === 'auth')).toEqual([expect.objectContaining({ type: 'auth', auth: { signedIn: false, onboarding: 'skipped' } })]);
+    // Idempoten: POST kedua sukses dengan nilai efektif sama.
+    const again = await t.post('/viewer/onboarding', { signin: 'skipped' });
+    expect(again.statusCode).toBe(200);
+    expect(again.json().data.signin).toBe('skipped');
+  });
+
+  it('body strict: nilai lain/field ekstra → 400; Origin lintas situs → 403', async () => {
+    const t = await setup();
+    const bad = await t.post('/viewer/onboarding', { signin: 'completed' });
+    expect(bad.statusCode).toBe(400);
+    const extra = await t.post('/viewer/onboarding', { signin: 'skipped', hack: true });
+    expect(extra.statusCode).toBe(400);
+    const cross = await t.daemon.app.inject({
+      method: 'POST',
+      url: '/viewer/onboarding',
+      payload: { signin: 'skipped' },
+      headers: { origin: 'https://evil.example' },
+    });
+    expect(cross.statusCode).toBe(403);
+  });
+
+  it('penanda completed tidak diturunkan: skip setelah sign-in → balasan tetap completed', async () => {
+    const t = await setup();
+    vi.stubEnv('LAKAR_CLOUD_URL', 'https://api.example');
+    await t.daemon.onboarding.save('completed', 'google');
+    const r = await t.post('/viewer/onboarding', { signin: 'skipped' });
+    expect(r.statusCode).toBe(200);
+    expect(r.json().data.signin).toBe('completed');
+    expect((await t.daemon.onboarding.load())!.signin).toBe('completed');
   });
 });
 
@@ -422,8 +498,22 @@ describe('kredensial cloud (compat AD-4)', () => {
     expect((calls[0]!.init!.headers as Record<string, string>).authorization).toBe('Bearer sess-token-1');
     // Session basi dibersihkan — panggilan berikutnya langsung pakai LAKAR_CLOUD_KEY.
     expect(existsSync(sessionPath(t))).toBe(false);
+    // Event `auth` {reason:'expired'} dipancarkan (viewer: toast + chip expired — bukan gate).
+    expect(t.events.filter((e) => e.type === 'auth')).toEqual([expect.objectContaining({ type: 'auth', auth: { signedIn: false, reason: 'expired' } })]);
     const r2 = await t.post(`/viewer/docs/${slug}/share`, {});
     expect(r2.statusCode, r2.body).toBe(200);
     expect((calls[1]!.init!.headers as Record<string, string>).authorization).toBe('Bearer kunci-admin');
+  });
+
+  it('share 401 TANPA session (env key ditolak) → tidak ada event `auth` expired', async () => {
+    const t = await setup();
+    const slug = (await t.post('/viewer/docs', { name: 'My Landing' }).then((r: any) => r.json().data.slug)) as string;
+    vi.stubEnv('LAKAR_CLOUD_URL', 'https://api.example');
+    vi.stubEnv('LAKAR_CLOUD_KEY', 'kunci-admin');
+    vi.stubGlobal('fetch', async () => failJson(401, 'kunci ditolak'));
+    const r = await t.post(`/viewer/docs/${slug}/share`, {});
+    expect(r.statusCode).toBe(500);
+    // Session tak pernah ada → tidak ada session basi untuk dibersihkan → tanpa event expired.
+    expect(t.events.filter((e) => e.type === 'auth' && e.auth.reason === 'expired')).toEqual([]);
   });
 });
