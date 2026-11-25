@@ -1,7 +1,19 @@
 export const PACKAGE = '@lakar/sync';
-export { buildSync, newRoomToken, ApiFail, type SyncOptions } from './app.js';
+export { buildSync, newRoomToken, ApiFail, type Caller, type SyncOptions } from './app.js';
 export { createPool, migrate, MIGRATIONS_DIR } from './db.js';
-export { MemoryRoomRepo, PgRoomRepo, type AppendResult, type LoadedRoom, type NewRoom, type RoomMeta, type RoomOpMeta, type RoomOpRow, type RoomRepo } from './repo.js';
+export {
+  AuthTablesMissing,
+  MemoryRoomRepo,
+  PgRoomRepo,
+  type AppendResult,
+  type LoadedRoom,
+  type NewRoom,
+  type RoomMeta,
+  type RoomOpMeta,
+  type RoomOpRow,
+  type RoomRepo,
+  type SessionUser,
+} from './repo.js';
 export { RoomManager, touchedNodeIds, type PeerSocket, type RoomManagerOptions } from './rooms.js';
 export { registerWsRoute, type WsRouteOptions } from './ws.js';
 export {

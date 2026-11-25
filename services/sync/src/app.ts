@@ -1,4 +1,5 @@
-// Builder app fastify @lakar/sync — REST pemilik (Bearer LAKAR_API_KEY) + route WS room.
+// Builder app fastify @lakar/sync — REST pemilik (Bearer session akun ATAU LAKAR_API_KEY
+// admin — spec-cloud-auth story B) + route WS room.
 // Dipisah dari entry (main.ts) supaya tes bisa memakai repo memori + listen ephemeral.
 // Envelope {ok,data|error} sama dengan daemon dan @lakar/api.
 import Fastify, { LogController, type FastifyInstance, type FastifyReply, type FastifyRequest } from 'fastify';
@@ -9,7 +10,7 @@ import { LakarError, SCHEMA_VERSION } from '@lakar/schema';
 import { z } from 'zod';
 import { RoomManager } from './rooms.js';
 import { registerWsRoute } from './ws.js';
-import type { RoomRepo } from './repo.js';
+import { AuthTablesMissing, type RoomRepo } from './repo.js';
 
 /** Error HTTP service: kode bebas (enum ErrorCode daemon tidak punya 401/403). */
 export class ApiFail extends Error {
@@ -27,9 +28,12 @@ export class ApiFail extends Error {
   }
 }
 
-const unauthorized = () => new ApiFail(401, 'UNAUTHORIZED', 'API key tidak valid atau tidak ada', { hint: 'kirim header authorization: Bearer <LAKAR_API_KEY>' });
+const unauthorized = () => new ApiFail(401, 'UNAUTHORIZED', 'kredensial tidak valid atau tidak ada', { hint: 'kirim header authorization: Bearer <session token atau LAKAR_API_KEY>' });
+const forbidden = (message: string, hint: string) => new ApiFail(403, 'FORBIDDEN', message, { hint });
 const notFound = (what: string) => new ApiFail(404, 'NOT_FOUND', `${what} tidak ada`, { hint: 'periksa token; room yang diarsip tidak bisa diakses lagi' });
 const invalid = (message: string, hint: string) => new ApiFail(400, 'SCHEMA_INVALID', message, { hint });
+const notSupported = () =>
+  new ApiFail(501, 'NOT_SUPPORTED', 'akun/session belum didukung deployment ini', { hint: 'jalankan migrasi auth service api (tabel users/sessions) di database yang sama' });
 
 /** Kode ErrorCode daemon → status HTTP (subset yang mungkin lewat: validasi dokumen/ops). */
 const STATUS: Record<string, number> = {
@@ -58,9 +62,13 @@ const parse = <T>(schema: z.ZodType<T>, body: unknown, hint: string): T => {
 /** Token capability: 24 byte → 32 char base64url. */
 export const newRoomToken = (): string => randomBytes(24).toString('base64url');
 
+/** Identitas peminta endpoint pemilik: admin key (era LAKAR_API_KEY, kompatibel penuh) atau
+ *  session user akun (spec-cloud-auth story B). */
+export type Caller = { kind: 'admin' } | { kind: 'user'; userId: string };
+
 export type SyncOptions = {
   repo: RoomRepo;
-  /** API key endpoint pemilik; kosong/undefined = semua endpoint pemilik 401. */
+  /** API key admin endpoint pemilik; kosong/undefined = admin tidak aktif (Bearer session masih bisa). */
   apiKey?: string;
   /** Manager room bawaan; tes bisa menyuntikkan sendiri untuk mengamati state. */
   rooms?: RoomManager;
@@ -100,18 +108,48 @@ export function buildSync({ repo, apiKey, rooms, bodyLimit = 16 * 1024 * 1024, l
   });
 
   const ok = (reply: FastifyReply, data: unknown) => reply.code(200).send({ ok: true, data });
-  const requireKey = (req: FastifyRequest) => {
-    // timingSafeEqual supaya perbandingan key tidak bocor lewat waktu respons; panjang dicek dulu
-    // (timingSafeEqual melempar bila beda panjang — selisih panjang sendiri bukan rahasia).
+  // timingSafeEqual supaya perbandingan key tidak bocor lewat waktu respons; panjang dicek dulu
+  // (timingSafeEqual melempar bila beda panjang — selisih panjang sendiri bukan rahasia).
+  const isAdmin = (req: FastifyRequest): boolean => {
     const expected = Buffer.from(`Bearer ${apiKey ?? ''}`, 'utf8');
     const given = Buffer.from(req.headers.authorization ?? '', 'utf8');
-    if (!apiKey || given.length !== expected.length || !timingSafeEqual(given, expected)) throw unauthorized();
+    return !!apiKey && given.length === expected.length && timingSafeEqual(given, expected);
+  };
+  /** User pemilik Bearer session; `undefined` = bukan session valid. Tabel auth milik api yang
+   *  belum termigrasi → 501 NOT_SUPPORTED (deployment tanpa akun, bukan kredensial jahat). */
+  const sessionOf = async (req: FastifyRequest) => {
+    const m = /^Bearer (\S+)$/.exec(req.headers.authorization ?? '');
+    if (!m) return undefined;
+    try {
+      return await repo.sessionUser(m[1]!);
+    } catch (e) {
+      if (e instanceof AuthTablesMissing) throw notSupported();
+      throw e;
+    }
+  };
+  /** Endpoint pemilik menerima admin key ATAU Bearer session akun (compat: key lama tetap admin). */
+  const requireIdentity = async (req: FastifyRequest): Promise<Caller> => {
+    if (isAdmin(req)) return { kind: 'admin' };
+    const user = await sessionOf(req);
+    if (user) return { kind: 'user', userId: user.id };
+    throw unauthorized();
+  };
+  /** Scoping GET/DELETE /api/rooms/:token: admin boleh semua; session user hanya room dengan
+   *  owner_id = dia. Room owner NULL (era admin-key) hanya bisa dikelola admin — bukan
+   *  "milik semua user". Urutan: 401 → 404 (missing/archived) → 403 — jangan bocorkan eksistensi. */
+  const requireRoomOwner = async (req: FastifyRequest, token: string): Promise<void> => {
+    const caller = await requireIdentity(req);
+    if (caller.kind === 'admin') return;
+    const owner = await repo.ownerOf(token);
+    if (owner === undefined) throw notFound(`room ${token}`);
+    if (owner !== caller.userId) throw forbidden(`room ${token} milik akun lain`, 'hanya pemilik room (atau admin key) yang boleh mengelolanya');
   };
 
   // Buat room (pemilik): doc divalidasi penuh `parseDocument` sebelum disimpan — doc harus sudah
   // schemaVersion terkini (server tidak memigrasi). `tokens` opsional digabung ke doc.tokens dulu.
+  // Session user menjadi pemilik room (owner_id); admin key → owner_id NULL (era workspace).
   app.post('/api/rooms', async (req, reply) => {
-    requireKey(req);
+    const caller = await requireIdentity(req);
     const body = parse(CreateRoomBody, req.body, CREATE_HINT);
     const raw = body.tokens && isPlainObject(body.doc.tokens) ? { ...body.doc, tokens: { ...body.doc.tokens, ...body.tokens } } : body.tokens ? { ...body.doc, tokens: body.tokens } : body.doc;
     // Server tidak memigrasi skema dokumen: doc harus sudah versi terkini (parseDocument saja
@@ -128,23 +166,30 @@ export function buildSync({ repo, apiKey, rooms, bodyLimit = 16 * 1024 * 1024, l
     }
     const token = newRoomToken();
     const viewToken = newRoomToken();
-    await repo.create({ token, viewToken, title: body.title, doc });
+    await repo.create({ token, viewToken, title: body.title, doc, ownerId: caller.kind === 'user' ? caller.userId : undefined });
     // Bersihkan tanda arsip basi di RoomManager (praktis mustahil — token acak, tapi murah).
     roomManager.created(token);
     return ok(reply, { token, viewToken, rev: doc.rev });
   });
 
-  // Meta room (pemilik).
+  // Daftar room aktif (pemilik): admin melihat semua, session user hanya miliknya.
+  app.get('/api/rooms', async (req, reply) => {
+    const caller = await requireIdentity(req);
+    return ok(reply, { rooms: await repo.list(caller.kind === 'user' ? caller.userId : undefined) });
+  });
+
+  // Meta room (pemilik: owner atau admin — membawa viewToken, jadi bukan endpoint sembarang user).
   app.get<{ Params: { token: string } }>('/api/rooms/:token', async (req, reply) => {
-    requireKey(req);
+    await requireRoomOwner(req, req.params.token);
     const meta = await repo.meta(req.params.token);
     if (!meta) throw notFound(`room ${req.params.token}`);
     return ok(reply, meta);
   });
 
-  // Arsipkan room (pemilik): semua peer diputus (close 4000) dan room tak bisa diakses lagi.
+  // Arsipkan room (pemilik: owner atau admin): semua peer diputus (close 4000) dan room tak
+  // bisa diakses lagi.
   app.delete<{ Params: { token: string } }>('/api/rooms/:token', async (req, reply) => {
-    requireKey(req);
+    await requireRoomOwner(req, req.params.token);
     if (!(await repo.archive(req.params.token))) throw notFound(`room ${req.params.token}`);
     await roomManager.closeRoom(req.params.token);
     return ok(reply, { token: req.params.token });

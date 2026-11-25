@@ -1,6 +1,7 @@
 // Entry @lakar/sync: `DATABASE_URL` wajib; `PORT` (default 8080), `HOST` (default 0.0.0.0 —
 // service ini memang untuk dijangkau jaringan, berbeda dengan lakard yang loopback-saja),
-// `LAKAR_API_KEY` (endpoint pemilik; kosong = semua endpoint pemilik 401).
+// `LAKAR_API_KEY` (admin endpoint pemilik; kosong = hanya Bearer session akun yang diterima —
+// spec-cloud-auth story B).
 import { buildSync } from './app.js';
 import { createPool, migrate } from './db.js';
 import { PgRoomRepo } from './repo.js';
@@ -11,7 +12,7 @@ if (!url) {
   process.exit(1);
 }
 if (!process.env.LAKAR_API_KEY) {
-  console.warn('lakar-sync: LAKAR_API_KEY tidak diset — endpoint pemilik (/api/rooms) selalu 401');
+  console.warn('lakar-sync: LAKAR_API_KEY tidak diset — endpoint pemilik (/api/rooms) hanya menerima Bearer session');
 }
 
 const pool = createPool(url);

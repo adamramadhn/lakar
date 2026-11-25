@@ -1,6 +1,14 @@
 // Koneksi Postgres + runner migrasi SQL plain (bukan ORM): file `NNNN_*.sql` di `migrations/`
-// diterapkan berurutan dalam satu transaksi per file; versi tercatat di `schema_migrations`.
-// Pola sama dengan services/api/src/db.ts.
+// diterapkan berurutan dalam satu transaksi per file; versi tercatat di `sync_schema_migrations`.
+// Pola sama dengan services/api/src/db.ts, TAPI tabel versi diberi prefix service: kedua service
+// berbagi satu Postgres (spec-cloud-auth) dan nomor versi migrasi bertabrakan (api 1..3 vs sync
+// 1..2) — tabel `schema_migrations` bersama membuat service yang jalan belakangan melewati
+// migrasinya sendiri (atau gagal cold-start berbarengan karena PK ganda). File SQL sync semuanya
+// IF NOT EXISTS, jadi re-apply pada install yang sempat mencatat versi di `schema_migrations`
+// lama aman (no-op); `schema_migrations` tetap dipakai service api.
+// CATATAN: install lama yang sudah menjalankan sync versi lama bisa meninggalkan baris versi
+// milik sync di `schema_migrations` — api lalu melewati migrasinya sendiri. Semua file api juga
+// IF NOT EXISTS, jadi menghapus baris itu (atau namespacing serupa di api) memulihkannya.
 import { readdir, readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
@@ -20,12 +28,15 @@ export function createPool(url: string): Pool {
   return pool;
 }
 
+/** Tabel versi migrasi milik sync (bukan `schema_migrations` bersama — lihat komentar di atas). */
+const VERSIONS_TABLE = 'sync_schema_migrations';
+
 /** Terapkan migrasi yang belum jalan; kembalikan daftar versi yang baru diterapkan. */
 export async function migrate(pool: Pool, dir = MIGRATIONS_DIR): Promise<number[]> {
-  // Tabel versi diciptakan juga oleh 0001; di sini dijamin dulu supaya runner bekerja pada DB kosong
-  // maupun DB yang isinya tinggal migrasi berikutnya.
-  await pool.query('CREATE TABLE IF NOT EXISTS schema_migrations (version integer PRIMARY KEY, applied_at timestamptz NOT NULL DEFAULT now())');
-  const { rows } = await pool.query<{ version: number }>('SELECT version FROM schema_migrations');
+  // Tabel versi dijamin dulu di sini supaya runner bekerja pada DB kosong maupun DB yang isinya
+  // tinggal migrasi berikutnya (termasuk install lama yang mencatat versi di `schema_migrations`).
+  await pool.query(`CREATE TABLE IF NOT EXISTS ${VERSIONS_TABLE} (version integer PRIMARY KEY, applied_at timestamptz NOT NULL DEFAULT now())`);
+  const { rows } = await pool.query<{ version: number }>(`SELECT version FROM ${VERSIONS_TABLE}`);
   const done = new Set(rows.map((r) => r.version));
   const files = (await readdir(dir))
     .map((f) => ({ file: f, m: MIGRATION_FILE.exec(f) }))
@@ -40,7 +51,7 @@ export async function migrate(pool: Pool, dir = MIGRATIONS_DIR): Promise<number[
     try {
       await client.query('BEGIN');
       await client.query(sql);
-      await client.query('INSERT INTO schema_migrations (version) VALUES ($1)', [version]);
+      await client.query(`INSERT INTO ${VERSIONS_TABLE} (version) VALUES ($1)`, [version]);
       await client.query('COMMIT');
       applied.push(version);
     } catch (e) {
