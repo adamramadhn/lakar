@@ -1,0 +1,27 @@
+name: Nightly desktop
+
+# Rilis malam dari tip `dev`: memanggil release.yml (build 4 OS + publish) dengan input nightly.
+# Tag rilis `nightly` dipindah ke commit terbaru dev tiap run; rilis berlabel pra-rilis sehingga
+# pointer `latest` (dipakai updater pengguna stabil) tidak ikut bergerak.
+# Jadwal: 01:00 WIB (18:00 UTC). workflow_dispatch untuk memicu manual.
+on:
+  schedule:
+    - cron: '0 18 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: nightly
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    name: nightly release
+    uses: ./.github/workflows/release.yml
+    with:
+      nightly: true
+    secrets: inherit
+    permissions:
+      contents: write
