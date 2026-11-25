@@ -22,8 +22,31 @@ permissions:
   contents: read
 
 jobs:
+  # Versi nightly dihitung SEKALI di sini (<stable tertinggi +1 patch>-nightly.<UTC YYYYMMDDHHmm>),
+  # lalu dipakai bersama oleh build (LAKAR_APP_VERSION) dan latest-json. Output kosong untuk
+  # non-nightly. Tag diambil dari remote (rilis ada di main, nightly dibangun dari dev).
+  meta:
+    name: nightly version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v6
+      - name: Compute nightly version
+        id: version
+        if: inputs.nightly == true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git ls-remote --tags --refs "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git" 'v*' \
+            | awk '{print $2}' | sed 's|refs/tags/||' > "$RUNNER_TEMP/tags.txt"
+          version="$(node apps/desktop/scripts/nightly-version.mjs --tags "$RUNNER_TEMP/tags.txt" --now "$(date -u +%Y-%m-%dT%H:%M:%SZ)")"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Nightly version: $version"
+
   build:
     name: build (${{ matrix.name }})
+    needs: meta
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     strategy:
@@ -34,6 +57,9 @@ jobs:
             os: windows-latest
             target: x86_64-pc-windows-msvc
             bundles: nsis,msi
+            # MSI menolak pra-rilis non-numerik (0.1.9-nightly.…); nightly Windows hanya NSIS —
+            # installer yang memang dipakai updater (-setup.exe). MSI tetap ada untuk stable.
+            nightly_bundles: nsis
           - name: macos-arm64
             os: macos-latest
             target: aarch64-apple-darwin
@@ -106,6 +132,12 @@ jobs:
             echo "LAKAR_APP_VERSION=$version" >> "$GITHUB_ENV"
           fi
 
+      # Versi unik per run (dari job meta) — tanpa ini semua nightly melapor 0.1.0 dan updater
+      # tidak pernah menawarkan nightly berikutnya.
+      - name: Set version (nightly)
+        if: inputs.nightly == true
+        run: echo "LAKAR_APP_VERSION=${{ needs.meta.outputs.version }}" >> "$GITHUB_ENV"
+
       - name: Enable macOS signing
         if: runner.os == 'macOS' && env.HAS_APPLE_CERT == 'true'
         env:
@@ -161,7 +193,7 @@ jobs:
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-        run: pnpm tauri build --ci --target ${{ matrix.target }} --bundles ${{ matrix.bundles }} --config src-tauri/ci-config.json
+        run: pnpm tauri build --ci --target ${{ matrix.target }} --bundles ${{ inputs.nightly && matrix.nightly_bundles || matrix.bundles }} --config src-tauri/ci-config.json
 
       # Installer rilis terakhir sebagai titik awal uji upgrade (opsional: belum ada rilis / gagal unduh → lewati).
       - name: Download previous Windows installer
@@ -222,7 +254,7 @@ jobs:
   # build tidak menghasilkan sig (TAURI_SIGNING_PRIVATE_KEY tidak diatur).
   latest-json:
     name: latest.json
-    needs: build
+    needs: [build, meta]
     runs-on: ubuntu-latest
     env:
       HAS_UPDATER_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY != '' }}
@@ -256,7 +288,8 @@ jobs:
           # Versi dari tag bila x.y.z, selain itu versi di tauri.conf.json; tag rilis = ref, fallback v<versi>
           # untuk dry run (URL platform hanya benar di rilis bertanda nyata).
           if [[ "${{ inputs.nightly }}" == "true" ]]; then
-            version="$(node -p "require('./apps/desktop/src-tauri/tauri.conf.json').version")-nightly"
+            # Versi unik dari job meta — sama dengan yang di-bake ke bundle via LAKAR_APP_VERSION.
+            version="${{ needs.meta.outputs.version }}"
             tag="nightly"
           else
             version="${GITHUB_REF_NAME#v}"
@@ -313,4 +346,16 @@ jobs:
             gh release create "$TAG" installers/* --repo "$GITHUB_REPOSITORY" --target "$TARGET" --generate-notes --title "Lakar Nightly" $prerelease
           else
             gh release create "$TAG" installers/* --repo "$GITHUB_REPOSITORY" --verify-tag --generate-notes --title "Lakar $TAG" $prerelease
+          fi
+          # Nightly: tiap file memuat versi unik, jadi --clobber tidak menimpa aset malam lalu —
+          # tanpa langkah ini rilis `nightly` menumpuk satu set installer baru setiap hari.
+          # Urutan: unggah dulu (di atas), baru hapus aset yang tak ada di set baru, supaya
+          # latest.json lama tidak pernah menunjuk aset yang sudah terhapus.
+          if [[ "$TAG" == "nightly" ]]; then
+            gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets -q '.assets[].name' | while read -r asset; do
+              if [[ ! -f "installers/$asset" ]]; then
+                echo "Pruning stale nightly asset: $asset"
+                gh release delete-asset "$TAG" "$asset" --repo "$GITHUB_REPOSITORY" -y
+              fi
+            done
           fi

@@ -5,7 +5,7 @@
 import { useState } from 'react';
 import { Icon } from './icons';
 import { SettingsSection } from './SettingsGeneral';
-import { checkForUpdate, getUpdatePolicy, installAndRelaunch, isDesktop, setUpdatePolicy, useUpdateState, type UpdatePolicy, type UpdateState, type UpdateStatus } from './updates';
+import { changeUpdateChannel, checkForUpdate, displayVersion, getUpdatePolicy, installAndRelaunch, isDesktop, isNightlyVersion, setUpdatePolicy, updateErrorText, useUpdateState, type UpdateChannel, type UpdatePolicy, type UpdateState, type UpdateStatus } from './updates';
 
 const PILL: Record<UpdateStatus, { label: string; cls: string }> = {
   idle: { label: 'Checking…', cls: '' },
@@ -86,6 +86,7 @@ function VersionCard({ s }: { s: UpdateState }) {
         <div className="conn-daemon-text">
           <div className="conn-daemon-title">
             <strong>Lakar</strong>
+            {isNightlyVersion(s.appVersion) && <span className="status-pill">Nightly</span>}
             <span className={`status-pill${pill.cls ? ` ${pill.cls}` : ''}`}>{pill.label}</span>
           </div>
           <span className="conn-daemon-sub mono">
@@ -96,12 +97,70 @@ function VersionCard({ s }: { s: UpdateState }) {
         <Action s={s} />
       </div>
       {progress}
-      {s.status === 'failed' && s.error && (
+      {s.status === 'failed' && updateErrorText(s.error, s.channel) && (
         <div className="conn-render error" role="alert">
           <Icon name="alert" size={14} />
-          <span>{s.error}</span>
+          <span>{updateErrorText(s.error, s.channel)}</span>
         </div>
       )}
+    </div>
+  );
+}
+
+/** Segmented Stable/Nightly + baris catatan sesuai matriks C1–C10 (spec-update-channel). Channel
+ * disimpan di sisi aplikasi (`set_update_channel`); ganti channel langsung memeriksa ulang. */
+function UpdateChannelPicker({ s }: { s: UpdateState }) {
+  const disabled = s.status === 'checking' || s.status === 'downloading' || s.status === 'installing';
+  const channels: { id: UpdateChannel; label: string }[] = [
+    { id: 'stable', label: 'Stable' },
+    { id: 'nightly', label: 'Nightly' },
+  ];
+  // Baris bantuan dasar (C1–C3): deskripsi channel + catatan khusus "stable di atas build nightly".
+  const base =
+    s.channel === 'nightly'
+      ? { icon: 'alert' as const, text: 'Pre-release builds — may be unstable. A new build ships every night.' }
+      : isNightlyVersion(s.appVersion) && s.status !== 'available' && s.status !== 'downloading' && s.status !== 'ready' && s.status !== 'installing'
+        ? { icon: 'info' as const, text: "You're on a nightly build that's newer than the latest stable release. You'll get the next stable release when it's out." }
+        : { icon: undefined, text: 'Tested releases. Recommended for most people.' };
+  return (
+    <div className="update-channel">
+      <div className="segmented update-channel-segmented" role="radiogroup" aria-label="Update channel">
+        {channels.map((c) => (
+          <button
+            key={c.id}
+            type="button"
+            role="radio"
+            aria-checked={s.channel === c.id}
+            disabled={disabled}
+            className={`segment${s.channel === c.id ? ' active' : ''}`}
+            onClick={() => void changeUpdateChannel(c.id)}
+          >
+            {c.label}
+          </button>
+        ))}
+      </div>
+      {s.channelError === 'save' && (
+        <div className="update-channel-note error" role="alert">
+          <Icon name="alert" size={14} />
+          <span>Couldn’t change the update channel. Try again.</span>
+        </div>
+      )}
+      {s.status === 'ready' && (
+        <div className="update-channel-note" role="note">
+          <Icon name="info" size={14} />
+          <span>Switching channels discards the update that’s ready to install.</span>
+        </div>
+      )}
+      {disabled && s.status !== 'checking' && (
+        <div className="update-channel-note" role="note">
+          <Icon name="info" size={14} />
+          <span>You can switch channels after the current update finishes.</span>
+        </div>
+      )}
+      <div className="update-channel-note">
+        {base.icon && <Icon name={base.icon} size={14} />}
+        <span>{base.text}</span>
+      </div>
     </div>
   );
 }
@@ -140,8 +199,13 @@ export function SettingsUpdates() {
       <SettingsSection title="Version" description="The version of Lakar running on this computer.">
         <VersionCard s={s} />
       </SettingsSection>
+      {s.channel !== undefined && (
+        <SettingsSection title="Update channel" description="Choose which builds this computer receives.">
+          <UpdateChannelPicker s={s} />
+        </SettingsSection>
+      )}
       {notes && notesVersion && (
-        <SettingsSection title={`What’s new in ${notesVersion}`} description="Release notes for this version.">
+        <SettingsSection title={`What’s new in ${displayVersion(notesVersion)}`} description="Release notes for this version.">
           <div className="update-notes">{notes}</div>
         </SettingsSection>
       )}

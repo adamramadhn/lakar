@@ -10,6 +10,8 @@ const COMMANDS: &[&str] = &[
     "download_update",
     "install_update",
     "relaunch_app",
+    "update_channel",
+    "set_update_channel",
 ];
 
 fn main() {

@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "viewer-window",
-  "description": "Viewer dari lakard (http://127.0.0.1:<port>/app/): kontrol jendela untuk title bar kustom (minimize, maximize/restore, close, drag region, setFocus untuk kembali dari sign-in browser), set_ui_theme (pilihan tema Settings untuk layar mulai), command updater aplikasi (app_version, check_update, download_update, install_update, relaunch_app), dan opener:default untuk membuka URL eksternal (sign-in OAuth) di browser sistem. Tanpa command aplikasi lain.",
+  "description": "Viewer dari lakard (http://127.0.0.1:<port>/app/): kontrol jendela untuk title bar kustom (minimize, maximize/restore, close, drag region, setFocus untuk kembali dari sign-in browser), set_ui_theme (pilihan tema Settings untuk layar mulai), command updater aplikasi (app_version, check_update, download_update, install_update, relaunch_app, update_channel, set_update_channel), dan opener:default untuk membuka URL eksternal (sign-in OAuth) di browser sistem. Tanpa command aplikasi lain.",
   "local": false,
   "remote": {
     "urls": ["http://127.0.0.1:*"]
@@ -21,6 +21,8 @@
     "allow-download-update",
     "allow-install-update",
     "allow-relaunch-app",
+    "allow-update-channel",
+    "allow-set-update-channel",
     "opener:default"
   ]
 }

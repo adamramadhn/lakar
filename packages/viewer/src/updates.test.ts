@@ -1,6 +1,6 @@
 // State machine updater viewer (pola theme.test.ts: window/localStorage dipalsukan, modul dimuat ulang per tes).
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { isDesktop, parseUpdatePolicy, UPDATED_KEY, UPDATE_POLICY_KEY } from './updates.ts';
+import { displayVersion, isDesktop, isNightlyVersion, parseUpdatePolicy, updateErrorText, UPDATED_KEY, UPDATE_POLICY_KEY } from './updates.ts';
 
 type Cmd = [cmd: string, args: Record<string, unknown> | undefined];
 
@@ -187,7 +187,7 @@ describe('initUpdates + dismissUpdated', () => {
     let u = await load();
     u.initUpdates();
     await vi.waitFor(() => expect(u.getUpdateState().status).toBe('ready'));
-    expect(calls.map((c) => c[0])).toEqual(['app_version', 'check_update', 'download_update']);
+    expect(calls.map((c) => c[0])).toEqual(['app_version', 'update_channel', 'check_update', 'download_update']);
 
     vi.resetModules();
     store.set(UPDATE_POLICY_KEY, 'ask');
@@ -195,12 +195,106 @@ describe('initUpdates + dismissUpdated', () => {
     u = await load();
     u.initUpdates();
     await vi.waitFor(() => expect(u.getUpdateState().status).toBe('available'));
-    expect(calls.map((c) => c[0])).toEqual(['app_version', 'check_update']);
+    expect(calls.map((c) => c[0])).toEqual(['app_version', 'update_channel', 'check_update']);
   });
   it('idempotent dan tanpa __TAURI__ tidak melakukan apa-apa', async () => {
     const u = await load();
     u.initUpdates();
     u.initUpdates();
     expect(u.getUpdateState().status).toBe('idle');
+  });
+  it('update_channel gagal → channel undefined, check tetap jalan', async () => {
+    tauri({ app_version: '0.9.0', update_channel: new Error('unknown command'), check_update: null });
+    const u = await load();
+    u.initUpdates();
+    await vi.waitFor(() => expect(u.getUpdateState().status).toBe('up-to-date'));
+    expect(u.getUpdateState().channel).toBeUndefined();
+  });
+  it('update_channel sukses → channel + saved dari respons', async () => {
+    tauri({ app_version: '0.9.0', update_channel: { channel: 'nightly', saved: true }, check_update: null });
+    const u = await load();
+    u.initUpdates();
+    await vi.waitFor(() => expect(u.getUpdateState().channel).toBe('nightly'));
+    expect(u.getUpdateState().channelSaved).toBe(true);
+  });
+});
+
+describe('helper murni', () => {
+  it('isNightlyVersion mengenali sufiks -nightly dan -nightly.<ts>', () => {
+    expect(isNightlyVersion('0.1.9-nightly.202611251800')).toBe(true);
+    expect(isNightlyVersion('0.1.9-nightly')).toBe(true);
+    expect(isNightlyVersion('0.1.9')).toBe(false);
+    expect(isNightlyVersion('0.1.9-rc1')).toBe(false);
+    expect(isNightlyVersion(undefined)).toBe(false);
+  });
+  it('displayVersion memetakan pola nightly, selain itu mentah', () => {
+    expect(displayVersion('0.1.9-nightly.202611251800')).toBe('0.1.9 Nightly (2026-11-25)');
+    expect(displayVersion('0.1.8')).toBe('0.1.8');
+    expect(displayVersion('0.1.9-nightly')).toBe('0.1.9-nightly');
+  });
+  it('updateErrorText memetakan prefiks per channel', () => {
+    expect(updateErrorText(undefined, 'stable')).toBeUndefined();
+    expect(updateErrorText('CHANNEL_CHANGED: x', 'nightly')).toBeUndefined();
+    expect(updateErrorText('RELEASE_NOT_FOUND: x', 'nightly')).toContain('No nightly build is available');
+    expect(updateErrorText('RELEASE_NOT_FOUND: x', 'stable')).toContain('latest release');
+    expect(updateErrorText('jaringan putus', 'stable')).toBe('jaringan putus');
+  });
+});
+
+describe('changeUpdateChannel', () => {
+  it('set_update_channel → check_update → (auto) download_update', async () => {
+    store.set(UPDATE_POLICY_KEY, 'auto');
+    const calls = tauri({
+      update_channel: { channel: 'stable', saved: false },
+      set_update_channel: { channel: 'nightly', saved: true },
+      check_update: META,
+      download_update: null,
+    });
+    const u = await load();
+    await u.checkForUpdate();
+    // state.channel masih undefined sampai update_channel dimuat (init); set manual untuk tes:
+    // di sini update_channel belum dipanggil, jadi pakai state apa adanya — channel undefined ≠ 'nightly' → lanjut.
+    await u.changeUpdateChannel('nightly');
+    await vi.waitFor(() => expect(u.getUpdateState().status).toBe('ready'));
+    expect(calls.map((c) => c[0])).toEqual(['check_update', 'set_update_channel', 'check_update', 'download_update']);
+    expect(u.getUpdateState().channel).toBe('nightly');
+    expect(u.getUpdateState().channelSaved).toBe(true);
+  });
+  it('kebijakan ask → hanya check, tanpa unduhan', async () => {
+    store.set(UPDATE_POLICY_KEY, 'ask');
+    const calls = tauri({ set_update_channel: { channel: 'nightly', saved: true }, check_update: META });
+    const u = await load();
+    await u.changeUpdateChannel('nightly');
+    expect(u.getUpdateState().status).toBe('available');
+    expect(calls.map((c) => c[0])).toEqual(['set_update_channel', 'check_update']);
+  });
+  it('pilihan sama / busy → tidak memanggil command', async () => {
+    const calls = tauri({ update_channel: { channel: 'stable', saved: false }, set_update_channel: null, check_update: null });
+    const u = await load();
+    u.initUpdates();
+    await vi.waitFor(() => expect(u.getUpdateState().channel).toBe('stable'));
+    await u.changeUpdateChannel('stable');
+    expect(calls.map((c) => c[0])).not.toContain('set_update_channel');
+  });
+  it('set gagal → channelError save, channel lama dipertahankan', async () => {
+    const calls = tauri({
+      update_channel: { channel: 'stable', saved: false },
+      set_update_channel: new Error('gagal tulis'),
+      check_update: null,
+    });
+    const u = await load();
+    u.initUpdates();
+    await vi.waitFor(() => expect(u.getUpdateState().channel).toBe('stable'));
+    calls.length = 0; // buang panggilan init (app_version/update_channel/check_update)
+    await u.changeUpdateChannel('nightly');
+    expect(u.getUpdateState().channelError).toBe('save');
+    expect(u.getUpdateState().channel).toBe('stable');
+    expect(calls.map((c) => c[0])).toEqual(['set_update_channel']);
+  });
+  it('CHANNEL_CHANGED dari check diabaikan (bukan failed)', async () => {
+    tauri({ check_update: new Error('CHANNEL_CHANGED: update channel changed while checking') });
+    const u = await load();
+    await u.checkForUpdate();
+    expect(u.getUpdateState().status).not.toBe('failed');
   });
 });

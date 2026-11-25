@@ -19,7 +19,11 @@ export interface UpdateInfo {
   currentVersion: string;
   notes?: string;
   pubDate?: string;
+  /** Channel yang menemukan update ini (aditif di Rust; absen di versi aplikasi lama). */
+  channel?: string;
 }
+
+export type UpdateChannel = 'stable' | 'nightly';
 
 export interface UpdateState {
   status: UpdateStatus;
@@ -35,6 +39,12 @@ export interface UpdateState {
   appVersion: string | undefined;
   /** Aplikasi baru saja diperbarui (banner "Updated to Lakar x.y" sampai di-Dismiss). */
   justUpdated: { version: string; notes?: string } | undefined;
+  /** Channel update efektif (`update_channel`); undefined = belum dimuat/command gagal → seksi disembunyikan. */
+  channel: UpdateChannel | undefined;
+  /** Channel berasal dari pilihan tersimpan (bukan turunan versi yang berjalan). */
+  channelSaved: boolean;
+  /** `set_update_channel` gagal — pilihan dikembalikan ke channel lama. */
+  channelError: 'save' | undefined;
 }
 
 export const UPDATE_POLICY_KEY = 'lakar.viewer.updatePolicy';
@@ -80,7 +90,7 @@ export function isDesktop(g: unknown = win()): boolean {
   return desktopInvoke(g) !== undefined;
 }
 
-let state: UpdateState = { status: 'idle', update: null, error: undefined, downloaded: 0, total: undefined, installPhase: undefined, appVersion: undefined, justUpdated: undefined };
+let state: UpdateState = { status: 'idle', update: null, error: undefined, downloaded: 0, total: undefined, installPhase: undefined, appVersion: undefined, justUpdated: undefined, channel: undefined, channelSaved: false, channelError: undefined };
 const listeners = new Set<() => void>();
 
 function set(partial: Partial<UpdateState>) {
@@ -150,7 +160,30 @@ const errText = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
 const busy = () => state.status === 'checking' || state.status === 'downloading' || state.status === 'installing';
 
-/** `check_update`: null → "up-to-date", metadata → "available" (update disimpan pending di aplikasi). */
+/** Versi pola `<x.y.z>-nightly.<UTC YYYYMMDDHHmm>` → `{x.y.z} Nightly ({YYYY-MM-DD})`; selain itu mentah. */
+export function displayVersion(v: string): string {
+  const m = /^(\d+\.\d+\.\d+)-nightly\.(\d{4})(\d{2})(\d{2})\d{4}$/.exec(v);
+  return m ? `${m[1]} Nightly (${m[2]}-${m[3]}-${m[4]})` : v;
+}
+
+/** Apakah `v` adalah versi build nightly (`-nightly` atau `-nightly.<ts>`). */
+export function isNightlyVersion(v: string | undefined): boolean {
+  return v !== undefined && /-nightly(\.|$)/.test(v);
+}
+
+/** Peta error check → teks UI: `RELEASE_NOT_FOUND` dibedakan per channel, `CHANNEL_CHANGED` tidak
+ * ditampilkan (channel berganti di tengah check — hasil basi, check baru sudah berjalan). */
+export function updateErrorText(error: string | undefined, channel: UpdateChannel | undefined): string | undefined {
+  if (error === undefined) return undefined;
+  if (error.startsWith('CHANNEL_CHANGED')) return undefined;
+  if (error.startsWith('RELEASE_NOT_FOUND')) {
+    return channel === 'nightly' ? 'No nightly build is available right now. Try again later, or switch to Stable.' : 'Couldn’t find the latest release. Try again later.';
+  }
+  return error;
+}
+
+/** `check_update`: null → "up-to-date", metadata → "available" (update disimpan pending di aplikasi).
+ * `CHANNEL_CHANGED` (channel diganti di tengah check) diabaikan — check baru sudah berjalan. */
 export async function checkForUpdate(): Promise<void> {
   const call = invoke();
   if (!call || busy()) return;
@@ -160,8 +193,29 @@ export async function checkForUpdate(): Promise<void> {
     if (meta) set({ status: 'available', update: meta, downloaded: 0, total: undefined });
     else set({ status: 'up-to-date', update: null });
   } catch (e) {
+    if (errText(e).startsWith('CHANNEL_CHANGED')) return;
     set({ status: 'failed', error: errText(e) });
   }
+}
+
+/** `set_update_channel` + re-check: menyimpan pilihan di sisi aplikasi (file `update-channel`), membuang
+ * update yang pending (bytes ikut hilang), lalu langsung memeriksa channel baru — tanpa restart.
+ * Diblokir saat check/unduh/pasang berjalan; `ready` diizinkan (baris discard sudah menjelaskannya).
+ * Kebijakan `auto` langsung mengunduh update yang ditemukan, sama seperti check saat startup. */
+export async function changeUpdateChannel(c: UpdateChannel): Promise<void> {
+  const call = invoke();
+  if (!call || c === state.channel || busy()) return;
+  set({ channelError: undefined });
+  try {
+    await call('set_update_channel', { channel: c });
+  } catch {
+    // Pilihan lama dipertahankan (UI kembali ke channel sebelumnya).
+    set({ channelError: 'save' });
+    return;
+  }
+  set({ channel: c, channelSaved: true, status: 'idle', update: null, error: undefined, downloaded: 0, total: undefined, installPhase: undefined });
+  await checkForUpdate();
+  if (state.status === 'available' && getUpdatePolicy() === 'auto') void downloadUpdate();
 }
 
 /** `download_update`: unduh di latar (kebijakan `auto`); sukses → "ready" (banner "Restart now" di Recents). */
@@ -235,6 +289,15 @@ export function initUpdates(): void {
       set({ appVersion, justUpdated });
     } catch {
       // versi tidak diketahui: cek update tetap dicoba
+    }
+    try {
+      const info = (await call('update_channel')) as { channel?: unknown; saved?: unknown };
+      set({
+        channel: info.channel === 'nightly' ? 'nightly' : 'stable',
+        channelSaved: info.saved === true,
+      });
+    } catch {
+      // command tidak ada (aplikasi lama) / gagal: channel undefined → seksi disembunyikan
     }
     await checkForUpdate();
     if (state.status === 'available' && getUpdatePolicy() === 'auto') void downloadUpdate();
