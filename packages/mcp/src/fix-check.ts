@@ -3,7 +3,7 @@
 import type { CallToolResult, McpServer } from '@modelcontextprotocol/server';
 import { z } from 'zod';
 import { G0_RULE_IDS, errorMessage, findingLine, summaryText, type DocOp, type Finding, type FindingSummary } from '@lakar/schema';
-import { formatError, type DaemonClient } from './client.js';
+import { formatError, type LakarTransport } from './client.js';
 import { toolAnnotations } from './annotations.js';
 
 /** Deskripsi tool `fix_check`. */
@@ -51,7 +51,7 @@ export function formatFixCheck(d: FixCheckData): string {
 
 const errorResult = (text: string): CallToolResult => ({ isError: true, content: [{ type: 'text', text }] });
 
-export function registerFixCheckTool(server: McpServer, client: DaemonClient): void {
+export function registerFixCheckTool(server: McpServer, client: LakarTransport): void {
   server.registerTool(
     'fix_check',
     {

@@ -136,11 +136,13 @@ export type SelectionRoutesOptions = {
   render: RenderPort<ResolvedDocument>;
   /** Ikon board yang tidak dikenal katalog → ICON_UNKNOWN (seperti inspect) sebelum render. */
   assertIcons: (board: ResolvedDocument['pages'][number]['children'][number]) => void;
+  /** Room `@lakar/sync` yang digabung: slug room membaca replika. */
+  rooms?: { doc(slug: string): LakarDocument | undefined };
 };
 
 const zodMessage = (e: z.ZodError) => e.issues.map((i) => `${i.path.join('.') || 'body'}: ${i.message}`).join('; ');
 
-export function registerSelectionRoutes(app: FastifyInstance, { docs, store, sessions, selections, focus, activity, render, assertIcons }: SelectionRoutesOptions): void {
+export function registerSelectionRoutes(app: FastifyInstance, { docs, store, sessions, selections, focus, activity, render, assertIcons, rooms }: SelectionRoutesOptions): void {
   const checkSlug = (slug: string) => {
     if (!SLUG_PATTERN.test(slug)) {
       throw new LakarError('SCHEMA_INVALID', `slug tidak valid: ${JSON.stringify(slug)}`, {
@@ -153,7 +155,7 @@ export function registerSelectionRoutes(app: FastifyInstance, { docs, store, ses
    * (tanpa kunci, jadi tidak boleh menulis balik migrasi/riwayat seperti `DocStore.read`) dan tanpa di-cache.
    */
   const loadDoc = async (slug: string): Promise<LakarDocument> => {
-    const doc = docs.get(slug) ?? (await peekDocument(store, slug));
+    const doc = docs.get(slug) ?? rooms?.doc(slug) ?? (await peekDocument(store, slug));
     if (!doc) throw new LakarError('NOT_FOUND', `dokumen ${slug} tidak ada`, { hint: 'pakai slug dari GET /viewer/docs' });
     return doc;
   };

@@ -32,4 +32,8 @@ export {
 } from './server.js';
 export { TOOL_EFFECTS, toolAnnotations, type ToolEffect, type ToolName } from './annotations.js';
 export { FIX_CHECK_DESCRIPTION, FIX_CHECK_FINDING_LINES, formatFixCheck, type FixCheckData } from './fix-check.js';
-export { CLIENT_NAME, DaemonClient, DaemonUnavailableError, START_HINT, VERSION_HINT, VersionMismatchError } from './client.js';
+export { CLIENT_NAME, DaemonClient, DaemonUnavailableError, START_HINT, VERSION_HINT, VersionMismatchError, type AgentInfo, type LakarTransport } from './client.js';
+// FileClient sengaja TIDAK diekspor di sini: file-client.ts memuat @lakar/daemon (DocStore/core/exec), dan
+// impor index di mode daemon tidak boleh menariknya. Dimuat malas lewat `await import('./file-client.js')`
+// hanya di cabang `--file`/`LAKAR_FILE` pada main.ts; tes mengimpor './file-client.js' langsung.
+// SyncClient idem (sync-client.ts memuat ws + @lakar/daemon): dimuat malas di cabang `--server`/`LAKAR_SERVER`.

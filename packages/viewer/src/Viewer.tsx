@@ -69,7 +69,8 @@ import { SidebarToggle, useSidebars } from './SidebarToggle';
 import { sidebarShortcut } from './sidebars';
 import { AddLayerButton, IconPicker, Toast, type ToastState } from './AddLayer';
 import { api, ApiError, errorText, OfflineError, type FontFamily, type HistoryEntry, type ImportUrlBody, type InspectResult } from './api';
-import { Canvas, type CanvasPreview, type Focus, type Highlight, type InsertPoint } from './Canvas';
+import { Canvas, type CanvasPeer, type CanvasPreview, type Focus, type Highlight, type InsertPoint } from './Canvas';
+import { peerViews, useRoomPeers, type RoomPresencePayload } from './rooms';
 import type { PathEditPanel } from './pathTools';
 import { measuredBoards, withHeight } from './boardHeight';
 import { failureText, imageFileProblem, insertBoardAt, insertBoardPlaced, insertIntoBoard, canvasInsertTarget, menuInsertTarget, type BoardPreset, type InsertExtra, type InsertKind, type InsertTarget } from './codegen';
@@ -85,6 +86,7 @@ import { Icon, NODE_ICON } from './icons';
 import { Modal } from './NewFileDialog';
 import { DesignPanel } from './DesignPanel';
 import { CodeExportDialog } from './CodeExportDialog';
+import { ShareDialog } from './ShareDialog';
 import { ImportCssDialog, ImportDtcgDialog } from './TokensCss';
 import { effectiveMode } from './themeModel';
 import { parentLayoutOf, type DesignTarget } from './designModel';
@@ -95,6 +97,16 @@ import { requestCloseTab } from './tabs';
 import { getCamera, getViewState, saveCamera, saveViewState, type PanelTab } from './viewState';
 import { CommentsPanel, fixPromptText, type CanvasComments } from './comments';
 import type { CommentThread } from './api';
+
+/** Interval minimum siaran presence room (collab story 5): kursor+seleksi ≈ 20 Hz dengan trailing send. */
+const PRESENCE_THROTTLE_MS = 50;
+/** Maks. chip peer di topbar sebelum sisanya digulung menjadi "+N". */
+const PEER_CHIPS_MAX = 3;
+/** Inisial nama peer (maks. 2 huruf) untuk chip topbar. */
+function peerInitials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  return (parts.length > 1 ? parts[0]![0]! + parts[1]![0]! : (parts[0] ?? '?').slice(0, 2)).toUpperCase();
+}
 
 const FOLLOW_KEY = 'lakar.viewer.followAgent';
 function readFollow(): boolean {
@@ -306,6 +318,8 @@ export function Viewer({ slug }: { slug: string }) {
   const [restoreError, setRestoreError] = useState<string | undefined>(undefined);
   /** Dialog Export code (epic kode story 5): id node sumber; ditutup saat pratinjau versi. */
   const [codeExport, setCodeExport] = useState<string | undefined>(undefined);
+  /** Dialog Share link (plan-share-link-ui): tombol di topbar; ditutup saat pratinjau versi. */
+  const [shareOpen, setShareOpen] = useState(false);
   /** Dialog Import (panel Theme): CSS variables (epic kode story 5) dan DTCG tokens (story 9). */
   const [cssImportOpen, setCssImportOpen] = useState(false);
   const [dtcgImportOpen, setDtcgImportOpen] = useState(false);
@@ -711,6 +725,60 @@ export function Viewer({ slug }: { slug: string }) {
    */
   const presence = useMemo(() => agentPresence(views, index, now), [views, index, now]);
   const marks = useMemo(() => layerMarks(presence), [presence]);
+
+  // Peer room `@lakar/sync` (collab story 5): `joined` = dokumen ini memang room (slug `room-*` lokal → false).
+  const room = useRoomPeers(slug);
+  const roomPeers = useMemo(() => peerViews(room), [room]);
+  const canvasPeers = useMemo<CanvasPeer[]>(
+    () =>
+      roomPeers.map((p) => {
+        const pr = room.presence[p.peerId] as RoomPresencePayload | undefined;
+        const cursor = pr?.cursor ? { x: pr.cursor.x, y: pr.cursor.y } : undefined;
+        return { peerId: p.peerId, name: p.name, kind: p.kind, color: p.color, ...(cursor ? { cursor } : {}) };
+      }),
+    [roomPeers, room.presence],
+  );
+  // Presence kursor + seleksi lokal disiarkan ke room maks. ~20 Hz; timer trailing menjamin posisi akhir terkirim.
+  const presenceRef = useRef<{ t: number; timer: ReturnType<typeof setTimeout> | undefined; cursor: { x: number; y: number } | undefined }>({ t: 0, timer: undefined, cursor: undefined });
+  const selRef = useRef<readonly string[]>(selection);
+  selRef.current = selection;
+  const publishPresence = useCallback(
+    (at: { x: number; y: number } | undefined) => {
+      if (!room.joined) return;
+      const r = presenceRef.current;
+      r.cursor = at;
+      const fire = () => {
+        r.t = Date.now();
+        const cursor = r.cursor;
+        void api.sendRoomPresence(slug, { cursor: cursor ?? null, selection: [...selRef.current] }).catch(() => {});
+      };
+      const wait = Date.now() - r.t;
+      if (wait >= PRESENCE_THROTTLE_MS) {
+        if (r.timer) {
+          clearTimeout(r.timer);
+          r.timer = undefined;
+        }
+        fire();
+      } else if (!r.timer) {
+        r.timer = setTimeout(() => {
+          r.timer = undefined;
+          fire();
+        }, PRESENCE_THROTTLE_MS - wait);
+      }
+    },
+    [slug, room.joined],
+  );
+  // Seleksi berubah tanpa gerak kursor tetap disiarkan (payload membawa posisi kursor terakhir).
+  useEffect(() => {
+    if (room.joined) publishPresence(presenceRef.current.cursor);
+  }, [selection, room.joined, publishPresence]);
+  // Keluar viewer/lepas room: bersihkan kursor agar tidak tertinggal di peer lain.
+  useEffect(() => {
+    if (!room.joined) return;
+    return () => {
+      void api.sendRoomPresence(slug, { cursor: null, selection: [] }).catch(() => {});
+    };
+  }, [slug, room.joined]);
   // Execute pertama sesi (board belum diketahui): label Generating tingkat dokumen (spec-progressive-live-build).
   const pending = useMemo(() => pendingAgents(views, index), [views, index]);
   // Rencana fade-in node baru dari execute agen (spec-canvas-agent-effects); Canvas menyaring yang lama.
@@ -1613,8 +1681,23 @@ export function Viewer({ slug }: { slug: string }) {
           <span className="viewer-topbar-title">{slug}</span>
           <span className="viewer-topbar-page">{previewDoc ? `Previewing rev ${d.rev}` : page?.name}</span>
         </button>
+        {/* Chip peer room (collab story 5): bulat = manusia, kotak = agen; maks. 3 lalu "+N". */}
+        {roomPeers.length > 0 && (
+          <div className="viewer-peer-chips" title={room.connected ? 'Room peers' : 'Reconnecting to room…'}>
+            {roomPeers.slice(0, PEER_CHIPS_MAX).map((p) => (
+              <span key={p.peerId} className={`peer-chip ${p.kind} ${p.color}${room.connected ? '' : ' offline'}`} title={`${p.name} (${p.kind})`}>
+                {peerInitials(p.name)}
+              </span>
+            ))}
+            {roomPeers.length > PEER_CHIPS_MAX && <span className="peer-chip more">+{roomPeers.length - PEER_CHIPS_MAX}</span>}
+          </div>
+        )}
         <button type="button" className={`viewer-topbar-btn${tab === 'history' ? ' active' : ''}`} aria-label="History" title="History" onClick={() => openTab('history')}>
           <Icon name="history" size={18} />
+        </button>
+        <button type="button" className="viewer-topbar-share" onClick={() => setShareOpen(true)} disabled={preview !== undefined}>
+          <Icon name="link" size={14} />
+          Share
         </button>
       </header>
       <aside className="layers-panel">
@@ -1797,6 +1880,8 @@ export function Viewer({ slug }: { slug: string }) {
         boards={boards}
         onHugHeight={onHugHeight}
         presence={presence}
+        peers={roomPeers.length > 0 ? canvasPeers : undefined}
+        onCursor={room.joined ? publishPresence : undefined}
         pending={pending}
         fades={fades}
         fadeEpoch={fadeEpoch}
@@ -1906,6 +1991,7 @@ export function Viewer({ slug }: { slug: string }) {
       )}
       {toast && <Toast toast={toast} onClose={closeToast} />}
       {codeExport && !preview && <CodeExportDialog doc={latestDoc} nodeId={codeExport} onClose={() => setCodeExport(undefined)} />}
+      {shareOpen && !preview && <ShareDialog slug={slug} onClose={() => setShareOpen(false)} />}
       {cssImportOpen && !preview && (
         <ImportCssDialog
           doc={latestDoc}
@@ -1960,6 +2046,7 @@ export function Viewer({ slug }: { slug: string }) {
         <FileMenu
           target={{ slug, x: fileMenu.x, y: fileMenu.y }}
           archived={false}
+          remote={room.joined}
           port={Number(location.port) || undefined}
           onClose={() => setFileMenu(undefined)}
           onError={setToast}

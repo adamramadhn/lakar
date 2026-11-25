@@ -5,7 +5,7 @@
 // tidak masuk state Activity; `remoteEffect`/`editChange` memutuskan reaksinya. `activityHub` berbagi satu
 // EventSource per jendela untuk App (daftar, tab) dan Viewer (state Activity, muat ulang dokumen).
 
-import { api } from './api.js';
+import { api, type CloudUser } from './api.js';
 
 export const VIEWER_CLIENT = 'lakar-viewer';
 /** Sesi dianggap Live bila ada call running atau call terakhir lebih baru dari ini. */
@@ -63,8 +63,19 @@ export type SelectionEvent = { seq: number; type: 'selection'; selection: DocSel
 /** Permintaan buka tab dokumen baru dari `open_doc` agen (salinan `DocOpenRequest` events.ts). */
 export type DocOpenRequest = { slug: string; origin?: string };
 export type OpenTabEvent = { seq: number; type: 'openTab'; openTab: DocOpenRequest };
+/** Peer room berubah atau status koneksi room berubah (story 5; broadcast-only, tanpa ring). `self` = peerId koneksi kita saat itu. */
+export type PeersEvent = {
+  seq: number;
+  type: 'peers';
+  peers: { slug: string; connected: boolean; peers: { peerId: string; name: string; kind: 'human' | 'agent'; access: 'edit' | 'view'; presence?: unknown }[]; self?: string };
+};
+/** Presence satu peer room (kursor/seleksi jarak jauh; broadcast-only). */
+export type PresenceEvent = { seq: number; type: 'presence'; presence: { slug: string; peerId: string; presence: unknown } };
+/** Status sign-in cloud berubah (spec-cloud-auth story C/D; broadcast-only, tanpa ring). `user` hanya ada saat `signedIn`. */
+export type CloudAuthState = { signedIn: boolean; user?: CloudUser };
+export type AuthEvent = { seq: number; type: 'auth'; auth: CloudAuthState };
 /** Semua event stream `/viewer/events` sesudah `hello`. */
-export type StreamEvent = ActivityEvent | ChangeEvent | SelectionEvent | OpenTabEvent;
+export type StreamEvent = ActivityEvent | ChangeEvent | SelectionEvent | OpenTabEvent | PeersEvent | PresenceEvent | AuthEvent;
 
 // ---- Reducer ----
 
@@ -92,8 +103,8 @@ export const isDocChangeFromViewer = (c: Pick<ActivityCall, 'client' | 'tool'>) 
 function applyEvent(state: ActivityState, event: StreamEvent): ActivityState {
   if (event.seq <= state.seq) return state;
   const next: ActivityState = { ...state, seq: event.seq };
-  // Perubahan dari aplikasi, seleksi, dan permintaan buka tab tidak tampil di Activity.
-  if (event.type === 'change' || event.type === 'selection' || event.type === 'openTab') return next;
+  // Perubahan dari aplikasi, seleksi, buka tab, event room, dan auth tidak tampil di Activity.
+  if (event.type === 'change' || event.type === 'selection' || event.type === 'openTab' || event.type === 'peers' || event.type === 'presence' || event.type === 'auth') return next;
   if (event.type === 'session') {
     if (isViewer(event.session.client)) return next;
     next.sessions = { ...state.sessions, [event.session.id]: { ...state.sessions[event.session.id], ...event.session } };
@@ -450,6 +461,9 @@ export function connectActivity(handlers: StreamHandlers, opts: { url?: string; 
     src.addEventListener('selection', onData);
     // Bukan `open` (nama event bawaan EventSource saat tersambung).
     src.addEventListener('openTab', onData);
+    src.addEventListener('peers', onData);
+    src.addEventListener('presence', onData);
+    src.addEventListener('auth', onData);
     src.onerror = () => {
       if (stopped || es !== src) return;
       src.close();
@@ -472,7 +486,7 @@ export function connectActivity(handlers: StreamHandlers, opts: { url?: string; 
 // ---- Hub: satu stream per jendela ----
 
 export type HubListener = {
-  /** Setiap event sesudah `hello` (call, session, change, selection, openTab). */
+  /** Setiap event sesudah `hello` (call, session, change, selection, openTab, peers, presence, auth). */
   onEvent?: (event: StreamEvent) => void;
   /** Stream tersambung lagi (event yang hilang tidak diputar ulang): muat ulang. */
   onReconnect?: () => void;

@@ -67,6 +67,14 @@ export type DocSummary = {
   lastClient?: string;
   lastAgent?: string;
   check?: { error: number; warning: number };
+  /** Dokumen room `@lakar/sync` yang digabung (story 5): bukan file lokal — tanpa history/snapshot/folder. */
+  remote?: boolean;
+  /** Origin sync server room (`remote` saja). */
+  server?: string;
+  /** Jumlah peer di room, termasuk klien daemon (`remote` saja). */
+  peers?: number;
+  /** Koneksi room hidup (`remote` saja; false = menyambung ulang). */
+  connected?: boolean;
 };
 /** Status pool render (`/status` → `pool`); `lastError` mis. "Chrome atau Edge tidak ditemukan …" di aplikasi desktop. */
 export type PoolStatus = { size: number; ready: number; browserVersion?: string; lastError?: string };
@@ -108,6 +116,12 @@ export type UploadedAsset = { assetId: string; mime: string; width: number; heig
 export type IconResult = { lib: string; icon: string; title?: string; aliasOf?: string };
 /** Hasil operasi halaman (`/viewer/docs/:slug/pages…`). */
 export type PageResult = { slug: string; rev: number; pageId: string };
+/** Peer room (story 5): `kind` membedakan chip bulat (human) dan kotak (agent) di title bar. */
+export type RoomPeer = { peerId: string; name: string; kind: 'human' | 'agent'; access: 'edit' | 'view'; presence?: unknown };
+/** Hasil `POST /viewer/rooms/join`. */
+export type RoomJoin = { slug: string; server: string; name: string; rev: number; peers: number; connected: boolean };
+/** Hasil `GET /viewer/rooms/:slug/peers`. */
+export type RoomPeers = { slug: string; connected: boolean; peers: RoomPeer[]; self?: string };
 /**
  * Hasil `POST /viewer/docs/:slug/ops`: `inverse` = op yang membatalkan commit ini (kosong bila tanpa efek). ID node baru
  * per op diketahui lewat `refs` (ref lokal → ID; kirim `ref` pada add/duplicate). `created` = semua node yang muncul
@@ -122,6 +136,44 @@ export type PasteResult = OpsResult & { nodeId: string; report: PasteReport };
 export type ImportUrlBody = { url: string; pageId?: string; x?: number; y?: number; name?: string; description?: string; width?: number; screen?: 'landing' | 'app' | 'mobile' };
 /** Hasil impor URL: seperti paste + `boardId` board baru dan metadata halaman yang diambil. */
 export type ImportUrlResult = OpsResult & { nodeId: string; boardId: string; report: PasteReport; page: { url: string; finalUrl: string; title?: string } };
+
+// ---- Sign-in cloud (spec-cloud-auth story D): status/start/logout lewat `/viewer/auth/*`.
+// Session disimpan daemon (dataDir/session.json) — viewer tidak pernah memegang token. ----
+
+/** Profil akun dari `/viewer/auth/status` (`user`, bentuk `CloudUser` daemon). */
+export type CloudUser = { id: string; email: string; name?: string; avatarUrl?: string };
+/** Provider sign-in yang diiklankan service; `email` = magic link (butuh alamat email). */
+export type AuthProvider = 'google' | 'github' | 'email';
+/** `GET /viewer/auth/status`: `configured:false` = LAKAR_CLOUD_URL belum diset; `host` = host service; `providers` hanya ada bila service menjawab. */
+export type AuthStatus = { signedIn: boolean; configured: boolean; user?: CloudUser; providers?: string[]; host?: string };
+/** Body `POST /viewer/auth/start`: OAuth (`google`/`github`) → `{url}` untuk dibuka di browser sistem; magic link (`email`) → `{sent:true}`. */
+export type AuthStartBody = { provider: 'google' | 'github' } | { provider: 'email'; email: string };
+export type AuthStartResult = { url: string } | { sent: true };
+
+// ---- Share link (plan-share-link-ui): proxy daemon → @lakar/api; kunci cloud hanya di daemon. ----
+
+/** Izin satu share link (lihat selalu ada — token = izin). */
+export type SharePermissions = { comment: boolean; download: boolean };
+/** Satu baris "Active links" di dialog Share (meta service + url halaman tamu). */
+export type ShareLink = {
+  token: string;
+  slug: string;
+  title: string;
+  permissions: SharePermissions;
+  url: string;
+  createdAt: string;
+  /** ISO kedaluwarsa; null = Never. */
+  expiresAt: string | null;
+  views: number;
+  boards: { id: string; name: string; w: number; h: number }[];
+};
+/** `GET /viewer/docs/:slug/shares`: `configured:false` = cloud env belum diset di lakard. */
+export type ShareList = { configured: boolean; host?: string; shares: ShareLink[] };
+/** Hasil upload/refresh snapshot share. */
+export type ShareUpload = { token: string; url: string; boards: number };
+/** Body PATCH share: izin parsial dan/atau kedaluwarsa (null = Never). */
+export type SharePatch = { permissions?: Partial<SharePermissions>; expiresAt?: string | null };
+
 /** Font terpasang (GET /viewer/fonts). */
 export type FontFamily = { family: string; weights: number[]; styles: string[] };
 export type LayoutCheck = { docId: string; rev: number; boards: unknown; summary: FindingSummary; findings: Finding[]; ranAt: number };
@@ -208,7 +260,7 @@ export const connection = {
   },
 };
 
-async function request<T>(method: 'GET' | 'POST' | 'PUT' | 'DELETE', path: string, body?: unknown, session?: string, keepalive?: boolean): Promise<T> {
+async function request<T>(method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE', path: string, body?: unknown, session?: string, keepalive?: boolean): Promise<T> {
   let res: Response;
   try {
     res = await fetch(path, {
@@ -373,6 +425,28 @@ class ViewerClient {
     const { doc } = await request<{ doc: LakarDocument }>('GET', `/viewer/docs/${encodeURIComponent(slug)}`);
     this.#known.add(slug);
     return doc;
+  }
+
+  // ---- Room `@lakar/sync` (story 5) ----
+
+  /** Gabung room: `{server, token}` → slug `room-<token6>` yang tampil di Dashboard sebagai remote. */
+  joinRoom(server: string, token: string, name?: string): Promise<RoomJoin> {
+    return request<RoomJoin>('POST', '/viewer/rooms/join', { server, token, ...(name !== undefined ? { name } : {}) });
+  }
+
+  /** Keluar room (koneksi WS ditutup; dokumen tidak disimpan lokal). */
+  leaveRoom(slug: string): Promise<{ slug: string; server: string }> {
+    return request('POST', `/viewer/rooms/${encodeURIComponent(slug)}/leave`);
+  }
+
+  /** Daftar peer + status koneksi room (untuk chip title bar; sisanya event `peers` di stream). */
+  listRoomPeers(slug: string): Promise<RoomPeers> {
+    return request('GET', `/viewer/rooms/${encodeURIComponent(slug)}/peers`);
+  }
+
+  /** Siarkan presence klien ini ke peer room (kursor/seleksi; payload bebas). */
+  sendRoomPresence(slug: string, presence: unknown): Promise<{ slug: string }> {
+    return request('PUT', `/viewer/rooms/${encodeURIComponent(slug)}/presence`, { presence });
   }
 
   /**
@@ -974,6 +1048,54 @@ class ViewerClient {
 
   layoutCheck(slug: string): Promise<LayoutCheck> {
     return this.#withDoc(slug, async (s) => ({ ...(await request<Omit<LayoutCheck, 'ranAt'>>('POST', '/layout-check', {}, s)), ranAt: Date.now() }));
+  }
+
+  // ---- Sign-in cloud (spec-cloud-auth story D): `/viewer/auth/*`; token session tetap di daemon. ----
+
+  /** Status sign-in cloud (`GET /viewer/auth/status`). `providers` diisi bila service menjawab; `host` = host LAKAR_CLOUD_URL. */
+  authStatus(): Promise<AuthStatus> {
+    return request<AuthStatus>('GET', '/viewer/auth/status');
+  }
+
+  /**
+   * Mulai sign-in (POST /viewer/auth/start): `{provider:'google'|'github'}` → `{url}` yang dibuka viewer
+   * di browser sistem (`window.open` di browser; `openExternal` desktop.ts di aplikasi Tauri —
+   * `window.open` no-op di sana); `{provider:'email', email}` → `{sent:true}` (magic link terkirim).
+   */
+  authStart(body: AuthStartBody): Promise<AuthStartResult> {
+    return request<AuthStartResult>('POST', '/viewer/auth/start', body);
+  }
+
+  /** Sign out (POST /viewer/auth/logout): hapus session lokal + revoke di service. Idempoten. */
+  authLogout(): Promise<{ signedIn: false }> {
+    return request<{ signedIn: false }>('POST', '/viewer/auth/logout');
+  }
+
+  // ---- Share link (plan-share-link-ui): proxy `/viewer/*` ke @lakar/api; tanpa sesi dokumen. ----
+
+  /** Daftar share aktif dokumen `slug` (+ `configured:false` bila cloud env lakard belum diset). */
+  listShares(slug: string): Promise<ShareList> {
+    return request<ShareList>('GET', `/viewer/docs/${encodeURIComponent(slug)}/shares`);
+  }
+
+  /** Buat link baru: render snapshot board lalu upload ke service (daemon yang merender). */
+  createShare(slug: string, permissions?: SharePermissions): Promise<ShareUpload> {
+    return request<ShareUpload>('POST', `/viewer/docs/${encodeURIComponent(slug)}/share`, permissions ? { permissions } : undefined);
+  }
+
+  /** Ubah izin dan/atau kedaluwarsa link `token` (`expiresAt:null` = Never). */
+  patchShare(token: string, patch: SharePatch): Promise<Record<string, unknown>> {
+    return request('PATCH', `/viewer/shares/${encodeURIComponent(token)}`, patch);
+  }
+
+  /** Revoke link `token` — semua GET publiknya langsung 404. */
+  revokeShare(token: string): Promise<{ token: string; revoked: boolean }> {
+    return request('DELETE', `/viewer/shares/${encodeURIComponent(token)}`);
+  }
+
+  /** "Update snapshot": render ulang `slug` dan ganti PNG/doc link `token` (URL & komentar tetap). */
+  refreshShare(token: string, slug: string): Promise<ShareUpload> {
+    return request<ShareUpload>('POST', `/viewer/shares/${encodeURIComponent(token)}/refresh`, { slug });
   }
 }
 

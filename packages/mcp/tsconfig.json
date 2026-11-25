@@ -9,6 +9,9 @@
   "references": [
     {
       "path": "../schema"
+    },
+    {
+      "path": "../daemon"
     }
   ],
   "compilerOptions": {

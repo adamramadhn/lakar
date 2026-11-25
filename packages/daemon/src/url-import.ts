@@ -115,7 +115,7 @@ const hostOf = (finalUrl: string): string => {
 
 async function commitUrlImport(opts: UrlImportRoutesOptions, slug: string, body: UrlImportBody, actor: Actor, onMissing: () => LakarError) {
   // Pra-cek dokumen+pageId SEBELUM fetch (seperti pasteParent di commitPaste): tujuan salah gagal cepat tanpa jaringan.
-  const pre = opts.docs.get(slug) ?? (await opts.store.read(slug));
+  const pre = opts.docs.get(slug) ?? opts.rooms?.doc(slug) ?? (await opts.store.read(slug));
   if (!pre) throw onMissing();
   if (body.pageId && !resolveDocument(pre).pages.some((p) => p.id === body.pageId)) {
     throw new LakarError('NOT_FOUND', `halaman ${body.pageId} tidak ada di dokumen ${slug}`, { hint: 'pakai pageId dari dokumen (list_boards/inspect)' });
@@ -134,8 +134,45 @@ async function commitUrlImport(opts: UrlImportRoutesOptions, slug: string, body:
   const width = Math.round(body.width ?? URL_IMPORT_DEFAULT_WIDTH);
   const imported = await importHtmlPage(opts, page.html, width, body.name);
   const description = body.description ?? describeImport(page.title, page.finalUrl);
+  // Slug room: ops impor di-commit ke sequencer (tanpa kunci/snapshot lokal); bentuk respons sama.
+  const room = opts.rooms?.get(slug);
+  if (room) {
+    const current = opts.rooms?.doc(slug);
+    if (!current) throw onMissing();
+    const doc = resolveDocument(current);
+    const target = body.pageId ? doc.pages.find((p) => p.id === body.pageId) : doc.pages[0];
+    if (!target) {
+      throw new LakarError('NOT_FOUND', `halaman ${body.pageId} tidak ada di dokumen ${slug}`, { hint: 'pakai pageId dari dokumen (list_boards/inspect)' });
+    }
+    const last = target.children.at(-1) as { x?: unknown; y?: unknown; width?: unknown } | undefined;
+    const bx = Math.round(body.x ?? (last ? (typeof last.x === 'number' ? last.x : 0) + (typeof last.width === 'number' ? last.width : 0) + 80 : 0));
+    const by = Math.round(body.y ?? (typeof last?.y === 'number' ? last.y : 0));
+    const height = Math.max(1, Math.round(imported.size?.height ?? 800));
+    const name = (body.name ?? page.title ?? hostOf(page.finalUrl)).slice(0, PASTE_NAME_MAX);
+    const board = { type: 'board', name, x: bx, y: by, width, height, screen: body.screen ?? screenOf(width), fills: [{ type: 'solid', color: '#FFFFFF' }] };
+    const ops: DocOp[] = [
+      { op: 'add', parentId: target.id, node: board, ref: BOARD_REF },
+      ...pasteOps(imported.node, { id: `@${BOARD_REF}`, type: 'board', width, height }, { x: 0, y: 0 }, imported.size),
+    ];
+    if (imported.assets.length) {
+      if (!opts.dataDir) throw new LakarError('RENDER_FAILED', 'store aset tidak tersedia untuk gambar HTML', { hint: 'jalankan lakard dengan dataDir', retryable: false });
+      for (const a of imported.assets) await writeAsset(opts.dataDir, a.bytes);
+    }
+    const r = await room.client.commitOps(ops, description);
+    return {
+      doc: r.doc,
+      created: r.created,
+      inverse: r.inverse,
+      refs: r.refs,
+      nodeId: r.refs[ROOT_REF]!,
+      boardId: r.refs[BOARD_REF]!,
+      boards: touchedBoards(doc, resolveDocument(r.doc)),
+      report: imported.report,
+      page: { url: body.url, finalUrl: page.finalUrl, ...(page.title ? { title: page.title } : {}) },
+    };
+  }
   return opts.docLocks.run(slug, async () => {
-    const current = opts.docs.get(slug) ?? (await opts.store.read(slug));
+    const current = opts.docs.get(slug) ?? opts.rooms?.doc(slug) ?? (await opts.store.read(slug));
     if (!current) throw onMissing();
     const doc = resolveDocument(current);
     const target = body.pageId ? doc.pages.find((p) => p.id === body.pageId) : doc.pages[0];

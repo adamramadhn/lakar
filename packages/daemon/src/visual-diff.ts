@@ -17,7 +17,7 @@ import { notFound } from './errors.js';
 import { readRevision } from './files.js';
 import { locateNode } from './inspect.js';
 import { decodePng, encodePng, type DecodedPng } from './png.js';
-import type { Session } from './sessions.js';
+import { NO_ACTIVE_DOC_HINT, type Session } from './sessions.js';
 import type { DocStore } from './store.js';
 
 /** Ambang beda warna pixelmatch (0–1, jarak OKLab HyAB); default pustaka. Piksel antialiasing tidak dihitung. */
@@ -503,11 +503,13 @@ export type VisualDiffRoutesOptions = {
   render: RenderPort<ResolvedDocument>;
   activeDoc: (header: string | string[] | undefined) => { session: Session; slug: string };
   assertIcons: (board: ResolvedDocument['pages'][number]['children'][number]) => void;
+  /** Room `@lakar/sync` yang digabung: sisi "terkini" bisa berupa replika room. */
+  rooms?: { doc(slug: string): LakarDocument | undefined; has(slug: string): boolean };
 };
 
 type Side = { raster: Raster; measure: BoardMeasure; board: ResolvedDocument['pages'][number]['children'][number] };
 
-export function registerVisualDiffRoutes(app: FastifyInstance, { docs, store, render, activeDoc, assertIcons }: VisualDiffRoutesOptions): void {
+export function registerVisualDiffRoutes(app: FastifyInstance, { docs, store, render, activeDoc, assertIcons, rooms }: VisualDiffRoutesOptions): void {
   // AD-4: route baru di bawah /viewer/* (seperti /viewer/undo). Guard Origin global hanya menolak Origin asing;
   // server MCP (fetch Node tanpa Origin) tetap lolos.
   app.post('/viewer/visual-diff', async (req, reply) => {
@@ -523,7 +525,8 @@ export function registerVisualDiffRoutes(app: FastifyInstance, { docs, store, re
     if (body.fromRev !== undefined && body.since !== undefined) {
       throw new LakarError('SCHEMA_INVALID', 'kirim fromRev ATAU since, bukan keduanya', { hint: VISUAL_DIFF_HINT });
     }
-    const current = docs.get(slug)!;
+    const current = docs.get(slug) ?? rooms?.doc(slug);
+    if (!current) throw new LakarError('NO_ACTIVE_DOC', 'sesi ini belum punya dokumen aktif', { hint: NO_ACTIVE_DOC_HINT });
     const toRev = body.toRev ?? current.rev;
     // Dasar default (hook tulis agen `AgentSteps.onAgentWrite`): rev sebelum tulis terakhir sesi ini (since 'session':
     // sebelum tulis pertamanya) di dokumen ini; sesi belum menulis → rev sebelumnya.
@@ -537,7 +540,9 @@ export function registerVisualDiffRoutes(app: FastifyInstance, { docs, store, re
     // r0 tanpa snapshot dianggap kosong hanya bila riwayat tidak punya commit r0: itu dokumen kosong dari open_doc
     // (createDocument + store.write). Ada commit r0 (duplikat) tetapi snapshot-nya hilang (retensi) → NOT_FOUND.
     const readRev = (rev: number) =>
-      readRevision(docs, store, slug, rev).catch(async (e: unknown) => {
+      // Dokumen room tidak punya snapshot lokal: rev ≠ terkini → NOT_FOUND eksplisit; rev terkini → replika.
+      rooms?.has(slug) ? Promise.resolve(rev === current.rev ? current : (() => { throw notFound(`dokumen room ${slug} tidak punya snapshot r${rev}`, 'dokumen room tidak menyimpan riwayat lokal'); })())
+      : readRevision(docs, store, slug, rev).catch(async (e: unknown) => {
         if (rev !== 0 || !(e instanceof LakarError) || e.code !== 'NOT_FOUND') throw e;
         const history = await store.readHistory(slug).catch(() => []);
         if (history.some((h) => h.rev === 0)) throw e;

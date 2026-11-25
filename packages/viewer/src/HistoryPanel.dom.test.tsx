@@ -4,6 +4,7 @@ import { screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { HistoryPanel } from './HistoryPanel';
 import { dom, renderUi } from './test/dom';
+import type { HistoryEntry } from './api';
 
 const SLUG = 'doc';
 const ENTRIES = [
@@ -11,7 +12,7 @@ const ENTRIES = [
   { rev: 2, description: 'Rename board', opsSummary: 'rename×1', opCount: 1, at: '2026-01-02T09:00:00Z', session: 'sess-111', snapshot: true },
 ];
 
-function panel(entries = ENTRIES) {
+function panel(entries: HistoryEntry[] = ENTRIES) {
   dom().daemon.on('GET', `/viewer/docs/${SLUG}/history`, () => ({ entries }));
   return renderUi(<HistoryPanel slug={SLUG} rev={3} onPreview={vi.fn()} onRestore={vi.fn()} />);
 }

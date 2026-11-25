@@ -261,7 +261,7 @@ describe('migrasi 2 → 3', () => {
     expect(MIGRATIONS[11]!(v11)).toEqual({ ...snapshot, schemaVersion: 12 });
     expect(v11).toEqual(snapshot);
     const doc = parseDocument(v11);
-    expect(doc.schemaVersion).toBe(12);
+    expect(doc.schemaVersion).toBe(SCHEMA_VERSION);
     expect(doc.comments).toEqual(comments);
     expect(doc.comments![0]!.fixRequest).toBeUndefined();
     // fixRequest v12 ikut tervalidasi bila ada di dokumen lama yang dibuka ulang (field baru sudah benar bentuknya).

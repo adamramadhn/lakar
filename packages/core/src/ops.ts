@@ -20,6 +20,12 @@ const OP_KEYS: Record<DocOpKind, { required: readonly string[]; optional: readon
   setComponent: { required: ['id', 'component'], optional: [] },
   resetOverride: { required: ['id'], optional: ['props'] },
   detach: { required: ['id'], optional: ['ref'] },
+  // Op level-dokumen (bukan node): dipakai klien sync untuk mutasi komentar/halaman.
+  setComments: { required: ['comments'], optional: [] },
+  insertPage: { required: ['page'], optional: ['index'] },
+  removePage: { required: ['id'], optional: [] },
+  renamePage: { required: ['id', 'name'], optional: [] },
+  movePage: { required: ['id', 'index'], optional: [] },
 };
 
 const OPS_HINT =
@@ -129,6 +135,21 @@ export function applyOps(tx: Transaction, ops: unknown): ApplyOpsResult {
         case 'detach':
           id = tx.detach(addr(o.id) as string) ?? undefined;
           break;
+        case 'setComments':
+          tx.setComments(o.comments);
+          break;
+        case 'insertPage':
+          tx.insertPage(o.page, o.index);
+          break;
+        case 'removePage':
+          tx.removePage(addr(o.id) as string);
+          break;
+        case 'renamePage':
+          tx.renamePage(addr(o.id) as string, o.name);
+          break;
+        case 'movePage':
+          tx.movePage(addr(o.id) as string, o.index);
+          break;
       }
       if ((o.op === 'add' || o.op === 'duplicate' || o.op === 'detach') && o.ref !== undefined && id !== undefined) refs[o.ref] = id;
     } catch (e) {
@@ -136,4 +157,128 @@ export function applyOps(tx: Transaction, ops: unknown): ApplyOpsResult {
     }
   });
   return { refs };
+}
+
+/**
+ * Bungkus `tx` dengan fasad `Transaction` yang mencatat setiap pemanggilan sebagai `DocOp` setara
+ * (untuk klien sync: snippet `execute` dijalankan pada replika lokal, ops-nya dikirim ke server dan
+ * diterapkan ulang di sana dengan seed deterministik). ID yang di-mint di transaksi ini dikembalikan
+ * pemanggilnya lalu dicatat sebagai `ref` + ditulis `"@<ref>"` pada field `id`/`parentId` op berikutnya —
+ * persis mekanisme `addr` di `applyOps`.
+ *
+ * Batasan terdokumentasi (sama dengan route ops): referensi ke ID minted di dalam payload `node`/`patch`/
+ * `component` (mis. `componentId`, `binds[].nodeId`) dan ID node dalam yang di-mint `duplicate`/`detach`/
+ * ekspansi tidak bisa dialamatkan `"@<ref>"` — op seperti itu gagal `SCHEMA_INVALID` saat replay.
+ */
+export function recordOps(tx: Transaction): { tx: Transaction; ops: DocOp[] } {
+  const ops: DocOp[] = [];
+  /** ID minted (nilai kembali add/duplicate/detach) → nama ref lokal. */
+  const minted = new Map<string, string>();
+  let n = 0;
+  /** Alamat `v` yang berawal ID minted → `"@<ref>"` (segmen komposit `/…` dipertahankan). */
+  const remap = <T>(v: T): T => {
+    if (typeof v !== 'string') return v;
+    const slash = v.indexOf('/');
+    const head = slash < 0 ? v : v.slice(0, slash);
+    const ref = minted.get(head);
+    return (ref === undefined ? v : `@${ref}${slash < 0 ? '' : v.slice(slash)}`) as T;
+  };
+  /** Daftarkan ID hasil op mint; `undefined`/`null` (mis. detach menghapus akar) → tanpa ref. */
+  const ref = (id: string | null | undefined): string | undefined => {
+    if (id === null || id === undefined) return undefined;
+    const r = `r${++n}`;
+    minted.set(id, r);
+    return r;
+  };
+  const opt = <K extends string, V>(key: K, v: V | undefined): Record<K, V> => (v === undefined ? {} : { [key]: v }) as Record<K, V>;
+  const rec: Transaction = {
+    add(parentId, node) {
+      const id = tx.add(parentId, node);
+      ops.push({ op: 'add', parentId: remap(parentId), node: node as Record<string, unknown>, ...opt('ref', ref(id)) });
+      return id;
+    },
+    update(id, patch) {
+      tx.update(id, patch);
+      ops.push({ op: 'update', id: remap(id), patch: patch as Record<string, unknown> });
+    },
+    replace(id, node) {
+      tx.replace(id, node);
+      ops.push({ op: 'replace', id: remap(id), node: node as Record<string, unknown> });
+    },
+    move(id, parentId, index) {
+      tx.move(id, parentId, index);
+      ops.push({ op: 'move', id: remap(id), parentId: remap(parentId), ...opt('index', index) });
+    },
+    duplicate(id, patch) {
+      const nid = tx.duplicate(id, patch);
+      ops.push({ op: 'duplicate', id: remap(id), ...opt('patch', patch as Record<string, unknown> | undefined), ...opt('ref', ref(nid)) });
+      return nid;
+    },
+    remove(id) {
+      tx.remove(id);
+      ops.push({ op: 'remove', id: remap(id) });
+    },
+    insert(parentId, node, index) {
+      const id = tx.insert(parentId, node, index);
+      ops.push({ op: 'insert', parentId: remap(parentId), node: node as Record<string, unknown>, ...opt('index', index) });
+      return id;
+    },
+    setTokens(map) {
+      tx.setTokens(map);
+      ops.push({ op: 'setTokens', tokens: map as Record<string, unknown> });
+    },
+    setTokenModes(modes) {
+      tx.setTokenModes(modes);
+      ops.push({ op: 'setTokenModes', modes: modes as string[] | null });
+    },
+    renameToken(from, to) {
+      tx.renameToken(from, to);
+      ops.push({ op: 'renameToken', from: String(from), to: String(to) });
+    },
+    setComponent(id, component) {
+      tx.setComponent(id, component);
+      ops.push({ op: 'setComponent', id: remap(id), component: component as Record<string, unknown> | null });
+    },
+    resetOverride(address, props) {
+      tx.resetOverride(address, props);
+      ops.push({ op: 'resetOverride', id: remap(address), ...opt('props', props as string[] | undefined) });
+    },
+    detach(id) {
+      const nid = tx.detach(id);
+      ops.push({ op: 'detach', id: remap(id), ...opt('ref', ref(nid)) });
+      return nid;
+    },
+    setComments(comments) {
+      tx.setComments(comments);
+      ops.push({ op: 'setComments', comments: comments as Record<string, unknown>[] | null });
+    },
+    setFlows(flows) {
+      tx.setFlows(flows);
+      ops.push({ op: 'setFlows', flows: flows as Record<string, unknown>[] | null });
+    },
+    insertPage(page, index) {
+      const id = tx.insertPage(page, index);
+      ops.push({ op: 'insertPage', page: page as Record<string, unknown>, ...opt('index', index) });
+      return id;
+    },
+    removePage(id) {
+      tx.removePage(id);
+      ops.push({ op: 'removePage', id });
+    },
+    renamePage(id, name) {
+      tx.renamePage(id, name);
+      ops.push({ op: 'renamePage', id: remap(String(id)), name: String(name) });
+    },
+    movePage(id, index) {
+      tx.movePage(id, index);
+      ops.push({ op: 'movePage', id: remap(String(id)), index: index as number });
+    },
+    view: () => tx.view(),
+    commit: (description) => tx.commit(description),
+    rollback: () => tx.rollback(),
+    get open() {
+      return tx.open;
+    },
+  };
+  return { tx: rec, ops };
 }

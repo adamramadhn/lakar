@@ -24,6 +24,8 @@ export type StartOptions = {
   photos?: PhotoService;
   /** Hook tes pool render (crash/macet deterministik). */
   onLease?: (page: Page) => Promise<void> | void;
+  /** Mode `--headless` resmi: viewer statis `/app/` tidak disajikan; `/status` menandai `headless:true`. */
+  headless?: boolean;
 };
 
 /** Rakit + listen di 127.0.0.1 (AD-14), lalu panaskan pool render di latar (AD-18). Port 0 = port acak (tes). */
@@ -42,7 +44,15 @@ export async function startDaemon(config: DaemonConfig, opts: StartOptions = {})
     ...(opts.onLease ? { onLease: opts.onLease } : {}),
   });
   const photos = opts.photos ?? new PhotoService({ dataDir: config.dataDir, keyFile: config.pexelsKeyFile, unsplashKeyFile: config.unsplashKeyFile, unsplashAppName: config.unsplashAppName });
-  const daemon = buildServer({ config, render: renderer, fonts, icons, photos, ...(opts.skillsDir ? { skillsDir: opts.skillsDir } : {}) });
+  const daemon = buildServer({
+    config,
+    render: renderer,
+    fonts,
+    icons,
+    photos,
+    ...(opts.skillsDir ? { skillsDir: opts.skillsDir } : {}),
+    ...(opts.headless ? { headless: true } : {}),
+  });
   await daemon.app.listen({ host: config.host, port: config.port });
   const addr = daemon.app.server.address();
   if (!addr || typeof addr === 'string') throw new Error('alamat listen tidak diketahui');
@@ -55,6 +65,7 @@ export async function startDaemon(config: DaemonConfig, opts: StartOptions = {})
     renderer,
     warmed,
     async close() {
+      daemon.rooms.close();
       await renderer.close();
       await daemon.app.close();
     },

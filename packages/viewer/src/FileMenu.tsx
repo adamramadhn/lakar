@@ -247,6 +247,7 @@ export function FileMenu({
   target,
   dialog,
   archived,
+  remote = false,
   port,
   folders,
   folderOf,
@@ -257,6 +258,8 @@ export function FileMenu({
   target: MenuTarget;
   dialog?: 'rename' | 'delete';
   archived: boolean;
+  /** Dokumen remote room `@lakar/sync` (collab story 5): operasi file lokal (rename/dst.) tidak berlaku → menu ringkas + Leave room. */
+  remote?: boolean;
   port: number | undefined;
   /** Slug terpakai (aktif + arsip yang dimuat) untuk validasi Rename. */
   taken?: ReadonlySet<string>;
@@ -278,7 +281,44 @@ export function FileMenu({
   if (phase === 'delete') return <DeleteDialog slug={slug} archived={archived} onClose={onClose} />;
   if (phase === 'move') return <MoveToDialog slug={slug} {...(folders ? { folders, current: folderOf ?? null } : {})} onClose={onClose} onError={onError} />;
 
-  const items: Item[] = archived
+  const items: Item[] = remote
+    ? [
+        // Room remote (collab story 5): rename/duplicate/archive/move/delete menolak daemon (501) — yang berlaku hanya Leave room.
+        {
+          label: 'Open',
+          icon: 'arrowUpRight',
+          shortcut: SHORTCUT.open.label,
+          keys: SHORTCUT.open.aria,
+          run: () => {
+            onClose();
+            location.hash = docHash(slug);
+          },
+        },
+        {
+          label: 'Open in new tab',
+          icon: 'externalLink',
+          run: () => {
+            onClose();
+            openInNewTab(slug);
+          },
+        },
+        {
+          label: 'Copy link',
+          icon: 'link',
+          run: act('copy', async () => copyText(docLink(port ?? (Number(location.port) || 7466), slug))),
+        },
+        {
+          label: 'Leave room',
+          icon: 'wifiOff',
+          danger: true,
+          separator: true,
+          run: act('leave', async () => {
+            await api.leaveRoom(slug);
+            location.hash = '#/';
+          }),
+        },
+      ]
+    : archived
     ? [
         { label: 'Unarchive', icon: 'archiveRestore', run: act('unarchive', () => api.unarchiveFile(slug)) },
         { label: 'Delete', icon: 'trash', shortcut: SHORTCUT.delete.label, keys: SHORTCUT.delete.aria, danger: true, separator: true, run: () => setPhase('delete') },

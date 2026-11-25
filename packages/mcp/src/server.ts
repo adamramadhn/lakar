@@ -18,7 +18,7 @@ import {
   SPACING_VALUES,
   TOUCH_MIN,
   LAKAR_VERSION, SCHEMA_VERSION, VERSION_HINT, errorMessage, findingLine, summaryText, type ApiResult, type Finding, type FindingSummary } from '@lakar/schema';
-import { DaemonClient, formatError } from './client.js';
+import { DaemonClient, formatError, type LakarTransport } from './client.js';
 import { registerFixCheckTool } from './fix-check.js';
 import { toolAnnotations } from './annotations.js';
 
@@ -145,6 +145,17 @@ export type StatusData = {
   icons?: Record<string, string>;
   photos?: { provider: string; keyFile: string; imported: number };
   sessions?: { count: number; active: { id: string; activeSlug?: string; executes: number }[] };
+  /** Mode `lakar --file` / `--server`: nama transport + detailnya (file: berkas/slug/rev; server: url/room/peer). */
+  transport?: string;
+  file?: string;
+  slug?: string;
+  rev?: number;
+  /** Mode `lakar --server`: URL `@lakar/sync`, capability token room, status koneksi WS, jumlah peer. */
+  server?: string;
+  room?: string;
+  connected?: boolean;
+  peers?: number;
+  hint?: string;
 };
 
 const uptime = (sec: number) => (sec < 60 ? `${sec}d` : sec < 3600 ? `${Math.floor(sec / 60)}m` : `${Math.floor(sec / 3600)}j ${Math.floor((sec % 3600) / 60)}m`);
@@ -167,7 +178,12 @@ export function formatStatus(st: StatusData): string {
   const sessions = ss
     ? `sesi: ${ss.count}${ss.active.length ? ` (${ss.active.map((a) => `${a.id} ${a.activeSlug ?? '-'}, ${a.executes} execute`).join('; ')})` : ''}`
     : 'sesi: -';
-  return [head, pool, fonts, icons, photos, sessions].join('\n');
+  const fileLine = st.transport === 'file' ? `lakar file: ${st.slug ?? '?'} (rev ${st.rev ?? '?'})${st.file ? ` · ${st.file}` : ''}` : undefined;
+  const serverLine =
+    st.transport === 'server'
+      ? `lakar server: ${st.server ?? '?'} room ${st.room ?? '?'} · koneksi ${st.connected === true ? 'hidup' : 'putus/menyambung ulang'} · rev ${st.rev ?? '?'} · ${st.peers ?? 0} peer`
+      : undefined;
+  return [head, ...(fileLine ? [fileLine] : []), ...(serverLine ? [serverLine] : []), pool, fonts, icons, photos, sessions, ...(st.hint ? [`hint: ${st.hint}`] : [])].join('\n');
 }
 
 /** Deskripsi tool `status`. */
@@ -482,10 +498,15 @@ export const VISUAL_DIFF_DESCRIPTION =
   'regions[].nodes = node paling spesifik yang bersinggungan (state added/removed): node di luar rencana edit berarti ikut berubah. ' +
   "Rev tanpa snapshot atau board/node tidak ada di kedua rev → NOT_FOUND; board/node hanya ada di satu rev → missing 'from'|'to'.";
 
-export function createLakarMcpServer(daemonUrl: string): McpServer {
+/**
+ * Rakit server MCP lakar. `backend` = URL lakard (`DaemonClient`, default) atau `LakarTransport` jadi
+ * (mis. `FileClient` dari `lakar --file`). Daftar tool dan routing route tidak berubah.
+ */
+export function createLakarMcpServer(backend: string | LakarTransport): McpServer {
   const server = new McpServer({ name: SERVER_NAME, version: SERVER_VERSION }, { instructions: SERVER_INSTRUCTIONS });
   // clientInfo harness (Claude Code, Codex, …) baru ada sesudah initialize; sesi daemon dibuat malas pada tool pertama.
-  const client = new DaemonClient(daemonUrl, { agent: () => server.server.getClientVersion() });
+  const client: LakarTransport = typeof backend === 'string' ? new DaemonClient(backend) : backend;
+  client.setAgent(() => server.server.getClientVersion());
   let executes = 0;
 
   server.registerTool(

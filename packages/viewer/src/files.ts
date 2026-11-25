@@ -56,6 +56,7 @@ export type Route =
   | { name: 'settings' }
   | { name: 'connections' }
   | { name: 'updates' }
+  | { name: 'join'; server?: string; token?: string }
   | { name: 'viewer'; slug: string }
   | { name: 'present'; slug: string; flow?: string };
 
@@ -85,6 +86,12 @@ export function parseRoute(hash: string): Route {
     }
   }
   if (/^#\/archive\/?$/.test(hash)) return { name: 'archive' };
+  // `#/join?server=<url>&token=<token>` — dialog gabung room (query opsional: prefill dari tautan undangan).
+  const j = /^#\/join(?:\?([^#]*))?\/?$/.exec(hash);
+  if (j) {
+    const q = new URLSearchParams(j[1] ?? '');
+    return { name: 'join', ...(q.get('server') ? { server: q.get('server')! } : {}), ...(q.get('token') ? { token: q.get('token')! } : {}) };
+  }
   const m = /^#\/d\/([^/?#]+)/.exec(hash);
   if (m) {
     try {
@@ -167,7 +174,7 @@ export const sortDocs = <T extends { slug: string; updatedAt: string }>(docs: re
 
 // ---- Pesan error kelola file ----
 
-export type FileOp = 'load' | 'create' | 'rename' | 'duplicate' | 'archive' | 'unarchive' | 'delete' | 'move' | 'folder' | 'copy';
+export type FileOp = 'load' | 'create' | 'rename' | 'duplicate' | 'archive' | 'unarchive' | 'delete' | 'move' | 'folder' | 'copy' | 'leave';
 
 const INTERNAL_PREFIX = 'kesalahan internal daemon: ';
 
@@ -192,6 +199,7 @@ export function fileErrorText(e: unknown, op: FileOp, slug: string | undefined, 
       if (op === 'folder') return 'A folder with this name already exists.';
       return `${name} changed in another window. Reload and try again.`;
     case 'NOT_FOUND':
+      if (op === 'leave') return 'This room is no longer joined. It may have been left in another window.';
       if (op === 'move' || op === 'folder') return 'This folder or file no longer exists. It may have been deleted in another window.';
       return `${name} no longer exists. It may have been renamed or deleted in another window.`;
     case 'SCHEMA_INVALID':
@@ -203,6 +211,7 @@ export function fileErrorText(e: unknown, op: FileOp, slug: string | undefined, 
       return `Lakar couldn’t save this change${detail ? ` (${detail})` : ''}. Try again.`;
     }
     default:
+      if (op === 'leave') return 'Couldn’t leave this room. Check your connection and try again.';
       return `Something went wrong (${code}). Try again.`;
   }
 }

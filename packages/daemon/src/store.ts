@@ -11,7 +11,7 @@
 // terakhir, dan total byte folder snapshot per dokumen maks SNAPSHOT_MAX_BYTES (snapshot tertua dibuang dulu; snapshot
 // terbaru selalu disimpan). Rename/archive/unarchive memindahkan foldernya, remove menghapusnya.
 import { mkdir, open, readFile, readdir, rename, rm, stat, truncate, type FileHandle } from 'node:fs/promises';
-import { dirname, join } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 import { randomBytes } from 'node:crypto';
 import { migrateDocument, parseDocument, type MigrationRegistry } from '@lakar/core';
 import { LakarError, SLUG_PATTERN, errorMessage, type HistoryEntry, type LakarDocument } from '@lakar/schema';
@@ -27,6 +27,18 @@ export type DocStoreOptions = {
   snapshotKeep?: number;
   /** Batas total byte snapshot per dokumen (default `SNAPSHOT_MAX_BYTES`). */
   snapshotMaxBytes?: number;
+  /**
+   * Ganti direktori dokumen (default `<dataDir>/docs`). Dipakai transport file (`lakar --file`): store
+   * menunjuk langsung ke direktori tempat `.lakar.json` berada, apa pun nama induknya.
+   */
+  docsDir?: string;
+  /**
+   * Nama berkas dokumen tetap pengganti `<slug>.lakar.json` — transport file (`lakar --file`) pada
+   * berkas yang namanya bukan slug valid (mis. `My Design.lakar.json`): slug = nama yang disanitasi,
+   * berkas di disk tetap nama aslinya. Riwayat memakai nama asli juga
+   * (`<nama tanpa .lakar.json>.history.jsonl`); folder snapshot tetap `.snapshots/<slug>/`.
+   */
+  docFile?: string;
 };
 
 /** Retensi snapshot: rev terakhir per dokumen. */
@@ -80,8 +92,8 @@ async function listDocsIn(dir: string): Promise<{ slug: string; mtimeMs: number 
   return out;
 }
 
-/** Hapus tmp sisa proses yang dibunuh milik `slug` di `dir`. */
-async function removeTmp(dir: string, slug: string): Promise<void> {
+/** Hapus tmp sisa proses yang dibunuh untuk berkas `docName`/`historyName` di `dir`. */
+async function removeTmp(dir: string, docName: string, historyName: string): Promise<void> {
   let names: string[];
   try {
     names = await readdir(dir);
@@ -89,7 +101,7 @@ async function removeTmp(dir: string, slug: string): Promise<void> {
     if (isEnoent(e)) return;
     throw e;
   }
-  const prefixes = [`${slug}${DOC_SUFFIX}.`, `${slug}${HISTORY_SUFFIX}.`];
+  const prefixes = [`${docName}.`, `${historyName}.`];
   await Promise.all(names.filter((n) => n.endsWith('.tmp') && prefixes.some((p) => n.startsWith(p))).map((n) => rm(join(dir, n), { force: true })));
 }
 
@@ -131,20 +143,23 @@ export class DocStore {
   readonly #log: (message: string) => void;
   readonly #keep: number;
   readonly #maxBytes: number;
+  readonly #docFile: string | undefined;
 
   constructor(dataDir: string, opts: DocStoreOptions = {}) {
-    this.docsDir = join(dataDir, 'docs');
+    this.docsDir = opts.docsDir ?? join(dataDir, 'docs');
     this.#migrate = opts.migrate ?? ((raw) => migrateDocument(raw, { migrations: opts.migrations }));
     this.#log = opts.log ?? ((m) => console.warn(m));
     this.#keep = Math.max(1, opts.snapshotKeep ?? SNAPSHOT_KEEP);
     this.#maxBytes = Math.max(0, opts.snapshotMaxBytes ?? SNAPSHOT_MAX_BYTES);
+    this.#docFile = opts.docFile;
   }
 
   docPath(slug: string): string {
-    return join(this.docsDir, `${slug}.lakar.json`);
+    return join(this.docsDir, this.#docFile ?? `${slug}.lakar.json`);
   }
   historyPath(slug: string): string {
-    return join(this.docsDir, `${slug}.history.jsonl`);
+    // docFile selalu berakhiran `.lakar.json` (divalidasi pemanggil) → riwayat = nama asli + .history.jsonl.
+    return join(this.docsDir, this.#docFile !== undefined ? `${this.#docFile.slice(0, -DOC_SUFFIX.length)}${HISTORY_SUFFIX}` : `${slug}.history.jsonl`);
   }
 
   /** Sidecar versi bernama (spec-viewer-named-versions): `<slug>.versions.json` di docsDir. */
@@ -387,7 +402,7 @@ export class DocStore {
     await rm(join(dir, `${slug}${HISTORY_SUFFIX}`), { force: true });
     await rm(join(dir, `${slug}${VERSIONS_SUFFIX}`), { force: true });
     await rm(this.snapshotDir(slug, archived), { recursive: true, force: true }).catch((e) => this.#log(`lakard: snapshot ${slug} gagal dihapus: ${errorMessage(e)}`));
-    await removeTmp(dir, slug);
+    await removeTmp(dir, `${slug}${DOC_SUFFIX}`, `${slug}${HISTORY_SUFFIX}`);
     await syncDir(dir).catch(() => {});
   }
 
@@ -474,7 +489,7 @@ export class DocStore {
       });
     }
     await mkdir(toDir, { recursive: true });
-    await removeTmp(fromDir, from);
+    await removeTmp(fromDir, `${from}${DOC_SUFFIX}`, `${from}${HISTORY_SUFFIX}`);
     const hasHistory = await isFile(fromHist);
     const fromVers = join(fromDir, `${from}${VERSIONS_SUFFIX}`);
     const toVers = join(toDir, `${to}${VERSIONS_SUFFIX}`);
@@ -534,9 +549,9 @@ export class DocStore {
     await syncDir(dir).catch(() => {});
   }
 
-  /** Hapus `<slug>.lakar.json.*.tmp` / `<slug>.history.jsonl.*.tmp` sisa proses yang dibunuh. */
+  /** Hapus tmp `<dokumen>/<riwayat>.*.tmp` sisa proses yang dibunuh (nama berkas asli bila `docFile`). */
   async #removeStaleTmp(slug: string): Promise<void> {
-    await removeTmp(this.docsDir, slug);
+    await removeTmp(this.docsDir, basename(this.docPath(slug)), basename(this.historyPath(slug)));
   }
 
   /** Buang baris parsial/rusak dan entri `rev > docRev`; tulis ulang atomik bila ada yang dibuang. */

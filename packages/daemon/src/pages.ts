@@ -8,6 +8,7 @@ import { IdAllocator, type DocumentLocks } from '@lakar/core';
 import { ID_PATTERN, LakarError, SLUG_PATTERN, errorMessage, type HistoryEntry, type LakarDocument } from '@lakar/schema';
 import { z } from 'zod';
 import { VIEWER_CLIENT, originOf, publicSessionId, type ActivityBus, type ActivityCall } from './events.js';
+import type { RoomRegistry } from './rooms.js';
 import type { DocStore } from './store.js';
 
 /** Panjang maksimum nama halaman (sesudah trim). */
@@ -28,6 +29,8 @@ export type PageRoutesOptions = {
   docLocks: DocumentLocks;
   /** Bus aktivitas: operasi halaman dipancarkan seperti tool call supaya viewer lain ikut memuat ulang. */
   activity?: ActivityBus;
+  /** Room `@lakar/sync` yang digabung: operasi halaman di slug room menjadi op `insertPage`/`renamePage`/`movePage`/`removePage`. */
+  rooms?: RoomRegistry;
 };
 
 const parse = <S extends z.ZodType>(schema: S, body: unknown, hint: string): z.output<S> => {
@@ -65,7 +68,7 @@ export function defaultPageName(pages: readonly { name: string }[]): string {
 /** Hasil mutasi: dokumen baru (tanpa rev; diisi `run`) + deskripsi riwayat, atau `null` = tanpa perubahan. */
 type Mutation = { next: LakarDocument; description: string } | null;
 
-export function registerPageRoutes(app: FastifyInstance, { docs, store, docLocks, activity }: PageRoutesOptions): void {
+export function registerPageRoutes(app: FastifyInstance, { docs, store, docLocks, activity, rooms }: PageRoutesOptions): void {
   let seq = 0;
 
   const pageIndexOf = (doc: LakarDocument, slug: string, pageId: string): number => {
@@ -114,11 +117,56 @@ export function registerPageRoutes(app: FastifyInstance, { docs, store, docLocks
     }
   };
 
+  /**
+   * Event call running→done/error seperti `run`, untuk jalur room (commit ops ke sequencer, bukan DocStore).
+   * Mutasi halaman di slug room berjalan lewat `commit(build)`: `build` dievaluasi ulang pada replika
+   * TERKINI setiap pengiriman (insertPage me-mint ID dan memilih "Page N" di basis segar; rename/move/
+   * delete me-resolve `pageId` di basis segar) sehingga retry pasca-rejected+resync tidak me-replay
+   * payload yang dibangun dari clone basi. `null` = tanpa perubahan pada replika ini.
+   */
+  const roomCall = async <T>(slug: string, label: string, origin: string | undefined, fn: () => Promise<{ slug: string; rev: number; pageId: string; description?: string } & T>) => {
+    const t0 = Date.now();
+    const call: ActivityCall = {
+      callId: `pages-${t0.toString(36)}-${++seq}`,
+      session: publicSessionId(VIEWER_CLIENT),
+      client: VIEWER_CLIENT,
+      tool: 'pages',
+      slug,
+      description: label,
+      status: 'running',
+      startedAt: new Date(t0).toISOString(),
+      ...(origin ? { origin } : {}),
+    };
+    activity?.emit({ type: 'call', call });
+    try {
+      const { description, ...out } = await fn();
+      activity?.emit({ type: 'call', call: { ...call, ...(description ? { description } : {}), status: 'done', durationMs: Date.now() - t0, rev: out.rev } });
+      return out;
+    } catch (e) {
+      const err = e instanceof LakarError ? { code: e.code, message: e.message } : { code: 'EXEC_ERROR', message: errorMessage(e) };
+      activity?.emit({ type: 'call', call: { ...call, status: 'error', durationMs: Date.now() - t0, error: err } });
+      throw e;
+    }
+  };
+
   // Tambah halaman di akhir; nama default "Page N".
   app.post<{ Params: { slug: string } }>('/viewer/docs/:slug/pages', async (req, reply) => {
     const { slug } = req.params;
     checkSlug(slug);
     const body = parse(AddBody, req.body, 'kirim {name?} (1–100 karakter)');
+    const room = rooms?.get(slug);
+    if (room) {
+      const data = await roomCall(slug, 'Add page', originOf(req.headers), async () => {
+        let pageId = '';
+        const r = await room.client.commit((base) => {
+          const name = body.name ?? defaultPageName(base.pages);
+          pageId = IdAllocator.forDocument(base).next();
+          return { ops: [{ op: 'insertPage', page: { id: pageId, name, children: [] } }], description: `Added page ${JSON.stringify(name)}` };
+        });
+        return { slug, rev: r.doc.rev, pageId };
+      });
+      return reply.code(200).send({ ok: true, data });
+    }
     const data = await run(slug, 'Add page', (doc) => {
       const name = body.name ?? defaultPageName(doc.pages);
       const pageId = IdAllocator.forDocument(doc).next();
@@ -133,6 +181,18 @@ export function registerPageRoutes(app: FastifyInstance, { docs, store, docLocks
     const { slug, pageId } = req.params;
     checkSlug(slug);
     const { name } = parse(RenameBody, req.body, 'kirim {name} (1–100 karakter)');
+    const room = rooms?.get(slug);
+    if (room) {
+      const data = await roomCall(slug, 'Rename page', originOf(req.headers), async () => {
+        const r = await room.client.commit((base) => {
+          const i = pageIndexOf(base, slug, pageId);
+          if (base.pages[i]!.name === name) return null;
+          return { ops: [{ op: 'renamePage', id: base.pages[i]!.id, name }], description: `Renamed page to ${JSON.stringify(name)}` };
+        });
+        return { slug, rev: r.doc.rev, pageId };
+      });
+      return reply.code(200).send({ ok: true, data });
+    }
     const data = await run(slug, 'Rename page', (doc) => {
       const i = pageIndexOf(doc, slug, pageId);
       if (doc.pages[i]!.name === name) return { mutation: null, pageId };
@@ -147,6 +207,21 @@ export function registerPageRoutes(app: FastifyInstance, { docs, store, docLocks
     const { slug, pageId } = req.params;
     checkSlug(slug);
     const { index } = parse(MoveBody, req.body, 'kirim {index} (bilangan bulat 0..jumlah halaman − 1)');
+    const room = rooms?.get(slug);
+    if (room) {
+      const data = await roomCall(slug, 'Move page', originOf(req.headers), async () => {
+        const r = await room.client.commit((base) => {
+          const from = pageIndexOf(base, slug, pageId);
+          if (index < 0 || index >= base.pages.length) {
+            throw new LakarError('SCHEMA_INVALID', `index harus 0..${base.pages.length - 1}, bukan ${index}`, { hint: 'index = posisi akhir halaman di daftar' });
+          }
+          if (index === from) return null;
+          return { ops: [{ op: 'movePage', id: base.pages[from]!.id, index }], description: `Moved page ${JSON.stringify(base.pages[from]!.name)}` };
+        });
+        return { slug, rev: r.doc.rev, pageId };
+      });
+      return reply.code(200).send({ ok: true, data });
+    }
     const data = await run(slug, 'Move page', (doc) => {
       const from = pageIndexOf(doc, slug, pageId);
       if (index < 0 || index >= doc.pages.length) {
@@ -164,6 +239,18 @@ export function registerPageRoutes(app: FastifyInstance, { docs, store, docLocks
   app.delete<{ Params: { slug: string; pageId: string } }>('/viewer/docs/:slug/pages/:pageId', async (req, reply) => {
     const { slug, pageId } = req.params;
     checkSlug(slug);
+    const room = rooms?.get(slug);
+    if (room) {
+      const data = await roomCall(slug, 'Delete page', originOf(req.headers), async () => {
+        const r = await room.client.commit((base) => {
+          const i = pageIndexOf(base, slug, pageId);
+          if (base.pages.length === 1) throw new LakarError('CONFLICT', `halaman ${pageId} adalah satu-satunya halaman ${slug}`, { hint: 'dokumen butuh setidaknya satu halaman' });
+          return { ops: [{ op: 'removePage', id: base.pages[i]!.id }], description: `Deleted page ${JSON.stringify(base.pages[i]!.name)}` };
+        });
+        return { slug, rev: r.doc.rev, pageId };
+      });
+      return reply.code(200).send({ ok: true, data });
+    }
     const data = await run(slug, 'Delete page', (doc) => {
       const i = pageIndexOf(doc, slug, pageId);
       if (doc.pages.length === 1) throw new LakarError('CONFLICT', `halaman ${pageId} adalah satu-satunya halaman ${slug}`, { hint: 'dokumen butuh setidaknya satu halaman' });

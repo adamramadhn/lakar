@@ -141,6 +141,8 @@ export type PasteRoutesOptions = {
   dataDir?: string;
   /** Hook tulis agen (spec-agent-undo, spec-agent-visual-diff): paste sesi agen = satu langkah undo + dasar visual_diff. */
   agentSteps?: AgentSteps;
+  /** Room `@lakar/sync` yang digabung: paste di slug room menjadi ops lewat klien room (tanpa snapshot/undo lokal). */
+  rooms?: { doc(slug: string): LakarDocument | undefined; get(slug: string): { client: { commitOps(ops: DocOp[], description: string): Promise<{ doc: LakarDocument; created: unknown[]; inverse: DocOp[]; refs: Record<string, string> }> } } | undefined };
 };
 
 export type Imported = { node: ImportedNode; report: PasteReport; assets: { sha: string; bytes: Buffer }[]; size?: { width: number; height: number } };
@@ -183,7 +185,7 @@ async function importContent(opts: PasteRoutesOptions, slug: string, body: Paste
   }
   // Pra-cek tanpa kunci sebelum render Chromium (mahal): dokumen dan parent salah gagal cepat dengan error yang sama.
   // Lebar viewport dari parent ter-resolve (token padding/lebar menjadi angka). Parent divalidasi ulang di bawah kunci.
-  const current = opts.docs.get(slug) ?? (await opts.store.read(slug));
+  const current = opts.docs.get(slug) ?? opts.rooms?.doc(slug) ?? (await opts.store.read(slug));
   pasteParent(current, slug, body.parentId, onMissing);
   const resolvedParent = locateNode(resolveDocument(current!), body.parentId)?.node as unknown as ParentLike | undefined;
   const width = Math.round(body.width ?? htmlViewportWidth(resolvedParent));
@@ -206,6 +208,20 @@ async function importContent(opts: PasteRoutesOptions, slug: string, body: Paste
 async function commitPaste(opts: PasteRoutesOptions, slug: string, body: PasteBody, actor: Actor, onMissing: () => LakarError) {
   const imported = await importContent(opts, slug, body, onMissing);
   const description = body.description ?? ((body.kind ?? 'svg') === 'html' ? PASTE_HTML_DESCRIPTION : PASTE_DEFAULT_DESCRIPTION);
+  // Slug room: ops hasil import di-commit ke sequencer; refs/created/inverse dari ack broadcast.
+  const room = opts.rooms?.get(slug);
+  if (room) {
+    const current = opts.rooms?.doc(slug);
+    const parent = pasteParent(current, slug, body.parentId, onMissing);
+    const ops = pasteOps(imported.node, parent, { ...(body.x !== undefined ? { x: body.x } : {}), ...(body.y !== undefined ? { y: body.y } : {}) }, imported.size);
+    if (imported.assets.length) {
+      if (!opts.dataDir) throw new LakarError('RENDER_FAILED', 'store aset tidak tersedia untuk gambar HTML', { hint: 'jalankan lakard dengan dataDir', retryable: false });
+      for (const a of imported.assets) await writeAsset(opts.dataDir, a.bytes);
+    }
+    const r = await room.client.commitOps(ops, description);
+    const boards = touchedBoards(resolveDocument(current!), resolveDocument(r.doc));
+    return { doc: r.doc, created: r.created, inverse: r.inverse, refs: r.refs, nodeId: r.refs[ROOT_REF]!, boards, report: imported.report };
+  }
   return opts.docLocks.run(slug, async () => {
     const current = opts.docs.get(slug) ?? (await opts.store.read(slug));
     const parent = pasteParent(current, slug, body.parentId, onMissing);

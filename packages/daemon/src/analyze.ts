@@ -10,6 +10,8 @@ import type { ActiveDoc } from './agent-pages.js';
 export type AnalyzeRoutesOptions = {
   docs: Map<string, LakarDocument>;
   activeDoc: ActiveDoc;
+  /** Room `@lakar/sync` yang digabung: dokumen aktif bisa berupa replika room. */
+  rooms?: { doc(slug: string): LakarDocument | undefined };
 };
 
 const parse = <S extends z.ZodType>(schema: S, body: unknown, hint: string): z.output<S> => {
@@ -20,10 +22,10 @@ const parse = <S extends z.ZodType>(schema: S, body: unknown, hint: string): z.o
 
 const ok = (reply: FastifyReply, data: unknown) => reply.code(200).send({ ok: true, data });
 
-const ScopeBody = z.object({ boardId: z.string().regex(ID_PATTERN).optional() }).strict();
-const ClustersBody = ScopeBody.extend({ min: z.number().int().min(2).max(50).optional() });
-const SCOPE_HINT = 'kirim {} (seluruh dokumen aktif) atau {boardId} (satu board)';
-const CLUSTERS_HINT = 'kirim {} , {boardId}, dan/atau {min} (batas minimal pengulangan, default 3)';
+export const ScopeBody = z.object({ boardId: z.string().regex(ID_PATTERN).optional() }).strict();
+export const ClustersBody = ScopeBody.extend({ min: z.number().int().min(2).max(50).optional() });
+export const SCOPE_HINT = 'kirim {} (seluruh dokumen aktif) atau {boardId} (satu board)';
+export const CLUSTERS_HINT = 'kirim {} , {boardId}, dan/atau {min} (batas minimal pengulangan, default 3)';
 const NO_ACTIVE_DOC_HINT = 'open_doc dulu di sesi ini';
 
 /** Batas entri per daftar di respons (uses/nodeIds) supaya output MCP terbatas; `truncated` menandai sisanya. */
@@ -51,7 +53,7 @@ function allNodes(doc: LakarDocument, boardId?: string): Located[] {
   return out;
 }
 
-const requireBoard = (doc: LakarDocument, boardId: string | undefined, slug: string): void => {
+export const requireBoard = (doc: LakarDocument, boardId: string | undefined, slug: string): void => {
   if (boardId && !doc.pages.some((p) => p.children.some((b) => b.id === boardId)))
     throw new LakarError('NOT_FOUND', `board ${boardId} tidak ada di dokumen ${slug}`, { hint: 'pakai boardId dari list_boards' });
 };
@@ -90,7 +92,7 @@ const isColorPath = (path: readonly (string | number)[], rootKey: string): boole
 };
 
 /** Frekuensi warna di seluruh node: literal hex vs ref {$token}; mesh colors[] dan props instance ikut dihitung. */
-function analyzeColors(doc: LakarDocument, boardId?: string): { colors: unknown[] } {
+export function analyzeColors(doc: LakarDocument, boardId?: string): { colors: unknown[] } {
   const buckets = new Map<string, ColorBucket>();
   // Kunci map dinormalkan per jenis: hex → uppercase, bound → apa adanya (nama token lowercase).
   const keyOf = (v: string) => (v.startsWith('{$token:') ? v : v.toUpperCase());
@@ -148,7 +150,7 @@ type StyleKey = { family: unknown; size: unknown; weight: unknown; style: unknow
 const val = (v: unknown): string | number | undefined => (isTokenRef(v) ? `{$token:${v.$token}}` : typeof v === 'string' || typeof v === 'number' ? v : undefined);
 
 /** Frekuensi gaya teks (node `text`) + tanda offScale untuk size literal di luar skala. */
-function analyzeTypography(doc: LakarDocument, boardId?: string): { styles: unknown[] } {
+export function analyzeTypography(doc: LakarDocument, boardId?: string): { styles: unknown[] } {
   const groups = new Map<string, { key: StyleKey; nodeIds: string[]; count: number }>();
   for (const { node } of allNodes(doc, boardId)) {
     if (node.type !== 'text') continue;
@@ -200,7 +202,7 @@ function signature(n: AnyNode): string {
 }
 
 /** Struktur kontainer berulang ≥ min → kandidat komponen. Daun, instance, dan master tidak dihitung. */
-function analyzeClusters(doc: LakarDocument, boardId: string | undefined, min: number): { clusters: unknown[] } {
+export function analyzeClusters(doc: LakarDocument, boardId: string | undefined, min: number): { clusters: unknown[] } {
   const groups = new Map<string, { sig: string; ids: { nodeId: string; pageId: string; boardId: string; name?: string }[] }>();
   for (const { node, pageId, boardId: b } of allNodes(doc, boardId)) {
     if (node.type === 'board' || node.type === 'instance' || 'component' in node) continue;
@@ -223,10 +225,10 @@ function analyzeClusters(doc: LakarDocument, boardId: string | undefined, min: n
   return { clusters };
 }
 
-export function registerAnalyzeRoutes(app: FastifyInstance, { docs, activeDoc }: AnalyzeRoutesOptions): void {
+export function registerAnalyzeRoutes(app: FastifyInstance, { docs, activeDoc, rooms }: AnalyzeRoutesOptions): void {
   const scopedDoc = (header: string | string[] | undefined, body: { boardId?: string }) => {
     const { slug } = activeDoc(header);
-    const doc = docs.get(slug);
+    const doc = docs.get(slug) ?? rooms?.doc(slug);
     if (!doc) throw new LakarError('NO_ACTIVE_DOC', 'sesi ini belum punya dokumen aktif', { hint: NO_ACTIVE_DOC_HINT });
     requireBoard(doc, body.boardId, slug);
     return { doc, slug };

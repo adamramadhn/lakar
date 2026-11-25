@@ -21,7 +21,7 @@ const pkg = (name: string, code: string, deps: Record<string, string> = {}): Pac
 describe('arah dependensi: repo nyata', () => {
   const packages = loadWorkspace(root);
 
-  it('menemukan 12 paket', () => {
+  it('menemukan 13 paket', () => {
     expect(packages.map((p) => p.name).sort()).toEqual(Object.keys(EDGES).sort());
     for (const p of packages) expect(Object.keys(p.files).length).toBeGreaterThan(0);
   });
@@ -85,16 +85,23 @@ describe('arah dependensi: fixture pelanggaran', () => {
     expect(checkPackage(pkg('daemon', "import { readFile } from 'node:fs';"))).toEqual([]);
   });
 
-  it('mcp impor @lakar/core → direction', () => {
-    expect(checkPackage(pkg('mcp', "import '@lakar/core';"))).toEqual([
-      { pkg: 'mcp', kind: 'direction', specifier: '@lakar/core', file: 'src/index.ts' },
+  it('mcp impor @lakar/viewer → direction', () => {
+    expect(checkPackage(pkg('mcp', "import '@lakar/viewer';"))).toEqual([
+      { pkg: 'mcp', kind: 'direction', specifier: '@lakar/viewer', file: 'src/index.ts' },
     ]);
   });
 
-  it('mcp dengan dep @lakar/core di package.json → direction', () => {
-    expect(checkPackage(pkg('mcp', '', { '@lakar/core': 'workspace:*' }))).toEqual([
-      { pkg: 'mcp', kind: 'direction', specifier: '@lakar/core', file: 'package.json' },
+  it('mcp dengan dep @lakar/viewer di package.json → direction', () => {
+    expect(checkPackage(pkg('mcp', '', { '@lakar/viewer': 'workspace:*' }))).toEqual([
+      { pkg: 'mcp', kind: 'direction', specifier: '@lakar/viewer', file: 'package.json' },
     ]);
+  });
+
+  it('mcp boleh @lakar/daemon (mode --file/--server) dan closure-nya + @lakar/sync (tes e2e)', () => {
+    expect(checkPackage(pkg('mcp', "import { FileTransport } from '@lakar/daemon';"))).toEqual([]);
+    expect(checkPackage(pkg('mcp', '', { '@lakar/daemon': 'workspace:*' }))).toEqual([]);
+    expect(checkPackage(pkg('mcp', '', { '@lakar/sync': 'workspace:*' }))).toEqual([]);
+    expect([...allowedDeps('mcp')].sort()).toEqual(['check', 'codegen', 'core', 'daemon', 'exec', 'icons', 'ports', 'render', 'schema', 'skills', 'sync']);
   });
 
   it('arah terbalik: schema impor @lakar/core → direction', () => {
@@ -109,11 +116,11 @@ describe('arah dependensi: fixture pelanggaran', () => {
     ]);
   });
 
-  it('subpath @lakar/core/x dinormalisasi ke @lakar/core', () => {
+  it('subpath @lakar/viewer/x dinormalisasi ke @lakar/viewer', () => {
     expect(normalizeSpecifier('@lakar/core/x')).toBe('@lakar/core');
     expect(normalizeSpecifier('node:fs/promises')).toBe('fs');
-    expect(checkPackage(pkg('mcp', "import { y } from '@lakar/core/x';"))).toMatchObject([
-      { pkg: 'mcp', kind: 'direction', specifier: '@lakar/core' },
+    expect(checkPackage(pkg('mcp', "import { y } from '@lakar/viewer/x';"))).toMatchObject([
+      { pkg: 'mcp', kind: 'direction', specifier: '@lakar/viewer' },
     ]);
   });
 

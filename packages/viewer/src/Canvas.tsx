@@ -391,6 +391,32 @@ function ConnectionLayer({
     </>
   );
 }
+/** Peer room lain yang tampil di canvas (collab story 5): kursor koordinat dokumen + label nama. */
+export type CanvasPeer = { peerId: string; name: string; kind: 'human' | 'agent'; color: string; cursor?: { x: number; y: number } | null };
+
+/** Kursor peer room: pointer + tag nama warna peer; posisi meluncur (`useGlide`) seperti kursor agen. */
+function PeerCursor({ p, x, y, cam }: { p: CanvasPeer; x: number; y: number; cam: Camera }) {
+  const pos = useGlide(x, y);
+  return (
+    <div className={`peer-cursor ${p.color}`} style={{ transform: `translate(${cam.x + pos.x * cam.z}px, ${cam.y + pos.y * cam.z}px)` }}>
+      <div className="peer-cursor-body">
+        <svg className="peer-cursor-pointer" width="16" height="18" viewBox="0 0 16 18" aria-hidden="true">
+          <path d="M1 1 L1 15 L5 11.5 L8 17 L10.5 15.8 L7.6 10.4 L13 10.4 Z" />
+        </svg>
+        <div className="peer-cursor-tag">{p.name}</div>
+      </div>
+    </div>
+  );
+}
+
+/** Lapisan kehadiran peer room (collab story 5): kursor berlabel per peer; peer tanpa kursor tidak tampil. */
+function PeerLayer({ peers, cam }: { peers: readonly CanvasPeer[]; cam: Camera }) {
+  return (
+    <div className="peer-layer" aria-hidden="true">
+      {peers.map((p) => (p.cursor ? <PeerCursor key={p.peerId} p={p} x={p.cursor.x} y={p.cursor.y} cam={cam} /> : null))}
+    </div>
+  );
+}
 
 function BoardImage({
   slug,
@@ -554,6 +580,8 @@ export function Canvas({
   boards,
   onHugHeight,
   presence,
+  peers,
+  onCursor,
   pending,
   fades,
   fadeEpoch = 0,
@@ -646,6 +674,10 @@ export function Canvas({
   onHugHeight?: ((boardId: string, height: number) => void) | undefined;
   /** Kehadiran agen per sesi Live (disembunyikan saat pratinjau versi). */
   presence?: readonly AgentPresence[];
+  /** Peer room lain (collab story 5): kursor berlabel di canvas; kosong/undefined = lapisan peer disembunyikan. */
+  peers?: readonly CanvasPeer[];
+  /** Kursor lokal bergerak/keluar canvas (koordinat dokumen): pemanggil meneruskannya sebagai presence room ber-throttle. */
+  onCursor?: ((at: { x: number; y: number } | undefined) => void) | undefined;
   /** Sesi yang menjalankan execute pertamanya (board belum diketahui): label Generating tingkat dokumen. */
   pending?: readonly PendingAgent[];
   /** Rencana fade-in node baru dari execute agen (`fadePlans`, spec-canvas-agent-effects). */
@@ -1111,6 +1143,12 @@ export function Canvas({
     if (pan && !touch) setPanning(true);
   };
   const onPointerMove = (e: ReactPointerEvent<HTMLDivElement>) => {
+    // Presence room (collab story 5): koordinat dokumen kursor (rumus sama dengan `insertAt`); pemanggil ber-throttle.
+    if (onCursor) {
+      const r = e.currentTarget.getBoundingClientRect();
+      const c = camRef.current;
+      onCursor({ x: (e.clientX - r.left - c.x) / c.z, y: (e.clientY - r.top - c.y) / c.z });
+    }
     if (touches.current.has(e.pointerId)) touches.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
     const p = pinch.current;
     if (p) {
@@ -1259,6 +1297,7 @@ export function Canvas({
       onPointerLeave={() => {
         edit.onPointerLeave();
         paths.pen.onPointerLeave();
+        onCursor?.(undefined);
       }}
       onContextMenu={(e) => {
         if ((e.target as HTMLElement).closest('.canvas-overlay-ui') || e.nativeEvent.composedPath().some((n) => n instanceof HTMLElement && n.isContentEditable)) return;
@@ -1353,6 +1392,9 @@ export function Canvas({
 
       {!preview && <SectionLayer boards={boards} cam={cam} />}
       {!preview && presence && <AgentLayer presence={presence} boardById={boardById} cam={cam} />}
+
+      {/* Kursor peer room (collab story 5): terpisah dari lapisan agen (sumber event berbeda). */}
+      {!preview && peers && peers.length > 0 && <PeerLayer peers={peers} cam={cam} />}
 
       {/* Pin komentar (story 9.4): avatar bulat warna penulis di titik halaman; resolved pudar + centang (toggle panel). */}
       {comments && !preview && (

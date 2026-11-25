@@ -7,6 +7,7 @@ import { IdAllocator, type DocumentLocks } from '@lakar/core';
 import { ID_PATTERN, LakarError, SESSION_HEADER, resolveDocument, type AnyNode, type HistoryEntry, type LakarDocument, type Page } from '@lakar/schema';
 import { z } from 'zod';
 import { INSPECT_DEPTH_DEFAULT, INSPECT_DEPTH_MAX } from './inspect.js';
+import type { RoomRegistry } from './rooms.js';
 import { NO_ACTIVE_DOC_HINT, activePageIndex, authorOf, noteWrite, type Session } from './sessions.js';
 import type { DocStore } from './store.js';
 import { PAGE_NAME_MAX, defaultPageName } from './pages.js';
@@ -20,6 +21,8 @@ export type AgentPageRoutesOptions = {
   store: DocStore;
   docLocks: DocumentLocks;
   activeDoc: ActiveDoc;
+  /** Room `@lakar/sync` yang digabung: dokumen aktif bisa berupa replika room. */
+  rooms?: RoomRegistry;
 };
 
 const parse = <S extends z.ZodType>(schema: S, body: unknown, hint: string): z.output<S> => {
@@ -34,9 +37,9 @@ const PageName = z
   .string()
   .transform((s) => s.trim())
   .pipe(z.string().min(1, 'nama halaman tidak boleh kosong').max(PAGE_NAME_MAX, `nama halaman maks ${PAGE_NAME_MAX} karakter`));
-const SwitchBody = z.object({ page: z.string().min(1, 'page tidak boleh kosong') }).strict();
-const CreateBody = z.object({ name: PageName.optional() }).strict();
-const TreeBody = z
+export const SwitchBody = z.object({ page: z.string().min(1, 'page tidak boleh kosong') }).strict();
+export const CreateBody = z.object({ name: PageName.optional() }).strict();
+export const TreeBody = z
   .object({
     page: z.string().min(1).optional(),
     depth: z.number().int().min(0).max(INSPECT_DEPTH_MAX).optional(),
@@ -44,13 +47,13 @@ const TreeBody = z
   .strict();
 
 /** Ringkasan satu halaman untuk respons list/switch/tree. */
-const pageSummary = <P extends { id: string; name: string; children: readonly unknown[] }>(p: P, index: number) => ({ id: p.id, name: p.name, index, boards: p.children.length });
+export const pageSummary = <P extends { id: string; name: string; children: readonly unknown[] }>(p: P, index: number) => ({ id: p.id, name: p.name, index, boards: p.children.length });
 
 /**
  * Halaman dari nama ATAU id (open-pencil `switch_page` menerima keduanya). Id dicek dulu; nama tidak
  * unik → SCHEMA_INVALID (pakai id). Tidak ditemukan → NOT_FOUND dengan hint list_pages.
  */
-function resolvePageRef<P extends { id: string; name: string }>(doc: { pages: readonly P[] }, ref: string, slug: string): { page: P; index: number } {
+export function resolvePageRef<P extends { id: string; name: string }>(doc: { pages: readonly P[] }, ref: string, slug: string): { page: P; index: number } {
   if (ID_PATTERN.test(ref)) {
     const index = doc.pages.findIndex((p) => p.id === ref);
     if (index !== -1) return { page: doc.pages[index]!, index };
@@ -75,7 +78,7 @@ const CONTENT_MAX = 120;
  * Outline ringkas sebuah node: id/type/name + geometri tersimpan + `content` teks terpotong; anak sampai
  * `depth`, lebih dalam → `childCount`. Mengembalikan `{node, truncated}` (`truncated` = ada pemotongan depth).
  */
-function outlineNode(n: AnyNode, depth: number): { node: Record<string, unknown>; truncated: boolean } {
+export function outlineNode(n: AnyNode, depth: number): { node: Record<string, unknown>; truncated: boolean } {
   const out: Record<string, unknown> = { id: n.id, type: n.type, name: n.name };
   const rec = n as unknown as Record<string, unknown>;
   for (const k of ['x', 'y', 'width', 'height', 'layout', 'component'] as const) {
@@ -101,12 +104,14 @@ function outlineNode(n: AnyNode, depth: number): { node: Record<string, unknown>
   return { node: out, truncated };
 }
 
-export function registerAgentPageRoutes(app: FastifyInstance, { docs, store, docLocks, activeDoc }: AgentPageRoutesOptions): void {
+export function registerAgentPageRoutes(app: FastifyInstance, { docs, store, docLocks, activeDoc, rooms }: AgentPageRoutesOptions): void {
+  /** Dokumen aktif: salinan memori lokal atau replika room (slug `room-*` tidak ada di `docs`). */
+  const docAt = (slug: string): LakarDocument | undefined => docs.get(slug) ?? rooms?.doc(slug);
   // Daftar halaman + halaman aktif sesi. Tanpa argumen.
   app.post('/pages', async (req, reply) => {
     const { session, slug } = activeDoc(req.headers[SESSION_HEADER]);
     parse(z.object({}).strict(), req.body, 'kirim {} (tanpa argumen)');
-    const doc = docs.get(slug)!;
+    const doc = docAt(slug)!;
     const i = activePageIndex(session, doc);
     return ok(reply, { docId: doc.id, rev: doc.rev, pages: doc.pages.map(pageSummary), active: pageSummary(doc.pages[i]!, i) });
   });
@@ -115,7 +120,7 @@ export function registerAgentPageRoutes(app: FastifyInstance, { docs, store, doc
   app.post('/pages/switch', async (req, reply) => {
     const { session, slug } = activeDoc(req.headers[SESSION_HEADER]);
     const body = parse(SwitchBody, req.body, 'kirim {page} (nama atau id halaman dari list_pages)');
-    const doc = docs.get(slug)!;
+    const doc = docAt(slug)!;
     const { page, index } = resolvePageRef(doc, body.page.trim(), slug);
     const previousId = doc.pages[activePageIndex(session, doc)]!.id;
     session.activePage = page.id;
@@ -126,8 +131,24 @@ export function registerAgentPageRoutes(app: FastifyInstance, { docs, store, doc
   app.post('/pages/create', async (req, reply) => {
     const { session, slug } = activeDoc(req.headers[SESSION_HEADER]);
     const body = parse(CreateBody, req.body, 'kirim {name?} (1–100 karakter; kosongkan untuk "Page N")');
+    // Slug room: halaman baru menjadi op insertPage lewat klien room (riwayat di sisi sequencer).
+    // ID dan "Page N" di-mint di dalam `commit(build)` pada replika terkini — retry pasca-resync
+    // me-mint ulang supaya tidak menabrak halaman yang dibuat peer selama jeda.
+    const room = rooms?.get(slug);
+    if (room) {
+      let pageId = '';
+      let usedName = '';
+      const r = await room.client.commit((base) => {
+        const name = body.name ?? defaultPageName(base.pages);
+        pageId = IdAllocator.forDocument(base).next();
+        usedName = name;
+        return { ops: [{ op: 'insertPage', page: { id: pageId, name, children: [] } }], description: `Added page ${JSON.stringify(name)}` };
+      });
+      session.activePage = pageId;
+      return ok(reply, { slug, rev: r.doc.rev, page: { id: pageId, name: usedName, index: r.doc.pages.length - 1, boards: 0 } });
+    }
     const data = await docLocks.run(slug, async () => {
-      const doc = docs.get(slug);
+      const doc = docAt(slug);
       if (!doc) throw new LakarError('NO_ACTIVE_DOC', 'sesi ini belum punya dokumen aktif', { hint: NO_ACTIVE_DOC_HINT });
       const name = body.name ?? defaultPageName(doc.pages);
       const next = structuredClone(doc);
@@ -148,7 +169,7 @@ export function registerAgentPageRoutes(app: FastifyInstance, { docs, store, doc
   app.post('/pages/tree', async (req, reply) => {
     const { session, slug } = activeDoc(req.headers[SESSION_HEADER]);
     const body = parse(TreeBody, req.body, `kirim {page?, depth?} (page = nama/id halaman; depth 0–${INSPECT_DEPTH_MAX}, default ${INSPECT_DEPTH_DEFAULT})`);
-    const doc = docs.get(slug)!;
+    const doc = docAt(slug)!;
     const resolved = resolveDocument(doc);
     const { page, index } = body.page !== undefined ? resolvePageRef(resolved, body.page.trim(), slug) : (() => { const i = activePageIndex(session, resolved); return { page: resolved.pages[i]!, index: i }; })();
     const depth = body.depth ?? INSPECT_DEPTH_DEFAULT;

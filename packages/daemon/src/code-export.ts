@@ -13,7 +13,7 @@ import { NO_ACTIVE_DOC_HINT, type Sessions } from './sessions.js';
 
 export const CODE_TARGETS = ['react-tailwind', 'react-css', 'dtcg'] as const;
 
-const Body = z
+export const ExportCodeBody = z
   .object({
     id: z.string().min(1).optional(),
     target: z.enum(CODE_TARGETS).optional(),
@@ -22,7 +22,7 @@ const Body = z
     typescript: z.boolean().optional(),
   })
   .strict();
-const HINT =
+export const EXPORT_CODE_HINT =
   "kirim {id?, target?, components?, tokens?, typescript?}: id board/node (default board pertama), target 'react-tailwind' (default), 'react-css', atau 'dtcg' (seluruh token dokumen sebagai tokens.json W3C DTCG), components/tokens/typescript boolean (default true)";
 
 export type CodeExportOptions = Omit<CodegenOptions, 'icons' | 'assetBase' | 'componentName'>;
@@ -45,21 +45,23 @@ export type CodeExportRoutesOptions = {
   docs: Map<string, LakarDocument>;
   sessions: Sessions;
   icons: IconCatalogPort<string, IconGlyph>;
+  /** Room `@lakar/sync` yang digabung: dokumen aktif bisa berupa replika room. */
+  rooms?: { doc(slug: string): LakarDocument | undefined };
 };
 
-export function registerCodeExportRoutes(app: FastifyInstance, { docs, sessions, icons }: CodeExportRoutesOptions): void {
+export function registerCodeExportRoutes(app: FastifyInstance, { docs, sessions, icons, rooms }: CodeExportRoutesOptions): void {
   app.post('/viewer/export-code', async (req, reply) => {
     const session = sessions.require(req.headers[SESSION_HEADER]);
     if (!session.activeSlug) {
       throw new LakarError('NO_ACTIVE_DOC', 'sesi ini belum punya dokumen aktif', { hint: NO_ACTIVE_DOC_HINT });
     }
     const slug = session.activeSlug;
-    const parsed = Body.safeParse(req.body ?? {});
+    const parsed = ExportCodeBody.safeParse(req.body ?? {});
     if (!parsed.success) {
-      throw new LakarError('SCHEMA_INVALID', parsed.error.issues.map((i) => `${i.path.join('.') || 'body'}: ${i.message}`).join('; '), { hint: HINT });
+      throw new LakarError('SCHEMA_INVALID', parsed.error.issues.map((i) => `${i.path.join('.') || 'body'}: ${i.message}`).join('; '), { hint: EXPORT_CODE_HINT });
     }
     const body = parsed.data;
-    const stored = docs.get(slug)!;
+    const stored = (docs.get(slug) ?? rooms?.doc(slug))!;
     const target = body.target ?? 'react-tailwind';
     if (target === 'dtcg') {
       // Token tingkat dokumen: satu berkas tokens.json W3C DTCG (tanpa resolusi node).

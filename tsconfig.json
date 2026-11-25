@@ -36,6 +36,12 @@
     },
     {
       "path": "./bench"
+    },
+    {
+      "path": "./services/api"
+    },
+    {
+      "path": "./services/sync"
     }
   ]
 }
