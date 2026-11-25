@@ -1,0 +1,126 @@
+{
+  "schemaVersion": 12,
+  "id": "CorpV11F",
+  "rev": 8,
+  "pages": [
+    {
+      "id": "PageFx01",
+      "name": "Page 1",
+      "children": [
+        {
+          "type": "board",
+          "id": "BrdFx001",
+          "name": "Kartu",
+          "x": 0,
+          "y": 0,
+          "width": 400,
+          "height": 300,
+          "screen": "app",
+          "fills": [
+            {
+              "type": "solid",
+              "color": "#F5F5F0"
+            }
+          ],
+          "children": [
+            {
+              "type": "text",
+              "id": "TxtFx001",
+              "name": "Judul",
+              "content": "Halo",
+              "weight": 600,
+              "size": 18,
+              "lineHeight": 24,
+              "color": "#1A1A1A"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "comments": [
+    {
+      "id": "ThrFx001",
+      "pageId": "PageFx01",
+      "nodeId": "TxtFx001",
+      "x": 0,
+      "y": 0,
+      "status": "open",
+      "fixRequest": {
+        "status": "open",
+        "agent": "claude-code",
+        "at": "2026-11-24T10:00:00.000Z"
+      },
+      "messages": [
+        {
+          "author": {
+            "kind": "user",
+            "name": "You"
+          },
+          "text": "Judul masih off-scale — pakai token text.title?",
+          "at": "2026-11-24T09:55:00.000Z"
+        },
+        {
+          "author": {
+            "kind": "user",
+            "name": "You"
+          },
+          "text": "Fix request for document \"comments-fix\"",
+          "at": "2026-11-24T10:00:00.000Z"
+        }
+      ]
+    },
+    {
+      "id": "ThrFx002",
+      "pageId": "PageFx01",
+      "x": 420,
+      "y": 80,
+      "status": "open",
+      "fixRequest": {
+        "status": "done",
+        "agent": "claude-code",
+        "at": "2026-11-24T10:30:00.000Z",
+        "note": "Warna board diikat ke token surface."
+      },
+      "messages": [
+        {
+          "author": {
+            "kind": "user",
+            "name": "You"
+          },
+          "text": "warna board belum terikat token",
+          "at": "2026-11-24T10:10:00.000Z"
+        },
+        {
+          "author": {
+            "kind": "agent",
+            "name": "claude-code"
+          },
+          "text": "Warna board diikat ke token surface.",
+          "at": "2026-11-24T10:30:00.000Z"
+        }
+      ]
+    },
+    {
+      "id": "ThrFx003",
+      "pageId": "PageFx01",
+      "x": 420,
+      "y": 180,
+      "status": "open",
+      "fixRequest": {
+        "status": "cancelled",
+        "at": "2026-11-24T11:00:00.000Z"
+      },
+      "messages": [
+        {
+          "author": {
+            "kind": "agent",
+            "name": "codex"
+          },
+          "text": "ikon ini sepertinya bukan set yang sama",
+          "at": "2026-11-24T10:45:00.000Z"
+        }
+      ]
+    }
+  ]
+}

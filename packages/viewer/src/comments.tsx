@@ -45,6 +45,22 @@ export const pinPoint = (t: CommentThread, nodeBox: (id: string) => { x: number;
 };
 
 /**
+ * Prompt fix (mailbox, spec-comment-to-fix): teks yang di-append daemon sebagai pesan pengguna saat minta fix,
+ * disalin apa adanya oleh tombol Copy prompt — bentuknya harus tetap sama dengan `fixPrompt` di
+ * `packages/daemon/src/comments.ts`.
+ */
+export const fixPromptText = (slug: string, t: CommentThread, agent?: string): string =>
+  [
+    `Fix request — Lakar document "${slug}"`,
+    ...(agent !== undefined ? [`Agent: ${agent}`] : []),
+    `Thread: ${t.id}`,
+    ...(t.nodeId !== undefined ? [`Layer: ${t.nodeId}`] : []),
+    `Pin: (${t.x}, ${t.y})`,
+    `Comment: ${t.messages[0]!.text}`,
+    'Apply the change, post progress via reply_to_comment, and close via fix_comment.',
+  ].join('\n');
+
+/**
  * Layer komentar di Canvas (prop `comments`): thread halaman ini, popover terbuka/draft baru, dan callback
  * tulisnya. `undefined` = layer disembunyikan (pratinjau versi / tanpa dokumen).
  */
@@ -64,6 +80,14 @@ export type CanvasComments = {
   onResolve: (threadId: string, resolved: boolean) => Promise<unknown> | void;
   /** Hapus thread permanen. */
   onDelete: (threadId: string) => Promise<unknown> | void;
+  /** Minta fix pada thread (mailbox, spec-comment-to-fix); `agent` = harness yang dituju bila dipilih di menu. */
+  onRequestFix: (threadId: string, agent?: string) => Promise<unknown> | void;
+  /** Batalkan permintaan fix yang masih open. */
+  onCancelFix: (threadId: string) => Promise<unknown> | void;
+  /** Salin prompt fix thread ke clipboard (tanpa mengubah thread). */
+  onCopyPrompt: (thread: CommentThread) => void;
+  /** Nama harness agen Live pada dokumen ini (opsi menu "Choose agent"; kosong/tiada = hanya "Any agent"). */
+  fixAgents?: readonly string[] | undefined;
   onDraftSubmit: (text: string) => Promise<unknown> | void;
   onDraftCancel: () => void;
 };
@@ -150,9 +174,13 @@ export function CommentThreadCard({
   x,
   y,
   busy,
+  fixAgents,
   onReply,
   onResolve,
   onDelete,
+  onRequestFix,
+  onCancelFix,
+  onCopyPrompt,
   onClose,
 }: {
   thread: CommentThread;
@@ -163,13 +191,23 @@ export function CommentThreadCard({
   y: number;
   /** Menulis (request berjalan): input dinonaktifkan. */
   busy: boolean;
+  /** Nama harness agen Live pada dokumen ini (menu "Choose agent"). */
+  fixAgents?: readonly string[] | undefined;
   onReply: (text: string) => Promise<unknown> | void;
   onResolve: (resolved: boolean) => void;
   onDelete: () => void;
+  /** Minta fix; `agent` = harness yang dituju bila dipilih di menu split. */
+  onRequestFix: (agent?: string) => Promise<unknown> | void;
+  /** Batalkan permintaan fix yang masih open (tombol Stop). */
+  onCancelFix: () => Promise<unknown> | void;
+  /** Salin prompt fix thread ke clipboard. */
+  onCopyPrompt: () => void;
   onClose: () => void;
 }) {
   const now = useNow(30_000);
+  const [agentMenu, setAgentMenu] = useState(false);
   const resolved = thread.status === 'resolved';
+  const fix = thread.fixRequest;
   return (
     <div className="comment-card canvas-overlay-ui" role="dialog" aria-label="Comment thread" style={{ left: x + 14, top: y + 18 }} onKeyDown={(e) => e.key === 'Escape' && onClose()}>
       <div className="comment-card-head">
@@ -194,6 +232,78 @@ export function CommentThreadCard({
         ))}
       </div>
       <CommentInput placeholder="Reply…" busy={busy} onSubmit={onReply} />
+      {/* Mailbox "Ask agent to fix" (spec-comment-to-fix): open = status + Stop; done = chip penutup;
+          failed = chip + Retry; cancelled/tanpa request = aksi awal. Thread resolved tidak menawarkan fix. */}
+      {!resolved &&
+        (fix?.status === 'open' ? (
+          <div className="comment-fix-status" role="status">
+            <Icon name="loaderCircle" size={12} />
+            <span className="comment-fix-status-text">Waiting for {fix.agent ? harnessLabel(fix.agent) : 'an agent'} to fix…</span>
+            <button type="button" className="comment-fix-stop" onClick={onCancelFix} disabled={busy}>
+              Stop
+            </button>
+          </div>
+        ) : (
+          <>
+            {(fix?.status === 'done' || fix?.status === 'failed') && (
+              <div className={`comment-fix-chip ${fix.status}`}>
+                <Icon name={fix.status === 'done' ? 'check' : 'x'} size={11} />
+                {fix.status === 'done' ? `fixed by ${fix.agent ? harnessLabel(fix.agent) : 'agent'}` : `fix failed${fix.agent ? ` by ${harnessLabel(fix.agent)}` : ''}`}
+              </div>
+            )}
+            <div className="comment-fix-actions">
+              <span className="comment-fix-split">
+                <button type="button" className="comment-fix-btn" onClick={() => onRequestFix()} disabled={busy}>
+                  <Icon name="sparkles" size={12} />
+                  {fix?.status === 'failed' ? 'Retry fix' : 'Ask agent to fix'}
+                </button>
+                <button
+                  type="button"
+                  className="comment-fix-caret"
+                  aria-label="Choose agent"
+                  title="Choose agent"
+                  aria-expanded={agentMenu}
+                  aria-haspopup="menu"
+                  onClick={() => setAgentMenu((v) => !v)}
+                  disabled={busy}
+                >
+                  <Icon name="chevronDown" size={11} />
+                </button>
+                {agentMenu && (
+                  <div className="comment-fix-menu" role="menu">
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={() => {
+                        setAgentMenu(false);
+                        void onRequestFix();
+                      }}
+                    >
+                      Any agent
+                    </button>
+                    {(fixAgents ?? []).map((a) => (
+                      <button
+                        key={a}
+                        type="button"
+                        role="menuitem"
+                        onClick={() => {
+                          setAgentMenu(false);
+                          void onRequestFix(a);
+                        }}
+                      >
+                        {harnessLabel(a)}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </span>
+              <button type="button" className="comment-fix-copy" onClick={onCopyPrompt} title="Copy the fix prompt to your clipboard">
+                <Icon name="copy" size={12} />
+                Copy prompt
+              </button>
+            </div>
+          </>
+        ))}
       <div className="comment-card-hint">Agents can read and reply to this thread</div>
     </div>
   );

@@ -76,6 +76,7 @@ export const TOOL_ROUTES: Readonly<Record<string, string>> = {
   '/comments/reply': 'reply_to_comment',
   '/comments/resolve': 'resolve_comment',
   '/comments/delete': 'delete_comment',
+  '/comments/fix': 'fix_comment',
   '/analyze/colors': 'analyze_colors',
   '/analyze/typography': 'analyze_typography',
   '/analyze/clusters': 'analyze_clusters',
@@ -359,6 +360,7 @@ function targetOf(tool: string, body: Record<string, unknown> | undefined): stri
       return str(body.nodeId) ?? str(body.pageId);
     case 'reply_to_comment':
     case 'resolve_comment':
+    case 'fix_comment':
       return str(body.threadId);
     case 'icon_search':
     case 'photo_search':
@@ -384,6 +386,9 @@ function finish(call: ActivityCall, statusCode: number, json: unknown): Activity
   if (typeof data.rev === 'number') out.rev = data.rev;
   switch (call.tool) {
     case 'open_doc':
+    case 'fix_comment':
+      // fix_comment: slug hasil bisa berbeda dari dokumen aktif sesi (slug eksplisit di body) — viewer memuat
+      // ulang dokumen yang benar lewat `revChange`.
       if (str(data.slug)) out.slug = str(data.slug);
       break;
     case 'execute': {
@@ -508,7 +513,8 @@ export function registerActivityHooks(app: FastifyInstance, { sessions, bus, hea
       description = description?.trim() || undefined;
     }
     // open_doc tanpa slug memakai dokumen fokus viewer (bila ada); dokumen baru baru diketahui di event selesai.
-    const slug = tool === 'open_doc' ? (str(body?.slug) ?? focusedSlug?.()) : session.activeSlug;
+    // fix_comment boleh membawa slug eksplisit (mailbox — agen menutup tanpa open_doc pada slug itu).
+    const slug = tool === 'open_doc' ? (str(body?.slug) ?? focusedSlug?.()) : tool === 'fix_comment' ? (str(body?.slug) ?? session.activeSlug) : session.activeSlug;
     const target = targetOf(tool, body);
     const t0 = now();
     const call: ActivityCall = {

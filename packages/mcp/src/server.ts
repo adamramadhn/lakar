@@ -1,4 +1,4 @@
-// Server MCP Lakar: 32 tool → HTTP lakard. Daftar lengkap dipaku di tests (daftar tool + anotasi read/write).
+// Server MCP Lakar: 34 tool → HTTP lakard. Daftar lengkap dipaku di tests (daftar tool + anotasi read/write).
 // import_url, undo, redo, visual_diff, fix_check.
 import { McpServer, type CallToolResult } from '@modelcontextprotocol/server';
 import { z } from 'zod';
@@ -439,8 +439,10 @@ export const PAGE_TREE_DESCRIPTION =
 
 /** Deskripsi tool `list_comments` (story 9.3). */
 export const LIST_COMMENTS_DESCRIPTION =
-  'Daftar thread komentar di dokumen aktif sesi: {total, open, threads:[{id, pageId, nodeId?, x, y, status, resolvedAt?, messages:[{author:{kind,name}, text, at}]}]}. ' +
-  'Filter opsional: status open/resolved/all, pageId, kind (penulis pembuka thread: user/agent). Pin nodeId = di layer; tanpa nodeId = titik bebas di x,y (koordinat halaman).';
+  'Daftar thread komentar di dokumen aktif sesi: {total, open, threads:[{id, pageId, nodeId?, x, y, status, resolvedAt?, fixRequest?, messages:[{author:{kind,name}, text, at}]}]}. ' +
+  'Filter opsional: status open/resolved/all, pageId, kind (penulis pembuka thread: user/agent). Pin nodeId = di layer; tanpa nodeId = titik bebas di x,y (koordinat halaman). ' +
+  'fixRequest = mailbox fix (spec-comment-to-fix): {status open/done/failed/cancelled, agent?, at} — pengguna memintanya dari aplikasi (Ask agent to fix); ' +
+  'thread ber-fixRequest open adalah antrean kerja untuk agen: kerjakan, kabari lewat reply_to_comment, lalu tutup dengan fix_comment.';
 
 /** Deskripsi tool `add_comment` (story 9.3). */
 export const ADD_COMMENT_DESCRIPTION =
@@ -460,6 +462,13 @@ export const RESOLVE_COMMENT_DESCRIPTION =
 export const DELETE_COMMENT_DESCRIPTION =
   'Hapus thread komentar permanen dari dokumen aktif: {threadId}. Berbeda dengan resolve — dokumen kehilangan threadnya ' +
   '(pulihkan lewat History/restore di aplikasi). Menambah rev; threadId dari list_comments.';
+
+/** Deskripsi tool `fix_comment` (spec-comment-to-fix): menutup mailbox permintaan fix dari aplikasi. */
+export const FIX_COMMENT_DESCRIPTION =
+  'Tutup permintaan fix (mailbox komentar) pada thread: {threadId, outcome:"done"|"failed", note?, slug?} — hanya thread ber-fixRequest open ' +
+  '(dibuat pengguna lewat "Ask agent to fix"; lihat list_comments). `note` tersimpan di fixRequest dan di-append sebagai pesan hasil berauthor agen ' +
+  '(default "Fix done."/"Fix failed."); fixRequest.agent diisi harness sesi ini (chip "fixed by" di aplikasi). ' +
+  'slug opsional — default dokumen aktif sesi; dengan slug, permintaan bisa ditutup tanpa open_doc dulu. Menambah rev.';
 
 /** Deskripsi tool `visual_diff` (spec-agent-visual-diff). */
 export const VISUAL_DIFF_DESCRIPTION =
@@ -756,6 +765,26 @@ export function createLakarMcpServer(daemonUrl: string): McpServer {
       }),
     },
     ({ threadId }) => guarded(async () => asText(await client.call('/comments/delete', { threadId }))),
+  );
+
+  // Mailbox fix (spec-comment-to-fix): agen menutup permintaan fix yang dibuat pengguna dari aplikasi.
+  server.registerTool(
+    'fix_comment',
+    {
+      annotations: toolAnnotations('fix_comment'),
+      description: FIX_COMMENT_DESCRIPTION,
+      inputSchema: z.object({
+        threadId: z.string().describe('id thread dari list_comments (harus ber-fixRequest open)'),
+        outcome: z.enum(['done', 'failed']).describe('hasil fix: done = perbaikan diterapkan, failed = tidak bisa digarap'),
+        note: z.string().min(1).max(4000).optional().describe('catatan hasil (jadi pesan di thread; default "Fix done."/"Fix failed.")'),
+        slug: z.string().optional().describe('slug dokumen (default dokumen aktif sesi; dengan slug tak perlu open_doc)'),
+      }),
+    },
+    (args) =>
+      guarded(async () => {
+        const body = Object.fromEntries(Object.entries(args).filter(([, v]) => v !== undefined));
+        return asText(await client.call('/comments/fix', body));
+      }),
   );
 
   // Audit desain (story 9.6): baca-saja, dihitung pada dokumen tersimpan sesi. Route agen `/analyze/*`.

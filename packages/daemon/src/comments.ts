@@ -10,7 +10,7 @@ import { IdAllocator, type DocumentLocks } from '@lakar/core';
 import { COMMENT_TEXT_MAX, ID_PATTERN, LakarError, SESSION_HEADER, SLUG_PATTERN, type AnyNode, type CommentAuthor, type CommentThread, type HistoryEntry, type LakarDocument } from '@lakar/schema';
 import { z } from 'zod';
 import { VIEWER_CLIENT, originOf, type ActivityBus } from './events.js';
-import { activePageIndex, authorOf, noteWrite, type Session } from './sessions.js';
+import { activePageIndex, authorOf, NO_ACTIVE_DOC_HINT, noteWrite, type Session, type Sessions } from './sessions.js';
 import type { DocStore } from './store.js';
 import type { ActiveDoc } from './agent-pages.js';
 import { peekDocument } from './viewer.js';
@@ -19,6 +19,7 @@ export type CommentRoutesOptions = {
   docs: Map<string, LakarDocument>;
   store: DocStore;
   docLocks: DocumentLocks;
+  sessions: Sessions;
   activeDoc: ActiveDoc;
 };
 
@@ -42,6 +43,15 @@ const CreateBody = z
 const ReplyBody = z.object({ threadId: ThreadId, text: Text }).strict();
 const ResolveBody = z.object({ threadId: ThreadId, resolved: z.boolean().optional() }).strict();
 const DeleteBody = z.object({ threadId: ThreadId }).strict();
+// Tutup permintaan fix oleh agen (mailbox, spec-comment-to-fix). `slug` opsional: tanpa slug dipakai dokumen aktif
+// sesi — dengan slug, sesi cukup POST /sessions + /comments/fix (tanpa open_doc; alur mailbox).
+const FixBody = z
+  .object({ slug: z.string().regex(SLUG_PATTERN).optional(), threadId: ThreadId, outcome: z.enum(['done', 'failed']), note: Text.optional() })
+  .strict();
+// Route fix dari aplikasi: {agent?} = permintaan baru (agent = harness yang dituju); {outcome:'cancelled'} = batal.
+const ViewerFixBody = z
+  .object({ agent: z.string().trim().min(1).max(80).optional(), outcome: z.literal('cancelled').optional() })
+  .strict();
 
 /** Penulis pesan: agen = harness sesi (`x-lakar-agent`, fallback nama klien); tanpa sesi = pengguna viewer. */
 const authorFor = (session: Session | undefined): CommentAuthor =>
@@ -132,8 +142,12 @@ const mutateResolve =
       return { changed: false, description: '', extra: { threadId, status: t.status, ...(t.resolvedAt ? { resolvedAt: t.resolvedAt } : {}) } };
     }
     t.status = resolved ? 'resolved' : 'open';
-    if (resolved) t.resolvedAt = new Date().toISOString();
-    else delete t.resolvedAt;
+    if (resolved) {
+      t.resolvedAt = new Date().toISOString();
+      // Mailbox fix: thread resolved tidak menampilkan aksi fix di aplikasi — permintaan open ditutup cancelled
+      // (tanpa pesan tambahan) agar tidak menggantung. Buka kembali tidak menyentuh fixRequest.
+      if (t.fixRequest?.status === 'open') t.fixRequest = { ...t.fixRequest, status: 'cancelled', at: t.resolvedAt };
+    } else delete t.resolvedAt;
     return { changed: true, description: `${resolved ? 'Resolved' : 'Reopened'} comment ${threadId}`, extra: { threadId, status: t.status, ...(t.resolvedAt ? { resolvedAt: t.resolvedAt } : {}) } };
   };
 
@@ -148,6 +162,76 @@ const mutateDelete =
     return { changed: true, description: `Deleted comment ${threadId}`, extra: { threadId } };
   };
 
+type FixRequest = NonNullable<CommentThread['fixRequest']>;
+type Message = CommentThread['messages'][number];
+
+/**
+ * Prompt fix (teks Inggris terstruktur): slug, threadId, pin layer/titik, teks komentar pembuka, dan instruksi
+ * menutup loop. Di-append sebagai pesan pengguna saat minta fix, dan disalin apa adanya oleh tombol Copy prompt
+ * di aplikasi — bentuknya harus tetap sama dengan `fixPromptText` di `packages/viewer/src/comments.tsx`.
+ */
+const fixPrompt = (slug: string, t: CommentThread, agent?: string): string =>
+  [
+    `Fix request — Lakar document "${slug}"`,
+    ...(agent !== undefined ? [`Agent: ${agent}`] : []),
+    `Thread: ${t.id}`,
+    ...(t.nodeId !== undefined ? [`Layer: ${t.nodeId}`] : []),
+    `Pin: (${t.x}, ${t.y})`,
+    `Comment: ${t.messages[0]!.text}`,
+    'Apply the change, post progress via reply_to_comment, and close via fix_comment.',
+  ].join('\n');
+
+/**
+ * Mutasi minta-fix (mailbox, spec-comment-to-fix): fixRequest `open` + pesan prompt (penulis `author`).
+ * Thread resolved → CONFLICT; sudah open → idempoten tanpa rev. Status terminal (done/failed/cancelled) atau
+ * tanpa fixRequest → permintaan baru.
+ */
+const mutateFixRequest =
+  (slug: string, threadId: string, agent: string | undefined, author: CommentAuthor): Mutate<{ threadId: string; fixRequest: FixRequest; thread: CommentThread; message?: Message }> =>
+  (doc) => {
+    const t = findThread(doc, slug, threadId);
+    if (t.status === 'resolved') throw new LakarError('CONFLICT', `thread ${threadId} sudah resolved`, { hint: 'buka kembali thread (Unresolve) dulu, lalu minta fix lagi' });
+    if (t.fixRequest?.status === 'open') return { changed: false, description: '', extra: { threadId, fixRequest: t.fixRequest, thread: t } };
+    const at = new Date().toISOString();
+    const fixRequest: FixRequest = { status: 'open', ...(agent !== undefined ? { agent } : {}), at };
+    t.fixRequest = fixRequest;
+    const message: Message = { author, text: fixPrompt(slug, t, agent), at };
+    t.messages.push(message);
+    return { changed: true, description: `Requested fix for comment ${threadId}`, extra: { threadId, fixRequest, thread: t, message } };
+  };
+
+/** Mutasi batal-fix (viewer): fixRequest open → cancelled. Idempoten — sudah cancelled → tanpa rev; terminal lain → CONFLICT. */
+const mutateFixCancel =
+  (slug: string, threadId: string): Mutate<{ threadId: string; fixRequest: FixRequest; thread: CommentThread }> =>
+  (doc) => {
+    const t = findThread(doc, slug, threadId);
+    const cur = t.fixRequest;
+    if (!cur) throw new LakarError('NOT_FOUND', `thread ${threadId} tidak punya permintaan fix`, { hint: 'minta fix dulu (Ask agent to fix) sebelum membatalkan' });
+    if (cur.status === 'cancelled') return { changed: false, description: '', extra: { threadId, fixRequest: cur, thread: t } };
+    if (cur.status !== 'open') throw new LakarError('CONFLICT', `permintaan fix thread ${threadId} sudah ${cur.status}`, { hint: 'hanya permintaan open yang bisa dibatalkan' });
+    t.fixRequest = { ...cur, status: 'cancelled', at: new Date().toISOString() };
+    return { changed: true, description: `Cancelled fix request ${threadId}`, extra: { threadId, fixRequest: t.fixRequest, thread: t } };
+  };
+
+/**
+ * Mutasi tutup-fix (agen): fixRequest open → done/failed + pesan hasil (penulis `author`). `agent` di fixRequest
+ * diganti nama harness penutup (chip "fixed by" aplikasi); `note` tersimpan di fixRequest.
+ */
+const mutateFixClose =
+  (slug: string, body: z.output<typeof FixBody>, author: CommentAuthor): Mutate<{ threadId: string; fixRequest: FixRequest; message: Message; thread: CommentThread }> =>
+  (doc) => {
+    const t = findThread(doc, slug, body.threadId);
+    const cur = t.fixRequest;
+    if (!cur) throw new LakarError('NOT_FOUND', `thread ${body.threadId} tidak punya permintaan fix`, { hint: 'fixRequest dibuat dari aplikasi (Ask agent to fix) — cek list_comments' });
+    if (cur.status !== 'open') throw new LakarError('CONFLICT', `permintaan fix thread ${body.threadId} sudah ${cur.status}`, { hint: 'tutup hanya permintaan yang masih open; status terminal → pengguna membuka permintaan baru' });
+    const at = new Date().toISOString();
+    const fixRequest: FixRequest = { status: body.outcome, agent: author.name, at, ...(body.note !== undefined ? { note: body.note } : {}) };
+    t.fixRequest = fixRequest;
+    const message: Message = { author, text: body.note ?? (body.outcome === 'done' ? 'Fix done.' : 'Fix failed.'), at };
+    t.messages.push(message);
+    return { changed: true, description: `${body.outcome === 'done' ? 'Fix done' : 'Fix failed'} for comment ${body.threadId}`, extra: { threadId: body.threadId, fixRequest, message, thread: t } };
+  };
+
 /** Daftar thread `doc` dengan filter ListBody (dipakai route agen dan viewer). */
 const filterThreads = (doc: LakarDocument, body: z.output<typeof ListBody>): CommentThread[] => {
   let threads = doc.comments ?? [];
@@ -157,11 +241,12 @@ const filterThreads = (doc: LakarDocument, body: z.output<typeof ListBody>): Com
   return threads;
 };
 
-export function registerCommentRoutes(app: FastifyInstance, { docs, store, docLocks, activeDoc }: CommentRoutesOptions): void {
-  /** Commit pola agent-pages: kunci → clone → mutate → rev+1 + riwayat + snapshot → memori → noteWrite. */
+export function registerCommentRoutes(app: FastifyInstance, { docs, store, docLocks, sessions, activeDoc }: CommentRoutesOptions): void {
+  /** Commit pola agent-pages: kunci → (memori, fallback disk untuk slug eksplisit) → clone → mutate → rev+1 → memori → noteWrite. */
   const run = async <T>(slug: string, session: Session, mutate: Mutate<T>): Promise<{ slug: string; rev: number } & T> =>
     docLocks.run(slug, async () => {
-      const doc = docs.get(slug)!;
+      const doc = docs.get(slug) ?? (await store.read(slug));
+      if (!doc) throw new LakarError('NOT_FOUND', `dokumen ${slug} tidak ada`, { hint: 'pakai slug dari list_documents/open_doc' });
       const next = structuredClone(doc);
       const { changed, description, extra } = mutate(next);
       if (!changed) return { slug, rev: doc.rev, ...extra };
@@ -211,6 +296,17 @@ export function registerCommentRoutes(app: FastifyInstance, { docs, store, docLo
     const { session, slug } = activeDoc(req.headers[SESSION_HEADER]);
     const body = parse(DeleteBody, req.body, 'kirim {threadId}');
     const data = await run(slug, session, mutateDelete(slug, body.threadId));
+    return ok(reply, data);
+  });
+
+  // Tutup permintaan fix (mailbox, spec-comment-to-fix): {threadId, outcome:'done'|'failed', note?, slug?}.
+  // slug default dokumen aktif sesi; slug eksplisit membolehkan tutup tanpa open_doc (sesi + slug saja).
+  app.post('/comments/fix', async (req, reply) => {
+    const session = sessions.require(req.headers[SESSION_HEADER]);
+    const body = parse(FixBody, req.body, 'kirim {threadId, outcome: "done"|"failed", note?, slug?}');
+    const slug = body.slug ?? session.activeSlug;
+    if (!slug) throw new LakarError('NO_ACTIVE_DOC', 'sesi ini belum punya dokumen aktif', { hint: NO_ACTIVE_DOC_HINT });
+    const data = await run(slug, session, mutateFixClose(slug, body, authorFor(session)));
     return ok(reply, data);
   });
 }
@@ -322,5 +418,16 @@ export function registerViewerCommentRoutes(app: FastifyInstance, { docs, store,
     const data = await run(slug, mutateDelete(slug, body.threadId));
     notify(req.headers, data);
     return ok(reply, { slug: data.slug, rev: data.rev, threadId: data.threadId });
+  });
+
+  // Minta/batal fix dari aplikasi (mailbox, spec-comment-to-fix): {agent?} = permintaan baru + pesan prompt;
+  // {outcome:'cancelled'} = batalkan permintaan open. Kedua cabang idempoten pada status yang sama.
+  app.post<{ Params: { slug: string; id: string } }>('/viewer/docs/:slug/comments/:id/fix', async (req, reply) => {
+    const { slug, id } = req.params;
+    checkSlug(slug);
+    const body = parse(ViewerFixBody, req.body, 'kirim {agent?} untuk minta fix atau {outcome:"cancelled"} untuk batal');
+    const data = body.outcome === 'cancelled' ? await run(slug, mutateFixCancel(slug, id)) : await run(slug, mutateFixRequest(slug, id, body.agent, authorFor(undefined)));
+    notify(req.headers, data);
+    return ok(reply, { slug: data.slug, rev: data.rev, threadId: data.threadId, fixRequest: data.fixRequest, thread: data.thread });
   });
 }

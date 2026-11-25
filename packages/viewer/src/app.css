@@ -7993,6 +7993,178 @@ button.panel-tab:hover {
   color: var(--accent);
 }
 
+/* Mailbox "Ask agent to fix" (spec-comment-to-fix): split-button + ghost Copy prompt, status + Stop, chip hasil. */
+.comment-fix-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.comment-fix-split {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  display: inline-flex;
+}
+.comment-fix-btn {
+  flex: 1;
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  height: 26px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 999px 0 0 999px;
+  background: var(--accent);
+  color: #ffffff;
+  font: 500 11px var(--font-ui);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.comment-fix-btn:hover {
+  filter: brightness(1.08);
+}
+.comment-fix-caret {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-left: 1px solid rgb(255 255 255 / 0.28);
+  border-radius: 0 999px 999px 0;
+  background: var(--accent);
+  color: #ffffff;
+  cursor: pointer;
+}
+.comment-fix-caret:hover {
+  filter: brightness(1.08);
+}
+.comment-fix-btn:disabled,
+.comment-fix-caret:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.comment-fix-menu {
+  position: absolute;
+  bottom: calc(100% + 4px);
+  left: 0;
+  z-index: 8;
+  display: flex;
+  flex-direction: column;
+  min-width: 150px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.28);
+}
+.comment-fix-menu button {
+  display: block;
+  width: 100%;
+  padding: 5px 8px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-primary);
+  font: 400 11px var(--font-ui);
+  text-align: left;
+  cursor: pointer;
+}
+.comment-fix-menu button:hover {
+  background: var(--surface-hover);
+}
+.comment-fix-copy {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 26px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-secondary);
+  font: 500 11px var(--font-ui);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.comment-fix-copy:hover {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+.comment-fix-copy:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.comment-fix-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 4px 0 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+.comment-fix-status > svg {
+  flex: none;
+  color: var(--accent);
+  animation: comment-fix-spin 1s linear infinite;
+}
+@keyframes comment-fix-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.comment-fix-status-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.comment-fix-stop {
+  flex: none;
+  height: 20px;
+  padding: 0 9px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--surface-hover);
+  color: var(--text-primary);
+  font: 500 10px var(--font-ui);
+  cursor: pointer;
+}
+.comment-fix-stop:hover {
+  color: var(--danger);
+}
+.comment-fix-stop:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.comment-fix-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  align-self: flex-start;
+  height: 22px;
+  padding: 0 9px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 500;
+}
+.comment-fix-chip.done {
+  background: var(--success-soft, var(--surface-hover));
+  color: var(--success);
+}
+.comment-fix-chip.failed {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
 /* Panel Comments di sidebar kiri (desain 05): chip filter, daftar thread, footer toggle. */
 .comments-panel {
   display: flex;

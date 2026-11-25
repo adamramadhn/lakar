@@ -375,3 +375,186 @@ describe('POST /comments/delete (agen)', () => {
     }
   });
 });
+
+// ---- Mailbox "Ask agent to fix" (spec-comment-to-fix): fixRequest di thread (skema v12). Viewer membuka/membatalkan
+//      lewat /viewer/docs/:slug/comments/:id/fix; agen menutup lewat /comments/fix {threadId, outcome, note?, slug?}. ----
+describe('POST /viewer/docs/:slug/comments/:id/fix', () => {
+  it('minta fix: fixRequest open + pesan prompt penulis user; idempoten; resolved → 409; asing → 404; origin → 403', async () => {
+    const t = await setup();
+    try {
+      const slug = await t.create('Minta Fix');
+      const made = await t.post(`/viewer/docs/${slug}/comments/create`, { text: 'tombol terlalu kecil', x: 5, y: 6 });
+      const threadId = made.json().data.thread.id;
+
+      const r = await t.post(`/viewer/docs/${slug}/comments/${threadId}/fix`, { agent: 'claude-code' }, undefined, { 'x-lakar-origin': 'win-a' });
+      expect(r.statusCode, r.body).toBe(200);
+      const d = r.json().data;
+      expect(d.fixRequest.status).toBe('open');
+      expect(d.fixRequest.agent).toBe('claude-code');
+      expect(d.fixRequest.at).toBeTruthy();
+      // Pesan prompt di-append sebagai penulis user dan membawa konteks thread.
+      const last = d.thread.messages.at(-1);
+      expect(last.author).toEqual({ kind: 'user', name: 'You' });
+      expect(last.text).toContain(`Fix request — Lakar document "${slug}"`);
+      expect(last.text).toContain(`Thread: ${threadId}`);
+      expect(last.text).toContain('tombol terlalu kecil');
+      expect(last.text).toContain('reply_to_comment');
+      expect(last.text).toContain('fix_comment');
+      // Tersimpan di dokumen + riwayat atas nama viewer + event change edit.
+      const stored = (await t.doc(slug)).comments![0]!;
+      expect(stored.fixRequest).toMatchObject({ status: 'open', agent: 'claude-code' });
+      expect(stored.messages).toHaveLength(2);
+      expect((await t.history(slug)).at(-1)).toMatchObject({ sessionId: 'lakar-viewer', client: 'lakar-viewer', opsSummary: 'comments' });
+      expect(t.changes.at(-1)).toMatchObject({ kind: 'edit', slug, rev: d.rev, origin: 'win-a' });
+
+      // Sudah open → idempoten: rev tetap, tanpa pesan/event baru.
+      const rev = d.rev;
+      const again = await t.post(`/viewer/docs/${slug}/comments/${threadId}/fix`, {});
+      expect(again.statusCode).toBe(200);
+      expect(again.json().data.fixRequest.status).toBe('open');
+      expect((await t.doc(slug)).rev).toBe(rev);
+      expect((await t.doc(slug)).comments![0]!.messages).toHaveLength(2);
+
+      // Thread resolved → 409; thread asing → 404; slug asing → 404; origin lintas situs → 403.
+      await t.post(`/viewer/docs/${slug}/comments/resolve`, { threadId });
+      expect((await t.post(`/viewer/docs/${slug}/comments/${threadId}/fix`, {})).statusCode).toBe(409);
+      expect((await t.post(`/viewer/docs/${slug}/comments/ZZzzzz99/fix`, {})).statusCode).toBe(404);
+      expect((await t.post('/viewer/docs/tidak-ada/comments/ZZzzzz99/fix', {})).statusCode).toBe(404);
+      expect((await t.post(`/viewer/docs/${slug}/comments/${threadId}/fix`, {}, undefined, { origin: 'https://evil.example' })).statusCode).toBe(403);
+    } finally {
+      await t.app.close();
+    }
+  });
+
+  it('batal: open → cancelled; idempoten; tanpa fixRequest → 404; setelah done → 409', async () => {
+    const t = await setup();
+    try {
+      const slug = await t.create('Batal Fix');
+      const made = await t.post(`/viewer/docs/${slug}/comments/create`, { text: 'x', x: 1, y: 1 });
+      const threadId = made.json().data.thread.id;
+      // Tanpa fixRequest → 404.
+      expect((await t.post(`/viewer/docs/${slug}/comments/${threadId}/fix`, { outcome: 'cancelled' })).statusCode).toBe(404);
+      await t.post(`/viewer/docs/${slug}/comments/${threadId}/fix`, {});
+      const cancel = await t.post(`/viewer/docs/${slug}/comments/${threadId}/fix`, { outcome: 'cancelled' });
+      expect(cancel.statusCode, cancel.body).toBe(200);
+      expect(cancel.json().data.fixRequest.status).toBe('cancelled');
+      const rev = cancel.json().data.rev;
+      // Sudah cancelled → idempoten tanpa rev baru.
+      const again = await t.post(`/viewer/docs/${slug}/comments/${threadId}/fix`, { outcome: 'cancelled' });
+      expect(again.statusCode).toBe(200);
+      expect((await t.doc(slug)).rev).toBe(rev);
+      // Agen menutup done → cancel berikutnya 409; minta fix baru boleh (permintaan baru).
+      const s = await t.session('claude-code');
+      const req2 = await t.post(`/viewer/docs/${slug}/comments/${threadId}/fix`, {});
+      expect(req2.json().data.fixRequest.status).toBe('open');
+      const done = await t.post('/comments/fix', { slug, threadId, outcome: 'done' }, s);
+      expect(done.statusCode, done.body).toBe(200);
+      expect((await t.post(`/viewer/docs/${slug}/comments/${threadId}/fix`, { outcome: 'cancelled' })).statusCode).toBe(409);
+    } finally {
+      await t.app.close();
+    }
+  });
+
+  it('resolve thread ber-fixRequest open → fixRequest ikut cancelled (tidak menggantung); unresolve tidak menyentuhnya', async () => {
+    const t = await setup();
+    try {
+      const slug = await t.create('Resolve Fix');
+      const made = await t.post(`/viewer/docs/${slug}/comments/create`, { text: 'x', x: 1, y: 1 });
+      const threadId = made.json().data.thread.id;
+      await t.post(`/viewer/docs/${slug}/comments/${threadId}/fix`, {});
+      const r = await t.post(`/viewer/docs/${slug}/comments/resolve`, { threadId });
+      expect(r.statusCode, r.body).toBe(200);
+      const stored = (await t.doc(slug)).comments![0]!;
+      expect(stored.status).toBe('resolved');
+      expect(stored.fixRequest).toMatchObject({ status: 'cancelled' });
+      expect(stored.messages).toHaveLength(2); // auto-cancel tanpa pesan tambahan
+      // Buka kembali → fixRequest tetap cancelled (tidak dihidupkan ulang).
+      await t.post(`/viewer/docs/${slug}/comments/resolve`, { threadId, resolved: false });
+      expect((await t.doc(slug)).comments![0]!.fixRequest!.status).toBe('cancelled');
+      // Minta fix baru tetap boleh setelah buka kembali.
+      expect((await t.post(`/viewer/docs/${slug}/comments/${threadId}/fix`, {})).json().data.fixRequest.status).toBe('open');
+    } finally {
+      await t.app.close();
+    }
+  });
+});
+
+describe('POST /comments/fix (agen)', () => {
+  it('done: fixRequest.status done + agent penutup + pesan hasil penulis agent; list membawa fixRequest; riwayat sesi; event fix_comment', async () => {
+    const t = await setup();
+    try {
+      const slug = await t.create('Tutup Fix');
+      const s = await t.session('claude-code');
+      await t.open(s, slug);
+      const made = await t.post('/comments/create', { text: 'padding masih aneh', x: 3, y: 4 }, s);
+      const threadId = made.json().data.thread.id;
+      // Pengguna minta fix dari aplikasi.
+      const req = await t.post(`/viewer/docs/${slug}/comments/${threadId}/fix`, {});
+      expect(req.statusCode, req.body).toBe(200);
+
+      const r = await t.post('/comments/fix', { threadId, outcome: 'done', note: 'padding diperbaiki ke 16' }, s);
+      expect(r.statusCode, r.body).toBe(200);
+      const d = r.json().data;
+      expect(d.rev).toBe((await t.doc(slug)).rev);
+      expect(d.fixRequest).toMatchObject({ status: 'done', agent: 'claude-code', note: 'padding diperbaiki ke 16' });
+      const last = d.thread.messages.at(-1);
+      expect(last.author).toEqual({ kind: 'agent', name: 'claude-code' });
+      expect(last.text).toBe('padding diperbaiki ke 16');
+      // Riwayat atas nama sesi + event Activity fix_comment.
+      expect((await t.history(slug)).at(-1)).toMatchObject({ sessionId: s, agent: 'claude-code', opsSummary: 'comments' });
+      expect(t.events.some((e) => e.type === 'call' && e.call.tool === 'fix_comment')).toBe(true);
+      // list_comments membawa fixRequest (respons hanya bertambah field).
+      const list = await t.post('/comments', {}, s);
+      expect(list.json().data.threads[0].fixRequest.status).toBe('done');
+      // list viewer juga membawa fixRequest.
+      const vlist = await t.post(`/viewer/docs/${slug}/comments`, {});
+      expect(vlist.json().data.threads[0].fixRequest.status).toBe('done');
+      // Sudah terminal → tutup lagi 409.
+      expect((await t.post('/comments/fix', { threadId, outcome: 'done' }, s)).statusCode).toBe(409);
+    } finally {
+      await t.app.close();
+    }
+  });
+
+  it('failed + tanpa note → pesan default; slug eksplisit bekerja tanpa dokumen aktif; validasi dan 401/404', async () => {
+    const t = await setup();
+    try {
+      const slug = await t.create('Fix Gagal');
+      const s = await t.session('codex');
+      await t.open(s, slug);
+      const made = await t.post('/comments/create', { text: 'x', x: 0, y: 0 }, s);
+      const threadId = made.json().data.thread.id;
+      // Thread tanpa fixRequest → NOT_FOUND.
+      const nf = await t.post('/comments/fix', { threadId, outcome: 'done' }, s);
+      expect(nf.statusCode).toBe(404);
+      expect(nf.json().error.code).toBe('NOT_FOUND');
+      await t.post(`/viewer/docs/${slug}/comments/${threadId}/fix`, {});
+      // outcome failed tanpa note → pesan default; agent = harness sesi.
+      const r = await t.post('/comments/fix', { threadId, outcome: 'failed' }, s);
+      expect(r.statusCode, r.body).toBe(200);
+      expect(r.json().data.fixRequest).toMatchObject({ status: 'failed', agent: 'codex' });
+      expect(r.json().data.thread.messages.at(-1).text).toBe('Fix failed.');
+
+      // Sesi baru tanpa open_doc + slug eksplisit → tutup langsung (alur mailbox).
+      const slug2 = await t.create('Mailbox Lain');
+      const made2 = await t.post(`/viewer/docs/${slug2}/comments/create`, { text: 'y', x: 0, y: 0 });
+      const threadId2 = made2.json().data.thread.id;
+      await t.post(`/viewer/docs/${slug2}/comments/${threadId2}/fix`, {});
+      const s2 = await t.session('claude-code');
+      const done2 = await t.post('/comments/fix', { slug: slug2, threadId: threadId2, outcome: 'done', note: 'ok' }, s2);
+      expect(done2.statusCode, done2.body).toBe(200);
+      expect(done2.json().data.slug).toBe(slug2);
+      expect(done2.json().data.fixRequest.status).toBe('done');
+      // Sesi tanpa dokumen aktif dan tanpa slug → NO_ACTIVE_DOC; slug asing → 404; body jelek → 400; tanpa sesi → 401.
+      const s3 = await t.session('codex');
+      const nad = await t.post('/comments/fix', { threadId: threadId2, outcome: 'done' }, s3);
+      expect(nad.statusCode).toBe(409);
+      expect(nad.json().error.code).toBe('NO_ACTIVE_DOC');
+      expect((await t.post('/comments/fix', { slug: 'tidak-ada', threadId: threadId2, outcome: 'done' }, s3)).statusCode).toBe(404);
+      expect((await t.post('/comments/fix', { threadId: threadId2, outcome: 'cancelled' }, s3)).statusCode).toBe(400);
+      expect((await t.post('/comments/fix', { threadId, outcome: 'done' })).statusCode).toBe(401);
+    } finally {
+      await t.app.close();
+    }
+  });
+});
