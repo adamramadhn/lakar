@@ -21,6 +21,7 @@ import { FOLDER_ID_PATTERN, FolderStore } from './folders.js';
 import { VIEWER_CLIENT, originOf, publicSessionId, type ActivityBus, type ActivityCall, type DocChange } from './events.js';
 import type { Sessions } from './sessions.js';
 import type { DocStore } from './store.js';
+import { notFound } from './errors.js';
 import { peekDocument, summarize, type ViewerDocSummary } from './viewer.js';
 
 /** Batas byte unggahan gambar `POST /viewer/assets` (route lain tetap 1 MB). */
@@ -92,6 +93,10 @@ const CREATE_HINT = "kirim {name, board?:{preset:'desktop'|'tablet'|'mobile'} | 
 const RenameBody = z.object({ name: NameField }).strict();
 const DeleteQuery = z.object({ archived: z.enum(['true', 'false']).optional() }).strict();
 const RestoreBody = z.object({ rev: z.number().int().nonnegative(), baseRev: z.number().int().nonnegative().optional() }).strict();
+const VersionBody = z
+  .object({ name: z.string().trim().min(1, 'name wajib').max(100, 'name maks 100 karakter'), rev: z.number().int().min(1).optional() })
+  .strict();
+const VERSION_HINT = "kirim {name, rev?} — rev default = revisi terkini; nama menempel ke satu rev dan mem-pin snapshotnya";
 const REV_PARAM = /^(0|[1-9]\d{0,9})$/;
 const FolderNameBody = z.object({ name: z.string().max(200, 'name maks 200 karakter') }).strict();
 const MoveBody = z.object({ slug: z.string(), folder: z.string().nullable() }).strict();
@@ -383,6 +388,31 @@ export function registerFileRoutes(app: FastifyInstance, { docs, store, sessions
       activity?.emit({ type: 'call', call: { ...call, status: 'error', durationMs: Date.now() - t0, error: err } });
       throw e;
     }
+  });
+
+  // Versi bernama (spec-viewer-named-versions): POST menandai rev dengan label (default rev terkini; rev yang sama
+  // = rename), DELETE menghapusnya. Snapshot rev bertag di-pin dari retensi DocStore.
+  app.post<{ Params: { slug: string } }>('/viewer/docs/:slug/versions', async (req, reply) => {
+    const { slug } = req.params;
+    checkSlug(slug);
+    const { name, rev } = parse(VersionBody, req.body, VERSION_HINT);
+    const doc = docs.get(slug) ?? (await peekDocument(store, slug));
+    if (!doc) throw notFound(`dokumen ${slug} tidak ada`, 'pakai slug dari GET /viewer/docs');
+    const target = rev ?? doc.rev;
+    if (target > doc.rev) {
+      throw new LakarError('SCHEMA_INVALID', `rev ${target} belum ada (rev terkini ${doc.rev})`, { hint: 'tag hanya bisa menempel ke rev yang sudah ada' });
+    }
+    const tag = await docLocks.run(slug, () => store.addVersionTag(slug, target, name));
+    return reply.code(200).send({ ok: true, data: tag });
+  });
+
+  app.delete<{ Params: { slug: string; rev: string } }>('/viewer/docs/:slug/versions/:rev', async (req, reply) => {
+    const { slug } = req.params;
+    checkSlug(slug);
+    const rev = parseRevParam(req.params.rev);
+    const removed = await docLocks.run(slug, () => store.removeVersionTag(slug, rev));
+    if (!removed) throw notFound(`tidak ada versi bernama di rev ${rev} dokumen ${slug}`, 'pakai rev bertag dari GET /viewer/docs/:slug/history (field label)');
+    return reply.code(200).send({ ok: true, data: { rev, deleted: true } });
   });
 
   // Unggah gambar (Image… di viewer): byte mentah (application/octet-stream atau image/*), maks 20 MB. Jenis

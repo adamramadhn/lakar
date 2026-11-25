@@ -38,8 +38,17 @@ const SNAPSHOT_FILE = /^r(\d+)\.lakar\.json$/;
 
 const DOC_SUFFIX = '.lakar.json';
 const HISTORY_SUFFIX = '.history.jsonl';
+const VERSIONS_SUFFIX = '.versions.json';
 
 const isEnoent = (e: unknown) => (e as NodeJS.ErrnoException)?.code === 'ENOENT';
+
+/** Tag versi bernama (spec-viewer-named-versions): label bebas yang menempel ke satu rev. */
+export type VersionTag = { rev: number; name: string; at: string };
+
+const isVersionTag = (v: unknown): v is VersionTag => {
+  const t = v as VersionTag;
+  return typeof t === 'object' && t !== null && Number.isInteger(t.rev) && t.rev >= 1 && typeof t.name === 'string' && t.name.length > 0 && typeof t.at === 'string';
+};
 
 const notFoundDoc = (slug: string, archived: boolean) =>
   new LakarError('NOT_FOUND', `dokumen ${slug} tidak ada${archived ? ' di arsip' : ''}`, {
@@ -136,6 +145,11 @@ export class DocStore {
   }
   historyPath(slug: string): string {
     return join(this.docsDir, `${slug}.history.jsonl`);
+  }
+
+  /** Sidecar versi bernama (spec-viewer-named-versions): `<slug>.versions.json` di docsDir. */
+  versionsPath(slug: string): string {
+    return join(this.docsDir, `${slug}${VERSIONS_SUFFIX}`);
   }
 
   /**
@@ -281,7 +295,9 @@ export class DocStore {
   async #writeSnapshot(slug: string, doc: LakarDocument): Promise<void> {
     const dir = this.snapshotDir(slug);
     await this.#writeAtomic(this.snapshotPath(slug, doc.rev), JSON.stringify(doc), dir);
-    const revs = [...(await this.snapshotRevs(slug))].sort((a, b) => b - a);
+    // Rev versi bernama di-pin: tidak masuk retensi jumlah maupun byte (spec-viewer-named-versions).
+    const pinned = new Set((await this.readVersions(slug)).map((t) => t.rev));
+    const revs = [...(await this.snapshotRevs(slug))].sort((a, b) => b - a).filter((r) => !pinned.has(r));
     const drop = revs.slice(this.#keep);
     let total = 0;
     for (const [i, r] of revs.slice(0, this.#keep).entries()) {
@@ -369,6 +385,7 @@ export class DocStore {
     if (!(await this.exists(slug, archived))) throw notFoundDoc(slug, archived);
     await rm(join(dir, `${slug}${DOC_SUFFIX}`));
     await rm(join(dir, `${slug}${HISTORY_SUFFIX}`), { force: true });
+    await rm(join(dir, `${slug}${VERSIONS_SUFFIX}`), { force: true });
     await rm(this.snapshotDir(slug, archived), { recursive: true, force: true }).catch((e) => this.#log(`lakard: snapshot ${slug} gagal dihapus: ${errorMessage(e)}`));
     await removeTmp(dir, slug);
     await syncDir(dir).catch(() => {});
@@ -378,7 +395,58 @@ export class DocStore {
   async dropOrphanHistory(slug: string): Promise<void> {
     if (await this.exists(slug)) return;
     await rm(this.historyPath(slug), { force: true });
+    await rm(this.versionsPath(slug), { force: true });
     await rm(this.snapshotDir(slug), { recursive: true, force: true });
+  }
+
+  /** Versi bernama yang tersimpan (sidecar rusak/kosong → []). */
+  async readVersions(slug: string): Promise<VersionTag[]> {
+    let text: string;
+    try {
+      text = await readFile(this.versionsPath(slug), 'utf8');
+    } catch (e) {
+      if (isEnoent(e)) return [];
+      throw e;
+    }
+    try {
+      const v = JSON.parse(text) as unknown;
+      const list = (v as { versions?: unknown }).versions;
+      return Array.isArray(list) ? (list.filter(isVersionTag) as VersionTag[]) : [];
+    } catch {
+      return [];
+    }
+  }
+
+  /** Tulis ulang daftar versi bernama (atomik). */
+  async writeVersions(slug: string, tags: readonly VersionTag[]): Promise<void> {
+    if (tags.length === 0) {
+      await rm(this.versionsPath(slug), { force: true });
+      return;
+    }
+    await this.#writeAtomic(this.versionsPath(slug), `${JSON.stringify({ versions: tags }, null, 2)}
+`);
+  }
+
+  /**
+   * Tag `rev` dengan `name` (spec-viewer-named-versions): rev yang sama menimpa nama lama (rename).
+   * Snapshot rev bertag dikecualikan dari retensi `#writeSnapshot`.
+   */
+  async addVersionTag(slug: string, rev: number, name: string): Promise<VersionTag> {
+    const tags = (await this.readVersions(slug)).filter((t) => t.rev !== rev);
+    const tag: VersionTag = { rev, name, at: new Date().toISOString() };
+    tags.push(tag);
+    tags.sort((a, b) => b.rev - a.rev);
+    await this.writeVersions(slug, tags);
+    return tag;
+  }
+
+  /** Hapus tag `rev`; tag tidak ada → false. */
+  async removeVersionTag(slug: string, rev: number): Promise<boolean> {
+    const tags = await this.readVersions(slug);
+    const kept = tags.filter((t) => t.rev !== rev);
+    if (kept.length === tags.length) return false;
+    await this.writeVersions(slug, kept);
+    return true;
   }
 
   /** Seperti `list`, untuk direktori arsip. */
@@ -408,12 +476,17 @@ export class DocStore {
     await mkdir(toDir, { recursive: true });
     await removeTmp(fromDir, from);
     const hasHistory = await isFile(fromHist);
+    const fromVers = join(fromDir, `${from}${VERSIONS_SUFFIX}`);
+    const toVers = join(toDir, `${to}${VERSIONS_SUFFIX}`);
+    const hasVersions = await isFile(fromVers);
     // Riwayat target tanpa dokumen = yatim (sisa penghapusan/kill): jangan sampai tercampur.
     if (!hasHistory) await rm(toHist, { force: true });
+    if (!hasVersions) await rm(toVers, { force: true });
     // Dokumen dulu, lalu riwayat. Kill di antaranya: dokumen di slug baru tanpa riwayat (riwayat lama yatim di
     // slug asal dan dibuang saat slug itu dipakai lagi) — dokumen sendiri tidak pernah hilang.
     await rename(fromDoc, toDoc);
     if (hasHistory) await rename(fromHist, toHist);
+    if (hasVersions) await rename(fromVers, toVers);
     await this.#moveSnapshots(fromDir, from, toDir, to);
     await syncDir(toDir).catch(() => {});
     if (toDir !== fromDir) await syncDir(fromDir).catch(() => {});

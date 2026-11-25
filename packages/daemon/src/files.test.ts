@@ -663,6 +663,7 @@ describe('event change untuk sinkron antar jendela', () => {
   });
 });
 
+<<<<<<< HEAD
 describe('POST /viewer/docs/:slug/export-file (seksi Export tab Design)', () => {
   const pngOf = (width: number, height: number): Uint8Array => {
     const b = Buffer.alloc(33);
@@ -731,5 +732,59 @@ describe('POST /viewer/docs/:slug/export-file (seksi Export tab Design)', () => 
     const t = await fileSetup();
     const r404 = await t.post({ boardId: t.boardId, nodeId: 'nope', scale: 1, format: 'png', dir: t.outDir, name: 'x' });
     expect(r404.statusCode).toBe(404);
+=======
+describe('Versi bernama — POST/DELETE /viewer/docs/:slug/versions (spec-viewer-named-versions)', () => {
+  it('tag rev terkini (tanpa rev); riwayat membawa label; rename menimpa nama', async () => {
+    const t = await setup();
+    const { slug } = await t.create('Versioned');
+
+    const head = await t.post(`/viewer/docs/${slug}/versions`, { name: 'v1 — ready for review' });
+    expect(head.statusCode, head.body).toBe(200);
+    expect(head.json().data).toMatchObject({ rev: 1, name: 'v1 — ready for review' });
+
+    const entries = (await t.get(`/viewer/docs/${slug}/history`)).json().data.entries as { rev: number; label?: string }[];
+    expect(entries.find((e) => e.rev === 1)?.label).toBe('v1 — ready for review');
+
+    // Rename: POST ulang rev yang sama menimpa nama.
+    const rename = await t.post(`/viewer/docs/${slug}/versions`, { name: 'v1 final', rev: 1 });
+    expect(rename.statusCode).toBe(200);
+    const after = (await t.get(`/viewer/docs/${slug}/history`)).json().data.entries as { rev: number; label?: string }[];
+    expect(after.find((e) => e.rev === 1)?.label).toBe('v1 final');
+  });
+
+  it('validasi: rev di atas terkini/nama kosong → 400; slug tak dikenal → 404', async () => {
+    const t = await setup();
+    const { slug } = await t.create('Versioned');
+    const future = await t.post(`/viewer/docs/${slug}/versions`, { name: 'x', rev: 99 });
+    expect(future.statusCode).toBe(400);
+    const empty = await t.post(`/viewer/docs/${slug}/versions`, { name: '   ' });
+    expect(empty.statusCode).toBe(400);
+    const ghost = await t.post(`/viewer/docs/ghost/versions`, { name: 'x' });
+    expect(ghost.statusCode).toBe(404);
+  });
+
+  it('DELETE menghapus label; tag tidak ada → 404; versi ikut rename/hapus dokumen', async () => {
+    const t = await setup();
+    const { slug } = await t.create('Versioned');
+    await t.post(`/viewer/docs/${slug}/versions`, { name: 'keep me' });
+    const gone = await t.del(`/viewer/docs/${slug}/versions/1`);
+    expect(gone.statusCode, gone.body).toBe(200);
+    const miss = await t.del(`/viewer/docs/${slug}/versions/1`);
+    expect(miss.statusCode).toBe(404);
+
+    // Tag lagi lalu rename dokumen → label bertahan di slug baru (file .versions.json ikut #move).
+    await t.post(`/viewer/docs/${slug}/versions`, { name: 'survivor' });
+    const renamed = await t.post(`/viewer/docs/${slug}/rename`, { name: 'Versioned 2' });
+    expect(renamed.statusCode, renamed.body).toBe(200);
+    const slug2 = renamed.json().data.slug as string;
+    const entries = (await t.get(`/viewer/docs/${slug2}/history`)).json().data.entries as { rev: number; label?: string }[];
+    expect(entries.find((e) => e.rev === 1)?.label).toBe('survivor');
+    // Delete dokumen → file sidecar ikut hilang (tak ada yatim saat slug dipakai ulang).
+    await t.del(`/viewer/docs/${slug2}`);
+    const { create } = { create: t.create };
+    const again = await create('Versioned 2');
+    const clean = (await t.get(`/viewer/docs/${again.slug}/history`)).json().data.entries as { rev: number; label?: string }[];
+    expect(clean.every((e) => e.label === undefined)).toBe(true);
+>>>>>>> feat/named-versions
   });
 });
