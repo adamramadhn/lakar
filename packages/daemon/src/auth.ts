@@ -160,8 +160,9 @@ export function registerAuthRoutes(app: FastifyInstance, opts: AuthRoutesOptions
 
   // Nonce sekali-pakai pengikat sign-in (anti session-fixation): `start` mencetak dan menyelipkan
   // di `return_to?state=`; script callback meng-echo; `/viewer/auth/session` mengkonsumsi (hapus —
-  // replay/state asing → 401). TTL ~10 menit, disapu malas di tiap akses — tanpa timer.
-  const NONCE_TTL_MS = 10 * 60 * 1000;
+  // replay/state asing → 401). TTL 15 menit — menyamai umur magic link service supaya nonce tak
+  // lebih dulu kedaluwarsa dari link yang masih valid; disapu malas di tiap akses — tanpa timer.
+  const NONCE_TTL_MS = 15 * 60 * 1000;
   const pending = new Map<string, number>();
   const sweep = () => {
     const now = Date.now();
