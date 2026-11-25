@@ -750,7 +750,9 @@ fn main() {
             updates::check_update,
             updates::download_update,
             updates::install_update,
-            updates::relaunch_app
+            updates::relaunch_app,
+            updates::update_channel,
+            updates::set_update_channel
         ])
         .setup(|app| {
             build_main_window(app.handle())?;
@@ -843,6 +845,8 @@ mod tests {
             "allow-download-update",
             "allow-install-update",
             "allow-relaunch-app",
+            "allow-update-channel",
+            "allow-set-update-channel",
             "opener:default",
         ]);
         assert_eq!(cap["permissions"], json!(expected));
@@ -862,7 +866,7 @@ mod tests {
     #[test]
     fn build_manifest_lists_every_command() {
         let build = include_str!("../build.rs");
-        for cmd in ["daemon_state", "restart_daemon", "set_ui_theme", "app_version", "check_update", "download_update", "install_update", "relaunch_app"] {
+        for cmd in ["daemon_state", "restart_daemon", "set_ui_theme", "app_version", "check_update", "download_update", "install_update", "relaunch_app", "update_channel", "set_update_channel"] {
             assert!(build.contains(&format!("\"{cmd}\"")), "{cmd} tidak ada di manifest build.rs");
         }
     }

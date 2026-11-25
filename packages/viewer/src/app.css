@@ -332,6 +332,40 @@ code {
   white-space: pre-wrap;
 }
 
+/* Settings → Updates — "Update channel" (spec-update-channel): segmented lebar konten + baris catatan
+ * di bawahnya (help/warn/info/error), pola baris conn-render tapi tanpa kartu. */
+.update-channel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.update-channel-segmented {
+  width: 240px;
+}
+.update-channel-segmented .segment:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.update-channel-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-secondary);
+}
+.update-channel-note > svg {
+  flex: none;
+  margin-top: 1px;
+}
+.update-channel-note span {
+  flex: 1;
+  min-width: 0;
+}
+.update-channel-note.error {
+  color: var(--danger);
+}
+
 /* ---- Skeleton / spinner ---- */
 .skeleton {
   width: 100%;

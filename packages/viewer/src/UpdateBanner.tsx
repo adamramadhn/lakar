@@ -4,7 +4,7 @@
 // Di browser komponen tidak merender apa-apa (updater hanya ada di aplikasi desktop).
 import { UPDATES_HASH } from './files';
 import { Icon } from './icons';
-import { dismissUpdated, installAndRelaunch, isDesktop, useUpdateState } from './updates';
+import { dismissUpdated, displayVersion, installAndRelaunch, isDesktop, useUpdateState } from './updates';
 
 export function UpdateBanner() {
   const s = useUpdateState();
@@ -14,7 +14,7 @@ export function UpdateBanner() {
       <div className="update-banner accent" role="status">
         <Icon name="download" size={16} className="update-icon" />
         <div className="update-text">
-          <strong>Lakar {s.update.version} is ready to install</strong>
+          <strong>Lakar {displayVersion(s.update.version)} is ready to install</strong>
           <span>Restart to finish updating.</span>
         </div>
         <a className="btn" href={UPDATES_HASH}>
@@ -32,7 +32,7 @@ export function UpdateBanner() {
       <div className="update-banner success" role="status">
         <Icon name="circleCheck" size={16} className="update-icon" />
         <div className="update-text">
-          <strong>Updated to Lakar {s.justUpdated.version}</strong>
+          <strong>Updated to Lakar {displayVersion(s.justUpdated.version)}</strong>
         </div>
         <a className="btn" href={UPDATES_HASH}>
           See what’s new
