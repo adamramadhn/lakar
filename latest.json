@@ -1,0 +1,22 @@
+{
+  "version": "0.1.9-nightly.202611250846",
+  "pub_date": "2026-11-25T09:43:58.670Z",
+  "platforms": {
+    "windows-x86_64": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVUenVZd3gyS0hSL2d5dW9IYXdwNktKd2U4Z2JtWFBGcG41bnlxZ1JFbWhmeGZPTXU0Y0ZmRnliQUhTODdWYk9KRWFrK2ZrZkdRbzBCVXF5UmZWQ1llcUZXMTM5VU1sQkE4PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzk1NTk2ODc5CWZpbGU6TGFrYXJfMC4xLjktbmlnaHRseS4yMDI2MTEyNTA4NDZfeDY0LXNldHVwLmV4ZQl2ZXJzaW9uOjAuMS45LW5pZ2h0bHkuMjAyNjExMjUwODQ2CitGeXdWbHVqNVJxZmZnQ01OUmhhNkw4YVN2NERCaDRoQXQ0TjZLNzJUMjFLVGZQTkUzM0RLZ3NoTUdlZ2o2cmI2NnVvOFBYVmJFR3BRT1VJblVmVEF3PT0K",
+      "url": "https://github.com/fatmuh/lakar/releases/download/nightly-202611250846/Lakar_0.1.9-nightly.202611250846_x64-setup.exe"
+    },
+    "darwin-x86_64": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVUenVZd3gyS0hSL29oUnAxYk5EeGhjcENvQVpBMFlDeWVPMUc1Z3Z5S0h1R05CTVBsNTRIZStvUzdEZXBVR2RNS3NnYzRkV1BHTGNTRjUrYUlkLzY4N01OMDIwVUdnakFvPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzk1NTk4NTE0CWZpbGU6TGFrYXIuYXBwLnRhci5negl2ZXJzaW9uOjAuMS45LW5pZ2h0bHkuMjAyNjExMjUwODQ2Clc2czR2YWV1cFBCdnBacTg5eU90U3dveFFORXVJSWptbHV2bWlMb2hwVFBFWHl5OWYxaXpoUW9jM1I2Z3pCQUNERHR3ckNCczQ5Qks2YXkvRUhwQkFRPT0K",
+      "url": "https://github.com/fatmuh/lakar/releases/download/nightly-202611250846/Lakar_0.1.9-nightly.202611250846_x64.app.tar.gz"
+    },
+    "darwin-aarch64": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVUenVZd3gyS0hSL3VWd0xNalF1VDJMd1ZDblB4RHpmbTNZUFBCa0s1a0ZkUm9KdytuUUNmekpaU3F5cTlLQjFZc2Urd0V0bkhrZkhJdmtJM2ZFamhRRWVHYzFOVW14OXdZPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzk1NTk2OTE5CWZpbGU6TGFrYXIuYXBwLnRhci5negl2ZXJzaW9uOjAuMS45LW5pZ2h0bHkuMjAyNjExMjUwODQ2CkNzVm5kVlZQU0djRmF6dDdBYXBNY1ZSUkQ5SmhtYk96OUdWZis1WHhRSmV4OG1FQ2N5K2E4dWw0cVY1K2xRVURSNWt6cE0wWmlzS1BKQ1hFUXFGTERnPT0K",
+      "url": "https://github.com/fatmuh/lakar/releases/download/nightly-202611250846/Lakar_0.1.9-nightly.202611250846_aarch64.app.tar.gz"
+    },
+    "linux-x86_64": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVUenVZd3gyS0hSL2tpdCtod1JtR2NwOUl5VGlnbGwvZ0JUbFBCdUdURWFwZm81b2x0ZC8rK0VRVVV0a0JSZ2ZYUlhRWmQ4MWNDOElGdHFJYnY2YnhaYTFCT0szU1VONFFZPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzk1NTk2NzU1CWZpbGU6TGFrYXJfMC4xLjktbmlnaHRseS4yMDI2MTEyNTA4NDZfYW1kNjQuQXBwSW1hZ2UJdmVyc2lvbjowLjEuOS1uaWdodGx5LjIwMjYxMTI1MDg0NgpJdisybmZ4NjlXYXV6SW1WQXFCZHMvUkk2SThleUhZa29Mc0orSGFoVFNmVEtnM2h3d0FpaHI3R1hlRE9ib2xTMWUyamNxS2RucEdqQWV1aDJOdGREZz09Cg==",
+      "url": "https://github.com/fatmuh/lakar/releases/download/nightly-202611250846/Lakar_0.1.9-nightly.202611250846_amd64.AppImage"
+    }
+  }
+}
