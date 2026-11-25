@@ -62,6 +62,8 @@ import type { PageFetch } from './url-fetch.js';
 import { SelectionStore, registerSelectionRoutes } from './selection.js';
 import { registerRenderDepsRoutes } from './render-deps.js';
 import { registerExportRoutes } from './export.js';
+import { registerAuthRoutes } from './auth.js';
+import { SessionStore } from './session.js';
 import { registerShareRoutes } from './share.js';
 import { registerVisualDiffRoutes } from './visual-diff.js';
 import { HugHeights } from './hug-heights.js';
@@ -280,6 +282,8 @@ export type Daemon = {
   activity: ActivityBus;
   /** Room `@lakar/sync` yang digabung (slug `room-<token6>`; spec-collab-cloud story 5). */
   rooms: RoomRegistry;
+  /** Session cloud pengguna `dataDir/session.json` (spec-cloud-auth story C). */
+  cloudSession: SessionStore;
   /** Seleksi canvas efemeral per dokumen (AD-9). */
   selections: SelectionStore;
   /** Dokumen yang difokuskan tiap jendela viewer (spec-agent-open-doc). */
@@ -302,6 +306,8 @@ export function buildServer({
   const app = Fastify({ logger: false, bodyLimit: 1024 * 1024 });
   const startedAt = new Date();
   const store = new DocStore(config.dataDir);
+  /** Session sign-in cloud (spec-cloud-auth story C): `dataDir/session.json`, Bearer di panggilan share. */
+  const cloudSession = new SessionStore(config.dataDir);
   const sessions = new Sessions();
   const activity = new ActivityBus();
   const checks = new CheckLedger();
@@ -369,14 +375,19 @@ export function buildServer({
   // sebelum route supaya hook berlaku untuk semua route tool.
   registerActivityHooks(app, { sessions, bus: activity, focusedSlug: () => focus.current(), onViewerGone: (o) => focus.drop(o), ...(activityHeartbeatMs !== undefined ? { heartbeatMs: activityHeartbeatMs } : {}) });
 
+  /** Port loopback yang benar-benar terikat (0 di config = port acak saat listen); dipakai guard Origin dan callback auth. */
+  const boundPort = () => {
+    const addr = app.server.address();
+    return addr && typeof addr === 'object' ? addr.port : config.port;
+  };
+
   // Route tulis `/viewer/*` tanpa sesi: tolak permintaan lintas situs. Browser selalu mengirim `Origin` pada POST/DELETE
   // (juga `mode:'no-cors'` tanpa preflight); origin selain daemon sendiri → 403. Tanpa Origin (CLI, tes, MCP) tetap boleh.
   app.addHook('onRequest', async (req, reply) => {
     if (req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS' || !req.url.startsWith('/viewer/')) return;
     const origin = req.headers.origin;
     if (origin === undefined) return;
-    const addr = app.server.address();
-    const port = addr && typeof addr === 'object' ? addr.port : config.port;
+    const port = boundPort();
     let host: string | undefined;
     try {
       host = new URL(origin).host;
@@ -999,8 +1010,10 @@ export function buildServer({
   registerSelectionRoutes(app, { docs, store, sessions, selections, focus, activity, render, assertIcons, rooms });
   registerRenderDepsRoutes(app, { fonts, icons });
   registerExportRoutes(app, { docs, store, render, icons, rooms });
+  // Sign-in cloud (spec-cloud-auth story C): `/viewer/auth/*` — session.json dipakai panggilan cloud share.
+  registerAuthRoutes(app, { store: cloudSession, activity, port: boundPort });
   // Share-link snapshot v1 (spec-collab-cloud story 1): upload doc + PNG per board ke @lakar/api.
-  registerShareRoutes(app, { docs, store, render, icons });
+  registerShareRoutes(app, { docs, store, render, icons, session: cloudSession });
   registerVisualDiffRoutes(app, { docs, store, render, activeDoc, assertIcons, rooms });
   registerCodeExportRoutes(app, { docs, sessions, icons, rooms });
   registerConnectionRoutes(app, {
@@ -1042,5 +1055,5 @@ export function buildServer({
     return reply.type(remote.type).header('cache-control', remote.placeholder ? 'no-store' : 'no-cache').send(remote.body);
   });
 
-  return { app, store, sessions, fonts, icons, photos, activity, rooms, selections, focus, startedAt: startedAt.toISOString() };
+  return { app, store, sessions, fonts, icons, photos, activity, rooms, cloudSession, selections, focus, startedAt: startedAt.toISOString() };
 }

@@ -177,11 +177,18 @@ export type PeersEvent = { seq: number; type: 'peers'; peers: RoomPeers };
 export type RoomPresence = { slug: string; peerId: string; presence: unknown };
 export type PresenceEvent = { seq: number; type: 'presence'; presence: RoomPresence };
 
+/**
+ * Status sign-in cloud berubah (spec-cloud-auth story C): sign-in/out di `/viewer/auth/*` supaya
+ * semua jendela viewer memuat ulang blok Lakar Cloud. `user` hanya ada saat `signedIn`.
+ */
+export type CloudAuthState = { signedIn: boolean; user?: { id: string; email: string; name?: string; avatarUrl?: string } };
+export type AuthEvent = { seq: number; type: 'auth'; auth: CloudAuthState };
+
 export type ActivityEvent = { seq: number; type: 'call'; call: ActivityCall } | { seq: number; type: 'session'; session: ActivitySession };
 type ActivityPayload = { type: 'call'; call: ActivityCall } | { type: 'session'; session: ActivitySession };
 
-/** Semua event bus: aktivitas (masuk ring) + perubahan aplikasi, seleksi, buka tab, dan room (tidak masuk ring). */
-export type BusEvent = ActivityEvent | ChangeEvent | SelectionEvent | OpenTabEvent | PeersEvent | PresenceEvent;
+/** Semua event bus: aktivitas (masuk ring) + perubahan aplikasi, seleksi, buka tab, room, dan auth (tidak masuk ring). */
+export type BusEvent = ActivityEvent | ChangeEvent | SelectionEvent | OpenTabEvent | PeersEvent | PresenceEvent | AuthEvent;
 export type ActivityListener = (event: ActivityEvent) => void;
 export type BusListener = (event: BusEvent) => void;
 
@@ -237,6 +244,13 @@ export class ActivityBus {
     this.#broadcast(event);
     return event;
   }
+  /** Siarkan perubahan status sign-in cloud (story C; tanpa ring, hanya pelanggan `subscribeAll`). */
+  auth(auth: CloudAuthState): AuthEvent {
+    const clean = Object.fromEntries(Object.entries(auth).filter(([, v]) => v !== undefined)) as CloudAuthState;
+    const event: AuthEvent = { seq: ++this.#seq, type: 'auth', auth: clean };
+    this.#broadcast(event);
+    return event;
+  }
   /** Minta viewer membuka tab dokumen (tanpa ring, hanya pelanggan `subscribeAll`). Field kosong dibuang. */
   openTab(request: DocOpenRequest): OpenTabEvent {
     const clean = Object.fromEntries(Object.entries(request).filter(([, v]) => v !== undefined)) as DocOpenRequest;
@@ -276,7 +290,7 @@ export class ActivityBus {
   }
   #broadcast(event: BusEvent): void {
     for (const [l, { all }] of [...this.#listeners]) {
-      if ((event.type === 'change' || event.type === 'selection' || event.type === 'openTab' || event.type === 'peers' || event.type === 'presence') && !all) continue;
+      if ((event.type === 'change' || event.type === 'selection' || event.type === 'openTab' || event.type === 'peers' || event.type === 'presence' || event.type === 'auth') && !all) continue;
       try {
         l(event);
       } catch {
@@ -292,7 +306,7 @@ export class ActivityBus {
   subscribe(l: ActivityListener): () => void {
     return this.#add(l as BusListener, false);
   }
-  /** Event aktivitas + event `change`, `selection`, `openTab`, `peers`, dan `presence`. */
+  /** Event aktivitas + event `change`, `selection`, `openTab`, `peers`, `presence`, dan `auth`. */
   subscribeAll(l: BusListener): () => void {
     return this.#add(l, true);
   }

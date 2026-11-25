@@ -9,6 +9,7 @@ import { LakarError, SLUG_PATTERN, errorMessage, resolveDocument, type IconGlyph
 import { z } from 'zod';
 import { notFound } from './errors.js';
 import { readPngSize } from './png.js';
+import { cloudAuth, type SessionStore } from './session.js';
 import type { DocStore } from './store.js';
 import { peekDocument } from './viewer.js';
 
@@ -38,6 +39,11 @@ export type ShareRoutesOptions = {
   env?: NodeJS.ProcessEnv;
   /** Fetch ke service (default `fetch` global); untuk tes. */
   fetchFn?: typeof fetch;
+  /**
+   * Session cloud pengguna (spec-cloud-auth story C): Bearer session diprioritaskan di atas
+   * `LAKAR_CLOUD_KEY` untuk semua panggilan service. Kosong → perilaku lama (key env saja).
+   */
+  session?: SessionStore;
 };
 
 export type ShareUploadResult = { token: string; url: string; boards: number };
@@ -88,23 +94,23 @@ function assertBodySize(docJson: string, boards: Snapshot['boards']) {
 }
 
 /**
- * Panggil JSON ke service share: `${LAKAR_CLOUD_URL}<path>` (Bearer `LAKAR_CLOUD_KEY`), timeout
- * total. Error jaringan/service dipetakan ke LakarError EXPORT_FAILED — cloud tidak dikonfigurasi
- * atau service mati tidak pernah mematikan daemon.
+ * Panggil JSON ke service share: `${LAKAR_CLOUD_URL}<path>` (Bearer session sign-in, jatuh ke
+ * `LAKAR_CLOUD_KEY` — compat AD-4), timeout total. Error jaringan/service dipetakan ke LakarError
+ * EXPORT_FAILED — cloud tidak dikonfigurasi atau service mati tidak pernah mematikan daemon.
  */
 async function cloudCall(
-  { env = process.env, fetchFn = fetch }: ShareRoutesOptions,
+  { env = process.env, fetchFn = fetch, session }: ShareRoutesOptions,
   path: string,
   init: { method: string; body?: string },
 ): Promise<Record<string, unknown> | undefined> {
   const cloudUrl = env.LAKAR_CLOUD_URL?.replace(/\/+$/, '');
   if (!cloudUrl) throw cloudMissing();
-  const cloudKey = env.LAKAR_CLOUD_KEY;
+  const { authorization, session: used } = await cloudAuth(session, env);
   let res: Response;
   try {
     res = await fetchFn(`${cloudUrl}${path}`, {
       method: init.method,
-      headers: { 'content-type': 'application/json', ...(cloudKey ? { authorization: `Bearer ${cloudKey}` } : {}) },
+      headers: { 'content-type': 'application/json', ...(authorization ? { authorization } : {}) },
       ...(init.body !== undefined ? { body: init.body } : {}),
       signal: AbortSignal.timeout(UPLOAD_TIMEOUT_MS),
     });
@@ -129,8 +135,18 @@ async function cloudCall(
   if (res.status === 204) return undefined;
   if (!res.ok || payload.ok !== true) {
     const detail = payload.error?.message ?? `HTTP ${res.status}`;
+    // 401 dengan Bearer session = session.json basi (kedaluwarsa/dicabut): bersihkan supaya
+    // panggilan berikutnya jatuh ke LAKAR_CLOUD_KEY atau memaksa sign-in ulang — jangan biarkan
+    // session mati terus dipakai.
+    if (res.status === 401 && used) await session?.clear().catch(() => {});
     throw new LakarError('EXPORT_FAILED', `service share menolak ${init.method} ${path}: ${detail}`, {
-      hint: payload.error?.hint || (res.status === 401 ? 'periksa LAKAR_CLOUD_KEY' : 'periksa log service @lakar-api, lalu coba lagi'),
+      hint:
+        payload.error?.hint ||
+        (res.status === 401
+          ? used
+            ? 'token session kedaluwarsa atau dicabut — sign in ulang dari aplikasi Lakar, atau periksa LAKAR_CLOUD_KEY'
+            : 'periksa LAKAR_CLOUD_KEY'
+          : 'periksa log service @lakar-api, lalu coba lagi'),
       retryable: res.status >= 500,
     });
   }
