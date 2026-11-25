@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 11,
+  "id": "Dv110001",
+  "rev": 0,
+  "pages": [
+    {
+      "id": "Pv110001",
+      "name": "Page 1",
+      "children": [
+        {
+          "type": "board",
+          "id": "Bv110001",
+          "name": "Hero",
+          "x": 0,
+          "y": 0,
+          "width": 1440,
+          "height": 900,
+          "screen": "landing",
+          "section": "Landing",
+          "children": []
+        },
+        {
+          "type": "board",
+          "id": "Bv110002",
+          "name": "Features",
+          "x": 0,
+          "y": 940,
+          "width": 1440,
+          "height": 800,
+          "screen": "landing",
+          "section": "Landing",
+          "children": []
+        },
+        {
+          "type": "board",
+          "id": "Bv110003",
+          "name": "Pricing",
+          "x": 0,
+          "y": 1800,
+          "width": 1440,
+          "height": 700,
+          "screen": "landing",
+          "children": []
+        }
+      ]
+    }
+  ]
+}

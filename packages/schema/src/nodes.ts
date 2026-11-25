@@ -24,7 +24,7 @@ import { NODE_ADDRESS_PATTERN } from './selection.js';
 // ke baris berikut, CSS flex-wrap); dokumen v8 dimigrasi identitas (`@lakar/core` MIGRATIONS[8]).
 // v10 (story komentar canvas, epic kolaborasi-agen) menambah `comments` opsional di root dokumen; dokumen v9
 // dimigrasi identitas (`@lakar/core` MIGRATIONS[9]).
-export const SCHEMA_VERSION = 10 as const;
+export const SCHEMA_VERSION = 11 as const;
 
 // ---------------------------------------------------------------------------
 // Primitif
@@ -458,6 +458,8 @@ const boardShape = {
   fills: z.array(Fill).optional(),
   /** Mode tema board (AD-11); wajib ada di `tokenModes`. Ketiadaan = mode pertama `tokenModes`. */
   themeMode: ModeName.optional(),
+  /** Grup section bernama (v11, spec-section-groups): nama grup kanvas pembungkus board; ketiadaan = tanpa section. */
+  section: z.string().min(1).max(120).optional(),
 };
 
 const frameShape = {

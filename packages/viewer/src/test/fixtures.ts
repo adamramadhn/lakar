@@ -1,6 +1,6 @@
 // Dokumen kecil untuk tes DOM viewer: satu halaman, satu board 400×300 (`Board001`, "Hero") dengan frame `Card0001`.
 // Tanpa teks/ikon, jadi canvas live tidak meminta font atau glyph (render-deps kosong).
-import type { LakarDocument } from '@lakar/schema';
+import { SCHEMA_VERSION, type LakarDocument } from '@lakar/schema';
 
 export const SLUG = 'demo';
 export const BOARD = 'Board001';
@@ -14,7 +14,7 @@ const frame = (n: Extra): Record<string, unknown> => ({ type: 'frame', position:
 /** Dokumen rev `rev`; `extra` = frame tambahan di board (mis. node baru dari execute agen). */
 export function makeDoc(rev = 1, extra: Extra[] = []): LakarDocument {
   return {
-    schemaVersion: 10,
+    schemaVersion: SCHEMA_VERSION,
     id: 'Doc00001',
     rev,
     tokens: {},

@@ -74,6 +74,7 @@ export function EditMenu({
   onAction,
   onClose,
   onExportCode,
+  onSection,
 }: {
   x: number;
   y: number;
@@ -82,11 +83,14 @@ export function EditMenu({
   onClose: () => void;
   /** undefined = item Export code… disembunyikan; null = tampil nonaktif (seleksi lebih dari satu node). */
   onExportCode?: (() => void) | null | undefined;
+  /** Section board (spec-section-groups): nama section bersama board terpilih (null = campuran/tanpa) + setter. */
+  onSection?: { current: string | null; set: (name: string | null) => void } | undefined;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const subRef = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState({ left: x, top: y });
   const [sub, setSub] = useState<{ key: 'align' | 'distribute'; left: number; top: number; focus: boolean } | undefined>(undefined);
+  const [secInput, setSecInput] = useState(false);
   useLayoutEffect(() => {
     const before = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     return () => {
@@ -205,6 +209,53 @@ export function EditMenu({
             </div>
           );
         })}
+        {onSection !== undefined && (
+          <div className="menu-group" role="none">
+            <div className="menu-separator" role="separator" />
+            {secInput ? (
+              <input
+                ref={(el) => el?.focus()}
+                className="menu-section-input"
+                defaultValue={onSection.current ?? ''}
+                placeholder="Section name"
+                maxLength={120}
+                onMouseEnter={() => setSub(undefined)}
+                onKeyDown={(e) => {
+                  e.stopPropagation();
+                  if (e.key === 'Enter' && e.currentTarget.value.trim()) {
+                    onSection.set(e.currentTarget.value.trim());
+                    onClose();
+                  } else if (e.key === 'Escape') {
+                    setSecInput(false);
+                  }
+                }}
+                onBlur={() => setSecInput(false)}
+              />
+            ) : (
+              <>
+                <button type="button" role="menuitem" className="menu-item" onMouseEnter={() => setSub(undefined)} onClick={() => setSecInput(true)}>
+                  <Icon name="folder" size={15} />
+                  <span className="menu-label">{onSection.current ? `Section · ${onSection.current}` : 'Move to section…'}</span>
+                </button>
+                {onSection.current && (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="menu-item"
+                    onMouseEnter={() => setSub(undefined)}
+                    onClick={() => {
+                      onSection.set(null);
+                      onClose();
+                    }}
+                  >
+                    <Icon name="x" size={15} />
+                    <span className="menu-label">Remove from section</span>
+                  </button>
+                )}
+              </>
+            )}
+          </div>
+        )}
         {onExportCode !== undefined && (
           <div className="menu-group" role="none">
             <div className="menu-separator" role="separator" />

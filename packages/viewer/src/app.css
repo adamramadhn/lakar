@@ -8530,3 +8530,36 @@ button.panel-tab:hover {
   flex: 1;
   min-width: 0;
 }
+
+/* Section board (spec-section-groups): bingkai grup + label di belakang board anggota. */
+.canvas-section {
+  position: absolute;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--fg) 3%, transparent);
+  pointer-events: none;
+}
+.canvas-section-name {
+  position: absolute;
+  top: -20px;
+  left: 0;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--fg-dim, var(--fg));
+  opacity: 0.75;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  max-width: 100%;
+}
+.menu-section-input {
+  width: 100%;
+  margin: 4px 0;
+  padding: 5px 8px;
+  font-size: 12px;
+  color: var(--fg);
+  background: var(--field, transparent);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  outline: none;
+}
