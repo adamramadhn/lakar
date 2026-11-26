@@ -151,6 +151,22 @@ const f = detach(i);
 get(f).type;
 ```
 
+### arrange
+
+`arrange(ids: string[], opts: {mode:'align', align:'left'|'hcenter'|'right'|'top'|'vcenter'|'bottom'} | {mode:'spread', axis:'x'|'y', gap?: number} | {mode:'grid', cols: number, gap?: number}): {moved: number}`
+
+Ratakan posisi node dalam koordinat absolut dokumen (x/y tiap node dihitung dari rantai parent; node di parent berbeda tetap sejajar). mode 'align' + align 'left'|'hcenter'|'right' (atau 'top'|'vcenter'|'bottom') menyamakan tepi/tengah kotak kelompok. mode 'spread' + axis 'x'|'y' memberi jarak antar merata: gap angka = jarak tetap dari tepi kiri/atas kelompok, tanpa gap = sisa ruang dibagi rata (urutan node mengikuti posisi sekarang). mode 'grid' + cols menyusun ulang dalam baris×kolom dari pojok kiri-atas kelompok (urutan membaca y lalu x; gap default 24; lebar kolom = node terlebar di kolom itu, tinggi baris = node tertinggi di baris itu). Syarat: tiap node punya x/y numerik — board atau anak dengan position:'absolute'. Anak layout auto tidak punya x/y → SCHEMA_INVALID (atur dulu lewat update, atau rapikan lewat gap/order parent-nya). Lebar/tinggi non-numerik (hug/fill) dihitung 0. Hasil: {moved} = jumlah node yang berubah posisi.
+
+- Mengembalikan: {moved: number}
+- Error: SCHEMA_INVALID, NOT_FOUND
+
+```js
+const a = add(null, {type:'board', name:'Kartu', x:0, y:0, width:390, height:844, screen:'mobile'});
+const c = add(null, {type:'board', name:'Detail', x:600, y:300, width:390, height:844, screen:'mobile'});
+const d = add(null, {type:'board', name:'Profil', x:1200, y:900, width:390, height:844, screen:'mobile'});
+arrange([a, c, d], {mode:'spread', axis:'x', gap:80});
+```
+
 ### setTokens
 
 `setTokens(map: {[name: string]: string | number | {type, value, modes?} | null}): void`
@@ -306,6 +322,22 @@ setTokenModes(['light', 'dark']);
 setTokens({'colors.bg': {type:'color', value:'#FFFFFF', modes:{dark:'#0B0C0F'}}, 'spacing.4': 16});
 const { tokens, modes } = getTokens();
 [modes, tokens['colors.bg'].modes.dark];
+```
+
+### analyze
+
+`analyze(opts?: {scope?: string, limit?: number, minCluster?: number}): {nodes, colors: {value,count}[], literalColors, tokenColors, typography: {family,weight,size,count}[], spacing: {gaps:{value,count}[], paddings:{value,count}[]}, clusters: {shape,count,ids}[]}`
+
+Audit konsistensi desain sebelum melapor selesai — output rapi memakai sedikit nilai berbeda dan warna bertoken. scope = ID node: hanya subtree-nya (termasuk dirinya); tanpa argumen = seluruh dokumen. limit = maks entri per kategori (default 10). minCluster = minimum pengulangan struktur yang dilaporkan (default 3). Warna dikumpulkan dari fills (solid + stop gradien), strokes, shadows, dan color teks/icon; hex literal dilaporkan apa adanya, ref {$token} sebagai "$token <nama>" (bandingkan literalColors vs tokenColors). Tipografi dari node text (family/weight/size; default = "(default)"/400). Spacing dari gap/columnGap/rowGap dan komponen padding wadah (ref token dilaporkan "$token <nama>"). clusters = subtree bertipe sama (tipe node + tipe anak rekursif, properti diabaikan) yang muncul ≥ minCluster kali — kandidat setComponent.
+
+- Mengembalikan: {nodes, colors, literalColors, tokenColors, typography, spacing:{gaps,paddings}, clusters}
+- Error: SCHEMA_INVALID, NOT_FOUND
+
+```js
+const b = add(null, {type:'board', name:'Beranda', x:0, y:0, width:390, height:844, screen:'mobile'});
+add(b, {type:'text', name:'Judul', content:'Halo', size:32, color:'#1A1A1A'});
+add(b, {type:'text', name:'Isi', content:'Teks', size:16, lineHeight:24, color:'#1A1A1A'});
+analyze({scope: b}).colors;
 ```
 
 ### place

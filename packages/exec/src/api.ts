@@ -79,6 +79,40 @@ export type PlaceOptions = {
 
 export type Point = { x: number; y: number };
 
+/** Opsi `arrange`: satu mode per panggilan. */
+export type ArrangeOptions =
+  | { mode: 'align'; align: 'left' | 'hcenter' | 'right' | 'top' | 'vcenter' | 'bottom' }
+  | { mode: 'spread'; axis: 'x' | 'y'; gap?: number }
+  | { mode: 'grid'; cols: number; gap?: number };
+
+/** Opsi `analyze`. */
+export type AnalyzeOptions = {
+  /** ID node: audit hanya subtree-nya (termasuk dirinya). Tanpa scope = seluruh dokumen. */
+  scope?: string;
+  /** Maks entri per kategori (default 10). */
+  limit?: number;
+  /** Minimum anggota kelompok struktur berulang yang dilaporkan (default 3). */
+  minCluster?: number;
+};
+
+/** Frekuensi satu nilai: angka untuk px, string hex untuk warna, `"$token <nama>"` untuk referensi token. */
+export type AnalyzeFreq = { value: number | string; count: number };
+/** Hasil `analyze`. */
+export type AnalyzeReport = {
+  /** Jumlah node yang diaudit (scope termasuk). */
+  nodes: number;
+  /** Warna pada fills/strokes/shadows/color teks/icon, urut frekuensi. `tokenColors`+`literalColors` = total pemakaian. */
+  colors: AnalyzeFreq[];
+  literalColors: number;
+  tokenColors: number;
+  /** Kombinasi family/weight/size pada node teks. */
+  typography: { family: number | string; weight: number | string; size: number | string; count: number }[];
+  /** Nilai `gap`/`columnGap`/`rowGap` dan komponen `padding` pada wadah. */
+  spacing: { gaps: AnalyzeFreq[]; paddings: AnalyzeFreq[] };
+  /** Subtree bentuk sama yang muncul ≥ `minCluster` kali (kandidat komponen). `shape` = tipe node + tipe anak rekursif. */
+  clusters: { shape: string; count: number; ids: string[] }[];
+};
+
 /** Opsi `iconSearch`. */
 export type IconSearchOptions = {
   /** Batasi ke satu pustaka: `lucide` (ikon UI) atau `simple-icons` (logo brand). */
@@ -141,6 +175,12 @@ export interface LakarApi {
   /** Hapus node beserta subtree-nya. Master yang terhapus men-detach semua instancenya di commit yang sama. */
   remove(id: string): void;
   /**
+   * Ratakan posisi node (koordinat absolut dokumen): `align` tepi/tengah kotak kelompok, `spread` jarak antar
+   * merata pada satu sumbu (gap tetap atau dibagi rata), `grid` susun ulang dalam baris×kolom. Node harus
+   * berposisi absolut (`position:'absolute'` dengan x/y) atau board — anak layout auto tidak punya x/y.
+   */
+  arrange(ids: string[], opts: ArrangeOptions): { moved: number };
+  /**
    * Jadikan node master komponen (`{props, slots}`; tanpa argumen = `{props:[], slots:[]}` bila belum master) atau
    * lepas status master (`null`, instancenya di-detach). Instance: `add(parent, {type:'instance', name, componentId})`.
    */
@@ -179,6 +219,12 @@ export interface LakarApi {
   children(id: string | null): NodeView[];
   /** Token dokumen (bentuk tersimpan) dan daftar mode tema (`[]` bila tanpa mode). */
   getTokens(): TokensView;
+  /**
+   * Audit konsistensi desain dalam `scope` (id board/halaman/frame; tanpa argumen = seluruh dokumen): frekuensi
+   * warna (literal vs `$token`), tipografi (family/weight/size), jarak (gap/padding), dan struktur berulang yang
+   * layak dijadikan komponen. Jalankan sebelum melapor selesai — output rapi biasanya sedikit nilai berbeda.
+   */
+  analyze(opts?: AnalyzeOptions): AnalyzeReport;
   /** Posisi bebas tumpang tindih untuk board baru berukuran `w`×`h`. */
   place(w: number, h: number | 'hug', opts?: PlaceOptions): Point;
   /**
@@ -400,6 +446,17 @@ function mutation<T>(ctx: ApiContext, fn: () => T): T {
 
 const FIND_KEYS = ['type', 'name', 'within'];
 const PLACE_KEYS = ['near', 'gap'];
+const ARRANGE_ALIGNS = ['left', 'hcenter', 'right', 'top', 'vcenter', 'bottom'] as const;
+const ARRANGE_HINT = "contoh: arrange([id1,id2], {mode:'align', align:'left'}); {mode:'spread', axis:'x', gap?:24}; {mode:'grid', cols:3, gap?:24}";
+/** Gap default `arrange` mode grid (px). */
+const DEFAULT_ARRANGE_GAP = 24;
+const isFiniteNum = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
+/** Nilai numerik properti node (x/y/width/height); non-numerik (hug/fill/token ref) → 0. */
+const num = (v: unknown): number => (isFiniteNum(v) ? v : 0);
+const ANALYZE_KEYS = ['scope', 'limit', 'minCluster'];
+/** Referensi token `{$token:"nama"}` — objek dengan tepat satu kunci string. */
+const isTokenRef = (v: unknown): v is { $token: string } =>
+  typeof v === 'object' && v !== null && !Array.isArray(v) && Object.keys(v).length === 1 && typeof (v as { $token?: unknown }).$token === 'string';
 
 type Rect = { x: number; y: number; w: number; h: number };
 /** Kotak board; `height:'hug'` = tinggi terukur (`heights`), belum terukur = 0. */
@@ -560,6 +617,131 @@ export const API: { readonly [K in keyof LakarApi]: ApiFunction } = {
       "const i = add(b, {type:'instance', name:'Kartu A', componentId:k});\nconst f = detach(i);\nget(f).type;",
     call(ctx, [id]) {
       return mutation(ctx, () => ctx.tx.detach(id as string));
+    },
+  },
+  arrange: {
+    kind: 'op',
+    signature: "arrange(ids: string[], opts: {mode:'align', align:'left'|'hcenter'|'right'|'top'|'vcenter'|'bottom'} | {mode:'spread', axis:'x'|'y', gap?: number} | {mode:'grid', cols: number, gap?: number}): {moved: number}",
+    doc:
+      'Ratakan posisi node dalam koordinat absolut dokumen (x/y tiap node dihitung dari rantai parent; node di parent berbeda tetap sejajar). ' +
+      "mode 'align' + align 'left'|'hcenter'|'right' (atau 'top'|'vcenter'|'bottom') menyamakan tepi/tengah kotak kelompok. " +
+      "mode 'spread' + axis 'x'|'y' memberi jarak antar merata: gap angka = jarak tetap dari tepi kiri/atas kelompok, tanpa gap = sisa ruang dibagi rata (urutan node mengikuti posisi sekarang). " +
+      "mode 'grid' + cols menyusun ulang dalam baris×kolom dari pojok kiri-atas kelompok (urutan membaca y lalu x; gap default 24; lebar kolom = node terlebar di kolom itu, tinggi baris = node tertinggi di baris itu). " +
+      "Syarat: tiap node punya x/y numerik — board atau anak dengan position:'absolute'. Anak layout auto tidak punya x/y → SCHEMA_INVALID (atur dulu lewat update, atau rapikan lewat gap/order parent-nya). " +
+      'Lebar/tinggi non-numerik (hug/fill) dihitung 0. Hasil: {moved} = jumlah node yang berubah posisi.',
+    returns: '{moved: number}',
+    errors: ['SCHEMA_INVALID', 'NOT_FOUND'],
+    example:
+      "const a = add(null, {type:'board', name:'Kartu', x:0, y:0, width:390, height:844, screen:'mobile'});\n" +
+      "const c = add(null, {type:'board', name:'Detail', x:600, y:300, width:390, height:844, screen:'mobile'});\n" +
+      "const d = add(null, {type:'board', name:'Profil', x:1200, y:900, width:390, height:844, screen:'mobile'});\n" +
+      "arrange([a, c, d], {mode:'spread', axis:'x', gap:80});",
+    call(ctx, [ids, opts]) {
+      if (!Array.isArray(ids) || !ids.every((i) => typeof i === 'string')) {
+        throw new LakarError('SCHEMA_INVALID', `arrange: ids harus array ID string, bukan ${show(ids)}`, { hint: ARRANGE_HINT });
+      }
+      if (ids.length < 2) throw new LakarError('SCHEMA_INVALID', `arrange: butuh minimal 2 node, dikirim ${ids.length}`, { hint: ARRANGE_HINT });
+      if (!isPlainObject(opts)) throw new LakarError('SCHEMA_INVALID', `arrange: opsi harus objek {mode, ...}, bukan ${show(opts)}`, { hint: ARRANGE_HINT });
+      const o = opts as Record<string, unknown>;
+      const mode = o.mode;
+      if (mode !== 'align' && mode !== 'spread' && mode !== 'grid') {
+        throw new LakarError('SCHEMA_INVALID', `arrange: mode harus 'align'|'spread'|'grid', bukan ${show(mode)}`, { hint: ARRANGE_HINT });
+      }
+      // Validasi opsi mode lebih dulu agar argumen yang salah → SCHEMA_INVALID sebelum NOT_FOUND id.
+      if (mode === 'align' && !ARRANGE_ALIGNS.includes(o.align as never)) {
+        throw new LakarError('SCHEMA_INVALID', `arrange: align harus ${ARRANGE_ALIGNS.map((a) => `'${a}'`).join('|')}, bukan ${show(o.align)}`, { hint: ARRANGE_HINT });
+      }
+      if (mode === 'spread') {
+        if (o.axis !== 'x' && o.axis !== 'y') throw new LakarError('SCHEMA_INVALID', `arrange: axis harus 'x'|'y', bukan ${show(o.axis)}`, { hint: ARRANGE_HINT });
+        if (o.gap !== undefined && (!isFiniteNum(o.gap) || o.gap < 0)) throw new LakarError('SCHEMA_INVALID', `arrange: gap harus angka ≥ 0, bukan ${show(o.gap)}`, { hint: 'hilangkan gap untuk jarak dibagi rata' });
+      }
+      if (mode === 'grid') {
+        if (!isFiniteNum(o.cols) || !Number.isInteger(o.cols) || o.cols < 1) throw new LakarError('SCHEMA_INVALID', `arrange: cols harus bilangan bulat ≥ 1, bukan ${show(o.cols)}`, { hint: ARRANGE_HINT });
+        if (o.gap !== undefined && (!isFiniteNum(o.gap) || o.gap < 0)) throw new LakarError('SCHEMA_INVALID', `arrange: gap harus angka ≥ 0, bukan ${show(o.gap)}`, { hint: ARRANGE_HINT });
+      }
+      const doc = ctx.view();
+      const index = new Map(walk(doc).map((e) => [e.node.id, e]));
+      /** Posisi absolut: x/y node + offset rantai parent (board di halaman = koordinat halaman). */
+      const box = (n: AnyNode) => n as { x?: unknown; y?: unknown; width?: unknown; height?: unknown };
+      const absOf = (e: Entry): Point => {
+        let x = num(box(e.node).x);
+        let y = num(box(e.node).y);
+        let p = e.parentId;
+        while (p) {
+          const pe = index.get(p)!;
+          x += num(box(pe.node).x);
+          y += num(box(pe.node).y);
+          p = pe.parentId;
+        }
+        return { x, y };
+      };
+      const items = ids.map((id) => {
+        const e = mustFind('arrange', doc, id);
+        const b = box(e.node);
+        if (!isFiniteNum(b.x) || !isFiniteNum(b.y)) {
+          throw new LakarError('SCHEMA_INVALID', `arrange: ${e.node.name} (${id}) tidak punya x/y — node berada di layout parent`, {
+            hint: "atur position:'absolute' + x/y lewat update() dulu, atau rapikan lewat gap/urutan anak pada parent layout",
+          });
+        }
+        const abs = absOf(e);
+        const parent = e.parentId ? absOf(index.get(e.parentId)!) : { x: 0, y: 0 };
+        return { e, abs, pOff: parent, w: num(b.width), h: num(b.height) };
+      });
+      const round = (v: number) => Math.round(v * 1000) / 1000;
+      /** Tetapkan posisi absolut node → x/y lokal = absolut target − offset parent. */
+      const placeAt = (it: (typeof items)[number], ax: number, ay: number): void => {
+        const b = box(it.e.node);
+        const nx = round(ax - it.pOff.x);
+        const ny = round(ay - it.pOff.y);
+        if (nx === num(b.x) && ny === num(b.y)) return;
+        mutation(ctx, () => ctx.tx.update(it.e.node.id, { x: nx, y: ny }));
+        moved++;
+      };
+      let moved = 0;
+      const minX = Math.min(...items.map((i) => i.abs.x));
+      const minY = Math.min(...items.map((i) => i.abs.y));
+      const maxX2 = Math.max(...items.map((i) => i.abs.x + i.w));
+      const maxY2 = Math.max(...items.map((i) => i.abs.y + i.h));
+      if (mode === 'align') {
+        const a = o.align as (typeof ARRANGE_ALIGNS)[number];
+        for (const it of items) {
+          const ax = a === 'left' ? minX : a === 'right' ? maxX2 - it.w : a === 'hcenter' ? minX + (maxX2 - minX - it.w) / 2 : it.abs.x;
+          const ay = a === 'top' ? minY : a === 'bottom' ? maxY2 - it.h : a === 'vcenter' ? minY + (maxY2 - minY - it.h) / 2 : it.abs.y;
+          placeAt(it, ax, ay);
+        }
+      } else if (mode === 'spread') {
+        const axis = o.axis as 'x' | 'y';
+        const gap = o.gap as number | undefined;
+        const sorted = [...items].sort((p, q) => (axis === 'x' ? p.abs.x - q.abs.x : p.abs.y - q.abs.y));
+        const span = axis === 'x' ? maxX2 - minX : maxY2 - minY;
+        const sizes = sorted.reduce((s, i) => s + (axis === 'x' ? i.w : i.h), 0);
+        const step = gap ?? (sorted.length > 1 ? Math.max(0, (span - sizes) / (sorted.length - 1)) : 0);
+        // gap eksplisit = jarak antar tepi; tanpa gap = sisa ruang dibagi rata (juga antar tepi).
+        let cursor = axis === 'x' ? minX : minY;
+        for (const it of sorted) {
+          if (axis === 'x') placeAt(it, cursor, it.abs.y);
+          else placeAt(it, it.abs.x, cursor);
+          cursor += (axis === 'x' ? it.w : it.h) + step;
+        }
+      } else {
+        const cols = o.cols as number;
+        const gap = (o.gap ?? DEFAULT_ARRANGE_GAP) as number;
+        const sorted = [...items].sort((p, q) => p.abs.y - q.abs.y || p.abs.x - q.abs.x);
+        const colW: number[] = [];
+        const rowH: number[] = [];
+        sorted.forEach((it, i) => {
+          const c = i % cols;
+          const r = Math.floor(i / cols);
+          colW[c] = Math.max(colW[c] ?? 0, it.w);
+          rowH[r] = Math.max(rowH[r] ?? 0, it.h);
+        });
+        const offX = [0];
+        const offY = [0];
+        for (let i = 1; i < cols; i++) offX[i] = offX[i - 1]! + (colW[i - 1] ?? 0) + gap;
+        for (let i = 1; i < rowH.length; i++) offY[i] = offY[i - 1]! + (rowH[i - 1] ?? 0) + gap;
+        sorted.forEach((it, i) => placeAt(it, minX + offX[i % cols]!, minY + offY[Math.floor(i / cols)]!));
+      }
+      return { moved };
     },
   },
   setTokens: {
@@ -803,6 +985,128 @@ export const API: { readonly [K in keyof LakarApi]: ApiFunction } = {
       }
       const doc = ctx.view();
       return JSON.parse(JSON.stringify({ tokens: doc.tokens ?? {}, modes: doc.tokenModes ?? [] })) as unknown;
+    },
+  },
+  analyze: {
+    kind: 'read',
+    signature:
+      "analyze(opts?: {scope?: string, limit?: number, minCluster?: number}): {nodes, colors: {value,count}[], literalColors, tokenColors, typography: {family,weight,size,count}[], spacing: {gaps:{value,count}[], paddings:{value,count}[]}, clusters: {shape,count,ids}[]}",
+    doc:
+      'Audit konsistensi desain sebelum melapor selesai — output rapi memakai sedikit nilai berbeda dan warna bertoken. ' +
+      "scope = ID node: hanya subtree-nya (termasuk dirinya); tanpa argumen = seluruh dokumen. limit = maks entri per kategori (default 10). minCluster = minimum pengulangan struktur yang dilaporkan (default 3). " +
+      'Warna dikumpulkan dari fills (solid + stop gradien), strokes, shadows, dan color teks/icon; hex literal dilaporkan apa adanya, ref {$token} sebagai "$token <nama>" (bandingkan literalColors vs tokenColors). ' +
+      'Tipografi dari node text (family/weight/size; default = "(default)"/400). Spacing dari gap/columnGap/rowGap dan komponen padding wadah (ref token dilaporkan "$token <nama>"). ' +
+      'clusters = subtree bertipe sama (tipe node + tipe anak rekursif, properti diabaikan) yang muncul ≥ minCluster kali — kandidat setComponent.',
+    returns: '{nodes, colors, literalColors, tokenColors, typography, spacing:{gaps,paddings}, clusters}',
+    errors: ['SCHEMA_INVALID', 'NOT_FOUND'],
+    example:
+      `${BOARD}\nadd(b, {type:'text', name:'Judul', content:'Halo', size:32, color:'#1A1A1A'});\n` +
+      "add(b, {type:'text', name:'Isi', content:'Teks', size:16, lineHeight:24, color:'#1A1A1A'});\n" +
+      "analyze({scope: b}).colors;",
+    call(ctx, [opts]) {
+      if (opts !== undefined && !isPlainObject(opts)) {
+        throw new LakarError('SCHEMA_INVALID', `analyze: opsi harus objek {scope?, limit?, minCluster?}, bukan ${show(opts)}`, { hint: 'contoh: analyze() atau analyze({scope: boardId, limit: 5})' });
+      }
+      const o = (opts ?? {}) as Record<string, unknown>;
+      const unknown = Object.keys(o).filter((k) => !ANALYZE_KEYS.includes(k));
+      if (unknown.length) throw new LakarError('SCHEMA_INVALID', `analyze: kunci opsi tidak dikenal: ${unknown.join(', ')}`, { hint: `kunci yang didukung: ${ANALYZE_KEYS.join(', ')}` });
+      for (const [what, v, min] of [['limit', o.limit ?? 10, 1], ['minCluster', o.minCluster ?? 3, 2]] as const) {
+        if (!isFiniteNum(v) || !Number.isInteger(v) || v < min) {
+          throw new LakarError('SCHEMA_INVALID', `analyze: ${what} harus bilangan bulat ≥ ${min}, bukan ${show(v)}`, { hint: `hilangkan ${what} untuk default` });
+        }
+      }
+      const limit = (o.limit ?? 10) as number;
+      const minCluster = (o.minCluster ?? 3) as number;
+      const doc = ctx.view();
+      let entries = walk(doc);
+      if (o.scope !== undefined) {
+        const sid = requireId('analyze', 'scope', o.scope);
+        const root = mustFind('analyze', doc, sid, 'node scope');
+        const keep = new Set<string>([sid]);
+        for (const e of entries) if (keep.has(e.parentId ?? '')) keep.add(e.node.id);
+        entries = entries.filter((e) => keep.has(e.node.id) || e.node.id === root.node.id);
+      }
+      /** Nilai untuk frekuensi: ref {$token} → "$token <nama>", angka apa adanya, hex warna huruf besar. */
+      const val = (v: unknown): number | string | undefined => {
+        if (isFiniteNum(v)) return v;
+        if (isTokenRef(v)) return `$token ${v.$token}`;
+        if (typeof v === 'string' && /^#[0-9A-Fa-f]{6,8}$/.test(v)) return v.toUpperCase();
+        return undefined;
+      };
+      const bump = (m: Map<number | string, number>, v: unknown) => {
+        const k = val(v);
+        if (k !== undefined) m.set(k, (m.get(k) ?? 0) + 1);
+      };
+      const freq = (m: Map<number | string, number>): AnalyzeFreq[] => [...m.entries()].map(([value, count]) => ({ value, count })).sort((a, b) => b.count - a.count).slice(0, limit);
+      const colors = new Map<number | string, number>();
+      const typo = new Map<string, { family: number | string; weight: number | string; size: number | string; count: number }>();
+      const gaps = new Map<number | string, number>();
+      const pads = new Map<number | string, number>();
+      const clusterMap = new Map<string, string[]>();
+      /** Tanda tangan struktur: tipe node + tipe anak rekursif (properti diabaikan), kedalaman maks 6. */
+      const sig = (n: AnyNode, depth: number): string => {
+        if (depth <= 0) return '…';
+        const kids = ('children' in n ? (n.children as AnyNode[] | undefined) : undefined) ?? [];
+        if (!kids.length) return n.type;
+        return `${n.type}(${kids.map((c) => sig(c, depth - 1)).sort().join(',')})`;
+      };
+      let literalColors = 0;
+      let tokenColors = 0;
+      for (const e of entries) {
+        const n = e.node as AnyNode & Record<string, unknown>;
+        const colorList = (list: unknown) => {
+          if (!Array.isArray(list)) return;
+          for (const item of list) {
+            if (!isPlainObject(item)) continue;
+            const it = item as Record<string, unknown>;
+            if (val(it.color) !== undefined) {
+              bump(colors, it.color);
+              if (isTokenRef(it.color)) tokenColors++;
+              else literalColors++;
+            }
+            if (Array.isArray(it.stops)) for (const s of it.stops as Record<string, unknown>[]) bump(colors, s.color);
+          }
+        };
+        colorList(n.fills);
+        colorList(n.strokes);
+        colorList(n.shadows);
+        if (val(n.color) !== undefined) {
+          bump(colors, n.color);
+          if (isTokenRef(n.color)) tokenColors++;
+          else literalColors++;
+        }
+        if (n.type === 'text') {
+          const fam = isTokenRef(n.family) ? `$token ${n.family.$token}` : typeof n.family === 'string' ? n.family : '(default)';
+          const wt = val(n.weight) ?? 400;
+          const sz = val(n.size);
+          if (sz !== undefined) {
+            const key = `${fam}|${wt}|${sz}`;
+            const row = typo.get(key) ?? { family: fam, weight: wt, size: sz, count: 0 };
+            row.count++;
+            typo.set(key, row);
+          }
+        }
+        for (const k of ['gap', 'columnGap', 'rowGap'] as const) bump(gaps, n[k]);
+        const pad = n.padding;
+        for (const v of Array.isArray(pad) ? pad : [pad]) bump(pads, v);
+        const s = sig(n, 6);
+        clusterMap.set(s, [...(clusterMap.get(s) ?? []), n.id]);
+      }
+      const clusters = [...clusterMap.entries()]
+        .filter(([, ids]) => ids.length >= minCluster)
+        .map(([shape, ids]) => ({ shape: shape.length > 120 ? `${shape.slice(0, 117)}…` : shape, count: ids.length, ids: ids.slice(0, limit) }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, limit);
+      const report: AnalyzeReport = {
+        nodes: entries.length,
+        colors: freq(colors),
+        literalColors,
+        tokenColors,
+        typography: [...typo.values()].sort((a, b) => b.count - a.count).slice(0, limit),
+        spacing: { gaps: freq(gaps), paddings: freq(pads) },
+        clusters,
+      };
+      return JSON.parse(JSON.stringify(report)) as unknown;
     },
   },
   place: {
