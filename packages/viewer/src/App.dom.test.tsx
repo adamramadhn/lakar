@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { api } from './api';
 import { App } from './App';
 import { docHash } from './files';
-import { dom, fail, FakeEventSource, renderUi, stream } from './test/dom';
+import { dom, FakeEventSource, renderUi, stream } from './test/dom';
 import { makeDoc } from './test/fixtures';
 
 /** Daemon tiruan minimum untuk App + Dashboard + Viewer. */
@@ -94,29 +94,24 @@ describe('App — gate first-run sign-in', () => {
     expect(document.querySelector('.onboarding')).toBeNull();
   });
 
-  it('skip → POST /viewer/onboarding + gate hilang, Dashboard tampil', async () => {
-    const d = daemonAuth(AUTH_PENDING);
-    d.on('POST', '/viewer/onboarding', () => ({ signin: 'skipped' }));
+  it('tanpa jalur skip: tidak ada tombol "Continue without an account" / "Continue offline"', async () => {
+    daemonAuth(AUTH_PENDING);
     location.hash = '#/';
-    const { user } = renderUi(<App />);
+    renderUi(<App />);
     await waitFor(() => expect(document.querySelector('.onboarding')).not.toBeNull());
-    await user.click(screen.getByRole('button', { name: 'Continue without an account' }));
-    await waitFor(() => expect(document.querySelector('main.body')).not.toBeNull());
-    expect(document.querySelector('.onboarding')).toBeNull();
-    expect(d.find('POST', '/viewer/onboarding')).toHaveLength(1);
+    expect(screen.queryByRole('button', { name: 'Continue without an account' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Continue offline' })).not.toBeInTheDocument();
   });
 
-  it('skip gagal (E5) → gate hilang + toast "couldn’t save this choice"', async () => {
-    const d = daemonAuth(AUTH_PENDING);
-    d.on('POST', '/viewer/onboarding', () => {
-      throw fail('INTERNAL', 500);
-    });
+  it('sign-in selesai (SSE auth) → S5 → gate hilang, Dashboard tampil', async () => {
+    daemonAuth(AUTH_PENDING);
     location.hash = '#/';
     const { user } = renderUi(<App />);
     await waitFor(() => expect(document.querySelector('.onboarding')).not.toBeNull());
-    await user.click(screen.getByRole('button', { name: 'Continue without an account' }));
-    await waitFor(() => expect(document.querySelector('.onboarding')).toBeNull());
-    await waitFor(() => expect(document.querySelector('.toast')?.textContent).toContain('see this screen again'));
+    stream.event('auth', { auth: { signedIn: true, user: { id: 'u1', email: 'ana@studio.id' } } });
+    await user.click(await screen.findByRole('button', { name: 'Open Lakar' }));
+    await waitFor(() => expect(document.querySelector('main.body')).not.toBeNull());
+    expect(document.querySelector('.onboarding')).toBeNull();
   });
 });
 

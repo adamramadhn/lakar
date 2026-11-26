@@ -9697,6 +9697,7 @@ button.panel-tab:hover {
   display: flex;
   align-items: center;
   gap: 12px;
+  padding: 4px 0;
   color: var(--text-secondary);
   font-size: 12px;
 }
@@ -9716,37 +9717,51 @@ button.panel-tab:hover {
   border-radius: 8px;
   margin: 0;
 }
-.onboarding-skip {
+/* Magic link (desain update first-run-signin): field + tombol "Send link" sebaris —
+   bobot visual sama dengan tombol provider, bukan blok form terpisah. */
+.onboarding-email-row {
   display: flex;
-  flex-direction: column;
+  align-items: center;
   gap: 8px;
 }
-.onboarding-skip .onboarding-divider {
-  margin-bottom: 4px;
+.onboarding-email-field {
+  flex: 1;
+  min-width: 0;
+  height: 40px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-secondary);
+  cursor: text;
 }
-/* Skip: .btn ghost lebar penuh — sama mudah ditemukan dengan tombol sign-in. */
-.btn.ghost {
-  width: 100%;
-  background: transparent;
-  border-color: transparent;
+.onboarding-email-field:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+.onboarding-email-field input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: none;
+  outline: 0;
+  padding: 0;
+  font: 400 13px var(--font-ui);
   color: var(--text-primary);
-  font-size: 14px;
-  font-weight: 500;
 }
-.btn.ghost:hover {
-  background: var(--surface-hover);
+.onboarding-email-row .btn {
+  height: 40px;
+  padding: 0 16px;
+  flex: none;
 }
-.onboarding-skip-help {
+.onboarding-email-hint {
   margin: 0;
-  text-align: center;
-  color: var(--text-secondary);
   font-size: 12px;
-  line-height: 1.45;
+  line-height: 1.5;
+  color: var(--text-secondary);
 }
-.onboarding-footer {
-  color: var(--text-secondary);
-  font-family: var(--mono, monospace);
-  font-size: 12px;
+.onboarding-email-hint.danger {
+  color: var(--danger);
 }
 .onboarding-success {
   display: flex;

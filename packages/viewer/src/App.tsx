@@ -73,7 +73,7 @@ export function App() {
     );
   }, []);
   useEffect(loadAuth, [loadAuth]);
-  // `offline` = "Continue offline" — tutup hanya untuk pemuatan ini (E2), tidak ditulis.
+  // Gate tertutup hanya lewat sign-in (`gateDone` diset OnboardingGate) — tanpa jalur skip/offline.
   const gate = gateDone === undefined && shouldShowGate(authStatus, bootRoute.current, false);
   const gateRef = useRef(gate);
   gateRef.current = gate;
@@ -269,7 +269,7 @@ export function App() {
       <TitleBar tabs={tabs} active={active} onMenu={() => setMenuOpen((v) => !v)} onClose={close} onNew={startNew} minimal={gate} />
       {offline && <OfflineBanner />}
       {gate && authStatus ? (
-        <OnboardingGate status={authStatus} onDone={setGateDone} onRetry={loadAuth} onToast={(message) => setToast({ message, kind: 'info' })} />
+        <OnboardingGate status={authStatus} onDone={setGateDone} onRetry={loadAuth} />
       ) : (
         <main className="body">
           {route.name === 'viewer' ? (
