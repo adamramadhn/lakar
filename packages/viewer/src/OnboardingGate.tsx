@@ -13,7 +13,7 @@ import { type AuthStatus, type CloudUser } from './api';
 import { GATE_ERRORS, gateErrorText } from './cloudAuth';
 import { focusWindow } from './desktop';
 import { useNow } from './hooks';
-import { BrandIcon, Icon } from './icons';
+import { BrandIcon, Icon, LakarMark } from './icons';
 import { useCloudSignIn } from './useCloudSignIn';
 
 /** Gate hanya tertutup oleh sign-in — tanpa jalur skip/offline. */
@@ -100,7 +100,7 @@ export function OnboardingGate({
   const brand = (
     <div className="onboarding-brand">
       <span className="onboarding-logo" aria-hidden="true">
-        L
+        <LakarMark size={24} />
       </span>
       <span className="onboarding-wordmark">Lakar</span>
     </div>
