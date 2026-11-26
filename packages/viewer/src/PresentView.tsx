@@ -1,10 +1,11 @@
 // Mode Present (spec-prototype-mode): route `#/p/<slug>[?f=<flowId>]`, satu board baca-saja penuh layar dari
-// dokumen ter-resolve. Klik pada elemen `[data-lakar-id]` di dalam shadow DOM board menjalankan interaksi `tap`
-// (v13): navigate ke board target (transisi instant/dissolve/slide), back ke board sebelumnya, atau openLink di
-// tab baru. Interaksi pada instance tersimpan dicocokkan lewat segmen terluar alamat (akar ekspansi memakai id
-// instance polos, isinya `I/…`). Esc menutup; `?f=` memilih flow awal (default flow pertama / board pertama).
+// dokumen ter-resolve. Pointer pada elemen `[data-lakar-id]` di dalam shadow DOM board menjalankan interaksi
+// (v13) sesuai trigger-nya — tap/press/hover/drag: navigate ke board target (transisi instant/dissolve/slide),
+// back ke board sebelumnya, atau openLink di tab baru. Interaksi pada instance tersimpan dicocokkan lewat segmen
+// terluar alamat (akar ekspansi memakai id instance polos, isinya `I/…`). Esc menutup; `?f=` memilih flow awal
+// (default flow pertama / board pertama).
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { resolveDocument, type Interaction, type LakarDocument, type ResolvedDocument } from '@lakar/schema';
+import { resolveDocument, type Interaction, type InteractionTrigger, type LakarDocument, type ResolvedDocument } from '@lakar/schema';
 import { api, errorText } from './api';
 import { docHash } from './files';
 import { boardDepKeys, ensureFaces, mountLive, RenderDepsCache } from './liveBoard';
@@ -15,16 +16,17 @@ const depsCache = new RenderDepsCache((keys) => api.renderDeps(keys));
 type NodeEntry = { type?: string; name?: string; interactions?: Interaction[] };
 
 /**
- * Alamat node → interaksi `tap` yang cocok: node ter-resolve plus node instance tersimpan pada segmen terluar
- * (akar ekspansi memakai id instance polos, jadi segmen pertama selalu id instance terluar bila ada). Dedupe
- * per `id` interaksi menjaga instance tersimpan dan hasil resolve tidak menghasilkan aksi ganda.
+ * Alamat node → interaksi `trigger` yang cocok (tanpa argumen = semua trigger, dipakai rect hotspot): node
+ * ter-resolve plus node instance tersimpan pada segmen terluar (akar ekspansi memakai id instance polos, jadi
+ * segmen pertama selalu id instance terluar bila ada). Dedupe per `id` interaksi menjaga instance tersimpan dan
+ * hasil resolve tidak menghasilkan aksi ganda.
  */
-function interactionsAt(resolved: ReadonlyMap<string, NodeEntry>, stored: ReadonlyMap<string, NodeEntry>, id: string): Interaction[] {
+function interactionsAt(resolved: ReadonlyMap<string, NodeEntry>, stored: ReadonlyMap<string, NodeEntry>, id: string, trigger?: InteractionTrigger): Interaction[] {
   const out: Interaction[] = [...(resolved.get(id)?.interactions ?? [])];
   const s = stored.get(id.split('/')[0]!);
   if (s?.type === 'instance' && s.interactions) out.push(...s.interactions);
   const seen = new Set<string>();
-  return out.filter((i) => i.trigger === 'tap' && !seen.has(i.id) && seen.add(i.id));
+  return out.filter((i) => (!trigger || i.trigger === trigger) && !seen.has(i.id) && seen.add(i.id));
 }
 
 /** Indeks id → node untuk dokumen (tersimpan atau ter-resolve): board dan semua turunannya termasuk slot instance. */
@@ -48,6 +50,8 @@ function firstBoardId(doc: ResolvedDocument): string | undefined {
 type Active = { boardId: string; enter?: { kind: 'dissolve' | 'slide'; direction?: 'left' | 'right' | 'up' | 'down'; durationMs: number; easing: string } };
 
 const isNum = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
+/** Ambang gerak pointerdown→pointermove sebelum gestur dihitung `drag` (piksel, jarak manhattan). */
+const DRAG_PX = 8;
 
 /**
  * Host satu board Present: shadow DOM live diskalakan agar muat di viewport (fit, boleh membesar). Board
@@ -176,24 +180,73 @@ export function PresentView({ slug, flowId, onExit }: { slug: string; flowId?: s
     [current, resolved],
   );
 
-  // Delegasi klik pada stage: jalan ke atas lewat `[data-lakar-id]` (shadow root ikut composedPath).
+  // Delegasi trigger pada stage: jalan ke atas lewat `[data-lakar-id]` (shadow root ikut composedPath). tap=click,
+  // press=pointerdown, hover=pointerover (sekali per masuk; pointerout melepas tandanya), drag=pointerdown lalu
+  // geser > DRAG_PX — gestur drag yang memicu tidak dihitung tap saat click berikutnya.
   useEffect(() => {
     const stage = stageRef.current;
     const idx = indexRef.current;
     if (!stage || !idx) return;
-    const onClick = (e: MouseEvent) => {
-      const path = e.composedPath() as HTMLElement[];
-      for (const el of path) {
+    const hit = (e: Event, trigger: InteractionTrigger): { el: HTMLElement; i: Interaction } | undefined => {
+      for (const el of e.composedPath() as HTMLElement[]) {
         if (!(el instanceof HTMLElement) || !el.dataset.lakarId) continue;
-        const ints = interactionsAt(idx.resolved, idx.stored, el.dataset.lakarId);
-        if (ints.length) {
-          go(ints[0]!);
-          return;
-        }
+        const ints = interactionsAt(idx.resolved, idx.stored, el.dataset.lakarId, trigger);
+        if (ints.length) return { el, i: ints[0]! };
+      }
+      return undefined;
+    };
+    const hovered = new Set<HTMLElement>();
+    const onOver = (e: PointerEvent) => {
+      const h = hit(e, 'hover');
+      if (h && !hovered.has(h.el)) {
+        hovered.add(h.el);
+        go(h.i);
       }
     };
+    const onOut = (e: PointerEvent) => {
+      for (const el of e.composedPath()) if (el instanceof HTMLElement) hovered.delete(el);
+    };
+    let drag: { i: Interaction; x: number; y: number } | undefined;
+    let dragFired = false;
+    const onDown = (e: PointerEvent) => {
+      const p = hit(e, 'press');
+      if (p) go(p.i);
+      const d = hit(e, 'drag');
+      drag = d ? { i: d.i, x: e.clientX, y: e.clientY } : undefined;
+      dragFired = false;
+    };
+    const onMove = (e: PointerEvent) => {
+      if (!drag || dragFired || Math.abs(e.clientX - drag.x) + Math.abs(e.clientY - drag.y) <= DRAG_PX) return;
+      dragFired = true;
+      go(drag.i);
+    };
+    const onUp = () => {
+      drag = undefined;
+    };
+    const onClick = (e: MouseEvent) => {
+      if (dragFired) {
+        dragFired = false;
+        return;
+      }
+      const t = hit(e, 'tap');
+      if (t) go(t.i);
+    };
     stage.addEventListener('click', onClick);
-    return () => stage.removeEventListener('click', onClick);
+    stage.addEventListener('pointerdown', onDown);
+    stage.addEventListener('pointermove', onMove);
+    stage.addEventListener('pointerup', onUp);
+    stage.addEventListener('pointercancel', onUp);
+    stage.addEventListener('pointerover', onOver);
+    stage.addEventListener('pointerout', onOut);
+    return () => {
+      stage.removeEventListener('click', onClick);
+      stage.removeEventListener('pointerdown', onDown);
+      stage.removeEventListener('pointermove', onMove);
+      stage.removeEventListener('pointerup', onUp);
+      stage.removeEventListener('pointercancel', onUp);
+      stage.removeEventListener('pointerover', onOver);
+      stage.removeEventListener('pointerout', onOut);
+    };
   }, [resolved, current, go]);
 
   useEffect(() => {
