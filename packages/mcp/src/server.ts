@@ -341,6 +341,7 @@ export const EXECUTE_DESCRIPTION =
   'importDtcgTokens(json) → {tokens, modes, skipped} token bertipe dari JSON W3C DTCG (grup bersarang = nama dipisah ".", mode di $extensions.mode, alias "{a.b}"); ' +
   'get(id) → NodeView; find({type?, name?: string|RegExp, within?}) → NodeView[] urutan dokumen; children(id|null) → NodeView[] anak langsung (null = board); ' +
   'analyze({scope?, limit?, minCluster?}?) → {nodes, colors, literalColors, tokenColors, typography, spacing:{gaps,paddings}, clusters:{shape,count,ids}} audit konsistensi dokumen: frekuensi warna literal vs token, tipografi, gap/padding, struktur berulang (kandidat komponen) — jalankan sebelum melapor selesai; ' +
+  'diff({scope?, limit?}?) → {added, removed, changed (per properti {from,to}), moved (parent/urutan), docChanged, summary} perubahan struktural snippet ini terhadap dokumen awal — jalankan di akhir untuk verifikasi sebelum commit; ' +
   "NodeView = properti tersimpan (token apa adanya) + parentId, path, childIds, measuredHeight (board height:'hug') (hanya-baca: jangan kirim balik ke update/add); " +
   "place(w, h|'hug', {near?, gap?}) → {x,y} posisi board baru yang tidak tumpang tindih (gap default 80); " +
   "iconSearch(query, {lib?:'lucide'|'simple-icons', limit?}) → [{lib, icon, tags?, title?, aliasOf?}] cari ikon (default 10, maks 50; sama dengan tool icon_search). " +

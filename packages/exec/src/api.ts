@@ -113,6 +113,32 @@ export type AnalyzeReport = {
   clusters: { shape: string; count: number; ids: string[] }[];
 };
 
+/** Opsi `diff`. */
+export type DiffOptions = {
+  /** ID node: diff hanya subtree-nya (termasuk dirinya). Tanpa scope = seluruh dokumen. */
+  scope?: string;
+  /** Maks entri per kategori (default 50). `summary` tetap memuat total sebenarnya. */
+  limit?: number;
+};
+
+/** Referensi node dalam laporan `diff`. */
+export type DiffRef = { id: string; type: NodeType; name: string; path: string };
+/** Node yang berubah properti (id sama). `from` tidak ada = properti baru; `to` tidak ada = properti dihapus. */
+export type DiffChange = DiffRef & { props: Record<string, { from?: unknown; to?: unknown }> };
+/** Node yang pindah parent dan/atau urutan saudara. */
+export type DiffMove = DiffRef & { from: { parentId: string | null; index: number }; to: { parentId: string | null; index: number } };
+/** Hasil `diff` — perubahan struktural snippet ini terhadap dokumen awal. */
+export type DiffReport = {
+  added: DiffRef[];
+  removed: DiffRef[];
+  changed: DiffChange[];
+  moved: DiffMove[];
+  /** Kunci root dokumen yang berubah (tokens, tokenModes, flows, …; pages dilaporkan lewat node). */
+  docChanged: string[];
+  /** Total per kategori (tidak terpotong `limit`). */
+  summary: { added: number; removed: number; changed: number; moved: number };
+};
+
 /** Opsi `iconSearch`. */
 export type IconSearchOptions = {
   /** Batasi ke satu pustaka: `lucide` (ikon UI) atau `simple-icons` (logo brand). */
@@ -225,6 +251,13 @@ export interface LakarApi {
    * layak dijadikan komponen. Jalankan sebelum melapor selesai — output rapi biasanya sedikit nilai berbeda.
    */
   analyze(opts?: AnalyzeOptions): AnalyzeReport;
+  /**
+   * Perubahan struktural dokumen sejak snippet ini mulai (baseline = dokumen awal execute, bukan commit terakhir):
+   * node `added`/`removed`, `changed` (perbedaan properti id sama; `children`/`slots` dilaporkan lewat moved/added/removed),
+   * `moved` (parent atau urutan saudara berubah), dan `docChanged` (kunci root yang berubah: tokens, tokenModes, flows, …).
+   * Jalankan di akhir snippet untuk verifikasi sebelum commit.
+   */
+  diff(opts?: DiffOptions): DiffReport;
   /** Posisi bebas tumpang tindih untuk board baru berukuran `w`×`h`. */
   place(w: number, h: number | 'hug', opts?: PlaceOptions): Point;
   /**
@@ -245,6 +278,8 @@ export type ApiContext = {
   tx: Transaction;
   /** Salinan kerja hidup transaksi (hanya-baca). */
   view(): Readonly<Doc>;
+  /** Dokumen saat snippet mulai (baseline `diff`; salinan beku, hanya-baca). */
+  baseDoc(): Readonly<Doc>;
   /** Dipanggil setelah setiap op mutasi sukses; melempar bila melewati `MAX_OPS`. */
   countOp(): void;
   /** Katalog ikon (kanonikalisasi node icon, `iconSearch`). */
@@ -399,21 +434,21 @@ function iconPatch(ctx: ApiContext, fn: string, id: unknown, patch: unknown): un
 const ICON_SEARCH_KEYS = ['lib', 'limit'];
 const ICON_SEARCH_HINT = "contoh: iconSearch('dumbbell') atau iconSearch('arrow right', {lib:'lucide', limit:5})";
 
-type Entry = { node: AnyNode; parentId: string | null; path: string[] };
+type Entry = { node: AnyNode; parentId: string | null; path: string[]; index: number };
 
 /** Halaman aktif sesi untuk target `add(null)`/`children(null)`/`place`; fallback halaman pertama. */
 const activePageOf = (ctx: ApiContext, doc: Readonly<Doc>) => doc.pages.find((p) => p.id === ctx.activePageId) ?? doc.pages[0]!;
 
-/** Semua node tersimpan dalam urutan dokumen (pre-order: halaman → board → anak; isi slot instance ber-parent instance). */
+/** Semua node tersimpan dalam urutan dokumen (pre-order: halaman → board → anak; isi slot instance ber-parent instance). `index` = posisi di daftar saudara. */
 function walk(doc: Readonly<Doc>): Entry[] {
   const out: Entry[] = [];
-  const visit = (n: AnyNode, parentId: string | null, prefix: string[]) => {
+  const visit = (n: AnyNode, parentId: string | null, prefix: string[], index: number) => {
     const path = [...prefix, n.name];
-    out.push({ node: n, parentId, path });
-    if ('children' in n) for (const c of n.children) visit(c, n.id, path);
-    if (n.type === 'instance') for (const list of Object.values(n.slots ?? {})) for (const c of list) visit(c, n.id, path);
+    out.push({ node: n, parentId, path, index });
+    if ('children' in n) n.children.forEach((c, i) => visit(c, n.id, path, i));
+    if (n.type === 'instance') for (const list of Object.values(n.slots ?? {})) list.forEach((c, i) => visit(c, n.id, path, i));
   };
-  for (const p of doc.pages) for (const b of p.children) visit(b, null, []);
+  for (const p of doc.pages) p.children.forEach((b, i) => visit(b, null, [], i));
   return out;
 }
 
@@ -454,9 +489,21 @@ const isFiniteNum = (v: unknown): v is number => typeof v === 'number' && Number
 /** Nilai numerik properti node (x/y/width/height); non-numerik (hug/fill/token ref) → 0. */
 const num = (v: unknown): number => (isFiniteNum(v) ? v : 0);
 const ANALYZE_KEYS = ['scope', 'limit', 'minCluster'];
+const DIFF_KEYS = ['scope', 'limit'];
 /** Referensi token `{$token:"nama"}` — objek dengan tepat satu kunci string. */
 const isTokenRef = (v: unknown): v is { $token: string } =>
   typeof v === 'object' && v !== null && !Array.isArray(v) && Object.keys(v).length === 1 && typeof (v as { $token?: unknown }).$token === 'string';
+/** Kesetaraan JSON dalam (objek tak peka urutan kunci; array peka urutan). */
+const sameJson = (a: unknown, b: unknown): boolean => {
+  if (a === b) return true;
+  if (typeof a !== 'object' || typeof b !== 'object' || a === null || b === null) return false;
+  if (Array.isArray(a) || Array.isArray(b)) {
+    return Array.isArray(a) && Array.isArray(b) && a.length === b.length && a.every((v, i) => sameJson(v, b[i]));
+  }
+  const ka = Object.keys(a).sort();
+  const kb = Object.keys(b).sort();
+  return ka.length === kb.length && ka.every((k, i) => k === kb[i] && sameJson((a as Record<string, unknown>)[k], (b as Record<string, unknown>)[k]));
+};
 
 type Rect = { x: number; y: number; w: number; h: number };
 /** Kotak board; `height:'hug'` = tinggi terukur (`heights`), belum terukur = 0. */
@@ -909,7 +956,7 @@ export const API: { readonly [K in keyof LakarApi]: ApiFunction } = {
           });
         }
         const owner = mustFind('get', doc, id.split('/')[0]!);
-        return toView({ node: hit.node as unknown as AnyNode, parentId: hit.parentId, path: [...owner.path.slice(0, -1), ...hit.names] }, ctx.boardHeights);
+        return toView({ node: hit.node as unknown as AnyNode, parentId: hit.parentId, path: [...owner.path.slice(0, -1), ...hit.names], index: 0 }, ctx.boardHeights);
       }
       const nid = requireId('get', 'id', id);
       return toView(mustFind('get', ctx.view(), nid), ctx.boardHeights);
@@ -1105,6 +1152,94 @@ export const API: { readonly [K in keyof LakarApi]: ApiFunction } = {
         typography: [...typo.values()].sort((a, b) => b.count - a.count).slice(0, limit),
         spacing: { gaps: freq(gaps), paddings: freq(pads) },
         clusters,
+      };
+      return JSON.parse(JSON.stringify(report)) as unknown;
+    },
+  },
+  diff: {
+    kind: 'read',
+    signature:
+      "diff(opts?: {scope?: string, limit?: number}): {added: {id,type,name,path}[], removed: {id,type,name,path}[], changed: {id,type,name,path,props:{[key]:{from?,to?}}}[], moved: {id,type,name,path,from:{parentId,index},to:{parentId,index}}[], docChanged: string[], summary: {added,removed,changed,moved}}",
+    doc:
+      'Perubahan struktural dokumen sejak snippet ini mulai — baseline = dokumen awal execute ini (bukan commit terakhir), jadi diff() di akhir snippet menjawab "apa yang berubah karena kode ini". ' +
+      'added/removed = node masuk/keluar (id + path); changed = id sama dengan properti berbeda (per kunci: {from,to}; tidak ada di sisi = kunci baru/dihapus); ' +
+      'moved = id sama dengan parent atau urutan saudara berbeda (from/to {parentId,index}); docChanged = kunci root yang berubah (tokens, tokenModes, flows, …). ' +
+      'Properti struktur (children, slots) tidak di-diff sebagai properti — keanggotaannya muncul di added/removed/moved. scope = ID node: hanya subtree-nya di kedua versi; limit (default 50) memotong tiap daftar, summary memuat total sebenarnya.',
+    returns: '{added, removed, changed, moved, docChanged, summary}',
+    errors: ['SCHEMA_INVALID', 'NOT_FOUND'],
+    example:
+      `${BOARD}\nadd(b, {type:'rect', name:'Kartu', width:100, height:80, fills:[{type:'solid', color:'#1A1A1A'}]});\n` +
+      "update(b, {name:'Beranda 2'});\ndiff();",
+    call(ctx, [opts]) {
+      if (opts !== undefined && !isPlainObject(opts)) {
+        throw new LakarError('SCHEMA_INVALID', `diff: opsi harus objek {scope?, limit?}, bukan ${show(opts)}`, { hint: 'contoh: diff() atau diff({scope: boardId, limit: 20})' });
+      }
+      const o = (opts ?? {}) as Record<string, unknown>;
+      const unknown = Object.keys(o).filter((k) => !DIFF_KEYS.includes(k));
+      if (unknown.length) throw new LakarError('SCHEMA_INVALID', `diff: kunci opsi tidak dikenal: ${unknown.join(', ')}`, { hint: `kunci yang didukung: ${DIFF_KEYS.join(', ')}` });
+      const limit = o.limit ?? 50;
+      if (!isFiniteNum(limit) || !Number.isInteger(limit) || limit < 1) {
+        throw new LakarError('SCHEMA_INVALID', `diff: limit harus bilangan bulat ≥ 1, bukan ${show(o.limit)}`, { hint: 'hilangkan limit untuk default 50' });
+      }
+      const before = ctx.baseDoc();
+      const after = ctx.view();
+      let oldEntries = walk(before);
+      let newEntries = walk(after);
+      if (o.scope !== undefined) {
+        const sid = requireId('diff', 'scope', o.scope);
+        const subtree = (entries: Entry[]) => {
+          const keep = new Set<string>([sid]);
+          for (const e of entries) if (keep.has(e.parentId ?? '')) keep.add(e.node.id);
+          return entries.filter((e) => keep.has(e.node.id));
+        };
+        const ol = subtree(oldEntries);
+        const nw = subtree(newEntries);
+        if (!ol.length && !nw.length) throw new LakarError('NOT_FOUND', `diff: node scope ${sid} tidak ada`, { hint: 'scope = ID node dari get()/find()/children() atau add()' });
+        oldEntries = ol;
+        newEntries = nw;
+      }
+      const oldMap = new Map(oldEntries.map((e) => [e.node.id, e]));
+      const newMap = new Map(newEntries.map((e) => [e.node.id, e]));
+      const ref = (e: Entry): DiffRef => ({ id: e.node.id, type: e.node.type, name: e.node.name, path: e.path.join(' / ') });
+      const added: DiffRef[] = [];
+      const removed: DiffRef[] = [];
+      const changed: DiffChange[] = [];
+      const moved: DiffMove[] = [];
+      for (const [id, e] of newMap) {
+        const old = oldMap.get(id);
+        if (!old) {
+          added.push(ref(e));
+          continue;
+        }
+        if (old.parentId !== e.parentId || old.index !== e.index) {
+          moved.push({ ...ref(e), from: { parentId: old.parentId, index: old.index }, to: { parentId: e.parentId, index: e.index } });
+        }
+        const on = old.node as Record<string, unknown>;
+        const nn = e.node as Record<string, unknown>;
+        const props: Record<string, { from?: unknown; to?: unknown }> = {};
+        for (const k of new Set([...Object.keys(on), ...Object.keys(nn)])) {
+          if (k === 'id' || k === 'children' || k === 'slots') continue;
+          const fv = on[k];
+          const tv = nn[k];
+          if (sameJson(fv, tv)) continue;
+          props[k] = { ...(fv !== undefined ? { from: JSON.parse(JSON.stringify(fv)) } : {}), ...(tv !== undefined ? { to: JSON.parse(JSON.stringify(tv)) } : {}) };
+        }
+        if (Object.keys(props).length) changed.push({ ...ref(e), props });
+      }
+      for (const [id, e] of oldMap) if (!newMap.has(id)) removed.push(ref(e));
+      // Kunci root selain `pages` (perubahan halaman/board muncul lewat node).
+      const docChanged: string[] = [];
+      for (const k of new Set([...Object.keys(before), ...Object.keys(after)])) {
+        if (k === 'pages') continue;
+        if (!sameJson((before as unknown as Record<string, unknown>)[k], (after as unknown as Record<string, unknown>)[k])) docChanged.push(k);
+      }
+      const report: DiffReport = {
+        added: added.slice(0, limit),
+        removed: removed.slice(0, limit),
+        changed: changed.slice(0, limit),
+        moved: moved.slice(0, limit),
+        docChanged,
+        summary: { added: added.length, removed: removed.length, changed: changed.length, moved: moved.length },
       };
       return JSON.parse(JSON.stringify(report)) as unknown;
     },

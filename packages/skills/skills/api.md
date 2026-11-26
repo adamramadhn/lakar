@@ -340,6 +340,22 @@ add(b, {type:'text', name:'Isi', content:'Teks', size:16, lineHeight:24, color:'
 analyze({scope: b}).colors;
 ```
 
+### diff
+
+`diff(opts?: {scope?: string, limit?: number}): {added: {id,type,name,path}[], removed: {id,type,name,path}[], changed: {id,type,name,path,props:{[key]:{from?,to?}}}[], moved: {id,type,name,path,from:{parentId,index},to:{parentId,index}}[], docChanged: string[], summary: {added,removed,changed,moved}}`
+
+Perubahan struktural dokumen sejak snippet ini mulai — baseline = dokumen awal execute ini (bukan commit terakhir), jadi diff() di akhir snippet menjawab "apa yang berubah karena kode ini". added/removed = node masuk/keluar (id + path); changed = id sama dengan properti berbeda (per kunci: {from,to}; tidak ada di sisi = kunci baru/dihapus); moved = id sama dengan parent atau urutan saudara berbeda (from/to {parentId,index}); docChanged = kunci root yang berubah (tokens, tokenModes, flows, …). Properti struktur (children, slots) tidak di-diff sebagai properti — keanggotaannya muncul di added/removed/moved. scope = ID node: hanya subtree-nya di kedua versi; limit (default 50) memotong tiap daftar, summary memuat total sebenarnya.
+
+- Mengembalikan: {added, removed, changed, moved, docChanged, summary}
+- Error: SCHEMA_INVALID, NOT_FOUND
+
+```js
+const b = add(null, {type:'board', name:'Beranda', x:0, y:0, width:390, height:844, screen:'mobile'});
+add(b, {type:'rect', name:'Kartu', width:100, height:80, fills:[{type:'solid', color:'#1A1A1A'}]});
+update(b, {name:'Beranda 2'});
+diff();
+```
+
 ### place
 
 `place(w: number, h: number | 'hug', opts?: {near?: string, gap?: number}): {x, y}`
