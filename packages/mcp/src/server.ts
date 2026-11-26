@@ -329,6 +329,7 @@ export const EXECUTE_DESCRIPTION =
   'move(id, parentId|null, index?) pindah ke board/frame (null = urutan board); ' +
   'duplicate(id, patch?) → id salinan subtree tepat setelah asal; ' +
   'remove(id) hapus subtree; ' +
+  "arrange(ids, {mode:'align', align:'left'|'hcenter'|'right'|'top'|'vcenter'|'bottom'} | {mode:'spread', axis:'x'|'y', gap?} | {mode:'grid', cols, gap?}) → {moved} rapikan posisi node absolut/board (selaraskan tepi/tengah, jarak merata, atau grid; anak layout auto → atur lewat gap/order parent); " +
   "komponen: setComponent(id, {props, slots}?) jadikan master (null melepas), add(parent, {type:'instance', name, componentId, props?}) sisip instance, " +
   "update('<instanceId>/<idNodeMaster>', patch) override isi instance, resetOverride(alamat, props?) kembali ke master, add('<instanceId>/<idFrameSlot>', node) isi slot, " +
   'detach(instanceId) → id node biasa, get(alamat) node efektif; hapus master men-detach instancenya; ' +
@@ -339,6 +340,7 @@ export const EXECUTE_DESCRIPTION =
   'importCssVariables(css) → {tokens, modes, skipped} token bertipe dari isi file CSS variables (:root + [data-theme="dark"]); ' +
   'importDtcgTokens(json) → {tokens, modes, skipped} token bertipe dari JSON W3C DTCG (grup bersarang = nama dipisah ".", mode di $extensions.mode, alias "{a.b}"); ' +
   'get(id) → NodeView; find({type?, name?: string|RegExp, within?}) → NodeView[] urutan dokumen; children(id|null) → NodeView[] anak langsung (null = board); ' +
+  'analyze({scope?, limit?, minCluster?}?) → {nodes, colors, literalColors, tokenColors, typography, spacing:{gaps,paddings}, clusters:{shape,count,ids}} audit konsistensi dokumen: frekuensi warna literal vs token, tipografi, gap/padding, struktur berulang (kandidat komponen) — jalankan sebelum melapor selesai; ' +
   "NodeView = properti tersimpan (token apa adanya) + parentId, path, childIds, measuredHeight (board height:'hug') (hanya-baca: jangan kirim balik ke update/add); " +
   "place(w, h|'hug', {near?, gap?}) → {x,y} posisi board baru yang tidak tumpang tindih (gap default 80); " +
   "iconSearch(query, {lib?:'lucide'|'simple-icons', limit?}) → [{lib, icon, tags?, title?, aliasOf?}] cari ikon (default 10, maks 50; sama dengan tool icon_search). " +

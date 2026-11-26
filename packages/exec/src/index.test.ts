@@ -118,7 +118,7 @@ async function commitRun(code: string, doc: Doc = createDocument()) {
 describe('@lakar/exec', () => {
   it('mengekspor nama paket dan permukaan API lengkap (AD-7)', () => {
     expect(PACKAGE).toBe('@lakar/exec');
-    expect(Object.keys(API)).toEqual(['add', 'update', 'replace', 'move', 'duplicate', 'remove', 'setComponent', 'resetOverride', 'detach', 'setTokens', 'setTokenModes', 'setFlows', 'renameToken', 'importCssVariables', 'importDtcgTokens', 'get', 'find', 'children', 'getTokens', 'place', 'iconSearch', 'photo']);
+    expect(Object.keys(API)).toEqual(['add', 'update', 'replace', 'move', 'duplicate', 'remove', 'setComponent', 'resetOverride', 'detach', 'arrange', 'setTokens', 'setTokenModes', 'setFlows', 'renameToken', 'importCssVariables', 'importDtcgTokens', 'get', 'find', 'children', 'getTokens', 'analyze', 'place', 'iconSearch', 'photo']);
     for (const [name, fn] of Object.entries(API)) {
       expect(fn.signature.startsWith(`${name}(`), name).toBe(true);
       expect(fn.doc.length, name).toBeGreaterThan(20);
@@ -290,6 +290,167 @@ describe('@lakar/exec', () => {
     });
   });
 
+  describe('arrange', () => {
+    const run = async (code: string) => okRun(await runSnippet(code, txFor())).value as any;
+    const THREE = "const a = add(null,{type:'board',name:'A',x:0,y:0,width:100,height:100,screen:'app'}); const b = add(null,{type:'board',name:'B',x:300,y:60,width:200,height:50,screen:'app'}); const c = add(null,{type:'board',name:'C',x:900,y:30,width:100,height:150,screen:'app'});";
+
+    it('align tepi dan tengah kotak kelompok', async () => {
+      expect(await run(`${THREE} arrange([a,b,c], {mode:'align', align:'top'}); [get(a).y, get(b).y, get(c).y]`)).toEqual([0, 0, 0]);
+      expect(await run(`${THREE} arrange([a,b,c], {mode:'align', align:'left'}); [get(a).x, get(b).x, get(c).x]`)).toEqual([0, 0, 0]);
+      // bawah kelompok = 30+150=180 → b.y = 180-50, a.y = 180-100
+      expect(await run(`${THREE} arrange([a,b,c], {mode:'align', align:'bottom'}); [get(a).y, get(b).y, get(c).y]`)).toEqual([80, 130, 30]);
+    });
+
+    it('spread gap tetap dihitung dari tepi kiri kelompok, urutan ikut posisi sekarang', async () => {
+      const v = await run(`${THREE} arrange([c,b,a], {mode:'spread', axis:'x', gap:40}); [get(a).x, get(b).x, get(c).x]`);
+      // urutan x: a(100) b(200) c(100); cursor: a@0, b@0+100+40=140, c@140+200+40=380
+      expect(v).toEqual([0, 140, 380]);
+    });
+
+    it('spread tanpa gap membagi sisa ruang antar tepi', async () => {
+      const v = await run(`${THREE} arrange([a,b,c], {mode:'spread', axis:'x'}); [get(a).x, get(b).x, get(c).x]`);
+      // span 0..1000, total lebar 400 → sisa 600 / 2 = 300 antar tepi: a@0, b@0+100+300=400, c@400+200+300=900
+      expect(v).toEqual([0, 400, 900]);
+    });
+
+    it('grid: baris×kolom dari pojok kiri-atas kelompok, kolom selebar isi terlebar', async () => {
+      const v = await run(`
+        ${THREE}
+        arrange([a,b,c], {mode:'grid', cols:2, gap:20});
+        [get(a).x, get(a).y, get(b).x, get(b).y, get(c).x, get(c).y]`);
+      // urutan y,x: a(y0) → c(y30) → b(y60). kol0 = max(a.w=100, b.w=200)=200 → c di x=220; baris0 = max(a.h,c.h)=150 → b di y=170.
+      // a@(0,0) b@(0,170) c@(220,0)
+      expect(v).toEqual([0, 0, 0, 170, 220, 0]);
+    });
+
+    it('anak absolute di board berbeda tetap sejajar dalam koordinat halaman', async () => {
+      const v = await run(`
+        const p = add(null,{type:'board',name:'P',x:500,y:0,width:400,height:400,screen:'app'});
+        const q = add(null,{type:'board',name:'Q',x:1000,y:0,width:400,height:400,screen:'app'});
+        const r1 = add(p,{type:'rect',name:'R1',position:'absolute',x:10,y:10,width:40,height:40});
+        const r2 = add(q,{type:'rect',name:'R2',position:'absolute',x:30,y:20,width:40,height:40});
+        arrange([r1,r2], {mode:'align', align:'left'});
+        [get(r1).x, get(r2).x]`);
+      // abs r1 = 500+10=510, r2 = 1000+30=1030 → align left ke 510: r2 lokal = 510-1000 = -490
+      expect(v).toEqual([10, -490]);
+    });
+
+    it('anak layout auto (tanpa x/y) → SCHEMA_INVALID + hint', async () => {
+      const e = errRun(await runSnippet(`
+        const b = ${BOARD()};
+        const f = add(b, {type:'frame', name:'F', layout:'column'});
+        const t = add(f, {type:'text', name:'T', content:'x', size:16});
+        arrange([b, t], {mode:'align', align:'left'})`, txFor()));
+      expect(e.code).toBe('SCHEMA_INVALID');
+      expect(e.hint).toContain('absolute');
+    });
+
+    it('hasil {moved} menghitung node yang berubah posisi', async () => {
+      const v = await run(`${THREE} update(b, {x:0}); arrange([a,b,c], {mode:'align', align:'left'})`);
+      // a dan b sudah di 0; hanya c yang pindah
+      expect(v).toEqual({ moved: 1 });
+    });
+
+    it.each([
+      "arrange('x', {mode:'align', align:'left'})",
+      "arrange(['Aaaaaaa1'], {mode:'align', align:'left'})",
+      "arrange(['Aaaaaaa1','Bbbbbbb2'], {mode:'tengah'})",
+      "arrange(['Aaaaaaa1','Bbbbbbb2'], {mode:'align', align:'kiri'})",
+      "arrange(['Aaaaaaa1','Bbbbbbb2'], {mode:'spread', axis:'z'})",
+      "arrange(['Aaaaaaa1','Bbbbbbb2'], {mode:'spread', axis:'x', gap:-5})",
+      "arrange(['Aaaaaaa1','Bbbbbbb2'], {mode:'grid', cols:0})",
+      "arrange(['Aaaaaaa1','Bbbbbbb2'], {mode:'grid', cols:1.5})",
+      "arrange(['Aaaaaaa1','Bbbbbbb2'], 'left')",
+    ])('%s → SCHEMA_INVALID', async (code) => {
+      expect(errRun(await runSnippet(`${THREE} ${code}`, txFor())).code).toBe('SCHEMA_INVALID');
+    });
+
+    it("arrange(['Aaaaaaa1','ZZZZZZZZ'], {...}) → NOT_FOUND", async () => {
+      expect(errRun(await runSnippet(`${THREE} arrange(['Aaaaaaa1','ZZZZZZZZ'], {mode:'align', align:'left'})`, txFor())).code).toBe('NOT_FOUND');
+    });
+  });
+
+  describe('analyze', () => {
+    const run = async (code: string) => okRun(await runSnippet(code, txFor())).value as any;
+    const SETUP_A = `
+      const b = ${BOARD('Home')};
+      add(b, {type:'rect', name:'KartuBg', position:'absolute', x:0, y:0, width:100, height:100, fills:[{type:'solid', color:'#1A1A1A'}]});
+      add(b, {type:'text', name:'Judul', content:'Halo', position:'absolute', x:0, y:0, size:32, weight:700, family:'Inter', color:'#1A1A1A'});
+      add(b, {type:'text', name:'Isi', content:'Teks', position:'absolute', x:0, y:40, size:14, color:'#FF0000'});
+      add(b, {type:'rect', name:'Tok', position:'absolute', x:0, y:200, width:10, height:10, fills:[{type:'solid', color:{$token:'colors.primary'}}]});`;
+
+    it('warna: frekuensi lintas fills/color, hex huruf besar, literalColors vs tokenColors', async () => {
+      const v = await run(`${SETUP_A} const r = analyze(); [r.colors, r.literalColors, r.tokenColors]`);
+      expect(v[0][0]).toEqual({ value: '#1A1A1A', count: 2 });
+      expect(v[0]).toContainEqual({ value: '#FF0000', count: 1 });
+      expect(v[0]).toContainEqual({ value: '$token colors.primary', count: 1 });
+      expect(v[1]).toBe(3);
+      expect(v[2]).toBe(1);
+    });
+
+    it('tipografi: (family, weight, size) per node text, default "(default)"/400', async () => {
+      const v = await run(`${SETUP_A} analyze().typography`);
+      expect(v).toContainEqual({ family: 'Inter', weight: 700, size: 32, count: 1 });
+      expect(v).toContainEqual({ family: '(default)', weight: 400, size: 14, count: 1 });
+    });
+
+    it('spacing: gap + komponen padding wadah', async () => {
+      const v = await run(`
+        const b = ${BOARD()};
+        add(b, {type:'frame', name:'F1', layout:'column', gap:16, padding:[20, 24]});
+        add(b, {type:'frame', name:'F2', layout:'row', gap:16, padding:20});
+        const r = analyze(); [r.spacing.gaps, r.spacing.paddings]`);
+      expect(v[0]).toContainEqual({ value: 16, count: 2 });
+      expect(v[1]).toContainEqual({ value: 20, count: 2 });
+      expect(v[1]).toContainEqual({ value: 24, count: 1 });
+    });
+
+    it('clusters: struktur berulang ≥ minCluster, shape ringkas, ids terbatas limit', async () => {
+      const v = await run(`
+        const b = ${BOARD()};
+        for (let i = 0; i < 3; i++) {
+          const k = add(b, {type:'frame', name:'Kartu'+i, position:'absolute', x:0, y:i*100, width:100, height:80});
+          add(k, {type:'text', name:'T', content:'x', size:16});
+          add(k, {type:'icon', name:'I', lib:'lucide', icon:'star', size:16});
+        }
+        analyze({minCluster: 3}).clusters`);
+      const kartu = v.find((c: any) => c.shape.startsWith('frame('));
+      expect(kartu.shape).toBe('frame(icon,text)');
+      expect(kartu.count).toBe(3);
+      expect(kartu.ids).toHaveLength(3);
+    });
+
+    it('scope membatasi ke subtree; node di luar tidak dihitung', async () => {
+      const v = await run(`
+        ${SETUP_A}
+        const l = ${BOARD('Lain', 500)};
+        add(l, {type:'text', name:'X', content:'y', size:99, color:'#00FF00'});
+        const scoped = analyze({scope: b});
+        [scoped.nodes, scoped.colors.every((c) => c.value !== '#00FF00'), analyze().nodes]`);
+      expect(v[1]).toBe(true);
+      expect(v[2]).toBeGreaterThan(v[0]);
+    });
+
+    it('limit memotong tiap kategori', async () => {
+      const v = await run(`${SETUP_A} analyze({limit: 1}).colors`);
+      expect(v).toHaveLength(1);
+      expect(v[0]).toEqual({ value: '#1A1A1A', count: 2 });
+    });
+
+    it.each([
+      'analyze(5)',
+      'analyze({scope: 42})',
+      'analyze({scope: "ZZZZZZZZ"})',
+      'analyze({limit: 0})',
+      'analyze({limit: 1.5})',
+      'analyze({minCluster: 1})',
+      'analyze({dekat: 1})',
+    ])('%s → SCHEMA_INVALID/NOT_FOUND', async (code) => {
+      const e = errRun(await runSnippet(code, txFor()));
+      expect(['SCHEMA_INVALID', 'NOT_FOUND']).toContain(e.code);
+    });
+  });
+
   // Story 9.2: `activePageId` membuat add(null)/children(null)/place() menargetkan halaman aktif sesi.
   describe('halaman aktif sesi (activePageId)', () => {
     const twoPages = () => {
@@ -391,7 +552,7 @@ describe('@lakar/exec', () => {
       const ts = errRun(await runSnippet('const a = 1;\nconst b: number = 2', txFor()));
       expect(ts.message).toMatch(/^baris 2:\d+: SyntaxError/);
       const ref = errRun(await runSnippet('fetch("x")', txFor()));
-      expect(ref.hint).toContain('add, update, replace, move, duplicate, remove, setComponent, resetOverride, detach, setTokens, setTokenModes, setFlows, renameToken, importCssVariables, importDtcgTokens, get, find, children, getTokens, place, iconSearch, photo, keep, console.log');
+      expect(ref.hint).toContain('add, update, replace, move, duplicate, remove, setComponent, resetOverride, detach, arrange, setTokens, setTokenModes, setFlows, renameToken, importCssVariables, importDtcgTokens, get, find, children, getTokens, analyze, place, iconSearch, photo, keep, console.log');
     });
 
     it('error host yang ditangkap snippet tidak membatalkan transaksi; e.code tersedia', async () => {
