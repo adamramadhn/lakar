@@ -19,7 +19,12 @@ function newId(): string {
 type Raw = { id: string; name: string; type: string; interactions?: Interaction[] };
 type Commit = (ops: DocOp[], description: string) => Promise<boolean>;
 
-const TRIGGERS: { value: Interaction['trigger']; label: string }[] = [{ value: 'tap', label: 'Tap' }];
+const TRIGGERS: { value: Interaction['trigger']; label: string }[] = [
+  { value: 'tap', label: 'Tap' },
+  { value: 'press', label: 'Press' },
+  { value: 'hover', label: 'Hover' },
+  { value: 'drag', label: 'Drag' },
+];
 const ACTIONS: { value: Interaction['action']['kind']; label: string }[] = [
   { value: 'navigate', label: 'Navigate to' },
   { value: 'back', label: 'Back' },
@@ -118,7 +123,7 @@ export function PrototypePanel({ slug, doc, selection, editable, onCommit }: { s
             {interactions.map((i) => (
               <div key={i.id} className="proto-interaction">
                 <div className="proto-row">
-                  {select(i.trigger, TRIGGERS, () => undefined, 'Trigger', true)}
+                  {select(i.trigger, TRIGGERS, (v) => patchInteraction(i.id, { trigger: v as Interaction['trigger'] }), 'Trigger', !editable)}
                   {select(
                     i.action.kind,
                     ACTIONS,
