@@ -1077,15 +1077,6 @@ class ViewerClient {
   authLogout(): Promise<{ signedIn: false }> {
     return request<{ signedIn: false }>('POST', '/viewer/auth/logout');
   }
-  /**
-   * Skip gate first-run (POST /viewer/onboarding, spec-first-run-signin task A): penanda
-   * "Continue without an account" per instalasi; balasan = nilai efektif (boleh `completed` —
-   * penanda selesai tidak diturunkan). Route hanya ada di daemon baru.
-   */
-  onboardingSkip(): Promise<{ signin: string }> {
-    return request<{ signin: string }>('POST', '/viewer/onboarding', { signin: 'skipped' });
-  }
-
   // ---- Share link (plan-share-link-ui): proxy `/viewer/*` ke @lakar/api; tanpa sesi dokumen. ----
 
   /** Daftar share aktif dokumen `slug` (+ `configured:false` bila cloud env lakard belum diset). */

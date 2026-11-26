@@ -43,7 +43,6 @@ export const GATE_ERRORS = {
   ratelimit: 'Too many sign-in emails. Wait a few minutes, then try again.',
   email: 'Enter a valid email address.',
   generic: 'Sign-in didn’t start. Try again or use another method.',
-  skip: 'Couldn’t save this choice — you may see this screen again next time.',
 } as const;
 
 /**

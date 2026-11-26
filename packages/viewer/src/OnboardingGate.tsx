@@ -1,23 +1,23 @@
 // Gate sign-in first-run (spec-first-run-signin task D): layar penuh pengganti <main> Dashboard
 // selama `shouldShowGate` benar. S1 `out` (provider/email) → S2 `waiting` (OAuth di browser) →
 // S3 `sent` (magic link terkirim, resend dikunci 30 dtk) → S5 `success` (auto-lanjut 1,5 dtk);
-// S4 `unreachable` (service tak menjawab: Try again + Continue offline sementara) dan S4b
-// `no-methods`. Gate adalah halaman, bukan dialog: tanpa Esc/klik-luar (skip permanen harus
-// disengaja) dan tanpa autofocus di S1; perpindahan state memindahkan fokus ke judul baru.
-// SSE `auth` ditangani di sini: `signedIn:true` → S5 + fokus jendela desktop (E8);
-// `onboarding` ≠ pending dari jendela lain → tutup (E9). Skip tidak pernah disabled (E5: POST
-// gagal tetap menutup gate — toast di App lewat `onToast`).
+// S4 `unreachable` (service tak menjawab: Try again) dan S4b `no-methods`. Sign-in wajib: tidak
+// ada jalur skip/offline — penanda `skipped` lama di daemon tetap dihormati (back-compat), tapi
+// UI tak lagi menawarkannya. Gate adalah halaman, bukan dialog: tanpa Esc/klik-luar dan tanpa
+// autofocus di S1; perpindahan state memindahkan fokus ke judul baru. SSE `auth` ditangani di
+// sini: `signedIn:true` → S5 + fokus jendela desktop (E8); `onboarding` ≠ pending dari jendela
+// lain → tutup (E9).
 import { useEffect, useRef, useState, type ReactElement } from 'react';
 import { activityHub } from './activity';
-import { api, type AuthStatus, type CloudUser } from './api';
+import { type AuthStatus, type CloudUser } from './api';
 import { GATE_ERRORS, gateErrorText } from './cloudAuth';
 import { focusWindow } from './desktop';
 import { useNow } from './hooks';
 import { BrandIcon, Icon } from './icons';
 import { useCloudSignIn } from './useCloudSignIn';
 
-/** Alasan gate tertutup; `offline` = Continue offline (sementara, hanya untuk pemuatan ini). */
-export type GateDoneReason = 'signedIn' | 'skipped' | 'offline';
+/** Gate hanya tertutup oleh sign-in — tanpa jalur skip/offline. */
+export type GateDoneReason = 'signedIn';
 
 /** Tampilan gate = gabungan fase hook sign-in + kondisi `status.providers` + sukses (S5). */
 type GateView = 'out' | 'waiting' | 'sent' | 'unreachable' | 'no-methods' | 'success';
@@ -34,17 +34,16 @@ export function OnboardingGate({
   status,
   onDone,
   onRetry,
-  onToast,
 }: {
   status: AuthStatus;
   onDone: (reason: GateDoneReason) => void;
   /** Muat ulang `authStatus` (Try again di S4 — cache providers daemon hanya menyimpan sukses). */
   onRetry: () => void;
-  /** Toast info global App (E5: `POST /viewer/onboarding` gagal saat skip). */
-  onToast?: (message: string) => void;
 }): ReactElement {
   const signin = useCloudSignIn({ formatError: gateErrorText });
   const [email, setEmail] = useState('');
+  /** Error validasi alamat email lokal — ditampilkan di baris hint form. */
+  const [emailError, setEmailError] = useState<string | undefined>(undefined);
   const [successUser, setSuccessUser] = useState<CloudUser | undefined>(undefined);
   /** Waktu kirim/resend magic link terakhir — dasar hitung mundur `Resend in m:ss`. */
   const [lastSentAt, setLastSentAt] = useState(0);
@@ -53,6 +52,8 @@ export function OnboardingGate({
   const providers = status.providers;
   const offered = (p: 'google' | 'github' | 'email') => providers?.includes(p) ?? false;
   const oauth = OAUTH.filter(offered);
+  /** Error form email: validasi lokal lebih dulu, lalu error sign-in (OAuth/gagal kirim). */
+  const formError = emailError ?? signin.error;
   const view: GateView =
     successUser !== undefined ? 'success' : providers === undefined ? 'unreachable' : providers.length === 0 ? 'no-methods' : signin.phase;
 
@@ -75,7 +76,7 @@ export function OnboardingGate({
             setSuccessUser(e.auth.user ?? { id: '', email: '' });
             void focusWindow();
           } else if (e.auth.onboarding !== undefined) {
-            onDone('skipped');
+            onDone('signedIn');
           }
         },
       }),
@@ -95,26 +96,6 @@ export function OnboardingGate({
     setLastSentAt(Date.now());
     await signin.sendLink(to);
   };
-
-  /** Skip permanen: POST penanda; gagal (E5) → toast + gate tetap ditutup (jangan menjebak). */
-  const skip = async () => {
-    try {
-      await api.onboardingSkip();
-    } catch {
-      onToast?.(GATE_ERRORS.skip);
-    }
-    onDone('skipped');
-  };
-
-  const skipBlock = (
-    <div className="onboarding-skip">
-      <div className="onboarding-divider" aria-hidden="true" />
-      <button type="button" className="btn ghost" onClick={() => void skip()}>
-        Continue without an account
-      </button>
-      <p className="onboarding-skip-help">Everything works offline. You can sign in later from Settings → Connections.</p>
-    </div>
-  );
 
   const brand = (
     <div className="onboarding-brand">
@@ -137,18 +118,14 @@ export function OnboardingGate({
         </div>
         <p className="cloud-empty onboarding-note" role="note">
           <Icon name="alert" size={15} />
-          Can’t reach Lakar Cloud right now. You can sign in later — Lakar works fully offline.
+          Can’t reach Lakar Cloud right now. Check your connection and try again.
         </p>
         <div className="onboarding-actions">
           <button type="button" className="btn" onClick={onRetry}>
             <Icon name="rotateCcw" size={14} />
             Try again
           </button>
-          <button type="button" className="btn primary" onClick={() => onDone('offline')}>
-            Continue offline
-          </button>
         </div>
-        {skipBlock}
       </>
     );
   } else if (view === 'no-methods') {
@@ -164,11 +141,11 @@ export function OnboardingGate({
           No sign-in methods are available on this service yet.
         </p>
         <div className="onboarding-actions">
-          <button type="button" className="btn primary" onClick={() => onDone('offline')}>
-            Continue offline
+          <button type="button" className="btn" onClick={onRetry}>
+            <Icon name="rotateCcw" size={14} />
+            Try again
           </button>
         </div>
-        {skipBlock}
       </>
     );
   } else if (view === 'waiting') {
@@ -193,7 +170,6 @@ export function OnboardingGate({
             Cancel
           </button>
         </div>
-        {skipBlock}
       </>
     );
   } else if (view === 'sent') {
@@ -217,13 +193,13 @@ export function OnboardingGate({
             className="btn"
             onClick={() => {
               setEmail(signin.sentTo);
+              setEmailError(undefined);
               signin.cancel();
             }}
           >
             Use a different email
           </button>
         </div>
-        {skipBlock}
       </>
     );
   } else if (view === 'success') {
@@ -281,25 +257,48 @@ export function OnboardingGate({
           )}
           {offered('email') && (
             <form
-              className="cloud-email"
+              className="cloud-email onboarding-email"
+              noValidate
               onSubmit={(e) => {
                 e.preventDefault();
-                void send(email);
+                const value = email.trim();
+                if (!EMAIL_OK.test(value)) {
+                  setEmailError(GATE_ERRORS.email);
+                  return;
+                }
+                setEmailError(undefined);
+                void send(value);
               }}
             >
-              <input className="input" type="email" aria-label="Email address" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} />
-              <button type="submit" className="btn" disabled={signin.busy !== undefined || !EMAIL_OK.test(email.trim())}>
-                {signin.busy === 'email' ? 'Sending…' : 'Email me a sign-in link'}
-              </button>
+              <div className="onboarding-email-row">
+                <label className="input onboarding-email-field">
+                  <Icon name="mail" size={14} />
+                  <input
+                    type="email"
+                    aria-label="Email address"
+                    aria-describedby="onboarding-email-hint"
+                    placeholder="you@example.com"
+                    value={email}
+                    onChange={(e) => {
+                      setEmail(e.target.value);
+                      setEmailError(undefined);
+                    }}
+                  />
+                </label>
+                <button type="submit" className="btn" disabled={signin.busy !== undefined}>
+                  {signin.busy === 'email' ? 'Sending…' : 'Send link'}
+                </button>
+              </div>
+              <p
+                id="onboarding-email-hint"
+                className={formError ? 'onboarding-email-hint danger' : 'onboarding-email-hint'}
+                role={formError ? 'alert' : undefined}
+              >
+                {formError ?? 'We’ll email you a sign-in link. No password needed.'}
+              </p>
             </form>
           )}
-          {signin.error && (
-            <p className="modal-error" role="alert">
-              {signin.error}
-            </p>
-          )}
         </div>
-        {skipBlock}
       </>
     );
   }
@@ -310,7 +309,6 @@ export function OnboardingGate({
         {brand}
         {body}
       </div>
-      {status.host && <div className="onboarding-footer">Lakar Cloud · {status.host}</div>}
     </main>
   );
 }
