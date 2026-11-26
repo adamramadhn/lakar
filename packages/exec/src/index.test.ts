@@ -118,7 +118,7 @@ async function commitRun(code: string, doc: Doc = createDocument()) {
 describe('@lakar/exec', () => {
   it('mengekspor nama paket dan permukaan API lengkap (AD-7)', () => {
     expect(PACKAGE).toBe('@lakar/exec');
-    expect(Object.keys(API)).toEqual(['add', 'update', 'replace', 'move', 'duplicate', 'remove', 'setComponent', 'resetOverride', 'detach', 'arrange', 'setTokens', 'setTokenModes', 'setFlows', 'renameToken', 'importCssVariables', 'importDtcgTokens', 'get', 'find', 'children', 'getTokens', 'analyze', 'place', 'iconSearch', 'photo']);
+    expect(Object.keys(API)).toEqual(['add', 'update', 'replace', 'move', 'duplicate', 'remove', 'setComponent', 'resetOverride', 'detach', 'arrange', 'setTokens', 'setTokenModes', 'setFlows', 'renameToken', 'importCssVariables', 'importDtcgTokens', 'get', 'find', 'children', 'getTokens', 'analyze', 'diff', 'place', 'iconSearch', 'photo']);
     for (const [name, fn] of Object.entries(API)) {
       expect(fn.signature.startsWith(`${name}(`), name).toBe(true);
       expect(fn.doc.length, name).toBeGreaterThan(20);
@@ -451,6 +451,101 @@ describe('@lakar/exec', () => {
     });
   });
 
+  describe('diff', () => {
+    const BASE = `const b = ${BOARD('Home')}; keep.t = add(b, {type:'text', name:'Judul', content:'Halo', size:32});`;
+
+    it('tanpa mutasi → semua daftar kosong', async () => {
+      const { c } = await commitRun(BASE);
+      const v = okRun(await runSnippet('diff()', txFor(c.doc))).value as any;
+      expect(v).toEqual({ added: [], removed: [], changed: [], moved: [], docChanged: [], summary: { added: 0, removed: 0, changed: 0, moved: 0 } });
+    });
+
+    it('added + changed memuat id/path dan {from,to} per properti', async () => {
+      const { c } = await commitRun(BASE);
+      const t = c.doc.pages[0]!.children[0]!.children![0]!.id;
+      const b = c.doc.pages[0]!.children[0]!.id;
+      const v = okRun(await runSnippet(`
+        add('${b}', {type:'rect', name:'Kartu', width:10, height:10});
+        update('${t}', {content:'Hai', color:'#FF0000'});
+        diff()`, txFor(c.doc))).value as any;
+      expect(v.summary).toEqual({ added: 1, removed: 0, changed: 1, moved: 0 });
+      expect(v.added[0]).toMatchObject({ type: 'rect', name: 'Kartu', path: 'Home / Kartu' });
+      expect(v.changed[0].id).toBe(t);
+      expect(v.changed[0].props.content).toEqual({ from: 'Halo', to: 'Hai' });
+      expect(v.changed[0].props.color).toEqual({ to: '#FF0000' });
+    });
+
+    it('removed memuat path lama; properti terhapus → {from} saja', async () => {
+      const { c } = await commitRun(`const b = ${BOARD('Home')}; keep.t = add(b, {type:'text', name:'Judul', content:'Halo', size:32, color:'#0000FF'}); keep.r = add(b, {type:'rect', name:'R', width:5, height:5});`);
+      const t = c.doc.pages[0]!.children[0]!.children![0]!.id;
+      const r = c.doc.pages[0]!.children[0]!.children![1]!.id;
+      const v = okRun(await runSnippet(`remove('${r}'); update('${t}', {color:null}); diff()`, txFor(c.doc))).value as any;
+      expect(v.summary).toEqual({ added: 0, removed: 1, changed: 1, moved: 0 });
+      expect(v.removed[0]).toMatchObject({ id: r, name: 'R', path: 'Home / R' });
+      expect(v.changed[0].props.color).toEqual({ from: '#0000FF' });
+    });
+
+    it('moved: pindah parent dan reorder di parent sama', async () => {
+      const { c } = await commitRun(`
+        const p = ${BOARD('P', 0)}; const q = ${BOARD('Q', 500)};
+        keep.r1 = add(p, {type:'rect', name:'R1', position:'absolute', x:0, y:0, width:10, height:10});
+        keep.r2 = add(p, {type:'rect', name:'R2', position:'absolute', x:20, y:0, width:10, height:10});
+        keep.f = add(q, {type:'frame', name:'F'});`);
+      const p = c.doc.pages[0]!.children[0]!.id;
+      const f = c.doc.pages[0]!.children[1]!.children![0]!.id;
+      const r1 = c.doc.pages[0]!.children[0]!.children![0]!.id;
+      const r2 = c.doc.pages[0]!.children[0]!.children![1]!.id;
+      const v = okRun(await runSnippet(`move('${r1}', '${f}'); move('${r2}', '${p}', 0); diff()`, txFor(c.doc))).value as any;
+      expect(v.summary.moved).toBe(2);
+      const m1 = v.moved.find((m: any) => m.id === r1);
+      expect(m1).toMatchObject({ from: { parentId: p, index: 0 }, to: { parentId: f, index: 0 } });
+      const m2 = v.moved.find((m: any) => m.id === r2);
+      expect(m2).toMatchObject({ from: { parentId: p, index: 1 }, to: { parentId: p, index: 0 } });
+    });
+
+    it('docChanged: setTokens/setFlows → kunci root', async () => {
+      const { c } = await commitRun(BASE);
+      const b = c.doc.pages[0]!.children[0]!.id;
+      const v = okRun(await runSnippet(`setTokens({'colors.a': '#112233'}); setFlows([{id:'Fl000001', name:'F', startBoardId:'${b}'}]); diff()`, txFor(c.doc))).value as any;
+      expect(v.docChanged).toEqual(expect.arrayContaining(['tokens', 'flows']));
+    });
+
+    it('scope membatasi kedua versi ke subtree', async () => {
+      const { c } = await commitRun(BASE);
+      const b = c.doc.pages[0]!.children[0]!.id;
+      const v = okRun(await runSnippet(`
+        const l = ${BOARD('Lain', 500)};
+        add(l, {type:'rect', name:'X', width:1, height:1});
+        diff({scope: '${b}'})`, txFor(c.doc))).value as any;
+      expect(v.summary).toEqual({ added: 0, removed: 0, changed: 0, moved: 0 });
+    });
+
+    it('limit memotong daftar; summary tetap total', async () => {
+      const { c } = await commitRun(BASE);
+      const b = c.doc.pages[0]!.children[0]!.id;
+      const v = okRun(await runSnippet(`
+        for (let i = 0; i < 5; i++) add('${b}', {type:'rect', name:'R'+i, width:1, height:1});
+        diff({limit: 2})`, txFor(c.doc))).value as any;
+      expect(v.added).toHaveLength(2);
+      expect(v.summary.added).toBe(5);
+    });
+
+    it('baseline = awal snippet: add lalu remove di snippet sama → bersih', async () => {
+      const { c } = await commitRun(BASE);
+      const b = c.doc.pages[0]!.children[0]!.id;
+      const v = okRun(await runSnippet(`const t = add('${b}', {type:'rect', name:'X', width:1, height:1}); remove(t); diff()`, txFor(c.doc))).value as any;
+      expect(v.summary).toEqual({ added: 0, removed: 0, changed: 0, moved: 0 });
+    });
+
+    it.each(['diff(5)', 'diff({scope: 42})', 'diff({limit: 0})', 'diff({dekat: 1})'])('%s → SCHEMA_INVALID', async (code) => {
+      expect(errRun(await runSnippet(code, txFor())).code).toBe('SCHEMA_INVALID');
+    });
+
+    it('diff({scope: id-hilang}) → NOT_FOUND', async () => {
+      expect(errRun(await runSnippet("diff({scope: 'ZZZZZZZZ'})", txFor())).code).toBe('NOT_FOUND');
+    });
+  });
+
   // Story 9.2: `activePageId` membuat add(null)/children(null)/place() menargetkan halaman aktif sesi.
   describe('halaman aktif sesi (activePageId)', () => {
     const twoPages = () => {
@@ -552,7 +647,7 @@ describe('@lakar/exec', () => {
       const ts = errRun(await runSnippet('const a = 1;\nconst b: number = 2', txFor()));
       expect(ts.message).toMatch(/^baris 2:\d+: SyntaxError/);
       const ref = errRun(await runSnippet('fetch("x")', txFor()));
-      expect(ref.hint).toContain('add, update, replace, move, duplicate, remove, setComponent, resetOverride, detach, arrange, setTokens, setTokenModes, setFlows, renameToken, importCssVariables, importDtcgTokens, get, find, children, getTokens, analyze, place, iconSearch, photo, keep, console.log');
+      expect(ref.hint).toContain('add, update, replace, move, duplicate, remove, setComponent, resetOverride, detach, arrange, setTokens, setTokenModes, setFlows, renameToken, importCssVariables, importDtcgTokens, get, find, children, getTokens, analyze, diff, place, iconSearch, photo, keep, console.log');
     });
 
     it('error host yang ditangkap snippet tidak membatalkan transaksi; e.code tersedia', async () => {

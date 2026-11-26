@@ -11,7 +11,7 @@ import {
 } from 'quickjs-emscripten';
 import type { Transaction } from '@lakar/core';
 import type { CssVariablesPort, DtcgPort, IconCatalogPort, PhotoLibraryPort } from '@lakar/ports';
-import { LakarError, errorMessage } from '@lakar/schema';
+import { LakarError, errorMessage, type LakarDocument as Doc } from '@lakar/schema';
 import { API, DEFAULT_TIMEOUT_MS, KEEP_MAX_BYTES, LOG_MAX_BYTES, LOG_MAX_LINES, MAX_OPS, SNIPPET_GLOBALS, VALUE_MAX_BYTES, type ApiContext } from './api.js';
 import { HELPERS_JS, HELPER_GLOBALS } from './helpers.js';
 
@@ -247,9 +247,13 @@ export async function runSnippet(code: string, tx: Transaction, opts: RunOptions
   const logs = new LogBuffer();
   let ops = 0;
   let fatal: LakarError | undefined;
+  // Dokumen awal snippet (baseline `diff`): mutasi hanya terjadi lewat panggilan API saat eval, jadi
+  // salinan di sini pasti pra-snippet.
+  const baseDoc = JSON.parse(JSON.stringify(tx.view())) as Doc;
   const apiCtx: ApiContext = {
     tx,
     view: () => tx.view(),
+    baseDoc: () => baseDoc,
     icons: opts.icons,
     ...(opts.photos ? { photos: opts.photos } : {}),
     ...(opts.cssVariables ? { cssVariables: opts.cssVariables } : {}),
