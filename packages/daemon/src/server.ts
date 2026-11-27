@@ -31,7 +31,8 @@ import { z } from 'zod';
 import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { randomBytes } from 'node:crypto';
-import { readAsset } from './assets.js';
+import { imageSize, readAsset, writeAsset } from './assets.js';
+import { IMAGE_MAX_BYTES } from './photos/providers.js';
 import { PhotoService, SEARCH_LIMIT_MAX } from './photos/service.js';
 import { STATUS, notFound } from './errors.js';
 import { runCheck } from './check.js';
@@ -249,6 +250,15 @@ const PhotoSearchBody = z
   })
   .strict();
 const PHOTO_SEARCH_HINT = `kirim {query, orientation?, limit?, preview?}, mis. {query:'kamar hotel', orientation:'landscape'}; limit 1–${SEARCH_LIMIT_MAX} (default 6)`;
+const PhotoImportBody = z
+  .object({
+    path: z.string().min(1, 'path wajib tidak kosong'),
+    dataBase64: z.string().min(1, 'dataBase64 wajib tidak kosong'),
+  })
+  .partial()
+  .strict()
+  .refine((b) => (b.path === undefined) !== (b.dataBase64 === undefined), { message: 'kirim tepat satu: path atau dataBase64' });
+const PHOTO_IMPORT_HINT = `kirim {path} (file lokal di mesin daemon) ATAU {dataBase64} (byte gambar base64) — tepat satu; raster PNG/JPEG/WebP/GIF ≤ ${IMAGE_MAX_BYTES / 1024 / 1024} MB`;
 export const ICON_SEARCH_HINT = "kirim {query, lib?, limit?}, mis. {query:'dumbbell'} atau {query:'github', lib:'simple-icons'}; limit 1–50 (default 10)";
 
 export type BuildOptions = {
@@ -942,6 +952,28 @@ export function buildServer({
       ...(body.preview !== undefined ? { preview: body.preview } : {}),
     });
     return ok(reply, res);
+  });
+
+  // Impor gambar agen (spec-mcp-import-image): {path|dataBase64} raster → store aset → assetId untuk fill {type:'image'}.
+  app.post('/photos/import', async (req, reply) => {
+    sessions.require(req.headers[SESSION_HEADER]);
+    const body = parse(PhotoImportBody, req.body, PHOTO_IMPORT_HINT);
+    let bytes: Buffer;
+    if (body.path !== undefined) {
+      bytes = await readFile(body.path).catch(() => {
+        throw fileNotFound(`file ${body.path}`);
+      });
+    } else {
+      bytes = Buffer.from(body.dataBase64!, 'base64');
+    }
+    if (bytes.byteLength > IMAGE_MAX_BYTES) {
+      throw new LakarError('SCHEMA_INVALID', `gambar ${bytes.byteLength} byte melebihi batas ${IMAGE_MAX_BYTES}`, { hint: PHOTO_IMPORT_HINT });
+    }
+    const { sha, mime } = await writeAsset(config.dataDir, bytes).catch(() => {
+      throw new LakarError('SCHEMA_INVALID', 'bukan gambar raster PNG/JPEG/WebP/GIF', { hint: 'hanya byte raster yang bisa jadi fill image; periksa isi file/data' });
+    });
+    const size = imageSize(bytes);
+    return ok(reply, { assetId: sha, mime, bytes: bytes.byteLength, ...(size ? { width: size.width, height: size.height } : {}) });
   });
 
   // Halaman render untuk Chromium (dimuat oleh adaptor ChromiumRenderer).

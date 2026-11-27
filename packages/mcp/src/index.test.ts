@@ -195,6 +195,9 @@ function fakeDaemon() {
       const results = Array.from({ length: 8 }, (_, i) => ({ ref: `openverse:${i}`, width: 40, height: 30, alt: 'kamar', creator: 'Budi', license: 'CC BY 2.0', sourcePageUrl: 'https://x', credit: 'kredit' }));
       return send(200, { ok: true, data: { provider: 'openverse', fallbackReason: 'no-key', query: body.query, results, thumbnails: results.map((r) => ({ ref: r.ref, mimeType: 'image/png', data: PNG_B64 })) } });
     }
+    if (req.url === '/photos/import') {
+      return send(200, { ok: true, data: { assetId: 'a'.repeat(64), mime: 'image/png', bytes: 2048, width: 32, height: 16 } });
+    }
     if (req.url === '/viewer/selection') {
       if (body.slug === 'hilang') return send(404, { ok: false, error: { code: 'NOT_FOUND', message: 'dokumen hilang tidak ada', hint: 'pakai slug dari GET /viewer/docs', retryable: false } });
       return send(200, {
@@ -278,7 +281,7 @@ describe('@lakar/mcp', () => {
     const c = await connect(url);
     const { tools } = await c.listTools();
     expect(tools.map((t) => t.name).sort()).toEqual(
-      ['execute', 'export', 'export_code', 'get_selection', 'icon_search', 'import_url', 'inspect', 'layout_check', 'list_boards', 'list_documents', 'list_fonts', 'open_doc', 'paste', 'photo_search', 'read_skill', 'redo', 'screenshot', 'status', 'undo', 'visual_diff', 'fix_check', 'list_pages', 'get_current_page', 'switch_page', 'create_page', 'get_page_tree', 'list_comments', 'add_comment', 'reply_to_comment', 'resolve_comment', 'delete_comment', 'fix_comment', 'analyze_colors', 'analyze_typography', 'analyze_clusters'].sort(),
+      ['execute', 'export', 'export_code', 'get_selection', 'icon_search', 'import_url', 'inspect', 'layout_check', 'list_boards', 'list_documents', 'list_fonts', 'import_image', 'open_doc', 'paste', 'photo_search', 'read_skill', 'redo', 'screenshot', 'status', 'undo', 'visual_diff', 'fix_check', 'list_pages', 'get_current_page', 'switch_page', 'create_page', 'get_page_tree', 'list_comments', 'add_comment', 'reply_to_comment', 'resolve_comment', 'delete_comment', 'fix_comment', 'analyze_colors', 'analyze_typography', 'analyze_clusters'].sort(),
     );
     expect(SERVER_VERSION).toBe(LAKAR_VERSION);
     expect(c.getServerVersion()?.version).toBe(LAKAR_VERSION);
@@ -528,6 +531,20 @@ describe('@lakar/mcp', () => {
     expect(PHOTO_SEARCH_DESCRIPTION).toMatch(/chef portrait/);
     expect(PHOTO_SEARCH_DESCRIPTION).toMatch(/jangan mengulang pencarian/);
     expect(PHOTO_SEARCH_DESCRIPTION).toContain("photo('<ref>')");
+  });
+
+  it('import_image → meneruskan {path|dataBase64} apa adanya; respons berisi assetId + contoh fills', async () => {
+    fake.seen.length = 0;
+    const c = await connect(url);
+    const r = await c.callTool({ name: 'import_image', arguments: { path: '/tmp/logo.png' } });
+    expect(r.isError).toBeFalsy();
+    expect(fake.seen.find((x) => x.path === '/photos/import')!.body).toEqual({ path: '/tmp/logo.png' });
+    const text = (r.content as any)[0].text as string;
+    expect(text).toContain(`assetId ${'a'.repeat(64)}`);
+    expect(text).toContain("fills: {type:'image', assetId:");
+    const r2 = await c.callTool({ name: 'import_image', arguments: { dataBase64: 'aGk=' } });
+    expect(fake.seen.filter((x) => x.path === '/photos/import')[1]!.body).toEqual({ dataBase64: 'aGk=' });
+    expect(r2.isError).toBeFalsy();
   });
 
   it('instructions server: read_skill core + 8 domain + skill jenis layar di giliran yang sama, rencana singkat lalu bangun bertahap per seksi, zoom review; deskripsi read_skill tanpa polish', async () => {
@@ -898,7 +915,7 @@ describe('@lakar/mcp', () => {
       const r = await c2.callTool({ name: 'execute', arguments: { code: '1' } });
       expect(r.isError).toBe(true);
       expect((r.content as any)[0].text).toContain('http://127.0.0.1:1');
-      expect((await c2.listTools()).tools).toHaveLength(35);
+      expect((await c2.listTools()).tools).toHaveLength(36);
     } finally {
       await c2.close();
       await deadTransport.close();

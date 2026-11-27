@@ -27,6 +27,8 @@ export const TOOL_EFFECTS = {
   icon_search: 'read',
   // Hanya mencari ke penyedia foto; impor terjadi saat foto dipakai lewat execute.
   photo_search: 'read',
+  // Menulis file aset baru di <dataDir>/assets/ (berdasar hash isi); isi desain tidak disentuh.
+  import_image: 'write',
   // Isi berkas dikembalikan di respons; tidak ada yang ditulis ke disk.
   export_code: 'read',
   visual_diff: 'read',

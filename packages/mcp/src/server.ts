@@ -417,6 +417,17 @@ export const PHOTO_SEARCH_DESCRIPTION =
   'Bila kosong, daemon menyederhanakan kata kunci sendiri (query = yang dipakai, tried = yang dicoba): jangan mengulang pencarian. ' +
   'Cari di awal (maks 2 pencarian per desain, paralel, sebelum execute pertama). Tidak ada hasil → NOT_FOUND; penyedia sibuk/gagal → EXEC_ERROR (retryable): satu percobaan saja, lalu pakai blok gambar pengganti.';
 
+/** Deskripsi tool `import_image`. */
+export const IMPORT_IMAGE_DESCRIPTION =
+  'Impor gambar milik agen (hasil render/sendiri/logo klien) ke store aset daemon: {path} file lokal di mesin daemon ATAU {dataBase64} byte gambar base64 — tepat satu; ' +
+  'raster PNG/JPEG/WebP/GIF ≤ 12 MB. Mengembalikan {assetId, mime, bytes, width?, height?}; pakai assetId di fills node: fills:[{type:\'image\', assetId, fit:\'cover\'}]. ' +
+  'Untuk foto stok beratribusi tetap pakai photo_search + photo(\'<ref>\').';
+
+/** Teks ringkas tool `import_image`. */
+export const formatImportImage = (d: { assetId: string; mime: string; bytes: number; width?: number; height?: number }) =>
+  `gambar terimpor: assetId ${d.assetId} (${d.mime}, ${d.width ?? '?'}×${d.height ?? '?'}, ${Math.round(d.bytes / 1024)} KB)\n` +
+  `pakai di fills: {type:'image', assetId:'${d.assetId}', fit:'cover'|'contain'|'fill'|'tile'}`;
+
 /** Deskripsi tool `get_selection` (AD-9). */
 export const GET_SELECTION_DESCRIPTION =
   'Baca node yang sedang dipilih pengguna di canvas viewer Lakar (seleksi hidup, hanya di memori daemon; tidak ada di dokumen maupun riwayat). ' +
@@ -1009,6 +1020,24 @@ export function createLakarMcpServer(backend: string | LakarTransport): McpServe
             ...shown.map((t) => ({ type: 'image' as const, data: t.data, mimeType: t.mimeType })),
           ];
         });
+      }),
+  );
+
+  server.registerTool(
+    'import_image',
+    {
+      annotations: toolAnnotations('import_image'),
+      description: IMPORT_IMAGE_DESCRIPTION,
+      inputSchema: z.object({
+        path: z.string().optional().describe('path file gambar lokal di mesin daemon (PNG/JPEG/WebP/GIF, ≤12 MB)'),
+        dataBase64: z.string().optional().describe('byte gambar sebagai base64 (alternatif path; kirim tepat satu)'),
+      }).strict(),
+    },
+    (args) =>
+      guarded(async () => {
+        const body = Object.fromEntries(Object.entries(args).filter(([, v]) => v !== undefined));
+        const r = await client.call<{ assetId: string; mime: string; bytes: number; width?: number; height?: number }>('/photos/import', body);
+        return asText(r, formatImportImage);
       }),
   );
 
