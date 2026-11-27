@@ -552,7 +552,8 @@ export const API: { readonly [K in keyof LakarApi]: ApiFunction } = {
       'Merge dangkal properti ke node; null menghapus properti opsional. type/id/children tidak bisa diubah (ganti tipe → replace). ' +
       "id '<instanceId>/<idNodeMaster>' (isi instance) atau properti node pada instance (mis. fills) menjadi override instance itu; master tetap. " +
       "Properti tambahan per tipe: anak position:'absolute' boleh membawa constraints:{h,v} (start|end|center|stretch|scale — perilaku saat parent di-resize lewat update); " +
-      'teks boleh membawa decoration:\'underline\'|\'strikethrough\'|\'none\' dan runs:[{start,length,style}] — gaya per rentang karakter (style subset: family/weight/style/size/lineHeight/letterSpacing/color/decoration, rentang terurut di dalam content). Patch content tanpa runs mereset rentang lama.',
+      'teks boleh membawa decoration:\'underline\'|\'strikethrough\'|\'none\' dan runs:[{start,length,style}] — gaya per rentang karakter (style subset: family/weight/style/size/lineHeight/letterSpacing/color/decoration, rentang terurut di dalam content). Patch content tanpa runs mereset rentang lama. ' +
+      "Master boleh membawa variantOf:{set, props:{axis→nilai}} (axis = prop enum master) dan instance variant:{axis→nilai} untuk memilih varian lain dalam set componentId-nya.",
     returns: 'undefined',
     errors: ['SCHEMA_INVALID', 'NOT_FOUND', 'ICON_UNKNOWN'],
     example: `${BOARD}\nconst t = add(b, {type:'text', name:'Judul', content:'Halo', size:32});\nupdate(t, {size: 40, color: '#1A1A1A'});`,
@@ -621,7 +622,8 @@ export const API: { readonly [K in keyof LakarApi]: ApiFunction } = {
       'Jadikan node anak (frame/text/rect/ellipse/path/icon) master komponen; tanpa component = {props:[], slots:[]} (master yang sudah ada tidak berubah). ' +
       "props: nama [a-z][A-Za-z0-9]*, binds menulis nilai prop ke properti node di dalam master (prop boolean + prop:'visible' menyembunyikan node). " +
       'slots: frame turunan master yang isinya diganti per instance. null melepas status master: semua instancenya di-detach di commit yang sama. ' +
-      "Sisipkan instance dengan add(parentId, {type:'instance', name, componentId: id, props?}).",
+      "Sisipkan instance dengan add(parentId, {type:'instance', name, componentId: id, props?}). " +
+      "Variant set: update(master, {variantOf:{set, props:{axis→nilai}}}) menandai master sebagai varian (axis = prop enum-nya; satu set wajib axis sama + kombinasi unik); instance memilih lewat field variant saat add atau update(inst, {variant:{axis→nilai}}).",
     returns: 'undefined',
     errors: ['SCHEMA_INVALID', 'NOT_FOUND'],
     example:

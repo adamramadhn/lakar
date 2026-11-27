@@ -42,6 +42,8 @@ export type MigrationRegistry = Readonly<Record<number, Migration>>;
  *   dokumen v13 valid apa adanya, jadi langkahnya identitas yang menaikkan versi.
  * - 14 → 15 (spec-rich-text): v15 hanya menambah `decoration`/`runs` opsional pada node teks; dokumen v14 valid
  *   apa adanya, jadi langkahnya identitas yang menaikkan versi.
+ * - 15 → 16 (spec-variant-set): v16 hanya menambah `variantOf` opsional pada master dan `variant` opsional pada
+ *   instance; dokumen v15 valid apa adanya, jadi langkahnya identitas yang menaikkan versi.
  */
 export const MIGRATIONS: MigrationRegistry = Object.freeze({
   1: (d: RawDocument): RawDocument => ({ ...d, schemaVersion: 2 }),
@@ -67,6 +69,8 @@ export const MIGRATIONS: MigrationRegistry = Object.freeze({
   13: (d: RawDocument): RawDocument => ({ ...d, schemaVersion: 14 }),
   // 14 → 15 (spec-rich-text): v15 hanya menambah `decoration?`/`runs?` pada teks; dokumen v14 valid apa adanya.
   14: (d: RawDocument): RawDocument => ({ ...d, schemaVersion: 15 }),
+  // 15 → 16 (spec-variant-set): v16 hanya menambah `variantOf?`/`variant?`; dokumen v15 valid apa adanya.
+  15: (d: RawDocument): RawDocument => ({ ...d, schemaVersion: 16 }),
 });
 
 export type MigrateOptions = { migrations?: MigrationRegistry; target?: number };

@@ -115,6 +115,16 @@ function expander(doc: Doc): Expander {
   visitStored(doc, ({ node }) => {
     if (node.component !== undefined) masters.set(node.id as string, node as unknown as ChildNode & { component: ComponentDef });
   });
+  // v16: indeks variant set → kombinasi axis → master (kunci = entri diurut, sama seperti comboKey di component-issues).
+  const variantSets = new Map<string, Map<string, ChildNode & { component: ComponentDef }>>();
+  for (const m of masters.values()) {
+    const vo = (m as { variantOf?: { set: string; props: Record<string, string> } }).variantOf;
+    if (!vo) continue;
+    const key = Object.keys(vo.props).sort().map((k) => `${k}=${vo.props[k]}`).join('\n');
+    const s = variantSets.get(vo.set) ?? new Map<string, ChildNode & { component: ComponentDef }>();
+    if (!variantSets.has(vo.set)) variantSets.set(vo.set, s);
+    s.set(key, m);
+  }
   const issues: InstanceIssue[] = [];
   let count = 0;
   let boardId = '';
@@ -143,18 +153,27 @@ function expander(doc: Doc): Expander {
 
   const expand = (inst: InstanceNode, addr: string, owner: string | undefined, stack: readonly string[]): Mut | null => {
     const cid = inst.componentId;
-    const master = masters.get(cid);
+    const anchor = masters.get(cid);
     // Sudah dijamin componentIssues; penjaga defensif bila dipanggil dengan dokumen yang tidak tervalidasi.
-    if (!master || stack.includes(cid)) {
-      throw new LakarError('SCHEMA_INVALID', `komponen tidak valid: instance ${addr} merujuk ${cid} (${master ? 'siklus' : 'tidak ada'})`, {
+    if (!anchor || stack.includes(cid)) {
+      throw new LakarError('SCHEMA_INVALID', `komponen tidak valid: instance ${addr} merujuk ${cid} (${anchor ? 'siklus' : 'tidak ada'})`, {
         hint: 'instance hanya boleh merujuk master di dokumen yang sama, tanpa siklus',
       });
     }
+    // v16: `variant` memilih master lain dalam set yang sama dengan anchor (dok sudah lolos componentIssues,
+    // jadi kombinasi yang sah selalu ada; fallback anchor untuk panggilan defensif tanpa validasi).
+    let master = anchor;
+    const vo = (anchor as { variantOf?: { set: string } }).variantOf;
+    if (inst.variant && vo) {
+      const key = Object.keys(inst.variant).sort().map((k) => `${k}=${inst.variant![k]}`).join('\n');
+      master = variantSets.get(vo.set)?.get(key) ?? anchor;
+    }
+    const mid = master.id as string;
     const mark = issues.length;
     const issue = (kind: InstanceIssueKind, key: string, detail: string) => {
       if (owner === undefined) issues.push({ boardId, instanceId: inst.id, instanceName: inst.name, kind, key, detail });
     };
-    const root = copy(master, addr, [...stack, cid])!;
+    const root = copy(master, addr, mid === cid ? [...stack, cid] : [...stack, cid, mid])!;
     root.id = addr;
     for (const k of ROOT_KEYS) {
       delete root[k];
@@ -166,7 +185,9 @@ function expander(doc: Doc): Expander {
       n.children?.forEach(walk);
     };
     walk(root);
-    const full = (key: string) => (key === cid ? addr : `${addr}/${key}`);
+    // Kunci akar = componentId (anchor) ATAU id master ter-resolve — override/bind yang menyebut salah satunya
+    // tetap mengenai akar saat `variant` menukar master (v16).
+    const full = (key: string) => (key === cid || key === mid ? addr : `${addr}/${key}`);
     const at = (key: string) => index.get(full(key));
     /** Node ada di salinan tetapi dibuang instance bersarang (tersembunyi/terganti slot): diam, bukan yatim. */
     const gone = (key: string) => removed.has(full(key));
@@ -176,7 +197,7 @@ function expander(doc: Doc): Expander {
     const hidden = new Set<Mut>();
     const given = inst.props ?? {};
     for (const name of Object.keys(given)) {
-      if (!def.props.some((p) => p.name === name)) issue('prop', name, `tidak ada di master ${cid}`);
+      if (!def.props.some((p) => p.name === name)) issue('prop', name, `tidak ada di master ${mid}`);
     }
     for (const p of def.props) {
       let value: string | boolean = p.default;
@@ -189,7 +210,7 @@ function expander(doc: Doc): Expander {
       for (const b of p.binds) {
         const target = at(b.nodeId);
         if (!target) {
-          if (!gone(b.nodeId)) issue('bind', `${p.name}.${b.nodeId}`, `node ${b.nodeId} tidak ada di master ${cid}`);
+          if (!gone(b.nodeId)) issue('bind', `${p.name}.${b.nodeId}`, `node ${b.nodeId} tidak ada di master ${mid}`);
         } else if (b.prop === VISIBLE_BIND) {
           if (p.type !== 'boolean') issue('bind', `${p.name}.${b.nodeId}`, `bind "${VISIBLE_BIND}" hanya untuk prop boolean (bertipe ${p.type})`);
           else if (value === false) hidden.add(target);
@@ -203,22 +224,22 @@ function expander(doc: Doc): Expander {
     for (const [key, patch] of Object.entries(inst.overrides ?? {})) {
       const target = at(key);
       if (!target) {
-        if (!gone(key)) issue('override', key, `node master tidak ada lagi di ${cid}; override diabaikan`);
+        if (!gone(key)) issue('override', key, `node master tidak ada lagi di ${mid}; override diabaikan`);
         continue;
       }
       const bad = applyLenient(target, patch);
-      if (bad.length) issue('override', key, `${bad.join(', ')} tidak sah lagi untuk ${target.type} di master ${cid}; override properti itu diabaikan`);
+      if (bad.length) issue('override', key, `${bad.join(', ')} tidak sah lagi untuk ${target.type} di master ${mid}; override properti itu diabaikan`);
     }
 
     // Slot: isi tersimpan instance menggantikan anak frame slot (prefiks pemilik instance).
     const slots = inst.slots ?? {};
     for (const name of Object.keys(slots)) {
-      if (!def.slots.some((s) => s.name === name)) issue('slot', name, `tidak ada di master ${cid}; isinya tidak ditampilkan`);
+      if (!def.slots.some((s) => s.name === name)) issue('slot', name, `tidak ada di master ${mid}; isinya tidak ditampilkan`);
     }
     for (const s of def.slots) {
       const target = at(s.nodeId);
       if (!target || target.type !== 'frame') {
-        if (target || !gone(s.nodeId)) issue('slot', s.name, target ? `node ${s.nodeId} bukan frame` : `frame ${s.nodeId} tidak ada di master ${cid}`);
+        if (target || !gone(s.nodeId)) issue('slot', s.name, target ? `node ${s.nodeId} bukan frame` : `frame ${s.nodeId} tidak ada di master ${mid}`);
         continue;
       }
       if (!Object.hasOwn(slots, s.name)) continue;

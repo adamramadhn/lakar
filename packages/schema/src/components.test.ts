@@ -383,3 +383,79 @@ describe('expandInstances: hasil review', () => {
     expect(at.get('Iiiiiii1')).toMatchObject({ type: 'instance', componentId: 'Mmmmmmm1', overrides: { Tttttt01: { color: '#111111' } } });
   });
 });
+
+// v16 (spec-variant-set): master bertanda variantOf membentuk set; instance memilih lewat `variant`.
+describe('variant set (v16)', () => {
+  const toneEnum = { name: 'tone', type: 'enum', options: ['solid', 'ghost'], default: 'solid', binds: [] };
+  /** Master varian satu set 'tombol'; id anak di-parameterkan karena ID unik se-dokumen. */
+  const vMaster = (id: string, tone: string, content: string, extra: Raw = {}, childId = 'Tttttt01') =>
+    master({ id, name: `Tombol ${tone}`, variantOf: { set: 'tombol', props: { tone } }, ...extra }, [text(childId, content)], { props: [toneEnum], slots: [] });
+  const issuesOf = (children: unknown[]) => componentIssues(docOf(children) as never);
+
+  it('skema: variantOf pada master dan variant pada instance diterima; master non-set tanpa variantOf tetap sah', () => {
+    const d = parse(docOf([vMaster('Mmmmmmm1', 'solid', 'Solid'), vMaster('Mmmmmmm2', 'ghost', 'Ghost', {}, 'Tttttt02'), inst({ variant: { tone: 'ghost' } }), master({ id: 'Mmmmmmm3' }, [text('Tttttt09')])]));
+    expect(componentIssues(d as never)).toEqual([]);
+  });
+
+  it('variantOf pada node non-master ditolak struktural', () => {
+    const i = issuesOf([text('Tttttt01', 'x', { variantOf: { set: 's', props: {} } })]);
+    expect(i.some((m) => m.message.includes('variantOf hanya pada node master'))).toBe(true);
+  });
+
+  it('axis bukan prop enum master / nilai di luar options → isu', () => {
+    const bad = vMaster('Mmmmmmm1', 'solid', 'x');
+    (bad.variantOf as Raw).props = { nope: 'solid' };
+    const i1 = issuesOf([bad]);
+    expect(i1.some((m) => m.message.includes('bukan prop enum'))).toBe(true);
+    const bad2 = vMaster('Mmmmmmm2', 'neon', 'x');
+    const i2 = issuesOf([bad2]);
+    expect(i2.some((m) => m.message.includes('harus salah satu options'))).toBe(true);
+  });
+
+  it('axis beda antar master satu set → isu; kombinasi duplikat → isu', () => {
+    const a = vMaster('Mmmmmmm1', 'solid', 'x');
+    const b = vMaster('Mmmmmmm2', 'ghost', 'y', {}, 'Tttttt02');
+    (b.variantOf as Raw).props = { tone: 'ghost', size: 'm' };
+    expect(issuesOf([a, b]).some((m) => m.message.includes('axis'))).toBe(true);
+    const c = vMaster('Mmmmmmm3', 'solid', 'z', {}, 'Tttttt03');
+    expect(issuesOf([a, c]).some((m) => m.message.includes('kombinasi'))).toBe(true);
+  });
+
+  it('instance variant memilih master lain dalam set; tanpa variant → anchor (kompat mundur)', () => {
+    const d = parse(docOf([vMaster('Mmmmmmm1', 'solid', 'Solid'), vMaster('Mmmmmmm2', 'ghost', 'Ghost', {}, 'Tttttt02'), inst({ variant: { tone: 'ghost' } }, 'Iiiiiii1'), inst({}, 'Iiiiiii2')]));
+    const at = nodes(expandInstances(d));
+    // Akar alamat tetap id instance; anak datang dari master ghost (id anaknya berbeda).
+    expect(at.get('Iiiiiii1/Tttttt01')).toBeUndefined();
+    const kids1 = (at.get('Iiiiiii1')!.children as Raw[]).map((c) => c.id);
+    expect(kids1).toEqual(['Iiiiiii1/Tttttt02']);
+    expect(at.get('Iiiiiii1/Tttttt02')!.content).toBe('Ghost');
+    const kids2 = (at.get('Iiiiiii2')!.children as Raw[]).map((c) => c.id);
+    expect(kids2).toEqual(['Iiiiiii2/Tttttt01']);
+  });
+
+  it('variant pada instance yang anchor-nya bukan varian → isu; axis kurang/lebih → isu; kombinasi tak ada → isu', () => {
+    const plain = master({ id: 'Mmmmmmm3' });
+    const i1 = issuesOf([plain, inst({ componentId: 'Mmmmmmm3', variant: { tone: 'ghost' } })]);
+    expect(i1.some((m) => m.message.includes('master varian'))).toBe(true);
+    const a = vMaster('Mmmmmmm1', 'solid', 'x');
+    const b = vMaster('Mmmmmmm2', 'ghost', 'y', {}, 'Tttttt02');
+    const i2 = issuesOf([a, b, inst({ variant: {} })]);
+    expect(i2.some((m) => m.message.includes('wajib diisi'))).toBe(true);
+    const i3 = issuesOf([a, b, inst({ variant: { tone: 'ghost', xtra: 'z' } })]);
+    expect(i3.some((m) => m.message.includes('wajib diisi'))).toBe(true);
+    const c = vMaster('Mmmmmmm4', 'solid', 'z', {}, 'Tttttt04');
+    (c.variantOf as Raw).set = 'lain';
+    const i4 = issuesOf([a, b, c, inst({ variant: { tone: 'neon' } })]);
+    expect(i4.some((m) => m.message.includes('tidak ada varian'))).toBe(true);
+  });
+
+  it('override/bind pada master ter-resolve memakai id-nya sendiri atau id anchor', () => {
+    // Override kunci id anak master ghost berlaku; bind prop master ter-resolve (ghost) dipakai.
+    const bindComp = { props: [toneEnum, { name: 'label', type: 'text', default: 'd', binds: [{ nodeId: 'Tttttt02', prop: 'content' }] }], slots: [] };
+    const g = master({ id: 'Mmmmmmm2', variantOf: { set: 'tombol', props: { tone: 'ghost' } } }, [text('Tttttt02', 'Ghost')], bindComp);
+    const s = vMaster('Mmmmmmm1', 'solid', 'Solid');
+    const d = parse(docOf([s, g, inst({ variant: { tone: 'ghost' }, props: { label: 'Cari' } })]));
+    const at = nodes(expandInstances(d));
+    expect(at.get('Iiiiiii1/Tttttt02')!.content).toBe('Cari');
+  });
+});

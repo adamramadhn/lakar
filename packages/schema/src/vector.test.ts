@@ -18,8 +18,8 @@ const message = (node: Record<string, unknown>) => {
 };
 
 describe('skema v6: vektor (AD-14)', () => {
-  it('SCHEMA_VERSION 15 (v6 + tag + hug board + wrap + komentar + section + fixRequest + prototype + constraints + rich text)', () => {
-    expect(SCHEMA_VERSION).toBe(15);
+  it('SCHEMA_VERSION 16 (v6 + tag + hug board + wrap + komentar + section + fixRequest + prototype + constraints + rich text + variant set)', () => {
+    expect(SCHEMA_VERSION).toBe(16);
   });
 
   it('path dengan semua atribut bertipe dan allowlist svg valid (dokumen dan NodeInput)', () => {

@@ -32,7 +32,9 @@ import { NODE_ADDRESS_PATTERN } from './selection.js';
 // dimigrasi identitas (`@lakar/core` MIGRATIONS[13]).
 // v15 (spec-rich-text) menambah `decoration` dan `runs` (gaya per rentang karakter) opsional pada node teks;
 // dokumen v14 dimigrasi identitas (`@lakar/core` MIGRATIONS[14]).
-export const SCHEMA_VERSION = 15 as const;
+// v16 (spec-variant-set) menambah `variantOf` opsional pada master dan `variant` opsional pada instance;
+// dokumen v15 dimigrasi identitas (`@lakar/core` MIGRATIONS[15]).
+export const SCHEMA_VERSION = 16 as const;
 
 // ---------------------------------------------------------------------------
 // Primitif
@@ -491,8 +493,30 @@ export const ComponentDef = z
   });
 export type ComponentDef = z.infer<typeof ComponentDef>;
 
+/**
+ * Peta axis → nilai varian (v16). Nama axis = nama prop `enum` yang dideklarasikan master; nilai = salah satu
+ * `options`-nya (divalidasi struktural di `componentIssues`, bukan di skema ini).
+ */
+export const VariantValues = z.record(ComponentName, z.string().min(1));
+export type VariantValues = z.infer<typeof VariantValues>;
+
+/** Nama variant set (v16): label bebas, dipakai `variantOf.set` dan pesan error. */
+export const VariantSetName = z.string().min(1).max(80);
+
+/**
+ * Penanda master-varian (v16): master ini adalah varian dari set `set` pada nilai axis `props`. Instance
+ * menyebut `componentId` salah satu master set dan memilih varian lewat `variant` (axis → nilai); ekspansi
+ * me-resolve master yang nilai axis-nya cocok. Semua master dalam satu set wajib axis yang sama, kombinasi unik.
+ */
+export const VariantOf = z.object({ set: VariantSetName, props: VariantValues }).strict();
+export type VariantOf = z.infer<typeof VariantOf>;
+
 /** Kunci `component` pada shape node yang boleh menjadi master. */
-const masterShape = { component: ComponentDef.optional() };
+const masterShape = {
+  component: ComponentDef.optional(),
+  /** v16: bila diisi, master adalah varian dalam set bernama; instance memilihnya lewat `variant`. */
+  variantOf: VariantOf.optional(),
+};
 
 /** Kunci override: id node master, atau path relatif ke dalam instance bersarang (`<J>/<U>`). */
 const OverrideKey = z.string().regex(NODE_ADDRESS_PATTERN, 'kunci override: id node master atau path id dipisah "/" (mis. "Ab12Cd34/Ef56Gh78")');
@@ -507,6 +531,11 @@ const instanceShape = {
   props: z.record(ComponentName, InstancePropValue).optional(),
   /** `{kunci: {properti: nilai}}`; `null` menghapus properti master. Nilai divalidasi pada node hasil ekspansi. */
   overrides: z.record(OverrideKey, z.record(OverridableKey, z.unknown())).optional(),
+  /**
+   * v16: pilih varian dalam set master `componentId` (axis → nilai, wajib lengkap semua axis set). Ekspansi
+   * me-resolve master yang `variantOf.props`-nya cocok; `props`/`overrides`/`slots` berlaku pada master itu.
+   */
+  variant: VariantValues.optional(),
 };
 
 const PadValue = tok(Size);
