@@ -269,9 +269,9 @@ function fakeDaemon() {
   };
 }
 
-async function connect(url: string) {
+async function connect(url: string, opts?: Parameters<typeof createLakarMcpServer>[1]) {
   const [ct, st] = InMemoryTransport.createLinkedPair();
-  await createLakarMcpServer(url).connect(st);
+  await createLakarMcpServer(url, opts).connect(st);
   const client = new Client({ name: 'test', version: '0' });
   await client.connect(ct);
   return client;
@@ -297,6 +297,22 @@ describe('@lakar/mcp', () => {
     );
     expect(SERVER_VERSION).toBe(LAKAR_VERSION);
     expect(c.getServerVersion()?.version).toBe(LAKAR_VERSION);
+  });
+
+  it('tools:readonly → hanya tool read terdaftar di tools/list; panggilan tool tulis → error "not found"; tool read tetap jalan', async () => {
+    const c = await connect(url, { tools: 'readonly' });
+    const { tools } = await c.listTools();
+    const names = tools.map((t) => t.name).sort();
+    const { TOOL_EFFECTS } = await import('./annotations.js');
+    const expected = Object.keys(TOOL_EFFECTS).filter((n) => TOOL_EFFECTS[n as keyof typeof TOOL_EFFECTS] === 'read').sort();
+    expect(names).toEqual(expected);
+    expect(names).not.toContain('execute');
+    expect(names).not.toContain('set_selection');
+    const r = await c.callTool({ name: 'status', arguments: {} });
+    expect(r.isError).toBeFalsy();
+    const bad = await c.callTool({ name: 'execute', arguments: { code: '1', description: 'tidak boleh jalan' } }).catch((e) => e);
+    expect(bad instanceof Error || bad.isError).toBe(true);
+    await c.close();
   });
 
   it('open_doc {slug?, name?}: tanpa argumen → body {} (dokumen viewer); name/slug diteruskan; list_documents → POST /viewer/documents', async () => {

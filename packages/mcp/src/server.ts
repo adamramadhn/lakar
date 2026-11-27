@@ -20,7 +20,7 @@ import {
   LAKAR_VERSION, SCHEMA_VERSION, VERSION_HINT, errorMessage, findingLine, summaryText, type ApiResult, type Finding, type FindingSummary } from '@lakar/schema';
 import { DaemonClient, formatError, type LakarTransport } from './client.js';
 import { registerFixCheckTool } from './fix-check.js';
-import { toolAnnotations } from './annotations.js';
+import { TOOL_EFFECTS, toolAnnotations, type ToolName } from './annotations.js';
 
 export const SERVER_NAME = 'lakar';
 export const SERVER_VERSION = LAKAR_VERSION;
@@ -549,12 +549,29 @@ export const VISUAL_DIFF_DESCRIPTION =
   'regions[].nodes = node paling spesifik yang bersinggungan (state added/removed): node di luar rencana edit berarti ikut berubah. ' +
   "Rev tanpa snapshot atau board/node tidak ada di kedua rev → NOT_FOUND; board/node hanya ada di satu rev → missing 'from'|'to'.";
 
+/** Kebijakan tool: 'all' (default) atau 'readonly' — hanya tool ber-efek `read` (TOOL_EFFECTS) yang terdaftar. */
+export type ToolPolicy = 'all' | 'readonly';
+
+export type LakarMcpOptions = {
+  /**
+   * 'readonly' menyembunyikan semua tool tulis/destruktif dari tools/list dan tools/call — untuk harness
+   * review/bench yang tidak boleh mengubah dokumen. Diatur lewat env `LAKAR_MCP_TOOLS` di main.ts.
+   */
+  tools?: ToolPolicy;
+};
+
 /**
  * Rakit server MCP lakar. `backend` = URL lakard (`DaemonClient`, default) atau `LakarTransport` jadi
  * (mis. `FileClient` dari `lakar --file`). Daftar tool dan routing route tidak berubah.
  */
-export function createLakarMcpServer(backend: string | LakarTransport): McpServer {
+export function createLakarMcpServer(backend: string | LakarTransport, opts: LakarMcpOptions = {}): McpServer {
   const server = new McpServer({ name: SERVER_NAME, version: SERVER_VERSION }, { instructions: SERVER_INSTRUCTIONS });
+  if (opts.tools === 'readonly') {
+    // Saring di satu titik: tool tanpa entri 'read' di TOOL_EFFECTS (termasuk tool baru yang belum dipetakan)
+    // tidak terdaftar → panggilan mendapat error MCP standar "tool not found".
+    const reg = server.registerTool.bind(server) as (...args: unknown[]) => unknown;
+    server.registerTool = ((name: string, ...rest: unknown[]) => (TOOL_EFFECTS[name as ToolName] === 'read' ? reg(name, ...rest) : undefined)) as McpServer['registerTool'];
+  }
   // clientInfo harness (Claude Code, Codex, …) baru ada sesudah initialize; sesi daemon dibuat malas pada tool pertama.
   const client: LakarTransport = typeof backend === 'string' ? new DaemonClient(backend) : backend;
   client.setAgent(() => server.server.getClientVersion());
