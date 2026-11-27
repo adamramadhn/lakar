@@ -35,7 +35,7 @@ import { z } from 'zod';
 import { CLUSTERS_HINT, ClustersBody, SCOPE_HINT, ScopeBody, analyzeClusters, analyzeColors, analyzeTypography, requireBoard } from './analyze.js';
 import { CreateBody as PageCreateBody, SwitchBody, TreeBody, outlineNode, pageSummary, resolvePageRef } from './agent-pages.js';
 import { AgentSteps, BODY_HINT as STEPS_HINT, FIX_FORWARD, StepsBody } from './agent-undo.js';
-import { EXPORT_CODE_HINT, ExportCodeBody, exportGlyphs, type CodeExportOptions } from './code-export.js';
+import { EXPORT_CODE_HINT, EXPORT_SVG_HINT, ExportCodeBody, ExportSvgBody, exportGlyphs, exportSvgNode, type CodeExportOptions } from './code-export.js';
 import {
   CreateBody as CommentCreateBody,
   DeleteBody,
@@ -259,6 +259,8 @@ export class DocTransport {
         return this.#skillRead(body);
       case '/viewer/export-code':
         return this.#exportCode(body);
+      case '/viewer/export-svg':
+        return this.#exportSvg(body);
       case '/viewer/undo':
         return this.#undoRedo('undo', body);
       case '/viewer/redo':
@@ -739,6 +741,13 @@ export class DocTransport {
     const result = generateCode(stored, { ...opts, icons: exportGlyphs(stored, opts, this.#iconCatalog()) });
     const files = result.files.map((f) => ({ path: f.path, contents: f.contents, bytes: Buffer.byteLength(f.contents, 'utf8') }));
     return { docId: stored.id, slug, rev: stored.rev, id, name: hit?.node.name ?? id, target, files, warnings: result.warnings };
+  }
+
+  /** export_svg (vectorToSvg murni — tanpa render; paritas route `/viewer/export-svg`). */
+  #exportSvg(rawBody: unknown): unknown {
+    const slug = this.#active();
+    const body = this.#parse(ExportSvgBody, rawBody ?? {}, EXPORT_SVG_HINT);
+    return exportSvgNode(this.#doc(), slug, body.id);
   }
 
   // -------------------------------------------------------------------------

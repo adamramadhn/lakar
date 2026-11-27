@@ -286,6 +286,16 @@ describe('FileTransport: baca dokumen', () => {
     expect(react.ok && react.data.target).toBe('react-tailwind');
     expect(react.ok && react.data.files.some((f) => f.path.endsWith('.tsx'))).toBe(true);
   });
+
+  it('export_svg tanpa render: board → SVG mandiri; node non-vektor → EXPORT_FAILED', async () => {
+    const { t, boardId } = await withBoard('export-svg');
+    const ex = await t.call('/execute', { code: `add('${boardId}',{type:'path',name:'V',position:'absolute',x:0,y:0,width:24,height:24,d:'M0 0h24v24z',viewBox:[0,0,24,24],fills:[{type:'solid',color:'#000000'}]})`, description: 'tambah path vektor uji' });
+    expect(ex.ok, JSON.stringify(ex)).toBe(true);
+    const r = await t.call<{ id: string; type: string; svg: string; dropped: string[] }>('/viewer/export-svg', { id: boardId });
+    expect(r.ok, JSON.stringify(r)).toBe(true);
+    expect(r.ok && r.data.svg.startsWith('<svg xmlns="http://www.w3.org/2000/svg"'), r.ok ? r.data.svg : '').toBe(true);
+    expect(r.ok && r.data.svg.includes('d="M0 0h24v24z"'), r.ok ? r.data.svg : '').toBe(true);
+  });
 });
 
 describe('FileTransport: komentar', () => {

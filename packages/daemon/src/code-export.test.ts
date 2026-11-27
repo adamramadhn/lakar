@@ -155,3 +155,70 @@ describe('POST /viewer/export-code (export_code)', () => {
     expect(calls.every((e) => e.type === 'call' && e.call.target === t.hero)).toBe(true);
   });
 });
+
+describe('POST /viewer/export-svg (export_svg)', () => {
+  const callSvg = (t: Awaited<ReturnType<typeof setup>>, body: unknown, s = t.sid) => t.inject('/viewer/export-svg', body, { 'x-lakar-session': s });
+
+  it('tanpa dokumen aktif → NO_ACTIVE_DOC; sesi tidak dikenal → 401; kunci asing → SCHEMA_INVALID', async () => {
+    const t = await setup();
+    const r = await callSvg(t, {});
+    expect(r.statusCode).toBe(409);
+    expect(r.json().error.code).toBe('NO_ACTIVE_DOC');
+    expect((await callSvg(t, {}, 'nope')).statusCode).toBe(401);
+    await t.inject('/docs/open', { slug: t.slug }, { 'x-lakar-session': t.sid });
+    expect((await callSvg(t, { foo: 1 })).statusCode).toBe(400);
+  });
+
+  it('board default → 200 SVG; anak non-vektor dilaporkan di dropped ("<nodeId>.<prop>")', async () => {
+    const t = await setup();
+    await t.inject('/docs/open', { slug: t.slug }, { 'x-lakar-session': t.sid });
+    const r = await callSvg(t, {});
+    expect(r.statusCode, r.body).toBe(200);
+    const data = r.json().data;
+    expect(data).toMatchObject({ slug: t.slug, id: t.board, type: 'board' });
+    expect(data.svg).toMatch(/^<svg xmlns="http:\/\/www\.w3\.org\/2000\/svg"/);
+    expect(data.bytes).toBe(Buffer.byteLength(data.svg, 'utf8'));
+    // Hero = frame (lolos), ikon Star di dalamnya tidak punya padanan → dropped.
+    expect(data.dropped).toContain(`${t.star}.type`);
+  });
+
+  it('path node → SVG utuh berisi <path d>; text → EXPORT_FAILED; id asing → NOT_FOUND', async () => {
+    const t = await setup();
+    const ops = await t.inject(`/viewer/docs/${t.slug}/ops`, {
+      ops: [
+        { op: 'add', parentId: t.board, node: { type: 'path', name: 'V', position: 'absolute', x: 0, y: 0, width: 24, height: 24, d: 'M0 0h24v24z', viewBox: [0, 0, 24, 24], fills: [{ type: 'solid', color: '#000000' }] }, ref: 'v' },
+        { op: 'add', parentId: t.board, node: { type: 'text', name: 'T', content: 'halo', size: 16 }, ref: 'tx' },
+      ],
+    });
+    expect(ops.statusCode, ops.body).toBe(200);
+    const { v, tx } = ops.json().data.refs;
+    await t.inject('/docs/open', { slug: t.slug }, { 'x-lakar-session': t.sid });
+    const r = await callSvg(t, { id: v });
+    expect(r.statusCode, r.body).toBe(200);
+    expect(r.json().data.svg).toContain('d="M0 0h24v24z"');
+    expect(r.json().data.dropped).toEqual([]);
+    const bad = await callSvg(t, { id: tx });
+    expect(bad.statusCode).toBe(500);
+    expect(bad.json().error.code).toBe('EXPORT_FAILED');
+    expect((await callSvg(t, { id: 'Zzzzzzzz' })).json().error.code).toBe('NOT_FOUND');
+  });
+
+  it('root instance (alamat di dokumen ter-resolve) → 200 sebagai frame; tercatat export_svg di Activity', async () => {
+    const t = await setup();
+    const r0 = await t.inject(`/viewer/docs/${t.slug}/ops`, {
+      ops: [
+        { op: 'setComponent', id: t.hero, component: { props: [], slots: [] } },
+        { op: 'add', parentId: t.board, node: { type: 'instance', name: 'Hero 2', componentId: t.hero }, ref: 'inst' },
+      ],
+    });
+    expect(r0.statusCode, r0.body).toBe(200);
+    const inst = r0.json().data.refs.inst as string;
+    await t.inject('/docs/open', { slug: t.slug }, { 'x-lakar-session': t.sid });
+    const r = await callSvg(t, { id: inst });
+    expect(r.statusCode, r.body).toBe(200);
+    expect(r.json().data.type).toBe('frame');
+    const calls = t.daemon.activity.recent().filter((e) => e.type === 'call' && e.call.tool === 'export_svg' && e.call.status === 'done');
+    expect(calls.length).toBeGreaterThan(0);
+    expect(calls.every((e) => e.type === 'call' && e.call.target === inst)).toBe(true);
+  });
+});
