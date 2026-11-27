@@ -28,7 +28,9 @@ import { NODE_ADDRESS_PATTERN } from './selection.js';
 // dokumen v11 dimigrasi identitas (`@lakar/core` MIGRATIONS[11]).
 // v13 (spec-prototype-mode) menambah `interactions` opsional pada node anak dan board serta `flows` opsional di
 // root dokumen; dokumen v12 dimigrasi identitas (`@lakar/core` MIGRATIONS[12]).
-export const SCHEMA_VERSION = 13 as const;
+// v14 (spec-resize-constraints) menambah `constraints` opsional pada node anak `position:'absolute'`; dokumen v13
+// dimigrasi identitas (`@lakar/core` MIGRATIONS[13]).
+export const SCHEMA_VERSION = 14 as const;
 
 // ---------------------------------------------------------------------------
 // Primitif
@@ -44,6 +46,7 @@ export const TOKEN_NAME_PATTERN = /^[a-z0-9][a-z0-9-]*(\.[a-z0-9][a-z0-9-]*)*$/;
 export const COLOR_MESSAGE = 'warna harus #RRGGBB atau #RRGGBBAA';
 export const COLOR_HINT = 'warna ditulis hex #RRGGBB atau #RRGGBBAA (mis. "#1A1A1AFF"), atau referensi token {$token:"colors.nama"}; rgba()/nama warna tidak didukung';
 export const XY_HINT = 'x/y hanya untuk board/node absolute (tambahkan position:"absolute" pada node, atau hapus x/y)';
+export const CONSTRAINTS_HINT = 'constraints hanya untuk node position:"absolute" (perilaku saat parent di-resize lewat update)';
 
 export const Id = z.string().regex(ID_PATTERN, 'ID harus 8 karakter [A-Za-z0-9]');
 export const Slug = z.string().regex(SLUG_PATTERN, `slug harus cocok ${SLUG_PATTERN.source}`);
@@ -292,11 +295,23 @@ const sizingShape = {
   maxHeight: tok(Size).optional(),
 };
 
+/**
+ * Constraint resize (v14): perilaku anak `position:'absolute'` saat `width`/`height` parent berubah lewat `update`.
+ * Sumbu: 'start' (tetap, default), 'end' (ikut tepi akhir), 'center' (geser setengah delta), 'stretch' (ukuran
+ * ikut delta), 'scale' (posisi+ukuran diskalakan rasio). Tanpa padanan lain — hanya memindah `x/y`/`width`/`height`
+ * angka saat commit; tidak disimpan sebagai perilaku render.
+ */
+export const ConstraintAxis = z.enum(['start', 'end', 'center', 'stretch', 'scale']);
+export type ConstraintAxis = z.infer<typeof ConstraintAxis>;
+export const Constraints = z.object({ h: ConstraintAxis.optional(), v: ConstraintAxis.optional() }).strict();
+export type Constraints = z.infer<typeof Constraints>;
+
 /** Posisi node anak: x/y hanya bersama position:'absolute' (lihat `xyOnlyWhenAbsolute`). */
 const positionShape = {
   position: z.literal('absolute').optional(),
   x: Px.optional(),
   y: Px.optional(),
+  constraints: Constraints.optional(),
 };
 
 // ---------------------------------------------------------------------------
@@ -658,10 +673,13 @@ const iconShape = {
   ...effectShape,
 };
 
-type Positioned = { position?: 'absolute' | undefined; x?: number | undefined; y?: number | undefined };
+type Positioned = { position?: 'absolute' | undefined; x?: number | undefined; y?: number | undefined; constraints?: unknown };
 const xyOnlyWhenAbsolute = (v: Positioned, ctx: z.RefinementCtx) => {
   if (v.position !== 'absolute' && (v.x !== undefined || v.y !== undefined)) {
     ctx.addIssue({ code: 'custom', message: XY_HINT, path: [v.x !== undefined ? 'x' : 'y'] });
+  }
+  if (v.position !== 'absolute' && v.constraints !== undefined) {
+    ctx.addIssue({ code: 'custom', message: CONSTRAINTS_HINT, path: ['constraints'] });
   }
 };
 
@@ -971,11 +989,13 @@ function describe(i: Issue): string {
   return `${path}: ${i.message}`;
 }
 
-/** Ringkas issue zod jadi satu baris + hint (dipakai core/daemon untuk SCHEMA_INVALID). Prioritas hint: x/y, warna, katalog. */
+/** Ringkas issue zod jadi satu baris + hint (dipakai core/daemon untuk SCHEMA_INVALID). Prioritas hint: x/y, constraints, warna, katalog. */
 export function zodToLakarError(err: z.ZodError, context: string): LakarError {
   const all = [...walkIssues(err.issues)];
   // x/y pada node flow terdeteksi lewat refinement XY_HINT di setiap tipe anak (board punya x/y di shape-nya).
   const xyIssue = all.some((i) => i.message === XY_HINT);
+  // constraints pada node flow terdeteksi lewat refinement CONSTRAINTS_HINT yang sama.
+  const constraintsIssue = all.some((i) => i.message === CONSTRAINTS_HINT);
   const colorIssue = all.some((i) => i.message === COLOR_MESSAGE);
   // Hanya discriminator node (bukan mis. Fill yang juga discriminatedUnion pada `type`).
   const catalogIssue = all.some(
@@ -987,10 +1007,12 @@ export function zodToLakarError(err: z.ZodError, context: string): LakarError {
   );
   const hint = xyIssue
     ? XY_HINT
-    : colorIssue
-      ? COLOR_HINT
-      : catalogIssue
-        ? CATALOG_HINT
-        : `periksa properti node terhadap skema Lakar v1 (${NODE_TYPES.join('/')})`;
+    : constraintsIssue
+      ? CONSTRAINTS_HINT
+      : colorIssue
+        ? COLOR_HINT
+        : catalogIssue
+          ? CATALOG_HINT
+          : `periksa properti node terhadap skema Lakar v1 (${NODE_TYPES.join('/')})`;
   return new LakarError('SCHEMA_INVALID', `${context}: ${err.issues.map(describe).join('; ')}`, { hint });
 }

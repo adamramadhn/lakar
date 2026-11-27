@@ -7,6 +7,7 @@
 import {
   CommentThread,
   ComponentDef,
+  CONSTRAINTS_HINT,
   Flow,
   ID_PATTERN,
   INSTANCE_KEYS,
@@ -198,6 +199,55 @@ function sameValue(a: unknown, b: unknown): boolean {
  * Patch `update` yang mengubah properti `after` kembali ke `before`: hanya kunci yang berbeda, nilai lama atau
  * `null` (kunci dulu tidak ada). Kosong → `undefined`.
  */
+const numOr = (v: unknown): number | undefined => (typeof v === 'number' && Number.isFinite(v) ? v : undefined);
+
+type Dims = { x?: number; y?: number; width?: number; height?: number };
+
+/**
+ * Propagasi `constraints` (v14) satu tingkat lalu rekursif ke anak yang ikut berubah ukuran (stretch/scale).
+ * `kids` = anak node SESUDAH patch (objeknya dimutasi di tempat); `dw`/`dh` = delta ukuran parent;
+ * `oldW`/`oldH` = ukuran parent SEBELUM (untuk 'scale'). Invers per anak didorong ke `inv` (urutan: parent
+ * dulu, baru anak — replay undo menormalkan parent sebelum memulihkan posisi anak).
+ */
+function cascadeConstraints(kids: readonly AnyNode[], dw: number, dh: number, oldW: number | undefined, oldH: number | undefined, inv: DocOp[]): void {
+  for (const c of kids) {
+    const b = c as AnyNode & Dims & { children?: AnyNode[]; position?: unknown; constraints?: { h?: string; v?: string } };
+    const con = b.constraints;
+    if (!con || b.position !== 'absolute') continue;
+    const old: Dims = { x: b.x, y: b.y, width: b.width, height: b.height };
+    const patch: Record<string, number> = {};
+    if (con.h === 'end' && b.x !== undefined) patch.x = b.x + dw;
+    else if (con.h === 'center' && b.x !== undefined) patch.x = b.x + dw / 2;
+    else if (con.h === 'stretch' && b.width !== undefined) patch.width = b.width + dw;
+    else if (con.h === 'scale' && oldW) {
+      const k = (oldW + dw) / oldW;
+      if (b.x !== undefined) patch.x = b.x * k;
+      if (b.width !== undefined) patch.width = b.width * k;
+    }
+    if (con.v === 'end' && b.y !== undefined) patch.y = b.y + dh;
+    else if (con.v === 'center' && b.y !== undefined) patch.y = b.y + dh / 2;
+    else if (con.v === 'stretch' && b.height !== undefined) patch.height = b.height + dh;
+    else if (con.v === 'scale' && oldH) {
+      const k = (oldH + dh) / oldH;
+      if (b.y !== undefined) patch.y = b.y * k;
+      if (b.height !== undefined) patch.height = b.height * k;
+    }
+    if (!Object.keys(patch).length) continue;
+    Object.assign(b, patch);
+    const back: Record<string, number | undefined> = {};
+    for (const k of Object.keys(patch)) back[k] = (old as Record<string, number | undefined>)[k];
+    inv.push({ op: 'update', id: b.id, patch: back });
+    const nw = numOr(b.width);
+    const nh = numOr(b.height);
+    const dw2 = nw !== undefined && old.width !== undefined ? nw - old.width : 0;
+    const dh2 = nh !== undefined && old.height !== undefined ? nh - old.height : 0;
+    if ((dw2 || dh2) && b.children?.length) cascadeConstraints(b.children, dw2, dh2, old.width, old.height, inv);
+  }
+}
+
+/** Patch `update` yang mengubah properti `after` kembali ke `before`: hanya kunci yang berbeda, nilai lama atau
+ * `null` (kunci dulu tidak ada). Kosong → `undefined`.
+ */
 function revertPatch(before: AnyNode, after: AnyNode): Record<string, unknown> | undefined {
   const b = propsOf(before);
   const a = propsOf(after);
@@ -236,8 +286,8 @@ function mergePatch(op: OpKind, node: AnyNode, patch: unknown): NodeInput {
   const parsed = NodeInput.safeParse(merged);
   if (!parsed.success) {
     const e = zodToLakarError(parsed.error, `${op} ${node.type} ${node.id}`);
-    // x/y pada node flow sudah membawa XY_HINT; selain itu tambahkan cara menghapus/ganti tipe.
-    const hint = e.hint === XY_HINT ? e.hint : `${e.hint}; null menghapus properti opsional (properti wajib tidak bisa dihapus); ganti tipe → replace`;
+    // x/y/constraints pada node flow sudah membawa hint spesifik; selain itu tambahkan cara menghapus/ganti tipe.
+    const hint = e.hint === XY_HINT || e.hint === CONSTRAINTS_HINT ? e.hint : `${e.hint}; null menghapus properti opsional (properti wajib tidak bisa dihapus); ganti tipe → replace`;
     throw new LakarError('SCHEMA_INVALID', e.message, { hint });
   }
   return parsed.data;
@@ -563,6 +613,20 @@ export function beginTransaction(doc: Doc, opts: TransactionOptions): Transactio
           over?.apply();
           over?.inv.forEach(undo);
           if (revert) undo({ op: 'update', id: next.id, patch: revert });
+          // Propagasi constraints (v14): resize width/height angka → anak absolute ber-constraints menyesuaikan
+          // (rekursif untuk stretch/scale). Inversnya didaftarkan SESUDAH invers parent: undo menormalkan
+          // ukuran parent dulu (constraint-nya berjalan lagi mundur), lalu posisi anak dipulihkan persis.
+          const bw = numOr((at.node as Dims).width);
+          const bh = numOr((at.node as Dims).height);
+          const aw = numOr((next as Dims).width);
+          const ah = numOr((next as Dims).height);
+          const dw = aw !== undefined && bw !== undefined ? aw - bw : 0;
+          const dh = ah !== undefined && bh !== undefined ? ah - bh : 0;
+          if ((dw || dh) && 'children' in next && next.children.length) {
+            const cinv: DocOp[] = [];
+            cascadeConstraints(next.children, dw, dh, bw, bh, cinv);
+            cinv.forEach(undo);
+          }
           undoSteps(steps, undo);
         };
         // Lepas status master lewat patch component:null → instancenya di-detach dulu (AD-12).
