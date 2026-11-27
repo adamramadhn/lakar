@@ -1260,6 +1260,17 @@ describe('font lokal (registry + FONT_MISSING)', () => {
     }
   }, 60_000);
 
+  it('GET /status: fonts.entries berisi keluarga + weight + style (list_fonts agen)', async () => {
+    const r = await fetch(`${d.url}/status`);
+    expect(r.status).toBe(200);
+    const { data } = (await r.json()) as { data: { fonts: { entries: { family: string; weights: number[]; styles: string[] }[] } } };
+    const inter = data.fonts.entries.find((e) => e.family === 'Inter')!;
+    expect(inter.weights).toContain(400);
+    expect(inter.weights).toContain(900);
+    expect(inter.styles).toContain('normal');
+    expect(inter.styles).toContain('italic');
+  });
+
   it('GET /fonts: file registry → 200 font/woff2; traversal / id asing / file asing → 404', async () => {
     const ok = await fetch(`${d.url}/fonts/inter/inter-latin-400-normal.woff2`);
     expect(ok.status).toBe(200);

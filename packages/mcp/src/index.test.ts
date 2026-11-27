@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { Client, InMemoryTransport } from '@modelcontextprotocol/client';
 import { StdioClientTransport } from '@modelcontextprotocol/client/stdio';
 import { LAKAR_VERSION, SCHEMA_VERSION } from '@lakar/schema';
-import { EXECUTE_LANDING_REMINDER_FROM, EXPORT_CODE_DESCRIPTION, GET_SELECTION_DESCRIPTION, IMPORT_URL_DESCRIPTION, LIST_DOCUMENTS_DESCRIPTION, OPEN_DOC_DESCRIPTION, PACKAGE, PASTE_DESCRIPTION, PHOTO_SEARCH_DESCRIPTION, READ_SKILL_DESCRIPTION, SERVER_INSTRUCTIONS, SERVER_VERSION, createLakarMcpServer, formatStatus } from './index.js';
+import { EXECUTE_LANDING_REMINDER_FROM, EXPORT_CODE_DESCRIPTION, GET_SELECTION_DESCRIPTION, IMPORT_URL_DESCRIPTION, LIST_DOCUMENTS_DESCRIPTION, OPEN_DOC_DESCRIPTION, PACKAGE, PASTE_DESCRIPTION, PHOTO_SEARCH_DESCRIPTION, READ_SKILL_DESCRIPTION, SERVER_INSTRUCTIONS, SERVER_VERSION, createLakarMcpServer, formatFonts, formatStatus } from './index.js';
 import { readFile } from 'node:fs/promises';
 import { chromiumInstalled, DEFAULT_BROWSERS_PATH } from '../../../tests/support/browser.ts';
 import { testLog } from '../../../tests/support/log.ts';
@@ -55,7 +55,14 @@ function fakeDaemon() {
           port: 7466,
           dataDir: '/data',
           pool: { size: 2, ready: 2, idle: 2, busy: 0, waiting: 0, recreated: 0, peakBusy: 1, browserVersion: '140.0' },
-          fonts: { families: ['Inter', 'Manrope'], missing: [] },
+          fonts: {
+            families: ['Inter', 'Manrope'],
+            entries: [
+              { family: 'Inter', weights: [100, 200, 300, 400, 500, 600, 700, 800, 900], styles: ['normal', 'italic'] },
+              { family: 'Manrope', weights: [400, 500, 600, 700, 800], styles: ['normal'] },
+            ],
+            missing: [],
+          },
           icons: { lucide: '1.74.0', 'simple-icons': '16.38.0' },
           photos: { provider: 'openverse', keyFile: 'absent', imported: 2 },
           sessions: { count: 1, active: [{ id: 'a1b2c3d4', activeSlug: 'landing-kopi', createdAt: 'x', executes: 3 }] },
@@ -271,7 +278,7 @@ describe('@lakar/mcp', () => {
     const c = await connect(url);
     const { tools } = await c.listTools();
     expect(tools.map((t) => t.name).sort()).toEqual(
-      ['execute', 'export', 'export_code', 'get_selection', 'icon_search', 'import_url', 'inspect', 'layout_check', 'list_boards', 'list_documents', 'open_doc', 'paste', 'photo_search', 'read_skill', 'redo', 'screenshot', 'status', 'undo', 'visual_diff', 'fix_check', 'list_pages', 'get_current_page', 'switch_page', 'create_page', 'get_page_tree', 'list_comments', 'add_comment', 'reply_to_comment', 'resolve_comment', 'delete_comment', 'fix_comment', 'analyze_colors', 'analyze_typography', 'analyze_clusters'].sort(),
+      ['execute', 'export', 'export_code', 'get_selection', 'icon_search', 'import_url', 'inspect', 'layout_check', 'list_boards', 'list_documents', 'list_fonts', 'open_doc', 'paste', 'photo_search', 'read_skill', 'redo', 'screenshot', 'status', 'undo', 'visual_diff', 'fix_check', 'list_pages', 'get_current_page', 'switch_page', 'create_page', 'get_page_tree', 'list_comments', 'add_comment', 'reply_to_comment', 'resolve_comment', 'delete_comment', 'fix_comment', 'analyze_colors', 'analyze_typography', 'analyze_clusters'].sort(),
     );
     expect(SERVER_VERSION).toBe(LAKAR_VERSION);
     expect(c.getServerVersion()?.version).toBe(LAKAR_VERSION);
@@ -583,6 +590,21 @@ describe('@lakar/mcp', () => {
     expect(fake.seen.map((x) => x.path)).toEqual(['/status']);
   });
 
+  it('list_fonts → satu baris per keluarga berisi weight/style dari fonts.entries /status', async () => {
+    const c = await connect(url);
+    const r = await c.callTool({ name: 'list_fonts', arguments: {} });
+    expect(r.isError).toBeFalsy();
+    expect((r.content as any)[0].text).toEqual(
+      [
+        'Inter — weight 100/200/300/400/500/600/700/800/900 · style normal/italic',
+        'Manrope — weight 400/500/600/700/800 · style normal',
+        'paket hilang: -',
+      ].join('\n'),
+    );
+    // Tanpa entries (lakard lama) → hanya nama keluarga.
+    expect(formatFonts({ fonts: { families: ['Inter'], missing: ['manrope'] } })).toEqual(['Inter', 'paket hilang: manrope'].join('\n'));
+  });
+
   it.each(['reject', 'old'] as const)('versi beda (%s) → setiap tool VERSION_MISMATCH + hint restart; status tetap jalan; pulih setelah daemon cocok', async (mode) => {
     fake.setVersionMode(mode);
     try {
@@ -876,7 +898,7 @@ describe('@lakar/mcp', () => {
       const r = await c2.callTool({ name: 'execute', arguments: { code: '1' } });
       expect(r.isError).toBe(true);
       expect((r.content as any)[0].text).toContain('http://127.0.0.1:1');
-      expect((await c2.listTools()).tools).toHaveLength(34);
+      expect((await c2.listTools()).tools).toHaveLength(35);
     } finally {
       await c2.close();
       await deadTransport.close();
