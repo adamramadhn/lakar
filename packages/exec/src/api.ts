@@ -550,7 +550,9 @@ export const API: { readonly [K in keyof LakarApi]: ApiFunction } = {
     signature: 'update(id: string, patch: {...}): void',
     doc:
       'Merge dangkal properti ke node; null menghapus properti opsional. type/id/children tidak bisa diubah (ganti tipe → replace). ' +
-      "id '<instanceId>/<idNodeMaster>' (isi instance) atau properti node pada instance (mis. fills) menjadi override instance itu; master tetap.",
+      "id '<instanceId>/<idNodeMaster>' (isi instance) atau properti node pada instance (mis. fills) menjadi override instance itu; master tetap. " +
+      "Properti tambahan per tipe: anak position:'absolute' boleh membawa constraints:{h,v} (start|end|center|stretch|scale — perilaku saat parent di-resize lewat update); " +
+      'teks boleh membawa decoration:\'underline\'|\'strikethrough\'|\'none\' dan runs:[{start,length,style}] — gaya per rentang karakter (style subset: family/weight/style/size/lineHeight/letterSpacing/color/decoration, rentang terurut di dalam content). Patch content tanpa runs mereset rentang lama.',
     returns: 'undefined',
     errors: ['SCHEMA_INVALID', 'NOT_FOUND', 'ICON_UNKNOWN'],
     example: `${BOARD}\nconst t = add(b, {type:'text', name:'Judul', content:'Halo', size:32});\nupdate(t, {size: 40, color: '#1A1A1A'});`,

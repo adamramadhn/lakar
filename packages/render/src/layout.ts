@@ -14,7 +14,7 @@ import type {
   ResolvedTextNode as TextNode,
 } from '@lakar/schema';
 import { cssFamily, textFont } from './fonts.js';
-import { boardDecls, BOARD_DEFAULT_BACKGROUND, boxPaintDecls, childLayoutDecls, frameDecls, hugBoardChild, frameLayout, radiusCss, textDecls, type ParentLayout } from './css.js';
+import { boardDecls, BOARD_DEFAULT_BACKGROUND, boxPaintDecls, childLayoutDecls, frameDecls, hugBoardChild, frameLayout, radiusCss, textDecls, textRunDecls, type ParentLayout } from './css.js';
 import { applyDecls, applyEffects, DEFAULT_ASSET_BASE, dropShadowFilters, applyFills, strokeOverlay } from './paint.js';
 import { ellipseShape, fillLayer, pathShape, strokeSvg, type Shape } from './shape.js';
 import { iconKey, renderIconElement } from './icon.js';
@@ -165,6 +165,22 @@ function renderText(d: Document, n: TextNode): HTMLElement {
   el.dataset.lakarText = '';
   // Satu keluarga terdaftar, tanpa generic fallback (cssFamily); sisanya dari css.ts.
   applyDecls(el.style, textDecls(n, cssFamily(textFont(n).family)));
-  el.textContent = n.content;
+  // v15: `runs` memecah content menjadi teks polos + <span> per rentang bergaya (urut, tak tumpang-tindih).
+  const runs = n.runs;
+  if (!runs?.length) {
+    el.textContent = n.content;
+    return el;
+  }
+  let pos = 0;
+  for (const run of runs) {
+    if (run.start > pos) el.appendChild(d.createTextNode(n.content.slice(pos, run.start)));
+    const span = d.createElement('span');
+    const fam = typeof run.style.family === 'string' ? cssFamily(run.style.family) : undefined;
+    applyDecls(span.style, textRunDecls(run.style, fam));
+    span.textContent = n.content.slice(run.start, run.start + run.length);
+    el.appendChild(span);
+    pos = run.start + run.length;
+  }
+  if (pos < n.content.length) el.appendChild(d.createTextNode(n.content.slice(pos)));
   return el;
 }

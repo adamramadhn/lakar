@@ -30,7 +30,9 @@ import { NODE_ADDRESS_PATTERN } from './selection.js';
 // root dokumen; dokumen v12 dimigrasi identitas (`@lakar/core` MIGRATIONS[12]).
 // v14 (spec-resize-constraints) menambah `constraints` opsional pada node anak `position:'absolute'`; dokumen v13
 // dimigrasi identitas (`@lakar/core` MIGRATIONS[13]).
-export const SCHEMA_VERSION = 14 as const;
+// v15 (spec-rich-text) menambah `decoration` dan `runs` (gaya per rentang karakter) opsional pada node teks;
+// dokumen v14 dimigrasi identitas (`@lakar/core` MIGRATIONS[14]).
+export const SCHEMA_VERSION = 15 as const;
 
 // ---------------------------------------------------------------------------
 // Primitif
@@ -47,6 +49,7 @@ export const COLOR_MESSAGE = 'warna harus #RRGGBB atau #RRGGBBAA';
 export const COLOR_HINT = 'warna ditulis hex #RRGGBB atau #RRGGBBAA (mis. "#1A1A1AFF"), atau referensi token {$token:"colors.nama"}; rgba()/nama warna tidak didukung';
 export const XY_HINT = 'x/y hanya untuk board/node absolute (tambahkan position:"absolute" pada node, atau hapus x/y)';
 export const CONSTRAINTS_HINT = 'constraints hanya untuk node position:"absolute" (perilaku saat parent di-resize lewat update)';
+export const RUNS_HINT = 'runs: rentang harus di dalam content (start+length <= jumlah karakter), terurut, dan tidak tumpang-tindih';
 
 export const Id = z.string().regex(ID_PATTERN, 'ID harus 8 karakter [A-Za-z0-9]');
 export const Slug = z.string().regex(SLUG_PATTERN, `slug harus cocok ${SLUG_PATTERN.source}`);
@@ -563,6 +566,44 @@ const frameShape = {
   ...visualShape,
 };
 
+/** Dekorasi teks (v15): `none` menghapus dekorasi bawaan, `underline` garis bawah, `strikethrough` coret. */
+export const TEXT_DECORATIONS = ['none', 'underline', 'strikethrough'] as const;
+export const TextDecoration = z.enum(TEXT_DECORATIONS);
+export type TextDecoration = z.infer<typeof TextDecoration>;
+
+/**
+ * Override gaya untuk satu rentang karakter (v15). Subset properti teks yang berlaku per karakter; properti
+ * yang tidak diisi mewarisi nilai level node. `size`/`lineHeight` di sini mengubah metrik baris (seperti Figma).
+ */
+export const TextRunStyle = z
+  .object({
+    family: tok(FontFamily).optional(),
+    weight: tok(Weight).optional(),
+    style: z.enum(['normal', 'italic']).optional(),
+    size: tok(Positive).optional(),
+    lineHeight: tok(Positive).optional(),
+    letterSpacing: tok(Px).optional(),
+    color: Color.optional(),
+    decoration: TextDecoration.optional(),
+  })
+  .strict();
+export type TextRunStyle = z.infer<typeof TextRunStyle>;
+
+/**
+ * Satu rentang bergaya di dalam `content` (v15): `start`/`length` dalam satuan karakter JS (UTF-16 code unit,
+ * seperti `String.slice`). Rentang harus di dalam `content`, terurut menaik, dan tidak tumpang-tindih —
+ * divalidasi refine `runsWithinContent` (pesan `RUNS_HINT`).
+ */
+export const TextRun = z
+  .object({
+    start: z.number().int().min(0),
+    length: z.number().int().min(1),
+    /** Override gaya untuk rentang; boleh {} sebagai penanda batas (mewarisi node sepenuhnya). */
+    style: TextRunStyle,
+  })
+  .strict();
+export type TextRun = z.infer<typeof TextRun>;
+
 const textShape = {
   type: z.literal('text'),
   ...childBase,
@@ -579,6 +620,10 @@ const textShape = {
   wrap: z.enum(['auto', 'wrap', 'fixed']).optional(),
   numeric: z.enum(['proportional', 'tabular']).optional(),
   color: Color.optional(),
+  /** v15: dekorasi untuk seluruh teks; ditimpa per rentang oleh `runs[].style.decoration`. */
+  decoration: TextDecoration.optional(),
+  /** v15: gaya per rentang karakter di atas gaya node (rich text). Patch `content` tanpa `runs` meresetnya. */
+  runs: z.array(TextRun).optional(),
   ...sizingShape,
   ...effectShape,
 };
@@ -683,9 +728,26 @@ const xyOnlyWhenAbsolute = (v: Positioned, ctx: z.RefinementCtx) => {
   }
 };
 
+/** `runs` (v15): tiap rentang harus di dalam `content`, terurut menaik, dan tidak tumpang-tindih. */
+const runsWithinContent = (
+  v: { content?: unknown; runs?: readonly { start: number; length: number }[] | undefined },
+  ctx: z.RefinementCtx,
+) => {
+  if (!v.runs?.length || typeof v.content !== 'string') return;
+  const len = v.content.length;
+  let end = -1;
+  for (const r of v.runs) {
+    if (r.start + r.length > len || r.start < end) {
+      ctx.addIssue({ code: 'custom', message: RUNS_HINT, path: ['runs'] });
+      return;
+    }
+    end = r.start + r.length;
+  }
+};
+
 export const BoardInput = z.object(boardShape).strict();
 export const FrameInput = z.object(frameShape).strict().superRefine(xyOnlyWhenAbsolute);
-export const TextInput = z.object(textShape).strict().superRefine(xyOnlyWhenAbsolute);
+export const TextInput = z.object(textShape).strict().superRefine(xyOnlyWhenAbsolute).superRefine(runsWithinContent);
 export const RectInput = z.object(rectShape).strict().superRefine(xyOnlyWhenAbsolute);
 export const EllipseInput = z.object(ellipseShape).strict().superRefine(xyOnlyWhenAbsolute);
 export const PathInput = z.object(pathShape).strict().superRefine(xyOnlyWhenAbsolute);
@@ -769,7 +831,7 @@ function nodeBranch(id: z.ZodString, leaves: readonly z.ZodType[], withInstance:
   return { frame, instance, child, board, page };
 }
 
-export const TextNode = z.object({ ...textShape, id: Id }).strict().superRefine(xyOnlyWhenAbsolute);
+export const TextNode = z.object({ ...textShape, id: Id }).strict().superRefine(xyOnlyWhenAbsolute).superRefine(runsWithinContent);
 export const RectNode = z.object({ ...rectShape, id: Id }).strict().superRefine(xyOnlyWhenAbsolute);
 export const EllipseNode = z.object({ ...ellipseShape, id: Id }).strict().superRefine(xyOnlyWhenAbsolute);
 export const PathNode = z.object({ ...pathShape, id: Id }).strict().superRefine(xyOnlyWhenAbsolute);
@@ -881,7 +943,7 @@ export type LakarDocument = z.infer<typeof LakarDocument>;
 export type ExpandedDocument = Omit<LakarDocument, 'pages'> & { pages: ExpandedPage[] };
 
 const expandedLeaves = [
-  z.object({ ...textShape, id: Address }).strict().superRefine(xyOnlyWhenAbsolute),
+  z.object({ ...textShape, id: Address }).strict().superRefine(xyOnlyWhenAbsolute).superRefine(runsWithinContent),
   z.object({ ...rectShape, id: Address }).strict().superRefine(xyOnlyWhenAbsolute),
   z.object({ ...ellipseShape, id: Address }).strict().superRefine(xyOnlyWhenAbsolute),
   z.object({ ...pathShape, id: Address }).strict().superRefine(xyOnlyWhenAbsolute),
@@ -996,6 +1058,8 @@ export function zodToLakarError(err: z.ZodError, context: string): LakarError {
   const xyIssue = all.some((i) => i.message === XY_HINT);
   // constraints pada node flow terdeteksi lewat refinement CONSTRAINTS_HINT yang sama.
   const constraintsIssue = all.some((i) => i.message === CONSTRAINTS_HINT);
+  // runs teks yang keluar batas/tidak terurut terdeteksi lewat refinement RUNS_HINT.
+  const runsIssue = all.some((i) => i.message === RUNS_HINT);
   const colorIssue = all.some((i) => i.message === COLOR_MESSAGE);
   // Hanya discriminator node (bukan mis. Fill yang juga discriminatedUnion pada `type`).
   const catalogIssue = all.some(
@@ -1009,10 +1073,12 @@ export function zodToLakarError(err: z.ZodError, context: string): LakarError {
     ? XY_HINT
     : constraintsIssue
       ? CONSTRAINTS_HINT
-      : colorIssue
-        ? COLOR_HINT
-        : catalogIssue
-          ? CATALOG_HINT
-          : `periksa properti node terhadap skema Lakar v1 (${NODE_TYPES.join('/')})`;
+      : runsIssue
+        ? RUNS_HINT
+        : colorIssue
+          ? COLOR_HINT
+          : catalogIssue
+            ? CATALOG_HINT
+            : `periksa properti node terhadap skema Lakar v1 (${NODE_TYPES.join('/')})`;
   return new LakarError('SCHEMA_INVALID', `${context}: ${err.issues.map(describe).join('; ')}`, { hint });
 }

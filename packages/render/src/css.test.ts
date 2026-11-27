@@ -12,6 +12,7 @@ import {
   gridLineCss,
   gridTemplateCss,
   gridTrackCss,
+  decorationCss,
   JUSTIFY,
   lengthCss,
   letterSpacingCss,
@@ -22,6 +23,7 @@ import {
   shadowCss,
   stopsCss,
   strokeBorderDecls,
+  textRunDecls,
   textShadowCss,
   tokenVar,
 } from './css.js';
@@ -155,6 +157,29 @@ describe('teks', () => {
     expect(fontFamilyCss('Inter')).toBe('Inter');
     expect(fontFamilyCss('JetBrains Mono')).toBe('"JetBrains Mono"');
     expect(fontFamilyCss({ $token: 'type.family' })).toBe('var(--type-family)');
+  });
+
+  it('decoration (v15): underline/strikethrough/none → text-decoration; nilai lain → undefined', () => {
+    expect(decorationCss('underline')).toBe('underline');
+    expect(decorationCss('strikethrough')).toBe('line-through');
+    expect(decorationCss('none')).toBe('none');
+    expect(decorationCss('blink')).toBeUndefined();
+    expect(decorationCss(undefined)).toBeUndefined();
+  });
+
+  it('textRunDecls (v15): hanya kunci yang diisi; family dari argumen; color/decoration ikut', () => {
+    expect(textRunDecls({}, undefined)).toEqual([]);
+    expect(textRunDecls({ weight: 700, color: '#FF0000' }, undefined)).toEqual([
+      ['font-weight', '700'],
+      ['color', '#FF0000'],
+    ]);
+    expect(textRunDecls({ family: 'JetBrains Mono', size: 12, decoration: 'strikethrough' }, '"JetBrains Mono"')).toEqual([
+      ['font-family', '"JetBrains Mono"'],
+      ['font-size', '12px'],
+      ['text-decoration', 'line-through'],
+    ]);
+    // family terisi di run tapi pemanggil tak memberi nilai CSS → deklarasi dilewati.
+    expect(textRunDecls({ family: 'X' }, undefined)).toEqual([]);
   });
 });
 
