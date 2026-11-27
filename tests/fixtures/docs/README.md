@@ -37,6 +37,7 @@ Loader bersama ada di `tests/support/doc-corpus.ts`.
 | `v12/comments-fix` | `fixRequest` pada thread komentar: open (dengan `agent` tujuan), done (penutup + `note`), cancelled |
 | `v13/prototype` | dua board mobile dengan `interactions` (`navigate` + `back`, transisi `slide`/`instant`) pada rect, frame, dan board, serta `flows` (dua flow, `startBoardId` berbeda) |
 | `v14/constraints` | anak `position:'absolute'` di frame `layout:'none'` dengan `constraints` per sumbu: `start`, `end`, `center`, `stretch`, `scale` |
+| `v15/rich-text` | teks dengan `runs` (weight+color, italic+color, decoration per rentang) dan `decoration` level node |
 
 SVG sumber tiga board ikon pertama ada di `tests/fixtures/svg/ikon-vektor/*.svg`; `packages/render/test/corpus.test.ts` membandingkan render board dengan render SVG sumber itu, dan render ekspor `vectorToSvg` dengan render Lakar (selisih piksel ≤ 1%).
 

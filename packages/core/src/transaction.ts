@@ -283,6 +283,9 @@ function mergePatch(op: OpKind, node: AnyNode, patch: unknown): NodeInput {
     if (value === null) delete merged[key];
     else merged[key] = value;
   }
+  // Rich text (v15): patch yang mengubah `content` tanpa `runs` menghapus rentang bergaya — offset lama tidak
+  // lagi menunjuk karakter yang sama (jelas & aman; agen yang menjaga gaya mengirim `runs` di patch yang sama).
+  if (merged.type === 'text' && Object.hasOwn(patch, 'content') && !Object.hasOwn(patch, 'runs')) delete merged.runs;
   const parsed = NodeInput.safeParse(merged);
   if (!parsed.success) {
     const e = zodToLakarError(parsed.error, `${op} ${node.type} ${node.id}`);

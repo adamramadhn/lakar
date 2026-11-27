@@ -26,6 +26,7 @@ import {
   strokeSvgSpec,
   tagResetDecls,
   textDecls,
+  textRunDecls,
   type CssDecl,
   type ParentLayout,
   type Shape,
@@ -283,10 +284,26 @@ export function nodeElement(ctx: TreeCtx, n: ExpandedChildNode, parent: ParentLa
       e.children = childElements(ctx, n.children, frameLayout(n), n.scrollY ?? 0, n.gap);
       break;
     }
-    case 'text':
+    case 'text': {
       e.decls.push(...textDecls(n, fontFamilyCss(n.family ?? DEFAULT_FONT.family) ?? DEFAULT_FONT.family));
-      e.children = [{ kind: 'text', text: n.content }];
+      const runs = n.runs;
+      if (!runs?.length) {
+        e.children = [{ kind: 'text', text: n.content }];
+        break;
+      }
+      // v15: rentang bergaya menjadi <span> (kelas sendiri di CSS module / kelas tailwind).
+      const kids: CodeNode[] = [];
+      let pos = 0;
+      for (const run of runs) {
+        if (run.start > pos) kids.push({ kind: 'text', text: n.content.slice(pos, run.start) });
+        const fam = run.style.family !== undefined ? fontFamilyCss(run.style.family) : undefined;
+        kids.push(el('span', `${camelName(n.name, 'text')}Run`, n.id, textRunDecls(run.style, fam), [{ kind: 'text', text: n.content.slice(run.start, run.start + run.length) }]));
+        pos = run.start + run.length;
+      }
+      if (pos < n.content.length) kids.push({ kind: 'text', text: n.content.slice(pos) });
+      e.children = kids;
       break;
+    }
     case 'rect':
       e.decls.push(['position', 'relative']);
       paintBox(ctx, e, n, radiusCss(n.radius));

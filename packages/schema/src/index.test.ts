@@ -74,11 +74,11 @@ describe('@lakar/schema', () => {
     expect(BoardNode.safeParse({ ...node, id: 'short' }).success).toBe(false);
   });
 
-  it('LakarDocument: schemaVersion = SCHEMA_VERSION (14) dan minimal 1 halaman; v1..v10 hanya lewat migrasi (@lakar/core)', () => {
-    expect(SCHEMA_VERSION).toBe(14);
+  it('LakarDocument: schemaVersion = SCHEMA_VERSION (15) dan minimal 1 halaman; v1..v10 hanya lewat migrasi (@lakar/core)', () => {
+    expect(SCHEMA_VERSION).toBe(15);
     const doc = { schemaVersion: SCHEMA_VERSION, id: 'Dddddddd', rev: 0, pages: [{ id: 'Pppppppp', name: 'Page 1', children: [] }] };
     expect(LakarDocument.safeParse(doc).success).toBe(true);
-    expect(LakarDocument.safeParse({ ...doc, schemaVersion: 15 }).success).toBe(false);
+    expect(LakarDocument.safeParse({ ...doc, schemaVersion: 16 }).success).toBe(false);
     expect(LakarDocument.safeParse({ ...doc, schemaVersion: 10 }).success).toBe(false);
     expect(LakarDocument.safeParse({ ...doc, schemaVersion: 9 }).success).toBe(false);
     expect(LakarDocument.safeParse({ ...doc, schemaVersion: 8 }).success).toBe(false);

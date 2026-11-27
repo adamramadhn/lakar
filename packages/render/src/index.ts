@@ -49,6 +49,8 @@ export {
   frameLayout,
   strokeOverlayDecls,
   textDecls,
+  textRunDecls,
+  decorationCss,
   textWrapMode,
   strokeBeforeFill,
   vectorSvgAttrs,

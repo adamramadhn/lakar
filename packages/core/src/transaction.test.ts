@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CONSTRAINTS_HINT, LakarError, XY_HINT, type LakarDocument } from '@lakar/schema';
+import { CONSTRAINTS_HINT, LakarError, RUNS_HINT, XY_HINT, type LakarDocument } from '@lakar/schema';
 import { beginTransaction, createDocument, parseDocument, transact, type Transaction } from './index.js';
 
 const fixedNow = () => new Date('2026-11-17T00:00:00.000Z');
@@ -228,6 +228,45 @@ describe('update', () => {
     const tx = beginTransaction(doc, { sessionId: 's' });
     tx.update(judul, { position: 'absolute', x: 0, y: 0, constraints: { h: 'center' } });
     expect(find(tx.commit('c').doc, judul)).toMatchObject({ position: 'absolute', constraints: { h: 'center' } });
+  });
+
+  it('runs (v15): gaya per rentang divalidasi; patch content tanpa runs meresetnya', () => {
+    const { doc, isi } = fixture();
+    const tx = beginTransaction(doc, { sessionId: 's' });
+    const teks = tx.add(isi, { type: 'text', name: 'Campur', content: 'Halo dunia', size: 16, runs: [{ start: 5, length: 5, style: { weight: 700, color: '#FF0000' } }] });
+    const d1 = tx.commit('runs').doc;
+    expect(find(d1, teks)).toMatchObject({ runs: [{ start: 5, length: 5, style: { weight: 700, color: '#FF0000' } }] });
+    // Patch content tanpa runs → rentang lama dihapus (offset tak lagi berarti).
+    const tx2 = beginTransaction(d1, { sessionId: 's' });
+    tx2.update(teks, { content: 'Halo' });
+    expect(find(tx2.commit('reset').doc, teks)!.runs).toBeUndefined();
+    // Patch content + runs bersama → rentang baru divalidasi dan disimpan.
+    const tx3 = beginTransaction(d1, { sessionId: 's' });
+    tx3.update(teks, { content: 'Halo semua', runs: [{ start: 0, length: 4, style: { style: 'italic' } }] });
+    expect(find(tx3.commit('both').doc, teks)).toMatchObject({ runs: [{ start: 0, length: 4, style: { style: 'italic' } }] });
+  });
+
+  it('runs keluar batas / tidak terurut / tumpang-tindih → SCHEMA_INVALID + RUNS_HINT', () => {
+    const { doc, isi } = fixture();
+    const base = { type: 'text' as const, name: 'R', content: 'abcd', size: 16 };
+    expect(code(() => beginTransaction(doc, { sessionId: 's' }).add(isi, { ...base, runs: [{ start: 3, length: 5, style: {} }] }))).toBe('SCHEMA_INVALID');
+    expect(code(() => beginTransaction(doc, { sessionId: 's' }).add(isi, { ...base, runs: [{ start: 1, length: 2, style: {} }, { start: 2, length: 1, style: {} }] }))).toBe('SCHEMA_INVALID');
+    const e = caught(() => beginTransaction(doc, { sessionId: 's' }).add(isi, { ...base, runs: [{ start: 9, length: 1, style: {} }] }));
+    expect(e.code).toBe('SCHEMA_INVALID');
+    expect(e.hint).toBe(RUNS_HINT);
+  });
+
+  it('decoration (v15): underline/strikethrough/none di level node dan per rentang', () => {
+    const { doc, isi } = fixture();
+    const tx = beginTransaction(doc, { sessionId: 's' });
+    const t = tx.add(isi, {
+      type: 'text', name: 'D', content: 'abc def', size: 16, decoration: 'underline',
+      runs: [{ start: 4, length: 3, style: { decoration: 'strikethrough' } }],
+    });
+    const d = tx.commit('deco').doc;
+    expect(parseDocument(d)).toEqual(d);
+    expect(find(d, t)).toMatchObject({ decoration: 'underline', runs: [{ start: 4, length: 3, style: { decoration: 'strikethrough' } }] });
+    expect(code(() => beginTransaction(doc, { sessionId: 's' }).add(isi, { type: 'text', name: 'X', content: 'x', size: 16, decoration: 'blink' }))).toBe('SCHEMA_INVALID');
   });
 });
 

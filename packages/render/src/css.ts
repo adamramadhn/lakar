@@ -509,6 +509,7 @@ export type TextLike = {
   readonly align?: unknown;
   readonly numeric?: unknown;
   readonly color?: unknown;
+  readonly decoration?: unknown;
   readonly shadows?: readonly ShadowLike[] | undefined;
   readonly wrap?: unknown;
   readonly width?: unknown;
@@ -535,6 +536,8 @@ export function textDecls(n: TextLike, family: string): CssDecl[] {
   if (typeof n.align === 'string') out.push(['text-align', n.align]);
   if (n.numeric === 'tabular') out.push(['font-variant-numeric', 'tabular-nums']);
   out.push(['color', colorCss(n.color ?? DEFAULT_TEXT_COLOR) ?? DEFAULT_TEXT_COLOR]);
+  const deco = decorationCss(n.decoration);
+  if (deco) out.push(['text-decoration', deco]);
   const shadow = textShadowCss(n.shadows);
   if (shadow) out.push(['text-shadow', shadow]);
   const wrap = textWrapMode(n);
@@ -542,6 +545,42 @@ export function textDecls(n: TextLike, family: string): CssDecl[] {
   else out.push(['white-space', 'pre-wrap'], ['overflow-wrap', 'break-word']);
   // `fixed`: overflow tidak dipotong agar teks yang meluber tetap terlihat.
   if (wrap === 'fixed') out.push(['overflow', 'visible']);
+  return out;
+}
+
+/** `decoration` skema (v15) → nilai `text-decoration`; `strikethrough` = `line-through` CSS. */
+export function decorationCss(v: unknown): string | undefined {
+  return v === 'underline' ? 'underline' : v === 'strikethrough' ? 'line-through' : v === 'none' ? 'none' : undefined;
+}
+
+/**
+ * Override gaya satu rentang `runs[]` (v15) → deklarasi `<span>`: hanya kunci yang diisi di run; `family` =
+ * nilai `font-family` hasil pemanggil (render: `cssFamily`, kode: `fontFamilyCss`) atau diabaikan bila run
+ * tidak mengubah keluarga.
+ */
+export type TextRunLike = {
+  readonly family?: unknown;
+  readonly weight?: unknown;
+  readonly style?: unknown;
+  readonly size?: unknown;
+  readonly lineHeight?: unknown;
+  readonly letterSpacing?: unknown;
+  readonly color?: unknown;
+  readonly decoration?: unknown;
+};
+export function textRunDecls(r: TextRunLike, family: string | undefined): CssDecl[] {
+  const out: CssDecl[] = [];
+  if (r.family !== undefined && family) out.push(['font-family', family]);
+  if (r.weight !== undefined) out.push(['font-weight', fontWeightCss(r.weight) ?? '400']);
+  if (r.style !== undefined) out.push(['font-style', r.style === 'italic' ? 'italic' : 'normal']);
+  if (r.size !== undefined) out.push(['font-size', lengthCss(r.size) ?? '16px']);
+  const lh = r.lineHeight !== undefined ? lineHeightCss(r.lineHeight) : undefined;
+  if (lh !== undefined) out.push(['line-height', lh]);
+  const ls = r.letterSpacing !== undefined ? letterSpacingCss(r.letterSpacing) : undefined;
+  if (ls !== undefined) out.push(['letter-spacing', ls]);
+  if (r.color !== undefined) out.push(['color', colorCss(r.color) ?? DEFAULT_TEXT_COLOR]);
+  const deco = decorationCss(r.decoration);
+  if (deco) out.push(['text-decoration', deco]);
   return out;
 }
 

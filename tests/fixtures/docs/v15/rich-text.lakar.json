@@ -1,0 +1,88 @@
+{
+  "schemaVersion": 15,
+  "id": "CorpV15R",
+  "rev": 1,
+  "pages": [
+    {
+      "id": "PageRt15",
+      "name": "Page 1",
+      "children": [
+        {
+          "type": "board",
+          "id": "BrdRtx01",
+          "name": "Rich Text",
+          "x": 0,
+          "y": 0,
+          "width": 390,
+          "height": 320,
+          "screen": "mobile",
+          "fills": [
+            {
+              "type": "solid",
+              "color": "#FFFFFF"
+            }
+          ],
+          "children": [
+            {
+              "type": "frame",
+              "id": "FrmRtx01",
+              "name": "Isi",
+              "layout": "column",
+              "gap": 16,
+              "padding": 24,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "TxtRtx01",
+                  "name": "Campur",
+                  "content": "Harga mulai Rp99rb/bulan untuk semua fitur",
+                  "size": 16,
+                  "lineHeight": 24,
+                  "color": "#101828",
+                  "width": 320,
+                  "runs": [
+                    {
+                      "start": 12,
+                      "length": 12,
+                      "style": {
+                        "weight": 700,
+                        "color": "#1570EF"
+                      }
+                    },
+                    {
+                      "start": 25,
+                      "length": 17,
+                      "style": {
+                        "style": "italic",
+                        "color": "#667085"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "id": "TxtRtx02",
+                  "name": "Dekorasi",
+                  "content": "Syarat dan ketentuan berlaku",
+                  "size": 12,
+                  "lineHeight": 16,
+                  "color": "#667085",
+                  "decoration": "underline",
+                  "runs": [
+                    {
+                      "start": 0,
+                      "length": 6,
+                      "style": {
+                        "decoration": "strikethrough"
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

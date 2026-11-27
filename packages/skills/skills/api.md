@@ -34,6 +34,8 @@ const t = add(b, {type:'text', name:'Judul', content:'Halo', size:32});
 update(t, {size: 40, color: '#1A1A1A'});
 ```
 
+Properti tambahan per tipe: anak `position:'absolute'` boleh membawa `constraints:{h,v}` (`start|end|center|stretch|scale` — perilaku saat parent di-resize lewat `update`); teks boleh membawa `decoration:'underline'|'strikethrough'|'none'` dan `runs:[{start,length,style}]` — gaya per rentang karakter (`style` subset: family/weight/style/size/lineHeight/letterSpacing/color/decoration, rentang terurut di dalam content). Patch `content` tanpa `runs` mereset rentang lama.
+
 ### replace
 
 `replace(id: string, node: {type, name, ...}): void`

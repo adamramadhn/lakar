@@ -147,6 +147,9 @@ export function tokenSlot(nodeType: string, propPath: readonly (string | number)
       return undefined;
     case 'color':
       return colorSlot('color');
+    // runs[i].style.<prop> (v15): slot = slot properti yang sama di level node teks.
+    case 'runs':
+      return rest[1] === 'style' && rest.length === 3 ? tokenSlot(nodeType, [rest[2]!]) : undefined;
     case 'radius':
       return lengthSlot('radius', 'radius');
     case 'size':
