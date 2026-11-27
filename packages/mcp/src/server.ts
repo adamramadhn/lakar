@@ -438,6 +438,14 @@ export const GET_SELECTION_DESCRIPTION =
   'addresses kosong = pengguna belum memilih apa pun. Pakai id untuk inspect, execute (get/update), atau open_doc {slug} dulu bila slug bukan dokumen aktif. ' +
   'Tanpa dokumen aktif, tanpa dokumen terbuka, dan tanpa seleksi → NO_ACTIVE_DOC. Alur varian responsif dan cek konsistensi atas seleksi: read_skill selection.';
 
+/** Deskripsi tool `set_selection`. */
+export const SET_SELECTION_DESCRIPTION =
+  'Atur seleksi canvas viewer (node yang tersorot untuk pengguna; state sesi di memori — bukan dokumen, rev, maupun riwayat). ' +
+  '{addresses:[id, …], slug?}: id = ID node 8 karakter; isi instance lewat alamat komposit <instanceId>/<idNodeMaster>. slug kosong = dokumen aktif sesi. ' +
+  'Alamat yang tidak ada di dokumen → NOT_FOUND. Pengguna tetap bisa menimpa/mengosongkan seleksi seperti biasa. ' +
+  'Pakai untuk menyorot node yang baru dibuat/diubah oleh execute agar pengguna langsung melihat hasilnya. ' +
+  'Mengembalikan {slug, rev, addresses, changed}.';
+
 /** Deskripsi tool `open_doc` (spec-agent-open-doc). */
 export const OPEN_DOC_DESCRIPTION =
   'Pilih dokumen kerja sesi ini; dokumen dipaku sampai open_doc berikutnya (pengguna pindah tab di aplikasi tidak memindahkannya). ' +
@@ -1049,6 +1057,24 @@ export function createLakarMcpServer(backend: string | LakarTransport): McpServe
       inputSchema: z.object({ slug: z.string().optional().describe('slug dokumen; kosongkan untuk dokumen aktif sesi (atau dokumen dengan seleksi terakhir)') }).strict(),
     },
     ({ slug }) => guarded(async () => asText(await client.call('/viewer/selection', slug !== undefined ? { slug } : {}))),
+  );
+
+  server.registerTool(
+    'set_selection',
+    {
+      annotations: toolAnnotations('set_selection'),
+      description: SET_SELECTION_DESCRIPTION,
+      inputSchema: z.object({
+        addresses: z.array(z.string()).describe('alamat node (ID 8 karakter atau komposit id/id; 0–500; [] = kosongkan seleksi)'),
+        slug: z.string().optional().describe('slug dokumen (kosongkan = dokumen aktif sesi)'),
+      }).strict(),
+    },
+    (args) =>
+      guarded(async () => {
+        const body: Record<string, unknown> = { addresses: args.addresses };
+        if (args.slug !== undefined) body.slug = args.slug;
+        return asText(await client.call('/viewer/selection/set', body));
+      }),
   );
 
   server.registerTool(

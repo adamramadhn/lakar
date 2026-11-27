@@ -241,6 +241,57 @@ describe('route seleksi', () => {
     }
   });
 
+  it('set_selection: dokumen aktif + event selection, alamat komposit, missing → NOT_FOUND, changed, file/rev tetap', async () => {
+    const t = await setup();
+    try {
+      const { slug, board } = await t.create('Sel Set');
+      const frame = await t.addFrame(slug, board);
+      const sid = await t.session();
+      const setSel = (body: unknown, headers: Record<string, string> = { 'x-lakar-session': sid }) =>
+        t.inject('POST', '/viewer/selection/set', body, headers);
+      // Sesi wajib; tanpa dokumen aktif (dan tanpa slug + fokus) → NO_ACTIVE_DOC.
+      expect((await t.inject('POST', '/viewer/selection/set', { addresses: [board] })).statusCode).toBe(401);
+      expect((await setSel({ addresses: [board] })).json().error.code).toBe('NO_ACTIVE_DOC');
+      await t.inject('POST', '/docs/open', { slug }, { 'x-lakar-session': sid });
+      const before = await t.files(slug);
+      // Set berhasil → 200 + event selection; isi sama → changed:false tanpa event baru.
+      const r = await setSel({ addresses: [frame, board] });
+      expect(r.statusCode, r.body).toBe(200);
+      expect(r.json().data).toEqual({ slug, rev: 2, addresses: [frame, board], changed: true });
+      expect(t.selEvents()).toEqual([{ slug, addresses: [frame, board], rev: 2 }]);
+      expect((await setSel({ addresses: [frame, board] })).json().data.changed).toBe(false);
+      expect(t.selEvents()).toHaveLength(1);
+      expect(await t.files(slug)).toEqual(before);
+      // Alamat komposit isi instance dikenali (divalidasi di dokumen ter-resolve).
+      const ex = await t.inject('POST', '/execute', {
+        code: `const r=add('${frame}',{type:'rect',name:'R',position:'absolute',x:0,y:0,width:10,height:10}); setComponent('${frame}',{props:[],slots:[]}); const i=add('${board}',{type:'instance',name:'I',componentId:'${frame}',position:'absolute',x:0,y:0}); i`,
+        description: 'make component and instance',
+      }, { 'x-lakar-session': sid });
+      expect(ex.statusCode, ex.body).toBe(200);
+      const inst = ex.json().data.created.at(-1).id as string;
+      const rect = ex.json().data.created.find((c: { name?: string }) => c.name === 'R').id as string;
+      const comp = await setSel({ addresses: [`${inst}/${rect}`] });
+      expect(comp.statusCode, comp.body).toBe(200);
+      expect(comp.json().data.addresses).toEqual([`${inst}/${rect}`]);
+      // missing → NOT_FOUND, extra key → SCHEMA_INVALID, slug tak dikenal → 404.
+      const miss = await setSel({ addresses: [board, 'Xxxxxxxx'] });
+      expect(miss.statusCode).toBe(404);
+      expect(miss.json().error.code).toBe('NOT_FOUND');
+      expect(miss.json().error.message).toContain('Xxxxxxxx');
+      expect((await setSel({ addresses: [board], extra: 1 })).statusCode).toBe(400);
+      expect((await setSel({ addresses: [board], slug: 'tidak-ada' })).statusCode).toBe(404);
+      // slug eksplisit
+      expect((await setSel({ addresses: [board], slug })).statusCode).toBe(200);
+      // kosongkan
+      expect((await setSel({ addresses: [] })).json().data).toMatchObject({ addresses: [], changed: true });
+      // Activity: tool set_selection tercatat.
+      const calls = t.activity.recent().filter((e) => e.type === 'call' && e.call.tool === 'set_selection' && e.call.status === 'done');
+      expect(calls.length).toBeGreaterThan(0);
+    } finally {
+      await t.app.close();
+    }
+  });
+
   it('rename/arsip/hapus membuang seleksi slug lama; daemon baru (restart) kosong', async () => {
     const t = await setup();
     try {

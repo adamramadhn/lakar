@@ -60,6 +60,7 @@ export const TOOL_ROUTES: Readonly<Record<string, string>> = {
   '/icons/search': 'icon_search',
   '/photos/search': 'photo_search',
   '/viewer/selection': 'get_selection',
+  '/viewer/selection/set': 'set_selection',
   '/viewer/export-code': 'export_code',
   '/viewer/paste': 'paste',
   '/viewer/import-url': 'import_url',
@@ -413,6 +414,10 @@ function targetOf(tool: string, body: Record<string, unknown> | undefined): stri
     case 'icon_search':
     case 'photo_search':
       return str(body.query);
+    case 'set_selection': {
+      const a = body.addresses;
+      return Array.isArray(a) && typeof a[a.length - 1] === 'string' ? (a[a.length - 1] as string) : undefined;
+    }
     default:
       return undefined;
   }
@@ -499,7 +504,8 @@ function finish(call: ActivityCall, statusCode: number, json: unknown): Activity
       if (boards) out.boards = boards;
       break;
     }
-    case 'get_selection': {
+    case 'get_selection':
+    case 'set_selection': {
       // Viewer menampilkan "… read your selection: {nama}" (agen-di-canvas story 3): dokumen yang benar-benar dibaca
       // (fallback bisa berbeda dari dokumen aktif sesi), alamat primer (terakhir dipilih), dan jumlah alamat.
       if (str(data.slug)) out.slug = str(data.slug);
