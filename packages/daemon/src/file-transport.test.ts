@@ -186,7 +186,7 @@ describe('FileTransport: execute menulis file', () => {
 });
 
 describe('FileTransport: route NOT_SUPPORTED', () => {
-  it.each(['/screenshot', '/export', '/layout-check', '/viewer/fix-check', '/viewer/paste', '/viewer/import-url', '/viewer/visual-diff', '/viewer/selection', '/photos/search', '/route/ngawur'])(
+  it.each(['/screenshot', '/export', '/layout-check', '/viewer/fix-check', '/viewer/paste', '/viewer/import-url', '/viewer/visual-diff', '/viewer/selection', '/photos/search', '/photos/import', '/route/ngawur'])(
     '%s → NOT_SUPPORTED dengan hint lakard',
     async (path) => {
       const { file } = await fixture('nsup');

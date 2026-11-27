@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createServer } from 'node:net';
 import { spawn } from 'node:child_process';
-import { createHash } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import { crc32, deflateSync } from 'node:zlib';
 import { fileURLToPath } from 'node:url';
 import { ChromiumRenderer, FontRegistry, IconCatalog, PACKAGE, PhotoService, RENDER_DIST_DIR, SafeNet, buildServer, loadConfig, startDaemon, type RunningDaemon } from './index.js';
@@ -1389,6 +1389,32 @@ describe('aset gambar (/assets + fill image)', () => {
     expect(r3.status, JSON.stringify(r3.body.error)).toBe(200);
     expect(r3.body.data.png).toBe(r.body.data.png);
   }, 60_000);
+
+  it('POST /photos/import: dataBase64/path → assetId sha + tersaji di /assets; input salah → SCHEMA_INVALID/NOT_FOUND/401', async () => {
+    const png = solidPng(8, 4, [0x12, 0x34, 0x56]);
+    const r = await call('/photos/import', { dataBase64: png.toString('base64') }, s);
+    expect(r.status, JSON.stringify(r.body.error)).toBe(200);
+    expect(r.body.data).toEqual({ assetId: sha(png), mime: 'image/png', bytes: png.byteLength, width: 8, height: 4 });
+    const served = await fetch(`${d.url}/assets/${sha(png)}`);
+    expect(served.status).toBe(200);
+    expect(Buffer.from(await served.arrayBuffer())).toEqual(png);
+
+    // path: file lokal yang sama → assetId identik (idempoten menurut isi).
+    const tmp = join(dataDir, `impor-${randomBytes(4).toString('hex')}.png`);
+    await writeFile(tmp, png);
+    const r2 = await call('/photos/import', { path: tmp }, s);
+    expect(r2.status, JSON.stringify(r2.body.error)).toBe(200);
+    expect(r2.body.data.assetId).toBe(sha(png));
+    await rm(tmp);
+
+    for (const bad of [{}, { path: tmp, dataBase64: 'aGk=' }, { dataBase64: 'bm90LWludWw=' }, { dataBase64: png.toString('base64'), extra: 1 }, { path: '' }]) {
+      const e = await call('/photos/import', bad, s);
+      expect(e.status, JSON.stringify(bad)).toBe(400);
+      expect(e.body.error!.code).toBe('SCHEMA_INVALID');
+    }
+    expect((await call('/photos/import', { path: join(dataDir, 'tidak-ada.png') }, s)).status).toBe(404);
+    expect((await call('/photos/import', { dataBase64: png.toString('base64') })).status).toBe(401);
+  });
 });
 
 describe('lakard main', () => {
