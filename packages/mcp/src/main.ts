@@ -36,22 +36,31 @@ function fileArg(): string | undefined {
   return argOf('file', 'mis. lakar --file ./desain.lakar.json') ?? process.env.LAKAR_FILE;
 }
 
+/** `LAKAR_MCP_TOOLS=readonly` membatasi server ke tool ber-efek read (untuk harness review/bench). */
+function toolsOpts(): { tools?: 'readonly' } {
+  const v = process.env.LAKAR_MCP_TOOLS;
+  if (v === undefined || v === 'all') return {};
+  if (v !== 'readonly') throw new Error(`LAKAR_MCP_TOOLS harus 'readonly' atau 'all', bukan ${JSON.stringify(v)}`);
+  return { tools: 'readonly' };
+}
+
 async function buildServer(): Promise<ReturnType<typeof createLakarMcpServer>> {
   try {
+    const opts = toolsOpts();
     // Prioritas mode: --server (live collab) > --file (satu file) > lakard (default).
     const server = serverArgs();
     if (server !== undefined) {
       // Impor malas: SyncClient menarik ws + @lakar/daemon — mode daemon/file tidak boleh memuatnya.
       const { SyncClient, maskToken } = await import('./sync-client.js');
-      const s = createLakarMcpServer(new SyncClient(server.url, server.token));
+      const s = createLakarMcpServer(new SyncClient(server.url, server.token), opts);
       console.error(`lakar: mode server ${server.url} room ${maskToken(server.token)} (tool render/jaringan → NOT_SUPPORTED)`);
       return s;
     }
     const file = fileArg();
-    if (file === undefined) return createLakarMcpServer(process.env.LAKAR_URL || DEFAULT_LAKARD_URL);
+    if (file === undefined) return createLakarMcpServer(process.env.LAKAR_URL || DEFAULT_LAKARD_URL, opts);
     // Impor malas: FileClient menarik @lakar/daemon (DocStore/core/exec) — mode daemon tidak boleh memuatnya.
     const { FileClient } = await import('./file-client.js');
-    const s = createLakarMcpServer(new FileClient(file));
+    const s = createLakarMcpServer(new FileClient(file), opts);
     console.error(`lakar: mode file ${file} (tanpa lakard; tool render → NOT_SUPPORTED)`);
     return s;
   } catch (e) {
