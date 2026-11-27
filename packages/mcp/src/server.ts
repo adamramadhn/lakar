@@ -141,7 +141,7 @@ export type StatusData = {
   pid?: number;
   uptimeSec?: number;
   pool?: { size: number; ready: number; busy: number; waiting: number; recreated: number; browserVersion?: string; lastError?: string } | null;
-  fonts?: { families: string[]; missing: string[] };
+  fonts?: { families: string[]; entries?: { family: string; weights: number[]; styles: string[] }[]; missing: string[] };
   icons?: Record<string, string>;
   photos?: { provider: string; keyFile: string; imported: number };
   sessions?: { count: number; active: { id: string; activeSlug?: string; executes: number }[] };
@@ -185,6 +185,20 @@ export function formatStatus(st: StatusData): string {
       : undefined;
   return [head, ...(fileLine ? [fileLine] : []), ...(serverLine ? [serverLine] : []), pool, fonts, icons, photos, sessions, ...(st.hint ? [`hint: ${st.hint}`] : [])].join('\n');
 }
+
+/** Teks ringkas tool `list_fonts`: satu baris per keluarga berisi weight/style yang valid. */
+export function formatFonts(st: StatusData): string {
+  const f = st.fonts;
+  if (!f) return 'font: -';
+  const rows = f.entries?.length ? f.entries.map((e) => `${e.family} — weight ${e.weights.join('/')} · style ${e.styles.join('/')}`) : f.families.map((n) => n);
+  return [...rows, `paket hilang: ${f.missing.length ? f.missing.join(', ') : '-'}`].join('\n');
+}
+
+/** Deskripsi tool `list_fonts`. */
+export const LIST_FONTS_DESCRIPTION =
+  'Font terpasang di lakard: satu baris per keluarga — "<family> — weight w/w/w · style s/s". ' +
+  'Hanya nama di sini yang valid untuk `family` pada node text (atau nilai token fontFamily); nama lain → FONT_MISSING saat check/screenshot. ' +
+  'Baris "paket hilang" = paket font yang gagal dimuat daemon. Pakai sebelum memilih tipografi.';
 
 /** Deskripsi tool `status`. */
 export const STATUS_DESCRIPTION =
@@ -516,6 +530,12 @@ export function createLakarMcpServer(backend: string | LakarTransport): McpServe
     'status',
     { annotations: toolAnnotations('status'), description: STATUS_DESCRIPTION, inputSchema: z.object({}).strict() },
     () => guarded(async () => asText(await client.status<StatusData>(), formatStatus)),
+  );
+
+  server.registerTool(
+    'list_fonts',
+    { annotations: toolAnnotations('list_fonts'), description: LIST_FONTS_DESCRIPTION, inputSchema: z.object({}).strict() },
+    () => guarded(async () => asText(await client.status<StatusData>(), formatFonts)),
   );
 
   server.registerTool(

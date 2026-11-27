@@ -47,7 +47,7 @@ describe('anotasi tool MCP', () => {
 
   it('pemetaan efek terkunci: baca → readOnlyHint true; tulis → destructiveHint hanya bila menghapus/menimpa isi pengguna', async () => {
     const byName = Object.fromEntries((await listTools()).map((t) => [t.name, t.annotations]));
-    const read = ['status', 'read_skill', 'list_boards', 'list_documents', 'inspect', 'screenshot', 'layout_check', 'get_selection', 'icon_search', 'photo_search', 'export_code', 'visual_diff', 'list_pages', 'get_current_page', 'get_page_tree', 'list_comments', 'analyze_colors', 'analyze_typography', 'analyze_clusters'];
+    const read = ['status', 'read_skill', 'list_fonts', 'list_boards', 'list_documents', 'inspect', 'screenshot', 'layout_check', 'get_selection', 'icon_search', 'photo_search', 'export_code', 'visual_diff', 'list_pages', 'get_current_page', 'get_page_tree', 'list_comments', 'analyze_colors', 'analyze_typography', 'analyze_clusters'];
     const write = ['open_doc', 'paste', 'import_url', 'export', 'undo', 'switch_page', 'create_page', 'add_comment', 'reply_to_comment', 'resolve_comment', 'fix_comment'];
     const destructive = ['execute', 'redo', 'fix_check', 'delete_comment'];
     expect([...read, ...write, ...destructive].sort()).toEqual(Object.keys(byName).sort());

@@ -11,6 +11,7 @@ export {
   findingLines,
   formatExecute,
   formatLayoutCheck,
+  formatFonts,
   formatStatus,
   GET_SELECTION_DESCRIPTION,
   IMPORT_URL_DESCRIPTION,

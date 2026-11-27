@@ -443,7 +443,7 @@ export function buildServer({
       dataDir: config.dataDir,
       ...(headless ? { headless: true } : {}),
       pool: render.status?.() ?? null,
-      fonts: { families: fonts.families(), missing: [...fonts.missing] },
+      fonts: { families: fonts.families(), entries: fonts.entries(), missing: [...fonts.missing] },
       icons: { ...icons.versions },
       photos: photos.status(),
       sessions: {

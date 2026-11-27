@@ -15,6 +15,8 @@ export type ToolEffect = 'read' | 'write' | 'destructive';
 
 export const TOOL_EFFECTS = {
   status: 'read',
+  // Daftar font terpasang (keluarga + weight + style) untuk pemilihan tipografi sebelum menulis.
+  list_fonts: 'read',
   read_skill: 'read',
   list_boards: 'read',
   list_documents: 'read',
