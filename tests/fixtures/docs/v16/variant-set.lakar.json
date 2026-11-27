@@ -1,0 +1,189 @@
+{
+  "schemaVersion": 16,
+  "id": "CorpV16V",
+  "rev": 1,
+  "pages": [
+    {
+      "id": "PageVr16",
+      "name": "Page 1",
+      "children": [
+        {
+          "type": "board",
+          "id": "BrdVar01",
+          "name": "Variant Set",
+          "x": 0,
+          "y": 0,
+          "width": 390,
+          "height": 360,
+          "screen": "mobile",
+          "fills": [
+            {
+              "type": "solid",
+              "color": "#F5F5F5"
+            }
+          ],
+          "children": [
+            {
+              "type": "frame",
+              "id": "MstBtn01",
+              "name": "Tombol solid",
+              "layout": "row",
+              "padding": [
+                8,
+                16
+              ],
+              "fills": [
+                {
+                  "type": "solid",
+                  "color": "#111111"
+                }
+              ],
+              "component": {
+                "props": [
+                  {
+                    "name": "tone",
+                    "type": "enum",
+                    "options": [
+                      "solid",
+                      "ghost"
+                    ],
+                    "default": "solid",
+                    "binds": []
+                  },
+                  {
+                    "name": "label",
+                    "type": "text",
+                    "default": "Button",
+                    "binds": [
+                      {
+                        "nodeId": "TxtBtn01",
+                        "prop": "content"
+                      }
+                    ]
+                  }
+                ],
+                "slots": []
+              },
+              "variantOf": {
+                "set": "tombol",
+                "props": {
+                  "tone": "solid"
+                }
+              },
+              "children": [
+                {
+                  "type": "text",
+                  "id": "TxtBtn01",
+                  "name": "Label",
+                  "content": "Button",
+                  "size": 14,
+                  "color": "#FFFFFF",
+                  "lineHeight": 20
+                }
+              ],
+              "radius": 8,
+              "x": 24,
+              "y": 24,
+              "position": "absolute"
+            },
+            {
+              "type": "frame",
+              "id": "MstBtn02",
+              "name": "Tombol ghost",
+              "layout": "row",
+              "padding": [
+                8,
+                16
+              ],
+              "fills": [
+                {
+                  "type": "solid",
+                  "color": "#FFFFFF"
+                }
+              ],
+              "stroke": {
+                "color": "#111111",
+                "width": 1,
+                "align": "inside"
+              },
+              "component": {
+                "props": [
+                  {
+                    "name": "tone",
+                    "type": "enum",
+                    "options": [
+                      "solid",
+                      "ghost"
+                    ],
+                    "default": "solid",
+                    "binds": []
+                  },
+                  {
+                    "name": "label",
+                    "type": "text",
+                    "default": "Button",
+                    "binds": [
+                      {
+                        "nodeId": "TxtBtn02",
+                        "prop": "content"
+                      }
+                    ]
+                  }
+                ],
+                "slots": []
+              },
+              "variantOf": {
+                "set": "tombol",
+                "props": {
+                  "tone": "ghost"
+                }
+              },
+              "children": [
+                {
+                  "type": "text",
+                  "id": "TxtBtn02",
+                  "name": "Label",
+                  "content": "Button",
+                  "size": 14,
+                  "color": "#111111",
+                  "lineHeight": 20
+                }
+              ],
+              "radius": 8,
+              "x": 24,
+              "y": 80,
+              "position": "absolute"
+            },
+            {
+              "type": "instance",
+              "id": "InsBtn01",
+              "name": "Tombol utama",
+              "componentId": "MstBtn01",
+              "props": {
+                "label": "Simpan"
+              },
+              "x": 24,
+              "y": 160,
+              "position": "absolute"
+            },
+            {
+              "type": "instance",
+              "id": "InsBtn02",
+              "name": "Tombol sekunder",
+              "componentId": "MstBtn01",
+              "variant": {
+                "tone": "ghost"
+              },
+              "props": {
+                "label": "Hapus"
+              },
+              "x": 24,
+              "y": 220,
+              "position": "absolute"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

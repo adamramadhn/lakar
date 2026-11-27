@@ -49,8 +49,8 @@ const err = (fn: () => unknown): LakarError => {
 const bgOf = (d: ReturnType<typeof resolveTokens>, i: number) => (d.pages[0]!.children[i]!.fills![0] as { color: string }).color;
 
 describe('skema v3: token bertipe', () => {
-  it('SCHEMA_VERSION 15 (v3 + grid + komponen + vektor + tag + hug board + wrap + komentar + section + fixRequest + prototype + constraints + rich text) dan urutan TOKEN_TYPES tetap', () => {
-    expect(SCHEMA_VERSION).toBe(15);
+  it('SCHEMA_VERSION 16 (v3 + grid + komponen + vektor + tag + hug board + wrap + komentar + section + fixRequest + prototype + constraints + rich text + variant set) dan urutan TOKEN_TYPES tetap', () => {
+    expect(SCHEMA_VERSION).toBe(16);
     expect(TOKEN_TYPES).toEqual(['color', 'radius', 'spacing', 'container', 'breakpoint', 'fontFamily', 'fontWeight', 'fontSize', 'lineHeight', 'letterSpacing']);
   });
 

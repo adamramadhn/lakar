@@ -24,8 +24,8 @@ const chain: MigrationRegistry = {
 };
 
 describe('migrateDocument', () => {
-  it('registri resmi: 1→2 identitas, 2→3 token bertipe, 3→4 identitas (grid), 4→5 identitas (komponen), 5→6 identitas (vektor), 6→7 identitas (tag), 7→8 identitas (board hug), 8→9 identitas (frame wrap), 9→10 identitas (komentar), 10→11 identitas (section), 11→12 identitas (fixRequest), 12→13 identitas (prototipe), 13→14 identitas (constraints), 14→15 identitas (rich text); versi kini → apa adanya (objek yang sama)', () => {
-    expect(Object.keys(MIGRATIONS)).toEqual(['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14']);
+  it('registri resmi: 1→2 identitas, 2→3 token bertipe, 3→4 identitas (grid), 4→5 identitas (komponen), 5→6 identitas (vektor), 6→7 identitas (tag), 7→8 identitas (board hug), 8→9 identitas (frame wrap), 9→10 identitas (komentar), 10→11 identitas (section), 11→12 identitas (fixRequest), 12→13 identitas (prototipe), 13→14 identitas (constraints), 14→15 identitas (rich text), 15→16 identitas (variant set); versi kini → apa adanya (objek yang sama)', () => {
+    expect(Object.keys(MIGRATIONS)).toEqual(['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '15']);
     const doc = JSON.parse(JSON.stringify(createDocument()));
     expect(doc.schemaVersion).toBe(SCHEMA_VERSION);
     expect(migrateDocument(doc)).toBe(doc);
@@ -49,7 +49,7 @@ describe('migrateDocument', () => {
     expect(migrateDocument({ schemaVersion: 2, meta: { note: 'x' } }, { migrations: chain, target: 3 })).toEqual({ schemaVersion: 3, meta: { notes: ['x', 'v3'] } });
   });
 
-  it.each([13, 14])('dokumen v%s (registry asli) → v15 identitas: hanya schemaVersion berubah', (v) => {
+  it.each([13, 14, 15])('dokumen v%s (registry asli) → versi kini identitas: hanya schemaVersion berubah', (v) => {
     const old = { ...createDocument(), schemaVersion: v };
     expect(parseDocument(old)).toEqual({ ...old, schemaVersion: SCHEMA_VERSION });
   });
