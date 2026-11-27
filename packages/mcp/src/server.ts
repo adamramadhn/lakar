@@ -514,7 +514,7 @@ export function createLakarMcpServer(backend: string | LakarTransport): McpServe
 
   server.registerTool(
     'status',
-    { annotations: toolAnnotations('status'), description: STATUS_DESCRIPTION, inputSchema: z.object({}) },
+    { annotations: toolAnnotations('status'), description: STATUS_DESCRIPTION, inputSchema: z.object({}).strict() },
     () => guarded(async () => asText(await client.status<StatusData>(), formatStatus)),
   );
 
@@ -523,7 +523,7 @@ export function createLakarMcpServer(backend: string | LakarTransport): McpServe
     {
       annotations: toolAnnotations('read_skill'),
       description: READ_SKILL_DESCRIPTION,
-      inputSchema: z.object({ name: z.string().optional().describe('core | landing | mobile | webapp | layout | typography | color | accessibility | ui | interface | writing | review | icons | api | selection | break-ui | variants | export-code; kosongkan untuk daftar') }),
+      inputSchema: z.object({ name: z.string().optional().describe('core | landing | mobile | webapp | layout | typography | color | accessibility | ui | interface | writing | review | icons | api | selection | break-ui | variants | export-code; kosongkan untuk daftar') }).strict(),
     },
     ({ name }) =>
       guarded(async () => {
@@ -534,7 +534,7 @@ export function createLakarMcpServer(backend: string | LakarTransport): McpServe
 
   server.registerTool(
     'list_boards',
-    { annotations: toolAnnotations('list_boards'), description: LIST_BOARDS_DESCRIPTION, inputSchema: z.object({}) },
+    { annotations: toolAnnotations('list_boards'), description: LIST_BOARDS_DESCRIPTION, inputSchema: z.object({}).strict() },
     () => guarded(async () => asText(await client.call('/boards', {}))),
   );
 
@@ -546,7 +546,7 @@ export function createLakarMcpServer(backend: string | LakarTransport): McpServe
       inputSchema: z.object({
         id: z.string().describe('ID board atau node'),
         depth: z.number().int().optional().describe('kedalaman children 0–6 (default 2)'),
-      }),
+      }).strict(),
     },
     ({ id, depth }) => guarded(async () => asText(await client.call('/inspect', depth !== undefined ? { id, depth } : { id }))),
   );
@@ -559,7 +559,7 @@ export function createLakarMcpServer(backend: string | LakarTransport): McpServe
       inputSchema: z.object({
         id: z.string().optional().describe('ID board/node; kosongkan untuk board pertama'),
         scale: z.number().int().optional().describe('1 atau 2 (default 1)'),
-      }),
+      }).strict(),
     },
     ({ id, scale }) =>
       guarded(async () => {
@@ -581,7 +581,7 @@ export function createLakarMcpServer(backend: string | LakarTransport): McpServe
         components: z.boolean().optional().describe('master sebagai berkas komponen terpisah (default true)'),
         tokens: z.boolean().optional().describe('sertakan tokens.css (default true)'),
         typescript: z.boolean().optional().describe('TSX bertipe (default true); false = JSX'),
-      }),
+      }).strict(),
     },
     (args) =>
       guarded(async () => {
@@ -604,7 +604,7 @@ export function createLakarMcpServer(backend: string | LakarTransport): McpServe
         description: z.string().optional().describe('label riwayat (default "Paste SVG"/"Paste HTML")'),
         kind: z.enum(['svg', 'html']).optional().describe("jenis isi: 'svg' (default) atau 'html'"),
         width: z.number().optional().describe('HTML: lebar viewport px (default lebar board/frame tujuan)'),
-      }),
+      }).strict(),
     },
     (args) =>
       guarded(async () => {
@@ -627,7 +627,7 @@ export function createLakarMcpServer(backend: string | LakarTransport): McpServe
         x: z.number().optional().describe('posisi x board di halaman (default kanan board terakhir + 80)'),
         y: z.number().optional().describe('posisi y board (default mengikuti board terakhir)'),
         description: z.string().optional().describe('label riwayat (default "Import page <title>")'),
-      }),
+      }).strict(),
     },
     (args) =>
       guarded(async () => {
@@ -644,7 +644,7 @@ export function createLakarMcpServer(backend: string | LakarTransport): McpServe
       inputSchema: z.object({
         slug: z.string().optional().describe('slug file tertentu, mis. "landing-kopi"; kosongkan untuk dokumen yang terbuka di aplikasi Lakar'),
         name: z.string().optional().describe('nama dokumen baru bila tidak ada dokumen terbuka (default "Untitled"); diabaikan bila ada'),
-      }),
+      }).strict(),
     },
     ({ slug, name }) =>
       guarded(async () => {
@@ -657,20 +657,20 @@ export function createLakarMcpServer(backend: string | LakarTransport): McpServe
 
   server.registerTool(
     'list_documents',
-    { annotations: toolAnnotations('list_documents'), description: LIST_DOCUMENTS_DESCRIPTION, inputSchema: z.object({}) },
+    { annotations: toolAnnotations('list_documents'), description: LIST_DOCUMENTS_DESCRIPTION, inputSchema: z.object({}).strict() },
     () => guarded(async () => asText(await client.call('/viewer/documents', {}))),
   );
 
   // Halaman (story 9.2): halaman aktif sesi + outline. Route agen `/pages*`, bukan `/viewer/*`.
   server.registerTool(
     'list_pages',
-    { annotations: toolAnnotations('list_pages'), description: LIST_PAGES_DESCRIPTION, inputSchema: z.object({}) },
+    { annotations: toolAnnotations('list_pages'), description: LIST_PAGES_DESCRIPTION, inputSchema: z.object({}).strict() },
     () => guarded(async () => asText(await client.call('/pages', {}))),
   );
 
   server.registerTool(
     'get_current_page',
-    { annotations: toolAnnotations('get_current_page'), description: GET_CURRENT_PAGE_DESCRIPTION, inputSchema: z.object({}) },
+    { annotations: toolAnnotations('get_current_page'), description: GET_CURRENT_PAGE_DESCRIPTION, inputSchema: z.object({}).strict() },
     () =>
       guarded(async () => {
         const r = await client.call<{ active: Record<string, unknown> }>('/pages', {});
@@ -683,7 +683,7 @@ export function createLakarMcpServer(backend: string | LakarTransport): McpServe
     {
       annotations: toolAnnotations('switch_page'),
       description: SWITCH_PAGE_DESCRIPTION,
-      inputSchema: z.object({ page: z.string().describe('nama atau id halaman dari list_pages') }),
+      inputSchema: z.object({ page: z.string().describe('nama atau id halaman dari list_pages') }).strict(),
     },
     ({ page }) => guarded(async () => asText(await client.call('/pages/switch', { page }))),
   );
@@ -693,7 +693,7 @@ export function createLakarMcpServer(backend: string | LakarTransport): McpServe
     {
       annotations: toolAnnotations('create_page'),
       description: CREATE_PAGE_DESCRIPTION,
-      inputSchema: z.object({ name: z.string().optional().describe('nama halaman (1–100 karakter; default "Page N")') }),
+      inputSchema: z.object({ name: z.string().optional().describe('nama halaman (1–100 karakter; default "Page N")') }).strict(),
     },
     ({ name }) => guarded(async () => asText(await client.call('/pages/create', name !== undefined ? { name } : {}))),
   );
@@ -706,7 +706,7 @@ export function createLakarMcpServer(backend: string | LakarTransport): McpServe
       inputSchema: z.object({
         page: z.string().optional().describe('nama atau id halaman; kosongkan untuk halaman aktif sesi'),
         depth: z.number().int().min(0).max(6).optional().describe('kedalaman anak 0–6 (default 2)'),
-      }),
+      }).strict(),
     },
     ({ page, depth }) =>
       guarded(async () => {
@@ -725,7 +725,7 @@ export function createLakarMcpServer(backend: string | LakarTransport): McpServe
         status: z.enum(['open', 'resolved', 'all']).optional().describe('filter status thread (default semua)'),
         pageId: z.string().optional().describe('filter halaman (id dari list_pages)'),
         kind: z.enum(['user', 'agent']).optional().describe('filter penulis pembuka thread'),
-      }),
+      }).strict(),
     },
     (args) =>
       guarded(async () => {
@@ -745,7 +745,7 @@ export function createLakarMcpServer(backend: string | LakarTransport): McpServe
         x: z.number().optional().describe('posisi X pin (koordinat halaman); wajib dengan y bila tanpa nodeId'),
         y: z.number().optional().describe('posisi Y pin (koordinat halaman); wajib dengan x bila tanpa nodeId'),
         pageId: z.string().optional().describe('halaman tujuan titik bebas (id dari list_pages; default halaman aktif sesi)'),
-      }),
+      }).strict(),
     },
     (args) =>
       guarded(async () => {
@@ -762,7 +762,7 @@ export function createLakarMcpServer(backend: string | LakarTransport): McpServe
       inputSchema: z.object({
         threadId: z.string().describe('id thread dari list_comments'),
         text: z.string().min(1).max(4000).describe('isi balasan (1–4000 karakter)'),
-      }),
+      }).strict(),
     },
     ({ threadId, text }) => guarded(async () => asText(await client.call('/comments/reply', { threadId, text }))),
   );
@@ -775,7 +775,7 @@ export function createLakarMcpServer(backend: string | LakarTransport): McpServe
       inputSchema: z.object({
         threadId: z.string().describe('id thread dari list_comments'),
         resolved: z.boolean().optional().describe('true = tandai selesai (default), false = buka kembali'),
-      }),
+      }).strict(),
     },
     ({ threadId, resolved }) => guarded(async () => asText(await client.call('/comments/resolve', resolved !== undefined ? { threadId, resolved } : { threadId }))),
   );
@@ -787,7 +787,7 @@ export function createLakarMcpServer(backend: string | LakarTransport): McpServe
       description: DELETE_COMMENT_DESCRIPTION,
       inputSchema: z.object({
         threadId: z.string().describe('id thread dari list_comments'),
-      }),
+      }).strict(),
     },
     ({ threadId }) => guarded(async () => asText(await client.call('/comments/delete', { threadId }))),
   );
@@ -803,7 +803,7 @@ export function createLakarMcpServer(backend: string | LakarTransport): McpServe
         outcome: z.enum(['done', 'failed']).describe('hasil fix: done = perbaikan diterapkan, failed = tidak bisa digarap'),
         note: z.string().min(1).max(4000).optional().describe('catatan hasil (jadi pesan di thread; default "Fix done."/"Fix failed.")'),
         slug: z.string().optional().describe('slug dokumen (default dokumen aktif sesi; dengan slug tak perlu open_doc)'),
-      }),
+      }).strict(),
     },
     (args) =>
       guarded(async () => {
@@ -823,7 +823,7 @@ export function createLakarMcpServer(backend: string | LakarTransport): McpServe
         'Pakai untuk mengikat literal ke token: setTokens + update nodeId di uses.',
       inputSchema: z.object({
         boardId: z.string().optional().describe('batasi satu board (id dari list_boards; default seluruh dokumen)'),
-      }),
+      }).strict(),
     },
     (args) => guarded(async () => asText(await client.call('/analyze/colors', args.boardId !== undefined ? { boardId: args.boardId } : {}))),
   );
@@ -837,7 +837,7 @@ export function createLakarMcpServer(backend: string | LakarTransport): McpServe
         'terurut pakai terbanyak. offScale = size literal di luar skala DESIGN.md (suggestedSize = skala terdekat); prop token-bound tampil sebagai "{$token:nama}".',
       inputSchema: z.object({
         boardId: z.string().optional().describe('batasi satu board (id dari list_boards; default seluruh dokumen)'),
-      }),
+      }).strict(),
     },
     (args) => guarded(async () => asText(await client.call('/analyze/typography', args.boardId !== undefined ? { boardId: args.boardId } : {}))),
   );
@@ -853,7 +853,7 @@ export function createLakarMcpServer(backend: string | LakarTransport): McpServe
       inputSchema: z.object({
         boardId: z.string().optional().describe('batasi satu board (id dari list_boards; default seluruh dokumen)'),
         min: z.number().int().min(2).max(50).optional().describe('batas minimal pengulangan 2–50 (default 3)'),
-      }),
+      }).strict(),
     },
     (args) =>
       guarded(async () => {
@@ -876,7 +876,7 @@ export function createLakarMcpServer(backend: string | LakarTransport): McpServe
               'Mengembalikan {docId, slug, rev, undone:[{description, rev}], boards, available:{undo, redo}, target}.'
             : 'Ulangi langkah yang baru di-undo sesi ini (default 1). Hanya bila tidak ada rev lain sesudah undo; execute/paste baru mengosongkan redo. ' +
               'Penolakan sama dengan undo (CONFLICT/NOT_FOUND). Mengembalikan {docId, slug, rev, redone:[{description, rev}], boards, available:{undo, redo}, target}.',
-        inputSchema: z.object({ steps: z.number().int().optional().describe('jumlah langkah 1–50 (default 1)') }),
+        inputSchema: z.object({ steps: z.number().int().optional().describe('jumlah langkah 1–50 (default 1)') }).strict(),
       },
       ({ steps }) => guarded(async () => asText(await client.call(`/viewer/${dir}`, steps !== undefined ? { steps } : {}))),
     );
@@ -896,7 +896,7 @@ export function createLakarMcpServer(backend: string | LakarTransport): McpServe
           .optional()
           .describe('edit find/replace berurutan terhadap snippet editId; kosong = jalankan ulang'),
         dryRun: z.boolean().optional().describe('true = pratinjau: jalankan ops pada salinan, kembalikan changes (added/updated/deleted/moved per node+board, other untuk tokens/halaman) + temuan check tanpa commit/rev/riwayat; ID added/created sekali-pakai'),
-      }),
+      }).strict(),
     },
     async ({ code, description, editId, edits, dryRun }) => {
       // Dihitung per instance server (= satu sesi agen), sukses maupun error.
@@ -928,7 +928,7 @@ export function createLakarMcpServer(backend: string | LakarTransport): McpServe
         boardId: z.string().optional().describe('ID board dari created[] execute atau list_boards'),
         nodeId: z.string().optional().describe('ID node yang dipotret sendiri (bukan bersama boardId)'),
         scale: z.number().int().optional().describe('1 (default) atau 2 (zoom review: 2× piksel)'),
-      }),
+      }).strict(),
     },
     ({ boardId, nodeId, scale }) =>
       guarded(async () => {
@@ -953,7 +953,7 @@ export function createLakarMcpServer(backend: string | LakarTransport): McpServe
         query: z.string().describe('kata kunci, mis. "dumbbell", "arrow right", "github"'),
         lib: z.enum(['lucide', 'simple-icons']).optional().describe('batasi pustaka: lucide (ikon UI) atau simple-icons (logo brand)'),
         limit: z.number().int().optional().describe('jumlah hasil 1–50 (default 10)'),
-      }),
+      }).strict(),
     },
     ({ query, lib, limit }) =>
       guarded(async () => {
@@ -973,7 +973,7 @@ export function createLakarMcpServer(backend: string | LakarTransport): McpServe
         query: z.string().describe('kata kunci foto, mis. "kamar hotel" atau "hotel room"'),
         orientation: z.enum(['landscape', 'portrait', 'square']).optional().describe('orientasi foto'),
         limit: z.number().int().optional().describe('jumlah hasil 1–12 (default 6)'),
-      }),
+      }).strict(),
     },
     ({ query, orientation, limit }) =>
       guarded(async () => {
@@ -997,7 +997,7 @@ export function createLakarMcpServer(backend: string | LakarTransport): McpServe
     {
       annotations: toolAnnotations('get_selection'),
       description: GET_SELECTION_DESCRIPTION,
-      inputSchema: z.object({ slug: z.string().optional().describe('slug dokumen; kosongkan untuk dokumen aktif sesi (atau dokumen dengan seleksi terakhir)') }),
+      inputSchema: z.object({ slug: z.string().optional().describe('slug dokumen; kosongkan untuk dokumen aktif sesi (atau dokumen dengan seleksi terakhir)') }).strict(),
     },
     ({ slug }) => guarded(async () => asText(await client.call('/viewer/selection', slug !== undefined ? { slug } : {}))),
   );
@@ -1013,7 +1013,7 @@ export function createLakarMcpServer(backend: string | LakarTransport): McpServe
         fromRev: z.number().int().optional().describe('rev "sebelum"; kosongkan untuk rev sebelum tulis terakhir sesi ini'),
         toRev: z.number().int().optional().describe('rev "sesudah" (default rev kini)'),
         since: z.enum(['last', 'session']).optional().describe("tanpa fromRev: 'last' (default) = sebelum tulis terakhir sesi, 'session' = sebelum tulis pertama sesi"),
-      }),
+      }).strict(),
     },
     (args) =>
       guarded(async () => {
@@ -1031,7 +1031,7 @@ export function createLakarMcpServer(backend: string | LakarTransport): McpServe
     {
       annotations: toolAnnotations('layout_check'),
       description: LAYOUT_CHECK_DESCRIPTION,
-      inputSchema: z.object({ boardId: z.string().optional().describe('ID board; kosongkan untuk semua board dokumen aktif') }),
+      inputSchema: z.object({ boardId: z.string().optional().describe('ID board; kosongkan untuk semua board dokumen aktif') }).strict(),
     },
     ({ boardId }) =>
       guarded(async () => {
