@@ -271,6 +271,21 @@ export function formatExportCode(data: ExportCodeData): CallToolResult['content'
   return [{ type: 'text', text: JSON.stringify(head) }, ...files.map((f) => ({ type: 'text' as const, text: `----- ${f.path} -----\n${f.contents}` }))];
 }
 
+/** Deskripsi tool `export_svg`. */
+export const EXPORT_SVG_DESCRIPTION =
+  'Ekspor board/node dokumen aktif menjadi dokumen SVG vektor mandiri (emitter yang sama dengan Export file di viewer). ' +
+  'id = board atau node (default board pertama); yang bisa diekspor utuh: path, frame, board — alamat komposit isi instance (<instanceId>/<idNodeMaster>) dikenali. ' +
+  'Fill/stroke solid, stroke inside/center/outside, radius, opacity, dan transformasi vektor dipetakan; yang tidak punya padanan SVG ' +
+  '(gradien non-solid, efek bayangan/blur, teks, ikon katalog) dilaporkan di dropped sebagai "<nodeId>.<prop>" — pakai export/screenshot untuk hasil piksel penuh. ' +
+  'Mengembalikan blok JSON {docId, slug, rev, id, name, type, bytes, dropped} lalu satu blok markup <svg>…</svg>.';
+
+/** Teks `export_svg`: ringkasan JSON (tanpa markup) lalu satu blok SVG. */
+export type ExportSvgResult = { svg: string } & Record<string, unknown>;
+export function formatExportSvg(data: ExportSvgResult): CallToolResult['content'] {
+  const { svg, ...rest } = data;
+  return [{ type: 'text', text: JSON.stringify(rest) }, { type: 'text', text: svg }];
+}
+
 /** Deskripsi tool `paste` (epic paste-vektor story 3–4, AD-15). */
 export const PASTE_DESCRIPTION =
   'Tempel SVG atau HTML ke board/frame dokumen aktif sebagai layer yang bisa diedit (importer yang sama dengan Ctrl+V di viewer; hasil identik). ' +
@@ -626,6 +641,22 @@ export function createLakarMcpServer(backend: string | LakarTransport): McpServe
       guarded(async () => {
         const body = Object.fromEntries(Object.entries(args).filter(([, v]) => v !== undefined));
         return asResult(await client.call<ExportCodeData>('/viewer/export-code', body), formatExportCode);
+      }),
+  );
+
+  server.registerTool(
+    'export_svg',
+    {
+      annotations: toolAnnotations('export_svg'),
+      description: EXPORT_SVG_DESCRIPTION,
+      inputSchema: z.object({
+        id: z.string().optional().describe('ID board/node vektor; kosongkan untuk board pertama; isi instance lewat <instanceId>/<idNodeMaster>'),
+      }).strict(),
+    },
+    (args) =>
+      guarded(async () => {
+        const body = Object.fromEntries(Object.entries(args).filter(([, v]) => v !== undefined));
+        return asResult(await client.call<ExportSvgResult>('/viewer/export-svg', body), formatExportSvg);
       }),
   );
 

@@ -62,6 +62,7 @@ export const TOOL_ROUTES: Readonly<Record<string, string>> = {
   '/viewer/selection': 'get_selection',
   '/viewer/selection/set': 'set_selection',
   '/viewer/export-code': 'export_code',
+  '/viewer/export-svg': 'export_svg',
   '/viewer/paste': 'paste',
   '/viewer/import-url': 'import_url',
   '/viewer/documents': 'list_documents',
@@ -389,6 +390,7 @@ function targetOf(tool: string, body: Record<string, unknown> | undefined): stri
       return str(body.boardId) ?? str(body.nodeId);
     case 'export':
     case 'export_code':
+    case 'export_svg':
       return str(body.id);
     case 'paste':
       return str(body.parentId);

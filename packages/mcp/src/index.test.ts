@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { Client, InMemoryTransport } from '@modelcontextprotocol/client';
 import { StdioClientTransport } from '@modelcontextprotocol/client/stdio';
 import { LAKAR_VERSION, SCHEMA_VERSION } from '@lakar/schema';
-import { EXECUTE_LANDING_REMINDER_FROM, EXPORT_CODE_DESCRIPTION, GET_SELECTION_DESCRIPTION, IMPORT_URL_DESCRIPTION, LIST_DOCUMENTS_DESCRIPTION, OPEN_DOC_DESCRIPTION, PACKAGE, PASTE_DESCRIPTION, PHOTO_SEARCH_DESCRIPTION, READ_SKILL_DESCRIPTION, SERVER_INSTRUCTIONS, SET_SELECTION_DESCRIPTION, SERVER_VERSION, createLakarMcpServer, formatFonts, formatStatus } from './index.js';
+import { EXECUTE_LANDING_REMINDER_FROM, EXPORT_CODE_DESCRIPTION, EXPORT_SVG_DESCRIPTION, GET_SELECTION_DESCRIPTION, IMPORT_URL_DESCRIPTION, LIST_DOCUMENTS_DESCRIPTION, OPEN_DOC_DESCRIPTION, PACKAGE, PASTE_DESCRIPTION, PHOTO_SEARCH_DESCRIPTION, READ_SKILL_DESCRIPTION, SERVER_INSTRUCTIONS, SET_SELECTION_DESCRIPTION, SERVER_VERSION, createLakarMcpServer, formatFonts, formatStatus } from './index.js';
 import { readFile } from 'node:fs/promises';
 import { chromiumInstalled, DEFAULT_BROWSERS_PATH } from '../../../tests/support/browser.ts';
 import { testLog } from '../../../tests/support/log.ts';
@@ -223,6 +223,12 @@ function fakeDaemon() {
       ];
       return send(200, { ok: true, data: { docId: 'Dddddddd', slug: 'a', rev: 3, id: body.id ?? 'Bbbbbbbb', name: 'Home', target: body.target ?? 'react-tailwind', files, warnings: [] } });
     }
+    if (req.url === '/viewer/export-svg') {
+      if (body.id === 'Zzzzzzzz') return send(404, { ok: false, error: { code: 'NOT_FOUND', message: 'node Zzzzzzzz tidak ada di dokumen a', hint: 'pakai ID', retryable: false } });
+      if (body.id === 'Tttttttt') return send(500, { ok: false, error: { code: 'EXPORT_FAILED', message: 'node text tidak bisa diekspor sebagai SVG', hint: 'pakai export/screenshot', retryable: false } });
+      const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path d="M0 0h24v24z" fill="#000"/></svg>';
+      return send(200, { ok: true, data: { docId: 'Dddddddd', slug: 'a', rev: 3, id: body.id ?? 'Bbbbbbbb', name: 'Home', type: 'frame', bytes: svg.length, dropped: ['Nnnnnnnn.fills[0]'], svg } });
+    }
     if (req.url === '/viewer/paste') {
       if (body.parentId === 'Zzzzzzzz') return send(404, { ok: false, error: { code: 'NOT_FOUND', message: 'paste: node Zzzzzzzz tidak ada di dokumen a', hint: 'pakai ID', retryable: false } });
       return send(200, { ok: true, data: { docId: 'Dddddddd', slug: 'a', rev: 5, created: [{ id: 'Pppppppp', name: 'SVG', path: ['Home', 'SVG'] }], nodeId: 'Pppppppp', boards: ['Bbbbbbbb'], report: { kind: 'svg', paths: 1, kept: [], dropped: [] } } });
@@ -287,7 +293,7 @@ describe('@lakar/mcp', () => {
     const c = await connect(url);
     const { tools } = await c.listTools();
     expect(tools.map((t) => t.name).sort()).toEqual(
-      ['execute', 'export', 'export_code', 'get_selection', 'icon_search', 'import_url', 'inspect', 'layout_check', 'list_boards', 'list_documents', 'list_fonts', 'import_image', 'set_selection', 'open_doc', 'paste', 'photo_search', 'read_skill', 'redo', 'screenshot', 'status', 'undo', 'visual_diff', 'fix_check', 'list_pages', 'get_current_page', 'switch_page', 'create_page', 'get_page_tree', 'list_comments', 'add_comment', 'reply_to_comment', 'resolve_comment', 'delete_comment', 'fix_comment', 'analyze_colors', 'analyze_typography', 'analyze_clusters'].sort(),
+      ['execute', 'export', 'export_code', 'export_svg', 'get_selection', 'icon_search', 'import_url', 'inspect', 'layout_check', 'list_boards', 'list_documents', 'list_fonts', 'import_image', 'set_selection', 'open_doc', 'paste', 'photo_search', 'read_skill', 'redo', 'screenshot', 'status', 'undo', 'visual_diff', 'fix_check', 'list_pages', 'get_current_page', 'switch_page', 'create_page', 'get_page_tree', 'list_comments', 'add_comment', 'reply_to_comment', 'resolve_comment', 'delete_comment', 'fix_comment', 'analyze_colors', 'analyze_typography', 'analyze_clusters'].sort(),
     );
     expect(SERVER_VERSION).toBe(LAKAR_VERSION);
     expect(c.getServerVersion()?.version).toBe(LAKAR_VERSION);
@@ -491,6 +497,27 @@ describe('@lakar/mcp', () => {
     expect(JSON.parse(dc[0]!.text)).toEqual({ docId: 'Dddddddd', slug: 'a', rev: 3, id: null, name: null, target: 'dtcg', files: [{ path: 'tokens.json', bytes: 18 }], warnings: [] });
     expect(dc[1]!.text).toContain('----- tokens.json -----');
     expect(fake.seen.filter((s) => s.path === '/viewer/export-code').at(-1)!.body).toEqual({ target: 'dtcg' });
+  });
+
+  it('export_svg → POST /viewer/export-svg dalam sesi; id diteruskan; ringkasan JSON + satu blok SVG; error terformat', async () => {
+    fake.seen.length = 0;
+    const c = await connect(url);
+    const r = await c.callTool({ name: 'export_svg', arguments: { id: 'Ffffffff' } });
+    expect(r.isError).toBeFalsy();
+    const content = r.content as { type: string; text: string }[];
+    expect(content).toHaveLength(2);
+    expect(JSON.parse(content[0]!.text)).toEqual({ docId: 'Dddddddd', slug: 'a', rev: 3, id: 'Ffffffff', name: 'Home', type: 'frame', bytes: expect.any(Number), dropped: ['Nnnnnnnn.fills[0]'] });
+    expect(content[1]!.text).toMatch(/^<svg xmlns="http:\/\/www\.w3\.org\/2000\/svg"/);
+    const call = fake.seen.find((s) => s.path === '/viewer/export-svg')!;
+    expect(call.body).toEqual({ id: 'Ffffffff' });
+    expect(call.session).toMatch(/^s\d+$/);
+    const bad = await c.callTool({ name: 'export_svg', arguments: { id: 'Zzzzzzzz' } });
+    expect(bad.isError).toBe(true);
+    expect((bad.content as any[])[0].text).toContain('NOT_FOUND: node Zzzzzzzz tidak ada');
+    const raster = await c.callTool({ name: 'export_svg', arguments: { id: 'Tttttttt' } });
+    expect(raster.isError).toBe(true);
+    expect((raster.content as any[])[0].text).toContain('EXPORT_FAILED');
+    expect(EXPORT_SVG_DESCRIPTION).toContain('dropped');
   });
 
   it('paste → POST /viewer/paste dalam sesi; argumen diteruskan; teks JSON; error terformat', async () => {
@@ -939,7 +966,7 @@ describe('@lakar/mcp', () => {
       const r = await c2.callTool({ name: 'execute', arguments: { code: '1' } });
       expect(r.isError).toBe(true);
       expect((r.content as any)[0].text).toContain('http://127.0.0.1:1');
-      expect((await c2.listTools()).tools).toHaveLength(37);
+      expect((await c2.listTools()).tools).toHaveLength(38);
     } finally {
       await c2.close();
       await deadTransport.close();

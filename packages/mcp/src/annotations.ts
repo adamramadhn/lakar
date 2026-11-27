@@ -33,6 +33,7 @@ export const TOOL_EFFECTS = {
   import_image: 'write',
   // Isi berkas dikembalikan di respons; tidak ada yang ditulis ke disk.
   export_code: 'read',
+  export_svg: 'read',
   visual_diff: 'read',
   // Mengganti dokumen aktif sesi atau membuat dokumen baru.
   open_doc: 'write',

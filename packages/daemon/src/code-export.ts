@@ -5,7 +5,8 @@
 import type { FastifyInstance } from 'fastify';
 import { dtcgTokensJson, generateCode, iconRefs, type CodegenOptions } from '@lakar/codegen';
 import type { IconCatalogPort } from '@lakar/ports';
-import { ICON_LIBS, LakarError, SESSION_HEADER, type IconGlyph, type IconLib, type LakarDocument } from '@lakar/schema';
+import { vectorToSvg } from '@lakar/render';
+import { ICON_LIBS, LakarError, SESSION_HEADER, resolveDocument, type IconGlyph, type IconLib, type LakarDocument } from '@lakar/schema';
 import { z } from 'zod';
 import { notFound } from './errors.js';
 import { locateNode } from './inspect.js';
@@ -26,6 +27,52 @@ export const EXPORT_CODE_HINT =
   "kirim {id?, target?, components?, tokens?, typescript?}: id board/node (default board pertama), target 'react-tailwind' (default), 'react-css', atau 'dtcg' (seluruh token dokumen sebagai tokens.json W3C DTCG), components/tokens/typescript boolean (default true)";
 
 export type CodeExportOptions = Omit<CodegenOptions, 'icons' | 'assetBase' | 'componentName'>;
+
+export const ExportSvgBody = z.object({ id: z.string().min(1).optional() }).strict();
+export const EXPORT_SVG_HINT = "kirim {id?}: id board/node vektor (default board pertama); yang bisa diekspor: path, frame, board — layer lain dilaporkan di dropped; pakai export/screenshot untuk PNG";
+
+export type ExportSvgData = {
+  docId: string;
+  slug: string;
+  rev: number;
+  id: string;
+  name: string;
+  type: string;
+  bytes: number;
+  dropped: string[];
+  svg: string;
+};
+
+/**
+ * Node board/frame/path → dokumen SVG mandiri (`vectorToSvg` AD-14, emitter yang sama dengan Export file viewer).
+ * Node dicari di dokumen ter-resolve (alamat komposit isi instance `I/…` dikenali). Node lain (text/rect/ellipse/
+ * icon) di dalam target tetap diekspor setia bila vektornya punya padanan; yang tidak → `dropped` ("<nodeId>.<prop>").
+ */
+export function exportSvgNode(stored: LakarDocument, slug: string, id: string | undefined): ExportSvgData {
+  const target = id ?? stored.pages[0]?.children[0]?.id;
+  if (!target) throw notFound(`dokumen ${slug} belum punya board`, 'buat board dulu lewat execute');
+  const doc = resolveDocument(stored);
+  const hit = locateNode(doc, target);
+  if (!hit) throw notFound(`node ${target} tidak ada di dokumen ${slug}`, 'pakai ID dari created[] execute atau list_boards');
+  const node = hit.node as { type?: string; name?: string };
+  if (node.type !== 'board' && node.type !== 'frame' && node.type !== 'path') {
+    throw new LakarError('EXPORT_FAILED', `node ${node.type ?? 'ini'} tidak bisa diekspor sebagai SVG`, {
+      hint: 'SVG mendukung path, frame, dan board; pakai export/screenshot untuk PNG pada layer ini',
+    });
+  }
+  const out = vectorToSvg(node as Parameters<typeof vectorToSvg>[0]);
+  return {
+    docId: stored.id,
+    slug,
+    rev: stored.rev,
+    id: target,
+    name: node.name ?? target,
+    type: node.type,
+    bytes: Buffer.byteLength(out.svg, 'utf8'),
+    dropped: out.dropped.map((d) => `${d.nodeId}.${d.prop}`),
+    svg: out.svg,
+  };
+}
 
 /**
  * Glyph untuk ekspor `opts`: ikon yang diminta ekspor (termasuk varian enum dan isi instance, `iconRefs`) yang dikenal
@@ -88,5 +135,20 @@ export function registerCodeExportRoutes(app: FastifyInstance, { docs, sessions,
       ok: true,
       data: { docId: stored.id, slug, rev: stored.rev, id, name: hit?.node.name ?? id, target, files, warnings: result.warnings },
     });
+  });
+
+  // Tool MCP `export_svg`: SVG vektor node sebagai teks respons (bukan berkas di disk seperti /export-file).
+  app.post('/viewer/export-svg', async (req, reply) => {
+    const session = sessions.require(req.headers[SESSION_HEADER]);
+    if (!session.activeSlug) {
+      throw new LakarError('NO_ACTIVE_DOC', 'sesi ini belum punya dokumen aktif', { hint: NO_ACTIVE_DOC_HINT });
+    }
+    const slug = session.activeSlug;
+    const parsed = ExportSvgBody.safeParse(req.body ?? {});
+    if (!parsed.success) {
+      throw new LakarError('SCHEMA_INVALID', parsed.error.issues.map((i) => `${i.path.join('.') || 'body'}: ${i.message}`).join('; '), { hint: EXPORT_SVG_HINT });
+    }
+    const stored = (docs.get(slug) ?? rooms?.doc(slug))!;
+    return reply.code(200).send({ ok: true, data: exportSvgNode(stored, slug, parsed.data.id) });
   });
 }
