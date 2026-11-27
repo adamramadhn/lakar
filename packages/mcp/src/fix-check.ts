@@ -65,7 +65,7 @@ export function registerFixCheckTool(server: McpServer, client: LakarTransport):
           .describe('hanya aturan ini, mis. ["LC-30","LC-12"]; kosongkan untuk semua'),
         suggestions: z.boolean().optional().describe('true = juga terapkan saran pertama temuan tanpa fix aman (default false)'),
         dryRun: z.boolean().optional().describe('true = hitung dan check tanpa commit (default false)'),
-      }),
+      }).strict(),
     },
     async (args) => {
       try {
