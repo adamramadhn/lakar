@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { LakarError, XY_HINT, type LakarDocument } from '@lakar/schema';
+import { CONSTRAINTS_HINT, LakarError, XY_HINT, type LakarDocument } from '@lakar/schema';
 import { beginTransaction, createDocument, parseDocument, transact, type Transaction } from './index.js';
 
 const fixedNow = () => new Date('2026-11-17T00:00:00.000Z');
@@ -186,6 +186,48 @@ describe('update', () => {
     tx2.update(home, { section: null });
     const r2 = tx2.commit('unsection');
     expect((find(r2.doc, home) as { section?: string }).section).toBeUndefined();
+  });
+
+  it('constraints (v14): resize parent menyesuaikan anak absolute per sumbu; anak tanpa constraints diam', () => {
+    const { doc, home } = fixture();
+    const tx = beginTransaction(doc, { sessionId: 's' });
+    const kanvas = tx.add(home, { type: 'frame', name: 'Kanvas', layout: 'none', width: 200, height: 100 });
+    const end = tx.add(kanvas, { type: 'rect', name: 'End', x: 150, y: 80, width: 20, height: 10, constraints: { h: 'end', v: 'end' } });
+    const center = tx.add(kanvas, { type: 'rect', name: 'Center', x: 90, y: 40, width: 20, height: 10, constraints: { h: 'center' } });
+    const stretch = tx.add(kanvas, { type: 'rect', name: 'Stretch', x: 0, y: 0, width: 200, height: 20, constraints: { h: 'stretch', v: 'start' } });
+    const scale = tx.add(kanvas, { type: 'rect', name: 'Scale', x: 50, y: 25, width: 40, height: 10, constraints: { h: 'scale', v: 'scale' } });
+    const bebas = tx.add(kanvas, { type: 'rect', name: 'Bebas', x: 10, y: 10, width: 5, height: 5 });
+    tx.update(kanvas, { width: 300, height: 200 });
+    const d = tx.commit('resize').doc;
+    expect(parseDocument(d)).toEqual(d);
+    expect(find(d, end)).toMatchObject({ x: 250, y: 180, width: 20, height: 10 });
+    expect(find(d, center)).toMatchObject({ x: 140, y: 40 });
+    expect(find(d, stretch)).toMatchObject({ x: 0, y: 0, width: 300, height: 20 });
+    expect(find(d, scale)).toMatchObject({ x: 75, y: 50, width: 60, height: 20 });
+    expect(find(d, bebas)).toMatchObject({ x: 10, y: 10, width: 5, height: 5 });
+  });
+
+  it('constraints merambat rekursif saat anak stretch/scale ikut berubah ukuran', () => {
+    const { doc, home } = fixture();
+    const tx = beginTransaction(doc, { sessionId: 's' });
+    const luar = tx.add(home, { type: 'frame', name: 'Luar', layout: 'none', width: 100, height: 100 });
+    const dalam = tx.add(luar, { type: 'frame', name: 'Dalam', layout: 'none', x: 0, y: 0, width: 50, height: 50, constraints: { h: 'stretch', v: 'stretch' } });
+    const cucu = tx.add(dalam, { type: 'rect', name: 'Cucu', x: 40, y: 10, width: 10, height: 10, constraints: { h: 'end' } });
+    tx.update(luar, { width: 200 });
+    const d = tx.commit('resize').doc;
+    expect(find(d, dalam)).toMatchObject({ width: 150, height: 50 });
+    expect(find(d, cucu)).toMatchObject({ x: 140, y: 10 });
+  });
+
+  it('constraints pada node flow → SCHEMA_INVALID + CONSTRAINTS_HINT', () => {
+    const { doc, isi, judul } = fixture();
+    expect(code(() => beginTransaction(doc, { sessionId: 's' }).update(judul, { constraints: { h: 'end' } }))).toBe('SCHEMA_INVALID');
+    const e = caught(() => beginTransaction(doc, { sessionId: 's' }).add(isi, { type: 'rect', name: 'R', width: 10, height: 10, constraints: { v: 'end' } }));
+    expect(e.code).toBe('SCHEMA_INVALID');
+    expect(e.hint).toBe(CONSTRAINTS_HINT);
+    const tx = beginTransaction(doc, { sessionId: 's' });
+    tx.update(judul, { position: 'absolute', x: 0, y: 0, constraints: { h: 'center' } });
+    expect(find(tx.commit('c').doc, judul)).toMatchObject({ position: 'absolute', constraints: { h: 'center' } });
   });
 });
 

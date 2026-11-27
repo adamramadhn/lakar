@@ -1,0 +1,152 @@
+{
+  "schemaVersion": 14,
+  "id": "CorpV14C",
+  "rev": 1,
+  "pages": [
+    {
+      "id": "PageCn14",
+      "name": "Page 1",
+      "children": [
+        {
+          "type": "board",
+          "id": "BrdCon01",
+          "name": "Constraints",
+          "x": 0,
+          "y": 0,
+          "width": 390,
+          "height": 400,
+          "screen": "mobile",
+          "fills": [
+            {
+              "type": "solid",
+              "color": "#FFFFFF"
+            }
+          ],
+          "children": [
+            {
+              "type": "frame",
+              "id": "FrmCon01",
+              "name": "Kanvas",
+              "layout": "none",
+              "width": 340,
+              "height": 300,
+              "fills": [
+                {
+                  "type": "solid",
+                  "color": "#F2F4F7"
+                }
+              ],
+              "children": [
+                {
+                  "type": "rect",
+                  "id": "RctCon01",
+                  "name": "Start",
+                  "position": "absolute",
+                  "x": 16,
+                  "y": 16,
+                  "width": 64,
+                  "height": 32,
+                  "radius": 4,
+                  "fills": [
+                    {
+                      "type": "solid",
+                      "color": "#1570EF"
+                    }
+                  ],
+                  "constraints": {
+                    "h": "start",
+                    "v": "start"
+                  }
+                },
+                {
+                  "type": "rect",
+                  "id": "RctCon02",
+                  "name": "End",
+                  "position": "absolute",
+                  "x": 260,
+                  "y": 252,
+                  "width": 64,
+                  "height": 32,
+                  "radius": 4,
+                  "fills": [
+                    {
+                      "type": "solid",
+                      "color": "#12B76A"
+                    }
+                  ],
+                  "constraints": {
+                    "h": "end",
+                    "v": "end"
+                  }
+                },
+                {
+                  "type": "rect",
+                  "id": "RctCon03",
+                  "name": "Center",
+                  "position": "absolute",
+                  "x": 138,
+                  "y": 134,
+                  "width": 64,
+                  "height": 32,
+                  "radius": 4,
+                  "fills": [
+                    {
+                      "type": "solid",
+                      "color": "#F79009"
+                    }
+                  ],
+                  "constraints": {
+                    "h": "center",
+                    "v": "center"
+                  }
+                },
+                {
+                  "type": "rect",
+                  "id": "RctCon04",
+                  "name": "Stretch",
+                  "position": "absolute",
+                  "x": 16,
+                  "y": 64,
+                  "width": 308,
+                  "height": 24,
+                  "radius": 4,
+                  "fills": [
+                    {
+                      "type": "solid",
+                      "color": "#7A5AF8"
+                    }
+                  ],
+                  "constraints": {
+                    "h": "stretch",
+                    "v": "start"
+                  }
+                },
+                {
+                  "type": "rect",
+                  "id": "RctCon05",
+                  "name": "Scale",
+                  "position": "absolute",
+                  "x": 85,
+                  "y": 200,
+                  "width": 170,
+                  "height": 40,
+                  "radius": 4,
+                  "fills": [
+                    {
+                      "type": "solid",
+                      "color": "#EE46BC"
+                    }
+                  ],
+                  "constraints": {
+                    "h": "scale",
+                    "v": "scale"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

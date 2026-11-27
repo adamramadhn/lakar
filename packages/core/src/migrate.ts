@@ -38,6 +38,8 @@ export type MigrationRegistry = Readonly<Record<number, Migration>>;
  *   valid apa adanya, jadi langkahnya identitas yang menaikkan versi.
  * - 12 → 13 (spec-prototype-mode): v13 hanya menambah `interactions` opsional pada node anak/board dan `flows`
  *   opsional di root dokumen; dokumen v12 valid apa adanya, jadi langkahnya identitas yang menaikkan versi.
+ * - 13 → 14 (spec-resize-constraints): v14 hanya menambah `constraints` opsional pada node anak `position:'absolute'`;
+ *   dokumen v13 valid apa adanya, jadi langkahnya identitas yang menaikkan versi.
  */
 export const MIGRATIONS: MigrationRegistry = Object.freeze({
   1: (d: RawDocument): RawDocument => ({ ...d, schemaVersion: 2 }),
@@ -59,6 +61,8 @@ export const MIGRATIONS: MigrationRegistry = Object.freeze({
   11: (d: RawDocument): RawDocument => ({ ...d, schemaVersion: 12 }),
   // 12 → 13 (spec-prototype-mode): v13 hanya menambah `interactions?`/`flows?`; dokumen v12 valid apa adanya.
   12: (d: RawDocument): RawDocument => ({ ...d, schemaVersion: 13 }),
+  // 13 → 14 (spec-resize-constraints): v14 hanya menambah `constraints?` pada anak absolute; dokumen v13 valid apa adanya.
+  13: (d: RawDocument): RawDocument => ({ ...d, schemaVersion: 14 }),
 });
 
 export type MigrateOptions = { migrations?: MigrationRegistry; target?: number };
