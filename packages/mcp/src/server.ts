@@ -565,7 +565,15 @@ export type LakarMcpOptions = {
  * (mis. `FileClient` dari `lakar --file`). Daftar tool dan routing route tidak berubah.
  */
 export function createLakarMcpServer(backend: string | LakarTransport, opts: LakarMcpOptions = {}): McpServer {
-  const server = new McpServer({ name: SERVER_NAME, version: SERVER_VERSION }, { instructions: SERVER_INSTRUCTIONS });
+  const server = new McpServer(
+    { name: SERVER_NAME, version: SERVER_VERSION },
+    {
+      instructions: SERVER_INSTRUCTIONS,
+      // capabilities.experimental: namespace vendor untuk discovery — harness bisa membaca schemaVersion dokumen
+      // dan mode tool ('all'|'readonly') dari hasil initialize tanpa menebak dari serverInfo.
+      capabilities: { experimental: { lakar: { schemaVersion: SCHEMA_VERSION, tools: opts.tools ?? 'all' } } },
+    },
+  );
   if (opts.tools === 'readonly') {
     // Saring di satu titik: tool tanpa entri 'read' di TOOL_EFFECTS (termasuk tool baru yang belum dipetakan)
     // tidak terdaftar → panggilan mendapat error MCP standar "tool not found".

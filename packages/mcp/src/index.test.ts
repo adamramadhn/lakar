@@ -315,6 +315,15 @@ describe('@lakar/mcp', () => {
     await c.close();
   });
 
+  it('capabilities.experimental.lakar: schemaVersion + mode tool terumumkan ke klien saat initialize', async () => {
+    const c = await connect(url);
+    expect(c.getServerCapabilities()?.experimental?.['lakar']).toMatchObject({ schemaVersion: SCHEMA_VERSION, tools: 'all' });
+    await c.close();
+    const ro = await connect(url, { tools: 'readonly' });
+    expect(ro.getServerCapabilities()?.experimental?.['lakar']).toMatchObject({ schemaVersion: SCHEMA_VERSION, tools: 'readonly' });
+    await ro.close();
+  });
+
   it('open_doc {slug?, name?}: tanpa argumen → body {} (dokumen viewer); name/slug diteruskan; list_documents → POST /viewer/documents', async () => {
     fake.seen.length = 0;
     const c = await connect(url);
