@@ -24,6 +24,8 @@ export const TOOL_EFFECTS = {
   screenshot: 'read',
   layout_check: 'read',
   get_selection: 'read',
+  // Hanya mengubah seleksi canvas (state memori; dokumen tidak disentuh). Pengguna bisa menimpanya.
+  set_selection: 'write',
   icon_search: 'read',
   // Hanya mencari ke penyedia foto; impor terjadi saat foto dipakai lewat execute.
   photo_search: 'read',

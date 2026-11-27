@@ -124,6 +124,15 @@ const PutBody = z
 const PUT_HINT = `kirim {addresses:[id, …]} (0–${SELECTION_MAX} alamat; [] mengosongkan seleksi)`;
 const ReadBody = z.object({ slug: z.string().optional() }).strict().optional();
 const READ_HINT = 'kirim {slug?} (kosong = dokumen aktif sesi, dokumen yang terbuka di viewer, atau dokumen dengan seleksi terakhir)';
+const SetBody = z
+  .object({
+    addresses: z
+      .array(z.string().regex(NODE_ADDRESS_PATTERN, 'alamat node harus ID 8 karakter [A-Za-z0-9] atau alamat komposit id/id'))
+      .max(SELECTION_MAX, `maks ${SELECTION_MAX} alamat`),
+    slug: z.string().optional(),
+  })
+  .strict();
+const SET_HINT = `kirim {addresses:[id, …], slug?} (0–${SELECTION_MAX} alamat; [] mengosongkan; slug default dokumen aktif sesi)`;
 
 export type SelectionRoutesOptions = {
   docs: Map<string, LakarDocument>;
@@ -226,5 +235,34 @@ export function registerSelectionRoutes(app: FastifyInstance, { docs, store, ses
         ...(e ? { updatedAt: e.updatedAt } : {}),
       },
     });
+  });
+
+  // Tool MCP set_selection (sesi, spec-mcp-set-selection): agen mengatur seleksi canvas — pengguna melihat
+  // node yang baru dibuat/diubah langsung tersorot di viewer. Alamat divalidasi pada dokumen ter-resolve
+  // (alamat komposit isi instance bisa dipilih). Seleksi tak ber-origin: jendela pengguna boleh menyapunya.
+  app.post('/viewer/selection/set', async (req, reply) => {
+    const session = sessions.require(req.headers[SESSION_HEADER]);
+    const parsed = SetBody.safeParse(req.body);
+    if (!parsed.success) throw new LakarError('SCHEMA_INVALID', zodMessage(parsed.error), { hint: SET_HINT });
+    const slug = parsed.data.slug ?? session.activeSlug ?? focus?.current();
+    if (!slug) {
+      throw new LakarError('NO_ACTIVE_DOC', 'sesi ini belum punya dokumen aktif dan tidak ada dokumen terbuka di viewer', {
+        hint: 'open_doc {slug} dulu, atau kirim slug eksplisit',
+      });
+    }
+    checkSlug(slug);
+    const stored = await loadDoc(slug);
+    // Alamat divalidasi pada dokumen ter-resolve supaya alamat komposit isi instance ikut dikenali.
+    const resolved = resolveDocument(stored);
+    const missing = parsed.data.addresses.filter((a) => !locateNode(resolved, a));
+    if (missing.length) {
+      throw new LakarError('NOT_FOUND', `alamat tidak ada di dokumen ${slug}: ${missing.join(', ')}`, {
+        hint: 'pakai id dari created[] execute / list_boards / inspect; isi instance lewat alamat <instanceId>/<idNodeMaster>',
+      });
+    }
+    const origin = originOf(req.headers);
+    const { entry, changed } = selections.set(slug, parsed.data.addresses, origin);
+    if (changed) activity?.selection({ slug, addresses: entry.addresses, rev: stored.rev, ...(origin ? { origin } : {}) });
+    return reply.code(200).send({ ok: true, data: { slug, rev: stored.rev, addresses: entry.addresses, changed } });
   });
 }

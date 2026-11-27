@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { Client, InMemoryTransport } from '@modelcontextprotocol/client';
 import { StdioClientTransport } from '@modelcontextprotocol/client/stdio';
 import { LAKAR_VERSION, SCHEMA_VERSION } from '@lakar/schema';
-import { EXECUTE_LANDING_REMINDER_FROM, EXPORT_CODE_DESCRIPTION, GET_SELECTION_DESCRIPTION, IMPORT_URL_DESCRIPTION, LIST_DOCUMENTS_DESCRIPTION, OPEN_DOC_DESCRIPTION, PACKAGE, PASTE_DESCRIPTION, PHOTO_SEARCH_DESCRIPTION, READ_SKILL_DESCRIPTION, SERVER_INSTRUCTIONS, SERVER_VERSION, createLakarMcpServer, formatFonts, formatStatus } from './index.js';
+import { EXECUTE_LANDING_REMINDER_FROM, EXPORT_CODE_DESCRIPTION, GET_SELECTION_DESCRIPTION, IMPORT_URL_DESCRIPTION, LIST_DOCUMENTS_DESCRIPTION, OPEN_DOC_DESCRIPTION, PACKAGE, PASTE_DESCRIPTION, PHOTO_SEARCH_DESCRIPTION, READ_SKILL_DESCRIPTION, SERVER_INSTRUCTIONS, SET_SELECTION_DESCRIPTION, SERVER_VERSION, createLakarMcpServer, formatFonts, formatStatus } from './index.js';
 import { readFile } from 'node:fs/promises';
 import { chromiumInstalled, DEFAULT_BROWSERS_PATH } from '../../../tests/support/browser.ts';
 import { testLog } from '../../../tests/support/log.ts';
@@ -205,6 +205,12 @@ function fakeDaemon() {
         data: { slug: body.slug ?? 'landing-kopi', rev: 4, addresses: ['Ffffffff'], nodes: [{ address: 'Ffffffff', id: 'Ffffffff', type: 'frame', name: 'Hero', boardId: 'Bbbbbbbb', bounds: [0, 0, 390, 200] }] },
       });
     }
+    if (req.url === '/viewer/selection/set') {
+      if (body.slug === 'hilang' || (body.addresses ?? []).includes('Xxxxxxxx')) {
+        return send(404, { ok: false, error: { code: 'NOT_FOUND', message: 'alamat tidak ada di dokumen', hint: 'pakai id dari created[] execute', retryable: false } });
+      }
+      return send(200, { ok: true, data: { slug: body.slug ?? 'landing-kopi', rev: 4, addresses: body.addresses ?? [], changed: true } });
+    }
     if (req.url === '/viewer/export-code') {
       if (body.id === 'Zzzzzzzz') return send(404, { ok: false, error: { code: 'NOT_FOUND', message: 'node Zzzzzzzz tidak ada di dokumen a', hint: 'pakai ID', retryable: false } });
       if (body.target === 'dtcg') {
@@ -281,7 +287,7 @@ describe('@lakar/mcp', () => {
     const c = await connect(url);
     const { tools } = await c.listTools();
     expect(tools.map((t) => t.name).sort()).toEqual(
-      ['execute', 'export', 'export_code', 'get_selection', 'icon_search', 'import_url', 'inspect', 'layout_check', 'list_boards', 'list_documents', 'list_fonts', 'import_image', 'open_doc', 'paste', 'photo_search', 'read_skill', 'redo', 'screenshot', 'status', 'undo', 'visual_diff', 'fix_check', 'list_pages', 'get_current_page', 'switch_page', 'create_page', 'get_page_tree', 'list_comments', 'add_comment', 'reply_to_comment', 'resolve_comment', 'delete_comment', 'fix_comment', 'analyze_colors', 'analyze_typography', 'analyze_clusters'].sort(),
+      ['execute', 'export', 'export_code', 'get_selection', 'icon_search', 'import_url', 'inspect', 'layout_check', 'list_boards', 'list_documents', 'list_fonts', 'import_image', 'set_selection', 'open_doc', 'paste', 'photo_search', 'read_skill', 'redo', 'screenshot', 'status', 'undo', 'visual_diff', 'fix_check', 'list_pages', 'get_current_page', 'switch_page', 'create_page', 'get_page_tree', 'list_comments', 'add_comment', 'reply_to_comment', 'resolve_comment', 'delete_comment', 'fix_comment', 'analyze_colors', 'analyze_typography', 'analyze_clusters'].sort(),
     );
     expect(SERVER_VERSION).toBe(LAKAR_VERSION);
     expect(c.getServerVersion()?.version).toBe(LAKAR_VERSION);
@@ -438,6 +444,24 @@ describe('@lakar/mcp', () => {
     expect(GET_SELECTION_DESCRIPTION).toContain('NO_ACTIVE_DOC');
     expect(GET_SELECTION_DESCRIPTION).toContain('read_skill selection');
     expect(READ_SKILL_DESCRIPTION).toMatch(/selection bila permintaan merujuk node yang dipilih pengguna/);
+  });
+
+  it('set_selection → POST /viewer/selection/set dalam sesi; addresses wajib, slug opsional diteruskan; error terformat', async () => {
+    fake.seen.length = 0;
+    const c = await connect(url);
+    const r = await c.callTool({ name: 'set_selection', arguments: { addresses: ['Ffffffff', 'Bbbbbbbb'] } });
+    expect(r.isError).toBeFalsy();
+    const data = JSON.parse((r.content as any[])[0].text);
+    expect(data).toMatchObject({ slug: 'landing-kopi', rev: 4, addresses: ['Ffffffff', 'Bbbbbbbb'], changed: true });
+    const call = fake.seen.find((s) => s.path === '/viewer/selection/set')!;
+    expect(call.body).toEqual({ addresses: ['Ffffffff', 'Bbbbbbbb'] });
+    expect(call.session).toMatch(/^s\d+$/);
+    const r2 = await c.callTool({ name: 'set_selection', arguments: { addresses: [], slug: 'lain' } });
+    expect(JSON.parse((r2.content as any[])[0].text).slug).toBe('lain');
+    const gone = await c.callTool({ name: 'set_selection', arguments: { addresses: ['Xxxxxxxx'] } });
+    expect(gone.isError).toBe(true);
+    expect((gone.content as any[])[0].text).toContain('NOT_FOUND');
+    expect(SET_SELECTION_DESCRIPTION).toContain('instanceId');
   });
 
   it('export_code → POST /viewer/export-code dalam sesi; argumen diteruskan; ringkasan JSON + satu blok per berkas; error terformat', async () => {
@@ -915,7 +939,7 @@ describe('@lakar/mcp', () => {
       const r = await c2.callTool({ name: 'execute', arguments: { code: '1' } });
       expect(r.isError).toBe(true);
       expect((r.content as any)[0].text).toContain('http://127.0.0.1:1');
-      expect((await c2.listTools()).tools).toHaveLength(36);
+      expect((await c2.listTools()).tools).toHaveLength(37);
     } finally {
       await c2.close();
       await deadTransport.close();
