@@ -214,16 +214,17 @@ describe('Lakar Cloud — status', () => {
     expect(cloudCard().querySelector('.cloud-email')).toBeNull();
   });
 
-  it('signed in → avatar inisial + nama + email + host + Sign out', async () => {
+  it('signed in → kartu akun tanpa head "Lakar Cloud"/host: avatar inisial + nama + email + Sign out', async () => {
     daemon();
     cloudStatus(() => ({ signedIn: true, configured: true, host: 'cloud.example', user: CLOUD_USER }));
     renderUi(<Connections />);
     await waitFor(() => expect(cloudCard().querySelector('.cloud-user')).not.toBeNull());
+    expect(cloudCard().querySelector('.cloud-head')).toBeNull();
+    expect(cloudCard().querySelector('.status-pill')).toBeNull();
     expect(cloudCard().querySelector('.cloud-avatar')!.textContent).toBe('AN');
     expect(cloudCard().querySelector('.cloud-user-title')!.textContent).toBe('Adi Nugraha');
     expect(cloudCard().querySelector('.cloud-user-sub')!.textContent).toContain('adi@example.com');
-    expect(cloudCard().querySelector('.conn-daemon-sub')!.textContent).toBe('cloud.example');
-    expect(cloudCard().querySelector('.status-pill')!.textContent).toBe('Signed in');
+    expect(cloudCard().textContent).not.toContain('cloud.example');
     expect(cloudButtons().map((b) => b.textContent)).toContain('Sign out');
   });
 });
@@ -309,7 +310,7 @@ describe('Lakar Cloud — alur', () => {
     signedIn = true;
     stream.event('auth', { auth: { signedIn: true, user: CLOUD_USER } });
     await waitFor(() => expect(cloudCard().querySelector('.cloud-user')).not.toBeNull());
-    expect(cloudCard().querySelector('.status-pill')!.textContent).toBe('Signed in');
+    expect(cloudCard().querySelector('.cloud-head')).toBeNull();
   });
 
   it('signed in → SSE auth{signedIn:false} → status di-fetch ulang → tombol provider lagi', async () => {

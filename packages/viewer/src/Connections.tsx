@@ -231,7 +231,7 @@ function CloudAuthCard() {
           <span className="cloud-user-title">
             <strong>{u.name?.trim() || u.email}</strong>
           </span>
-          <span className="cloud-user-sub">{u.name?.trim() ? u.email : `Signed in${status.host ? ` · ${status.host}` : ''}`}</span>
+          <span className="cloud-user-sub">{u.name?.trim() ? u.email : 'Signed in'}</span>
         </span>
         <button type="button" className="btn small" disabled={busy !== undefined || signingOut} onClick={() => void signOut()}>
           <Icon name="logOut" size={13} />
@@ -239,8 +239,6 @@ function CloudAuthCard() {
         </button>
       </div>
     );
-    pill = <span className="status-pill ok">Signed in</span>;
-    sub = status.host ?? 'connected';
   } else {
     sub = status.host ?? 'configured';
     if (phase === 'waiting') {
@@ -336,18 +334,20 @@ function CloudAuthCard() {
       <h2>Lakar Cloud</h2>
       <p>Sign in to share snapshots and create rooms with your account. Guests never need one.</p>
       <div className="conn-card conn-cloud">
-        <div className="conn-daemon cloud-head">
-          <span className="conn-daemon-icon">
-            <Icon name="cloud" size={16} />
-          </span>
-          <div className="conn-daemon-text">
-            <div className="conn-daemon-title">
-              <strong>Lakar Cloud</strong>
-              {pill}
+        {!(status?.signedIn && status.user) && (
+          <div className="conn-daemon cloud-head">
+            <span className="conn-daemon-icon">
+              <Icon name="cloud" size={16} />
+            </span>
+            <div className="conn-daemon-text">
+              <div className="conn-daemon-title">
+                <strong>Lakar Cloud</strong>
+                {pill}
+              </div>
+              <span className="conn-daemon-sub mono">{sub}</span>
             </div>
-            <span className="conn-daemon-sub mono">{sub}</span>
           </div>
-        </div>
+        )}
         {body}
         {error && (
           <div className="conn-render error" role="alert">
